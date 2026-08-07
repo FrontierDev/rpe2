@@ -1,0 +1,419 @@
+local _, Addon = ...
+
+Addon.Internal = Addon.Internal or {}
+Addon.Internal.Ruleset = Addon.Internal.Ruleset or {}
+
+local Ruleset = Addon.Internal.Ruleset
+
+local function refreshVisibleProfileWindow()
+    local profileWindow = Addon.Client and Addon.Client.UI and Addon.Client.UI.Profile and Addon.Client.UI.Profile.Window or nil
+    if not (profileWindow and profileWindow.Get) then
+        return false
+    end
+
+    local instance = profileWindow:Get()
+    if instance and instance.RefreshVisible then
+        instance:RefreshVisible()
+        return true
+    end
+
+    return false
+end
+local Rules = Addon.Internal.Ruleset.Rules or {}
+local Database = Addon.Internal.Database or {}
+local RULESET_CATEGORY_DEFINITIONS = Rules.Definitions or {}
+
+local function findCategoryDefinition(categoryKey)
+    for index = 1, #RULESET_CATEGORY_DEFINITIONS do
+        if RULESET_CATEGORY_DEFINITIONS[index].key == categoryKey then
+            return RULESET_CATEGORY_DEFINITIONS[index], index
+        end
+    end
+
+    return RULESET_CATEGORY_DEFINITIONS[1], 1
+end
+
+local function findRuleDefinition(categoryDefinition, ruleKey)
+    local rules = categoryDefinition and categoryDefinition.rules or nil
+    for index = 1, #(rules or {}) do
+        local rule = rules and rules[index]
+        if rule and rule.key == ruleKey then
+            return rule, index
+        end
+    end
+
+    return nil, nil
+end
+
+local function normalizeCheckboxValue(value, defaultValue)
+    if value == nil then
+        return defaultValue == true
+    end
+
+    if value == true or value == false then
+        return value
+    end
+
+    if type(value) == "number" then
+        return value ~= 0
+    end
+
+    if type(value) == "string" then
+        local normalized = string.lower(value:gsub("^%s+", ""):gsub("%s+$", ""))
+        if normalized == "" or normalized == "0" or normalized == "false" or normalized == "off" or normalized == "no" then
+            return false
+        end
+        if normalized == "1" or normalized == "true" or normalized == "on" or normalized == "yes" then
+            return true
+        end
+    end
+
+    return value and true or false
+end
+
+local function buildDatasetEntryReferenceItems(collectionKey, options)
+    local items = {}
+    local settings = type(options) == "table" and options or {}
+    if settings.includeNone == true then
+        items[#items + 1] = {
+            label = settings.noneLabel or "None",
+            value = "",
+        }
+    end
+
+    local datasets = Database and Database.ListDatasets and Database.ListDatasets() or {}
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local datasetId = tostring(dataset and dataset.id or "")
+        local datasetLabel = Database and Database.GetDatasetDisplayName and Database.GetDatasetDisplayName(dataset) or tostring(dataset and dataset.name or datasetId)
+        local entries = dataset and dataset[collectionKey] or {}
+        for entryIndex = 1, #entries do
+            local entry = entries[entryIndex]
+            local entryId = tostring(entry and entry.id or "")
+            if datasetId ~= "" and entryId ~= "" then
+                local entryLabel = tostring(entry and entry.name or entryId)
+                items[#items + 1] = {
+                    label = ("%s / %s"):format(datasetLabel, entryLabel),
+                    value = ("%s:%s"):format(datasetId, entryId),
+                }
+            end
+        end
+    end
+
+    return items
+end
+
+function Ruleset.GetRulesets()
+    return Database.ListRulesets and Database.ListRulesets() or {}
+end
+
+function Ruleset.GetRulesetByID(rulesetId)
+    if not (Database and Database.GetRulesetByID) then
+        return nil
+    end
+
+    return Database.GetRulesetByID(rulesetId)
+end
+
+function Ruleset.GetRulesetDisplayName(ruleset)
+    if Database and Database.GetRulesetDisplayName then
+        return Database.GetRulesetDisplayName(ruleset)
+    end
+
+    local name = ruleset and ruleset.name or nil
+    if name == nil or name == "" then
+        return "Unnamed Ruleset"
+    end
+
+    return tostring(name)
+end
+
+function Ruleset.GetActiveRulesetId()
+    return Database and Database.GetActiveRulesetId and Database.GetActiveRulesetId() or nil
+end
+
+function Ruleset.GetActiveRuleset()
+    return Database and Database.GetActiveRuleset and Database.GetActiveRuleset() or nil
+end
+
+function Ruleset.IsRulesetActive(rulesetId)
+    local activeRulesetId = Ruleset.GetActiveRulesetId()
+    return activeRulesetId ~= nil and activeRulesetId == rulesetId
+end
+
+function Ruleset.SetActiveRulesetId(rulesetId)
+    if not (Database and Database.SetActiveRulesetId) then
+        return nil
+    end
+
+    local activeId = Database.SetActiveRulesetId(rulesetId)
+    refreshVisibleProfileWindow()
+    return activeId
+end
+
+function Ruleset.CreateRuleset(name)
+    if not (Database and Database.CreateRuleset) then
+        return nil
+    end
+
+    return Database.CreateRuleset(name or "New Ruleset")
+end
+
+function Ruleset.DeleteRuleset(rulesetId)
+    if not rulesetId or not (Database and Database.DeleteRuleset) then
+        return false
+    end
+
+    return Database.DeleteRuleset(rulesetId)
+end
+
+function Ruleset.ExportRuleset(rulesetId)
+    if not rulesetId or not (Database and Database.ExportRuleset) then
+        return nil
+    end
+
+    return Database.ExportRuleset(rulesetId)
+end
+
+function Ruleset.ImportRuleset(text)
+    if not (Database and Database.ImportRuleset) then
+        return nil, "Ruleset import is unavailable."
+    end
+
+    return Database.ImportRuleset(text)
+end
+
+function Ruleset.GetRulesetCategoryDefinitions()
+    return RULESET_CATEGORY_DEFINITIONS
+end
+
+function Ruleset.GetRulesetCategoryIndexByKey(categoryKey)
+    local _, index = findCategoryDefinition(categoryKey)
+    return index or 1
+end
+
+function Ruleset.GetRulesetCategoryDefinition(categoryKey)
+    return findCategoryDefinition(categoryKey)
+end
+
+function Ruleset.GetRulesetRuleDefinition(categoryKey, ruleKey)
+    local categoryDefinition = Ruleset.GetRulesetCategoryDefinition(categoryKey)
+    return findRuleDefinition(categoryDefinition, ruleKey)
+end
+
+function Ruleset.GetDefaultRulesetCategoryKey()
+    local categoryDefinition = RULESET_CATEGORY_DEFINITIONS[1]
+    return categoryDefinition and categoryDefinition.key or nil
+end
+
+function Ruleset.GetDefaultRulesetRuleKey(categoryKey)
+    local categoryDefinition = Ruleset.GetRulesetCategoryDefinition(categoryKey)
+    local firstRule = categoryDefinition and categoryDefinition.rules and categoryDefinition.rules[1] or nil
+    return firstRule and firstRule.key or nil
+end
+
+function Ruleset.GetRulesetRuleValue(ruleset, categoryKey, ruleDefinition)
+    if not ruleDefinition then
+        return nil
+    end
+
+    local rules = ruleset and type(ruleset.rules) == "table" and ruleset.rules or nil
+    local categoryRules = rules and type(rules[categoryKey]) == "table" and rules[categoryKey] or nil
+    local value = nil
+    if categoryRules ~= nil then
+        value = categoryRules[ruleDefinition.key]
+    end
+    if value == nil then
+        value = ruleDefinition.default
+    end
+
+    if ruleDefinition.type == "checkbox" then
+        return normalizeCheckboxValue(value, ruleDefinition.default)
+    end
+
+    return value
+end
+
+function Ruleset.GetRulesetRuleValueByKey(ruleset, categoryKey, ruleKey, defaultValue)
+    local normalizedCategoryKey = tostring(categoryKey or "")
+    local normalizedRuleKey = tostring(ruleKey or "")
+    if normalizedCategoryKey == "" or normalizedRuleKey == "" then
+        return defaultValue
+    end
+
+    local rules = ruleset and type(ruleset.rules) == "table" and ruleset.rules or nil
+    local categoryRules = rules and type(rules[normalizedCategoryKey]) == "table" and rules[normalizedCategoryKey] or nil
+    local ruleDefinition = Ruleset.GetRulesetRuleDefinition(normalizedCategoryKey, normalizedRuleKey)
+    local fallbackValue = defaultValue
+    if fallbackValue == nil and ruleDefinition ~= nil then
+        fallbackValue = ruleDefinition.default
+    end
+
+    local value = categoryRules ~= nil and categoryRules[normalizedRuleKey] or nil
+    if value == nil then
+        value = fallbackValue
+    end
+
+    if (ruleDefinition and ruleDefinition.type == "checkbox") or type(fallbackValue) == "boolean" then
+        return normalizeCheckboxValue(value, fallbackValue)
+    end
+
+    return value
+end
+
+function Ruleset.SetRulesetRuleValue(rulesetId, categoryKey, ruleDefinition, value)
+    local ruleset = Ruleset.GetRulesetByID(rulesetId)
+    if not ruleset or not ruleDefinition then
+        return nil
+    end
+
+    ruleset.rules = type(ruleset.rules) == "table" and ruleset.rules or {}
+    ruleset.rules[categoryKey] = type(ruleset.rules[categoryKey]) == "table" and ruleset.rules[categoryKey] or {}
+    ruleset.rules[categoryKey][ruleDefinition.key] = value
+
+    if Database and Database.UpdateRulesetMetadata then
+        local updated = Database.UpdateRulesetMetadata(ruleset.id, { rules = ruleset.rules })
+        refreshVisibleProfileWindow()
+        return updated
+    end
+
+    refreshVisibleProfileWindow()
+    return ruleset
+end
+
+function Ruleset.BuildRulesetStatReferenceItems()
+    local items = {
+        { label = "None", value = "" },
+    }
+
+    local datasets = Database and Database.ListDatasets and Database.ListDatasets() or {}
+    local dependencies = Database and Database.Dependecies or {}
+
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local stats = dataset and dataset.stats or {}
+        for statIndex = 1, #stats do
+            local stat = stats[statIndex]
+            if stat and stat.id then
+                local value = dependencies.ComposeSourceStatRef and dependencies.ComposeSourceStatRef(dataset.id, stat.id) or ("%s:%s"):format(dataset.id, stat.id)
+                local statLabel = tostring(stat.name or stat.id)
+                local datasetLabel = Database and Database.GetDatasetDisplayName and Database.GetDatasetDisplayName(dataset) or tostring(dataset.name or dataset.id)
+                items[#items + 1] = {
+                    label = ("%s / %s"):format(datasetLabel, statLabel),
+                    value = value,
+                }
+            end
+        end
+    end
+
+    return items
+end
+
+function Ruleset.BuildRulesetResourceReferenceItems()
+    local items = {
+        { label = "None", value = "" },
+    }
+
+    local datasets = Database and Database.ListDatasets and Database.ListDatasets() or {}
+    local dependencies = Database and Database.Dependecies or {}
+
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local resources = dataset and dataset.resources or {}
+        for resourceIndex = 1, #resources do
+            local resource = resources[resourceIndex]
+            if resource and resource.id then
+                local value = dependencies.ComposeSourceStatRef and dependencies.ComposeSourceStatRef(dataset.id, resource.id) or ("%s:%s"):format(dataset.id, resource.id)
+                local resourceLabel = tostring(resource.name or resource.id)
+                local datasetLabel = Database and Database.GetDatasetDisplayName and Database.GetDatasetDisplayName(dataset) or tostring(dataset.name or dataset.id)
+                items[#items + 1] = {
+                    label = ("%s / %s"):format(datasetLabel, resourceLabel),
+                    value = value,
+                }
+            end
+        end
+    end
+
+    return items
+end
+
+function Ruleset.BuildRulesetItemSlotReferenceItems()
+    local items = {
+        { label = "None", value = "" },
+    }
+
+    local datasets = Database and Database.ListDatasets and Database.ListDatasets() or {}
+    local dependencies = Database and Database.Dependecies or {}
+
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local itemSlots = dataset and dataset.itemSlots or {}
+        for itemSlotIndex = 1, #itemSlots do
+            local itemSlot = itemSlots[itemSlotIndex]
+            if itemSlot and itemSlot.id then
+                local value = dependencies.ComposeSourceStatRef and dependencies.ComposeSourceStatRef(dataset.id, itemSlot.id) or ("%s:%s"):format(dataset.id, itemSlot.id)
+                local itemSlotLabel = tostring(itemSlot.name or itemSlot.id)
+                local datasetLabel = Database and Database.GetDatasetDisplayName and Database.GetDatasetDisplayName(dataset) or tostring(dataset.name or dataset.id)
+                items[#items + 1] = {
+                    label = ("%s / %s"):format(datasetLabel, itemSlotLabel),
+                    value = value,
+                }
+            end
+        end
+    end
+
+    return items
+end
+
+function Ruleset.BuildRulesetDatasetIdItems()
+    local items = {}
+    local datasets = Database and Database.ListDatasets and Database.ListDatasets() or {}
+
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local datasetId = tostring(dataset and dataset.id or "")
+        if datasetId ~= "" then
+            items[#items + 1] = {
+                label = Database and Database.GetDatasetDisplayName and Database.GetDatasetDisplayName(dataset) or tostring(dataset and dataset.name or datasetId),
+                value = datasetId,
+            }
+        end
+    end
+
+    return items
+end
+
+function Ruleset.BuildRulesetRaceReferenceItems()
+    return buildDatasetEntryReferenceItems("races")
+end
+
+function Ruleset.BuildRulesetClassReferenceItems()
+    return buildDatasetEntryReferenceItems("classes")
+end
+
+function Ruleset.GetRulesetRuleOptions(ruleDefinition)
+    if not ruleDefinition or ruleDefinition.type ~= "dropdown" then
+        return {}
+    end
+
+    if ruleDefinition.optionsSource == "statReference" then
+        return Ruleset.BuildRulesetStatReferenceItems()
+    end
+    if ruleDefinition.optionsSource == "resourceReference" then
+        return Ruleset.BuildRulesetResourceReferenceItems()
+    end
+    if ruleDefinition.optionsSource == "itemSlotReference" then
+        return Ruleset.BuildRulesetItemSlotReferenceItems()
+    end
+    if ruleDefinition.optionsSource == "datasetId" then
+        return Ruleset.BuildRulesetDatasetIdItems()
+    end
+    if ruleDefinition.optionsSource == "raceReference" then
+        return Ruleset.BuildRulesetRaceReferenceItems()
+    end
+    if ruleDefinition.optionsSource == "classReference" then
+        return Ruleset.BuildRulesetClassReferenceItems()
+    end
+
+    return ruleDefinition.options or {}
+end

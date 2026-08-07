@@ -15,6 +15,25 @@
         "~\\.vscode\\extensions\\ketho.wow-api-0.22.3\\Annotations\\Core"
     ],
     "Lua.diagnostics.globals": [
-        "Add"
+        "Add",
+        "DEFAULT_CHAT_FRAME",
+        "WorldFrame",
+        "UIDropDownMenu_Initialize",
+        "UIDropDownMenu_AddButton",
+        "CloseDropDownMenus",
+        "UIDropDownMenu_SetWidth",
+        "UIDropDownMenu_JustifyText",
+        "UIDropDownMenu_SetSelectedValue",
+        "ToggleDropDownMenu",
+        "UIDropDownMenu_SetText",
+        "UIDropDownMenu_CreateInfo",
+        "UIDropDownMenu_SetButtonWidth",
+        "GetUnitName",
+        "SlashCmdList",
+        "ChatFrame1EditBox",
+        "ChatEdit_SendText",
+        "TooltipDataProcessor",
+        "SetRaidTargetIconTexture",
+        "SOUNDKIT"
     ]
 }

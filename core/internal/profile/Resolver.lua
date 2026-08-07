@@ -1,0 +1,1187 @@
+local _, Addon = ...
+
+Addon.Internal = Addon.Internal or {}
+Addon.Internal.Profile = Addon.Internal.Profile or {}
+Addon.Utils = Addon.Utils or {}
+
+local Profile = Addon.Internal.Profile
+local Resolver = Profile.Resolver or {}
+Profile.Resolver = Resolver
+
+local Common = Addon.Utils.Common or {}
+local Database = Addon.Internal.Database or {}
+local Dependencies = Database.Dependecies or {}
+local Equipment = Profile.Equipment or {}
+local Modifications = Profile.Modifications or {}
+
+local function getRulesetLogic()
+    return Addon.Internal and Addon.Internal.Ruleset or {}
+end
+
+local function ensureString(value)
+    if value == nil then
+        return ""
+    end
+
+    return tostring(value)
+end
+
+local function cloneColor(value)
+    if type(value) ~= "table" then
+        return { r = 1, g = 1, b = 1, a = 1 }
+    end
+
+    return {
+        r = tonumber(value.r) or 1,
+        g = tonumber(value.g) or 1,
+        b = tonumber(value.b) or 1,
+        a = tonumber(value.a) or 1,
+    }
+end
+
+local function collectActivatedStats()
+    local datasets = Addon.Internal.Registry and Addon.Internal.Registry.GetActivatedDatasets and Addon.Internal.Registry:GetActivatedDatasets() or {}
+    local entries = {}
+    local byRef = {}
+
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local stats = dataset and dataset.stats or {}
+        for statIndex = 1, #stats do
+            local stat = stats[statIndex]
+            if stat and stat.id then
+                local ref = Dependencies.ComposeSourceStatRef and Dependencies.ComposeSourceStatRef(dataset.id, stat.id) or nil
+                if ref then
+                    local entry = {
+                        ref = ref,
+                        dataset = dataset,
+                        stat = stat,
+                    }
+                    entries[#entries + 1] = entry
+                    byRef[ref] = entry
+                end
+            end
+        end
+    end
+
+    return entries, byRef
+end
+
+local function collectActivatedResources()
+    local datasets = Addon.Internal.Registry and Addon.Internal.Registry.GetActivatedDatasets and Addon.Internal.Registry:GetActivatedDatasets() or {}
+    local entries = {}
+    local byRef = {}
+
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local resources = dataset and dataset.resources or {}
+        for resourceIndex = 1, #resources do
+            local resource = resources[resourceIndex]
+            if resource and resource.id then
+                local ref = Dependencies.ComposeSourceStatRef and Dependencies.ComposeSourceStatRef(dataset.id, resource.id) or nil
+                if ref then
+                    local entry = {
+                        ref = ref,
+                        dataset = dataset,
+                        resource = resource,
+                    }
+                    entries[#entries + 1] = entry
+                    byRef[ref] = entry
+                end
+            end
+        end
+    end
+
+    return entries, byRef
+end
+
+local function collectActivatedSkills()
+    local datasets = Addon.Internal.Registry and Addon.Internal.Registry.GetActivatedDatasets and Addon.Internal.Registry:GetActivatedDatasets() or {}
+    local entries = {}
+
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local skills = dataset and dataset.skills or {}
+        for skillIndex = 1, #skills do
+            local skill = skills[skillIndex]
+            if skill and skill.id then
+                local ref = Dependencies.ComposeSourceStatRef and Dependencies.ComposeSourceStatRef(dataset.id, skill.id) or nil
+                if ref then
+                    entries[#entries + 1] = {
+                        ref = ref,
+                        dataset = dataset,
+                        skill = skill,
+                    }
+                end
+            end
+        end
+    end
+
+    return entries
+end
+
+local function buildProfileStatBonusMap()
+    local bonuses = {}
+    local profile = Database.GetActiveProfile and Database.GetActiveProfile() or nil
+    local storedBonuses = profile and profile.statBonuses or nil
+
+    for statRef, bonus in pairs(type(storedBonuses) == "table" and storedBonuses or {}) do
+        local normalizedStatRef = ensureString(statRef)
+        if normalizedStatRef ~= "" then
+            bonuses[normalizedStatRef] = tonumber(bonus) or 0
+        end
+    end
+
+    return bonuses
+end
+
+local function buildProfileSkillLevelMap()
+    local levels = {}
+    local profile = Database.GetActiveProfile and Database.GetActiveProfile() or nil
+    local storedLevels = profile and profile.skillLevels or nil
+
+    for skillRef, value in pairs(type(storedLevels) == "table" and storedLevels or {}) do
+        local normalizedSkillRef = ensureString(skillRef)
+        if normalizedSkillRef ~= "" then
+            levels[normalizedSkillRef] = math.max(0, math.floor(tonumber(value) or 0))
+        end
+    end
+
+    return levels
+end
+
+local function getRulesetRuleValue(categoryKey, ruleKey, fallback)
+    local rulesetLogic = getRulesetLogic()
+    local ruleset = rulesetLogic.GetActiveRuleset and rulesetLogic.GetActiveRuleset() or nil
+    local value = nil
+    if rulesetLogic.GetRulesetRuleDefinition and rulesetLogic.GetRulesetRuleValue then
+        local ruleDefinition = rulesetLogic.GetRulesetRuleDefinition(categoryKey, ruleKey)
+        value = rulesetLogic.GetRulesetRuleValue(ruleset, categoryKey, ruleDefinition)
+    end
+    if value == nil then
+        return fallback
+    end
+
+    return value
+end
+
+local function getConditions()
+    return Addon.Client and Addon.Client.Conditions or {}
+end
+
+local function isTraitCategoryAllowed(category)
+    local normalizedCategory = ensureString(category)
+    if normalizedCategory == "class" or normalizedCategory == "class_passives" or normalizedCategory == "class_talents" then
+        return getRulesetRuleValue("traits", "allow_class_traits", true) ~= false
+    end
+    if normalizedCategory == "race" or normalizedCategory == "race_passives" then
+        return getRulesetRuleValue("traits", "allow_race_traits", true) ~= false
+    end
+    if normalizedCategory == "consumable" then
+        return getRulesetRuleValue("consumables", "allow_consumable_traits", true) ~= false
+    end
+
+    return true
+end
+
+local function accumulateTraitStatBonuses(bonuses, payload)
+    for index = 1, #(payload and payload.statBonuses or {}) do
+        local statBonus = payload.statBonuses[index]
+        local statRef = type(statBonus) == "table" and ensureString(statBonus.statRef) or ""
+        if statRef ~= "" then
+            bonuses[statRef] = (bonuses[statRef] or 0) + (tonumber(statBonus.value) or 0)
+        end
+    end
+end
+
+local function evaluateProfileConditions(ownerType, owner, options)
+    local conditions = getConditions()
+    if type(conditions) ~= "table" or type(conditions.EvaluateList) ~= "function" then
+        return true
+    end
+
+    local values = type(options) == "table" and options or {}
+    local context = conditions:BuildContext(ownerType, owner, values)
+    local result = conditions:EvaluateList(type(owner) == "table" and owner.conditions or nil, context)
+    return result.passed == true
+end
+
+local function accumulateTraitSkillBonuses(bonuses, payload)
+    for index = 1, #(payload and payload.skillBonuses or {}) do
+        local skillBonus = payload.skillBonuses[index]
+        local skillRef = type(skillBonus) == "table" and ensureString(skillBonus.skillRef) or ""
+        if skillRef ~= "" then
+            bonuses[skillRef] = (bonuses[skillRef] or 0) + (tonumber(skillBonus.value) or 0)
+        end
+    end
+end
+
+local function buildTraitStatBonusMap()
+    local bonuses = {}
+    local activeTraits = type(Profile.ListActiveTraits) == "function" and Profile.ListActiveTraits() or type(Profile.ListKnownTraits) == "function" and Profile.ListKnownTraits() or {}
+
+    for index = 1, #activeTraits do
+        local row = activeTraits[index]
+        local trait = row and row.trait or nil
+        local category = row and row.category or nil
+        if trait
+            and row.isMissing ~= true
+            and trait.isEnvironmental ~= true
+            and isTraitCategoryAllowed(category)
+            and evaluateProfileConditions("trait", trait, {
+                traitRef = row and row.traitRef,
+            })
+        then
+            accumulateTraitStatBonuses(bonuses, trait)
+        end
+    end
+
+    local equippedItemTraits = type(Profile.ListEquippedItemTraits) == "function" and Profile.ListEquippedItemTraits() or {}
+    for index = 1, #equippedItemTraits do
+        local row = equippedItemTraits[index]
+        if row
+            and row.isMissing ~= true
+            and evaluateProfileConditions("item", row.item, {
+                itemRef = row.itemRef,
+                item = row.item,
+                equipmentScope = row.sourceType == "mount_equipment" and "mount" or nil,
+            })
+            and evaluateProfileConditions("trait", row.payload or row.equipmentTrait, {
+                itemRef = row.itemRef,
+                item = row.item,
+                equipmentScope = row.sourceType == "mount_equipment" and "mount" or nil,
+            })
+        then
+            accumulateTraitStatBonuses(bonuses, row.payload or row.equipmentTrait)
+        end
+    end
+
+    local client = Addon.Client or nil
+    local eventState = type(client) == "table" and type(client.GetEventState) == "function" and client:GetEventState() or nil
+    if type(client) == "table" and type(eventState) == "table" and eventState.active == true and type(client.GetAppliedConsumableTraitsForEvent) == "function" then
+        local appliedConsumables = client:GetAppliedConsumableTraitsForEvent(eventState) or {}
+        for index = 1, #appliedConsumables do
+            local entry = appliedConsumables[index]
+            if isTraitCategoryAllowed("consumable")
+                and evaluateProfileConditions("trait", entry and entry.payload or nil, {
+                    eventState = eventState,
+                    item = entry and entry.item,
+                    itemRef = entry and entry.itemRef,
+                })
+            then
+                accumulateTraitStatBonuses(bonuses, entry and entry.payload or nil)
+            end
+        end
+    end
+
+    return bonuses
+end
+
+local function buildTraitSkillBonusMap()
+    local bonuses = {}
+    local activeTraits = type(Profile.ListActiveTraits) == "function" and Profile.ListActiveTraits() or type(Profile.ListKnownTraits) == "function" and Profile.ListKnownTraits() or {}
+
+    for index = 1, #activeTraits do
+        local row = activeTraits[index]
+        local trait = row and row.trait or nil
+        local category = row and row.category or nil
+        if trait
+            and row.isMissing ~= true
+            and trait.isEnvironmental ~= true
+            and isTraitCategoryAllowed(category)
+            and evaluateProfileConditions("trait", trait, {
+                traitRef = row and row.traitRef,
+            })
+        then
+            accumulateTraitSkillBonuses(bonuses, trait)
+        end
+    end
+
+    local equippedItemTraits = type(Profile.ListEquippedItemTraits) == "function" and Profile.ListEquippedItemTraits() or {}
+    for index = 1, #equippedItemTraits do
+        local row = equippedItemTraits[index]
+        if row
+            and row.isMissing ~= true
+            and evaluateProfileConditions("item", row.item, {
+                itemRef = row.itemRef,
+                item = row.item,
+                equipmentScope = row.sourceType == "mount_equipment" and "mount" or nil,
+            })
+            and evaluateProfileConditions("trait", row.payload or row.equipmentTrait, {
+                itemRef = row.itemRef,
+                item = row.item,
+                equipmentScope = row.sourceType == "mount_equipment" and "mount" or nil,
+            })
+        then
+            accumulateTraitSkillBonuses(bonuses, row.payload or row.equipmentTrait)
+        end
+    end
+
+    local client = Addon.Client or nil
+    local eventState = type(client) == "table" and type(client.GetEventState) == "function" and client:GetEventState() or nil
+    if type(client) == "table" and type(eventState) == "table" and eventState.active == true and type(client.GetAppliedConsumableTraitsForEvent) == "function" then
+        local appliedConsumables = client:GetAppliedConsumableTraitsForEvent(eventState) or {}
+        for index = 1, #appliedConsumables do
+            local entry = appliedConsumables[index]
+            if isTraitCategoryAllowed("consumable")
+                and evaluateProfileConditions("trait", entry and entry.payload or nil, {
+                    eventState = eventState,
+                    item = entry and entry.item,
+                    itemRef = entry and entry.itemRef,
+                })
+            then
+                accumulateTraitSkillBonuses(bonuses, entry and entry.payload or nil)
+            end
+        end
+    end
+
+    return bonuses
+end
+
+local function buildEmptyResolvedComponents()
+    return {
+        definitionBaseValue = 0,
+        raceBaseValue = 0,
+        classBaseValue = 0,
+        profileBonusBaseValue = 0,
+        traitBonusBaseValue = 0,
+        baseValue = 0,
+        derivedContribution = 0,
+        equipmentBonus = 0,
+        auraFlatBonus = 0,
+        auraPercentBonus = 0,
+        value = 0,
+    }
+end
+
+local function clampNumber(value, minimum, maximum)
+    local numericValue = tonumber(value) or 0
+    if minimum ~= nil and numericValue < minimum then
+        numericValue = minimum
+    end
+    if maximum ~= nil and numericValue > maximum then
+        numericValue = maximum
+    end
+    return numericValue
+end
+
+local function getProfileLevel()
+    local profile = Database.GetActiveProfile and Database.GetActiveProfile() or nil
+    return math.max(1, math.floor(tonumber(profile and profile.level) or 1))
+end
+
+local function resolveProfileDefinition(reference, collectionKey)
+    local normalizedRef = ensureString(reference)
+    if normalizedRef == "" then
+        return nil, nil
+    end
+
+    local datasetId, entryId = nil, nil
+    if Dependencies.ParseSourceStatRef then
+        datasetId, entryId = Dependencies.ParseSourceStatRef(normalizedRef)
+    end
+    if not datasetId or not entryId then
+        return nil, nil
+    end
+
+    local dataset = Database.GetDatasetByID and Database.GetDatasetByID(datasetId) or nil
+    if not dataset then
+        return nil, nil
+    end
+
+    for index = 1, #(dataset[collectionKey] or {}) do
+        local entry = dataset[collectionKey][index]
+        if entry and tostring(entry.id or "") == entryId then
+            return dataset, entry
+        end
+    end
+
+    return dataset, nil
+end
+
+local function buildProgressionValueMap(progressions, refKey, level)
+    local values = {}
+
+    for index = 1, #(progressions or {}) do
+        local entry = progressions[index]
+        local reference = type(entry) == "table" and ensureString(entry[refKey]) or ""
+        if reference ~= "" then
+            values[reference] = (values[reference] or 0)
+                + (tonumber(entry.initialValue) or 0)
+                + ((math.max(1, level) - 1) * (tonumber(entry.perLevelValue) or 0))
+        end
+    end
+
+    return values
+end
+
+local function buildProfileProgressionContext()
+    local useRaces = getRulesetRuleValue("character", "use_races", false) == true
+    local useClasses = getRulesetRuleValue("character", "use_classes", false) == true
+    local useFallback = getRulesetRuleValue("resources", "use_base_resource_fallback", true) ~= false
+    local fallbackFraction = clampNumber(getRulesetRuleValue("resources", "base_resource_fallback", 1), 0, 1)
+    local profile = Database.GetActiveProfile and Database.GetActiveProfile() or nil
+    local level = getProfileLevel()
+    local race = nil
+    local class = nil
+
+    if useRaces then
+        _, race = resolveProfileDefinition(profile and profile.raceRef, "races")
+    end
+    if useClasses then
+        _, class = resolveProfileDefinition(profile and profile.classRef, "classes")
+    end
+
+    return {
+        level = level,
+        useFallback = useFallback,
+        fallbackFraction = fallbackFraction,
+        raceStatValues = buildProgressionValueMap(race and race.statProgressions, "statRef", level),
+        classStatValues = buildProgressionValueMap(class and class.statProgressions, "statRef", level),
+        raceResourceValues = buildProgressionValueMap(race and race.resourceProgressions, "resourceRef", level),
+        classResourceValues = buildProgressionValueMap(class and class.resourceProgressions, "resourceRef", level),
+    }
+end
+
+local function shouldIncludeAuraBonuses(options)
+    if type(options) ~= "table" or options.includeAuraBonuses == nil then
+        return true
+    end
+
+    return options.includeAuraBonuses == true
+end
+
+local function resolveLocalAuraContext(options)
+    if not shouldIncludeAuraBonuses(options) then
+        return nil
+    end
+
+    local client = Addon.Client or nil
+    local eventState = type(client) == "table"
+        and ((type(client.GetEventState) == "function" and client:GetEventState()) or client.EventState)
+        or nil
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return nil
+    end
+
+    local localUnit = type(client) == "table" and type(client.ResolveLocalEventUnit) == "function"
+        and client:ResolveLocalEventUnit(eventState)
+        or nil
+    local unitEventId = tonumber(localUnit and localUnit.eventID) or 0
+    if unitEventId <= 0 then
+        return nil
+    end
+
+    local auraManager = type(client) == "table" and client.Spellcasting and client.Spellcasting.AuraManager or nil
+    if type(auraManager) ~= "table" or type(auraManager.BuildStatModifierTotals) ~= "function" then
+        return nil
+    end
+
+    return {
+        auraManager = auraManager,
+        eventState = eventState,
+        unitEventId = unitEventId,
+    }
+end
+
+local function resolveAuraBonusesForStat(auraContext, statRef)
+    if type(auraContext) ~= "table" or type(statRef) ~= "string" or statRef == "" then
+        return 0, 0
+    end
+
+    local ok, flatBonus, percentBonus = pcall(
+        auraContext.auraManager.BuildStatModifierTotals,
+        auraContext.auraManager,
+        auraContext.eventState,
+        auraContext.unitEventId,
+        statRef
+    )
+    if not ok then
+        return 0, 0
+    end
+
+    return tonumber(flatBonus) or 0, tonumber(percentBonus) or 0
+end
+
+local function resolveAuraBonusForSkill(auraContext, skillRef)
+    if type(auraContext) ~= "table" or type(skillRef) ~= "string" or skillRef == "" then
+        return 0
+    end
+
+    if type(auraContext.auraManager.BuildSkillModifierTotal) ~= "function" then
+        return 0
+    end
+
+    local ok, flatBonus = pcall(
+        auraContext.auraManager.BuildSkillModifierTotal,
+        auraContext.auraManager,
+        auraContext.eventState,
+        auraContext.unitEventId,
+        skillRef
+    )
+    if not ok then
+        return 0
+    end
+
+    return tonumber(flatBonus) or 0
+end
+
+local function roundResolvedValue(value)
+    if type(Common.Round) == "function" then
+        return Common.Round(value)
+    end
+
+    return math.floor((tonumber(value) or 0) + 0.5)
+end
+
+local function resolveStatComponents(entry, byRef, cache, activeRefs, profileBonuses, equipmentBonuses, auraContext, progressionContext)
+    if not entry or not entry.ref then
+        return buildEmptyResolvedComponents()
+    end
+
+    if cache[entry.ref] ~= nil then
+        return cache[entry.ref]
+    end
+
+    if activeRefs[entry.ref] then
+        return buildEmptyResolvedComponents()
+    end
+    activeRefs[entry.ref] = true
+
+    local stat = entry.stat or {}
+    local valueMode = tostring(stat.valueMode or "manual")
+    local definitionBaseValue = tonumber(stat.baseValue) or 0
+    local raceBaseValue = tonumber(progressionContext and progressionContext.raceStatValues and progressionContext.raceStatValues[entry.ref]) or 0
+    local classBaseValue = tonumber(progressionContext and progressionContext.classStatValues and progressionContext.classStatValues[entry.ref]) or 0
+    local profileBonusBaseValue = tonumber(profileBonuses[entry.ref]) or 0
+    local traitBonusBaseValue = tonumber(equipmentBonuses.__traitBonuses and equipmentBonuses.__traitBonuses[entry.ref]) or 0
+    local baseValue = definitionBaseValue + raceBaseValue + classBaseValue + profileBonusBaseValue + traitBonusBaseValue
+    local derivedContribution = 0
+    local equipmentBonus = tonumber(equipmentBonuses[entry.ref]) or 0
+
+    if valueMode == "derived" and type(stat.derivedSources) == "table" and #stat.derivedSources > 0 then
+        for index = 1, #stat.derivedSources do
+            local source = stat.derivedSources[index]
+            local sourceRef = type(source) == "table" and source.sourceStatRef or nil
+            local coefficient = type(source) == "table" and tonumber(source.coefficient) or 1
+            local sourceEntry = sourceRef and byRef[sourceRef] or nil
+            if sourceEntry then
+                local sourceComponents = resolveStatComponents(sourceEntry, byRef, cache, activeRefs, profileBonuses, equipmentBonuses, auraContext, progressionContext)
+                derivedContribution = derivedContribution + ((sourceComponents and sourceComponents.value or 0) * coefficient)
+            end
+        end
+    end
+
+    local auraFlatBonus, auraPercentBonus = resolveAuraBonusesForStat(auraContext, entry.ref)
+    local value = baseValue + derivedContribution + equipmentBonus + auraFlatBonus
+    if auraPercentBonus ~= 0 then
+        value = value * (1 + (auraPercentBonus / 100))
+    end
+    if auraFlatBonus ~= 0 or auraPercentBonus ~= 0 then
+        value = roundResolvedValue(value)
+    end
+
+    local resolved = {
+        definitionBaseValue = definitionBaseValue,
+        raceBaseValue = raceBaseValue,
+        classBaseValue = classBaseValue,
+        profileBonusBaseValue = profileBonusBaseValue,
+        traitBonusBaseValue = traitBonusBaseValue,
+        baseValue = baseValue,
+        derivedContribution = derivedContribution,
+        equipmentBonus = equipmentBonus,
+        auraFlatBonus = auraFlatBonus,
+        auraPercentBonus = auraPercentBonus,
+        value = value,
+    }
+
+    activeRefs[entry.ref] = nil
+    cache[entry.ref] = resolved
+    return resolved
+end
+
+local function accumulateEquipmentStatBonuses(bonuses, equippedRows, equipmentScope)
+    for index = 1, #(equippedRows or {}) do
+        local entry = equippedRows[index]
+        local equippedEntry = entry and entry.entry or nil
+        local item = equippedEntry and Equipment.ResolveItemDefinition and Equipment.ResolveItemDefinition(equippedEntry.itemRef) or nil
+        if item and not evaluateProfileConditions("item", item, {
+            itemRef = equippedEntry and equippedEntry.itemRef,
+            item = item,
+            equipmentScope = equipmentScope,
+        }) then
+            item = nil
+        end
+        local stats = item and item.stats or nil
+        if type(stats) == "table" then
+            for statIndex = 1, #stats do
+                local statEntry = stats[statIndex]
+                local statRef = type(statEntry) == "table" and statEntry.sourceStatRef or nil
+                local bonus = type(statEntry) == "table" and tonumber(statEntry.value) or 0
+                if statRef and bonus ~= 0 then
+                    bonuses[statRef] = (bonuses[statRef] or 0) + bonus
+                end
+            end
+        end
+
+        local modificationBonuses = equippedEntry and Modifications.GetAggregatedBonuses and Modifications.GetAggregatedBonuses(equippedEntry.modifications) or nil
+        for statRef, bonus in pairs(modificationBonuses and modificationBonuses.stats or {}) do
+            if statRef and bonus ~= 0 then
+                bonuses[statRef] = (bonuses[statRef] or 0) + bonus
+            end
+        end
+    end
+end
+
+local function accumulateEquipmentSkillBonuses(bonuses, equippedRows, equipmentScope)
+    for index = 1, #(equippedRows or {}) do
+        local entry = equippedRows[index]
+        local equippedEntry = entry and entry.entry or nil
+        local item = equippedEntry and Equipment.ResolveItemDefinition and Equipment.ResolveItemDefinition(equippedEntry.itemRef) or nil
+        if item and not evaluateProfileConditions("item", item, {
+            itemRef = equippedEntry and equippedEntry.itemRef,
+            item = item,
+            equipmentScope = equipmentScope,
+        }) then
+            item = nil
+        end
+
+        for bonusIndex = 1, #(item and item.skillBonuses or {}) do
+            local skillBonus = item.skillBonuses[bonusIndex]
+            local skillRef = type(skillBonus) == "table" and ensureString(skillBonus.skillRef) or ""
+            local bonusValue = type(skillBonus) == "table" and tonumber(skillBonus.value) or 0
+            if skillRef ~= "" and bonusValue ~= 0 then
+                bonuses[skillRef] = (bonuses[skillRef] or 0) + bonusValue
+            end
+        end
+
+        local modificationBonuses = equippedEntry and Modifications.GetAggregatedBonuses and Modifications.GetAggregatedBonuses(equippedEntry.modifications) or nil
+        for skillRef, bonusValue in pairs(modificationBonuses and modificationBonuses.skills or {}) do
+            if ensureString(skillRef) ~= "" and bonusValue ~= 0 then
+                bonuses[skillRef] = (bonuses[skillRef] or 0) + bonusValue
+            end
+        end
+    end
+end
+
+local function appendRuntimeStatValue(rows, valuesByRef, order, statRef, value)
+    local normalizedStatRef = ensureString(statRef)
+    local numericValue = tonumber(value) or 0
+    if normalizedStatRef == "" or numericValue == 0 then
+        return
+    end
+
+    if valuesByRef[normalizedStatRef] == nil then
+        order[#order + 1] = normalizedStatRef
+        valuesByRef[normalizedStatRef] = 0
+    end
+
+    valuesByRef[normalizedStatRef] = (valuesByRef[normalizedStatRef] or 0) + numericValue
+end
+
+local function buildRuntimeStatRows(baseEntries, equippedRows, extraEntries)
+    local valuesByRef = {}
+    local order = {}
+    local equipmentBonuses = {}
+    local rows = {}
+
+    for index = 1, #(baseEntries or {}) do
+        local entry = baseEntries[index]
+        appendRuntimeStatValue(rows, valuesByRef, order, entry and entry.statRef, entry and entry.value)
+    end
+
+    accumulateEquipmentStatBonuses(equipmentBonuses, equippedRows, nil)
+    for statRef, value in pairs(equipmentBonuses) do
+        appendRuntimeStatValue(rows, valuesByRef, order, statRef, value)
+    end
+
+    for index = 1, #(extraEntries or {}) do
+        local entry = extraEntries[index]
+        appendRuntimeStatValue(rows, valuesByRef, order, entry and entry.statRef, entry and entry.value)
+    end
+
+    for index = 1, #order do
+        local statRef = order[index]
+        local value = tonumber(valuesByRef[statRef]) or 0
+        rows[#rows + 1] = {
+            statRef = statRef,
+            value = value,
+            currentValue = value,
+        }
+    end
+
+    return rows
+end
+
+local function buildItemStatBonusMap()
+    local bonuses = {}
+    local equipped = Equipment.ListEquippedSlots and Equipment.ListEquippedSlots() or {}
+    accumulateEquipmentStatBonuses(bonuses, equipped, nil)
+
+    if type(Profile.IsMounted) == "function" and Profile.IsMounted() then
+        local selectedMount = type(Profile.GetSelectedMount) == "function" and Profile.GetSelectedMount() or nil
+        local mount = selectedMount and selectedMount.mount or nil
+        for index = 1, #(mount and mount.stats or {}) do
+            local entry = mount.stats[index]
+            local statRef = type(entry) == "table" and ensureString(entry.statRef) or ""
+            local bonus = type(entry) == "table" and tonumber(entry.value) or 0
+            if statRef ~= "" and bonus ~= 0 then
+                bonuses[statRef] = (bonuses[statRef] or 0) + bonus
+            end
+        end
+
+        local mountedEquipped = Profile.ListEquippedSlotsByScope and Profile.ListEquippedSlotsByScope("mount") or {}
+        accumulateEquipmentStatBonuses(bonuses, mountedEquipped, "mount")
+    end
+
+    return bonuses
+end
+
+local function buildItemSkillBonusMap()
+    local bonuses = {}
+    local equipped = Equipment.ListEquippedSlots and Equipment.ListEquippedSlots() or {}
+    accumulateEquipmentSkillBonuses(bonuses, equipped, nil)
+
+    if type(Profile.IsMounted) == "function" and Profile.IsMounted() then
+        local mountedEquipped = Profile.ListEquippedSlotsByScope and Profile.ListEquippedSlotsByScope("mount") or {}
+        accumulateEquipmentSkillBonuses(bonuses, mountedEquipped, "mount")
+    end
+
+    return bonuses
+end
+
+local function buildOriginSkillBonusMap(collectionKey)
+    local bonuses = {}
+    if collectionKey == "races" and getRulesetRuleValue("character", "use_races", false) ~= true then
+        return bonuses
+    end
+    if collectionKey == "classes" and getRulesetRuleValue("character", "use_classes", false) ~= true then
+        return bonuses
+    end
+
+    local profile = Database.GetActiveProfile and Database.GetActiveProfile() or nil
+    local reference = profile and profile[(collectionKey == "races" and "raceRef" or "classRef")] or nil
+    local _, definition = resolveProfileDefinition(reference, collectionKey)
+
+    for index = 1, #(definition and definition.skillBonuses or {}) do
+        local skillBonus = definition.skillBonuses[index]
+        local skillRef = type(skillBonus) == "table" and ensureString(skillBonus.skillRef) or ""
+        local bonusValue = type(skillBonus) == "table" and tonumber(skillBonus.value) or 0
+        if skillRef ~= "" and bonusValue ~= 0 then
+            bonuses[skillRef] = (bonuses[skillRef] or 0) + bonusValue
+        end
+    end
+
+    return bonuses
+end
+
+local function buildStatResolutionContext(options)
+    local entries, byRef = collectActivatedStats()
+    local profileBonuses = buildProfileStatBonusMap()
+    local bonuses = buildItemStatBonusMap()
+    bonuses.__traitBonuses = buildTraitStatBonusMap()
+
+    return {
+        entries = entries,
+        byRef = byRef,
+        cache = {},
+        profileBonuses = profileBonuses,
+        bonuses = bonuses,
+        auraContext = resolveLocalAuraContext(options),
+        progressionContext = buildProfileProgressionContext(),
+    }
+end
+
+local function buildResolvedStatRow(entry, context)
+    if type(entry) ~= "table" or type(context) ~= "table" then
+        return nil
+    end
+
+    local stat = entry.stat or {}
+    local resolved = resolveStatComponents(
+        entry,
+        context.byRef,
+        context.cache,
+        {},
+        context.profileBonuses,
+        context.bonuses,
+        context.auraContext,
+        context.progressionContext
+    )
+    local statName = ensureString(stat.name)
+    if statName == "" then
+        statName = ensureString(stat.id)
+    end
+    if statName == "" then
+        statName = "Unnamed Stat"
+    end
+
+    return {
+        ref = entry.ref,
+        datasetId = entry.dataset and entry.dataset.id or nil,
+        statId = stat.id,
+        name = statName,
+        icon = ensureString(stat.icon),
+        priority = math.floor(tonumber(stat.priority) or 0),
+        color = cloneColor(stat.color),
+        displayMode = tostring(stat.displayMode or "signed_value"),
+        definitionBaseValue = resolved.definitionBaseValue,
+        raceBaseValue = resolved.raceBaseValue,
+        classBaseValue = resolved.classBaseValue,
+        profileBonusBaseValue = resolved.profileBonusBaseValue,
+        traitBonusBaseValue = resolved.traitBonusBaseValue,
+        baseValue = resolved.baseValue,
+        derivedContribution = resolved.derivedContribution,
+        equipmentBonus = resolved.equipmentBonus,
+        auraFlatBonus = resolved.auraFlatBonus,
+        auraPercentBonus = resolved.auraPercentBonus,
+        value = resolved.value,
+        stat = stat,
+    }
+end
+
+local function buildResolvedStatsByRef(statRefs, options)
+    local requestedRefs = type(statRefs) == "table" and statRefs or {}
+    local context = buildStatResolutionContext(options)
+    local rowsByRef = {}
+
+    for index = 1, #requestedRefs do
+        local statRef = ensureString(requestedRefs[index])
+        local entry = context.byRef and context.byRef[statRef] or nil
+        if statRef ~= "" and entry then
+            rowsByRef[statRef] = buildResolvedStatRow(entry, context)
+        end
+    end
+
+    return rowsByRef
+end
+
+local function buildResolvedResourceRow(entry, resolvedStatsByRef, progressionContext)
+    if type(entry) ~= "table" then
+        return nil
+    end
+
+    local resource = entry.resource or {}
+    local resourceName = ensureString(resource.name)
+    local definitionBaseValue = tonumber(resource.baseValue) or 0
+    local derivedContribution = 0
+    local intrinsicDerivedContribution = 0
+    local raceBaseValue = tonumber(progressionContext.raceResourceValues and progressionContext.raceResourceValues[entry.ref]) or 0
+    local classBaseValue = tonumber(progressionContext.classResourceValues and progressionContext.classResourceValues[entry.ref]) or 0
+    local resolvedBaseValue = definitionBaseValue + raceBaseValue + classBaseValue
+
+    if tostring(resource.valueMode or "manual") == "derived" then
+        local sourceRow = type(resource.sourceStatRef) == "string" and resolvedStatsByRef[resource.sourceStatRef] or nil
+        local multiplier = tonumber(resource.multiplier) or 0
+        local sourceValue = sourceRow and tonumber(sourceRow.value) or 0
+        local sourceIntrinsicValue = sourceRow and ((tonumber(sourceRow.baseValue) or 0) + (tonumber(sourceRow.derivedContribution) or 0)) or 0
+        derivedContribution = sourceValue * multiplier
+        intrinsicDerivedContribution = sourceIntrinsicValue * multiplier
+    end
+
+    if resourceName == "" then
+        resourceName = ensureString(resource.id)
+    end
+    if resourceName == "" then
+        resourceName = "Unnamed Resource"
+    end
+
+    return {
+        ref = entry.ref,
+        datasetId = entry.dataset and entry.dataset.id or nil,
+        resourceId = resource.id,
+        name = resourceName,
+        icon = ensureString(resource.icon),
+        color = cloneColor(resource.color),
+        definitionBaseValue = definitionBaseValue,
+        baseValue = resolvedBaseValue,
+        derivedContribution = derivedContribution,
+        raceBaseValue = raceBaseValue,
+        classBaseValue = classBaseValue,
+        fallbackBaseValue = 0,
+        baseResourceValue = 0,
+        intrinsicBaseResourceValue = resolvedBaseValue + intrinsicDerivedContribution,
+        value = resolvedBaseValue + derivedContribution,
+        isSpecial = resource.special == true,
+        resource = resource,
+    }
+end
+
+local function finalizeResolvedResourceRows(rows, progressionContext)
+    for index = 1, #rows do
+        local row = rows[index]
+        local computedBaseResource = tonumber(row.intrinsicBaseResourceValue) or 0
+        local fallbackBaseValue = 0
+        if computedBaseResource <= 0 and progressionContext.useFallback == true then
+            fallbackBaseValue = (tonumber(row.value) or 0) * progressionContext.fallbackFraction
+            computedBaseResource = fallbackBaseValue
+        end
+        row.fallbackBaseValue = fallbackBaseValue
+        row.baseResourceValue = computedBaseResource
+    end
+end
+
+function Resolver.ListResolvedStats(options)
+    local context = buildStatResolutionContext(options)
+    local rows = {}
+
+    for index = 1, #context.entries do
+        local row = buildResolvedStatRow(context.entries[index], context)
+        if row then
+            rows[#rows + 1] = row
+        end
+    end
+
+    table.sort(rows, function(left, right)
+        if left.priority == right.priority then
+            local leftName = string.lower(tostring(left.name or ""))
+            local rightName = string.lower(tostring(right.name or ""))
+            if leftName == rightName then
+                return tostring(left.statId or "") < tostring(right.statId or "")
+            end
+            return leftName < rightName
+        end
+        return left.priority > right.priority
+    end)
+
+    return rows
+end
+
+function Resolver.GetResolvedStatRowsByRefs(statRefs, options)
+    local rowsByRef = buildResolvedStatsByRef(statRefs, options)
+    local rows = {}
+
+    for index = 1, #(statRefs or {}) do
+        local statRef = ensureString(statRefs[index])
+        local row = rowsByRef[statRef]
+        if row then
+            rows[#rows + 1] = row
+        end
+    end
+
+    return rows
+end
+
+function Resolver.ListResolvedResources(options)
+    local entries = collectActivatedResources()
+    local statRows = Resolver.ListResolvedStats(options)
+    local progressionContext = buildProfileProgressionContext()
+    local resolvedStatsByRef = {}
+    local rows = {}
+
+    for index = 1, #statRows do
+        local statRow = statRows[index]
+        if statRow and statRow.ref then
+            resolvedStatsByRef[statRow.ref] = statRow
+        end
+    end
+
+    for index = 1, #entries do
+        local row = buildResolvedResourceRow(entries[index], resolvedStatsByRef, progressionContext)
+        if row then
+            rows[#rows + 1] = row
+        end
+    end
+
+    finalizeResolvedResourceRows(rows, progressionContext)
+
+    table.sort(rows, function(left, right)
+        local leftName = string.lower(tostring(left.name or ""))
+        local rightName = string.lower(tostring(right.name or ""))
+        if leftName == rightName then
+            return tostring(left.resourceId or "") < tostring(right.resourceId or "")
+        end
+        return leftName < rightName
+    end)
+
+    return rows
+end
+
+function Resolver.GetResolvedResourceRowsByRefs(resourceRefs, options)
+    local entries, entriesByRef = collectActivatedResources()
+    local progressionContext = buildProfileProgressionContext()
+    local requestedStatRefs = {}
+    local seenStatRefs = {}
+    local resolvedStatsByRef = {}
+    local rows = {}
+
+    for index = 1, #(resourceRefs or {}) do
+        local resourceRef = ensureString(resourceRefs[index])
+        local entry = entriesByRef and entriesByRef[resourceRef] or nil
+        local resource = entry and entry.resource or nil
+        local sourceStatRef = type(resource) == "table" and ensureString(resource.sourceStatRef) or ""
+        if sourceStatRef ~= "" and not seenStatRefs[sourceStatRef] then
+            seenStatRefs[sourceStatRef] = true
+            requestedStatRefs[#requestedStatRefs + 1] = sourceStatRef
+        end
+    end
+
+    local statRows = buildResolvedStatsByRef(requestedStatRefs, options)
+    for statRef, row in pairs(statRows) do
+        resolvedStatsByRef[statRef] = row
+    end
+
+    for index = 1, #(resourceRefs or {}) do
+        local resourceRef = ensureString(resourceRefs[index])
+        local entry = entriesByRef and entriesByRef[resourceRef] or nil
+        local row = entry and buildResolvedResourceRow(entry, resolvedStatsByRef, progressionContext) or nil
+        if row then
+            rows[#rows + 1] = row
+        end
+    end
+
+    finalizeResolvedResourceRows(rows, progressionContext)
+    return rows
+end
+
+local SKILL_TYPE_ORDER = {
+    weapon = 1,
+    noncombat = 2,
+    crafting = 3,
+    language = 4,
+}
+
+local function isSkillTypeEnabled(skillType)
+    local normalizedType = ensureString(skillType)
+    if normalizedType == "weapon" then
+        return getRulesetRuleValue("skills", "use_weapon_skills", true) ~= false
+    end
+    if normalizedType == "crafting" then
+        return getRulesetRuleValue("skills", "use_crafting_skills", true) ~= false
+    end
+    if normalizedType == "language" then
+        return getRulesetRuleValue("skills", "use_language_skills", true) ~= false
+    end
+
+    return getRulesetRuleValue("skills", "use_noncombat_skills", true) ~= false
+end
+
+local function getFixedSkillCap(skillType)
+    if skillType == "crafting" then
+        return math.max(0, math.floor(tonumber(getRulesetRuleValue("skills", "crafting_skill_max_level", 100)) or 100))
+    end
+    if skillType == "language" then
+        return math.max(0, math.floor(tonumber(getRulesetRuleValue("skills", "language_skill_max_level", 100)) or 100))
+    end
+
+    return math.max(0, math.floor(tonumber(getRulesetRuleValue("skills", "noncombat_skill_max_level", 100)) or 100))
+end
+
+function Resolver.ListResolvedSkills(options)
+    local entries = collectActivatedSkills()
+    local statRows = Resolver.ListResolvedStats(options)
+    local resolvedStatsByRef = {}
+    local storedLevels = buildProfileSkillLevelMap()
+    local itemBonuses = buildItemSkillBonusMap()
+    local traitBonuses = buildTraitSkillBonusMap()
+    local raceBonuses = buildOriginSkillBonusMap("races")
+    local classBonuses = buildOriginSkillBonusMap("classes")
+    local auraContext = resolveLocalAuraContext(options)
+    local level = getProfileLevel()
+    local weaponMultiplier = tonumber(getRulesetRuleValue("skills", "weapon_skill_level_multiplier", 5)) or 5
+    local rows = {}
+
+    for index = 1, #statRows do
+        local statRow = statRows[index]
+        if statRow and statRow.ref then
+            resolvedStatsByRef[statRow.ref] = statRow
+        end
+    end
+
+    for index = 1, #entries do
+        local entry = entries[index]
+        local skill = entry.skill or {}
+        local skillType = ensureString(skill.skillType)
+        if isSkillTypeEnabled(skillType) then
+            local maxValue = 0
+            local storedValue = math.max(0, math.floor(tonumber(storedLevels[entry.ref]) or 0))
+            local baseValue = 0
+            local derivedValue = 0
+            local hasDerivedStat = type(skill.derivedStatRef) == "string" and skill.derivedStatRef ~= ""
+
+            if skillType == "weapon" then
+                maxValue = math.max(0, math.floor(level * weaponMultiplier))
+                baseValue = clampNumber(storedValue, 0, maxValue)
+            elseif skillType == "crafting" or skillType == "language" then
+                maxValue = getFixedSkillCap(skillType)
+                baseValue = storedValue
+            else
+                maxValue = getFixedSkillCap(skillType)
+                if hasDerivedStat then
+                    local statRow = resolvedStatsByRef[skill.derivedStatRef]
+                    local statValue = tonumber(statRow and statRow.value) or 0
+                    derivedValue = roundResolvedValue(statValue * (tonumber(skill.derivedMultiplier) or 0))
+                    baseValue = storedValue + derivedValue
+                else
+                    baseValue = storedValue
+                end
+            end
+
+            local name = ensureString(skill.name)
+            if name == "" then
+                name = ensureString(skill.id)
+            end
+            if name == "" then
+                name = "Unnamed Skill"
+            end
+
+            local itemBonus = tonumber(itemBonuses[entry.ref]) or 0
+            local traitBonus = tonumber(traitBonuses[entry.ref]) or 0
+            local raceBonus = tonumber(raceBonuses[entry.ref]) or 0
+            local classBonus = tonumber(classBonuses[entry.ref]) or 0
+            local auraBonus = resolveAuraBonusForSkill(auraContext, entry.ref)
+            local bonusValue = itemBonus + traitBonus + raceBonus + classBonus + auraBonus
+            local resolvedValue = math.max(0, baseValue + bonusValue)
+
+            rows[#rows + 1] = {
+                ref = entry.ref,
+                datasetId = entry.dataset and entry.dataset.id or nil,
+                skillId = skill.id,
+                name = name,
+                icon = ensureString(skill.icon),
+                description = ensureString(skill.description),
+                skillType = skillType ~= "" and skillType or "noncombat",
+                weaponTypeRef = skillType == "weapon" and ensureString(skill.weaponTypeRef) or nil,
+                learnMode = ensureString(skill.learnMode) ~= "" and ensureString(skill.learnMode) or "always_available",
+                rollable = skill.rollable == true,
+                derivedStatRef = skill.derivedStatRef,
+                derivedMultiplier = tonumber(skill.derivedMultiplier) or 0,
+                storedValue = storedValue,
+                baseValue = baseValue,
+                derivedValue = hasDerivedStat and derivedValue or nil,
+                maxValue = maxValue,
+                itemBonus = itemBonus,
+                traitBonus = traitBonus,
+                raceBonus = raceBonus,
+                classBonus = classBonus,
+                auraBonus = auraBonus,
+                bonusValue = bonusValue,
+                value = resolvedValue,
+                resolvedValue = resolvedValue,
+                progressValue = math.min(resolvedValue, maxValue),
+                isDerived = hasDerivedStat,
+                skill = skill,
+            }
+        end
+    end
+
+    table.sort(rows, function(left, right)
+        local leftOrder = SKILL_TYPE_ORDER[left.skillType] or 999
+        local rightOrder = SKILL_TYPE_ORDER[right.skillType] or 999
+        if leftOrder == rightOrder then
+            local leftName = string.lower(tostring(left.name or ""))
+            local rightName = string.lower(tostring(right.name or ""))
+            if leftName == rightName then
+                return tostring(left.skillId or "") < tostring(right.skillId or "")
+            end
+            return leftName < rightName
+        end
+        return leftOrder < rightOrder
+    end)
+
+    return rows
+end
+
+Resolver.BuildUnitRuntimeStatRows = buildRuntimeStatRows
+
+return Resolver
