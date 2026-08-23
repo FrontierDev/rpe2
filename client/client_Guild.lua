@@ -6,6 +6,7 @@ Addon.Client.Guild = Addon.Client.Guild or {}
 local Client = Addon.Client
 local Guild = Addon.Client.Guild
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
+local Profile = Addon.Internal and Addon.Internal.Profile or {}
 
 local function ensureString(value)
     if value == nil then
@@ -85,6 +86,7 @@ local function makeMatch(dataset, setting, matchType)
     return {
         dataset = dataset,
         setting = setting,
+        rank = setting,
         datasetId = datasetId,
         settingId = settingId,
         ref = datasetId ~= "" and settingId ~= "" and (datasetId .. ":" .. settingId) or "",
@@ -93,6 +95,79 @@ local function makeMatch(dataset, setting, matchType)
         guildName = trimText(setting and setting.guildName),
         matchType = matchType,
     }
+end
+
+local function normalizeWowGuildRankIndex(value)
+    local numeric = tonumber(value)
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        return nil
+    end
+
+    local integer = math.floor(numeric)
+    if numeric ~= integer or integer < 0 then
+        return nil
+    end
+
+    return integer
+end
+
+local function getGuildKey(identity)
+    return trimText(identity and identity.guildName)
+end
+
+local function getAssignedGuildRankRef(identity)
+    if type(Profile.GetAssignedGuildRank) ~= "function" then
+        return nil
+    end
+
+    local guildKey = getGuildKey(identity)
+    if guildKey == "" then
+        return nil
+    end
+
+    local ok, assignedRankRef = pcall(Profile.GetAssignedGuildRank, guildKey)
+    if not ok then
+        return nil
+    end
+
+    local normalizedRef = trimText(assignedRankRef)
+    return normalizedRef ~= "" and normalizedRef or nil
+end
+
+local function findMatchByRef(matches, assignedRankRef)
+    local normalizedRef = trimText(assignedRankRef)
+    if normalizedRef == "" then
+        return nil
+    end
+
+    for index = 1, #(matches or {}) do
+        local match = matches[index]
+        if trimText(match and match.ref) == normalizedRef then
+            return match
+        end
+    end
+
+    return nil
+end
+
+local function isGuildRankEligibleForWowRank(setting, wowRankIndex)
+    local mappedWowRanks = setting and setting.wowGuildRankIndices
+    if type(mappedWowRanks) ~= "table" or #mappedWowRanks == 0 then
+        return true
+    end
+
+    local normalizedTarget = normalizeWowGuildRankIndex(wowRankIndex)
+    if normalizedTarget == nil then
+        return false
+    end
+
+    for index = 1, #mappedWowRanks do
+        if normalizeWowGuildRankIndex(mappedWowRanks[index]) == normalizedTarget then
+            return true
+        end
+    end
+
+    return false
 end
 
 local function hasOfficerPermission()
@@ -141,17 +216,20 @@ function Guild:GetCurrentGuildName()
     return getGuildIdentity().guildName
 end
 
-function Guild:ResolveActiveGuildSetting()
+local function buildApplicableGuildRankCatalogue()
     local identity = getGuildIdentity()
     local result = {
         inGuild = identity.inGuild,
         guildName = identity.guildName,
         guildRankName = identity.guildRankName,
         guildRankIndex = identity.guildRankIndex,
-        setting = nil,
-        dataset = nil,
+        guildKey = getGuildKey(identity),
+        ranks = {},
         matches = {},
         conflict = false,
+        exactMatches = {},
+        genericMatches = {},
+        matchType = nil,
         reason = nil,
     }
 
@@ -184,6 +262,10 @@ function Guild:ResolveActiveGuildSetting()
     end
 
     local candidates = #exactMatches > 0 and exactMatches or genericMatches
+    result.exactMatches = exactMatches
+    result.genericMatches = genericMatches
+    result.matchType = #exactMatches > 0 and "exact" or (#genericMatches > 0 and "generic" or nil)
+    result.ranks = candidates
     result.matches = candidates
 
     if #candidates == 0 then
@@ -191,16 +273,171 @@ function Guild:ResolveActiveGuildSetting()
         return result
     end
 
-    if #candidates > 1 then
-        result.conflict = true
-        result.reason = "conflict"
+    result.reason = result.matchType
+    return result
+end
+
+function Guild:GetApplicableGuildRanks()
+    local catalogue = buildApplicableGuildRankCatalogue()
+    return catalogue.ranks, catalogue
+end
+
+function Guild:GetEligibleGuildRanksForWoWRank(wowRankIndex)
+    local catalogue = buildApplicableGuildRankCatalogue()
+    local eligibleRanks = {}
+
+    for index = 1, #catalogue.ranks do
+        local match = catalogue.ranks[index]
+        if isGuildRankEligibleForWowRank(match and match.setting, wowRankIndex) then
+            eligibleRanks[#eligibleRanks + 1] = match
+        end
+    end
+
+    local result = {
+        inGuild = catalogue.inGuild,
+        guildName = catalogue.guildName,
+        guildRankName = catalogue.guildRankName,
+        guildRankIndex = catalogue.guildRankIndex,
+        guildKey = catalogue.guildKey,
+        wowRankIndex = normalizeWowGuildRankIndex(wowRankIndex),
+        ranks = eligibleRanks,
+        matches = eligibleRanks,
+        conflict = false,
+        applicableRanks = catalogue.ranks,
+        reason = catalogue.reason,
+        matchType = catalogue.matchType,
+    }
+
+    return eligibleRanks, result
+end
+
+function Guild:GetAssignedGuildRankRef()
+    local identity = getGuildIdentity()
+    return getAssignedGuildRankRef(identity)
+end
+
+local function buildAssignedGuildRankStatus()
+    local identity = getGuildIdentity()
+    local result = {
+        status = nil,
+        reason = nil,
+        inGuild = identity.inGuild,
+        guildName = identity.guildName,
+        guildRankName = identity.guildRankName,
+        guildRankIndex = identity.guildRankIndex,
+        guildKey = getGuildKey(identity),
+        assignedRankRef = nil,
+        rank = nil,
+        setting = nil,
+        dataset = nil,
+        match = nil,
+        catalogue = nil,
+    }
+
+    if not identity.inGuild then
+        result.status = "not-in-guild"
+        result.reason = result.status
         return result
     end
 
-    result.setting = candidates[1].setting
-    result.dataset = candidates[1].dataset
-    result.match = candidates[1]
-    result.reason = candidates[1].matchType
+    if trimText(identity.guildName) == "" then
+        result.status = "guild-loading"
+        result.reason = result.status
+        return result
+    end
+
+    local assignedRankRef = getAssignedGuildRankRef(identity)
+    result.assignedRankRef = assignedRankRef
+    if not assignedRankRef then
+        result.status = "unassigned"
+        result.reason = result.status
+        return result
+    end
+
+    local catalogue = buildApplicableGuildRankCatalogue()
+    result.catalogue = catalogue
+    local match = findMatchByRef(catalogue.ranks, assignedRankRef)
+    if not match then
+        local dataset, rank
+        if type(Registry.ResolveGuildSettingReference) == "function" then
+            dataset, rank = Registry:ResolveGuildSettingReference(assignedRankRef)
+        end
+
+        if not rank then
+            result.status = "unknown-rank"
+            result.reason = result.status
+            return result
+        end
+
+        result.dataset = dataset
+        result.rank = rank
+        result.setting = rank
+        result.status = "not-applicable"
+        result.reason = result.status
+        return result
+    end
+
+    result.match = match
+    result.dataset = match.dataset
+    result.rank = match.setting
+    result.setting = match.setting
+
+    if normalizeWowGuildRankIndex(identity.guildRankIndex) == nil then
+        result.status = "guild-loading"
+        result.reason = result.status
+        return result
+    end
+
+    if not isGuildRankEligibleForWowRank(match.setting, identity.guildRankIndex) then
+        result.status = "not-eligible-for-current-wow-rank"
+        result.reason = result.status
+        return result
+    end
+
+    result.status = "valid"
+    result.reason = result.status
+    return result
+end
+
+function Guild:GetAssignedGuildRankStatus()
+    return buildAssignedGuildRankStatus()
+end
+
+function Guild:GetAssignedGuildRank()
+    local result = buildAssignedGuildRankStatus()
+    if result.status ~= "valid" then
+        return nil, result
+    end
+
+    return result.rank, result
+end
+
+-- Compatibility facade for the existing Guild pages. The complete catalogue is
+-- available through GetApplicableGuildRanks; this wrapper never reports a
+-- multi-rank catalogue as a conflict or selects one rank as authoritative.
+function Guild:ResolveActiveGuildSetting()
+    local catalogue = buildApplicableGuildRankCatalogue()
+    local result = {
+        inGuild = catalogue.inGuild,
+        guildName = catalogue.guildName,
+        guildRankName = catalogue.guildRankName,
+        guildRankIndex = catalogue.guildRankIndex,
+        setting = nil,
+        dataset = nil,
+        matches = catalogue.ranks,
+        conflict = false,
+        reason = catalogue.reason,
+        catalogue = catalogue,
+    }
+
+    if #catalogue.ranks == 1 then
+        result.setting = catalogue.ranks[1].setting
+        result.dataset = catalogue.ranks[1].dataset
+        result.match = catalogue.ranks[1]
+    elseif #catalogue.ranks > 1 then
+        result.reason = "multiple"
+    end
+
     return result
 end
 

@@ -1,83 +1,105 @@
 ## Goal
-Add backward-compatible per-guild Profile state and thin Profile APIs for the officer-assigned RPE Guild Rank.
+Refactor `client/client_Guild.lua` from the Phase 1 single-setting/conflict model to the revised multi-rank catalogue and assignment eligibility model.
 
-Depends on: #10
+Depends on: #10, #12
 
 ## Primary files
-- `core/internal/database/Database.lua`
-- `core/internal/profile/Guild.lua`
+- `client/client_Guild.lua`
+- `core/internal/Registry.lua` if a semantic resolver alias is useful
+- `core/internal/Runtime.lua` only if refresh routing requires a small adjustment
 
-## Required Profile state
-Within each guild bucket support:
+## Required facade behavior
+Replace the semantic dependence on:
 
 ```lua
-profile.guild.byGuild[guildKey] = {
-    assignedRankRef = nil,
-    assignedRankAt = nil,
-    assignedRankBy = nil,
-    ...existing/future fields...
-}
+ResolveActiveGuildSetting()
+GetActiveGuildSetting()
 ```
 
-The Profile continues to store one guild bucket per guild. A character may have at most one assigned RPE Guild Rank in a guild at a time.
+with catalogue-oriented helpers, for example:
 
-Normalization must preserve unknown/future nested Guild state, including existing/future Requisition and Progression data. Do not destructively replace the guild bucket with only the assignment fields.
+```lua
+Guild:GetApplicableGuildRanks()
+Guild:GetEligibleGuildRanksForWoWRank(wowRankIndex)
+Guild:GetAssignedGuildRankRef()
+Guild:GetAssignedGuildRank()
+Guild:GetAssignedGuildRankStatus()
+```
 
-## Schema
-Increment only the Profile schema:
+Exact naming may follow current conventions. Compatibility wrappers may remain temporarily if existing UI still calls them during this task, but new behavior must not return a conflict merely because multiple Guild Rank entries apply.
+
+## Applicable Guild Rank catalogue
+Use activated datasets from the existing Registry path.
+
+Resolution rules:
+1. Player must currently be in a WoW guild.
+2. Search Guild Rank definitions in activated datasets (`guildSettings` internally).
+3. Collect all exact `guildName` matches.
+4. If at least one exact match exists, the complete exact-match set is the applicable catalogue.
+5. Otherwise use all blank/generic `guildName` entries.
+6. Multiple applicable entries are expected and are **not** a conflict.
+7. Preserve each rank's qualified `datasetId:guildSettingId` reference.
+
+Do not silently collapse the catalogue to one rank.
+
+## WoW rank eligibility
+For a target WoW guild rank index:
 
 ```text
-5 -> 6
+wowGuildRankIndices empty -> eligible
+otherwise -> eligible only if exact integer index is present
 ```
 
-Old Profiles without assignment fields must normalize safely. Follow the existing monotonic schema behavior and do not lower any future higher schema marker.
+Do **not** infer a hierarchy using `<=`, `>=`, rank names or array order.
 
-## Thin Profile API
-Add narrow helpers such as:
+A single WoW guild rank may make several RPE Guild Ranks eligible at the same time.
+
+## Assigned-rank validation
+Resolve the Profile `assignedRankRef` against the applicable catalogue and the local player's current WoW guild rank.
+
+Return explicit status for at least:
+
+```text
+valid
+unassigned
+unknown-rank
+not-applicable
+not-eligible-for-current-wow-rank
+guild-loading
+not-in-guild
+```
+
+The exact representation may follow current result-table patterns, but callers must be able to distinguish these states.
+
+Do not automatically fix, replace or clear an invalid/stale assignment.
+
+## Officer state
+Preserve the centralized:
 
 ```lua
-Profile.GetGuildBucket(guildKey)
-Profile.GetAssignedGuildRank(guildKey)
-Profile.SetAssignedGuildRank(guildKey, guildRankRef, metadata)
-Profile.ClearAssignedGuildRank(guildKey)
+Client.Guild:IsLocalPlayerOfficer()
 ```
 
-Exact naming may follow current Profile conventions, but callers must not need to mutate the raw `profile.guild` table directly.
-
-`SetAssignedGuildRank` should normalize:
-- `guildRankRef` as a non-empty string/reference;
-- optional assignment timestamp;
-- optional assigning officer display identity.
-
-Returned state should follow existing Database/Profile copy semantics so callers cannot accidentally bypass persistence/notification paths.
-
-## Scope boundary
-This task deliberately does **not** decide whether a requested rank is valid for a particular WoW guild rank. Catalogue eligibility and receiver-side validation belong to later tasks.
-
-Setting assignment state must not itself:
-- award Daily Rewards;
-- enable/claim a Requisition;
-- unlock Progression;
-- grant an Achievement;
-- send Comms;
-- infer assignment from the local WoW rank.
+behavior from Phase 1. RPE Guild Rank assignment/eligibility must not confer officer permission.
 
 ## Constraints
-- Preserve all existing `profile.guild.byGuild` nested data.
-- Do not introduce another SavedVariable root.
-- Do not automatically assign, remap or clear a rank during normalization, login or guild events.
-- Do not add UI or Comms behavior.
-- Keep this module a persistence primitive, not Guild business logic.
+- Do not write Profile assignment state during catalogue resolution or runtime refresh.
+- Do not reintroduce the old equal-priority conflict model for multiple ranks.
+- Do not infer implicit RPE Guild Rank hierarchy/inheritance.
+- Do not add Requisition transactions, Daily Reward grants or Progression writes.
+- Keep guild event integration on the existing centralized Runtime frame.
 
 ## Acceptance criteria
-- [ ] Old Profiles without assignment fields normalize safely.
-- [ ] Existing Guild nested state is preserved.
-- [ ] Assignment set/get/clear survives `/reload` through SavedVariables.
-- [ ] Reads do not expose mutable internal tables unnecessarily.
-- [ ] Profile schema becomes 6 without lowering a future higher marker.
-- [ ] Setting a rank does not award rewards, unlock progression or perform a requisition.
-- [ ] No automatic assignment occurs on initialization or normalization.
-- [ ] No Comms/UI behavior is added.
+- [ ] Multiple exact Guild Ranks for one guild are returned without conflict.
+- [ ] Multiple generic Guild Ranks are returned when no exact catalogue exists.
+- [ ] Exact catalogue takes priority over generic catalogue as a set.
+- [ ] One WoW rank can return multiple eligible RPE Guild Ranks.
+- [ ] Eligibility is set membership, not `<=` hierarchy logic.
+- [ ] Assigned rank resolves from Profile state.
+- [ ] Invalid/stale assignments produce explicit status.
+- [ ] No assignment is written or changed by catalogue/runtime refresh.
+- [ ] `IsLocalPlayerOfficer()` remains centralized and intact.
+- [ ] No Requisition/Daily Reward/Progression transaction behavior is added.
 
 ## Coding-agent instructions
-Read the revised PDD and implementation plan, then inspect all current Guild Profile normalization/default-state/accessor paths before editing. Implement Task 3 only. Keep the new APIs thin and persistence-focused; report changed files, validation performed and any deviation from this issue.
+Read the revised PDD and implementation plan, then inspect the current Phase 1 Guild facade and Runtime event routing before editing. Implement Task 4 only. Prefer a coherent catalogue/result API over scattered special cases, preserve existing officer detection, and report changed files, validation performed and any deviation from this issue.
