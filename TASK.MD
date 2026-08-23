@@ -1,108 +1,141 @@
 ## Goal
-Award the assigned RPE Guild Rank's Daily Rewards once per character, per guild, per calendar day without automatically assigning a rank.
+Activate automatic Achievement progression and completion using the completed Phase 1 Achievement model without coupling it to Guild Rank assignment.
 
-Depends on: #15
+Depends on: completed Phase 1 Achievement data/Profile/editor work. This task may proceed after the Guild Rank foundation is stable; it does not depend on Requisition or Daily Reward runtime.
 
 ## Primary files
-- `client/client_Guild.lua` or a focused Guild reward module consistent with current organization
-- `core/internal/Runtime.lua`
-- `core/internal/profile/Guild.lua`
+- `client/client_Achievements.lua` **new** or equivalent focused module
+- `core/internal/profile/Achievements.lua`
 - `core/internal/profile/Currencies.lua`
-- `client/character/inventory/Inventory.lua` as the existing item award path
-- `client/character/guild/page_GuildRequisitions.lua`
+- `client/client_Resources.lua`
+- current RPE event-completion integration point identified from the repository
+- `client/character/profile/page_ProfileAchievements.lua`
+- `RPEngine_Dev.toc`
 
-## Runtime integration
-Use the existing centralized Runtime event frame. Do not create a separate event frame for Daily Rewards.
-
-Process/retry from appropriate existing login/guild-context events so rewards are attempted only when guild identity and roster/rank data are actually available.
-
-The operation must be idempotent across repeated runtime events and `/reload`.
-
-## Eligibility
-Before any award, validate:
+## Trigger contract
+Implement the existing Achievement criterion trigger tokens:
 
 ```text
-player is in a guild
-guild context is loaded
-valid assigned RPE Guild Rank exists
-enableDailyRewards is true
-current guild/calendar day has not already been claimed
-all Daily Reward definitions are valid/resolvable
+manual
+currency_gain
+rpe_kill
+rpe_event_complete
+achievement_earned
 ```
 
-Award only the character's valid assigned RPE Guild Rank rewards.
+Build an index from Achievement criteria in activated datasets rather than scanning every Achievement/criterion for every runtime event.
 
-No assigned/valid rank must produce no reward and must never trigger automatic rank assignment.
+Use the Phase 1 stable criterion IDs as the keys for Profile progress.
 
-## Award paths
-Use existing canonical APIs:
+## Criterion filtering
+Apply the Phase 1 filter semantics for the trigger being processed.
 
-### Item reward
-```lua
-Client.Inventory.AddItem(...)
-```
+At minimum:
+- `currency_gain` matches its configured `currencyRef` where present;
+- `rpe_kill` respects optional `unitRef` and `enemyOnly` where applicable;
+- `achievement_earned` matches configured `achievementRef`;
+- `manual` is not advanced by unrelated automatic events;
+- `rpe_event_complete` advances only from the authoritative event-completion path.
 
-### Currency reward
-Use the existing Profile currency add API so caps and normal currency behavior remain intact.
+Do not treat arbitrary filter strings as executable logic.
 
-Do not write directly to Inventory or Profile currency tables.
-
-## Claim state
-Store the completed claim in the current guild bucket using:
+## Currency gain integration
+The correct hook is the positive applied gain path in:
 
 ```lua
-dailyRewardDate
-dailyRewardRankRef
+Profile.AddCurrencyAmount(...)
 ```
 
-`dailyRewardDate` is a stable calendar-day key, for example:
+Do not trigger from:
+
+```lua
+Profile.SetCurrencyAmount(...)
+Profile.SpendCurrencyAmount(...)
+```
+
+Calculate:
 
 ```text
-2026-08-23
+previousAmount
+updatedAmount
+actualGain = updatedAmount - previousAmount
 ```
 
-Do **not** implement a rolling `timestamp + 86400` policy.
+and only advance `currency_gain` criteria when `actualGain > 0`.
 
-`dailyRewardRankRef` records which RPE Guild Rank supplied that day's reward.
+This must respect currency caps; requested gain above the cap counts only the amount actually applied.
 
-The claim is **one reward claim per character, per guild, per calendar day**, not one claim per RPE Guild Rank. Changing RPE Guild Rank after claiming must not provide another reward that day.
+## RPE kill integration
+Do **not** award kills from preliminary Damage/effect preview.
 
-## Transaction/idempotency behavior
-Design the award/claim sequence so repeated Runtime events, `/reload` and relog cannot duplicate a completed claim.
-
-Do not mark a claim successful before all required reward grants have been applied successfully.
-
-If partial award failure is possible with the existing APIs, handle it coherently so retry behavior cannot create duplicated partial rewards.
-
-## UI
-Update the Daily Reward section on the Requisitions tab to report useful states such as:
+Use the authoritative committed RPE resource-delta/death path and detect only:
 
 ```text
-Not eligible: no RPE Guild Rank assigned
-Daily rewards disabled
-Available today
-Received today
+alive before authoritative delta
+        ->
+dead after authoritative delta
 ```
 
-UI state is informational; runtime validation remains authoritative.
+Credit the kill only to the correct local player/action owner using the authoritative sender/action context available in the current code.
+
+Repeated updates to an already-dead EventUnit must not produce extra kills.
+
+## Completion behavior
+An Achievement completes when all of its criteria meet their goals.
+
+Completion is transition-based:
+
+```text
+incomplete -> complete
+```
+
+On that transition only:
+- persist updated criterion progress;
+- set `completedAt` once;
+- process `achievement_earned` dependents/meta Achievements;
+- refresh Profile Achievements UI;
+- announce the newly earned Achievement to Guild/Raid visible chat when appropriate.
+
+Loading an already-completed Profile must never retrigger completion or announcements.
+
+## Manual Grant API
+Provide an explicit runtime path such as:
+
+```lua
+Achievements:Grant(achievementRef, options)
+```
+
+for later Guild Admin use.
+
+`Grant()` must use the normal completion path rather than directly stamping arbitrary Profile state in a way that bypasses completion/meta/UI/announcement handling.
+
+## Broadcasting
+Achievement announcements are ordinary visible chat messages, not addon synchronization messages.
+
+When appropriate:
+- Guild announcement uses normal Guild chat;
+- Raid announcement uses normal Raid chat;
+- being in both may announce to both according to the PDD.
 
 ## Constraints
-- Never automatically assign/remap/clear RPE Guild Rank.
-- Do not permit a second claim after rank change on the same guild/calendar day.
-- Do not introduce another event frame or SavedVariable root.
-- Do not implement Requisition transaction changes beyond any shared helper strictly required.
-- Do not implement Achievement or Progression runtime here.
+- Do not couple Achievement eligibility/progress to RPE Guild Rank.
+- Do not add general Guild Admin mutations in this task.
+- Do not award from damage previews.
+- Do not treat currency spending or absolute Set operations as gain.
+- Do not re-announce completed Achievements during load/refresh.
+- Preserve Phase 1 Profile state shape and stable criterion IDs.
 
 ## Acceptance criteria
-- [ ] No assigned rank -> no reward and no auto-assignment.
-- [ ] Invalid assigned rank -> no reward.
-- [ ] Disabled Daily Rewards -> no reward.
-- [ ] Item and currency rewards use canonical APIs.
-- [ ] One claim per guild/calendar day survives reload/relog.
-- [ ] Changing rank after claim does not yield a second reward.
-- [ ] `dailyRewardRankRef` records which rank supplied the claimed reward.
-- [ ] Guild context loading races do not duplicate rewards.
-- [ ] UI accurately reports claimed/not-eligible state.
+- [ ] Currency gain uses actual applied positive delta after cap.
+- [ ] Currency spending/absolute set does not count as earning.
+- [ ] Kill progression uses authoritative alive->dead transition only.
+- [ ] Dead-unit repeats do not count again.
+- [ ] Filters select only matching criteria.
+- [ ] Meta Achievements progress from `achievement_earned`.
+- [ ] `completedAt` is set exactly once per completion transition.
+- [ ] Reloading completed state does not announce again.
+- [ ] Guild/Raid announcements are visible chat, not addon synchronization.
+- [ ] Manual `Grant()` uses normal completion handling.
 
 ## Coding-agent instructions
-Read the revised PDD and implementation plan, then inspect the existing Runtime event flow, Profile Guild state, currency API and Inventory award path before editing. Implement Task 8 only. Treat repeated Runtime events as normal and make processing idempotent. Report changed files, validation performed and any deviation from this issue.
+Read the revised PDD and implementation plan, then inspect the current currency, authoritative resource/death and event-completion paths before editing. Implement Task 9 only. Do not guess event authority from preliminary effects. Report changed files, validation performed and any deviation from this issue.

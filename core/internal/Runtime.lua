@@ -78,6 +78,11 @@ function Addon.Internal.DispatchEvent(event, ...)
         end
 
         if event == "PLAYER_ENTERING_WORLD" then
+            local Achievements = Client and Client.Achievements or nil
+            if Achievements and Achievements.RebuildIndex then
+                safeCall(Achievements.RebuildIndex, Achievements)
+            end
+
             local Guild = Client and Client.Guild or nil
             if Guild and Guild.HandleRuntimeEvent then
                 safeCall(Guild.HandleRuntimeEvent, Guild, event, ...)

@@ -43,6 +43,7 @@ core/classes/Condition.lua
 
 client/client_Session.lua
 client/client_Resources.lua
+client/client_Achievements.lua
 client/client_Guild.lua
 client/client_Commands.lua
 client/character/inventory/Inventory.lua

@@ -364,7 +364,28 @@ function Profile.AddCurrencyAmount(currencyRefOrId, amount)
     end
 
     local currentAmount = Profile.GetCurrencyAmount(normalizedKey)
-    return Profile.SetCurrencyAmount(normalizedKey, currentAmount + normalizeCurrencyAmount(amount))
+    local persistedAmount = Profile.SetCurrencyAmount(normalizedKey, currentAmount + normalizeCurrencyAmount(amount))
+    local updatedAmount = Profile.GetCurrencyAmount(normalizedKey)
+    local actualGain = updatedAmount - currentAmount
+    if actualGain > 0 then
+        local achievements = Addon.Client and Addon.Client.Achievements or nil
+        if achievements and type(achievements.ProcessTrigger) == "function" then
+            pcall(
+                achievements.ProcessTrigger,
+                achievements,
+                "currency_gain",
+                {
+                    currencyRef = normalizedKey,
+                    previousAmount = currentAmount,
+                    updatedAmount = updatedAmount,
+                    amount = actualGain,
+                    source = "currency-add",
+                }
+            )
+        end
+    end
+
+    return persistedAmount
 end
 
 function Profile.SpendCurrencyAmount(currencyRefOrId, amount)

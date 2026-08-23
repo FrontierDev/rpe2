@@ -1454,6 +1454,10 @@ function Client:HandleEventEnd(arguments)
     end
 
     local reason = arguments and arguments[3] or "ended"
+    local achievements = Client.Achievements
+    if achievements and type(achievements.HandleRPEEventComplete) == "function" then
+        pcall(achievements.HandleRPEEventComplete, achievements, state, reason)
+    end
     if self.PromptPhaseConsumableTraits then
         local prompted = self:PromptPhaseConsumableTraits(state, "event_end", function()
             Client:ResetEventState(reason)

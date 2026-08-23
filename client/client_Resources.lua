@@ -310,6 +310,158 @@ local function resolveLocalPlayerName()
     return type(playerName) == "string" and playerName or ""
 end
 
+local function getEventUnitHealthValue(unit, eventState)
+    if type(unit) ~= "table" then
+        return nil
+    end
+
+    local combat = getCombat()
+    if combat and type(combat.GetUnitHealthEntry) == "function" then
+        local entry = combat:GetUnitHealthEntry(unit, { eventState = eventState })
+        if type(entry) == "table" then
+            return tonumber(entry.currentValue) or tonumber(entry.maxValue) or 0
+        end
+    end
+
+    local healthResourceRef = eventState and eventState.healthResourceRef or nil
+    if type(healthResourceRef) ~= "string" or healthResourceRef == "" then
+        return nil
+    end
+
+    for index = 1, #(unit.resources or {}) do
+        local resource = unit.resources[index]
+        if resource and resource.resourceRef == healthResourceRef then
+            return tonumber(resource.currentValue) or tonumber(resource.maxValue) or 0
+        end
+    end
+
+    return nil
+end
+
+local function resolveKillIsEnemy(targetClient, eventState, targetUnit)
+    if type(targetUnit) ~= "table" then
+        return false
+    end
+
+    local actorUnit = nil
+    if type(targetClient.ResolveControlledEventUnit) == "function" then
+        actorUnit = targetClient:ResolveControlledEventUnit(eventState)
+    end
+    if not actorUnit and type(targetClient.ResolveLocalEventUnit) == "function" then
+        actorUnit = targetClient:ResolveLocalEventUnit(eventState)
+    end
+
+    local targetTeam = tonumber(targetUnit.team)
+    local actorTeam = tonumber(actorUnit and actorUnit.team)
+    if targetTeam ~= nil and actorTeam ~= nil then
+        return targetTeam ~= actorTeam
+    end
+
+    return targetUnit.isPlayer ~= true
+end
+
+local function notifyRPEKillAchievement(targetClient, eventState, actionOwnerName, result)
+    local kill = result and result.kill
+    if type(kill) ~= "table" then
+        return
+    end
+
+    local localPlayerName = resolveLocalPlayerName()
+    local normalizedActionOwnerName = Common.NormalizeName
+        and Common.NormalizeName(actionOwnerName)
+        or tostring(actionOwnerName or "")
+    if normalizedActionOwnerName == "" or localPlayerName == "" or normalizedActionOwnerName ~= localPlayerName then
+        return
+    end
+
+    local achievements = Addon.Client and Addon.Client.Achievements or nil
+    if not achievements or type(achievements.HandleRPEKill) ~= "function" then
+        return
+    end
+
+    local targetUnit = kill.targetUnit
+    pcall(
+        achievements.HandleRPEKill,
+        achievements,
+        {
+            authoritative = true,
+            actionOwnerName = normalizedActionOwnerName,
+            actorName = normalizedActionOwnerName,
+            eventState = eventState,
+            targetEventId = kill.targetEventId,
+            targetUnit = targetUnit,
+            unitRef = targetUnit and (targetUnit.registryID or targetUnit.unitRef or targetUnit.ref) or nil,
+            isEnemy = resolveKillIsEnemy(targetClient, eventState, targetUnit),
+            wasAlive = true,
+            isDead = true,
+            source = "resource-delta",
+        }
+    )
+end
+
+local normalizePendingScope
+
+local function queueRPEKillAchievement(targetClient, eventState, actionOwnerName, result, options)
+    if type(targetClient) ~= "table" or type(result and result.kill) ~= "table" then
+        return false
+    end
+
+    targetClient.PendingRPEKillAchievements = targetClient.PendingRPEKillAchievements or {}
+    targetClient.PendingRPEKillAchievements[#targetClient.PendingRPEKillAchievements + 1] = {
+        eventState = eventState,
+        actionOwnerName = actionOwnerName,
+        result = result,
+        allowLocalEchoApply = type(options) == "table" and options.allowLocalEchoApply == true,
+        scope = normalizePendingScope(type(options) == "table" and options.scope or nil),
+    }
+    return true
+end
+
+local function settleQueuedRPEKillAchievements(targetClient, expectedState, aggregate, committed)
+    if type(targetClient) ~= "table"
+        or type(expectedState) ~= "table"
+        or type(aggregate) ~= "table"
+        or aggregate.allowLocalEchoApply ~= true
+    then
+        return 0
+    end
+
+    local pending = targetClient.PendingRPEKillAchievements
+    if type(pending) ~= "table" or #pending == 0 then
+        return 0
+    end
+
+    local targetEventIds = {}
+    for index = 1, #(aggregate.targetedResourceDeltas or {}) do
+        local targetEventId = tonumber(aggregate.targetedResourceDeltas[index].targetEventId) or 0
+        if targetEventId > 0 then
+            targetEventIds[targetEventId] = true
+        end
+    end
+
+    local currentEventState = targetClient.GetEventState and targetClient:GetEventState() or nil
+    local processed = 0
+    for index = #pending, 1, -1 do
+        local queued = pending[index]
+        local targetEventId = tonumber(queued and queued.result and queued.result.kill and queued.result.kill.targetEventId) or 0
+        if queued
+            and queued.eventState == currentEventState
+            and queued.eventState
+            and queued.allowLocalEchoApply == true
+            and queued.scope == normalizePendingScope(aggregate.scope)
+            and targetEventIds[targetEventId]
+        then
+            if committed == true then
+                notifyRPEKillAchievement(targetClient, queued.eventState, queued.actionOwnerName, queued.result)
+            end
+            table.remove(pending, index)
+            processed = processed + 1
+        end
+    end
+
+    return processed
+end
+
 local function buildResourceDeltaSignature(channelName, playerName, payload, targetEventId)
     return table.concat({
         tostring(channelName or ""),
@@ -327,7 +479,7 @@ local function buildResourceDeltaBatchSignature(channelName, playerName, payload
     }, "\31")
 end
 
-local function normalizePendingScope(value)
+normalizePendingScope = function(value)
     return tostring(value or "turn") == "reaction" and "reaction" or "turn"
 end
 
@@ -607,6 +759,8 @@ local function applyInboundResourceDeltasForTarget(targetClient, state, eventSta
     local targetUnit = tonumber(targetEventId) and tonumber(targetEventId) > 0
         and findEventUnitById(eventState and eventState.units, targetEventId)
         or nil
+    local healthBefore = getEventUnitHealthValue(targetUnit, eventState)
+    local wasAlive = healthBefore ~= nil and healthBefore > 0
     local targetUnitIsPlayer = targetUnit and targetUnit.isPlayer == true or false
     local targetOwnerName = Common.NormalizeName(targetUnit and (targetUnit.ownerID or targetUnit.controllerID or targetUnit.name) or nil)
     local resourceOwnerName = targetUnit and tostring(targetUnit.name or playerName) or playerName
@@ -667,6 +821,9 @@ local function applyInboundResourceDeltasForTarget(targetClient, state, eventSta
         targetClient:BumpCombatRuntimeRevision(eventState, targetEventId)
     end
 
+    local healthAfter = getEventUnitHealthValue(targetUnit, eventState)
+    local isDead = healthAfter ~= nil and healthAfter <= 0
+
     return {
         changed = cachedChanged or eventUpdated,
         eventUpdated = eventUpdated,
@@ -674,6 +831,10 @@ local function applyInboundResourceDeltasForTarget(targetClient, state, eventSta
         appliedDeltas = appliedDeltas or resourceDeltas,
         resourceOwnerName = resourceOwnerName,
         sender = sender,
+        kill = wasAlive and isDead and {
+            targetEventId = tonumber(targetEventId) or 0,
+            targetUnit = targetUnit,
+        } or nil,
     }
 end
 
@@ -710,6 +871,7 @@ local function applyQueuedLocalResourceDeltas(targetClient, state, targetEventId
         targetEventId,
         resourceDeltas
     )
+    queueRPEKillAchievement(targetClient, eventState, playerName, result, options)
     local suppressLocalVisualRefresh = type(options) == "table" and options.suppressLocalVisualRefresh == true
     if result.eventUpdated and type(targetClient.QueueEventWidgetRefresh) == "function" and not suppressLocalVisualRefresh then
         queueScopedEventPortraitRefresh(targetClient, "resource-delta-local", targetEventId)
@@ -802,6 +964,11 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
                     threatUpdates = aggregate.threatUpdates,
                 }
             )
+            settleQueuedRPEKillAchievements(targetClient, expectedState, {
+                allowLocalEchoApply = aggregate.allowLocalEchoApply == true,
+                scope = scope,
+                targetedResourceDeltas = aggregate.targetedResourceDeltas,
+            }, sent == true)
             flushed = sent or flushed
         end
     end
@@ -868,7 +1035,7 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
         return true
     end
 
-    return self:SendClientResourceDeltaBatch(
+    local sent = self:SendClientResourceDeltaBatch(
         state,
         reason ~= "" and reason or "turn-resource",
         nil,
@@ -877,6 +1044,12 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
             allowLocalEchoApply = false,
         }
     )
+    settleQueuedRPEKillAchievements(self, state, {
+        allowLocalEchoApply = true,
+        scope = "turn",
+        targetedResourceDeltas = targetedResourceDeltas,
+    }, sent == true)
+    return sent
 end
 
 local function syncServerEventState(eventState)
@@ -902,6 +1075,7 @@ function Client:ResetResourceState()
     self.PendingResourceDeltaFlushQueuedByScope = {}
     self.PendingLocalResourceDeltaEchoSignatures = {}
     self.PendingLocalResourceDeltaBatchEchoSignatures = {}
+    self.PendingRPEKillAchievements = {}
     self.LastAppliedTurnRegenKey = nil
 end
 
@@ -1640,6 +1814,7 @@ function Client:HandleResourceDelta(arguments, sender)
 
     local eventState = self:GetEventState()
     local result = applyInboundResourceDeltasForTarget(self, state, eventState, playerName, sender, targetEventId, resourceDeltas)
+    notifyRPEKillAchievement(self, eventState, playerName, result)
 
     if eventState and ResourceSync.UpdateEventReadiness then
         ResourceSync.UpdateEventReadiness(eventState)
@@ -1761,6 +1936,7 @@ function Client:HandleResourceDeltaBatch(arguments, sender)
             targetEventId,
             deltasByTargetEventId[targetEventId]
         )
+        notifyRPEKillAchievement(self, eventState, playerName, result)
         if result.changed then
             changed = true
         end
