@@ -1,125 +1,197 @@
 ## Goal
-Activate the existing structural Guild Progression definitions as character state scoped to the character's assigned valid RPE Guild Rank, and add receiver-validated officer Progression administration.
+Audit Tasks 1–11 as one coherent Guild Rank/Achievement implementation and fix **concrete defects only**.
 
-Depends on: #12, #13, #15
+Depends on: #10, #11, #12, #13, #14, #15, #16, #17, #18, #19, #20
 
-## Primary files
-- `client/client_Guild.lua` or a focused Guild progression module consistent with current organization
-- `core/internal/profile/Guild.lua`
-- `client/character/guild/page_GuildProgression.lua`
-- `client/character/guild/page_GuildAdmin.lua`
-- `core/internal/comms/Operations.lua` and existing Guild Admin protocol handlers
+Do not start this issue until Tasks 1–11 are implemented and pushed.
 
-## Progression Profile state
-Persist Progression state under the current guild bucket, keyed by qualified RPE Guild Rank reference:
+## Required audit
+### User-facing terminology
+Search user-facing UI/text for stale:
 
-```lua
-profile.guild.byGuild[guildKey].progression[guildRankRef] = {
-    slots = {},
-    unlocked = {},
-    selectedSpells = {},
-}
+```text
+Guild Setting
+Guild Settings
+Minimum Guild Rank
 ```
 
-Use the existing/final normalized Guild Profile shape rather than introducing another SavedVariable root.
+Internal compatibility identifiers such as:
 
-State is rank-scoped:
-- only the currently assigned **valid** RPE Guild Rank's Progression is active/displayed;
-- changing assigned rank does not delete another rank's stored Progression state;
-- switching back to a previously assigned rank restores its preserved state.
-
-## Progression definition validation
-Use the assigned Guild Rank's existing structural definition:
-
-```lua
-progression = {
-    slotCount = 3,
-    entries = {
-        {
-            id = "...",
-            name = "...",
-            description = "...",
-            icon = "...",
-            lockedText = "...",
-            spellRefs = {},
-        },
-    },
-}
+```text
+GuildSetting
+guildSettings
+requiredGuildRankIndex
 ```
 
-Validate state against the current dataset definition:
-- slot assignments must refer to configured entry IDs;
-- locked entries cannot be actively selected/used where selection requires unlock;
-- selected spells must be present in that entry's configured `spellRefs`;
-- stale/invalid stored references should be handled safely without deleting unrelated rank state.
+may remain where required for storage/backward compatibility, but product UI must use **Guild Rank** terminology and must not expose the superseded Requisition-level Minimum Guild Rank authoring/eligibility model.
 
-Do not hard-code campaign-specific concepts such as Squire, Knight, Crusader, Oath or Troth into RPE core.
+### Schema and migration smoke test
+Verify backward-compatible normalization for:
 
-## Progression UI
-Render only the assigned valid rank's configured Progression.
+```text
+Profile schema 5 -> 6
+Dataset schema 15 -> 16
+old GuildSetting without wowGuildRankIndices
+old Requisitions containing requiredGuildRankIndex
+existing profile.guild.byGuild nested state
+```
 
-The presentation should preserve the useful panel/entry model from the PDD using existing RPE UI primitives:
-- entry name;
-- icon;
-- description;
-- locked text/state;
-- available/selected spell where applicable.
+Confirm:
+- existing Achievement/Profile state still loads;
+- existing Requisition/Daily Reward/Progression definitions survive;
+- old Guild nested state is preserved;
+- Inventory remains independent/untouched by migration;
+- future higher schema markers are not lowered;
+- migration never automatically assigns an RPE Guild Rank.
 
-`slotCount = 3` is a default, not a hard data/UI limit. If more entries/slots exist than fit horizontally, use existing scrolling/pagination/layout patterns rather than assuming exactly three.
+### Dataset round-trip
+Construct or inspect a representative Dataset containing:
+- multiple RPE Guild Ranks;
+- two RPE Guild Ranks mapping to the same WoW guild rank;
+- one unrestricted Guild Rank with empty `wowGuildRankIndices`;
+- Requisitions with built-in and dataset Currency refs;
+- Daily item/currency rewards;
+- Progression entries/spell refs;
+- Achievements referenced by the runtime/admin path.
 
-When no valid RPE Guild Rank is assigned, show a clean no-active-progression state and perform no mutation.
+Export/import and verify definitions, qualified refs, mappings and legacy compatibility fields survive appropriately.
 
-## Local mutation/business logic
-Centralize Progression mutation/validation in Guild/Profile APIs rather than implementing write logic directly in the UI.
+### Guild Rank catalogue
+Verify:
+- exact `guildName` catalogue takes priority over the generic catalogue **as a set**;
+- multiple exact ranks are returned without conflict;
+- multiple generic ranks are returned when no exact catalogue exists;
+- one WoW rank may have multiple eligible RPE Guild Ranks;
+- empty `wowGuildRankIndices` means unrestricted;
+- eligibility uses exact index membership, not numeric hierarchy;
+- there is no implicit RPE rank inheritance.
 
-Operations should support the state required by the PDD, including:
-- assigning an entry to a Progression slot;
-- locking/unlocking an entry;
-- selecting/clearing a configured spell as appropriate.
+### Manual assignment model
+Verify:
+- a character has at most one assigned RPE Guild Rank per guild;
+- assignment is set/cleared only by the explicit officer admin flow;
+- login, roster refresh and WoW rank changes never automatically assign/remap/clear the rank;
+- stale/invalid assignments return explicit status without mutation;
+- rank assignment persists per guild;
+- receiver validates applicability/eligibility using its own live state.
 
-All writes must be scoped to the current guild and qualified `guildRankRef`.
+### Guild window/UI
+Smoke-test:
+- Launcher -> Guild;
+- `/rpe guild`;
+- Guild -> Requisitions;
+- Guild -> Progression;
+- Guild -> Admin;
+- assigned/unassigned/invalid rank status;
+- Admin roster refresh/officer gating.
 
-## Officer Progression administration
-Extend the existing Guild Admin request/response protocol/UI so an authorized WoW guild officer can administer an online compatible member's Progression.
+Multiple catalogue ranks must not produce the old Phase 1 conflict state.
 
-Required officer operations:
-- assign an entry to a Progression slot;
-- lock/unlock an entry;
-- clear an invalid/undesired selected spell.
+### Requisition runtime
+Verify:
+- only the valid assigned rank's Requisitions are usable;
+- Requisition from another rank is rejected;
+- legacy `requiredGuildRankIndex` is ignored by runtime;
+- multiple currency costs validate before spending;
+- built-in `copper` works;
+- character lifetime limits are rank/Requisition scoped;
+- Inventory grants use `Client.Inventory.AddItem()`;
+- failures cannot leave partial deductions;
+- usage persists across reload/relog.
 
-The target member's client must independently validate:
+### Daily Reward runtime
+Verify:
+- rewards come only from the valid assigned rank;
+- no assigned/valid rank gives no reward;
+- item/currency rewards use canonical APIs;
+- claim is one per character/guild/calendar day;
+- `/reload`, relog and repeated guild events cannot duplicate the claim;
+- changing RPE Guild Rank after claiming does not allow a second claim that day;
+- `dailyRewardRankRef` records which rank supplied the reward.
+
+### Achievement runtime
+Verify:
+- `currency_gain` uses actual positive applied gain after caps;
+- Set/Spend does not count as earning;
+- `rpe_kill` comes only from authoritative alive -> dead transition;
+- already-dead updates do not count again;
+- criterion filters work;
+- `rpe_event_complete` uses the authoritative event-completion path;
+- `achievement_earned` meta progress works;
+- `completedAt` is transition-based and persists;
+- completed Achievements do not re-announce on load;
+- Guild/Raid announcements are normal visible chat;
+- manual `Grant()` uses normal completion handling.
+
+### Guild Admin security boundary
+For **every** remote mutation (Guild Rank, Achievement, Skill, Item, Progression), verify the target member's client independently derives/validates:
 
 ```text
 sender identity from transport
 same-guild membership
 sender WoW officer capability
-target is this client's active character
-currently assigned RPE Guild Rank is valid
-requested progression entry/slot exists in that rank definition
-requested selected spell state is valid
+target-self state
+requested object/reference validity
+operation-specific numeric/state validity
 ```
 
-Do not trust sender-supplied officer or eligibility flags. Return explicit acknowledgement and do not optimistically report success in the officer UI.
+Do not rely on prior query success, sender-supplied officer flags or UI gating.
 
-## Constraints
-- No valid assigned RPE Guild Rank -> no active Progression.
-- Do not infer Progression from WoW guild rank directly.
-- Do not automatically assign/remap an RPE Guild Rank.
-- Do not delete prior rank-scoped Progression state when rank changes.
-- Do not hard-code a three-entry data limit.
-- Do not create a second Guild Admin messaging system.
-- Do not directly write another member's SavedVariables from the officer client.
+Verify:
+- explicit acknowledgement for mutations;
+- no optimistic success in Admin UI;
+- online compatible members only;
+- no direct remote SavedVariable writes.
 
-## Acceptance criteria
-- [ ] No assigned/valid rank -> no active progression.
-- [ ] Progression state is keyed by RPE Guild Rank ref.
-- [ ] Switching ranks preserves prior rank state but activates only the current rank.
-- [ ] Progression survives reload/relog.
-- [ ] Locked entries cannot be selected.
-- [ ] Selected spell must exist in configured `spellRefs`.
-- [ ] UI is not hard-coded to exactly three entries.
-- [ ] Officer remote mutations are receiver-validated and acknowledged.
-- [ ] Core contains no campaign-specific rank/oath terminology.
+### Progression runtime/admin
+Verify:
+- only the valid assigned rank's Progression is active/displayed;
+- state is stored under `progression[guildRankRef]`;
+- switching ranks preserves prior rank state but activates only the new/current rank;
+- locked entries cannot be selected;
+- selected spells must exist in configured `spellRefs`;
+- UI supports more than exactly three entries/slots;
+- officer mutations are receiver-validated and acknowledged;
+- core contains no campaign-specific rank/oath terminology.
+
+### Load order and explicit integration maps
+Review `RPEngine_Dev.toc` and all explicit collection/inspector/refresh maps affected by the revision.
+
+Verify:
+- classes load before instantiation;
+- Profile Guild/Achievement modules load before client/UI consumers;
+- Guild/Achievement pages load before their windows;
+- Data Editor pages/inspectors load before use;
+- new runtime modules load before hooks/callers that require them;
+- `guildSettings` remains integrated in Database/Data Editor/dependency flows.
+
+### Non-goal audit
+Search the implementation and ensure it has **not** introduced:
+
+```text
+automatic RPE Guild Rank assignment
+automatic rank remapping/clearing
+multiple simultaneous assigned RPE Guild Ranks
+implicit RPE Guild Rank hierarchy/inheritance
+offline remote Profile mutation
+direct remote SavedVariable writes
+another Guild Admin messaging subsystem
+another Inventory/currency storage system
+```
+
+## Definition of done
+- [ ] Existing Phase 1 data remains loadable.
+- [ ] Guild Rank is the external terminology.
+- [ ] Dataset mappings support many RPE ranks per WoW rank.
+- [ ] Character rank is officer-assigned only.
+- [ ] Rank assignment is stored per guild and receiver-validated.
+- [ ] Requisitions are rank-scoped and transactional.
+- [ ] Daily Rewards are rank-scoped and once-per-guild/day.
+- [ ] Achievement runtime works without Guild Rank coupling.
+- [ ] General Guild Admin mutations are receiver-validated.
+- [ ] Progression is rank-scoped and persistent.
+- [ ] No prohibited automatic rank behavior exists.
+- [ ] Load order, schemas, exports/imports and dependency handling remain coherent.
 
 ## Coding-agent instructions
-Read the revised PDD and implementation plan, then inspect the current structural Progression editor/data model, Profile Guild state and existing Guild Admin protocol before editing. Implement Task 11 only. Keep all state qualified by guild and RPE Guild Rank ref, reuse the existing Comms security boundary, and report changed files, validation performed and any deviation from this issue.
+Treat the current `FrontierDev/rpe2` repository, revised `RPE2-Achievements-Guild-Systems-PDD.md`, and completed Tasks 1–11 as authoritative. Compare every checklist item against the implemented state. Fix concrete omissions/regressions only; do not expand scope or redesign working systems during the audit. Report the audit performed, files changed, validation results and any unresolved deviation before considering the task complete.

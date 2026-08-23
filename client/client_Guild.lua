@@ -1502,15 +1502,30 @@ function Guild:TryRequisition(guildRankRef, requisitionId)
         id = detail.itemId,
         quantity = detail.quantity,
     })
-    if not added or not addedRecord then
-        local restored = rollbackCurrencies()
-        return false, restored and "inventory-award-failed" or "rollback-failed", detail
-    end
-
     local quantityAfter = getInventoryItemQuantity(inventory, detail.datasetId, detail.itemId)
     local awardedQuantity = detail.quantity
     if quantityBefore ~= nil and quantityAfter ~= nil then
         awardedQuantity = math.max(0, quantityAfter - quantityBefore)
+    end
+
+    local measuredAward = quantityBefore ~= nil and quantityAfter ~= nil
+    if not added or not addedRecord or (measuredAward and awardedQuantity < detail.quantity) then
+        local itemRestored = true
+        if measuredAward and awardedQuantity > 0 then
+            itemRestored = removeInventoryItemQuantity(
+                inventory,
+                detail.datasetId,
+                detail.itemId,
+                awardedQuantity
+            )
+        end
+
+        local currenciesRestored = rollbackCurrencies()
+        if itemRestored and currenciesRestored then
+            return false, "inventory-award-failed", detail
+        end
+
+        return false, "rollback-failed", detail
     end
 
     local expectedUsage = detail.usage + 1
