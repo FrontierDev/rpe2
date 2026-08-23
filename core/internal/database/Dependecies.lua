@@ -608,8 +608,12 @@ local function pruneGuildSettingReferences(guildSettings, deletedDatasetId, dele
         local dailyRewards = type(guildSetting) == "table" and type(guildSetting.dailyRewards) == "table" and guildSetting.dailyRewards or {}
         for rewardIndex = 1, #dailyRewards do
             local reward = dailyRewards[rewardIndex]
+            local rewardType = type(reward) == "table" and reward.type or nil
+            local rewardTypeMatchesCollection = not collectionKey
+                or (collectionKey == "items" and rewardType == "item")
+                or (collectionKey == "currencies" and rewardType == "currency")
             if type(reward) == "table"
-                and (not collectionKey or collectionKey == "items" or collectionKey == "currencies")
+                and rewardTypeMatchesCollection
                 and isDeletedReference(reward.ref, deletedDatasetId, deletedRef)
             then
                 reward.ref = nil
