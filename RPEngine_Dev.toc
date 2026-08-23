@@ -86,6 +86,7 @@ core/classes/Recipe.lua
 core/classes/Aura.lua
 core/classes/Interaction.lua
 core/classes/Achievement.lua
+core/classes/GuildSetting.lua
 core/classes/Currency.lua
 core/classes/Event.lua
 
