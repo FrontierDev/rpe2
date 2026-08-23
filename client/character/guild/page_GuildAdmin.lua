@@ -243,6 +243,9 @@ function AdminPage:RefreshActionControls()
     local canAdminister = self.IsOfficer == true
         and selectedMember ~= nil
         and selectedMember.online == true
+        and self.SelectedMemberQueryPending ~= true
+        and self.SelectedMemberAdminState ~= nil
+        and self.SelectedMemberAdminState.success == true
         and self.PendingAdminAction == nil
     local eligibleRanks = self.EligibleGuildRanks or {}
     local selectedRankIsEligible = false
@@ -290,6 +293,8 @@ function AdminPage:SetSelectedGuildRank()
     local selectedMember = self.SelectedMember
     local selectedRankRef = tostring(self.SelectedGuildRankRef or "")
     if not Guild or not selectedMember or selectedMember.online ~= true or self.IsOfficer ~= true
+        or self.SelectedMemberQueryPending == true
+        or not self.SelectedMemberAdminState or self.SelectedMemberAdminState.success ~= true
         or selectedRankRef == "" or not containsRankRef(self.EligibleGuildRanks, selectedRankRef)
         or self.PendingAdminAction ~= nil then
         return false
@@ -330,6 +335,7 @@ function AdminPage:ClearSelectedGuildRank()
     local Guild = Client.Guild
     local selectedMember = self.SelectedMember
     if not Guild or not selectedMember or selectedMember.online ~= true or self.IsOfficer ~= true
+        or self.SelectedMemberQueryPending == true
         or self.PendingAdminAction ~= nil then
         return false
     end

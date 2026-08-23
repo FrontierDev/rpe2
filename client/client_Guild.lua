@@ -269,24 +269,20 @@ local function hasGuildOfficerCapability(member)
         -- one-based rankOrder for permission flags.
         local ok, permissions = pcall(getRankFlags, rankIndex + 1)
         if ok and type(permissions) == "table" then
-            -- Treat officer-chat and guild-management permissions as the WoW
-            -- officer capability. Sender-provided fields are never consulted.
-            return permissions[3] == true
-                or permissions[4] == true
-                or permissions[5] == true
-                or permissions[6] == true
-                or permissions[7] == true
-                or permissions[8] == true
-                or permissions[9] == true
-                or permissions[11] == true
-                or permissions[12] == true
-                or permissions[13] == true
+            -- Mirror the established local fallback: only management
+            -- capabilities authorize Guild Admin. Officer-chat listen/speak
+            -- and view-only note permissions are deliberately insufficient.
+            return permissions[5] == true -- promote
+                or permissions[6] == true -- demote
+                or permissions[8] == true -- remove member
+                or permissions[12] == true -- edit officer note
+                or permissions[13] == true -- modify guild info
         end
     end
 
-    -- Compatibility fallback for clients that cannot expose rank flags. The
-    -- guild master and first officer rank are the stable roster-only fallback.
-    return rankIndex <= 1
+    -- Do not infer authority from rank order when capability inspection is
+    -- unavailable. A passive rank or rank 1 must not authorize mutations.
+    return false
 end
 
 local function invokeGuildAdminCallback(pending, response)
