@@ -7,7 +7,7 @@ Addon.Internal.Database = Database
 local Dependecies = Database.Dependecies or {}
 
 local SCHEMA = {
-    profiles = 5,
+    profiles = 6,
     rulesets = 1,
     datasets = 16,
     globalSettings = 1,
@@ -556,10 +556,41 @@ local function normalizeProfileAchievements(record)
     return normalized
 end
 
+local function normalizeOptionalProfileText(value)
+    local text = ensureString(value, "")
+    text = text:gsub("^%s+", ""):gsub("%s+$", "")
+    return text ~= "" and text or nil
+end
+
+local function normalizeProfileTimestamp(value)
+    local numeric = tonumber(value)
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge or numeric < 0 then
+        return nil
+    end
+
+    return math.floor(numeric)
+end
+
+local function normalizeProfileGuildBucket(record)
+    local data = ensureTable(record)
+    local normalized = deepCopy(data)
+
+    normalized.assignedRankRef = normalizeOptionalProfileText(data.assignedRankRef)
+    normalized.assignedRankAt = normalizeProfileTimestamp(data.assignedRankAt)
+    normalized.assignedRankBy = normalizeOptionalProfileText(data.assignedRankBy)
+
+    return normalized
+end
+
 local function normalizeProfileGuildState(record)
     local data = ensureTable(record)
     local normalized = deepCopy(data)
-    normalized.byGuild = deepCopy(ensureTable(data.byGuild))
+    normalized.byGuild = {}
+
+    for guildKey, bucket in pairs(ensureTable(data.byGuild)) do
+        normalized.byGuild[guildKey] = normalizeProfileGuildBucket(bucket)
+    end
+
     return normalized
 end
 

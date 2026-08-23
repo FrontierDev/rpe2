@@ -1,92 +1,83 @@
 ## Goal
-Change all user-facing Data Editor terminology from **Guild Setting** to **Guild Rank** and allow authors to configure the WoW guild ranks that may be assigned to each RPE Guild Rank.
+Add backward-compatible per-guild Profile state and thin Profile APIs for the officer-assigned RPE Guild Rank.
 
 Depends on: #10
 
 ## Primary files
-- `client/ui/editor/windows/window_DataEditor.lua`
-- `client/ui/editor/pages/page_GuildSetting.lua`
-- `client/ui/editor/inspectors/page_InspectorGuildSetting.lua`
-- `client/ui/editor/pages/page_Datasets.lua` if user-facing collection labels/status text require changes
-- related editor helpers found by repository search
+- `core/internal/database/Database.lua`
+- `core/internal/profile/Guild.lua`
 
-## Data Editor terminology
-Search every user-facing occurrence of:
-
-```text
-Guild Setting
-Guild Settings
-New Guild Setting
-```
-
-in the Data Editor and replace the product terminology with:
-
-```text
-Guild Rank
-Guild Ranks
-New Guild Rank
-```
-
-Do not rename internal Lua identifiers solely for display terminology. The underlying collection remains `guildSettings` and the class remains `GuildSetting`.
-
-## Eligible WoW Guild Ranks editor
-Add an editor for:
+## Required Profile state
+Within each guild bucket support:
 
 ```lua
-wowGuildRankIndices
+profile.guild.byGuild[guildKey] = {
+    assignedRankRef = nil,
+    assignedRankAt = nil,
+    assignedRankBy = nil,
+    ...existing/future fields...
+}
 ```
 
-under the General section.
+The Profile continues to store one guild bucket per guild. A character may have at most one assigned RPE Guild Rank in a guild at a time.
 
-Use existing RPE UI primitives and keep the control simple. A compact validated text/list editor is acceptable if no reusable multi-select exists.
+Normalization must preserve unknown/future nested Guild state, including existing/future Requisition and Progression data. Do not destructively replace the guild bucket with only the assignment fields.
 
-Requirements:
-- allow multiple non-negative indexes;
-- explain `0 = highest WoW guild rank`;
-- explain blank/empty means any WoW guild rank;
-- normalize through `GuildSetting` rather than implementing a competing normalization path;
-- multiple Guild Rank entries may contain the same WoW rank index.
-
-One WoW guild rank mapping to several RPE Guild Ranks is intentional and must not be treated as an editor conflict.
-
-## Requisition UI change
-Remove the user-facing:
+## Schema
+Increment only the Profile schema:
 
 ```text
-Minimum Guild Rank
-Minimum Guild Rank Index
+5 -> 6
 ```
 
-editor backed by legacy `requiredGuildRankIndex` from the new authoring flow.
+Old Profiles without assignment fields must normalize safely. Follow the existing monotonic schema behavior and do not lower any future higher schema marker.
 
-Do not delete or clear legacy stored `requiredGuildRankIndex` values merely because the field is no longer shown.
+## Thin Profile API
+Add narrow helpers such as:
 
-Keep the existing editors for:
-- Requisition Item Ref;
-- Quantity;
-- Character Limit;
-- Currency costs;
-- Daily Rewards;
-- Progression definitions;
-- General feature flags/tags.
+```lua
+Profile.GetGuildBucket(guildKey)
+Profile.GetAssignedGuildRank(guildKey)
+Profile.SetAssignedGuildRank(guildKey, guildRankRef, metadata)
+Profile.ClearAssignedGuildRank(guildKey)
+```
+
+Exact naming may follow current Profile conventions, but callers must not need to mutate the raw `profile.guild` table directly.
+
+`SetAssignedGuildRank` should normalize:
+- `guildRankRef` as a non-empty string/reference;
+- optional assignment timestamp;
+- optional assigning officer display identity.
+
+Returned state should follow existing Database/Profile copy semantics so callers cannot accidentally bypass persistence/notification paths.
+
+## Scope boundary
+This task deliberately does **not** decide whether a requested rank is valid for a particular WoW guild rank. Catalogue eligibility and receiver-side validation belong to later tasks.
+
+Setting assignment state must not itself:
+- award Daily Rewards;
+- enable/claim a Requisition;
+- unlock Progression;
+- grant an Achievement;
+- send Comms;
+- infer assignment from the local WoW rank.
 
 ## Constraints
-- Do not rename `GuildSetting`, `guildSettings`, files or SavedVariable structures for display terminology.
-- Do not add Profile rank assignment.
-- Do not change Guild runtime resolution in this task.
-- Do not add officer Comms, Requisition transactions, Daily Reward grants or Progression mutation.
-- Preserve generic create/select/delete/export/import behavior.
+- Preserve all existing `profile.guild.byGuild` nested data.
+- Do not introduce another SavedVariable root.
+- Do not automatically assign, remap or clear a rank during normalization, login or guild events.
+- Do not add UI or Comms behavior.
+- Keep this module a persistence primitive, not Guild business logic.
 
 ## Acceptance criteria
-- [ ] Data Editor collection/button/empty-state/inspector text says Guild Rank(s), not Guild Setting(s).
-- [ ] Internal `guildSettings` collection behavior remains intact.
-- [ ] A Guild Rank can be authored with multiple WoW guild rank indexes.
-- [ ] Empty mapping round-trips as unrestricted.
-- [ ] Two different RPE Guild Ranks can both map to the same WoW rank.
-- [ ] Requisition-level Minimum Guild Rank is no longer exposed for new authoring.
-- [ ] Existing Requisition costs/limits and Daily Reward/Progression editors still work.
-- [ ] Export/import preserves authored Guild Rank mappings.
-- [ ] No Profile assignment or runtime Guild behavior is added.
+- [ ] Old Profiles without assignment fields normalize safely.
+- [ ] Existing Guild nested state is preserved.
+- [ ] Assignment set/get/clear survives `/reload` through SavedVariables.
+- [ ] Reads do not expose mutable internal tables unnecessarily.
+- [ ] Profile schema becomes 6 without lowering a future higher marker.
+- [ ] Setting a rank does not award rewards, unlock progression or perform a requisition.
+- [ ] No automatic assignment occurs on initialization or normalization.
+- [ ] No Comms/UI behavior is added.
 
 ## Coding-agent instructions
-Read the revised PDD and implementation plan, then inspect all Data Editor collection labels, page mappings, inspector mappings and explicit strings before editing. Implement Task 2 only. Preserve internal compatibility identifiers and existing editor architecture; report changed files, validation performed and any deviation from this issue.
+Read the revised PDD and implementation plan, then inspect all current Guild Profile normalization/default-state/accessor paths before editing. Implement Task 3 only. Keep the new APIs thin and persistence-focused; report changed files, validation performed and any deviation from this issue.
