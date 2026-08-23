@@ -1,138 +1,125 @@
 ## Goal
-Build the remaining Guild Admin operations on the receiver-validated request/response protocol introduced by Task 6.
+Activate the existing structural Guild Progression definitions as character state scoped to the character's assigned valid RPE Guild Rank, and add receiver-validated officer Progression administration.
 
-Depends on: #15, #18
+Depends on: #12, #13, #15
 
 ## Primary files
-- `core/internal/comms/Operations.lua`
-- existing Comms send/dispatch files as required by current patterns
-- `client/client_Guild.lua`
+- `client/client_Guild.lua` or a focused Guild progression module consistent with current organization
+- `core/internal/profile/Guild.lua`
+- `client/character/guild/page_GuildProgression.lua`
 - `client/character/guild/page_GuildAdmin.lua`
-- Achievement runtime from #18
-- existing Profile Skill APIs
-- existing Inventory APIs
+- `core/internal/comms/Operations.lua` and existing Guild Admin protocol handlers
 
-## Required Admin operations
-Implement:
-
-```text
-grant_achievement
-adjust_skill
-give_item
-```
-
-Use the same targeted addon-message request/response architecture established by Task 6. Do not create a second Guild Admin protocol.
-
-Extend the member query response only as needed for the Admin UI to display:
-- Achievement earned/completion state;
-- relevant Skill levels;
-- assigned RPE Guild Rank.
-
-Inventory contents do not need to be transmitted merely to give an item.
-
-## Receiver-side validation
-Every mutation must independently validate again:
-
-```text
-sender identity came from transport
-sender is in the same WoW guild
-sender currently has WoW officer capability
-target is this client's own active character
-requested operation is supported
-referenced RPE object exists
-numeric arguments are valid
-```
-
-Do not rely on:
-- a previous successful member query;
-- the officer UI being gated;
-- payload fields claiming officer status;
-- state cached only on the sender.
-
-The target member's client is authoritative for applying its own Profile/Inventory mutation.
-
-## Grant Achievement
-Resolve the requested Achievement and apply through the Achievement runtime:
+## Progression Profile state
+Persist Progression state under the current guild bucket, keyed by qualified RPE Guild Rank reference:
 
 ```lua
-Achievements:Grant(achievementRef, {
-    source = "guild_admin",
-    actor = sender,
-})
-```
-
-or equivalent current API.
-
-Do not directly stamp `profile.achievements` in a way that bypasses normal completion/meta/UI/announcement handling.
-
-## Adjust Skill
-Resolve/validate the Skill reference and use existing Profile Skill APIs, conceptually:
-
-```lua
-local current = Profile.GetSkillLevel(skillRef)
-Profile.SetSkillLevel(skillRef, current + delta)
-```
-
-Validate numeric delta/result according to the current Skill/Profile constraints. Do not write the underlying Profile table directly.
-
-## Give Item
-Resolve:
-
-```lua
-Registry:ResolveItemReference(itemRef)
-```
-
-then award through:
-
-```lua
-Client.Inventory.AddItem(...)
-```
-
-Validate quantity before mutation. Preserve existing stack/bind/Inventory behavior.
-
-## Admin UI
-For an online selected member, activate the relevant sections for officers:
-- Achievements: display earned state and Grant action where appropriate;
-- Skills: show level and Increase/Decrease controls;
-- Items: select item, enter quantity, Give action.
-
-The UI must:
-- show pending state where practical;
-- wait for explicit target acknowledgement;
-- display failure reason rather than optimistically assuming success;
-- keep the existing RPE Guild Rank Set/Clear operations functional.
-
-## Responses
-Every supported mutation returns an acknowledgement containing enough information to match the request and report success/failure, for example:
-
-```lua
-{
-    requestId = "...",
-    success = true,
-    operation = "give_item",
+profile.guild.byGuild[guildKey].progression[guildRankRef] = {
+    slots = {},
+    unlocked = {},
+    selectedSpells = {},
 }
 ```
 
-or an explicit failure reason.
+Use the existing/final normalized Guild Profile shape rather than introducing another SavedVariable root.
+
+State is rank-scoped:
+- only the currently assigned **valid** RPE Guild Rank's Progression is active/displayed;
+- changing assigned rank does not delete another rank's stored Progression state;
+- switching back to a previously assigned rank restores its preserved state.
+
+## Progression definition validation
+Use the assigned Guild Rank's existing structural definition:
+
+```lua
+progression = {
+    slotCount = 3,
+    entries = {
+        {
+            id = "...",
+            name = "...",
+            description = "...",
+            icon = "...",
+            lockedText = "...",
+            spellRefs = {},
+        },
+    },
+}
+```
+
+Validate state against the current dataset definition:
+- slot assignments must refer to configured entry IDs;
+- locked entries cannot be actively selected/used where selection requires unlock;
+- selected spells must be present in that entry's configured `spellRefs`;
+- stale/invalid stored references should be handled safely without deleting unrelated rank state.
+
+Do not hard-code campaign-specific concepts such as Squire, Knight, Crusader, Oath or Troth into RPE core.
+
+## Progression UI
+Render only the assigned valid rank's configured Progression.
+
+The presentation should preserve the useful panel/entry model from the PDD using existing RPE UI primitives:
+- entry name;
+- icon;
+- description;
+- locked text/state;
+- available/selected spell where applicable.
+
+`slotCount = 3` is a default, not a hard data/UI limit. If more entries/slots exist than fit horizontally, use existing scrolling/pagination/layout patterns rather than assuming exactly three.
+
+When no valid RPE Guild Rank is assigned, show a clean no-active-progression state and perform no mutation.
+
+## Local mutation/business logic
+Centralize Progression mutation/validation in Guild/Profile APIs rather than implementing write logic directly in the UI.
+
+Operations should support the state required by the PDD, including:
+- assigning an entry to a Progression slot;
+- locking/unlocking an entry;
+- selecting/clearing a configured spell as appropriate.
+
+All writes must be scoped to the current guild and qualified `guildRankRef`.
+
+## Officer Progression administration
+Extend the existing Guild Admin request/response protocol/UI so an authorized WoW guild officer can administer an online compatible member's Progression.
+
+Required officer operations:
+- assign an entry to a Progression slot;
+- lock/unlock an entry;
+- clear an invalid/undesired selected spell.
+
+The target member's client must independently validate:
+
+```text
+sender identity from transport
+same-guild membership
+sender WoW officer capability
+target is this client's active character
+currently assigned RPE Guild Rank is valid
+requested progression entry/slot exists in that rank definition
+requested selected spell state is valid
+```
+
+Do not trust sender-supplied officer or eligibility flags. Return explicit acknowledgement and do not optimistically report success in the officer UI.
 
 ## Constraints
-- Online compatible RPE members only; offline editing remains out of scope.
-- Do not directly mutate another player's SavedVariables from the officer client.
-- Do not weaken the receiver-side validation established in Task 6.
-- Do not bypass Achievement, Skill or Inventory domain APIs.
-- Do not break RPE Guild Rank Set/Clear administration.
-- Progression administration belongs to Task 11.
+- No valid assigned RPE Guild Rank -> no active Progression.
+- Do not infer Progression from WoW guild rank directly.
+- Do not automatically assign/remap an RPE Guild Rank.
+- Do not delete prior rank-scoped Progression state when rank changes.
+- Do not hard-code a three-entry data limit.
+- Do not create a second Guild Admin messaging system.
+- Do not directly write another member's SavedVariables from the officer client.
 
 ## Acceptance criteria
-- [ ] Officer can grant a valid Achievement to an online RPE member.
-- [ ] Achievement uses normal completion/announcement behavior.
-- [ ] Officer can increase/decrease a valid Skill within valid numeric bounds.
-- [ ] Officer can give a valid Item/quantity through Inventory.
-- [ ] Invalid references/quantities are rejected by receiver.
-- [ ] Non-officer/spoofed senders are rejected.
-- [ ] Each mutation receives explicit acknowledgement.
-- [ ] Officer UI does not optimistically report success.
-- [ ] Existing Guild Rank set/clear operations still work.
+- [ ] No assigned/valid rank -> no active progression.
+- [ ] Progression state is keyed by RPE Guild Rank ref.
+- [ ] Switching ranks preserves prior rank state but activates only the current rank.
+- [ ] Progression survives reload/relog.
+- [ ] Locked entries cannot be selected.
+- [ ] Selected spell must exist in configured `spellRefs`.
+- [ ] UI is not hard-coded to exactly three entries.
+- [ ] Officer remote mutations are receiver-validated and acknowledged.
+- [ ] Core contains no campaign-specific rank/oath terminology.
 
 ## Coding-agent instructions
-Read the revised PDD and implementation plan, then inspect the Task 6 protocol, current Achievement runtime, Skill Profile APIs, Registry item resolution and Inventory award path before editing. Implement Task 10 only. Keep receiver validation authoritative and reuse existing domain APIs. Report changed files, validation performed and any deviation from this issue.
+Read the revised PDD and implementation plan, then inspect the current structural Progression editor/data model, Profile Guild state and existing Guild Admin protocol before editing. Implement Task 11 only. Keep all state qualified by guild and RPE Guild Rank ref, reuse the existing Comms security boundary, and report changed files, validation performed and any deviation from this issue.
