@@ -452,6 +452,190 @@ local function getUnitSourceRefs(unit)
     return refs
 end
 
+local ACHIEVEMENT_FILTER_REFERENCE_FIELDS = {
+    "currencyRef",
+    "unitRef",
+    "achievementRef",
+}
+
+local function getAchievementSourceRefs(achievement)
+    local refs = {}
+    if type(achievement) ~= "table" then
+        return refs
+    end
+
+    local criteria = type(achievement.criteria) == "table" and achievement.criteria or {}
+    for index = 1, #criteria do
+        local criterion = criteria[index]
+        local filters = type(criterion) == "table" and criterion.filters or nil
+        if type(filters) == "table" then
+            for fieldIndex = 1, #ACHIEVEMENT_FILTER_REFERENCE_FIELDS do
+                local fieldName = ACHIEVEMENT_FILTER_REFERENCE_FIELDS[fieldIndex]
+                local reference = filters[fieldName]
+                if type(reference) == "string" and reference ~= "" then
+                    refs[#refs + 1] = reference
+                end
+            end
+        end
+    end
+
+    return refs
+end
+
+local function getGuildSettingSourceRefs(guildSetting)
+    local refs = {}
+    if type(guildSetting) ~= "table" then
+        return refs
+    end
+
+    local requisitions = type(guildSetting.requisitions) == "table" and guildSetting.requisitions or {}
+    for index = 1, #requisitions do
+        local requisition = requisitions[index]
+        if type(requisition) == "table" then
+            if type(requisition.itemRef) == "string" and requisition.itemRef ~= "" then
+                refs[#refs + 1] = requisition.itemRef
+            end
+
+            local costs = type(requisition.costs) == "table" and requisition.costs or {}
+            for costIndex = 1, #costs do
+                local cost = costs[costIndex]
+                local currencyRef = type(cost) == "table" and cost.currencyRef or nil
+                if type(currencyRef) == "string" and currencyRef ~= "" then
+                    refs[#refs + 1] = currencyRef
+                end
+            end
+        end
+    end
+
+    local dailyRewards = type(guildSetting.dailyRewards) == "table" and guildSetting.dailyRewards or {}
+    for index = 1, #dailyRewards do
+        local reward = dailyRewards[index]
+        local reference = type(reward) == "table" and reward.ref or nil
+        if type(reference) == "string" and reference ~= "" then
+            refs[#refs + 1] = reference
+        end
+    end
+
+    local progression = guildSetting.progression
+    local progressionEntries = type(progression) == "table" and type(progression.entries) == "table" and progression.entries or {}
+    for index = 1, #progressionEntries do
+        local entry = progressionEntries[index]
+        local spellRefs = type(entry) == "table" and type(entry.spellRefs) == "table" and entry.spellRefs or {}
+        for spellIndex = 1, #spellRefs do
+            local spellRef = spellRefs[spellIndex]
+            if type(spellRef) == "string" and spellRef ~= "" then
+                refs[#refs + 1] = spellRef
+            end
+        end
+    end
+
+    return refs
+end
+
+local function isDeletedReference(reference, deletedDatasetId, deletedRef)
+    if type(reference) ~= "string" or reference == "" then
+        return false
+    end
+
+    if deletedRef and reference == deletedRef then
+        return true
+    end
+
+    local sourceDatasetId = Dependecies.ParseSourceStatRef(reference)
+    return deletedDatasetId ~= nil and sourceDatasetId == deletedDatasetId
+end
+
+local function pruneAchievementReferences(achievements, deletedDatasetId, deletedRef, collectionKey)
+    local mutated = false
+    local achievementList = type(achievements) == "table" and achievements or {}
+    for index = 1, #achievementList do
+        local achievement = achievementList[index]
+        local criteria = type(achievement) == "table" and type(achievement.criteria) == "table" and achievement.criteria or {}
+        for criterionIndex = 1, #criteria do
+            local criterion = criteria[criterionIndex]
+            local filters = type(criterion) == "table" and criterion.filters or nil
+            if type(filters) == "table" then
+                for fieldIndex = 1, #ACHIEVEMENT_FILTER_REFERENCE_FIELDS do
+                    local fieldName = ACHIEVEMENT_FILTER_REFERENCE_FIELDS[fieldIndex]
+                    local fieldCollectionKey = fieldName == "currencyRef" and "currencies"
+                        or fieldName == "unitRef" and "units"
+                        or "achievements"
+                    if (not collectionKey or collectionKey == fieldCollectionKey)
+                        and isDeletedReference(filters[fieldName], deletedDatasetId, deletedRef)
+                    then
+                        filters[fieldName] = nil
+                        mutated = true
+                    end
+                end
+            end
+        end
+    end
+
+    return mutated
+end
+
+local function pruneGuildSettingReferences(guildSettings, deletedDatasetId, deletedRef, collectionKey)
+    local mutated = false
+    local guildSettingList = type(guildSettings) == "table" and guildSettings or {}
+    for index = 1, #guildSettingList do
+        local guildSetting = guildSettingList[index]
+
+        local requisitions = type(guildSetting) == "table" and type(guildSetting.requisitions) == "table" and guildSetting.requisitions or {}
+        for requisitionIndex = 1, #requisitions do
+            local requisition = requisitions[requisitionIndex]
+            if type(requisition) == "table" then
+                if (not collectionKey or collectionKey == "items")
+                    and isDeletedReference(requisition.itemRef, deletedDatasetId, deletedRef)
+                then
+                    requisition.itemRef = nil
+                    mutated = true
+                end
+
+                local costs = type(requisition.costs) == "table" and requisition.costs or {}
+                for costIndex = #costs, 1, -1 do
+                    local cost = costs[costIndex]
+                    local currencyRef = type(cost) == "table" and cost.currencyRef or nil
+                    if (not collectionKey or collectionKey == "currencies")
+                        and isDeletedReference(currencyRef, deletedDatasetId, deletedRef)
+                    then
+                        table.remove(costs, costIndex)
+                        mutated = true
+                    end
+                end
+            end
+        end
+
+        local dailyRewards = type(guildSetting) == "table" and type(guildSetting.dailyRewards) == "table" and guildSetting.dailyRewards or {}
+        for rewardIndex = 1, #dailyRewards do
+            local reward = dailyRewards[rewardIndex]
+            if type(reward) == "table"
+                and (not collectionKey or collectionKey == "items" or collectionKey == "currencies")
+                and isDeletedReference(reward.ref, deletedDatasetId, deletedRef)
+            then
+                reward.ref = nil
+                mutated = true
+            end
+        end
+
+        local progression = type(guildSetting) == "table" and guildSetting.progression or nil
+        local entries = type(progression) == "table" and type(progression.entries) == "table" and progression.entries or {}
+        for entryIndex = 1, #entries do
+            local entry = entries[entryIndex]
+            local spellRefs = type(entry) == "table" and type(entry.spellRefs) == "table" and entry.spellRefs or {}
+            for spellIndex = #spellRefs, 1, -1 do
+                if (not collectionKey or collectionKey == "spells")
+                    and isDeletedReference(spellRefs[spellIndex], deletedDatasetId, deletedRef)
+                then
+                    table.remove(spellRefs, spellIndex)
+                    mutated = true
+                end
+            end
+        end
+    end
+
+    return mutated
+end
+
 local function pruneDeletedDerivedSources(entry, deletedDatasetId, legacyField, refField)
     local mutated = false
     local keptSources = {}
@@ -531,6 +715,8 @@ function Dependecies.RecomputeDatasetDependencies(datasetId)
     local races = ensureTable(dataset.races)
     local classes = ensureTable(dataset.classes)
     local auras = ensureTable(dataset.auras)
+    local achievements = ensureTable(dataset.achievements)
+    local guildSettings = ensureTable(dataset.guildSettings)
 
     for index = 1, #units do
         local unit = units[index]
@@ -688,6 +874,32 @@ function Dependecies.RecomputeDatasetDependencies(datasetId)
         end
     end
 
+    for index = 1, #achievements do
+        local achievement = achievements[index]
+        local sourceRefs = getAchievementSourceRefs(achievement)
+
+        for refIndex = 1, #sourceRefs do
+            local sourceDatasetId = Dependecies.ParseSourceStatRef(sourceRefs[refIndex])
+            if sourceDatasetId and sourceDatasetId ~= dataset.id and not seen[sourceDatasetId] then
+                dependencies[#dependencies + 1] = sourceDatasetId
+                seen[sourceDatasetId] = true
+            end
+        end
+    end
+
+    for index = 1, #guildSettings do
+        local guildSetting = guildSettings[index]
+        local sourceRefs = getGuildSettingSourceRefs(guildSetting)
+
+        for refIndex = 1, #sourceRefs do
+            local sourceDatasetId = Dependecies.ParseSourceStatRef(sourceRefs[refIndex])
+            if sourceDatasetId and sourceDatasetId ~= dataset.id and not seen[sourceDatasetId] then
+                dependencies[#dependencies + 1] = sourceDatasetId
+                seen[sourceDatasetId] = true
+            end
+        end
+    end
+
     for index = 1, #damageSchools do
         local damageSchool = damageSchools[index]
         local sourceRefs = getDamageSchoolSourceRefs(damageSchool)
@@ -743,6 +955,8 @@ function Dependecies.HandleDatasetDeleted(datasetId)
             local races = ensureTable(dataset.races)
             local classes = ensureTable(dataset.classes)
             local auras = ensureTable(dataset.auras)
+            local achievements = ensureTable(dataset.achievements)
+            local guildSettings = ensureTable(dataset.guildSettings)
 
             for index = 1, #units do
                 local unit = units[index]
@@ -1404,6 +1618,14 @@ function Dependecies.HandleDatasetDeleted(datasetId)
                 end
             end
 
+            if pruneAchievementReferences(achievements, datasetId, nil) then
+                mutated = true
+            end
+
+            if pruneGuildSettingReferences(guildSettings, datasetId, nil) then
+                mutated = true
+            end
+
             for index = 1, #damageSchools do
                 local damageSchool = damageSchools[index]
                 local mitigationDatasetId = damageSchool and Dependecies.ParseSourceStatRef(damageSchool.mitigationStatRef) or nil
@@ -1721,6 +1943,18 @@ function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
                     pet.spells = keptSpellRefs
                     mutated = true
                 end
+            end
+        end
+
+        if collectionKey == "units" or collectionKey == "currencies" or collectionKey == "achievements" then
+            if pruneAchievementReferences(dataset.achievements, nil, deletedRef, collectionKey) then
+                mutated = true
+            end
+        end
+
+        if collectionKey == "items" or collectionKey == "currencies" or collectionKey == "spells" then
+            if pruneGuildSettingReferences(dataset.guildSettings, nil, deletedRef, collectionKey) then
+                mutated = true
             end
         end
 

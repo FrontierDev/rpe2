@@ -3461,7 +3461,9 @@ function Database.NotifyDatasetEntryChanged(datasetId, collectionKey, options)
             or collectionKey == "itemSlots"
             or collectionKey == "weaponTypes"
             or collectionKey == "damageSchools"
-            or collectionKey == "auras")
+            or collectionKey == "auras"
+            or collectionKey == "achievements"
+            or collectionKey == "guildSettings")
         and Dependecies and Dependecies.RecomputeDatasetDependencies then
         Dependecies.RecomputeDatasetDependencies(datasetId)
     end

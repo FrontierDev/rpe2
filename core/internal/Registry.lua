@@ -410,6 +410,43 @@ function Registry:ResolveItemName(itemRef)
     return "unknown-item"
 end
 
+function Registry:ResolveAchievementReference(achievementRef)
+    local datasetId, achievementId = parseDatasetQualifiedRef(achievementRef)
+    if not datasetId or not achievementId then
+        return nil, nil
+    end
+
+    return resolveDatasetEntryByCollection(datasetId, achievementId, "achievements")
+end
+
+function Registry:ResolveAchievementName(achievementRef)
+    local _, achievement = self:ResolveAchievementReference(achievementRef)
+    if achievement and type(achievement.name) == "string" and achievement.name ~= "" then
+        return achievement.name
+    end
+
+    local _, achievementId = parseDatasetQualifiedRef(achievementRef)
+    if achievementId then
+        return achievementId
+    end
+
+    local normalizedRef = type(achievementRef) == "string" and achievementRef or ""
+    if normalizedRef ~= "" then
+        return normalizedRef
+    end
+
+    return "unknown-achievement"
+end
+
+function Registry:ResolveGuildSettingReference(guildSettingRef)
+    local datasetId, guildSettingId = parseDatasetQualifiedRef(guildSettingRef)
+    if not datasetId or not guildSettingId then
+        return nil, nil
+    end
+
+    return resolveDatasetEntryByCollection(datasetId, guildSettingId, "guildSettings")
+end
+
 function Registry:ResolveRecipeReference(recipeRef)
     local datasetId, recipeId = parseDatasetQualifiedRef(recipeRef)
     if not datasetId or not recipeId then

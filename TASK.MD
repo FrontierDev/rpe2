@@ -1,47 +1,51 @@
 ## Goal
-Expose the new Database-backed Achievement and Guild character state through `Addon.Internal.Profile` without implementing later-phase behavior.
+Make Achievement and GuildSetting references participate correctly in the existing RPE2 Registry/dependency system.
 
-Depends on: #2
+Depends on: #1, #2
 
 ## Primary files
-- `core/internal/profile/Achievements.lua` **new**
-- `core/internal/profile/Guild.lua` **new**
-- `RPEngine_Dev.toc`
+- `core/internal/Registry.lua`
+- `core/internal/database/Dependecies.lua`
 
-## Required API
-### Achievement state
-Provide thin wrappers such as:
-- `Profile.ListAchievementStates()`
-- `Profile.GetAchievementState(achievementRef)`
-- `Profile.SetAchievementState(achievementRef, state)`
-- `Profile.ClearAchievementState(achievementRef)`
+## Registry additions
+Add resolvers using the existing dataset-qualified reference parser/cache path:
+- `Registry:ResolveAchievementReference(achievementRef)`
+- `Registry:ResolveAchievementName(achievementRef)`
+- `Registry:ResolveGuildSettingReference(guildSettingRef)`
 
-### Guild state
-Provide:
-- `Profile.GetGuildState()`
-- `Profile.SetGuildState(state)`
+Do not create a second resolution mechanism.
 
-Optional narrowly scoped `byGuild` read helpers are acceptable only if they simplify later read-only UI and remain persistence primitives.
+## Dependency extraction
+### Achievement criteria filters
+Recognize known dataset-qualified refs from:
+- `currencyRef`
+- `unitRef`
+- `achievementRef`
 
-## Load order
-Load after `Database.lua` and before UI/client consumers. Follow the namespace-extension style used by `core/internal/profile/Currencies.lua` and existing Profile modules.
+Do not treat every arbitrary filter string as a dependency.
 
-## Constraints
-Do **not** add:
-- `GrantAchievement` or completion evaluation;
-- `TryRequisition`;
-- `ClaimDailyReward`;
-- progression unlock/evaluation methods;
-- runtime triggers or messaging.
+### GuildSetting
+Collect refs from:
+- `requisitions[].itemRef`
+- `requisitions[].costs[].currencyRef`
+- `dailyRewards[].ref`
+- `progression.entries[].spellRefs[]`
 
-Returned state must follow existing copy/reference conventions so callers cannot accidentally bypass Database persistence notifications.
+Built-in currencies such as `copper` must not create dataset dependencies.
+
+## Rewrite/prune/deletion handling
+Inspect all existing dependency recalculation, referenced-dataset deletion, source-pruning and reference-rewrite paths. Extend the relevant explicit collection handling for Achievement/GuildSetting references so they do not become a blind spot.
+
+Do not broadly rewrite arbitrary strings.
 
 ## Acceptance criteria
-- [ ] Calls are safe when no Profile existed previously.
-- [ ] Reads follow current Profile/Database copy semantics.
-- [ ] Set/Clear operations persist and use existing notification paths.
-- [ ] TOC load order is dependency-safe.
-- [ ] No Phase 2/3/4 behavior is introduced.
+Using conceptual datasets A/B where B references entries in A:
+- [ ] B detects A as a dependency through Achievement filters.
+- [ ] B detects A through GuildSetting item/currency/spell refs.
+- [ ] Same-dataset refs do not create self-dependencies.
+- [ ] Built-in `copper` does not create a dependency.
+- [ ] Deletion/recompute behavior is consistent with existing Item/Spell/etc. handling.
+- [ ] Existing dependency behavior is unchanged.
 
 ## Coding-agent instructions
-Keep these modules deliberately thin. Do not move normalization/business logic out of `Database.lua`.
+Search all explicit collection maps/branches in `Dependecies.lua` before editing. Keep the implementation narrow and aligned with existing reference semantics.
