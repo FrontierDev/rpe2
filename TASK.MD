@@ -1,84 +1,82 @@
 ## Goal
-Create the Guild-facing read-only runtime facade and top-level Guild window required by later phases, without implementing transactions or remote mutations.
+Audit the complete Phase 1 implementation as one coherent system and fix **Phase 1 defects only**.
 
-Depends on: #1, #2, #3, #4
+Depends on: #1, #2, #3, #4, #5, #6, #7, #8
 
-## Primary files
-- `client/client_Guild.lua` **new**
-- `client/character/guild/window_Guild.lua` **new**
-- `client/character/guild/page_GuildRequisitions.lua` **new**
-- `client/character/guild/page_GuildProgression.lua` **new**
-- `client/character/guild/page_GuildAdmin.lua` **new**
-- `core/internal/Runtime.lua`
-- `client/ui/windows/window_LauncherMenu.lua`
-- `client/client_Commands.lua`
-- `RPEngine_Dev.toc`
+Do not start this issue until Tasks 2–9 are implemented.
 
-## `client_Guild.lua` responsibilities
-Provide a narrow local facade for:
-- current guild identity/name;
-- active GuildSetting resolution;
-- GuildSetting conflict detection;
-- local officer-state query;
-- guild roster readout;
-- Guild window refresh routing.
+## Required audit
+### Load order
+Review `RPEngine_Dev.toc` and verify:
+- new classes load before instantiation;
+- Profile state modules load before UI/client consumers;
+- Guild/Achievement pages load before their windows;
+- Data Editor pages/inspectors load before `window_DataEditor.lua` uses them.
 
-Do not put Profile transaction/business logic here.
+### Explicit collection maps
+Search the repository for neighboring explicit collection handling including:
+- `achievements`
+- `currencies`
+- `interactions`
+- `DATASET_ENTRY_DEFINITIONS`
+- `ENTRY_DEFINITIONS`
+- `CONTENT_PAGE_DEFINITIONS`
+- `INSPECTOR_PAGE_BY_COLLECTION`
 
-### Active GuildSetting resolution
-Search `Registry:GetActivatedDatasets()`.
-Rules:
-1. Player must be in a guild.
-2. Exact `guildName` matches take priority.
-3. If no exact match exists, blank `guildName` may act as generic match.
-4. Multiple equally valid matches produce a conflict.
-5. On conflict, return no active setting plus enough detail for UI explanation.
+Identify any explicit maps/branches that should include `guildSettings` and correct omissions.
 
-Never silently choose the first match.
+### Schema/migration smoke test
+Verify:
+- old Profile without `achievements`/`guild` normalizes safely;
+- old Dataset without `guildSettings` normalizes safely;
+- inventory remains untouched;
+- existing currencies, skills, equipment and spells remain untouched.
 
-### Officer state
-Centralize officer detection in one helper such as `Client.Guild:IsLocalPlayerOfficer()` using the target WoW interface APIs. Do not scatter hard-coded rank checks through pages.
+### Dataset round-trip
+Create/construct a Dataset containing:
+- one Achievement with multiple criteria;
+- one custom Currency;
+- one Item;
+- one Spell;
+- one GuildSetting referencing those definitions.
 
-## Runtime integration
-Extend the existing centralized `core/internal/Runtime.lua` event dispatch. Do not create an independent event frame.
+Export/import and verify definitions and references survive.
 
-Register/route appropriate guild lifecycle events (including current-interface equivalents of `PLAYER_GUILD_UPDATE` and `GUILD_ROSTER_UPDATE`) to Guild refresh handling.
+### Cross-dataset dependency test
+Use A/B datasets where B's Achievement/GuildSetting references A. Verify dependency discovery/recompute/deletion behavior.
 
-Do not implement daily reward processing.
+### Character UI smoke test
+Verify:
+- Profile → Achievements;
+- Guild → Requisitions;
+- Guild → Progression;
+- Guild → Admin;
+- Launcher → Guild;
+- `/rpe guild`.
 
-## Guild window
-Create one top-level RPE `UI.Window` titled `Guild` with tabs:
-- Requisitions
-- Progression
-- Admin
+### Phase-boundary audit
+Search for and ensure Phase 1 did **not** add:
+- Achievement `SendChatMessage` announcements;
+- Guild Admin comms opcodes;
+- Requisition currency spending/purchases;
+- automatic daily reward grants;
+- automatic Achievement trigger calls;
+- remote Profile mutation;
+- progression unlock evaluation/reward execution.
 
-### Requisitions — display only
-Render active GuildSetting Daily Reward and Requisition definitions with useful resolved labels where available. Any action button must be disabled/non-functional.
-
-### Progression — display only
-Render configured progression slots/entries read-only. No unlock evaluation, selection or rewards.
-
-### Admin — shell only
-Show live guild roster/member selector.
-- Officers: planned Achievements/Skills/Items sections as disabled controls/placeholders.
-- Non-officers: clear insufficient-permissions state.
-- No addon-message operations.
-
-## Navigation
-- Add one `Guild` entry to the existing launcher without unrelated reorganization.
-- Add `/rpe guild` through existing command routing.
-- Add `Client:OpenGuildLauncherDestination()` (or equivalent existing pattern).
-
-## Acceptance criteria
-- [ ] `/rpe guild` and Launcher open the same window.
-- [ ] All three tabs render.
-- [ ] Guild join/leave/roster changes refresh safely.
-- [ ] No active setting shows a clean empty state.
-- [ ] One matching setting renders read-only data.
-- [ ] Equal-priority conflicts are surfaced explicitly.
-- [ ] Admin roster populates when guild data is available.
-- [ ] Non-officers cannot access active Admin controls.
-- [ ] No requisition/reward/Achievement/skill/item state is mutated.
+## Definition of done
+- [ ] Achievement definitions use the stable normalized criterion schema.
+- [ ] GuildSetting is a first-class Dataset entry.
+- [ ] Profile safely persists Achievement and Guild state.
+- [ ] Registry/dependency analysis understands all Phase 1 refs.
+- [ ] Achievement authoring is functional.
+- [ ] GuildSetting authoring is functional.
+- [ ] Profile Achievements tab is functional/read-only.
+- [ ] Guild window has Requisitions/Progression/Admin tabs.
+- [ ] GuildSetting resolution/conflicts work.
+- [ ] Admin roster is displayed and officer-gated.
+- [ ] Existing datasets/profiles remain backward compatible.
+- [ ] No Phase 2/3/4 runtime behavior has leaked into Phase 1.
 
 ## Coding-agent instructions
-Follow existing Runtime, Launcher, command and `UI.Window` patterns. This task is a read-only shell: do not cross into Phase 2/3/4 implementation.
+Treat the repository as authoritative. Compare every Phase 1 acceptance criterion against the implemented state. Fix concrete omissions/regressions only; do not expand scope.
