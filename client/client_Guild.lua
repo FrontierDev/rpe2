@@ -102,8 +102,16 @@ local function hasOfficerPermission()
     end
 
     local guildInfo = _G and _G.C_GuildInfo or nil
-    if guildInfo and type(guildInfo.IsGuildLeader) == "function" then
-        local ok, isLeader = pcall(guildInfo.IsGuildLeader)
+    if guildInfo and type(guildInfo.IsGuildOfficer) == "function" then
+        local ok, isOfficer = pcall(guildInfo.IsGuildOfficer)
+        if ok then
+            return isOfficer == true
+        end
+    end
+
+    -- Compatibility fallback for interfaces without C_GuildInfo.IsGuildOfficer.
+    if type(IsGuildLeader) == "function" then
+        local ok, isLeader = pcall(IsGuildLeader)
         if ok and isLeader == true then
             return true
         end
