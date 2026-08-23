@@ -399,6 +399,19 @@ local function notifyRPEKillAchievement(targetClient, eventState, actionOwnerNam
     )
 end
 
+local function getTrustedTransportActionOwner(arguments, sender)
+    local claimedPlayerName = Common.NormalizeName(arguments and arguments[2])
+    local transportSenderName = Common.NormalizeName(sender)
+    if claimedPlayerName == ""
+        or transportSenderName == ""
+        or claimedPlayerName ~= transportSenderName
+    then
+        return nil
+    end
+
+    return transportSenderName
+end
+
 local normalizePendingScope
 
 local function queueRPEKillAchievement(targetClient, eventState, actionOwnerName, result, options)
@@ -1795,6 +1808,7 @@ function Client:HandleResourceDelta(arguments, sender)
         end
         return false
     end
+    local transportActionOwner = getTrustedTransportActionOwner(arguments, sender)
 
     local targetEventId = tonumber(arguments and arguments[4]) or 0
     local deltaPayload = arguments and arguments[3] or ""
@@ -1814,7 +1828,9 @@ function Client:HandleResourceDelta(arguments, sender)
 
     local eventState = self:GetEventState()
     local result = applyInboundResourceDeltasForTarget(self, state, eventState, playerName, sender, targetEventId, resourceDeltas)
-    notifyRPEKillAchievement(self, eventState, playerName, result)
+    if transportActionOwner then
+        notifyRPEKillAchievement(self, eventState, transportActionOwner, result)
+    end
 
     if eventState and ResourceSync.UpdateEventReadiness then
         ResourceSync.UpdateEventReadiness(eventState)
@@ -1896,6 +1912,7 @@ function Client:HandleResourceDeltaBatch(arguments, sender)
         end
         return false
     end
+    local transportActionOwner = getTrustedTransportActionOwner(arguments, sender)
 
     local deltaPayload = arguments and arguments[3] or ""
     local localPlayerName = Common.NormalizeName(Common.GetPlayerName and Common.GetPlayerName() or nil)
@@ -1936,7 +1953,9 @@ function Client:HandleResourceDeltaBatch(arguments, sender)
             targetEventId,
             deltasByTargetEventId[targetEventId]
         )
-        notifyRPEKillAchievement(self, eventState, playerName, result)
+        if transportActionOwner then
+            notifyRPEKillAchievement(self, eventState, transportActionOwner, result)
+        end
         if result.changed then
             changed = true
         end
