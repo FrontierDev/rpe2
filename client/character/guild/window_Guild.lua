@@ -29,6 +29,43 @@ local function refreshPageOnShow(page, refreshFn)
     end)
 end
 
+local function getAssignedRankLabel(status)
+    local rank = status and status.rank or nil
+    local rankName = tostring(rank and rank.name or "")
+    if rankName ~= "" then
+        return rankName
+    end
+
+    local rankId = tostring(rank and rank.id or "")
+    if rankId ~= "" then
+        return rankId
+    end
+
+    local assignedRankRef = tostring(status and status.assignedRankRef or "")
+    return assignedRankRef ~= "" and assignedRankRef or "Unknown"
+end
+
+local function describeAssignedRankStatus(status)
+    local statusKey = tostring(status and status.status or "not-in-guild")
+    if statusKey == "valid" then
+        return "Guild Rank: " .. getAssignedRankLabel(status)
+    elseif statusKey == "unassigned" then
+        return "Guild Rank: Not assigned"
+    elseif statusKey == "not-eligible-for-current-wow-rank" then
+        return "Guild Rank: " .. getAssignedRankLabel(status) .. " (no longer valid for current WoW rank)"
+    elseif statusKey == "not-applicable" then
+        return "Guild Rank: " .. getAssignedRankLabel(status) .. " (not applicable to this guild)"
+    elseif statusKey == "unknown-rank" then
+        return "Guild Rank: Unknown assignment"
+    elseif statusKey == "guild-loading" then
+        return "Guild Rank: Guild information is still loading"
+    elseif statusKey == "not-in-guild" then
+        return "Guild Rank: Not in a guild"
+    end
+
+    return "Guild Rank: Unavailable"
+end
+
 local function createInstance()
     return setmetatable({
         window = nil,
@@ -67,6 +104,18 @@ function GuildWindow:GetTabIndex(tabKey)
     end
 
     return 1
+end
+
+function GuildWindow:GetAssignedGuildRankDisplay()
+    local Guild = Client.Guild
+    local status = {
+        status = "not-in-guild",
+    }
+    if Guild and type(Guild.GetAssignedGuildRankStatus) == "function" then
+        status = Guild:GetAssignedGuildRankStatus() or status
+    end
+
+    return status, describeAssignedRankStatus(status)
 end
 
 function GuildWindow:RefreshTab(tabKey)
@@ -160,6 +209,10 @@ function GuildWindow:BuildWindow()
 end
 
 function GuildWindow:Refresh()
+    local _, assignmentText = self:GetAssignedGuildRankDisplay()
+    if self.window and self.window.SetTitle then
+        self.window:SetTitle("Guild | " .. assignmentText)
+    end
     self:RefreshTab(self:GetActiveTabKey())
     return self.window
 end

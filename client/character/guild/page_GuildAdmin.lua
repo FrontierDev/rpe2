@@ -185,9 +185,12 @@ function AdminPage:Refresh()
     self.RosterEmptyText:SetText(identity.inGuild and #roster == 0 and "No guild roster data is available yet." or "")
 
     if isOfficer then
-        self.AdminSectionsText:SetText("Planned officer sections (disabled in Phase 1):\nAchievements\nSkills\nItems")
+        local selectedRankText = selectedMember
+            and "Selected member RPE Guild Rank: remote sync planned."
+            or "RPE Guild Rank details: select a member."
+        self.AdminSectionsText:SetText("Planned officer sections (disabled in Phase 1): Achievements, Skills, Items\n" .. selectedRankText)
     else
-        self.AdminSectionsText:SetText("Admin controls are unavailable.\nAchievements, Skills, and Items require officer access in a later phase.")
+        self.AdminSectionsText:SetText("Admin controls are unavailable.\nAchievements, Skills, and Items require officer access in a later phase.\n\nRPE Guild Rank assignment is planned and remains read-only.")
     end
     return self.frame
 end

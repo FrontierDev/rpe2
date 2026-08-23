@@ -4,31 +4,12 @@ Addon.Client = Addon.Client or {}
 Addon.Client.UI = Addon.Client.UI or {}
 Addon.Client.UI.Guild = Addon.Client.UI.Guild or {}
 
-local Client = Addon.Client
 local GuildUI = Addon.Client.UI.Guild
 local UI = Addon.UI or {}
 
 local ProgressionPage = GuildUI.ProgressionPage or {}
 GuildUI.ProgressionPage = ProgressionPage
 ProgressionPage.__index = ProgressionPage
-
-local function describeResolution(resolution)
-    if not resolution or resolution.inGuild ~= true then
-        return "Join a guild to view its read-only progression."
-    end
-
-    if resolution.conflict then
-        return "Conflict: multiple Guild Settings match this guild. Progression is unavailable until it is resolved."
-    end
-
-    if not resolution.setting then
-        return resolution.reason == "guild-loading"
-            and "Guild information is still loading."
-            or "No active Guild Setting matches this guild."
-    end
-
-    return "Display only. Progression entries are not evaluated or unlocked here."
-end
 
 function ProgressionPage:Build(parent, owner)
     self.owner = owner
@@ -105,7 +86,7 @@ function ProgressionPage:Build(parent, owner)
         end
         row:SetCategory(tostring(entry and entry.id or ("Entry " .. tostring(entryIndex))))
         row:SetTestName(name)
-        row:SetStatus("View")
+        row:SetStatus("Read-only")
         row:SetDetail(details)
     end)
     self.EntryList:Create()
@@ -129,20 +110,24 @@ function ProgressionPage:Refresh()
         return nil
     end
 
-    local setting, resolution
-    if Client.Guild and Client.Guild.GetActiveGuildSetting then
-        setting, resolution = Client.Guild:GetActiveGuildSetting()
+    local assignment, assignmentText
+    if self.owner and self.owner.GetAssignedGuildRankDisplay then
+        assignment, assignmentText = self.owner:GetAssignedGuildRankDisplay()
     end
 
-    local hasSetting = setting ~= nil and resolution and resolution.conflict ~= true
-    local progression = hasSetting and setting.progression or {}
+    local assignedRank = assignment and assignment.status == "valid" and assignment.rank or nil
+    local hasAssignedRank = assignedRank ~= nil
+    local progression = hasAssignedRank and assignedRank.progression or {}
     local entries = progression and progression.entries or {}
-    self.StatusText:SetText(describeResolution(resolution))
-    self.SummaryText:SetText(hasSetting
+    self.StatusText:SetText(hasAssignedRank
+        and (assignmentText .. ". Progression is read-only.")
+        or (assignmentText or "Guild Rank: Unavailable"))
+    self.SummaryText:SetText(hasAssignedRank
         and ("Configured slots: %d | Entries: %d"):format(tonumber(progression.slotCount) or 0, #entries)
         or "")
     self.EntryList:SetItems(entries or {})
-    self.EmptyText:SetText(not hasSetting and "No active Guild Setting." or (#entries == 0 and "No progression entries configured." or ""))
+    self.EmptyText:SetText(not hasAssignedRank and (assignmentText or "Guild Rank unavailable.")
+        or (#entries == 0 and "No progression entries configured." or ""))
     return self.frame
 end
 

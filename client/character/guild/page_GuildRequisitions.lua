@@ -4,7 +4,6 @@ Addon.Client = Addon.Client or {}
 Addon.Client.UI = Addon.Client.UI or {}
 Addon.Client.UI.Guild = Addon.Client.UI.Guild or {}
 
-local Client = Addon.Client
 local GuildUI = Addon.Client.UI.Guild
 local UI = Addon.UI or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
@@ -31,35 +30,6 @@ local function resolveCurrencyName(currencyRef)
     end
 
     return tostring(currencyRef or "unknown-currency")
-end
-
-local function describeResolution(resolution)
-    if not resolution or resolution.inGuild ~= true then
-        return "Join a guild to view its read-only Guild Setting."
-    end
-
-    if resolution.conflict then
-        local labels = {}
-        for index = 1, #(resolution.matches or {}) do
-            local match = resolution.matches[index]
-            labels[#labels + 1] = ("%s:%s"):format(
-                tostring(match and match.datasetName or "dataset"),
-                tostring(match and match.settingName or "Guild Setting")
-            )
-        end
-        return "Conflict: multiple Guild Settings match this guild. " .. table.concat(labels, ", ")
-    end
-
-    if not resolution.setting then
-        if resolution.reason == "guild-loading" then
-            return "Guild information is still loading."
-        end
-        return "No active Guild Setting matches this guild."
-    end
-
-    local match = resolution.match or {}
-    local source = tostring(match.datasetName or match.datasetId or "dataset")
-    return ("%s (%s, read-only)"):format(tostring(match.settingName or "Guild Setting"), source)
 end
 
 function RequisitionsPage:Build(parent, owner)
@@ -121,7 +91,7 @@ function RequisitionsPage:Build(parent, owner)
         local label = rewardType == "currency" and resolveCurrencyName(ref) or resolveItemName(ref)
         row:SetCategory(rewardType == "currency" and "Currency" or "Item")
         row:SetTestName(("%s x%d"):format(label, tonumber(reward and reward.amount) or 1))
-        row:SetStatus("View")
+        row:SetStatus("Read-only")
         row:SetDetail(ref)
     end)
     self.DailyList:Create()
@@ -181,12 +151,9 @@ function RequisitionsPage:Build(parent, owner)
             end
             details[#details + 1] = "Cost: " .. table.concat(costLabels, ", ")
         end
-        if requisition and requisition.requiredGuildRankIndex ~= nil then
-            details[#details + 1] = "Minimum guild rank index: " .. tostring(requisition.requiredGuildRankIndex)
-        end
         row:SetCategory(tostring(requisition and requisition.id or "Requisition"))
         row:SetTestName(("%s x%d"):format(label, tonumber(requisition and requisition.quantity) or 1))
-        row:SetStatus("View")
+        row:SetStatus("Read-only")
         row:SetDetail(table.concat(details, "\n"))
     end)
     self.RequisitionList:Create()
@@ -208,19 +175,24 @@ function RequisitionsPage:Refresh()
         return nil
     end
 
-    local setting, resolution
-    if Client.Guild and Client.Guild.GetActiveGuildSetting then
-        setting, resolution = Client.Guild:GetActiveGuildSetting()
+    local assignment, assignmentText
+    if self.owner and self.owner.GetAssignedGuildRankDisplay then
+        assignment, assignmentText = self.owner:GetAssignedGuildRankDisplay()
     end
 
-    self.StatusText:SetText(describeResolution(resolution))
-    local hasSetting = setting ~= nil and resolution and resolution.conflict ~= true
-    local dailyRewards = hasSetting and setting.dailyRewards or {}
-    local requisitions = hasSetting and setting.requisitions or {}
+    local assignedRank = assignment and assignment.status == "valid" and assignment.rank or nil
+    local hasAssignedRank = assignedRank ~= nil
+    self.StatusText:SetText(hasAssignedRank
+        and (assignmentText .. ". Requisitions and Daily Rewards are read-only.")
+        or (assignmentText or "Guild Rank: Unavailable"))
+    local dailyRewards = hasAssignedRank and assignedRank.dailyRewards or {}
+    local requisitions = hasAssignedRank and assignedRank.requisitions or {}
     self.DailyList:SetItems(dailyRewards or {})
     self.RequisitionList:SetItems(requisitions or {})
-    self.DailyEmptyText:SetText(not hasSetting and "No active Guild Setting." or (#dailyRewards == 0 and "No daily rewards configured." or ""))
-    self.RequisitionEmptyText:SetText(not hasSetting and "No active Guild Setting." or (#requisitions == 0 and "No requisitions configured." or ""))
+    self.DailyEmptyText:SetText(not hasAssignedRank and (assignmentText or "Guild Rank unavailable.")
+        or (#dailyRewards == 0 and "No daily rewards configured." or ""))
+    self.RequisitionEmptyText:SetText(not hasAssignedRank and (assignmentText or "Guild Rank unavailable.")
+        or (#requisitions == 0 and "No requisitions configured." or ""))
     return self.frame
 end
 
