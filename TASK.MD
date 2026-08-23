@@ -1,95 +1,108 @@
-# Task 7 Revision — Fix Requisition Currency Spending
-
 ## Goal
+Award the assigned RPE Guild Rank's Daily Rewards once per character, per guild, per calendar day without automatically assigning a rank.
 
-Fix the currency-spending bug in `Guild:TryRequisition()`.
+Depends on: #15
 
-Do not redesign the transaction system or change unrelated Task 7 behavior.
+## Primary files
+- `client/client_Guild.lua` or a focused Guild reward module consistent with current organization
+- `core/internal/Runtime.lua`
+- `core/internal/profile/Guild.lua`
+- `core/internal/profile/Currencies.lua`
+- `client/character/inventory/Inventory.lua` as the existing item award path
+- `client/character/guild/page_GuildRequisitions.lua`
 
-## Problem
+## Runtime integration
+Use the existing centralized Runtime event frame. Do not create a separate event frame for Daily Rewards.
 
-The current code uses:
+Process/retry from appropriate existing login/guild-context events so rewards are attempted only when guild identity and roster/rank data are actually available.
 
-```lua
-local spent, updated = pcall(Profile.SpendCurrencyAmount, cost.currencyRef, cost.amount)
+The operation must be idempotent across repeated runtime events and `/reload`.
+
+## Eligibility
+Before any award, validate:
+
+```text
+player is in a guild
+guild context is loaded
+valid assigned RPE Guild Rank exists
+enableDailyRewards is true
+current guild/calendar day has not already been claimed
+all Daily Reward definitions are valid/resolvable
 ```
 
-However, `Profile.SpendCurrencyAmount()` returns:
+Award only the character's valid assigned RPE Guild Rank rewards.
 
+No assigned/valid rank must produce no reward and must never trigger automatic rank assignment.
+
+## Award paths
+Use existing canonical APIs:
+
+### Item reward
 ```lua
-success, updatedAmount
+Client.Inventory.AddItem(...)
 ```
 
-Therefore `pcall()` returns:
+### Currency reward
+Use the existing Profile currency add API so caps and normal currency behavior remain intact.
+
+Do not write directly to Inventory or Profile currency tables.
+
+## Claim state
+Store the completed claim in the current guild bucket using:
 
 ```lua
-callOk, spendOk, updatedAmount
+dailyRewardDate
+dailyRewardRankRef
 ```
 
-The current implementation captures only the first two values, meaning `updated` receives the boolean `spendOk` instead of the new numeric balance.
+`dailyRewardDate` is a stable calendar-day key, for example:
 
-This causes the subsequent comparison:
-
-```lua
-updated ~= expected
+```text
+2026-08-23
 ```
 
-to always fail for a successful currency spend, so any Requisition with a currency cost rolls back.
+Do **not** implement a rolling `timestamp + 86400` policy.
 
-## Required Fix
+`dailyRewardRankRef` records which RPE Guild Rank supplied that day's reward.
 
-Capture all three return values from `pcall()`.
+The claim is **one reward claim per character, per guild, per calendar day**, not one claim per RPE Guild Rank. Changing RPE Guild Rank after claiming must not provide another reward that day.
 
-Use logic equivalent to:
+## Transaction/idempotency behavior
+Design the award/claim sequence so repeated Runtime events, `/reload` and relog cannot duplicate a completed claim.
 
-```lua
-local callOk, spendOk, updated =
-    pcall(Profile.SpendCurrencyAmount, cost.currencyRef, cost.amount)
+Do not mark a claim successful before all required reward grants have been applied successfully.
 
-local gotAfter, after =
-    pcall(Profile.GetCurrencyAmount, cost.currencyRef)
+If partial award failure is possible with the existing APIs, handle it coherently so retry behavior cannot create duplicated partial rewards.
 
-after = gotAfter and tonumber(after) or nil
+## UI
+Update the Daily Reward section on the Requisitions tab to report useful states such as:
 
-if not callOk
-    or spendOk ~= true
-    or not gotAfter
-    or updated ~= expected
-    or after ~= expected
-then
-    local restored = rollbackCurrencies()
-    return false,
-        restored and "currency-transaction-failed" or "rollback-failed",
-        detail
-end
+```text
+Not eligible: no RPE Guild Rank assigned
+Daily rewards disabled
+Available today
+Received today
 ```
+
+UI state is informational; runtime validation remains authoritative.
 
 ## Constraints
+- Never automatically assign/remap/clear RPE Guild Rank.
+- Do not permit a second claim after rank change on the same guild/calendar day.
+- Do not introduce another event frame or SavedVariable root.
+- Do not implement Requisition transaction changes beyond any shared helper strictly required.
+- Do not implement Achievement or Progression runtime here.
 
-- Fix this bug only.
-- Preserve the existing validation order.
-- Preserve the existing rollback mechanism.
-- Preserve the existing Requisition ledger behavior.
-- Preserve `Client.Inventory.AddItem()` as the item-award path.
-- Do not add Daily Reward behavior.
-- Do not change Guild Rank eligibility behavior.
-- Do not use legacy `requiredGuildRankIndex`.
-- Do not modify unrelated systems.
+## Acceptance criteria
+- [ ] No assigned rank -> no reward and no auto-assignment.
+- [ ] Invalid assigned rank -> no reward.
+- [ ] Disabled Daily Rewards -> no reward.
+- [ ] Item and currency rewards use canonical APIs.
+- [ ] One claim per guild/calendar day survives reload/relog.
+- [ ] Changing rank after claim does not yield a second reward.
+- [ ] `dailyRewardRankRef` records which rank supplied the claimed reward.
+- [ ] Guild context loading races do not duplicate rewards.
+- [ ] UI accurately reports claimed/not-eligible state.
 
-## Acceptance Criteria
-
-- [ ] A Requisition with one currency cost succeeds when the player can afford it.
-- [ ] A Requisition with multiple currency costs succeeds when all costs are affordable.
-- [ ] Built-in `copper` costs work.
-- [ ] Insufficient currency causes no spending.
-- [ ] A failure after one or more currency deductions restores the original balances.
-- [ ] Existing item-award and Requisition-ledger rollback behavior remains intact.
-- [ ] No unrelated Task 7 behavior is changed.
-
-## Coding-Agent Instructions
-
-Inspect the current `Guild:TryRequisition()` implementation and `Profile.SpendCurrencyAmount()` return contract before editing.
-
-Implement this fix only.
-
-When finished, review the diff against every acceptance criterion above and report any deviation.
+## Coding-agent instructions
+Read the revised PDD and implementation plan, then inspect the existing Runtime event flow, Profile Guild state, currency API and Inventory award path before editing. Implement Task 8 only. Treat repeated Runtime events as normal and make processing idempotent. Report changed files, validation performed and any deviation from this issue.

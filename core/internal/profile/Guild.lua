@@ -33,6 +33,15 @@ local function normalizeRequisitionUsage(value)
     return math.max(0, math.floor(usage))
 end
 
+local function normalizeDailyRewardDate(value)
+    local dateKey = tostring(value or "")
+    if dateKey:match("^%d%d%d%d%-%d%d%-%d%d$") then
+        return dateKey
+    end
+
+    return ""
+end
+
 function Profile.GetGuildState()
     if Database.GetProfileGuildState then
         return Database.GetProfileGuildState()
@@ -172,4 +181,42 @@ end
 function Profile.IncrementGuildRequisitionUsage(guildKey, guildRankRef, requisitionId)
     local currentUsage = Profile.GetGuildRequisitionUsage(guildKey, guildRankRef, requisitionId)
     return Profile.SetGuildRequisitionUsage(guildKey, guildRankRef, requisitionId, currentUsage + 1)
+end
+
+function Profile.GetDailyRewardClaim(guildKey)
+    local normalizedGuildKey = normalizeGuildKey(guildKey)
+    if normalizedGuildKey == "" then
+        return nil, nil
+    end
+
+    local bucket = Profile.GetGuildBucket(normalizedGuildKey)
+    local dateKey = normalizeDailyRewardDate(bucket and bucket.dailyRewardDate)
+    local rankRef = normalizeGuildRankRef(bucket and bucket.dailyRewardRankRef)
+    if dateKey == "" then
+        return nil, rankRef ~= "" and rankRef or nil
+    end
+
+    return dateKey, rankRef ~= "" and rankRef or nil
+end
+
+function Profile.SetDailyRewardClaim(guildKey, dateKey, guildRankRef)
+    local normalizedGuildKey = normalizeGuildKey(guildKey)
+    local normalizedDateKey = normalizeDailyRewardDate(dateKey)
+    local normalizedRankRef = normalizeGuildRankRef(guildRankRef)
+    if normalizedGuildKey == "" or normalizedDateKey == "" or normalizedRankRef == "" then
+        return nil
+    end
+
+    local state = Profile.GetGuildState()
+    state.byGuild = type(state.byGuild) == "table" and state.byGuild or {}
+    local bucket = type(state.byGuild[normalizedGuildKey]) == "table"
+        and state.byGuild[normalizedGuildKey]
+        or {}
+    bucket.dailyRewardDate = normalizedDateKey
+    bucket.dailyRewardRankRef = normalizedRankRef
+    state.byGuild[normalizedGuildKey] = bucket
+
+    local persistedState = Profile.SetGuildState(state)
+    local persistedByGuild = type(persistedState) == "table" and persistedState.byGuild or nil
+    return type(persistedByGuild) == "table" and persistedByGuild[normalizedGuildKey] or nil
 end

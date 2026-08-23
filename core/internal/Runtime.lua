@@ -76,6 +76,13 @@ function Addon.Internal.DispatchEvent(event, ...)
         elseif Client and Client.HandleChannelRuntimeEvent then
             safeCall(Client.HandleChannelRuntimeEvent, Client, event, ...)
         end
+
+        if event == "PLAYER_ENTERING_WORLD" then
+            local Guild = Client and Client.Guild or nil
+            if Guild and Guild.HandleRuntimeEvent then
+                safeCall(Guild.HandleRuntimeEvent, Guild, event, ...)
+            end
+        end
         return
     end
 

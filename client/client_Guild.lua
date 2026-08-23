@@ -1030,6 +1030,407 @@ function Guild:TryRequisition(guildRankRef, requisitionId)
     }
 end
 
+local function getDailyRewardDayKey()
+    if type(Common.GetNow) ~= "function" or type(date) ~= "function" then
+        return nil
+    end
+
+    local timestamp = tonumber(Common.GetNow())
+    if not timestamp then
+        return nil
+    end
+
+    local ok, dayKey = pcall(date, "%Y-%m-%d", timestamp)
+    if not ok or type(dayKey) ~= "string" or dayKey == "" then
+        return nil
+    end
+
+    return dayKey
+end
+
+local function buildDailyRewardPlan(rank)
+    local rewards = type(rank and rank.dailyRewards) == "table" and rank.dailyRewards or {}
+    local plan = {}
+    local needsItemAward = false
+    local needsCurrencyAward = false
+
+    for index = 1, #rewards do
+        local reward = rewards[index]
+        local rewardId = trimText(reward and reward.id)
+        local rewardType = string.lower(trimText(reward and reward.type))
+        local rewardRef = trimText(reward and reward.ref)
+        local amount = tonumber(reward and reward.amount)
+        if rewardId == ""
+            or (rewardType ~= "item" and rewardType ~= "currency")
+            or rewardRef == ""
+            or not amount
+            or amount ~= amount
+            or amount == math.huge
+            or amount == -math.huge
+            or amount < 1
+            or amount ~= math.floor(amount) then
+            return nil, "invalid-reward-definition", {
+                rewardIndex = index,
+                rewardId = rewardId,
+            }
+        end
+        amount = math.floor(amount)
+
+        if rewardType == "item" then
+            if type(Registry.ResolveItemReference) ~= "function" then
+                return nil, "item-api-unavailable", {
+                    rewardIndex = index,
+                    rewardId = rewardId,
+                }
+            end
+
+            local callOk, dataset, item = pcall(Registry.ResolveItemReference, Registry, rewardRef)
+            local datasetId, itemId = parseItemReference(rewardRef)
+            if not callOk or type(dataset) ~= "table" or type(item) ~= "table" or not datasetId or not itemId then
+                return nil, "item-unavailable", {
+                    rewardIndex = index,
+                    rewardId = rewardId,
+                    ref = rewardRef,
+                }
+            end
+
+            plan[#plan + 1] = {
+                id = rewardId,
+                type = rewardType,
+                ref = rewardRef,
+                amount = amount,
+                datasetId = datasetId,
+                itemId = itemId,
+            }
+            needsItemAward = true
+        else
+            if type(Profile.NormalizeCurrencyKey) ~= "function"
+                or type(Profile.ResolveCurrencyDefinition) ~= "function" then
+                return nil, "currency-api-unavailable", {
+                    rewardIndex = index,
+                    rewardId = rewardId,
+                }
+            end
+
+            local currencyRef = Profile.NormalizeCurrencyKey(rewardRef)
+            local callOk, definition = pcall(Profile.ResolveCurrencyDefinition, currencyRef)
+            if currencyRef == ""
+                or not callOk
+                or type(definition) ~= "table"
+                or definition.isMissing == true then
+                return nil, "currency-unavailable", {
+                    rewardIndex = index,
+                    rewardId = rewardId,
+                    ref = rewardRef,
+                }
+            end
+
+            plan[#plan + 1] = {
+                id = rewardId,
+                type = rewardType,
+                ref = rewardRef,
+                currencyRef = currencyRef,
+                amount = amount,
+                definition = definition,
+            }
+            needsCurrencyAward = true
+        end
+    end
+
+    return plan, nil, {
+        needsItemAward = needsItemAward,
+        needsCurrencyAward = needsCurrencyAward,
+    }
+end
+
+local function getDailyRewardStatus(self)
+    local identity = getGuildIdentity()
+    local result = {
+        status = nil,
+        reason = nil,
+        inGuild = identity.inGuild,
+        guildName = identity.guildName,
+        guildRankName = identity.guildRankName,
+        guildRankIndex = identity.guildRankIndex,
+        guildKey = getGuildKey(identity),
+        assignedRankRef = nil,
+        rank = nil,
+        rewards = {},
+        dayKey = nil,
+        claimDate = nil,
+        claimRankRef = nil,
+        plan = nil,
+    }
+
+    if not identity.inGuild then
+        result.status = "not-in-guild"
+        result.reason = result.status
+        return result
+    end
+
+    if result.guildKey == "" then
+        result.status = "guild-loading"
+        result.reason = result.status
+        return result
+    end
+
+    local assignmentOk, assignment = pcall(self.GetAssignedGuildRankStatus, self)
+    if not assignmentOk or type(assignment) ~= "table" then
+        result.status = "invalid-assigned-rank"
+        result.reason = result.status
+        return result
+    end
+
+    result.assignment = assignment
+    result.assignedRankRef = trimText(assignment.assignedRankRef)
+    result.rank = assignment.rank
+    result.rewards = type(assignment.rank and assignment.rank.dailyRewards) == "table"
+        and assignment.rank.dailyRewards
+        or {}
+
+    if assignment.status == "not-in-guild" or assignment.status == "guild-loading" then
+        result.status = assignment.status
+        result.reason = result.status
+        return result
+    end
+    if assignment.status == "unassigned" then
+        result.status = "no-assigned-rank"
+        result.reason = result.status
+        return result
+    end
+    if assignment.status ~= "valid" or type(assignment.rank) ~= "table" then
+        result.status = "invalid-assigned-rank"
+        result.reason = result.status
+        return result
+    end
+
+    local general = type(assignment.rank.general) == "table" and assignment.rank.general or {}
+    if general.enableDailyRewards ~= true then
+        result.status = "daily-rewards-disabled"
+        result.reason = result.status
+        return result
+    end
+
+    local dayKey = getDailyRewardDayKey()
+    if not dayKey then
+        result.status = "calendar-unavailable"
+        result.reason = result.status
+        return result
+    end
+    result.dayKey = dayKey
+
+    if type(Profile.GetDailyRewardClaim) ~= "function" then
+        result.status = "profile-api-unavailable"
+        result.reason = result.status
+        return result
+    end
+
+    local claimCallOk, claimDate, claimRankRef = pcall(Profile.GetDailyRewardClaim, result.guildKey)
+    if not claimCallOk then
+        result.status = "profile-api-unavailable"
+        result.reason = result.status
+        return result
+    end
+    result.claimDate = claimDate
+    result.claimRankRef = claimRankRef
+    if claimDate == dayKey then
+        result.status = "received-today"
+        result.reason = result.status
+        return result
+    end
+
+    local plan, planReason, planDetail = buildDailyRewardPlan(assignment.rank)
+    if not plan then
+        result.status = planReason or "invalid-reward-definition"
+        result.reason = result.status
+        result.detail = planDetail
+        return result
+    end
+
+    local planFlags = planDetail or {}
+    local inventory = getInventoryService()
+    if planFlags.needsItemAward and type(inventory.AddItem) ~= "function" then
+        result.status = "inventory-api-unavailable"
+        result.reason = result.status
+        return result
+    end
+    if planFlags.needsCurrencyAward
+        and (type(Profile.GetCurrencyAmount) ~= "function"
+            or type(Profile.AddCurrencyAmount) ~= "function"
+            or type(Profile.SetCurrencyAmount) ~= "function") then
+        result.status = "currency-api-unavailable"
+        result.reason = result.status
+        return result
+    end
+
+    result.status = "available-today"
+    result.reason = result.status
+    result.plan = plan
+    return result
+end
+
+function Guild:GetDailyRewardStatus()
+    return getDailyRewardStatus(self)
+end
+
+local function createDailyRewardTransaction()
+    local transaction = {
+        itemAwards = {},
+        currencySnapshots = {},
+    }
+
+    function transaction:Rollback()
+        local restored = true
+        local inventory = getInventoryService()
+        for index = #self.itemAwards, 1, -1 do
+            local award = self.itemAwards[index]
+            if not removeInventoryItemQuantity(
+                inventory,
+                award.datasetId,
+                award.itemId,
+                award.amount
+            ) then
+                restored = false
+            end
+        end
+
+        if not restoreCurrencySnapshots(self.currencySnapshots) then
+            restored = false
+        end
+
+        return restored
+    end
+
+    return transaction
+end
+
+local function awardDailyRewardPlan(plan)
+    local transaction = createDailyRewardTransaction()
+    local inventory = getInventoryService()
+    local currencySnapshotsByRef = {}
+
+    for index = 1, #plan do
+        local reward = plan[index]
+        if reward.type == "currency" and not currencySnapshotsByRef[reward.currencyRef] then
+            local gotAmount, amount = pcall(Profile.GetCurrencyAmount, reward.currencyRef)
+            if not gotAmount then
+                transaction:Rollback()
+                return false, "currency-read-failed", transaction
+            end
+
+            local snapshot = {
+                currencyRef = reward.currencyRef,
+                amount = tonumber(amount) or 0,
+            }
+            currencySnapshotsByRef[reward.currencyRef] = snapshot
+            transaction.currencySnapshots[#transaction.currencySnapshots + 1] = snapshot
+        end
+    end
+
+    for index = 1, #plan do
+        local reward = plan[index]
+        if reward.type == "item" then
+            local quantityBefore = getInventoryItemQuantity(inventory, reward.datasetId, reward.itemId)
+            local callOk, addedRecord = pcall(inventory.AddItem, {
+                dataset = reward.datasetId,
+                id = reward.itemId,
+                quantity = reward.amount,
+            })
+            local quantityAfter = getInventoryItemQuantity(inventory, reward.datasetId, reward.itemId)
+            local awardedAmount = reward.amount
+            local measuredAward = quantityBefore ~= nil and quantityAfter ~= nil
+            if measuredAward then
+                awardedAmount = math.max(0, quantityAfter - quantityBefore)
+            end
+
+            if awardedAmount > 0 and (measuredAward or (callOk and addedRecord)) then
+                transaction.itemAwards[#transaction.itemAwards + 1] = {
+                    datasetId = reward.datasetId,
+                    itemId = reward.itemId,
+                    amount = awardedAmount,
+                }
+            end
+
+            if not callOk or not addedRecord or awardedAmount < reward.amount then
+                local rolledBack = transaction:Rollback()
+                return false, rolledBack and "item-award-failed" or "rollback-failed", transaction
+            end
+        else
+            local snapshot = currencySnapshotsByRef[reward.currencyRef]
+            local callOk, addedAmount = pcall(Profile.AddCurrencyAmount, reward.currencyRef, reward.amount)
+            local gotAfter, after = pcall(Profile.GetCurrencyAmount, reward.currencyRef)
+            after = gotAfter and (tonumber(after) or 0) or nil
+            if not callOk
+                or addedAmount == nil
+                or not gotAfter
+                or after < snapshot.amount then
+                local rolledBack = transaction:Rollback()
+                return false, rolledBack and "currency-award-failed" or "rollback-failed", transaction
+            end
+        end
+    end
+
+    return true, "ok", transaction
+end
+
+function Guild:ProcessDailyRewards()
+    if self._dailyRewardProcessing == true then
+        return false, "processing"
+    end
+
+    self._dailyRewardProcessing = true
+    local callOk, success, reason, result = xpcall(function()
+        local status = self:GetDailyRewardStatus()
+        if status.status ~= "available-today" then
+            return false, status.status, status
+        end
+
+        local awarded, awardReason, transaction = awardDailyRewardPlan(status.plan or {})
+        if not awarded then
+            return false, awardReason, status
+        end
+
+        if type(Profile.SetDailyRewardClaim) ~= "function" then
+            local rolledBack = transaction:Rollback()
+            return false, rolledBack and "claim-persistence-unavailable" or "rollback-failed", status
+        end
+
+        local claimCallOk, persistedBucket = pcall(
+            Profile.SetDailyRewardClaim,
+            status.guildKey,
+            status.dayKey,
+            status.assignedRankRef
+        )
+        local storedCallOk, storedDate, storedRankRef = pcall(Profile.GetDailyRewardClaim, status.guildKey)
+        if not claimCallOk
+            or type(persistedBucket) ~= "table"
+            or not storedCallOk
+            or storedDate ~= status.dayKey
+            or storedRankRef ~= status.assignedRankRef then
+            local rolledBack = transaction:Rollback()
+            return false, rolledBack and "claim-persistence-failed" or "rollback-failed", status
+        end
+
+        pcall(self.RefreshWindow, self)
+        return true, "claimed", {
+            dayKey = status.dayKey,
+            guildRankRef = status.assignedRankRef,
+            rewardCount = #(status.plan or {}),
+        }
+    end, function(errorMessage)
+        return tostring(errorMessage)
+    end)
+    self._dailyRewardProcessing = false
+
+    if not callOk then
+        return false, "processing-failed", {
+            error = reason,
+        }
+    end
+
+    return success, reason, result
+end
+
 function Guild:IsGuildAdminTargetAvailable(targetName)
     local identity = getGuildIdentity()
     if not identity.inGuild then
@@ -1435,11 +1836,15 @@ function Guild:RefreshWindow()
 end
 
 function Guild:HandleRuntimeEvent(event)
-    if event ~= "PLAYER_GUILD_UPDATE" and event ~= "GUILD_ROSTER_UPDATE" then
+    if event ~= "PLAYER_ENTERING_WORLD"
+        and event ~= "PLAYER_GUILD_UPDATE"
+        and event ~= "GUILD_ROSTER_UPDATE" then
         return nil
     end
 
-    return self:RefreshWindow()
+    local dailyResult = self:ProcessDailyRewards()
+    self:RefreshWindow()
+    return dailyResult
 end
 
 return Guild

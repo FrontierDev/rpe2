@@ -75,6 +75,31 @@ local function describeEligibilityFailure(reason, detail)
     return "Requisition unavailable"
 end
 
+local function describeDailyStatus(status)
+    status = tostring(status or "unavailable")
+    if status == "not-in-guild" then
+        return "Not eligible: not in a guild"
+    elseif status == "guild-loading" then
+        return "Not eligible: guild information is still loading"
+    elseif status == "no-assigned-rank" then
+        return "Not eligible: no RPE Guild Rank assigned"
+    elseif status == "invalid-assigned-rank" then
+        return "Not eligible: assigned RPE Guild Rank is no longer valid"
+    elseif status == "daily-rewards-disabled" then
+        return "Daily rewards disabled"
+    elseif status == "available-today" then
+        return "Available today"
+    elseif status == "received-today" then
+        return "Received today"
+    elseif status == "invalid-reward-definition"
+        or status == "item-unavailable"
+        or status == "currency-unavailable" then
+        return "Daily rewards unavailable"
+    end
+
+    return "Daily rewards unavailable"
+end
+
 function RequisitionsPage:Build(parent, owner)
     self.owner = owner
     if self.frame then
@@ -85,6 +110,7 @@ function RequisitionsPage:Build(parent, owner)
     self.SelectedRequisitionItems = {}
     self.RequisitionActionMessage = nil
     self.RequisitionPending = false
+    self.DailyRewardStateLabel = "Info"
 
     self.frame = CreateFrame("Frame", "RPEGuildRequisitionsPage", parent)
     self.frame:SetAllPoints(parent)
@@ -139,7 +165,7 @@ function RequisitionsPage:Build(parent, owner)
         local label = rewardType == "currency" and resolveCurrencyName(ref) or resolveItemName(ref)
         row:SetCategory(rewardType == "currency" and "Currency" or "Item")
         row:SetTestName(("%s x%d"):format(label, tonumber(reward and reward.amount) or 1))
-        row:SetStatus("Read-only")
+        row:SetStatus(self.DailyRewardStateLabel or "Info")
         row:SetDetail(ref)
     end)
     self.DailyList:Create()
@@ -298,12 +324,29 @@ function RequisitionsPage:Refresh()
         assignment, assignmentText = self.owner:GetAssignedGuildRankDisplay()
     end
 
+    local Guild = Client.Guild
+    local dailyStatus = Guild and type(Guild.GetDailyRewardStatus) == "function"
+        and Guild:GetDailyRewardStatus()
+        or { status = "unavailable", rewards = {} }
+    local dailyStateText = describeDailyStatus(dailyStatus.status)
+    if dailyStatus.status == "available-today" then
+        self.DailyRewardStateLabel = "Available"
+    elseif dailyStatus.status == "received-today" then
+        self.DailyRewardStateLabel = "Received"
+    elseif dailyStatus.status == "daily-rewards-disabled" then
+        self.DailyRewardStateLabel = "Disabled"
+    else
+        self.DailyRewardStateLabel = "Info"
+    end
+
     local assignedRank = assignment and assignment.status == "valid" and assignment.rank or nil
     local hasAssignedRank = assignedRank ~= nil
     self.StatusText:SetText(hasAssignedRank
-        and (assignmentText .. ". Daily Rewards are read-only; Requisitions can be claimed below.")
+        and (assignmentText .. ". " .. dailyStateText .. ". Daily Rewards are shown below; Requisitions can be claimed below.")
         or (assignmentText or "Guild Rank: Unavailable"))
-    local dailyRewards = hasAssignedRank and assignedRank.dailyRewards or {}
+    local dailyRewards = hasAssignedRank
+        and (dailyStatus.rewards or assignedRank.dailyRewards)
+        or {}
     local requisitions = hasAssignedRank and assignedRank.requisitions or {}
     self.SelectedRequisitionItems = requisitions or {}
     if not self.SelectedRequisitionIndex
@@ -313,8 +356,8 @@ function RequisitionsPage:Refresh()
     end
     self.DailyList:SetItems(dailyRewards or {})
     self.RequisitionList:SetItems(requisitions or {})
-    self.DailyEmptyText:SetText(not hasAssignedRank and (assignmentText or "Guild Rank unavailable.")
-        or (#dailyRewards == 0 and "No daily rewards configured." or ""))
+    self.DailyEmptyText:SetText(not hasAssignedRank and dailyStateText
+        or (#dailyRewards == 0 and (dailyStateText .. "; no rewards configured.") or ""))
     self.RequisitionEmptyText:SetText(not hasAssignedRank and (assignmentText or "Guild Rank unavailable.")
         or (#requisitions == 0 and "No requisitions configured." or ""))
 
