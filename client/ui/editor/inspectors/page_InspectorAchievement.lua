@@ -161,6 +161,32 @@ local function buildCriterionId(criteria, ignoredIndex)
     return "criterion_" .. index
 end
 
+local function buildUniqueCriterionId(criteria, ignoredIndex, requestedId)
+    local baseId = trim(requestedId)
+    if baseId == "" then
+        return buildCriterionId(criteria, ignoredIndex)
+    end
+
+    local used = {}
+    for index = 1, #(criteria or {}) do
+        if index ~= ignoredIndex then
+            local criterion = criteria[index]
+            local id = trim(criterion and criterion.id)
+            if id ~= "" then
+                used[id] = true
+            end
+        end
+    end
+
+    local candidate = baseId
+    local suffix = 2
+    while used[candidate] do
+        candidate = ("%s_%d"):format(baseId, suffix)
+        suffix = suffix + 1
+    end
+    return candidate
+end
+
 local function getFilter(criterion)
     if type(criterion.filters) ~= "table" then
         criterion.filters = {}
@@ -503,8 +529,11 @@ function DataEditor:BuildAchievementInspectorCriteriaPage(parent)
         self:CommitSelectedAchievement(function(achievement)
             local criterion = getCriterion(achievement, selectedIndex)
             if criterion then
-                local id = trim(self.AchievementInspectorCriterionIdInput:GetText())
-                criterion.id = id ~= "" and id or buildCriterionId(achievement.criteria, selectedIndex)
+                criterion.id = buildUniqueCriterionId(
+                    achievement.criteria,
+                    selectedIndex,
+                    self.AchievementInspectorCriterionIdInput:GetText()
+                )
             end
         end)
         self:RefreshAchievementCriteriaInspector()
