@@ -581,6 +581,8 @@ function AdminPage:RefreshActionControls()
         and self.SelectedMemberAdminState.success == true
         and tostring(self.SelectedMemberAdminState.assignedRankRef or "")
         or ""
+    local progressionStateMatchesRank = assignedRankRef ~= ""
+        and tostring(progressionState.rankRef or "") == assignedRankRef
     if self.ClearGuildRankButton then
         self.ClearGuildRankButton:SetEnabled(canAdminister and assignedRankRef ~= "")
     end
@@ -621,13 +623,18 @@ function AdminPage:RefreshActionControls()
         self.GiveItemButton:SetEnabled(canUseAdminControls and selectedItemRef ~= "" and itemQuantity ~= nil)
     end
 
-    local canUseProgression = canUseAdminControls and selectedProgressionEntry ~= nil
-        and progressionState.rankRef ~= ""
+    local canUseProgression = canUseAdminControls
+        and progressionStateMatchesRank
+        and selectedProgressionEntry ~= nil
     if self.ProgressionEntryDropdown then
-        self.ProgressionEntryDropdown:SetEnabled(canUseAdminControls and progressionDefinition ~= nil)
+        self.ProgressionEntryDropdown:SetEnabled(
+            canUseAdminControls and progressionStateMatchesRank and progressionDefinition ~= nil
+        )
     end
     if self.ProgressionSlotDropdown then
-        self.ProgressionSlotDropdown:SetEnabled(canUseAdminControls and progressionDefinition ~= nil and progressionSlotCount > 0)
+        self.ProgressionSlotDropdown:SetEnabled(
+            canUseAdminControls and progressionStateMatchesRank and progressionDefinition ~= nil and progressionSlotCount > 0
+        )
     end
     if self.AssignProgressionButton then
         self.AssignProgressionButton:SetEnabled(
@@ -980,12 +987,19 @@ function AdminPage:SetSelectedGuildRank()
         end
 
         self.PendingAdminAction = nil
-        self.SelectedMemberAdminState = response or { success = false, reason = "unknown-error" }
-        if self.SelectedMemberAdminState.success == true then
-            self.SelectedGuildRankRef = tostring(self.SelectedMemberAdminState.assignedRankRef or selectedRankRef)
+        local normalizedResponse = response or { success = false, reason = "unknown-error" }
+        if normalizedResponse.success == true then
+            self.SelectedGuildRankRef = tostring(normalizedResponse.assignedRankRef or selectedRankRef)
+            -- The rank mutation changes which rank-scoped Progression bucket
+            -- is authoritative. Drop the old snapshot and force a fresh query
+            -- before any Progression control can be enabled.
+            self.SelectedMemberAdminState = nil
+            self.SelectedMemberProfileState = { achievements = {}, skills = {}, progression = nil }
+            self.SelectedMemberQueryPending = false
             self.AdminActionMessage = "Set succeeded; target client acknowledged the assignment."
         else
-            self.AdminActionMessage = ("Set failed: %s"):format(getAdminReason(self.SelectedMemberAdminState))
+            self.SelectedMemberAdminState = normalizedResponse
+            self.AdminActionMessage = ("Set failed: %s"):format(getAdminReason(normalizedResponse))
         end
         self:Refresh()
     end
