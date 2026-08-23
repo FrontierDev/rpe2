@@ -31,6 +31,8 @@ core/internal/profile/Modifications.lua
 core/internal/profile/Equipment.lua
 core/internal/profile/Resolver.lua
 core/internal/profile/Currencies.lua
+core/internal/profile/Achievements.lua
+core/internal/profile/Guild.lua
 core/internal/profile/Profile.lua
 core/internal/ruleset/Rules.lua
 core/internal/ruleset/Ruleset.lua
