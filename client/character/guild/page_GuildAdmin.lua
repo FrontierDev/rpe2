@@ -8,6 +8,7 @@ local Client = Addon.Client
 local GuildUI = Addon.Client.UI.Guild
 local UI = Addon.UI or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
+local Registry = Addon.Internal and Addon.Internal.Registry or {}
 
 local AdminPage = GuildUI.AdminPage or {}
 GuildUI.AdminPage = AdminPage
@@ -55,6 +56,76 @@ local function getAdminReason(response)
     return reason
 end
 
+local function getDatasetEntryLabel(dataset, entry, reference)
+    local entryName = tostring(entry and entry.name or "")
+    local entryId = tostring(entry and entry.id or "")
+    local datasetName = tostring(dataset and dataset.name or dataset and dataset.id or "")
+    local label = entryName ~= "" and entryName or entryId
+    if label == "" then
+        label = tostring(reference or "")
+    end
+    if datasetName ~= "" and label ~= "" then
+        return ("%s (%s)"):format(label, datasetName)
+    end
+
+    return label
+end
+
+local function buildReferenceItems(collectionKey)
+    local items = {
+        { label = "Select a " .. collectionKey .. " reference", value = "" },
+    }
+    local seen = {}
+    local datasets = type(Registry.GetActivatedDatasets) == "function"
+        and Registry:GetActivatedDatasets()
+        or {}
+    for datasetIndex = 1, #(datasets or {}) do
+        local dataset = datasets[datasetIndex]
+        local entries = type(dataset and dataset[collectionKey]) == "table" and dataset[collectionKey] or {}
+        for entryIndex = 1, #entries do
+            local entry = entries[entryIndex]
+            local datasetId = tostring(dataset and dataset.id or "")
+            local entryId = tostring(entry and entry.id or "")
+            local reference = datasetId ~= "" and entryId ~= "" and (datasetId .. ":" .. entryId) or ""
+            if reference ~= "" and not seen[reference] then
+                seen[reference] = true
+                items[#items + 1] = {
+                    label = getDatasetEntryLabel(dataset, entry, reference),
+                    value = reference,
+                }
+            end
+        end
+    end
+
+    return items
+end
+
+local function normalizeInteger(value, minimum, maximum)
+    local numeric = tonumber(tostring(value or ""))
+    if not numeric or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        return nil
+    end
+
+    local integer = math.floor(numeric)
+    if numeric ~= integer or (minimum ~= nil and integer < minimum) or (maximum ~= nil and integer > maximum) then
+        return nil
+    end
+
+    return integer
+end
+
+local function getSelectedAchievementState(page)
+    local profileState = page.SelectedMemberProfileState or {}
+    local achievements = type(profileState.achievements) == "table" and profileState.achievements or {}
+    return achievements[tostring(page.SelectedAchievementRef or "")]
+end
+
+local function getSelectedSkillLevel(page)
+    local profileState = page.SelectedMemberProfileState or {}
+    local skills = type(profileState.skills) == "table" and profileState.skills or {}
+    return tonumber(skills[tostring(page.SelectedSkillRef or "")]) or 0
+end
+
 function AdminPage:Build(parent, owner)
     self.owner = owner
     if self.frame then
@@ -63,11 +134,16 @@ function AdminPage:Build(parent, owner)
 
     self.SelectedMemberKey = nil
     self.SelectedMemberAdminState = nil
+    self.SelectedMemberProfileState = { achievements = {}, skills = {} }
     self.SelectedMemberQueryPending = false
     self.PendingAdminAction = nil
     self.SelectedGuildRankRef = ""
     self.EligibleGuildRanks = {}
     self.AdminActionMessage = nil
+    self.AdminSection = "Achievements"
+    self.SelectedAchievementRef = ""
+    self.SelectedSkillRef = ""
+    self.SelectedItemRef = ""
 
     self.frame = CreateFrame("Frame", "RPEGuildAdminPage", parent)
     self.frame:SetAllPoints(parent)
@@ -141,9 +217,13 @@ function AdminPage:Build(parent, owner)
                     self.SelectedMemberIndex = memberIndex
                     self.SelectedMemberKey = nil
                     self.SelectedMemberAdminState = nil
+                    self.SelectedMemberProfileState = { achievements = {}, skills = {} }
                     self.SelectedMemberQueryPending = false
                     self.PendingAdminAction = nil
                     self.SelectedGuildRankRef = ""
+                    self.SelectedAchievementRef = ""
+                    self.SelectedSkillRef = ""
+                    self.SelectedItemRef = ""
                     self.EligibleGuildRanks = {}
                     self.AdminActionMessage = nil
                     self:Refresh()
@@ -164,7 +244,7 @@ function AdminPage:Build(parent, owner)
 
     self.AdminSectionsPanel = UI.CreatePanel(self.RootLayout:GetFrame(), "RPEGuildAdminSectionsPanel", {
         width = 520,
-        height = 112,
+        height = 190,
         expandWidth = true,
         contentInset = 2,
         showBorder = false,
@@ -183,13 +263,13 @@ function AdminPage:Build(parent, owner)
     for index = 1, #plannedSections do
         local section = plannedSections[index]
         local button = UI.CreateButton(self.AdminSectionsLayout:GetFrame(), "RPEGuildAdminPlanned" .. section .. "Button", section, 104, function()
-            return false
+            self.AdminSection = section
+            self.AdminActionMessage = nil
+            self:Refresh()
         end, {
             height = 20,
             fontSize = 8,
-            enableMouse = false,
         })
-        button:SetEnabled(false)
         self.AdminSectionsLayout:AddChild(button)
         self.AdminSectionButtons[#self.AdminSectionButtons + 1] = button
     end
@@ -234,6 +314,109 @@ function AdminPage:Build(parent, owner)
     })
     self.GuildRankDropdown:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 2, -35)
 
+    self.AchievementDropdown = UI.CreateDropdown(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminAchievementDropdown", {
+        width = 250,
+        height = 18,
+        placeholder = "Select an Achievement",
+        items = {
+            { label = "Select an Achievement", value = "" },
+        },
+        onValueChanged = function(value)
+            self.SelectedAchievementRef = tostring(value or "")
+            self.AdminActionMessage = nil
+            self:RefreshActionControls()
+        end,
+    })
+    self.AchievementDropdown:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 2, -58)
+
+    self.AchievementStateText = UI.CreateText(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminAchievementStateText", "", {
+        width = 150,
+        height = 18,
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.AchievementStateText:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 258, -58)
+
+    self.GrantAchievementButton = UI.CreateButton(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminGrantAchievementButton", "Grant", 70, function()
+        self:GrantSelectedAchievement()
+    end, {
+        height = 18,
+        fontSize = 8,
+    })
+    self.GrantAchievementButton:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 412, -58)
+
+    self.SkillDropdown = UI.CreateDropdown(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminSkillDropdown", {
+        width = 250,
+        height = 18,
+        placeholder = "Select a Skill",
+        items = {
+            { label = "Select a Skill", value = "" },
+        },
+        onValueChanged = function(value)
+            self.SelectedSkillRef = tostring(value or "")
+            self.AdminActionMessage = nil
+            self:RefreshActionControls()
+        end,
+    })
+    self.SkillDropdown:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 2, -80)
+
+    self.SkillLevelText = UI.CreateText(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminSkillLevelText", "Level: --", {
+        width = 74,
+        height = 18,
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.SkillLevelText:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 258, -80)
+
+    self.DecreaseSkillButton = UI.CreateButton(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminDecreaseSkillButton", "-1", 42, function()
+        self:AdjustSelectedSkill(-1)
+    end, {
+        height = 18,
+        fontSize = 8,
+    })
+    self.DecreaseSkillButton:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 334, -80)
+
+    self.IncreaseSkillButton = UI.CreateButton(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminIncreaseSkillButton", "+1", 42, function()
+        self:AdjustSelectedSkill(1)
+    end, {
+        height = 18,
+        fontSize = 8,
+    })
+    self.IncreaseSkillButton:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 380, -80)
+
+    self.ItemDropdown = UI.CreateDropdown(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminItemDropdown", {
+        width = 250,
+        height = 18,
+        placeholder = "Select an Item",
+        items = {
+            { label = "Select an Item", value = "" },
+        },
+        onValueChanged = function(value)
+            self.SelectedItemRef = tostring(value or "")
+            self.AdminActionMessage = nil
+            self:RefreshActionControls()
+        end,
+    })
+    self.ItemDropdown:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 2, -102)
+
+    self.ItemQuantityInput = UI.CreateTextInput(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminItemQuantityInput", {
+        width = 62,
+        height = 18,
+        text = "1",
+        placeholder = "Qty",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.ItemQuantityInput:SetScript("OnTextChanged", function()
+        self:RefreshActionControls()
+    end)
+    self.ItemQuantityInput:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 258, -102)
+
+    self.GiveItemButton = UI.CreateButton(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminGiveItemButton", "Give", 70, function()
+        self:GiveSelectedItem()
+    end, {
+        height = 18,
+        fontSize = 8,
+    })
+    self.GiveItemButton:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 326, -102)
+
     self:Refresh()
     return self.frame
 end
@@ -248,6 +431,11 @@ function AdminPage:RefreshActionControls()
         and self.SelectedMemberAdminState.success == true
         and self.PendingAdminAction == nil
     local eligibleRanks = self.EligibleGuildRanks or {}
+    local selectedAchievementState = getSelectedAchievementState(self)
+    local selectedSkillRef = tostring(self.SelectedSkillRef or "")
+    local selectedItemRef = tostring(self.SelectedItemRef or "")
+    local itemQuantity = self.ItemQuantityInput and normalizeInteger(self.ItemQuantityInput:GetText(), 1) or nil
+    local canUseAdminControls = canAdminister
     local selectedRankIsEligible = false
     for index = 1, #eligibleRanks do
         if tostring(eligibleRanks[index] and eligibleRanks[index].ref or "") == tostring(self.SelectedGuildRankRef or "")
@@ -271,6 +459,42 @@ function AdminPage:RefreshActionControls()
     if self.ClearGuildRankButton then
         self.ClearGuildRankButton:SetEnabled(canAdminister and assignedRankRef ~= "")
     end
+
+    for index = 1, #(self.AdminSectionButtons or {}) do
+        self.AdminSectionButtons[index]:SetEnabled(
+            self.IsOfficer == true
+                and selectedMember ~= nil
+                and selectedMember.online == true
+        )
+    end
+    if self.AchievementDropdown then
+        self.AchievementDropdown:SetEnabled(canUseAdminControls)
+    end
+    if self.GrantAchievementButton then
+        self.GrantAchievementButton:SetEnabled(
+            canUseAdminControls
+                and tostring(self.SelectedAchievementRef or "") ~= ""
+                and selectedAchievementState == nil
+        )
+    end
+    if self.SkillDropdown then
+        self.SkillDropdown:SetEnabled(canUseAdminControls)
+    end
+    if self.DecreaseSkillButton then
+        self.DecreaseSkillButton:SetEnabled(canUseAdminControls and selectedSkillRef ~= "")
+    end
+    if self.IncreaseSkillButton then
+        self.IncreaseSkillButton:SetEnabled(canUseAdminControls and selectedSkillRef ~= "")
+    end
+    if self.ItemDropdown then
+        self.ItemDropdown:SetEnabled(canUseAdminControls)
+    end
+    if self.ItemQuantityInput then
+        self.ItemQuantityInput:SetEnabled(canUseAdminControls)
+    end
+    if self.GiveItemButton then
+        self.GiveItemButton:SetEnabled(canUseAdminControls and selectedItemRef ~= "" and itemQuantity ~= nil)
+    end
 end
 
 local function containsRankRef(ranks, rankRef)
@@ -286,6 +510,150 @@ local function containsRankRef(ranks, rankRef)
     end
 
     return false
+end
+
+local function getSelectedMutationContext(page)
+    local selectedMember = page.SelectedMember
+    if not selectedMember or selectedMember.online ~= true or page.IsOfficer ~= true
+        or page.SelectedMemberQueryPending == true
+        or not page.SelectedMemberAdminState
+        or page.SelectedMemberAdminState.success ~= true
+        or page.PendingAdminAction ~= nil then
+        return nil, nil
+    end
+
+    return selectedMember, page.SelectionGeneration
+end
+
+local function preserveSelectedRankState(page, response)
+    local previous = page.SelectedMemberAdminState or {}
+    local normalizedResponse = response or { success = false, reason = "unknown-error" }
+    if tostring(normalizedResponse.assignedRankRef or "") == "" then
+        normalizedResponse.assignedRankRef = tostring(previous.assignedRankRef or "")
+    end
+    page.SelectedMemberAdminState = normalizedResponse
+    return normalizedResponse
+end
+
+function AdminPage:GrantSelectedAchievement()
+    local Guild = Client.Guild
+    local selectedMember, selectionGeneration = getSelectedMutationContext(self)
+    local achievementRef = tostring(self.SelectedAchievementRef or "")
+    if not Guild or not selectedMember or achievementRef == "" or getSelectedAchievementState(self) ~= nil then
+        return false
+    end
+
+    local selectedKey = self.SelectedMemberKey
+    self.PendingAdminAction = "grant_achievement"
+    self.AdminActionMessage = "Grant pending..."
+    self:Refresh()
+
+    local function finish(response)
+        if self.SelectedMemberKey ~= selectedKey or self.SelectionGeneration ~= selectionGeneration then
+            return
+        end
+
+        self.PendingAdminAction = nil
+        local normalizedResponse = preserveSelectedRankState(self, response)
+        if normalizedResponse.success == true then
+            self.SelectedMemberProfileState = self.SelectedMemberProfileState or { achievements = {}, skills = {} }
+            self.SelectedMemberProfileState.achievements = self.SelectedMemberProfileState.achievements or {}
+            self.SelectedMemberProfileState.achievements[achievementRef] = {
+                completedAt = tostring(normalizedResponse.value or "") ~= ""
+                    and normalizedResponse.value
+                    or true,
+            }
+            self.AdminActionMessage = "Grant acknowledged by target client."
+        else
+            self.AdminActionMessage = ("Grant failed: %s"):format(getAdminReason(normalizedResponse))
+        end
+        self:Refresh()
+    end
+
+    if type(Guild.GrantAchievementForMember) ~= "function" then
+        finish({ success = false, reason = "incompatible-protocol" })
+        return false
+    end
+
+    return Guild:GrantAchievementForMember(selectedMember.name, achievementRef, finish) == true
+end
+
+function AdminPage:AdjustSelectedSkill(delta)
+    local Guild = Client.Guild
+    local selectedMember, selectionGeneration = getSelectedMutationContext(self)
+    local skillRef = tostring(self.SelectedSkillRef or "")
+    local normalizedDelta = normalizeInteger(delta)
+    if not Guild or not selectedMember or skillRef == "" or not normalizedDelta or normalizedDelta == 0 then
+        return false
+    end
+
+    local selectedKey = self.SelectedMemberKey
+    self.PendingAdminAction = "adjust_skill"
+    self.AdminActionMessage = normalizedDelta > 0 and "Skill increase pending..." or "Skill decrease pending..."
+    self:Refresh()
+
+    local function finish(response)
+        if self.SelectedMemberKey ~= selectedKey or self.SelectionGeneration ~= selectionGeneration then
+            return
+        end
+
+        self.PendingAdminAction = nil
+        local normalizedResponse = preserveSelectedRankState(self, response)
+        if normalizedResponse.success == true then
+            self.SelectedMemberProfileState = self.SelectedMemberProfileState or { achievements = {}, skills = {} }
+            self.SelectedMemberProfileState.skills = self.SelectedMemberProfileState.skills or {}
+            self.SelectedMemberProfileState.skills[skillRef] = tonumber(normalizedResponse.value)
+                or (getSelectedSkillLevel(self) + normalizedDelta)
+            self.AdminActionMessage = "Skill adjustment acknowledged by target client."
+        else
+            self.AdminActionMessage = ("Skill adjustment failed: %s"):format(getAdminReason(normalizedResponse))
+        end
+        self:Refresh()
+    end
+
+    if type(Guild.AdjustSkillForMember) ~= "function" then
+        finish({ success = false, reason = "incompatible-protocol" })
+        return false
+    end
+
+    return Guild:AdjustSkillForMember(selectedMember.name, skillRef, normalizedDelta, finish) == true
+end
+
+function AdminPage:GiveSelectedItem()
+    local Guild = Client.Guild
+    local selectedMember, selectionGeneration = getSelectedMutationContext(self)
+    local itemRef = tostring(self.SelectedItemRef or "")
+    local quantity = self.ItemQuantityInput and normalizeInteger(self.ItemQuantityInput:GetText(), 1) or nil
+    if not Guild or not selectedMember or itemRef == "" or quantity == nil then
+        return false
+    end
+
+    local selectedKey = self.SelectedMemberKey
+    self.PendingAdminAction = "give_item"
+    self.AdminActionMessage = "Item award pending..."
+    self:Refresh()
+
+    local function finish(response)
+        if self.SelectedMemberKey ~= selectedKey or self.SelectionGeneration ~= selectionGeneration then
+            return
+        end
+
+        self.PendingAdminAction = nil
+        local normalizedResponse = preserveSelectedRankState(self, response)
+        if normalizedResponse.success == true then
+            self.AdminActionMessage = "Item award acknowledged by target client."
+        else
+            self.AdminActionMessage = ("Item award failed: %s"):format(getAdminReason(normalizedResponse))
+        end
+        self:Refresh()
+    end
+
+    if type(Guild.GiveItemToMember) ~= "function" then
+        finish({ success = false, reason = "incompatible-protocol" })
+        return false
+    end
+
+    return Guild:GiveItemToMember(selectedMember.name, itemRef, quantity, finish) == true
 end
 
 function AdminPage:SetSelectedGuildRank()
@@ -396,16 +764,24 @@ function AdminPage:Refresh()
         self.SelectionGeneration = (tonumber(self.SelectionGeneration) or 0) + 1
         self.SelectedMemberKey = selectedMemberKey ~= "" and selectedMemberKey or nil
         self.SelectedMemberAdminState = nil
+        self.SelectedMemberProfileState = { achievements = {}, skills = {} }
         self.SelectedMemberQueryPending = false
         self.PendingAdminAction = nil
         self.SelectedGuildRankRef = ""
+        self.SelectedAchievementRef = ""
+        self.SelectedSkillRef = ""
+        self.SelectedItemRef = ""
         self.AdminActionMessage = nil
     elseif selectedMember and self.SelectedMemberWowRankIndex ~= nil and self.SelectedMemberWowRankIndex ~= wowRankIndex then
         self.SelectionGeneration = (tonumber(self.SelectionGeneration) or 0) + 1
         self.SelectedMemberAdminState = nil
+        self.SelectedMemberProfileState = { achievements = {}, skills = {} }
         self.SelectedMemberQueryPending = false
         self.PendingAdminAction = nil
         self.SelectedGuildRankRef = ""
+        self.SelectedAchievementRef = ""
+        self.SelectedSkillRef = ""
+        self.SelectedItemRef = ""
         self.AdminActionMessage = nil
     end
     self.SelectedMemberWowRankIndex = wowRankIndex
@@ -435,6 +811,69 @@ function AdminPage:Refresh()
             self.SelectedGuildRankRef = ""
         end
         self.GuildRankDropdown:SetSelectedValue(self.SelectedGuildRankRef, true)
+    end
+
+    local achievementItems = buildReferenceItems("achievements")
+    local skillItems = buildReferenceItems("skills")
+    local itemItems = buildReferenceItems("items")
+    if self.AchievementDropdown then
+        self.AchievementDropdown:SetItems(achievementItems)
+        local achievementFound = false
+        for index = 1, #achievementItems do
+            if tostring(achievementItems[index].value or "") == tostring(self.SelectedAchievementRef or "") then
+                achievementFound = true
+                break
+            end
+        end
+        if not achievementFound then
+            self.SelectedAchievementRef = ""
+        end
+        self.AchievementDropdown:SetSelectedValue(self.SelectedAchievementRef, true)
+    end
+    if self.SkillDropdown then
+        self.SkillDropdown:SetItems(skillItems)
+        local skillFound = false
+        for index = 1, #skillItems do
+            if tostring(skillItems[index].value or "") == tostring(self.SelectedSkillRef or "") then
+                skillFound = true
+                break
+            end
+        end
+        if not skillFound then
+            self.SelectedSkillRef = ""
+        end
+        self.SkillDropdown:SetSelectedValue(self.SelectedSkillRef, true)
+    end
+    if self.ItemDropdown then
+        self.ItemDropdown:SetItems(itemItems)
+        local itemFound = false
+        for index = 1, #itemItems do
+            if tostring(itemItems[index].value or "") == tostring(self.SelectedItemRef or "") then
+                itemFound = true
+                break
+            end
+        end
+        if not itemFound then
+            self.SelectedItemRef = ""
+        end
+        self.ItemDropdown:SetSelectedValue(self.SelectedItemRef, true)
+    end
+    if self.AchievementStateText then
+        self.AchievementStateText:SetText(
+            self.SelectedAchievementRef == ""
+                and "Earned: --"
+                or (getSelectedAchievementState(self) and "Earned" or "Not earned")
+        )
+    end
+    if self.SkillLevelText then
+        self.SkillLevelText:SetText(
+            self.SelectedSkillRef == ""
+                and "Level: --"
+                or ("Level: %d"):format(getSelectedSkillLevel(self))
+        )
+    end
+    if self.AchievementDropdown then
+        self.AchievementDropdown:SetEnabled(self.IsOfficer == true and selectedMember ~= nil and selectedMember.online == true)
     end
 
     if not identity.inGuild then
@@ -504,6 +943,8 @@ function AdminPage:Refresh()
 
                 self.SelectedMemberQueryPending = false
                 self.SelectedMemberAdminState = response or { success = false, reason = "no-response" }
+                self.SelectedMemberProfileState = self.SelectedMemberAdminState.profileState
+                    or { achievements = {}, skills = {} }
                 if self.SelectedMemberAdminState.success == true then
                     self.SelectedGuildRankRef = tostring(self.SelectedMemberAdminState.assignedRankRef or "")
                 else
@@ -514,6 +955,7 @@ function AdminPage:Refresh()
         else
             self.SelectedMemberQueryPending = false
             self.SelectedMemberAdminState = { success = false, reason = "incompatible-protocol" }
+            self.SelectedMemberProfileState = { achievements = {}, skills = {} }
             self:Refresh()
         end
     end

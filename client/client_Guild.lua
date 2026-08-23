@@ -360,8 +360,60 @@ local function getResolvedGuildRankReference(guildRankRef)
     return Registry:ResolveGuildSettingReference(guildRankRef)
 end
 
+local function getSortedStringKeys(values, predicate)
+    local keys = {}
+    for key, value in pairs(type(values) == "table" and values or {}) do
+        local normalizedKey = trimText(key)
+        if normalizedKey ~= "" and (type(predicate) ~= "function" or predicate(value)) then
+            keys[#keys + 1] = normalizedKey
+        end
+    end
+
+    table.sort(keys)
+    return keys
+end
+
+local function appendQueryProfileStateArguments(arguments)
+    local achievementStates = {}
+    if type(Profile.ListAchievementStates) == "function" then
+        local ok, states = pcall(Profile.ListAchievementStates)
+        if ok and type(states) == "table" then
+            achievementStates = states
+        end
+    end
+
+    local completedAchievementRefs = getSortedStringKeys(achievementStates, function(state)
+        return type(state) == "table" and state.completedAt ~= nil
+    end)
+    arguments[#arguments + 1] = tostring(#completedAchievementRefs)
+    for index = 1, #completedAchievementRefs do
+        local achievementRef = completedAchievementRefs[index]
+        local state = achievementStates[achievementRef] or {}
+        arguments[#arguments + 1] = achievementRef
+        arguments[#arguments + 1] = state.completedAt
+    end
+
+    local skillLevels = {}
+    if type(Profile.ListSkillLevels) == "function" then
+        local ok, levels = pcall(Profile.ListSkillLevels)
+        if ok and type(levels) == "table" then
+            skillLevels = levels
+        end
+    end
+
+    local skillRefs = getSortedStringKeys(skillLevels)
+    arguments[#arguments + 1] = tostring(#skillRefs)
+    for index = 1, #skillRefs do
+        local skillRef = skillRefs[index]
+        arguments[#arguments + 1] = skillRef
+        arguments[#arguments + 1] = tonumber(skillLevels[skillRef]) or 0
+    end
+
+    return arguments
+end
+
 local function buildQueryResponseArguments(requestId, success, reason, identity, assignedRankRef)
-    return {
+    local arguments = {
         requestId,
         GUILD_ADMIN_PROTOCOL_VERSION,
         success and "1" or "0",
@@ -371,9 +423,16 @@ local function buildQueryResponseArguments(requestId, success, reason, identity,
         identity and identity.guildRankName or "",
         identity and identity.guildName or "",
     }
+    if success then
+        return appendQueryProfileStateArguments(arguments)
+    end
+
+    arguments[#arguments + 1] = ""
+    arguments[#arguments + 1] = ""
+    return arguments
 end
 
-local function buildMutationResponseArguments(requestId, operation, success, reason, assignedRankRef)
+local function buildMutationResponseArguments(requestId, operation, success, reason, assignedRankRef, detail, value)
     return {
         requestId,
         GUILD_ADMIN_PROTOCOL_VERSION,
@@ -381,7 +440,122 @@ local function buildMutationResponseArguments(requestId, operation, success, rea
         success and "1" or "0",
         reason or (success and "ok" or "unknown-error"),
         assignedRankRef or "",
+        detail or "",
+        value or "",
     }
+end
+
+local function normalizeIntegerArgument(value, minimum, maximum)
+    local numeric = tonumber(trimText(value))
+    if not numeric or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        return nil
+    end
+
+    local integer = math.floor(numeric)
+    if numeric ~= integer then
+        return nil
+    end
+    if minimum ~= nil and integer < minimum then
+        return nil
+    end
+    if maximum ~= nil and integer > maximum then
+        return nil
+    end
+
+    return integer
+end
+
+local function resolveAchievementReference(achievementRef)
+    if type(Registry.ResolveAchievementReference) ~= "function" then
+        return nil, nil
+    end
+
+    local ok, dataset, achievement = pcall(Registry.ResolveAchievementReference, Registry, achievementRef)
+    if not ok or type(dataset) ~= "table" or type(achievement) ~= "table" then
+        return nil, nil
+    end
+
+    return dataset, achievement
+end
+
+local function resolveSkillReference(skillRef)
+    if type(Registry.ResolveSkillReference) ~= "function" then
+        return nil, nil
+    end
+
+    local ok, dataset, skill = pcall(Registry.ResolveSkillReference, Registry, skillRef)
+    if not ok or type(dataset) ~= "table" or type(skill) ~= "table" then
+        return nil, nil
+    end
+
+    return dataset, skill
+end
+
+local function resolveItemReference(itemRef)
+    if type(Registry.ResolveItemReference) ~= "function" then
+        return nil, nil
+    end
+
+    local ok, dataset, item = pcall(Registry.ResolveItemReference, Registry, itemRef)
+    if not ok or type(dataset) ~= "table" or type(item) ~= "table" then
+        return nil, nil
+    end
+
+    return dataset, item
+end
+
+local function getSkillLevelBounds(skillRef, skill)
+    local minimum = string.lower(trimText(skill and skill.skillType)) == "crafting" and 1 or 0
+    local maximum = nil
+    local hasResolvedRow = false
+    if type(Profile.GetResolvedSkillRow) == "function" then
+        hasResolvedRow = true
+        local ok, row = pcall(Profile.GetResolvedSkillRow, skillRef)
+        if ok and type(row) == "table" then
+            maximum = normalizeIntegerArgument(row.maxValue, minimum)
+        else
+            return nil, nil, false
+        end
+    end
+
+    if maximum ~= nil and maximum < minimum then
+        return nil, nil, hasResolvedRow
+    end
+
+    return minimum, maximum, hasResolvedRow
+end
+
+local function parseQueryProfileStateArguments(arguments)
+    local result = {
+        achievements = {},
+        skills = {},
+    }
+    local cursor = 9
+    local achievementCount = normalizeIntegerArgument(getArgument(arguments, cursor), 0, 10000) or 0
+    cursor = cursor + 1
+    for index = 1, achievementCount do
+        local achievementRef = getArgument(arguments, cursor)
+        local completedAt = getArgument(arguments, cursor + 1)
+        cursor = cursor + 2
+        if achievementRef ~= "" and completedAt ~= "" then
+            result.achievements[achievementRef] = {
+                completedAt = completedAt,
+            }
+        end
+    end
+
+    local skillCount = normalizeIntegerArgument(getArgument(arguments, cursor), 0, 10000) or 0
+    cursor = cursor + 1
+    for index = 1, skillCount do
+        local skillRef = getArgument(arguments, cursor)
+        local level = normalizeIntegerArgument(getArgument(arguments, cursor + 1), 0)
+        cursor = cursor + 2
+        if skillRef ~= "" and level ~= nil then
+            result.skills[skillRef] = level
+        end
+    end
+
+    return result
 end
 
 local function hasOfficerPermission()
@@ -1636,6 +1810,137 @@ function Guild:ClearGuildRankForMember(targetName, callback)
     })
 end
 
+function Guild:GrantAchievementForMember(targetName, achievementRef, callback)
+    local available, reason, member = self:IsGuildAdminTargetAvailable(targetName)
+    local normalizedRef = trimText(achievementRef)
+    if not available then
+        invokeGuildAdminCallback({ callback = callback }, {
+            success = false,
+            operation = "grant_achievement",
+            reason = reason,
+        })
+        return false, reason
+    end
+
+    if normalizedRef == "" then
+        invokeGuildAdminCallback({ callback = callback }, {
+            success = false,
+            operation = "grant_achievement",
+            reason = "unknown-achievement",
+        })
+        return false, "unknown-achievement"
+    end
+
+    local requestId = getGuildAdminRequestId()
+    return sendGuildAdminRequest(self, GUILD_ADMIN_MUTATION_OPCODE, member.name, {
+        requestId,
+        GUILD_ADMIN_PROTOCOL_VERSION,
+        "grant_achievement",
+        member.name,
+        normalizedRef,
+    }, {
+        requestId = requestId,
+        kind = "mutation",
+        operation = "grant_achievement",
+        targetName = member.name,
+        callback = callback,
+    })
+end
+
+function Guild:AdjustSkillForMember(targetName, skillRef, delta, callback)
+    local available, reason, member = self:IsGuildAdminTargetAvailable(targetName)
+    local normalizedRef = trimText(skillRef)
+    local normalizedDelta = normalizeIntegerArgument(delta)
+    if not available then
+        invokeGuildAdminCallback({ callback = callback }, {
+            success = false,
+            operation = "adjust_skill",
+            reason = reason,
+        })
+        return false, reason
+    end
+
+    if normalizedRef == "" then
+        invokeGuildAdminCallback({ callback = callback }, {
+            success = false,
+            operation = "adjust_skill",
+            reason = "unknown-skill",
+        })
+        return false, "unknown-skill"
+    end
+    if normalizedDelta == nil or normalizedDelta == 0 then
+        invokeGuildAdminCallback({ callback = callback }, {
+            success = false,
+            operation = "adjust_skill",
+            reason = "invalid-delta",
+        })
+        return false, "invalid-delta"
+    end
+
+    local requestId = getGuildAdminRequestId()
+    return sendGuildAdminRequest(self, GUILD_ADMIN_MUTATION_OPCODE, member.name, {
+        requestId,
+        GUILD_ADMIN_PROTOCOL_VERSION,
+        "adjust_skill",
+        member.name,
+        normalizedRef,
+        normalizedDelta,
+    }, {
+        requestId = requestId,
+        kind = "mutation",
+        operation = "adjust_skill",
+        targetName = member.name,
+        callback = callback,
+    })
+end
+
+function Guild:GiveItemToMember(targetName, itemRef, quantity, callback)
+    local available, reason, member = self:IsGuildAdminTargetAvailable(targetName)
+    local normalizedRef = trimText(itemRef)
+    local normalizedQuantity = normalizeIntegerArgument(quantity, 1)
+    if not available then
+        invokeGuildAdminCallback({ callback = callback }, {
+            success = false,
+            operation = "give_item",
+            reason = reason,
+        })
+        return false, reason
+    end
+
+    if normalizedRef == "" then
+        invokeGuildAdminCallback({ callback = callback }, {
+            success = false,
+            operation = "give_item",
+            reason = "unknown-item",
+        })
+        return false, "unknown-item"
+    end
+    if normalizedQuantity == nil then
+        invokeGuildAdminCallback({ callback = callback }, {
+            success = false,
+            operation = "give_item",
+            reason = "invalid-quantity",
+        })
+        return false, "invalid-quantity"
+    end
+
+    local requestId = getGuildAdminRequestId()
+    return sendGuildAdminRequest(self, GUILD_ADMIN_MUTATION_OPCODE, member.name, {
+        requestId,
+        GUILD_ADMIN_PROTOCOL_VERSION,
+        "give_item",
+        member.name,
+        normalizedRef,
+        normalizedQuantity,
+    }, {
+        requestId = requestId,
+        kind = "mutation",
+        operation = "give_item",
+        targetName = member.name,
+        callback = callback,
+    })
+end
+
 local function getPendingResponse(self, arguments, sender, distribution)
     local requestId = getArgument(arguments, 1)
     local pending = self._guildAdminPending and self._guildAdminPending[requestId] or nil
@@ -1667,6 +1972,7 @@ function Guild:HandleGuildAdminQueryResponse(arguments, sender, distribution, ta
         })
     end
 
+    local profileState = parseQueryProfileStateArguments(arguments)
     return completeGuildAdminPending(self, requestId, {
         requestId = requestId,
         protocolVersion = protocolVersion,
@@ -1676,6 +1982,9 @@ function Guild:HandleGuildAdminQueryResponse(arguments, sender, distribution, ta
         guildRankIndex = tonumber(getArgument(arguments, 6)),
         guildRankName = getArgument(arguments, 7),
         guildName = getArgument(arguments, 8),
+        profileState = profileState,
+        achievements = profileState.achievements,
+        skills = profileState.skills,
         sender = sender,
     })
 end
@@ -1706,6 +2015,8 @@ function Guild:HandleGuildAdminMutationResponse(arguments, sender, distribution,
         success = isSuccessfulArgument(getArgument(arguments, 4)),
         reason = getArgument(arguments, 5),
         assignedRankRef = getArgument(arguments, 6),
+        detail = getArgument(arguments, 7),
+        value = getArgument(arguments, 8),
         sender = sender,
     })
 end
@@ -1801,6 +2112,160 @@ function Guild:HandleGuildAdminMutation(arguments, sender, distribution, target,
                     sender,
                     buildMutationResponseArguments(requestId, operation, true, "ok")
                 )
+            end
+        end
+
+        return sendGuildAdminMessage(
+            GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
+            sender,
+            buildMutationResponseArguments(requestId, operation, false, reason)
+        )
+    end
+
+    if operation == "grant_achievement" then
+        local achievementRef = getArgument(arguments, 5)
+        local _, achievement = resolveAchievementReference(achievementRef)
+        if not achievement then
+            reason = "unknown-achievement"
+        else
+            local achievements = Client.Achievements or {}
+            if type(achievements.Grant) ~= "function" then
+                reason = "achievement-api-unavailable"
+            else
+                local callOk, granted, grantReason = pcall(
+                    achievements.Grant,
+                    achievements,
+                    achievementRef,
+                    {
+                        source = "guild_admin",
+                        actor = tostring(sender or ""),
+                    }
+                )
+                if not callOk or granted ~= true then
+                    reason = callOk and trimText(grantReason) or "achievement-grant-failed"
+                    if reason == "" then
+                        reason = "achievement-grant-failed"
+                    end
+                else
+                    self:RefreshWindow()
+                    return sendGuildAdminMessage(
+                        GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
+                        sender,
+                        buildMutationResponseArguments(
+                            requestId,
+                            operation,
+                            true,
+                            "ok",
+                            nil,
+                            "achievement-granted",
+                            achievementRef
+                        )
+                    )
+                end
+            end
+        end
+
+        return sendGuildAdminMessage(
+            GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
+            sender,
+            buildMutationResponseArguments(requestId, operation, false, reason)
+        )
+    end
+
+    if operation == "adjust_skill" then
+        local skillRef = getArgument(arguments, 5)
+        local delta = normalizeIntegerArgument(getArgument(arguments, 6))
+        local _, skill = resolveSkillReference(skillRef)
+        if not skill then
+            reason = "unknown-skill"
+        elseif delta == nil or delta == 0 then
+            reason = "invalid-delta"
+        elseif type(Profile.GetSkillLevel) ~= "function" or type(Profile.SetSkillLevel) ~= "function" then
+            reason = "skill-api-unavailable"
+        else
+            local minimum, maximum, hasResolvedRow = getSkillLevelBounds(skillRef, skill)
+            if type(Profile.GetResolvedSkillRow) == "function" and hasResolvedRow == false then
+                reason = "skill-unavailable"
+            elseif minimum == nil then
+                reason = "invalid-skill-bounds"
+            else
+                local currentCallOk, current = pcall(Profile.GetSkillLevel, skillRef)
+                current = currentCallOk and normalizeIntegerArgument(current, 0) or nil
+                local nextLevel = current and (current + delta) or nil
+                if not nextLevel or nextLevel ~= nextLevel or nextLevel == math.huge or nextLevel == -math.huge then
+                    reason = "invalid-skill-level"
+                elseif nextLevel < minimum or (maximum ~= nil and nextLevel > maximum) then
+                    reason = "skill-level-out-of-range"
+                else
+                    local setCallOk, storedLevel = pcall(Profile.SetSkillLevel, skillRef, nextLevel)
+                    local getCallOk, verifiedLevel = pcall(Profile.GetSkillLevel, skillRef)
+                    verifiedLevel = getCallOk and normalizeIntegerArgument(verifiedLevel, 0) or nil
+                    if not setCallOk or storedLevel == nil or not getCallOk or verifiedLevel ~= nextLevel then
+                        reason = "skill-persistence-failed"
+                    else
+                        self:RefreshWindow()
+                        return sendGuildAdminMessage(
+                            GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
+                            sender,
+                            buildMutationResponseArguments(
+                                requestId,
+                                operation,
+                                true,
+                                "ok",
+                                nil,
+                                "skill-adjusted",
+                                verifiedLevel
+                            )
+                        )
+                    end
+                end
+            end
+        end
+
+        return sendGuildAdminMessage(
+            GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
+            sender,
+            buildMutationResponseArguments(requestId, operation, false, reason)
+        )
+    end
+
+    if operation == "give_item" then
+        local itemRef = getArgument(arguments, 5)
+        local quantity = normalizeIntegerArgument(getArgument(arguments, 6), 1)
+        local itemDataset, item = resolveItemReference(itemRef)
+        local datasetId, itemId = parseItemReference(itemRef)
+        if not itemDataset or not item or not datasetId or not itemId then
+            reason = "unknown-item"
+        elseif quantity == nil then
+            reason = "invalid-quantity"
+        else
+            local inventory = getInventoryService()
+            if type(inventory.AddItem) ~= "function" then
+                reason = "inventory-api-unavailable"
+            else
+                local callOk, addedRecord = pcall(inventory.AddItem, {
+                    dataset = datasetId,
+                    id = itemId,
+                    quantity = quantity,
+                })
+                if not callOk or not addedRecord then
+                    reason = "item-award-failed"
+                else
+                    self:RefreshWindow()
+                    return sendGuildAdminMessage(
+                        GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
+                        sender,
+                        buildMutationResponseArguments(
+                            requestId,
+                            operation,
+                            true,
+                            "ok",
+                            nil,
+                            "item-awarded",
+                            quantity
+                        )
+                    )
+                end
             end
         end
 

@@ -1,141 +1,138 @@
 ## Goal
-Activate automatic Achievement progression and completion using the completed Phase 1 Achievement model without coupling it to Guild Rank assignment.
+Build the remaining Guild Admin operations on the receiver-validated request/response protocol introduced by Task 6.
 
-Depends on: completed Phase 1 Achievement data/Profile/editor work. This task may proceed after the Guild Rank foundation is stable; it does not depend on Requisition or Daily Reward runtime.
+Depends on: #15, #18
 
 ## Primary files
-- `client/client_Achievements.lua` **new** or equivalent focused module
-- `core/internal/profile/Achievements.lua`
-- `core/internal/profile/Currencies.lua`
-- `client/client_Resources.lua`
-- current RPE event-completion integration point identified from the repository
-- `client/character/profile/page_ProfileAchievements.lua`
-- `RPEngine_Dev.toc`
+- `core/internal/comms/Operations.lua`
+- existing Comms send/dispatch files as required by current patterns
+- `client/client_Guild.lua`
+- `client/character/guild/page_GuildAdmin.lua`
+- Achievement runtime from #18
+- existing Profile Skill APIs
+- existing Inventory APIs
 
-## Trigger contract
-Implement the existing Achievement criterion trigger tokens:
+## Required Admin operations
+Implement:
 
 ```text
-manual
-currency_gain
-rpe_kill
-rpe_event_complete
-achievement_earned
+grant_achievement
+adjust_skill
+give_item
 ```
 
-Build an index from Achievement criteria in activated datasets rather than scanning every Achievement/criterion for every runtime event.
+Use the same targeted addon-message request/response architecture established by Task 6. Do not create a second Guild Admin protocol.
 
-Use the Phase 1 stable criterion IDs as the keys for Profile progress.
+Extend the member query response only as needed for the Admin UI to display:
+- Achievement earned/completion state;
+- relevant Skill levels;
+- assigned RPE Guild Rank.
 
-## Criterion filtering
-Apply the Phase 1 filter semantics for the trigger being processed.
+Inventory contents do not need to be transmitted merely to give an item.
 
-At minimum:
-- `currency_gain` matches its configured `currencyRef` where present;
-- `rpe_kill` respects optional `unitRef` and `enemyOnly` where applicable;
-- `achievement_earned` matches configured `achievementRef`;
-- `manual` is not advanced by unrelated automatic events;
-- `rpe_event_complete` advances only from the authoritative event-completion path.
+## Receiver-side validation
+Every mutation must independently validate again:
 
-Do not treat arbitrary filter strings as executable logic.
+```text
+sender identity came from transport
+sender is in the same WoW guild
+sender currently has WoW officer capability
+target is this client's own active character
+requested operation is supported
+referenced RPE object exists
+numeric arguments are valid
+```
 
-## Currency gain integration
-The correct hook is the positive applied gain path in:
+Do not rely on:
+- a previous successful member query;
+- the officer UI being gated;
+- payload fields claiming officer status;
+- state cached only on the sender.
+
+The target member's client is authoritative for applying its own Profile/Inventory mutation.
+
+## Grant Achievement
+Resolve the requested Achievement and apply through the Achievement runtime:
 
 ```lua
-Profile.AddCurrencyAmount(...)
+Achievements:Grant(achievementRef, {
+    source = "guild_admin",
+    actor = sender,
+})
 ```
 
-Do not trigger from:
+or equivalent current API.
+
+Do not directly stamp `profile.achievements` in a way that bypasses normal completion/meta/UI/announcement handling.
+
+## Adjust Skill
+Resolve/validate the Skill reference and use existing Profile Skill APIs, conceptually:
 
 ```lua
-Profile.SetCurrencyAmount(...)
-Profile.SpendCurrencyAmount(...)
+local current = Profile.GetSkillLevel(skillRef)
+Profile.SetSkillLevel(skillRef, current + delta)
 ```
 
-Calculate:
+Validate numeric delta/result according to the current Skill/Profile constraints. Do not write the underlying Profile table directly.
 
-```text
-previousAmount
-updatedAmount
-actualGain = updatedAmount - previousAmount
-```
-
-and only advance `currency_gain` criteria when `actualGain > 0`.
-
-This must respect currency caps; requested gain above the cap counts only the amount actually applied.
-
-## RPE kill integration
-Do **not** award kills from preliminary Damage/effect preview.
-
-Use the authoritative committed RPE resource-delta/death path and detect only:
-
-```text
-alive before authoritative delta
-        ->
-dead after authoritative delta
-```
-
-Credit the kill only to the correct local player/action owner using the authoritative sender/action context available in the current code.
-
-Repeated updates to an already-dead EventUnit must not produce extra kills.
-
-## Completion behavior
-An Achievement completes when all of its criteria meet their goals.
-
-Completion is transition-based:
-
-```text
-incomplete -> complete
-```
-
-On that transition only:
-- persist updated criterion progress;
-- set `completedAt` once;
-- process `achievement_earned` dependents/meta Achievements;
-- refresh Profile Achievements UI;
-- announce the newly earned Achievement to Guild/Raid visible chat when appropriate.
-
-Loading an already-completed Profile must never retrigger completion or announcements.
-
-## Manual Grant API
-Provide an explicit runtime path such as:
+## Give Item
+Resolve:
 
 ```lua
-Achievements:Grant(achievementRef, options)
+Registry:ResolveItemReference(itemRef)
 ```
 
-for later Guild Admin use.
+then award through:
 
-`Grant()` must use the normal completion path rather than directly stamping arbitrary Profile state in a way that bypasses completion/meta/UI/announcement handling.
+```lua
+Client.Inventory.AddItem(...)
+```
 
-## Broadcasting
-Achievement announcements are ordinary visible chat messages, not addon synchronization messages.
+Validate quantity before mutation. Preserve existing stack/bind/Inventory behavior.
 
-When appropriate:
-- Guild announcement uses normal Guild chat;
-- Raid announcement uses normal Raid chat;
-- being in both may announce to both according to the PDD.
+## Admin UI
+For an online selected member, activate the relevant sections for officers:
+- Achievements: display earned state and Grant action where appropriate;
+- Skills: show level and Increase/Decrease controls;
+- Items: select item, enter quantity, Give action.
+
+The UI must:
+- show pending state where practical;
+- wait for explicit target acknowledgement;
+- display failure reason rather than optimistically assuming success;
+- keep the existing RPE Guild Rank Set/Clear operations functional.
+
+## Responses
+Every supported mutation returns an acknowledgement containing enough information to match the request and report success/failure, for example:
+
+```lua
+{
+    requestId = "...",
+    success = true,
+    operation = "give_item",
+}
+```
+
+or an explicit failure reason.
 
 ## Constraints
-- Do not couple Achievement eligibility/progress to RPE Guild Rank.
-- Do not add general Guild Admin mutations in this task.
-- Do not award from damage previews.
-- Do not treat currency spending or absolute Set operations as gain.
-- Do not re-announce completed Achievements during load/refresh.
-- Preserve Phase 1 Profile state shape and stable criterion IDs.
+- Online compatible RPE members only; offline editing remains out of scope.
+- Do not directly mutate another player's SavedVariables from the officer client.
+- Do not weaken the receiver-side validation established in Task 6.
+- Do not bypass Achievement, Skill or Inventory domain APIs.
+- Do not break RPE Guild Rank Set/Clear administration.
+- Progression administration belongs to Task 11.
 
 ## Acceptance criteria
-- [ ] Currency gain uses actual applied positive delta after cap.
-- [ ] Currency spending/absolute set does not count as earning.
-- [ ] Kill progression uses authoritative alive->dead transition only.
-- [ ] Dead-unit repeats do not count again.
-- [ ] Filters select only matching criteria.
-- [ ] Meta Achievements progress from `achievement_earned`.
-- [ ] `completedAt` is set exactly once per completion transition.
-- [ ] Reloading completed state does not announce again.
-- [ ] Guild/Raid announcements are visible chat, not addon synchronization.
-- [ ] Manual `Grant()` uses normal completion handling.
+- [ ] Officer can grant a valid Achievement to an online RPE member.
+- [ ] Achievement uses normal completion/announcement behavior.
+- [ ] Officer can increase/decrease a valid Skill within valid numeric bounds.
+- [ ] Officer can give a valid Item/quantity through Inventory.
+- [ ] Invalid references/quantities are rejected by receiver.
+- [ ] Non-officer/spoofed senders are rejected.
+- [ ] Each mutation receives explicit acknowledgement.
+- [ ] Officer UI does not optimistically report success.
+- [ ] Existing Guild Rank set/clear operations still work.
 
 ## Coding-agent instructions
-Read the revised PDD and implementation plan, then inspect the current currency, authoritative resource/death and event-completion paths before editing. Implement Task 9 only. Do not guess event authority from preliminary effects. Report changed files, validation performed and any deviation from this issue.
+Read the revised PDD and implementation plan, then inspect the Task 6 protocol, current Achievement runtime, Skill Profile APIs, Registry item resolution and Inventory award path before editing. Implement Task 10 only. Keep receiver validation authoritative and reuse existing domain APIs. Report changed files, validation performed and any deviation from this issue.
