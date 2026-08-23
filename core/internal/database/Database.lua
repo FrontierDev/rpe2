@@ -7,9 +7,9 @@ Addon.Internal.Database = Database
 local Dependecies = Database.Dependecies or {}
 
 local SCHEMA = {
-    profiles = 4,
+    profiles = 5,
     rulesets = 1,
-    datasets = 14,
+    datasets = 15,
     globalSettings = 1,
 }
 
@@ -49,6 +49,7 @@ local DATASET_ENTRY_DEFINITIONS = {
     auras = { className = "Aura", singular = "Aura", assignsId = true },
     interactions = { className = "Interaction", singular = "Interaction", assignsId = true },
     achievements = { className = "Achievement", singular = "Achievement", assignsId = true },
+    guildSettings = { className = "GuildSetting", singular = "Guild Setting", assignsId = true },
     currencies = { className = "Currency", singular = "Currency", assignsId = true },
 }
 
@@ -391,6 +392,7 @@ local function normalizeDatasetRecord(record, fallbackId, fallbackName)
         auras = ensureTable(data.auras),
         interactions = ensureTable(data.interactions),
         achievements = ensureTable(data.achievements),
+        guildSettings = ensureTable(data.guildSettings),
         currencies = ensureTable(data.currencies),
     }
 end
@@ -464,6 +466,57 @@ local function normalizeProfileCurrencies(record)
         end
     end
 
+    return normalized
+end
+
+local function normalizeNonNegativeInteger(value)
+    local numeric = tonumber(value)
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        return 0
+    end
+
+    return math.max(0, math.floor(numeric))
+end
+
+local function normalizeProfileAchievementState(record)
+    local data = ensureTable(record)
+    local criteria = {}
+
+    for criterionId, progress in pairs(ensureTable(data.criteria)) do
+        local normalizedCriterionId = ensureString(criterionId, "")
+        if normalizedCriterionId ~= "" then
+            criteria[normalizedCriterionId] = normalizeNonNegativeInteger(progress)
+        end
+    end
+
+    local completedAt = tonumber(data.completedAt)
+    if completedAt == nil or completedAt ~= completedAt or completedAt == math.huge or completedAt == -math.huge or completedAt < 0 then
+        completedAt = nil
+    end
+
+    return {
+        criteria = criteria,
+        completedAt = completedAt,
+    }
+end
+
+local function normalizeProfileAchievements(record)
+    local normalized = {}
+
+    for achievementRef, state in pairs(ensureTable(record)) do
+        local normalizedAchievementRef = ensureString(achievementRef, "")
+        if normalizedAchievementRef ~= "" then
+            normalized[normalizedAchievementRef] = normalizeProfileAchievementState(state)
+        end
+    end
+
+    return normalized
+end
+
+local function normalizeProfileGuildState(record)
+    local data = ensureTable(record)
+    local normalized = deepCopy(data)
+    normalized.byGuild = deepCopy(ensureTable(data.byGuild))
     return normalized
 end
 
@@ -789,6 +842,8 @@ local function normalizeProfileRecord(record, fallbackCharacterKey, fallbackName
         setupWizard = normalizeProfileSetupWizard(data.setupWizard),
         statBonuses = normalizeProfileStatBonuses(data.statBonuses),
         currencies = normalizeProfileCurrencies(data.currencies),
+        achievements = normalizeProfileAchievements(data.achievements),
+        guild = normalizeProfileGuildState(data.guild),
     }
 end
 
@@ -821,6 +876,24 @@ end
 
 local function isTableEmpty(value)
     return type(value) ~= "table" or next(value) == nil
+end
+
+local function isEmptyProfileGuildState(value)
+    if type(value) ~= "table" then
+        return true
+    end
+
+    for key, nestedValue in pairs(value) do
+        if key == "byGuild" then
+            if not isTableEmpty(nestedValue) then
+                return false
+            end
+        else
+            return false
+        end
+    end
+
+    return true
 end
 
 local function isDefaultProfileRecord(record)
@@ -860,6 +933,8 @@ local function isDefaultProfileRecord(record)
         and isTableEmpty(setupWizard.actionBarSpellRefs)
         and isTableEmpty(profile.statBonuses)
         and isTableEmpty(profile.currencies)
+        and isTableEmpty(profile.achievements)
+        and isEmptyProfileGuildState(profile.guild)
 end
 
 local function migrateUnknownPlayerProfile(root)
@@ -1281,7 +1356,7 @@ local function ensureSection(rootName, schemaVersion, defaults)
     local root = ensureTable(_G[rootName])
     _G[rootName] = root
 
-    root._schema = root._schema or schemaVersion
+    root._schema = math.max(tonumber(root._schema) or 0, schemaVersion)
 
     for key, defaultValue in pairs(defaults) do
         if root[key] == nil then
@@ -1361,6 +1436,8 @@ function Database.GetOrCreateActiveProfile()
         setupWizard = {},
         statBonuses = {},
         currencies = {},
+        achievements = {},
+        guild = { byGuild = {} },
     }, characterKey, getCharacterDisplayName())
     root.profiles[characterKey] = profile
     return profile
@@ -2539,6 +2616,65 @@ function Database.ClearProfileCurrencyAmount(currencyKey)
     return existed
 end
 
+function Database.ListProfileAchievementStates()
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.achievements = normalizeProfileAchievements(profile.achievements)
+    return deepCopy(profile.achievements)
+end
+
+function Database.GetProfileAchievementState(achievementRef)
+    local normalizedAchievementRef = ensureString(achievementRef, "")
+    if normalizedAchievementRef == "" then
+        return nil
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.achievements = normalizeProfileAchievements(profile.achievements)
+    return deepCopy(profile.achievements[normalizedAchievementRef])
+end
+
+function Database.SetProfileAchievementState(achievementRef, state)
+    local normalizedAchievementRef = ensureString(achievementRef, "")
+    if normalizedAchievementRef == "" then
+        return nil
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.achievements = normalizeProfileAchievements(profile.achievements)
+    profile.achievements[normalizedAchievementRef] = normalizeProfileAchievementState(state)
+    notifyConfigurationChanged("profile-achievements")
+    return deepCopy(profile.achievements[normalizedAchievementRef])
+end
+
+function Database.ClearProfileAchievementState(achievementRef)
+    local normalizedAchievementRef = ensureString(achievementRef, "")
+    if normalizedAchievementRef == "" then
+        return false
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.achievements = normalizeProfileAchievements(profile.achievements)
+    local existed = profile.achievements[normalizedAchievementRef] ~= nil
+    profile.achievements[normalizedAchievementRef] = nil
+    if existed then
+        notifyConfigurationChanged("profile-achievements")
+    end
+    return existed
+end
+
+function Database.GetProfileGuildState()
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.guild = normalizeProfileGuildState(profile.guild)
+    return deepCopy(profile.guild)
+end
+
+function Database.SetProfileGuildState(state)
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.guild = normalizeProfileGuildState(state)
+    notifyConfigurationChanged("profile-guild")
+    return deepCopy(profile.guild)
+end
+
 function Database.ListProfileSkillLevels()
     local profile = Database.GetOrCreateActiveProfile()
     profile.skillLevels = normalizeProfileSkillLevels(profile.skillLevels)
@@ -3069,6 +3205,7 @@ function Database.CreateDataset(name)
         auras = {},
         interactions = {},
         achievements = {},
+        guildSettings = {},
         currencies = {},
     }, datasetId, name)
 

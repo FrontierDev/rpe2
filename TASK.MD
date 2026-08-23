@@ -1,106 +1,70 @@
 ## Goal
-Create the Phase 1 `GuildSetting` dataset class and normalize all guild configuration structures **without implementing gameplay behavior**.
+Make `guildSettings` a first-class Dataset collection and add persistent Achievement/Guild character state using the existing centralized Database normalization model.
 
-Task 1 (`Achievement` normalization) is already complete on `main`; preserve its conventions and the current RPE2 architecture.
+Depends on: #1
 
-## Primary files
-- `core/classes/GuildSetting.lua` **new**
-- `RPEngine_Dev.toc`
+## Primary file
+- `core/internal/database/Database.lua`
 
-## Required data model
+## Required changes
+### Schema
+Increment only:
+- profiles `4 -> 5`
+- datasets `14 -> 15`
+
+### Dataset integration
+Add `guildSettings` to `DATASET_ENTRY_DEFINITIONS` using class `GuildSetting`, singular `Guild Setting`, `assignsId = true`.
+
+Add `guildSettings = ensureTable(data.guildSettings)` to normalized Dataset records and ensure generic create/import/export/update/delete flows accept it.
+
+### Profile state
+Add normalized fields:
 ```lua
-GuildSetting {
-    id = nil,
-    name = "",
-    description = "",
-    guildName = "",
-    general = {
-        enableRequisitions = false,
-        enableDailyRewards = false,
-        enableProgression = false,
-    },
-    requisitions = {},
-    dailyRewards = {},
-    progression = {
-        slotCount = 3,
-        entries = {},
-    },
-    tags = {},
-}
+achievements = {}
+guild = { byGuild = {} }
 ```
+They must be included anywhere Profile defaults/normalization/default-profile checks enumerate fields.
 
-### Requisitions
-Normalize each definition to:
+Normalize Achievement state to:
 ```lua
-{
-    id = "stable_id",
-    itemRef = "dataset:item",
-    quantity = 1,
-    costs = {
-        { currencyRef = "copper", amount = 1 },
-    },
-    requiredGuildRankIndex = nil,
-    characterLimit = 1,
-}
-```
-Requirements:
-- stable non-empty IDs with deterministic duplicate handling;
-- string `itemRef`;
-- `quantity >= 1` integer;
-- cost amounts `>= 0`;
-- guild rank index nil or non-negative integer;
-- `characterLimit >= 1`, default 1.
-
-### Daily rewards
-Normalize:
-```lua
-{
-    id = "stable_id",
-    type = "item", -- item | currency
-    ref = "dataset:item-or-currency",
-    amount = 1,
-}
-```
-Requirements:
-- stable/duplicate-safe IDs;
-- type restricted to `item` or `currency`;
-- string ref;
-- amount integer `>= 1`.
-
-### Progression
-Phase 1 stores configuration only:
-```lua
-progression = {
-    slotCount = 3,
-    entries = {
-        {
-            id = "entry_id",
-            name = "",
-            description = "",
-            icon = "",
-            lockedText = "",
-            spellRefs = {},
-        },
+profile.achievements = {
+    [achievementRef] = {
+        criteria = { [criterionId] = 0 },
+        completedAt = nil,
     },
 }
 ```
-Normalize stable entry IDs, strings, and unique non-empty spell refs.
+Rules:
+- non-empty achievement keys;
+- non-empty criterion keys;
+- criterion progress integer `>= 0`;
+- `completedAt` nil or non-negative number.
+
+Guild state normalization should preserve nested future fields instead of destructively constraining them; guarantee the outer `{ byGuild = {} }` shape only.
+
+### Database accessors
+Add thin persistence helpers consistent with current Profile DB patterns:
+- `ListProfileAchievementStates()`
+- `GetProfileAchievementState(achievementRef)`
+- `SetProfileAchievementState(achievementRef, state)`
+- `ClearProfileAchievementState(achievementRef)`
+- `GetProfileGuildState()`
+- `SetProfileGuildState(state)`
+
+Use copies where adjacent APIs return copies and existing configuration-change notification for mutations.
 
 ## Constraints
-- Follow existing class patterns (`Currency.lua`, `Skill.lua`, `Achievement.lua`).
-- Do not add character-specific state to `GuildSetting`.
-- Do not add purchase, reward-claim, progression-unlock, or other runtime behavior.
-- Do not hard-code guild rank names or Holy Order terminology.
-- Add the class to the TOC in dependency-safe order before any future consumer.
+- No Achievement completion semantics.
+- No requisition/reward/progression behavior.
+- Existing inventory/currencies/skills/equipment/spells must remain untouched.
+- Preserve backward compatibility with schema-4 Profiles and schema-14 Datasets.
 
 ## Acceptance criteria
-- [ ] `GuildSetting:New()` returns a complete safe default.
-- [ ] `FromTable(ToTable(x))` is stable for normalized data.
-- [ ] Missing nested tables never error.
-- [ ] Nested IDs are deterministic and duplicate-safe.
-- [ ] Spell refs are unique/non-empty after normalization.
-- [ ] `RPEngine_Dev.toc` loads the class before consumers.
-- [ ] No Phase 2/3/4 behavior is introduced.
+- [ ] Existing Profiles normalize safely to schema 5 without data loss.
+- [ ] Existing Datasets normalize safely to schema 15 with empty `guildSettings`.
+- [ ] Generic Dataset APIs create/import/export GuildSettings.
+- [ ] Achievement/Guild Profile state persists.
+- [ ] Existing Profile behavior is unchanged.
 
 ## Coding-agent instructions
-Inspect current adjacent class patterns before editing. Make the smallest coherent change. Report changed files, validation performed, and any deviation from this issue.
+Inspect all Profile normalization/default/migration paths before editing; do not assume one constructor is sufficient. Keep this issue bounded to Database persistence and Dataset collection integration.
