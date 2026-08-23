@@ -30,6 +30,7 @@ local GROUPS = {
             { label = "Skills", action = "OpenSkillsLauncherDestination" },
             { label = "Inventory", action = "OpenInventoryLauncherDestination" },
             { label = "Setup", action = "OpenSetupLauncherDestination" },
+            { label = "Guild", action = "OpenGuildLauncherDestination" },
         },
     },
     {

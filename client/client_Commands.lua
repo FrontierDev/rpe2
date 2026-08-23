@@ -77,6 +77,17 @@ function ClientCommands:RegisterSlashCommands()
         return true
     end, "Show the profile window.")
 
+    register({ "guild" }, function(context)
+        if not Client.OpenGuildLauncherDestination then
+            context.router:Print("Guild UI is not available.", "warn")
+            return false
+        end
+
+        Client:OpenGuildLauncherDestination()
+        context.router:Print("Guild window shown.")
+        return true
+    end, "Show the guild window.")
+
     register({ "unlock" }, function(context)
         if not Profile or not Profile.SetWidgetsUnlocked then
             context.router:Print("Widget unlock mode is not available.", "warn")
@@ -134,6 +145,14 @@ function Client:OpenProfileLauncherDestination()
     end
 
     return self:ShowProfileWindowTab("equipment")
+end
+
+function Client:OpenGuildLauncherDestination()
+    if not self.ShowGuildWindow then
+        return nil
+    end
+
+    return self:ShowGuildWindow()
 end
 
 function Client:OpenSpellbookLauncherDestination()

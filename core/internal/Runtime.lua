@@ -79,6 +79,17 @@ function Addon.Internal.DispatchEvent(event, ...)
         return
     end
 
+    if event == "PLAYER_GUILD_UPDATE"
+        or event == "GUILD_ROSTER_UPDATE"
+    then
+        local Client = Addon.Client or nil
+        local Guild = Client and Client.Guild or nil
+        if Guild and Guild.HandleRuntimeEvent then
+            safeCall(Guild.HandleRuntimeEvent, Guild, event, ...)
+        end
+        return
+    end
+
 end
 
 Events.Frame = Events.Frame or (CreateFrame and CreateFrame("Frame"))
@@ -92,6 +103,8 @@ if Events.Frame then
     Events.Frame:RegisterEvent("CHAT_MSG_CHANNEL_NOTICE_USER")
     Events.Frame:RegisterEvent("GROUP_ROSTER_UPDATE")
     Events.Frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    Events.Frame:RegisterEvent("PLAYER_GUILD_UPDATE")
+    Events.Frame:RegisterEvent("GUILD_ROSTER_UPDATE")
     Events.Frame:SetScript("OnEvent", function(_, event, ...)
         Addon.Internal.DispatchEvent(event, ...)
     end)
