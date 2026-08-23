@@ -68,6 +68,7 @@ local function buildDatasetStatus(dataset)
         + #(dataset.auras or {})
         + #(dataset.interactions or {})
         + #(dataset.achievements or {})
+        + #(dataset.guildSettings or {})
         + #(dataset.currencies or {})
     if total <= 0 then
         return "Empty"

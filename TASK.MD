@@ -1,68 +1,74 @@
 ## Goal
-Replace the current Achievement placeholder with a functional authoring surface and add the missing Achievement inspector using existing RPE2 Data Editor patterns.
+Make `guildSettings` a fully usable Data Editor collection and expose all Phase 1 configuration required by later phases.
 
-Depends on: Task 1 complete on `main`; #2; #4
+Depends on: #1, #2, #4
 
 ## Primary files
-- `client/ui/editor/pages/page_Achievement.lua`
-- `client/ui/editor/inspectors/page_InspectorAchievement.lua` **new**
-- Data Editor mapping/core files that enumerate collections/inspectors/refreshers
+- `client/ui/editor/pages/page_GuildSetting.lua` **new**
+- `client/ui/editor/inspectors/page_InspectorGuildSetting.lua` **new**
+- Data Editor mapping/core files
+- `client/ui/editor/pages/page_Datasets.lua` if collection counts are explicitly enumerated
 - `RPEngine_Dev.toc`
 
-## Required behavior
-### Achievement page
-Replace the placeholder with a real selectable list/icon list. Each entry should show at least:
-- icon;
-- name;
-- ID or useful secondary detail;
-- selection state.
+## Data Editor integration
+Add `guildSettings` to every explicit mapping/branch required by the current editor, including where applicable:
+- entry definition;
+- content page definition;
+- page builder/refresh mapping;
+- inspector mapping;
+- inspector selection getter;
+- create/select branches;
+- dataset content count/status.
 
-Preserve generic create/select/delete/export/import behavior supplied by the existing Data Editor framework.
+Search explicit per-collection maps/`elseif` chains; do not assume one registration is enough.
 
-### Inspector integration
-Add Achievements to every relevant inspector mapping/getter/refresh path. Selecting an Achievement must open its inspector.
+## GuildSetting page
+Use the existing list/page structure and show at least name plus guild binding.
 
-### Inspector fields
-#### General
+## GuildSetting inspector
+### General
 - Name
 - Description
-- Icon
+- Guild Name
+- Enable Requisitions
+- Enable Daily Rewards
+- Enable Progression
 - Tags
 
-#### Criteria
-Editable collection supporting:
-- add/delete criterion;
-- stable Criterion ID;
-- Description;
-- Trigger dropdown;
-- Goal;
-- Phase 1 filter fields.
+### Requisitions
+Editable definitions:
+- ID
+- Item Ref
+- Quantity
+- Minimum Guild Rank Index
+- Character Limit
+- Costs list: Currency Ref + Amount
 
-Required filter UI:
-- `currency_gain`: `currencyRef`
-- `rpe_kill`: optional `unitRef`, optional `enemyOnly`
-- `achievement_earned`: `achievementRef`
-- `manual`: none required
-- `rpe_event_complete`: none required in Phase 1
+### Daily Rewards
+Editable ordered list:
+- ID
+- Type (`item` / `currency`)
+- Ref
+- Amount
 
-Use existing reference/dropdown/text-input conventions. Do not build a large new reference-picker framework solely for this task.
-
-#### Rewards
-Preserve and round-trip existing `rewards` data, but do not invent reward execution semantics or a speculative reward schema.
+### Progression
+Structural configuration only:
+- Slot Count
+- Entries: ID, Name, Description, Icon, Locked Text, Spell Ref list
 
 ## Constraints
-- Do not create a separate Achievement editor window.
-- Do not add trigger execution or Profile progression logic.
-- Editing/reordering one criterion must not change IDs of unaffected criteria.
-- Follow current RPE UI abstractions and Data Editor patterns.
+- No purchase behavior.
+- No daily reward claiming.
+- No progression unlocking/evaluation/selection behavior.
+- Use existing UI abstractions and editor patterns.
+- Stable nested IDs must survive ordinary edits/reordering.
 
 ## Acceptance criteria
-- [ ] New Achievement can be fully authored through Data Editor.
-- [ ] Criteria add/delete/edit works with stable IDs.
-- [ ] Trigger changes do not corrupt unrelated criterion data.
-- [ ] Selection/refresh behaves like neighboring collections.
-- [ ] Export/import preserves authored Achievement data.
-- [ ] No runtime Achievement behavior is introduced.
+- [ ] GuildSetting can be created, selected, edited, deleted, exported and imported.
+- [ ] Nested lists retain stable IDs.
+- [ ] Feature flags persist.
+- [ ] Cross-dataset refs surface through dependency analysis.
+- [ ] No gameplay behavior occurs from editing/activating a GuildSetting.
 
 ## Coding-agent instructions
-Search all explicit collection and inspector maps before editing. Make the smallest coherent integration rather than special-casing the editor outside its current architecture.
+Inspect adjacent collection pages/inspectors and all explicit mapping tables before implementing. Avoid introducing a separate editor framework.

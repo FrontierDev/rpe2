@@ -38,6 +38,7 @@ local ENTRY_DEFINITIONS = {
     auras = { className = "Aura", singular = "Aura", buttonLabel = "New Aura", emptyName = "Unnamed Aura", assignsId = true },
     interactions = { className = "Interaction", singular = "Interaction", buttonLabel = "New Interaction", emptyName = "Unnamed Interaction", assignsId = true },
     achievements = { className = "Achievement", singular = "Achievement", buttonLabel = "New Achievement", emptyName = "Unnamed Achievement", assignsId = true },
+    guildSettings = { className = "GuildSetting", singular = "Guild Setting", buttonLabel = "New Guild Setting", emptyName = "Unnamed Guild Setting", assignsId = true },
     currencies = { className = "Currency", singular = "Currency", buttonLabel = "New Currency", emptyName = "Unnamed Currency", assignsId = true },
 }
 
@@ -57,6 +58,7 @@ local INSPECTOR_PAGE_BY_COLLECTION = {
     stats = "stat",
     resources = "resource",
     achievements = "achievement",
+    guildSettings = "guildSetting",
     currencies = "currency",
     races = "race",
     classes = "class",
@@ -82,6 +84,7 @@ local DATA_PAGE_REFRESHER_BY_COLLECTION = {
     auras = "RefreshAuraDataPage",
     interactions = "RefreshInteractionDataPage",
     achievements = "RefreshAchievementDataPage",
+    guildSettings = "RefreshGuildSettingDataPage",
     currencies = "RefreshCurrencyDataPage",
 }
 
@@ -102,6 +105,7 @@ local INSPECTOR_REFRESHER_BY_PAGE = {
     stat = "RefreshStatInspectorPage",
     resource = "RefreshResourceInspectorPage",
     achievement = "RefreshAchievementInspectorPage",
+    guildSetting = "RefreshGuildSettingInspectorPage",
     currency = "RefreshCurrencyInspectorPage",
     race = "RefreshRaceInspectorPage",
     class = "RefreshClassInspectorPage",
@@ -123,6 +127,7 @@ local INSPECTOR_SELECTION_GETTER_BY_PAGE = {
     stat = "GetSelectedStat",
     resource = "GetSelectedResource",
     achievement = "GetSelectedAchievement",
+    guildSetting = "GetSelectedGuildSetting",
     currency = "GetSelectedCurrency",
     race = "GetSelectedRace",
     class = "GetSelectedClass",
@@ -144,6 +149,7 @@ local function collectionQueuesDependencyRecompute(collectionKey)
         or collectionKey == "damageSchools"
         or collectionKey == "auras"
         or collectionKey == "achievements"
+        or collectionKey == "guildSettings"
 end
 
 function DataEditor:GetEntryDefinition(collectionKey)
@@ -403,6 +409,8 @@ function DataEditor:CreateDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = "resource"
         elseif collectionKey == "achievements" then
             self.ActiveInspectorPageKey = "achievement"
+        elseif collectionKey == "guildSettings" then
+            self.ActiveInspectorPageKey = "guildSetting"
         elseif collectionKey == "currencies" then
             self.ActiveInspectorPageKey = "currency"
         elseif collectionKey == "races" then
@@ -457,6 +465,8 @@ function DataEditor:CloneSelectedDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = "resource"
         elseif collectionKey == "achievements" then
             self.ActiveInspectorPageKey = "achievement"
+        elseif collectionKey == "guildSettings" then
+            self.ActiveInspectorPageKey = "guildSetting"
         elseif collectionKey == "currencies" then
             self.ActiveInspectorPageKey = "currency"
         elseif collectionKey == "races" then
@@ -517,6 +527,8 @@ function DataEditor:DeleteSelectedDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = nextIndex and "resource" or "dataset"
         elseif collectionKey == "achievements" then
             self.ActiveInspectorPageKey = nextIndex and "achievement" or "dataset"
+        elseif collectionKey == "guildSettings" then
+            self.ActiveInspectorPageKey = nextIndex and "guildSetting" or "dataset"
         elseif collectionKey == "currencies" then
             self.ActiveInspectorPageKey = nextIndex and "currency" or "dataset"
         elseif collectionKey == "races" then
@@ -631,6 +643,7 @@ local CONTENT_PAGE_DEFINITIONS = {
     { key = "auras", label = "Aura", builder = "BuildAuraPage" },
     { key = "interactions", label = "Interaction", builder = "BuildInteractionPage" },
     { key = "achievements", label = "Achievement", builder = "BuildAchievementPage" },
+    { key = "guildSettings", label = "Guild Settings", builder = "BuildGuildSettingPage" },
     { key = "currencies", label = "Currency", builder = "BuildCurrencyPage" },
 }
 
@@ -1183,6 +1196,10 @@ function DataEditor:GetSelectedAchievement()
     return self:GetSelectedDatasetEntry("achievements")
 end
 
+function DataEditor:GetSelectedGuildSetting()
+    return self:GetSelectedDatasetEntry("guildSettings")
+end
+
 function DataEditor:GetSelectedCurrency()
     return self:GetSelectedDatasetEntry("currencies")
 end
@@ -1695,6 +1712,7 @@ function DataEditor:ShowInspectorPage(pageKey)
         stat = "BuildStatInspectorPage",
         resource = "BuildResourceInspectorPage",
         achievement = "BuildAchievementInspectorPage",
+        guildSetting = "BuildGuildSettingInspectorPage",
         currency = "BuildCurrencyInspectorPage",
         race = "BuildRaceInspectorPage",
         class = "BuildClassInspectorPage",
@@ -1785,6 +1803,9 @@ function DataEditor:RefreshAll()
     if self.RefreshAchievementDataPage then
         self:RefreshAchievementDataPage()
     end
+    if self.RefreshGuildSettingDataPage then
+        self:RefreshGuildSettingDataPage()
+    end
     if self.RefreshCurrencyDataPage then
         self:RefreshCurrencyDataPage()
     end
@@ -1838,6 +1859,9 @@ function DataEditor:RefreshAll()
     end
     if self.RefreshAchievementInspectorPage then
         self:RefreshAchievementInspectorPage()
+    end
+    if self.RefreshGuildSettingInspectorPage then
+        self:RefreshGuildSettingInspectorPage()
     end
     if self.RefreshRaceInspectorPage then
         self:RefreshRaceInspectorPage()
