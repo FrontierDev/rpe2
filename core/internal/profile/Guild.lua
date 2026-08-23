@@ -42,6 +42,26 @@ local function normalizeDailyRewardDate(value)
     return ""
 end
 
+local function normalizeDailyRewardTransaction(value)
+    if type(value) ~= "table" then
+        return nil
+    end
+
+    local dateKey = normalizeDailyRewardDate(value.date)
+    local rankRef = normalizeGuildRankRef(value.rankRef)
+    local status = tostring(value.status or "")
+    if status ~= "in-progress" and status ~= "failed" then
+        status = "failed"
+    end
+
+    return {
+        status = status,
+        date = dateKey,
+        rankRef = rankRef,
+        reason = tostring(value.reason or ""),
+    }
+end
+
 function Profile.GetGuildState()
     if Database.GetProfileGuildState then
         return Database.GetProfileGuildState()
@@ -219,4 +239,65 @@ function Profile.SetDailyRewardClaim(guildKey, dateKey, guildRankRef)
     local persistedState = Profile.SetGuildState(state)
     local persistedByGuild = type(persistedState) == "table" and persistedState.byGuild or nil
     return type(persistedByGuild) == "table" and persistedByGuild[normalizedGuildKey] or nil
+end
+
+function Profile.GetDailyRewardTransaction(guildKey)
+    local normalizedGuildKey = normalizeGuildKey(guildKey)
+    if normalizedGuildKey == "" then
+        return nil
+    end
+
+    local bucket = Profile.GetGuildBucket(normalizedGuildKey)
+    return normalizeDailyRewardTransaction(bucket and bucket.dailyRewardTransaction)
+end
+
+function Profile.SetDailyRewardTransaction(guildKey, dateKey, guildRankRef, status, reason)
+    local normalizedGuildKey = normalizeGuildKey(guildKey)
+    local normalizedDateKey = normalizeDailyRewardDate(dateKey)
+    local normalizedRankRef = normalizeGuildRankRef(guildRankRef)
+    local normalizedStatus = tostring(status or "")
+    if normalizedGuildKey == ""
+        or normalizedDateKey == ""
+        or normalizedRankRef == ""
+        or (normalizedStatus ~= "in-progress" and normalizedStatus ~= "failed") then
+        return nil
+    end
+
+    local state = Profile.GetGuildState()
+    state.byGuild = type(state.byGuild) == "table" and state.byGuild or {}
+    local bucket = type(state.byGuild[normalizedGuildKey]) == "table"
+        and state.byGuild[normalizedGuildKey]
+        or {}
+    bucket.dailyRewardTransaction = {
+        status = normalizedStatus,
+        date = normalizedDateKey,
+        rankRef = normalizedRankRef,
+        reason = tostring(reason or ""),
+    }
+    state.byGuild[normalizedGuildKey] = bucket
+
+    local persistedState = Profile.SetGuildState(state)
+    if type(persistedState) ~= "table" then
+        return nil
+    end
+
+    return Profile.GetDailyRewardTransaction(normalizedGuildKey)
+end
+
+function Profile.ClearDailyRewardTransaction(guildKey)
+    local normalizedGuildKey = normalizeGuildKey(guildKey)
+    if normalizedGuildKey == "" then
+        return false
+    end
+
+    local state = Profile.GetGuildState()
+    local byGuild = type(state) == "table" and state.byGuild or nil
+    local bucket = type(byGuild) == "table" and byGuild[normalizedGuildKey] or nil
+    if type(bucket) ~= "table" or bucket.dailyRewardTransaction == nil then
+        return true
+    end
+
+    bucket.dailyRewardTransaction = nil
+    local persistedState = Profile.SetGuildState(state)
+    return type(persistedState) == "table"
 end

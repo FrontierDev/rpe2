@@ -91,6 +91,8 @@ local function describeDailyStatus(status)
         return "Available today"
     elseif status == "received-today" then
         return "Received today"
+    elseif status == "transaction-recovery-required" then
+        return "Daily reward transaction requires recovery"
     elseif status == "invalid-reward-definition"
         or status == "item-unavailable"
         or status == "currency-unavailable" then

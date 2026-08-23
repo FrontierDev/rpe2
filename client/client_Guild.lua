@@ -1239,6 +1239,25 @@ local function getDailyRewardStatus(self)
         return result
     end
 
+    if type(Profile.GetDailyRewardTransaction) ~= "function" then
+        result.status = "profile-api-unavailable"
+        result.reason = result.status
+        return result
+    end
+
+    local transactionCallOk, transaction = pcall(Profile.GetDailyRewardTransaction, result.guildKey)
+    if not transactionCallOk then
+        result.status = "profile-api-unavailable"
+        result.reason = result.status
+        return result
+    end
+    if type(transaction) == "table" then
+        result.status = "transaction-recovery-required"
+        result.reason = result.status
+        result.transaction = transaction
+        return result
+    end
+
     local plan, planReason, planDetail = buildDailyRewardPlan(assignment.rank)
     if not plan then
         result.status = planReason or "invalid-reward-definition"
@@ -1314,8 +1333,8 @@ local function awardDailyRewardPlan(plan)
         if reward.type == "currency" and not currencySnapshotsByRef[reward.currencyRef] then
             local gotAmount, amount = pcall(Profile.GetCurrencyAmount, reward.currencyRef)
             if not gotAmount then
-                transaction:Rollback()
-                return false, "currency-read-failed", transaction
+                local rolledBack = transaction:Rollback()
+                return false, rolledBack and "currency-read-failed" or "rollback-failed", transaction
             end
 
             local snapshot = {
@@ -1373,26 +1392,76 @@ local function awardDailyRewardPlan(plan)
     return true, "ok", transaction
 end
 
+local function persistDailyRewardTransactionState(context, state, reason)
+    if type(context) ~= "table"
+        or type(Profile.SetDailyRewardTransaction) ~= "function" then
+        return false
+    end
+
+    local callOk, persisted = pcall(
+        Profile.SetDailyRewardTransaction,
+        context.guildKey,
+        context.dayKey,
+        context.guildRankRef,
+        state,
+        reason
+    )
+    return callOk
+        and type(persisted) == "table"
+        and persisted.status == state
+        and persisted.date == context.dayKey
+        and persisted.rankRef == context.guildRankRef
+end
+
+local function clearDailyRewardTransactionState(guildKey)
+    if type(Profile.ClearDailyRewardTransaction) ~= "function" then
+        return false
+    end
+
+    local callOk, cleared = pcall(Profile.ClearDailyRewardTransaction, guildKey)
+    return callOk and cleared == true
+end
+
 function Guild:ProcessDailyRewards()
     if self._dailyRewardProcessing == true then
         return false, "processing"
     end
 
     self._dailyRewardProcessing = true
+    local transactionContext = nil
     local callOk, success, reason, result = xpcall(function()
         local status = self:GetDailyRewardStatus()
         if status.status ~= "available-today" then
             return false, status.status, status
         end
 
+        transactionContext = {
+            guildKey = status.guildKey,
+            dayKey = status.dayKey,
+            guildRankRef = status.assignedRankRef,
+        }
+        if not persistDailyRewardTransactionState(transactionContext, "in-progress", "award-started") then
+            return false, "transaction-state-persistence-failed", status
+        end
+
         local awarded, awardReason, transaction = awardDailyRewardPlan(status.plan or {})
         if not awarded then
+            if not persistDailyRewardTransactionState(transactionContext, "failed", awardReason) then
+                return false, "transaction-state-persistence-failed", status
+            end
             return false, awardReason, status
         end
 
         if type(Profile.SetDailyRewardClaim) ~= "function" then
-            local rolledBack = transaction:Rollback()
-            return false, rolledBack and "claim-persistence-unavailable" or "rollback-failed", status
+            pcall(transaction.Rollback, transaction)
+            if not persistDailyRewardTransactionState(
+                transactionContext,
+                "failed",
+                "claim-persistence-unavailable"
+            ) then
+                return false, "transaction-state-persistence-failed", status
+            end
+            return false, "claim-persistence-unavailable", status
         end
 
         local claimCallOk, persistedBucket = pcall(
@@ -1407,10 +1476,20 @@ function Guild:ProcessDailyRewards()
             or not storedCallOk
             or storedDate ~= status.dayKey
             or storedRankRef ~= status.assignedRankRef then
-            local rolledBack = transaction:Rollback()
-            return false, rolledBack and "claim-persistence-failed" or "rollback-failed", status
+            pcall(transaction.Rollback, transaction)
+            if not persistDailyRewardTransactionState(
+                transactionContext,
+                "failed",
+                "claim-persistence-failed"
+            ) then
+                return false, "transaction-state-persistence-failed", status
+            end
+            return false, "claim-persistence-failed", status
         end
 
+        -- The claim is authoritative once verified. If marker cleanup fails,
+        -- the completed claim still wins over the stale marker on future runs.
+        clearDailyRewardTransactionState(status.guildKey)
         pcall(self.RefreshWindow, self)
         return true, "claimed", {
             dayKey = status.dayKey,
@@ -1423,6 +1502,9 @@ function Guild:ProcessDailyRewards()
     self._dailyRewardProcessing = false
 
     if not callOk then
+        if transactionContext then
+            persistDailyRewardTransactionState(transactionContext, "failed", "processing-failed")
+        end
         return false, "processing-failed", {
             error = reason,
         }
