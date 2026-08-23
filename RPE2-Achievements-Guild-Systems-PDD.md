@@ -1,11 +1,31 @@
 # RPE 2 — Achievements and Guild Systems
 ## Product Design Document
 
-**Status:** Draft  
+**Status:** Revised after Phase 1  
 **Target:** RPEngine 2.0 (`FrontierDev/rpe2`)  
-**Scope:** Achievements, Guild Requisitions, Daily Rewards, Guild Administration, Guild Progression  
+**Scope:** Achievements, RPE Guild Ranks, Guild Requisitions, Daily Rewards, Guild Administration, Guild Progression  
 **Reference addons:** `old_crusadetoolkit`, `gns_mekkatorque`  
 **Explicitly out of scope:** Bestiary, Quest Log
+
+## Revision note — Guild Rank model
+
+The original design treated a `GuildSetting` as one active guild-wide configuration. That model is superseded.
+
+From this revision onward:
+
+- the existing internal `GuildSetting` class and `guildSettings` dataset collection are retained for compatibility;
+- the concept is exposed to users as **Guild Rank**;
+- a guild may define multiple RPE Guild Ranks;
+- one WoW guild rank may map to multiple RPE Guild Ranks;
+- a character has at most one assigned RPE Guild Rank within a guild at a time;
+- the RPE Guild Rank is assigned manually by a guild officer;
+- RPE never automatically derives, changes or clears a character's assigned RPE Guild Rank from their WoW guild rank;
+- the WoW guild rank mapping constrains which RPE Guild Ranks an officer may assign;
+- each RPE Guild Rank owns the Requisitions, Daily Rewards and Progression available while that rank is assigned;
+- multiple RPE Guild Ranks applying to the same WoW guild rank are intentional and are not a configuration conflict;
+- there is no implicit RPE Guild Rank hierarchy or inheritance. If content should be shared between ranks, the dataset must define it for each relevant rank unless a future inheritance feature is deliberately added.
+
+Where this document refers to `GuildSetting`, it is referring to the current internal class/storage name. User-facing terminology is **Guild Rank**.
 
 ---
 
@@ -16,17 +36,18 @@ This project extends RPE 2 with two related systems:
 1. **Achievements**
    - Defined as dataset content.
    - Progress and completion stored per character Profile.
-   - Displayed in a new Profile → Achievements tab.
+   - Displayed in Profile → Achievements.
    - Can progress automatically from RPE gameplay.
    - Can be granted manually by guild officers.
    - Newly earned achievements can be announced to Guild and Raid chat.
 
 2. **Guild Systems**
-   - A new top-level RPE **Guild** window.
-   - Dataset-defined guild settings.
-   - Requisitions.
-   - Daily login rewards.
-   - Guild-specific character progression.
+   - A top-level RPE **Guild** window.
+   - Dataset-defined RPE Guild Ranks.
+   - Manual officer assignment of an RPE Guild Rank to an online member.
+   - Rank-scoped Requisitions.
+   - Rank-scoped Daily Rewards.
+   - Rank-scoped Guild Progression.
    - Officer administration of online members' RPE characters.
 
 The implementation must build on RPE 2's existing Database, Profile, Registry, Inventory, Runtime, UI and Comms systems rather than importing the architecture of either reference addon.
@@ -35,9 +56,11 @@ The implementation must build on RPE 2's existing Database, Profile, Registry, I
 
 # 2. Existing RPE 2 Architecture
 
-## 2.1 Achievements already exist as dataset objects
+Phase 1 has established the data and read-only UI foundation required by this document.
 
-RPE 2 already defines:
+## 2.1 Achievements are dataset objects
+
+RPE 2 defines:
 
 ```lua
 Achievement {
@@ -57,23 +80,15 @@ and registers the class as:
 Addon.Internal.Database.Classes.Achievement
 ```
 
-The class already serializes `criteria`, `rewards` and `tags`, but currently performs no normalization or semantic interpretation of these fields.
+Achievement criteria are normalized, use stable criterion IDs and are authorable through the Data Editor.
 
-Achievements are already a recognized dataset collection in the Database and Data Editor.
-
-However, the current Achievement editor is unfinished. It can create Achievement entries through the generic dataset tooling, but the page currently displays:
-
-> `Achievement icon grid will appear here.`
-
-There is also no Achievement inspector mapping in the Data Editor.
-
-Therefore Phase 1 must include **finishing Achievement authoring**, not merely adding the character-facing Achievement page.
+Achievements are a first-class dataset collection and have a read-only Profile page backed by character Profile state.
 
 ---
 
 ## 2.2 Profiles are centrally normalized in Database.lua
 
-RPE character Profiles currently contain state such as:
+RPE character Profiles contain state such as:
 
 - race/class;
 - equipment;
@@ -82,26 +97,21 @@ RPE character Profiles currently contain state such as:
 - skill levels;
 - action bars;
 - stat bonuses;
-- currencies.
+- currencies;
+- Achievement state;
+- Guild state.
 
-There is currently no Achievement or Guild state in the Profile. Profile creation and normalization are centralized in `core/internal/database/Database.lua`.
+Profile creation and normalization remain centralized in:
 
-The new systems should therefore extend the existing Profile record rather than introduce separate SavedVariables for achievement/guild character state.
-
-Proposed additions:
-
-```lua
-profile.achievements = {}
-profile.guild = {}
+```text
+core/internal/database/Database.lua
 ```
 
-The Profile database schema should be incremented accordingly.
+Guild Rank assignment must therefore extend the existing `profile.guild` state rather than introduce another SavedVariable.
 
 ---
 
 ## 2.3 Inventory is not part of the Profile
-
-This is important for Guild Admin and rewards.
 
 RPE character inventory is stored independently in:
 
@@ -109,7 +119,7 @@ RPE character inventory is stored independently in:
 RPEngineInventoryDB
 ```
 
-rather than inside `RPEngineProfilesDB`. The canonical item award path is:
+The canonical item award path is:
 
 ```lua
 Addon.Client.Inventory.AddItem(...)
@@ -131,9 +141,7 @@ Therefore:
 
 ## 2.4 Currencies already have a suitable abstraction
 
-RPE supports:
-
-### Built-in currencies
+RPE supports built-in currencies:
 
 ```text
 copper
@@ -143,13 +151,13 @@ honor
 conquest
 ```
 
-### Dataset currencies
+and dataset currencies:
 
 ```text
 datasetId:currencyId
 ```
 
-The Profile system already exposes:
+The Profile system exposes:
 
 ```lua
 Profile.GetCurrencyAmount(...)
@@ -159,9 +167,9 @@ Profile.SpendCurrencyAmount(...)
 Profile.ResolveCurrencyDefinition(...)
 ```
 
-including currency caps and support for both built-in and dataset-defined currencies.
+including caps and support for both built-in and dataset-defined currencies.
 
-Guild Requisition costs should therefore store **currency references**, not a special Guild currency representation.
+Guild Requisition costs therefore store currency references.
 
 Example:
 
@@ -190,13 +198,11 @@ Profile.SetSkillLevel(skillRef, value)
 Profile.ClearSkillLevel(skillRef)
 ```
 
-and the Registry can resolve dataset-qualified Skill references. Skills themselves remain dataset definitions.
-
-Guild Admin should therefore modify skills through these APIs.
+Guild Admin should modify skills through these APIs.
 
 ---
 
-## 2.6 Dataset-qualified references are already the RPE convention
+## 2.6 Dataset-qualified references are the RPE convention
 
 The Registry consistently resolves entries using:
 
@@ -204,16 +210,23 @@ The Registry consistently resolves entries using:
 datasetId:entryId
 ```
 
-for Items, Skills, Spells, Traits, Stats, etc.
-
-The same convention should be extended to:
+The current internal Guild Rank reference remains:
 
 ```text
-datasetId:achievementId
 datasetId:guildSettingId
 ```
 
-and all GuildSetting references to Items, Currencies, Spells or Achievements should use the existing qualified-reference format.
+For example:
+
+```text
+campaign:militant
+campaign:medic
+campaign:engineer
+```
+
+The field may be named `guildSettingRef` internally where existing APIs require it, but new Profile/runtime APIs should prefer the semantic name `guildRankRef` when no compatibility constraint requires otherwise.
+
+All references from Guild Rank definitions to Items, Currencies, Spells or Achievements use the existing qualified-reference format.
 
 ---
 
@@ -227,32 +240,33 @@ RPE has a central addon messaging layer with:
 - dispatch;
 - channel messages;
 - targeted addon messages;
-- request/response style operations.
+- request/response operations.
 
-The current operation table reaches opcode 23 and handles RPE session, event, combat, resource and combat-log traffic.
-
-`Comms.SendMessage()` already accepts a Blizzard addon-message distribution and target, so Guild Administration should extend this protocol and use targeted `WHISPER` addon messages rather than creating another messaging subsystem.
+Guild Administration must extend this protocol and use targeted `WHISPER` addon messages rather than creating another messaging subsystem.
 
 ---
 
 # 3. Core Design Principle
 
-The architecture should maintain a strict distinction:
+The architecture maintains a strict distinction:
 
 ```text
-Dataset                        Character State
-────────────────────           ──────────────────────────
-Achievement definition   ->    Achievement progress
-GuildSetting              ->    Requisition usage
-                              Daily reward claim
-                              Progression state
+Dataset / Definition                 Character State
+──────────────────────────           ─────────────────────────────
+Achievement definition         ->    Achievement progress
+RPE Guild Rank (GuildSetting)  ->    Assigned Guild Rank ref
+                                     Requisition usage
+                                     Daily reward claim
+                                     Progression state
 ```
 
-A Dataset describes **what exists and how it behaves**.
+A Dataset describes **what exists and what is available at a rank**.
 
-A Profile describes **what this character has done**.
+A Profile describes **what this character has done and which RPE Guild Rank an officer has assigned**.
 
-No player-specific completion state should ever be serialized into an Achievement or GuildSetting dataset object.
+No player-specific assignment, completion, claim or progression state is serialized into an Achievement or Guild Rank dataset object.
+
+The player's WoW guild rank is live Blizzard state. It is used to validate which RPE Guild Ranks may be assigned, but it is not the stored RPE Guild Rank.
 
 ---
 
@@ -269,23 +283,11 @@ checklist
 meta
 ```
 
-and has separate completion logic for each.
-
-Those concepts are useful, but RPE 2 already has a more suitable starting point: an Achievement owns an array called `criteria`.
-
-Rather than introducing another top-level:
-
-```lua
-type = "counter"
-```
-
-RPE 2 should make each criterion independently describable.
-
-This allows all four CrusadeToolkit behaviours to emerge naturally from one model.
+RPE 2 instead models independently describable Achievement criteria. This allows those behaviours to emerge from one model without another top-level Achievement type.
 
 ---
 
-# 5. Proposed Achievement Criteria Schema
+# 5. Achievement Criteria Schema
 
 An Achievement remains:
 
@@ -295,17 +297,13 @@ Achievement {
     name = "Boss Slayer",
     description = "Defeat ten enemies during RPE events.",
     icon = "...",
-
-    criteria = {
-        ...
-    },
-
+    criteria = { ... },
     rewards = {},
     tags = {},
 }
 ```
 
-Each criterion becomes:
+Each criterion is normalized to:
 
 ```lua
 {
@@ -313,16 +311,13 @@ Each criterion becomes:
     description = "Defeat enemies",
     trigger = "rpe_kill",
     goal = 10,
-
     filters = {
         enemyOnly = true,
     },
 }
 ```
 
-Every criterion must have a **stable ID**.
-
-Criterion progress must be keyed by that ID rather than by array position so editing or reordering criteria does not invalidate existing character progress.
+Every criterion has a stable ID. Profile progress is keyed by criterion ID rather than array position.
 
 ---
 
@@ -338,8 +333,6 @@ criteria = {
 }
 ```
 
----
-
 ## 5.2 Counter achievement
 
 ```lua
@@ -351,8 +344,6 @@ criteria = {
     },
 }
 ```
-
----
 
 ## 5.3 Checklist achievement
 
@@ -379,8 +370,6 @@ criteria = {
 
 Completion requires every criterion to be complete.
 
----
-
 ## 5.4 Meta achievement
 
 ```lua
@@ -404,13 +393,13 @@ criteria = {
 }
 ```
 
-This replaces CrusadeToolkit's name-based `Dependencies` system with stable RPE dataset references.
+This replaces CrusadeToolkit's name-based dependency system with stable RPE references.
 
 ---
 
 # 6. Initial Achievement Trigger Types
 
-Phase 3 should implement the following trigger contract:
+The initial runtime trigger contract is:
 
 ```text
 manual
@@ -419,8 +408,6 @@ rpe_kill
 rpe_event_complete
 achievement_earned
 ```
-
-The engine should be designed so new triggers can later be added without changing the Achievement state model.
 
 Likely future triggers include:
 
@@ -433,15 +420,11 @@ rpe_healing
 rpe_event_started
 ```
 
-but they are not required for the initial implementation.
-
-CrusadeToolkit demonstrates the value of a centralized trigger map covering kills, bosses, event completion, initiative results and other event actions. RPE should retain this event-driven approach, but the mapping should come from dataset Achievement criteria rather than a hard-coded table of Achievement names.
+but they are not required for the initial Achievement runtime.
 
 ---
 
 # 7. Achievement Profile State
-
-Add:
 
 ```lua
 profile.achievements = {
@@ -449,21 +432,8 @@ profile.achievements = {
         criteria = {
             ["kills"] = 7,
         },
-
         completedAt = nil,
     },
-}
-```
-
-Completed example:
-
-```lua
-profile.achievements["campaign:boss_slayer"] = {
-    criteria = {
-        ["kills"] = 10,
-    },
-
-    completedAt = 1787481200,
 }
 ```
 
@@ -475,13 +445,11 @@ completedAt ~= nil
 
 is sufficient.
 
-This state belongs in `RPEngineProfilesDB`.
-
 ---
 
 # 8. Achievement Runtime
 
-Introduce a proposed runtime module:
+Introduce:
 
 ```text
 client/client_Achievements.lua
@@ -502,27 +470,13 @@ Refresh Profile UI
 Broadcast newly earned achievements
 ```
 
-The runtime should build its index from:
+The runtime builds its index from:
 
 ```lua
 Registry:GetActivatedDatasets()
 ```
 
-which is already the standard RPE mechanism for working with active dataset content.
-
-Conceptually:
-
-```text
-currency_gain
-    -> campaign:wealthy / copper_earned
-    -> guild:treasurer / commendations
-
-rpe_kill
-    -> campaign:first_blood / kill
-    -> campaign:slayer / kills
-```
-
-This avoids scanning every Achievement every time something happens.
+rather than scanning every Achievement for every event.
 
 ---
 
@@ -534,17 +488,9 @@ The correct integration point is:
 Profile.AddCurrencyAmount(...)
 ```
 
-not:
+not `SetCurrencyAmount()`, because absolute assignment may represent administrative changes or decreases.
 
-```lua
-Profile.SetCurrencyAmount(...)
-```
-
-because `SetCurrencyAmount()` is also used to produce decreases, administrative changes and other absolute assignments.
-
-`SpendCurrencyAmount()` already has a separate path.
-
-`AddCurrencyAmount()` should calculate the **actual applied increase**:
+`AddCurrencyAmount()` should calculate the actual applied increase after caps:
 
 ```lua
 previousAmount
@@ -552,59 +498,15 @@ updatedAmount
 actualGain = updatedAmount - previousAmount
 ```
 
-This matters when a currency reaches its configured maximum.
-
-Then:
-
-```lua
-Achievements:Trigger("currency_gain", {
-    currencyRef = normalizedCurrencyRef,
-    amount = actualGain,
-    source = source,
-})
-```
-
-The existing API should gain an optional third argument:
-
-```lua
-Profile.AddCurrencyAmount(currencyRef, amount, options)
-```
-
-for example:
-
-```lua
-{
-    source = "daily_reward"
-}
-```
-
-This is backward-compatible with all existing two-argument calls.
+and trigger only a positive applied gain.
 
 ---
 
 # 10. RPE Kill Trigger
 
-This requires particular care because RPE combat does not treat the initial damage preview as authoritative.
+Achievements must not be awarded from preliminary Damage preview state.
 
-The Damage system explicitly previews resource changes locally; a resource change becomes authoritative when the corresponding `RESOURCE_DELTA` returns through the normal RPE client path.
-
-Current death handling occurs after resource deltas are applied to the EventUnit. `client_Resources.lua` then checks:
-
-```lua
-Combat:IsUnitDead(...)
-```
-
-and calls:
-
-```lua
-Combat:HandleUnitDeath(...)
-```
-
-Therefore **Achievements must not be awarded directly from the preliminary Damage effect.**
-
-Doing so could grant an Achievement for a lethal preview that was never committed.
-
-Instead, the resource-delta application path should detect:
+Only the authoritative resource-delta path should detect:
 
 ```text
 alive before delta
@@ -614,45 +516,17 @@ authoritative RESOURCE_DELTA
 dead after delta
 ```
 
-Only this transition generates:
+and generate `rpe_kill`.
 
-```text
-rpe_kill
-```
-
-The resource-delta handling already has:
-
-- event state;
-- target EventUnit;
-- target event ID;
-- applied resource deltas;
-- addon-message sender.
-
-That sender can be compared with the local player to determine whether this player's committed action produced the kill.
-
-Example trigger payload:
-
-```lua
-{
-    eventId = eventState.id,
-    targetEventId = targetUnit.eventID,
-    targetUnitRef = targetUnit.unitRef,
-    targetName = targetUnit.name,
-    targetTeam = targetUnit.team,
-    targetIsPlayer = targetUnit.isPlayer == true,
-    killerName = sender,
-}
-```
-
-The transition check is important because further updates to a unit that is already dead must not count as additional kills.
+Further updates to an already-dead EventUnit must not generate additional kills.
 
 ---
 
 # 11. Achievement Completion
 
-An Achievement completes when **all of its criteria are satisfied**.
+An Achievement completes when all criteria are satisfied.
 
-Completion must be transition-based:
+Completion is transition-based:
 
 ```text
 not complete
@@ -663,18 +537,18 @@ complete
 Only that transition should:
 
 1. set `completedAt`;
-2. process the Achievement's completion event;
-3. update dependent achievements;
-4. refresh the Profile Achievement UI;
+2. process the completion event;
+3. update dependent/meta achievements;
+4. refresh Profile UI;
 5. broadcast the Achievement.
 
-Loading an already-completed Profile must never re-trigger completion announcements.
+Loading an already-completed Profile must never re-trigger completion behavior.
 
 ---
 
 # 12. Achievement Broadcasting
 
-Achievement earning announcements are **normal visible chat messages**, not RPE addon synchronization messages.
+Achievement announcements are visible chat messages, not RPE synchronization messages.
 
 Example:
 
@@ -682,109 +556,35 @@ Example:
 [RPE] Cybercog has earned the achievement [Boss Slayer]!
 ```
 
-On completion:
+On completion, Guild and Raid messages may be emitted when appropriate.
 
-```lua
-if IsInGuild() then
-    SendChatMessage(message, "GUILD")
-end
-
-if IsInRaid() then
-    SendChatMessage(message, "RAID")
-end
-```
-
-If the player is in both, the achievement is announced in both.
-
-CrusadeToolkit currently has separate achievement update and achievement-earned broadcast concepts. RPE should preserve that separation:
-
-```text
-internal state/progress
-≠
-public achievement announcement
-```
+Internal progress synchronization and public chat announcements remain separate concerns.
 
 ---
 
 # 13. Profile → Achievements UI
 
-The current Profile window has four tabs:
+The Profile window includes an `Achievements` tab using the existing RPE UI architecture.
 
-```text
-Equipment & Stats
-Spellbook
-Traits
-Skills
-```
+The page displays:
 
-and routes tab construction and refresh through `window_Profile.lua`.
+- Achievement icon;
+- name;
+- description;
+- tag-based filters;
+- criterion progress;
+- complete/incomplete state;
+- completion date.
 
-Add:
-
-```text
-Achievements
-```
-
-Proposed file:
-
-```text
-client/character/profile/page_ProfileAchievements.lua
-```
-
-and add:
-
-```lua
-achievementsPage = ProfileUI.AchievementsPage
-```
-
-to the Profile window instance.
-
-The new tab is then added through the existing `UI.Window` tabs table and `RefreshTab()` pattern.
-
----
-
-## 13.1 Achievement page layout
-
-Recommended structure:
-
-```text
-┌──────────────────────────────────────────────────────┐
-│ Equipment | Spellbook | Traits | Skills | Achievements
-├───────────────┬──────────────────────────────────────┤
-│ All           │ [icon] Boss Slayer                  │
-│ Combat        │ Defeat 10 enemies in RPE events.    │
-│ Events        │                                     │
-│ Guild         │ █████████████░░░ 7 / 10             │
-│ Other         │                                     │
-│               │ [icon] First Blood                  │
-│               │ Defeat an enemy during an RPE event │
-│               │ Completed 23 Aug 2026               │
-└───────────────┴──────────────────────────────────────┘
-```
-
-The implementation should use existing RPE UI abstractions:
-
-```text
-Panel
-VerticalLayoutGroup
-HorizontalLayoutGroup
-ScrollLayout
-ProgressBar
-Text
-Image
-```
-
-rather than Blizzard XML/templates or the custom CrusadeToolkit UI code.
-
-Achievement tags can initially drive category/filter presentation without requiring a new explicit category field.
+Viewing the page must never mutate Achievement progress.
 
 ---
 
 # 14. Achievement Authoring UI
 
-Phase 1 should replace the existing placeholder Achievement Data Editor page with a functional list/grid.
+The Data Editor supports Achievement authoring through the normal dataset editor.
 
-The Achievement inspector should support:
+The inspector exposes:
 
 ```text
 General
@@ -794,7 +594,7 @@ General
   Tags
 
 Criteria
-  Add Criterion
+  Add/Delete Criterion
   Criterion ID
   Description
   Trigger
@@ -802,32 +602,32 @@ Criteria
   Trigger-specific filters
 
 Rewards
-  Existing rewards field
+  Existing opaque rewards field
 ```
 
-Proposed file:
-
-```text
-client/ui/editor/inspectors/page_InspectorAchievement.lua
-```
-
-The existing Data Editor maps content collections to inspector pages, but currently does not map Achievements to an inspector.
-
-That mapping must be added during Phase 1.
+Criterion edits must preserve IDs of unaffected criteria.
 
 ---
 
-# 15. GuildSetting Dataset Class
+# 15. RPE Guild Rank Dataset Model
 
-Add:
+The existing internal class remains:
 
 ```text
 core/classes/GuildSetting.lua
 ```
 
-following the normalization/serialization pattern used by current classes such as `Currency` and `Skill`.
+and the existing dataset collection remains:
 
-Proposed structure:
+```text
+guildSettings
+```
+
+for compatibility with already-authored datasets and Phase 1 code.
+
+**All user-facing labels must call these entries `Guild Rank`.**
+
+The revised internal structure is:
 
 ```lua
 GuildSetting {
@@ -837,6 +637,8 @@ GuildSetting {
 
     guildName = "",
 
+    wowGuildRankIndices = {},
+
     general = {
         enableRequisitions = false,
         enableDailyRewards = false,
@@ -844,7 +646,6 @@ GuildSetting {
     },
 
     requisitions = {},
-
     dailyRewards = {},
 
     progression = {
@@ -856,60 +657,166 @@ GuildSetting {
 }
 ```
 
-`guildName` may be blank.
+`wowGuildRankIndices` is a normalized, deduplicated array of non-negative Blizzard guild rank indexes.
 
-A blank guild name means:
+An empty array means the RPE Guild Rank is not restricted to a particular WoW guild rank and may be assigned to any member of the applicable guild.
 
-```text
-This setting may apply to the player's current guild.
-```
+A populated `guildName` restricts the RPE Guild Rank to that guild. A blank `guildName` defines a generic reusable rank.
 
-A populated guild name restricts the setting to that guild.
-
-This allows generic reusable datasets while preventing guild-specific datasets from unintentionally configuring unrelated guilds.
+The existing `requiredGuildRankIndex` field inside Requisition definitions is superseded by the rank-scoped model. It may be preserved temporarily during backward-compatible normalization/import, but new UI and runtime behavior must not depend on it.
 
 ---
 
-# 16. Active GuildSetting Resolution
+# 16. Applicable Guild Rank Catalogue
 
-Introduce:
+The old single-setting function concept:
 
 ```lua
 Guild:GetActiveGuildSetting()
 ```
 
-Resolution rules:
+is superseded by a Guild Rank catalogue.
+
+Recommended facade operations:
+
+```lua
+Guild:GetApplicableGuildRanks()
+Guild:GetEligibleGuildRanksForWoWRank(wowRankIndex)
+Guild:GetAssignedGuildRankRef()
+Guild:GetAssignedGuildRank()
+```
+
+Catalogue resolution rules:
 
 ```text
 1. Player must currently be in a guild.
 
-2. Search GuildSettings in activated datasets.
+2. Search Guild Rank definitions (`guildSettings`) in activated datasets.
 
-3. Exact guildName matches take priority.
+3. Collect exact guildName matches.
 
-4. If no exact match exists, an unbound GuildSetting may apply.
+4. If at least one exact guildName match exists, use the full exact-match set.
 
-5. If multiple settings have equal priority:
-      return a conflict state
-      do not silently choose one.
+5. Otherwise use the full set of blank/generic guildName definitions.
+
+6. Multiple definitions in the selected set are expected and are not a conflict.
 ```
 
-The Guild window should display:
+A rank's stable identity remains its qualified dataset reference:
 
 ```text
-Multiple active Guild Settings apply to this guild.
-Disable one of the conflicting datasets.
+datasetId:guildSettingId
 ```
 
-rather than applying unpredictable configuration.
-
-This uses the existing RPE concept of activated datasets through the Registry.
+No first-match selection is performed.
 
 ---
 
-# 17. Requisition Definition
+# 17. WoW Guild Rank Mapping Semantics
 
-Inside `GuildSetting.requisitions`:
+WoW guild rank indexes remain inverse to normal numeric hierarchy:
+
+```text
+0 = highest WoW guild rank
+larger number = lower WoW guild rank
+```
+
+However, RPE Guild Ranks are **not automatically derived from this hierarchy**.
+
+The mapping is a set-membership constraint.
+
+Example:
+
+```lua
+GuildSetting {
+    id = "militant",
+    wowGuildRankIndices = { 4 },
+}
+
+GuildSetting {
+    id = "medic",
+    wowGuildRankIndices = { 4 },
+}
+
+GuildSetting {
+    id = "engineer",
+    wowGuildRankIndices = { 4 },
+}
+```
+
+A member whose WoW guild rank index is `4` may therefore be assigned any of:
+
+```text
+Militant
+Medic
+Engineer
+```
+
+by an officer.
+
+This is the required many-RPE-ranks-per-WoW-rank relationship.
+
+There is no implicit rule such as:
+
+```lua
+playerRankIndex <= requiredRankIndex
+```
+
+for selecting an RPE Guild Rank. That comparison remains useful only for unrelated WoW-rank permission concepts if explicitly needed elsewhere.
+
+---
+
+# 18. Manual RPE Guild Rank Assignment
+
+A player's RPE Guild Rank is stored in Profile state and is set manually by a guild officer.
+
+Example:
+
+```lua
+profile.guild.byGuild[guildKey] = {
+    assignedRankRef = "campaign:medic",
+    assignedRankAt = 1787481200,
+    assignedRankBy = "Officer-Realm",
+}
+```
+
+The assignment flow is:
+
+```text
+Officer selects online guild member
+        ↓
+RPE shows RPE Guild Ranks eligible for that member's current WoW guild rank
+        ↓
+Officer selects one RPE Guild Rank, or clears the assignment
+        ↓
+targeted RPE addon message
+        ↓
+member client validates sender, guild, officer state and rank eligibility
+        ↓
+member client stores assignedRankRef in its own Profile
+        ↓
+member client acknowledges success/failure
+```
+
+RPE must never automatically assign a rank because:
+
+- the player logged in;
+- the player joined the guild;
+- the player's WoW guild rank changed;
+- only one eligible RPE rank exists;
+- a dataset was activated.
+
+If an existing assignment becomes invalid because the member's WoW guild rank changed or the referenced RPE Guild Rank is no longer applicable, RPE should treat it as an **invalid assignment** for feature eligibility and show an explanatory UI state. It must not silently remap or clear the Profile value.
+
+No assigned RPE Guild Rank means no rank-scoped Requisitions, Daily Rewards or Progression are available.
+
+WoW officer permission remains the authority for Guild Admin access. Being assigned a particular RPE Guild Rank does not itself make a user an officer.
+
+---
+
+# 19. Requisition Definition
+
+Requisitions live inside the RPE Guild Rank that grants access to them:
 
 ```lua
 {
@@ -929,77 +836,38 @@ Inside `GuildSetting.requisitions`:
         },
     },
 
-    requiredGuildRankIndex = 3,
-
     characterLimit = 1,
 }
 ```
 
-`characterLimit` defaults to:
+There is no new per-Requisition minimum guild rank field. The enclosing RPE Guild Rank already defines who may see and use the Requisition.
 
-```text
-1
-```
-
-and is a **lifetime per-character limit for that Requisition definition**.
-
-A later feature can introduce reset policies if required, but Phase 2 should not implicitly make this daily or weekly.
+`characterLimit` defaults to `1` and is a lifetime per-character limit for that Requisition definition within that RPE Guild Rank.
 
 ---
 
-# 18. Guild Rank Semantics
+# 20. Requisition Transaction
 
-WoW guild rank indexes are inverse to normal numeric hierarchy:
-
-```text
-0 = highest rank
-larger number = lower rank
-```
-
-GNS already implements the correct check:
+Use one central function, for example:
 
 ```lua
-playerRankIndex <= requiredRankIndex
+Guild:TryRequisition(guildRankRef, requisitionId)
 ```
 
-RPE should use the same rule.
-
-The Data Editor should present the field to the user as:
-
-```text
-Minimum Guild Rank
-```
-
-while persisting:
-
-```lua
-requiredGuildRankIndex
-```
-
----
-
-# 19. Requisition Transaction
-
-Requisitioning must be handled by one central function, for example:
-
-```lua
-Guild:TryRequisition(guildSettingRef, requisitionId)
-```
-
-The UI must not perform the actual business logic itself.
+The UI must not perform the business logic.
 
 Validation order:
 
 ```text
-Guild feature enabled
+Player has a valid assigned RPE Guild Rank
         ↓
-Player is in applicable guild
+Assigned rank equals guildRankRef
         ↓
-Requisition exists
+Requisitions enabled for that RPE Guild Rank
+        ↓
+Requisition exists in that RPE Guild Rank
         ↓
 Item reference resolves
-        ↓
-Player satisfies guild rank
         ↓
 Character limit not reached
         ↓
@@ -1017,22 +885,18 @@ Spend all required currencies
         ↓
 Add item through Client.Inventory.AddItem()
         ↓
-Increment requisition ledger
+Increment rank-scoped requisition ledger
         ↓
 Refresh Guild UI
 ```
 
-All costs must be validated **before any currency is spent**.
-
-If an unexpected failure occurs after spending begins, balances must be restored so a partial transaction cannot occur.
-
-GNS provides useful precedent for visually locking acquisitions based on guild rank and available resources, but its UI directly gates item acquisition. In RPE, the UI state is only informative; the transaction function must independently repeat all checks.
+All costs must be validated before any currency is spent. Partial transactions must roll back.
 
 ---
 
-# 20. Daily Reward Definition
+# 21. Daily Reward Definition
 
-Use one typed reward list:
+Daily Rewards live inside the assigned RPE Guild Rank:
 
 ```lua
 dailyRewards = {
@@ -1042,7 +906,6 @@ dailyRewards = {
         ref = "campaign:field_ration",
         amount = 2,
     },
-
     {
         id = "allowance",
         type = "currency",
@@ -1052,84 +915,73 @@ dailyRewards = {
 }
 ```
 
-This is preferable to separate item/currency lists because the GuildSetting editor can represent the daily reward as one ordered collection.
+The reward granted on a day is the reward list belonging to the character's valid assigned RPE Guild Rank at claim time.
 
 ---
 
-# 21. Daily Reward Processing
+# 22. Daily Reward Processing and Day Key
 
-Daily rewards should be awarded automatically when an eligible character logs in.
+Daily rewards are awarded automatically only when a character has a valid officer-assigned RPE Guild Rank.
 
-The existing RPE Runtime centralizes Blizzard event registration and already receives `PLAYER_ENTERING_WORLD`.
-
-Extend this runtime integration to also handle the guild lifecycle, including appropriate guild-roster/membership update events.
-
-Processing should be:
+Processing:
 
 ```text
-PLAYER_ENTERING_WORLD
+PLAYER_ENTERING_WORLD / guild context refresh
         ↓
-Guild context available?
+Valid assigned RPE Guild Rank?
         ↓ no
-wait for guild roster/update event
+stop without assigning one
         ↓ yes
-Resolve GuildSetting
+Daily rewards enabled for assigned rank?
         ↓
-Daily rewards enabled?
-        ↓
-Already claimed for current calendar day?
+Already claimed for current guild/calendar day?
         ↓ no
 Validate every reward definition
         ↓
 Award rewards
         ↓
-Record today's claim
+Record today's claim and rankRef used
 ```
 
-The operation must be idempotent.
-
-A `/reload` must not provide another reward.
-
----
-
-# 22. Daily Reward Day Key
-
-Store a stable server/calendar day key such as:
+The calendar key should be stable, for example:
 
 ```text
 2026-08-23
 ```
 
-Do **not** implement this as:
+Do not use a rolling 24-hour timer.
 
-```text
-lastRewardTimestamp + 86400
-```
+A rank change after a daily reward has been claimed must **not** permit a second daily reward from the newly assigned rank on the same calendar day. The claim ledger is one claim per character, per guild, per calendar day.
 
-because the requirement is one reward per calendar day, not one reward every rolling 24 hours.
+Store the rank used for the claim for display/debugging, but do not key claim eligibility by rank.
 
 ---
 
 # 23. Guild Profile State
 
-Guild state should support characters changing guilds.
+Guild state supports characters changing guilds and changing RPE Guild Ranks.
 
 Proposed structure:
 
 ```lua
 profile.guild = {
     byGuild = {
-        ["guild-key"] = {
-            dailyRewardDate = nil,
+        [guildKey] = {
+            assignedRankRef = "campaign:medic",
+            assignedRankAt = 1787481200,
+            assignedRankBy = "Officer-Realm",
+
+            dailyRewardDate = "2026-08-23",
+            dailyRewardRankRef = "campaign:medic",
 
             requisitions = {
-                ["dataset:guildSetting"] = {
-                    ["standard_rifle"] = 1,
+                ["campaign:medic"] = {
+                    ["field_ration"] = 1,
                 },
             },
 
             progression = {
-                ["dataset:guildSetting"] = {
+                ["campaign:medic"] = {
                     ...
                 },
             },
@@ -1138,32 +990,15 @@ profile.guild = {
 }
 ```
 
-The `guild-key` should be produced by one Guild helper from the best stable Blizzard guild identity available, with guild name/realm as fallback.
+The guild key is produced by one Guild helper from the best stable Blizzard guild identity available, with guild name/realm fallback.
 
-This avoids one guild's daily-reward/requisition history leaking into another guild if the character changes guilds.
+Requisition and progression state remain keyed by RPE Guild Rank reference so changing ranks does not erase previous rank-specific state. Returning to a prior rank restores its previous persisted state.
 
 ---
 
 # 24. Guild Window
 
-Create a new top-level window rather than embedding guild functionality inside Profile.
-
-Proposed namespace:
-
-```lua
-Addon.Client.UI.Guild
-```
-
-Proposed files:
-
-```text
-client/character/guild/page_GuildRequisitions.lua
-client/character/guild/page_GuildProgression.lua
-client/character/guild/page_GuildAdmin.lua
-client/character/guild/window_Guild.lua
-```
-
-Tabs:
+The top-level Guild window remains:
 
 ```text
 Requisitions
@@ -1171,110 +1006,105 @@ Progression
 Admin
 ```
 
-Use the same `UI.Window` tab architecture already used by the Profile window.
-
----
-
-# 25. Launcher and Slash Command Integration
-
-The current Launcher has Profile, Event and Settings groups, and routes destinations through `Client:Open...LauncherDestination()` functions.
-
-Add:
+The window should also show the local character's assigned RPE Guild Rank prominently, for example:
 
 ```text
-Guild
-```
-
-to the Launcher.
-
-Also add:
-
-```text
-/rpe guild
-```
-
-through the same command registration system currently used by `/rpe profile`, `/rpe inventory`, `/rpe data`, etc.
-
----
-
-# 26. Requisitions Tab UI
-
-The first section displays Daily Rewards:
-
-```text
-DAILY REWARD
-
-[icon] Field Ration ×2
-[icon] Guild Commendation ×1
-
-Received today
+Guild Rank: Medic
 ```
 
 or:
 
 ```text
-Daily rewards are disabled for this guild.
+Guild Rank: Not assigned
 ```
 
-The second section lists Requisitions:
+or:
 
 ```text
-[ITEM ICON] Standard Rifle
+Guild Rank: Medic (assignment no longer valid for current WoW rank)
+```
 
+Requisitions and Progression render from the assigned RPE Guild Rank only.
+
+---
+
+# 25. Launcher and Slash Command Integration
+
+Keep:
+
+```text
+Launcher → Guild
+/rpe guild
+```
+
+through the existing navigation system.
+
+---
+
+# 26. Requisitions Tab UI
+
+The Requisitions tab renders only content from the valid assigned RPE Guild Rank.
+
+Example:
+
+```text
+GUILD RANK
+Medic
+
+DAILY REWARD
+[icon] Field Ration ×2
+[icon] Guild Commendation ×1
+Received today
+
+REQUISITIONS
+[ITEM ICON] Medical Satchel
 Cost
-  50,000 Copper
   2 Guild Commendations
-
-Minimum Rank
-  Militant
-
 Character Limit
   0 / 1
-
 [ Requisition ]
 ```
 
-Unavailable buttons must explain why:
+There is no `Minimum Rank` row because rank eligibility is represented by the assigned RPE Guild Rank itself.
+
+Unavailable buttons must explain why, for example:
 
 ```text
-Requires rank: Knight
+No RPE Guild Rank assigned
+Assigned RPE Guild Rank is no longer valid
 Insufficient Guild Commendations
 Character limit reached
-Requisitions disabled
+Requisitions disabled for this Guild Rank
 ```
-
-Do not rely solely on desaturation.
 
 ---
 
 # 27. Guild Administration
 
-The Admin tab allows guild officers to modify an **online RPE member's own character state**.
+The Admin tab allows WoW guild officers to modify an online RPE member's own character state.
 
-Required operations:
+Required operations become:
 
 ```text
+Set/Clear RPE Guild Rank
 Grant Achievement
 Increase Skill
 Decrease Skill
 Give Item
 ```
 
-The tab should use the live WoW guild roster for member discovery.
+The live WoW guild roster remains the member-discovery source.
 
-CrusadeToolkit's Guild Admin page already demonstrates the basic interaction pattern of:
+Selecting a member should show both:
 
 ```text
-Guild roster
-   ↓
-rank ordering
-   ↓
-select member
-   ↓
-member editor
+WoW Guild Rank
+RPE Guild Rank
 ```
 
-RPE should reuse the product interaction, not CrusadeToolkit's storage implementation.
+The RPE Guild Rank selector presents all applicable RPE Guild Ranks whose `wowGuildRankIndices` contains the member's current WoW guild rank index, plus unrestricted ranks whose mapping list is empty.
+
+Multiple eligible RPE Guild Ranks are expected.
 
 ---
 
@@ -1287,11 +1117,11 @@ RPEngineProfilesDB
 RPEngineInventoryDB
 ```
 
-exist on **their** WoW client.
+exist on their WoW client.
 
 An officer therefore cannot directly write them.
 
-Guild administration must work as:
+Guild administration works as:
 
 ```text
 Officer RPE client
@@ -1309,9 +1139,7 @@ Member RPE client
 Officer RPE client
 ```
 
-Only online members running a compatible RPE version can therefore be administrated.
-
-Offline Profile modification is out of scope.
+Only online members running a compatible RPE version can be administrated.
 
 ---
 
@@ -1319,9 +1147,7 @@ Offline Profile modification is out of scope.
 
 Extend the existing RPE Operations table rather than introducing another addon prefix.
 
-At the inspected code state, opcodes 1–23 are in use.
-
-Allocate the next available operation IDs when implementation begins, conceptually:
+Conceptual operations:
 
 ```text
 GUILD_ADMIN_QUERY
@@ -1330,36 +1156,43 @@ GUILD_ADMIN_MUTATION
 GUILD_ADMIN_MUTATION_RESPONSE
 ```
 
-These can be four opcodes or two request/response opcodes with an operation discriminator.
+The mutation discriminator includes:
 
-Recommended mutation envelope:
+```text
+set_guild_rank
+clear_guild_rank
+grant_achievement
+adjust_skill
+give_item
+```
+
+Example rank mutation:
 
 ```lua
 {
     requestId = "...",
     protocolVersion = 1,
-
-    operation = "give_item",
-
+    operation = "set_guild_rank",
     data = {
-        itemRef = "campaign:standard_rifle",
-        quantity = 1,
+        guildRankRef = "campaign:medic",
     },
 }
 ```
 
-The sender identity must come from the addon-message transport, not from a client-supplied `sender` field.
+Sender identity comes from the addon-message transport, never a client-supplied sender field.
 
 ---
 
 # 30. Guild Admin Member Query
 
-When the officer selects an online member, RPE should request the minimal state required by the Admin UI.
+When an officer selects an online member, query the minimal state required by Admin UI.
 
 Response:
 
 ```lua
 {
+    assignedGuildRankRef = "campaign:medic",
+
     achievements = {
         ["campaign:first_blood"] = {
             completedAt = 1787481200,
@@ -1373,50 +1206,59 @@ Response:
 }
 ```
 
+The member's WoW guild rank is normally available from the guild roster and should not be trusted from a mutation payload.
+
 Inventory contents do not need to be transmitted merely to give an item.
-
-This allows the officer UI to show:
-
-```text
-Achievements
-  First Blood                Earned
-  Boss Slayer                [Grant]
-
-Skills
-  Athletics                   12  [-] [+]
-
-Items
-  [Select Item] [Quantity] [Give]
-```
 
 ---
 
 # 31. Receiver-Side Guild Admin Validation
 
-Every incoming administrative mutation must independently verify:
+Every incoming administrative mutation independently verifies:
 
 ```text
 Sender is in the same guild
-Sender currently has an officer-capable guild rank
+Sender currently has WoW officer capability
 Requested operation is supported
+Target is this client's own active character
 Referenced Dataset object exists
 Numeric values are valid
-Target is this client's own active character
 ```
 
-The recipient must never trust:
+For `set_guild_rank`, additionally verify:
+
+```text
+RPE Guild Rank is in the current applicable guild catalogue
+Target's live WoW guild rank index is allowed by that RPE Guild Rank
+```
+
+An empty `wowGuildRankIndices` list is unrestricted.
+
+The recipient must never trust client-supplied values such as:
 
 ```lua
 payload.isOfficer = true
+payload.targetWowRankIndex = 4
 ```
 
-or any equivalent client-supplied permission value.
-
-The Admin UI itself should also be inaccessible/locked to non-officers, but **UI gating is not security**.
+The target client determines its own live guild/rank state.
 
 ---
 
 # 32. Guild Admin Mutation Paths
+
+## Set/Clear RPE Guild Rank
+
+Use a Profile/Guild state helper such as:
+
+```lua
+Profile.SetAssignedGuildRank(guildKey, guildRankRef, metadata)
+Profile.ClearAssignedGuildRank(guildKey)
+```
+
+Only the validated receiver-side Guild Admin operation should call this on behalf of another player.
+
+Setting an RPE Guild Rank does not automatically award its Daily Reward, consume a Requisition or mutate Progression. Normal runtime/UI refresh follows the assignment change.
 
 ## Grant Achievement
 
@@ -1429,60 +1271,25 @@ Achievements:Grant(achievementRef, {
 })
 ```
 
-Do not directly modify:
-
-```lua
-profile.achievements
-```
-
-because normal completion handling must still run.
-
----
-
 ## Adjust Skill
 
-Use:
-
-```lua
-local current = Profile.GetSkillLevel(skillRef)
-Profile.SetSkillLevel(skillRef, current + delta)
-```
-
-after validating the Skill reference.
-
----
+Use Profile skill APIs after reference validation.
 
 ## Give Item
 
-Resolve:
-
-```lua
-Registry:ResolveItemReference(itemRef)
-```
-
-then call:
-
-```lua
-Client.Inventory.AddItem({
-    dataset = dataset.id,
-    id = item.id,
-    quantity = quantity,
-})
-```
-
-This preserves RPE's existing stack and bind behavior.
+Resolve through Registry and award through `Client.Inventory.AddItem()`.
 
 ---
 
 # 33. Guild Admin Responses
 
-Every mutation returns:
+Every mutation returns explicit acknowledgement:
 
 ```lua
 {
     requestId = "...",
     success = true,
-    operation = "give_item",
+    operation = "set_guild_rank",
 }
 ```
 
@@ -1492,16 +1299,19 @@ or:
 {
     requestId = "...",
     success = false,
-    reason = "sender-not-officer",
+    reason = "rank-not-eligible",
 }
 ```
 
-Useful error codes include:
+Useful errors include:
 
 ```text
 target-offline / no response
 sender-not-in-guild
 sender-not-officer
+unknown-guild-rank
+rank-not-applicable
+rank-not-eligible
 unknown-achievement
 unknown-skill
 unknown-item
@@ -1509,32 +1319,28 @@ invalid-quantity
 incompatible-protocol
 ```
 
-The officer UI must not optimistically display success before acknowledgement.
+The officer UI must not display success before acknowledgement.
 
 ---
 
 # 34. Guild Progression
 
-CrusadeToolkit's `CrusaderPath` is not simply an XP bar.
-
-Its core model consists of progression panels containing:
+CrusadeToolkit's progression concept remains useful as a generalized RPE system containing:
 
 - a named progression identity;
-- descriptive/oath text;
+- descriptive text;
 - locked text;
 - an unlocked state;
-- a configured selection of abilities;
+- configured ability choices;
 - a player's selected ability.
 
-The character stores selected progression panels, unlock flags and selected spells.
-
-RPE 2 should generalize this mechanism without embedding Holy Order-specific concepts.
+The revised design scopes that progression to the assigned RPE Guild Rank.
 
 ---
 
-# 35. GuildSetting Progression Definition
+# 35. RPE Guild Rank Progression Definition
 
-Proposed Phase 4 data:
+Each RPE Guild Rank owns its own progression definition:
 
 ```lua
 progression = {
@@ -1542,52 +1348,23 @@ progression = {
 
     entries = {
         {
-            id = "aspirant",
-            name = "Aspirant",
+            id = "field_medicine",
+            name = "Field Medicine",
             description = "...",
             icon = "...",
-
             lockedText = "You have not yet unlocked this progression.",
-
             spellRefs = {
                 "campaign:ability_one",
                 "campaign:ability_two",
-                "campaign:ability_three",
-            },
-        },
-
-        {
-            id = "knight",
-            name = "Knight",
-            description = "...",
-            icon = "...",
-
-            lockedText = "...",
-
-            spellRefs = {
-                ...
             },
         },
     },
 }
 ```
 
-`slotCount = 3` preserves CrusadeToolkit's existing three-panel behaviour as the default while allowing another GuildSetting to configure a different number.
+The progression entry is not itself the character's RPE Guild Rank. It is progression content available **inside** that Guild Rank.
 
-There should be no hard-coded concepts such as:
-
-```text
-Squire
-Aspirant
-Knight
-Crusader
-Oath
-Troth
-```
-
-in RPE core.
-
-Those belong entirely to Dataset content.
+There are no hard-coded campaign-specific rank/oath terms in RPE core.
 
 ---
 
@@ -1596,83 +1373,54 @@ Those belong entirely to Dataset content.
 Example:
 
 ```lua
-profile.guild.byGuild[guildKey].progression[guildSettingRef] = {
+profile.guild.byGuild[guildKey].progression[guildRankRef] = {
     slots = {
-        [1] = "aspirant",
-        [2] = "knight",
-        [3] = "crusader",
+        [1] = "field_medicine",
     },
 
     unlocked = {
-        ["aspirant"] = true,
-        ["knight"] = true,
-        ["crusader"] = false,
+        ["field_medicine"] = true,
     },
 
     selectedSpells = {
-        ["aspirant"] = "campaign:ability_one",
-        ["knight"] = "campaign:ability_two",
+        ["field_medicine"] = "campaign:ability_one",
     },
 }
 ```
 
-The Profile stores only IDs/references and state.
+Changing the assigned RPE Guild Rank does not delete progression state associated with the previous rank.
 
-Names, descriptions, icons and available spell choices remain in the GuildSetting dataset.
+Only the currently assigned valid rank's progression is active/displayed.
 
 ---
 
 # 37. Progression UI
 
-The Progression tab should retain the core visual model from CrusadeToolkit:
+The Progression tab renders the assigned rank's configured progression entries.
 
-```text
-┌────────────────┐ ┌────────────────┐ ┌────────────────┐
-│    ASPIRANT    │ │     KNIGHT     │ │    CRUSADER    │
-│                │ │                │ │                │
-│    [ICON]      │ │    [ICON]      │ │    [LOCK]      │
-│                │ │                │ │                │
-│ Description    │ │ Description    │ │ Requirements / │
-│                │ │                │ │ locked text    │
-│ [chosen power] │ │ [chosen power] │ │                │
-└────────────────┘ └────────────────┘ └────────────────┘
-```
+Where more slots exist than fit horizontally, the page paginates or scrolls rather than assuming exactly three definitions.
 
-RPE UI primitives should replace CrusadeToolkit's standalone frame construction.
-
-Where more progression slots exist than fit horizontally, the page should paginate/scroll rather than assuming exactly three definitions exist.
+No progression from a different RPE Guild Rank is displayed as active.
 
 ---
 
 # 38. Progression Administration
 
-Phase 4 should extend the Guild Admin member editor with:
-
-```text
-Progression
-```
-
-allowing an officer to:
+Guild Admin may later expose Progression controls for the selected member:
 
 - assign an entry to a progression slot;
 - lock/unlock an entry;
-- clear a player's selected spell if necessary.
+- clear a selected spell.
 
-This reproduces the functional relationship between CrusadeToolkit's GuildAdmin and CrusaderPath without maintaining a second guild-member database.
+Every remote mutation is validated against the member's currently assigned RPE Guild Rank and its progression definition.
 
-The changes are applied remotely through the same Guild Admin communication protocol.
+A rank assignment change does not destroy previous rank-scoped progression state.
 
 ---
 
 # 39. Dataset Dependency Integration
 
-This is required and should not be omitted.
-
-RPE's dependency system explicitly walks known fields in Units, Items, Traits, Skills, Spells, Auras and other definitions to determine cross-dataset dependencies.
-
-It does **not currently inspect Achievement criteria**, and GuildSetting does not yet exist.
-
-Phase 1 must add dependency extraction for:
+Dependency extraction remains required for Achievement and internal `GuildSetting` definitions.
 
 ### Achievement
 
@@ -1680,362 +1428,277 @@ Phase 1 must add dependency extraction for:
 achievementRef
 currencyRef
 unitRef
-and any other criterion reference
+other defined criterion references
 ```
 
-### GuildSetting
+### RPE Guild Rank / GuildSetting
 
 ```text
 Requisition itemRef
 Requisition currencyRefs
 Daily Reward item/currency refs
 Progression spellRefs
-Achievement refs used by future progression requirements
+future Achievement refs used by progression requirements
 ```
 
-This is necessary so dataset activation/import/dependency handling remains correct when a GuildSetting references entries defined elsewhere.
+`wowGuildRankIndices` contains Blizzard numeric rank indexes and creates no dataset dependency.
 
-Any reference-rewrite/pruning paths in `Dependecies.lua` must be extended at the same time.
+`assignedRankRef` is Profile state, not Dataset definition data, so it is not part of dataset dependency discovery.
 
 ---
 
 # 40. Registry Additions
 
-Add:
+Existing internal resolvers remain valid:
 
 ```lua
 Registry:ResolveAchievementReference(achievementRef)
 Registry:ResolveAchievementName(achievementRef)
-
 Registry:ResolveGuildSettingReference(guildSettingRef)
 ```
 
-using the same internal collection-cache mechanism already used for Items, Skills, Stats and other dataset entries.
+A semantic alias may be added if useful:
 
-This prevents individual systems from repeatedly hand-parsing:
-
-```text
-datasetId:id
+```lua
+Registry:ResolveGuildRankReference(guildRankRef)
 ```
+
+but existing datasets and APIs must not be broken solely to rename the internal class.
 
 ---
 
 # 41. Data Editor Integration
 
-`GuildSetting` should become a normal dataset collection:
+The internal collection remains:
 
 ```text
 guildSettings
 ```
 
-Changes include:
+but Data Editor user-facing text becomes:
 
 ```text
-Database.DATASET_ENTRY_DEFINITIONS
-normalizeDatasetRecord()
-DataEditor ENTRY_DEFINITIONS
-Data Editor page definitions
-Data Editor refresh mapping
-Inspector mapping
-Dataset item-count display
-Dependency handling
+Guild Ranks
+Guild Rank
+New Guild Rank
 ```
 
-Proposed UI files:
-
-```text
-client/ui/editor/pages/page_GuildSetting.lua
-client/ui/editor/inspectors/page_InspectorGuildSetting.lua
-```
-
-The page should expose:
+The editor exposes:
 
 ```text
 General
+  Name
+  Description
+  Guild Name
+  Eligible WoW Guild Ranks
+  Enable Requisitions
+  Enable Daily Rewards
+  Enable Progression
+  Tags
+
 Requisitions
 Daily Rewards
 Progression
 ```
 
-The Progression editing controls may initially be structural in Phase 1 and receive their complete behavior/editor polish in Phase 4.
+`Eligible WoW Guild Ranks` edits `wowGuildRankIndices` and permits multiple RPE Guild Rank entries to contain the same WoW rank index.
+
+The old Requisition-level `Minimum Guild Rank` control is removed from the user-facing editor because Requisitions are rank-scoped.
+
+Existing datasets containing `requiredGuildRankIndex` must continue to import without crashing, but the field is legacy and does not participate in the new eligibility model.
 
 ---
 
-# 42. Schema Changes
+# 42. Schema and Migration Changes
 
-Current RPE database schemas include separate Profile and Dataset versions.
+Phase 1 currently uses:
 
-Proposed:
+```text
+Profile schema = 5
+Dataset schema = 15
+```
+
+The Guild Rank revision should increment these additively:
 
 ```text
 Profile schema
-4 → 5
+5 → 6
 
 Dataset schema
-14 → 15
+15 → 16
 ```
 
-Profile normalization must add:
+Profile normalization adds/normalizes rank assignment fields inside each guild bucket without destroying existing requisition/progression/future nested fields.
+
+Dataset normalization adds:
 
 ```lua
-achievements = {}
-guild = {}
+wowGuildRankIndices = {}
 ```
 
-Dataset normalization must add:
+to each internal `GuildSetting`.
 
-```lua
-guildSettings = {}
-```
+Existing `GuildSetting` records therefore become unrestricted RPE Guild Ranks until an author configures their WoW rank mappings.
 
-Existing characters therefore migrate additively:
+Existing `requiredGuildRankIndex` values are legacy data. They should be preserved through compatibility normalization/import where practical but are not automatically converted into `wowGuildRankIndices`, because the old minimum-rank rule cannot reliably infer the author's intended new RPE Guild Rank assignments.
 
-```text
-old Profile
-    ↓ normalization
-old Profile + empty achievements + empty guild state
-```
-
-No destructive conversion is required.
-
-Any default-profile detection/migration logic in `Database.lua` must also recognize these new fields.
+No automatic character rank assignment is performed during migration.
 
 ---
 
 # 43. Runtime Event Integration
 
-RPE currently centralizes WoW runtime events in:
+RPE continues to centralize WoW runtime events in:
 
 ```text
 core/internal/Runtime.lua
 ```
 
-rather than giving every module an independent event frame.
+Guild membership/roster events are used to:
 
-Extend the same dispatcher for Guild functionality.
+- refresh the Guild Rank catalogue;
+- refresh officer/member roster UI;
+- revalidate whether the stored assignment is currently eligible;
+- retry Daily Reward processing when guild information becomes available.
 
-Relevant events should include the appropriate equivalents of:
-
-```text
-PLAYER_ENTERING_WORLD
-guild membership update
-guild roster update
-```
-
-and route them to:
-
-```lua
-Client.Guild:HandleRuntimeEvent(...)
-```
-
-or equivalent.
-
-This is used for:
-
-- resolving current guild state;
-- refreshing the Admin roster;
-- retrying Daily Reward processing when guild information becomes available.
+They must **not** assign, remap or clear `assignedRankRef` automatically.
 
 ---
 
 # 44. Proposed Module Layout
 
+Existing Phase 1 files remain the starting point:
+
 ```text
 core/
   classes/
-    Achievement.lua                 [modify]
-    GuildSetting.lua                [new]
+    Achievement.lua
+    GuildSetting.lua                 [extend Guild Rank schema]
 
   internal/
     database/
-      Database.lua                  [modify]
-      Dependecies.lua               [modify]
+      Database.lua                   [schema/profile/dataset migration]
+      Dependecies.lua
 
     profile/
-      Profile.lua                   [modify wrappers]
-      Currencies.lua                [currency trigger hook]
-      Achievements.lua              [new profile-state helpers]
-      Guild.lua                     [new guild-state helpers]
+      Achievements.lua
+      Guild.lua                      [assigned-rank state helpers]
+      Currencies.lua
+      Profile.lua
 
-    Registry.lua                    [modify]
-    Runtime.lua                     [modify]
+    Registry.lua                     [optional Guild Rank alias]
+    Runtime.lua
     comms/
-      Operations.lua                [Phase 3 admin operations]
+      Operations.lua                [Guild Admin operations]
 
 client/
-  client_Achievements.lua           [new]
-  client_Guild.lua                  [new]
-
-  client_Resources.lua              [authoritative kill hook]
-  client_Commands.lua               [guild command]
+  client_Achievements.lua            [future Achievement runtime]
+  client_Guild.lua                   [Guild Rank catalogue/eligibility/runtime]
+  client_Resources.lua               [authoritative kill hook]
+  client_Commands.lua
 
   character/
     profile/
-      page_ProfileAchievements.lua  [new]
-      window_Profile.lua             [modify]
+      page_ProfileAchievements.lua
+      window_Profile.lua
 
     guild/
-      page_GuildRequisitions.lua    [new]
-      page_GuildProgression.lua     [new]
-      page_GuildAdmin.lua           [new]
-      window_Guild.lua              [new]
+      page_GuildRequisitions.lua
+      page_GuildProgression.lua
+      page_GuildAdmin.lua
+      window_Guild.lua
 
   ui/
     windows/
-      window_LauncherMenu.lua       [modify]
+      window_LauncherMenu.lua
 
     editor/
       pages/
-        page_Achievement.lua        [complete]
-        page_GuildSetting.lua       [new]
+        page_Achievement.lua
+        page_GuildSetting.lua        [externally Guild Ranks]
 
       inspectors/
         page_InspectorAchievement.lua
         page_InspectorGuildSetting.lua
 
       windows/
-        window_DataEditor.lua       [modify]
+        window_DataEditor.lua
 
-RPEngine_Dev.toc                    [modify]
+RPEngine_Dev.toc
 ```
-
-Exact naming can follow implementation preference, but responsibilities should remain separated this way.
 
 ---
 
-# 45. Phase 1 — UI and Data Layer
+# 45. Phase 1 — UI and Data Layer — Complete Baseline
 
-## Data
+Phase 1 established:
 
-Implement:
-
-- normalized Achievement criteria schema;
+- normalized Achievement criteria;
 - stable criterion IDs;
-- `GuildSetting` class;
-- `guildSettings` dataset collection;
-- `profile.achievements`;
-- `profile.guild`;
-- Profile schema update;
-- Dataset schema update;
-- Registry Achievement/GuildSetting resolvers;
-- Dependency discovery/rewrite support.
+- internal `GuildSetting` class and dataset collection;
+- Profile Achievement/Guild state;
+- Registry/dependency support;
+- Achievement Data Editor authoring;
+- GuildSetting Data Editor authoring;
+- read-only Profile Achievements;
+- read-only Guild Requisitions/Progression/Admin shell;
+- guild roster display and WoW officer gating;
+- Launcher and `/rpe guild` integration.
 
-## Character UI
+The Guild Rank revision builds on this baseline rather than restarting it.
 
-Implement:
+---
 
-- Profile → Achievements tab;
-- empty/read-only Achievement presentation;
-- Guild window;
-- Requisitions page shell;
-- Progression page shell;
-- Admin page shell;
-- guild roster display;
-- officer access state.
+# 46. Phase 2 — Guild Rank Revision, Requisitions and Daily Rewards
 
-## Data Editor
-
-Implement:
-
-- functional Achievement list/grid;
-- Achievement inspector;
-- Achievement criteria editor;
-- GuildSetting page;
-- GuildSetting inspector;
-- Requisition definitions;
-- Daily reward definitions;
-- Progression definitions.
-
-## Navigation
+Before transactional Guild features are activated, refactor the Phase 1 Guild model to the revised RPE Guild Rank semantics.
 
 Implement:
 
 ```text
-Launcher → Guild
-/rpe guild
+External Guild Rank terminology
+wowGuildRankIndices model/editor
+Profile assignedRankRef state
+Applicable Guild Rank catalogue
+WoW-rank eligibility filtering
+Manual officer rank assignment
+Remote validation/acknowledgement
+Assigned-rank Guild UI states
+Rank-scoped Requisitions
+Rank-scoped Daily Rewards
+One daily claim per guild/calendar day
 ```
 
-## Acceptance Criteria
-
-Phase 1 is complete when:
+Acceptance includes:
 
 ```text
-Existing Profiles load without errors.
+One WoW guild rank can offer multiple assignable RPE Guild Ranks.
 
-Achievement/Guild Profile state survives /reload.
+No RPE Guild Rank is automatically assigned on login, guild join, WoW rank
+change or dataset activation.
 
-GuildSetting exports and imports as part of a Dataset.
+A non-officer cannot assign an RPE Guild Rank.
 
-Cross-dataset GuildSetting references create dependencies.
+The target client rejects a rank not valid for its own live WoW guild rank.
 
-Achievements can actually be authored in the Data Editor.
+No assigned rank produces a clean non-transactional empty state.
 
-Achievements appear in the Profile page even though automatic
-progression is not active yet.
+An invalid/stale assignment is surfaced and never silently remapped.
 
-Guild window opens with all three tabs.
+Only the assigned valid RPE Guild Rank contributes Requisitions and Daily
+Rewards.
 
-Guild roster is shown in Admin.
+Changing rank after claiming a Daily Reward does not grant a second reward
+on the same calendar day.
 
-Normal members cannot use Admin controls.
-
-No active GuildSetting produces a clean empty state.
-
-Conflicting GuildSettings produce a clear error state.
+Requisition transactions remain atomic and use existing Currency/Inventory APIs.
 ```
 
 ---
 
-# 46. Phase 2 — Guild Requisitions and Daily Rewards
+# 47. Phase 3 — Achievements and General Guild Administration
 
-Implement:
-
-- active GuildSetting resolution;
-- Requisition eligibility;
-- rank gating;
-- arbitrary RPE currency costs;
-- multiple currency costs;
-- per-character lifetime limits;
-- transactional purchase handling;
-- item grants through Inventory;
-- Daily Reward validation;
-- item rewards;
-- currency rewards;
-- daily claim ledger;
-- runtime login/guild event integration;
-- Requisitions UI refresh.
-
-## Acceptance Criteria
-
-A player cannot:
-
-```text
-requisition while the feature is disabled;
-
-requisition while outside the configured guild;
-
-requisition below the required guild rank;
-
-requisition without sufficient currency;
-
-exceed the per-character limit;
-
-receive the daily reward twice through /reload;
-
-receive a partial requisition after a failed transaction.
-```
-
-Successful claims persist across relogging.
-
-Built-in and dataset-defined currencies both work.
-
----
-
-# 47. Phase 3 — Achievements and Guild Administration
-
-Implement the Achievement runtime.
-
-Initial automatic triggers:
+Implement the Achievement runtime with initial triggers:
 
 ```text
 currency_gain
@@ -2052,10 +1715,9 @@ Implement:
 - meta/dependency completion;
 - completion timestamps;
 - Profile UI progress display;
-- visible Guild achievement announcements;
-- visible Raid achievement announcements.
+- Guild/Raid achievement announcements.
 
-Then activate Guild Admin:
+Extend Guild Admin beyond rank assignment:
 
 ```text
 member query
@@ -2066,82 +1728,37 @@ request acknowledgement
 receiver permission validation
 ```
 
-Add required RPE Comms operations.
-
-## Acceptance Criteria
-
-```text
-Currency gains update the correct criterion by the actual amount gained.
-
-Currency spending does not count as earning currency.
-
-A lethal preview does not award a kill.
-
-Only an authoritative alive → dead RPE event transition awards a kill.
-
-The kill is credited only to the correct local player.
-
-Repeated updates to a dead EventUnit do not produce extra kills.
-
-Completed achievements survive relogging.
-
-Completed achievements are not announced again at login.
-
-Meta achievements complete correctly.
-
-Achievements announce to Guild when appropriate.
-
-Achievements announce to Raid when appropriate.
-
-A normal guild member cannot perform an Admin mutation merely by
-calling the underlying message function.
-
-Invalid Skill/Achievement/Item references are rejected.
-
-An officer receives explicit success/failure acknowledgement.
-
-Item administration goes through RPE Inventory.
-
-Skill administration goes through RPE Profile APIs.
-```
+All Guild Admin operations use the same targeted, receiver-validated protocol established for manual RPE Guild Rank assignment.
 
 ---
 
-# 48. Phase 4 — Guild Progression
+# 48. Phase 4 — Rank-Scoped Guild Progression
 
 Implement:
 
-- progression slot definitions;
-- progression entries;
+- progression slots and entries defined per RPE Guild Rank;
 - unlocked/locked state;
 - narrative/locked text;
 - spell selections;
-- persisted character progression state;
-- Progression UI;
-- officer progression administration;
+- persisted progression state keyed by RPE Guild Rank ref;
+- Progression UI for the assigned rank;
+- officer Progression administration;
 - remote progression mutations through Guild Admin.
 
-Optional automatic requirements can reuse the Achievement trigger/criteria infrastructure rather than introducing another event framework.
-
-## Acceptance Criteria
+Acceptance includes:
 
 ```text
-Progression state survives /reload.
+Only the assigned valid RPE Guild Rank's progression is active/displayed.
+
+Changing RPE Guild Rank does not delete previous rank-scoped progression state.
 
 Dataset content controls names, descriptions and choices.
 
-Core contains no CrusadeToolkit-specific rank/oath terminology.
-
 Locked entries cannot be selected.
 
-Selected spells must be present in the configured entry.
+Selected spells must exist in the configured progression entry.
 
 Officer changes are validated by the target client.
-
-Different GuildSettings can define completely different progression trees.
-
-The default three-panel presentation reproduces the useful behaviour of
-CrusadeToolkit without imposing a three-entry data limit.
 ```
 
 ---
@@ -2161,6 +1778,9 @@ Native Blizzard Achievements
 Generic arbitrary Profile-field editing
 Arbitrary executable Lua contained in dataset criteria
 A cryptographically secure character database
+Automatic RPE Guild Rank assignment from WoW guild rank
+Automatic RPE Guild Rank hierarchy/inheritance
+Multiple simultaneously active RPE Guild Ranks for one character
 ```
 
 RPE SavedVariables remain fundamentally player-controlled.
@@ -2171,30 +1791,44 @@ RPE SavedVariables remain fundamentally player-controlled.
 
 **Achievement definitions remain Dataset data; progress remains Profile data.**
 
-**Existing `Achievement.criteria` becomes the central progression model instead of importing CrusadeToolkit's top-level single/counter/checklist/meta state model.**
+**Existing `Achievement.criteria` remains the central Achievement progression model.**
 
 **All RPE object references use existing dataset-qualified references.**
 
-**GuildSettings become normal dataset entries and participate in RPE dependency analysis.**
+**The internal `GuildSetting` class/collection is retained for compatibility, but the feature is exposed to users as RPE Guild Rank.**
+
+**A guild has a catalogue of RPE Guild Ranks rather than one active GuildSetting.**
+
+**One WoW guild rank may map to multiple RPE Guild Ranks.**
+
+**A character has at most one assigned RPE Guild Rank per guild.**
+
+**The assigned RPE Guild Rank is set manually by a WoW guild officer and is never inferred automatically.**
+
+**WoW guild rank mapping constrains valid officer assignments; it does not select an RPE Guild Rank.**
+
+**Multiple RPE Guild Ranks matching the same WoW guild rank are expected and are not a conflict.**
+
+**Each RPE Guild Rank independently owns its Requisitions, Daily Rewards and Progression.**
+
+**There is no implicit cross-rank inheritance.**
 
 **Items remain in `RPEngineInventoryDB`; Guild systems use `Client.Inventory.AddItem()`.**
 
-**Currencies use the existing Profile currency APIs.**
+**Currencies use existing Profile currency APIs.**
 
-**Skills use the existing Profile skill APIs.**
+**Skills use existing Profile skill APIs.**
 
-**Currency Achievements trigger from `Profile.AddCurrencyAmount()`, not arbitrary currency assignment.**
+**RPE kill Achievements trigger from the authoritative alive→dead resource-delta transition.**
 
-**RPE kill Achievements trigger from the authoritative resource-delta alive→dead transition, not the preliminary damage preview.**
+**Guild Admin extends RPE's existing Comms system and uses targeted addon whispers.**
 
-**Guild Admin extends RPE's existing Comms opcode system and uses targeted addon whispers.**
+**The member's own client validates and applies every officer mutation, including RPE Guild Rank assignment.**
 
-**The member's own client validates and applies every officer mutation.**
-
-**Daily rewards are calendar-day based and idempotent.**
+**Daily rewards are calendar-day based and cannot be duplicated by changing rank.**
 
 **Requisition validation exists in the transaction layer, not merely the UI.**
 
-**CrusadeToolkit's progression panel/unlock/ability-choice behaviour is generalized into Dataset-driven Guild progression rather than copied with its campaign-specific terminology.**
+**Rank changes preserve previous rank-scoped requisition/progression history rather than deleting it.**
 
-This fits the new functionality into RPE 2's current architecture without creating parallel storage, UI, messaging, currency, inventory or event systems.
+This revision preserves the completed Phase 1 architecture while changing the Guild model from a single guild-wide setting into a manually assigned, dataset-driven RPE Guild Rank system.
