@@ -7,12 +7,134 @@ Addon.Internal.Database.Classes = Addon.Internal.Database.Classes or {}
 local Achievement = {}
 Achievement.__index = Achievement
 
+local SUPPORTED_TRIGGERS = {
+    manual = true,
+    currency_gain = true,
+    rpe_kill = true,
+    rpe_event_complete = true,
+    achievement_earned = true,
+}
+
+local function ensureString(value)
+    if value == nil then
+        return ""
+    end
+
+    return tostring(value)
+end
+
+local function trimText(value)
+    local text = ensureString(value)
+    text = text:gsub("^%s+", "")
+    text = text:gsub("%s+$", "")
+    return text
+end
+
+local function deepCopy(value)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local copy = {}
+    for key, nestedValue in pairs(value) do
+        copy[key] = deepCopy(nestedValue)
+    end
+
+    return copy
+end
+
+local function normalizeTrigger(value)
+    local trigger = string.lower(trimText(value))
+    if SUPPORTED_TRIGGERS[trigger] then
+        return trigger
+    end
+
+    return "manual"
+end
+
+local function normalizeGoal(value)
+    local numericGoal = tonumber(value)
+    if not numericGoal or numericGoal ~= numericGoal or numericGoal == math.huge or numericGoal == -math.huge then
+        return 1
+    end
+
+    local goal = math.floor(numericGoal)
+    return math.max(1, goal)
+end
+
+local function normalizeFilters(value)
+    if type(value) ~= "table" then
+        return {}
+    end
+
+    return deepCopy(value)
+end
+
+local function normalizeCriterionId(value, index, usedIds)
+    local baseId = trimText(value)
+    if baseId == "" then
+        baseId = ("criterion_%d"):format(index)
+    end
+
+    local criterionId = baseId
+    local suffix = 2
+    while usedIds[criterionId] do
+        criterionId = ("%s_%d"):format(baseId, suffix)
+        suffix = suffix + 1
+    end
+
+    usedIds[criterionId] = true
+    return criterionId
+end
+
+local function normalizeCriterion(value, index, usedIds)
+    local source = type(value) == "table" and value or {}
+
+    return {
+        id = normalizeCriterionId(source.id, index, usedIds),
+        description = ensureString(source.description),
+        trigger = normalizeTrigger(source.trigger),
+        goal = normalizeGoal(source.goal),
+        filters = normalizeFilters(source.filters),
+    }
+end
+
+local function normalizeCriteria(value)
+    if type(value) ~= "table" then
+        return {}
+    end
+
+    local criteria = {}
+    local usedIds = {}
+    for index = 1, #value do
+        criteria[index] = normalizeCriterion(value[index], index, usedIds)
+    end
+
+    return criteria
+end
+
+local function normalizeTags(value)
+    if type(value) ~= "table" then
+        return {}
+    end
+
+    local tags = {}
+    for index = 1, #value do
+        local tag = trimText(value[index])
+        if tag ~= "" then
+            tags[#tags + 1] = tag
+        end
+    end
+
+    return tags
+end
+
 function Achievement:New(data)
     return setmetatable({
         id = nil,
         name = "",
         description = "",
-        icon = nil,
+        icon = "",
         criteria = {},
         rewards = {},
         tags = {},
@@ -28,18 +150,25 @@ function Achievement:Merge(data)
         self[key] = value
     end
 
+    self.name = ensureString(self.name)
+    self.description = ensureString(self.description)
+    self.icon = ensureString(self.icon)
+    self.criteria = normalizeCriteria(self.criteria)
+    self.rewards = type(self.rewards) == "table" and deepCopy(self.rewards) or {}
+    self.tags = normalizeTags(self.tags)
+
     return self
 end
 
 function Achievement:ToTable()
     return {
         id = self.id,
-        name = self.name,
-        description = self.description,
-        icon = self.icon,
-        criteria = self.criteria,
-        rewards = self.rewards,
-        tags = self.tags,
+        name = ensureString(self.name),
+        description = ensureString(self.description),
+        icon = ensureString(self.icon),
+        criteria = normalizeCriteria(self.criteria),
+        rewards = type(self.rewards) == "table" and deepCopy(self.rewards) or {},
+        tags = normalizeTags(self.tags),
     }
 end
 
