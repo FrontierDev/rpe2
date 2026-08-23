@@ -22,13 +22,12 @@ local function commitSelectedDamageSchool(self, mutate)
         return
     end
 
+    local before = self:DeepCopyValue(damageSchool)
     mutate(damageSchool, dataset)
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "damageSchools", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, damageSchool) then
+        return
     end
-    self:RefreshAfterDatasetEntryChanged("damageSchools")
+    self:QueuePendingDatasetEntryChanged(dataset.id, "damageSchools")
 end
 
 local function normalizeDamageSchoolColor(color)

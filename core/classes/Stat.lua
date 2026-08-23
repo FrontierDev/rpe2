@@ -9,7 +9,7 @@ Stat.__index = Stat
 
 local function normalizeDisplayMode(value)
     local mode = tostring(value or "signed_value")
-    if mode == "value" or mode == "signed_percent" then
+    if mode == "value" or mode == "signed_percent" or mode == "equip" or mode == "equip_percent" then
         return mode
     end
 

@@ -12,6 +12,22 @@ local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local ResourceSync = Addon.Internal and Addon.Internal.Comms and Addon.Internal.Comms.ResourceSync or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
 
+local function getTimings()
+    return Addon.Debug and Addon.Debug.Timings or nil
+end
+
+local function measureEventWidgetTiming(label, fn)
+    local timings = getTimings()
+    if type(timings) ~= "table" or type(timings.Measure) ~= "function" or type(fn) ~= "function" then
+        return fn()
+    end
+
+    return timings:Measure(label, fn, {
+        context = "event-widget",
+        thresholdMs = 15,
+    })
+end
+
 local function getEventClass()
     return Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Event or nil
 end
@@ -219,7 +235,7 @@ local INACTIVE_PORTRAIT_ALPHA = 0.4
 local ACTIVE_PORTRAIT_ALPHA = 1
 local COMBAT_LOG_TOP_OFFSET = -12
 local COMBAT_LOG_PANEL_HEIGHT = 34
-local COMBAT_LOG_TIME_VISIBLE = 3
+local COMBAT_LOG_TIME_VISIBLE = 5
 local COMBAT_LOG_FADE_IN_DURATION = 0.18
 local COMBAT_LOG_FADE_OUT_DURATION = 0.22
 local TOOLTIP_HINT_COLOR = { r = 0.38, g = 0.9, b = 0.42, a = 1 }
@@ -687,7 +703,7 @@ local function formatTooltipResourceValue(state)
 
     currentValue = tonumber(currentValue) or 0
     maxValue = tonumber(maxValue) or currentValue
-    return ("%g / %g"):format(currentValue, maxValue)
+    return ("%.0f / %.0f"):format(currentValue, maxValue)
 end
 
 local function buildPortraitTooltipResourceLine(state)
@@ -1923,13 +1939,15 @@ function EventWidget:Refresh(reason)
     if self.turnStatusText and self.turnStatusText.SetText then
         self.turnStatusText:SetText(tostring(math.max(1, tonumber(state.turnNumber) or 1)))
     end
+    local startupPending = state.unitsReady ~= true or state.startupReady ~= true
+    local startupPhase = tostring(state.startupPhase or (state.unitsReady == true and "syncing-local" or "waiting-units"))
     if self.waitingPanel and self.waitingPanel.GetFrame then
         local waitingFrame = self.waitingPanel:GetFrame()
         if waitingFrame then
-            if state.unitsReady == true then
-                waitingFrame:Hide()
-            else
+            if startupPending then
                 waitingFrame:Show()
+            else
+                waitingFrame:Hide()
             end
         end
     end
@@ -1939,9 +1957,7 @@ function EventWidget:Refresh(reason)
         local waitingFrame = self.waitingPanel and self.waitingPanel.GetFrame and self.waitingPanel:GetFrame() or nil
         if portraitFrame and headerFrame then
             portraitFrame:ClearAllPoints()
-            if state.unitsReady == true then
-                portraitFrame:SetPoint("TOP", headerFrame, "BOTTOM", 0, PORTRAIT_TOP_OFFSET)
-            elseif waitingFrame then
+            if startupPending and waitingFrame then
                 portraitFrame:SetPoint("TOP", waitingFrame, "BOTTOM", 0, PORTRAIT_TOP_OFFSET)
             else
                 portraitFrame:SetPoint("TOP", headerFrame, "BOTTOM", 0, PORTRAIT_TOP_OFFSET)
@@ -1949,12 +1965,49 @@ function EventWidget:Refresh(reason)
         end
     end
     if self.waitingText and self.waitingText.SetText then
-        self.waitingText:SetText(state.unitsReady == true and "" or "Waiting for Server")
+        local waitingText = ""
+        if startupPending then
+            if startupPhase == "starting" then
+                waitingText = "Starting Event"
+            elseif startupPhase == "waiting-state" then
+                waitingText = "Waiting for Server State"
+            elseif startupPhase == "syncing-local" then
+                waitingText = "Preparing Event"
+            else
+                waitingText = "Waiting for Event Units"
+            end
+        end
+        self.waitingText:SetText(waitingText)
     end
     if self.turnProgressBar and self.turnProgressBar.SetMinMax and self.turnProgressBar.SetValue then
         local progressFrame = self.turnProgressBar.GetFrame and self.turnProgressBar:GetFrame() or nil
 
-        if state.unitsReady == true then
+        if startupPending then
+            local expectedCount = math.max(
+                0,
+                tonumber(state.startupProgressExpected)
+                    or tonumber(state.readyProgressExpected)
+                    or tonumber(state.unitsChunkExpected)
+                    or 0
+            )
+            local receivedCount = math.max(
+                0,
+                tonumber(state.startupProgressReceived)
+                    or tonumber(state.readyProgressReceived)
+                    or tonumber(state.unitsChunkReceived)
+                    or 0
+            )
+            if expectedCount > 0 then
+                self.turnProgressBar:SetMinMax(0, expectedCount)
+                self.turnProgressBar:SetValue(math.min(receivedCount, expectedCount))
+            else
+                self.turnProgressBar:SetMinMax(0, 1)
+                self.turnProgressBar:SetValue(0)
+            end
+            if progressFrame and progressFrame.Show then
+                progressFrame:Show()
+            end
+        else
             local totalTicks = math.max(0, tonumber(state.totalTicks) or 0)
             local tickNumber = math.max(0, tonumber(state.tickNumber) or 0)
             if totalTicks > 1 then
@@ -1965,19 +2018,6 @@ function EventWidget:Refresh(reason)
                 end
             elseif progressFrame and progressFrame.Hide then
                 progressFrame:Hide()
-            end
-        else
-            local expectedCount = math.max(0, tonumber(state.readyProgressExpected) or tonumber(state.unitsChunkExpected) or 0)
-            local receivedCount = math.max(0, tonumber(state.readyProgressReceived) or tonumber(state.unitsChunkReceived) or 0)
-            if expectedCount > 0 then
-                self.turnProgressBar:SetMinMax(0, expectedCount)
-                self.turnProgressBar:SetValue(math.min(receivedCount, expectedCount))
-            else
-                self.turnProgressBar:SetMinMax(0, 1)
-                self.turnProgressBar:SetValue(0)
-            end
-            if progressFrame and progressFrame.Show then
-                progressFrame:Show()
             end
         end
     end
@@ -1995,6 +2035,7 @@ function EventWidget:Refresh(reason)
             and type(Addon.Server.EndEvent) == "function"
         local canAdvance = isHost == true
             and state.unitsReady == true
+            and state.startupReady == true
             and type(Addon.Server) == "table"
             and type(Addon.Server.AdvanceEventStep) == "function"
         if controlRowFrame then
@@ -2105,7 +2146,9 @@ function EventWidget:Refresh(reason)
 end
 
 function Client:BuildEventWidget()
-    return EventWidget:Get():Build()
+    return measureEventWidgetTiming("BuildEventWidget", function()
+        return EventWidget:Get():Build()
+    end)
 end
 
 function Client:ShowEventWidget()
@@ -2117,9 +2160,13 @@ function Client:HideEventWidget()
 end
 
 function Client:RefreshEventWidget(reason)
-    return EventWidget:Get():Refresh(reason)
+    return measureEventWidgetTiming("RefreshEventWidget", function()
+        return EventWidget:Get():Refresh(reason)
+    end)
 end
 
 function Client:RefreshEventWidgetPortraits(eventIds, reason)
-    return EventWidget:Get():RefreshPortraitsForEventIds(eventIds, reason)
+    return measureEventWidgetTiming("RefreshEventWidgetPortraits", function()
+        return EventWidget:Get():RefreshPortraitsForEventIds(eventIds, reason)
+    end)
 end

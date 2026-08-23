@@ -1448,6 +1448,17 @@ function Dependecies.HandleDatasetDeleted(datasetId)
                     end
                 end
             end
+            if type(profile) == "table" and type(profile.recipebook) == "table" then
+                for index = #profile.recipebook, 1, -1 do
+                    local sourceDatasetId = Dependecies.ParseSourceStatRef(profile.recipebook[index])
+                    if sourceDatasetId == datasetId then
+                        table.remove(profile.recipebook, index)
+                    end
+                end
+            end
+            if type(profile) == "table" then
+                profile.recipeKnowledge = {}
+            end
             if type(profile) == "table" and type(profile.mountedActionBar) == "table" then
                 for slotIndex, spellRef in pairs(profile.mountedActionBar) do
                     local sourceDatasetId = Dependecies.ParseSourceStatRef(spellRef)
@@ -1734,14 +1745,26 @@ function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
                         end
                     end
                 end
+                if type(profile) == "table" then
+                    profile.recipeKnowledge = {}
+                end
             end
         end
-    elseif collectionKey == "spells" or collectionKey == "mounts" or collectionKey == "pets" or collectionKey == "itemSlots" then
+    elseif collectionKey == "recipes" or collectionKey == "spells" or collectionKey == "mounts" or collectionKey == "pets" or collectionKey == "itemSlots" then
         local profilesRoot = getProfilesRoot()
         local profiles = type(profilesRoot) == "table" and profilesRoot.profiles or nil
         if type(profiles) == "table" then
             for _, profile in pairs(profiles) do
-                if collectionKey == "spells" and type(profile) == "table" and type(profile.mountedActionBar) == "table" then
+                if collectionKey == "recipes" and type(profile) == "table" then
+                    if type(profile.recipebook) == "table" then
+                        for index = #profile.recipebook, 1, -1 do
+                            if tostring(profile.recipebook[index] or "") == deletedRef then
+                                table.remove(profile.recipebook, index)
+                            end
+                        end
+                    end
+                    profile.recipeKnowledge = {}
+                elseif collectionKey == "spells" and type(profile) == "table" and type(profile.mountedActionBar) == "table" then
                     for slotIndex, spellRef in pairs(profile.mountedActionBar) do
                         if tostring(spellRef or "") == deletedRef then
                             profile.mountedActionBar[slotIndex] = nil

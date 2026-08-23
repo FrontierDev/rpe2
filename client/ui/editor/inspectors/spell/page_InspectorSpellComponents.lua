@@ -945,6 +945,27 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
     self.SpellInspectorResourceEffectGroup:AddChild(self.SpellInspectorResourceEffectDropdown)
     attachMouseWheel(self.SpellInspectorResourceEffectDropdown)
 
+    self.SpellInspectorResourceAmountModeGroup = createGroup("RPEDataEditorSpellInspectorResourceAmountModeGroup", "Amount Mode")
+    self.SpellInspectorResourceAmountModeDropdown = UI.CreateDropdown(self.SpellInspectorResourceAmountModeGroup:GetFrame(), "RPEDataEditorSpellInspectorResourceAmountModeDropdown", {
+        width = self.SpellInspectorFieldWidth,
+        height = 18,
+        items = self:GetSpellInspectorAmountModeItems(),
+        onValueChanged = function(value)
+            if self._refreshingSpellInspector then
+                return
+            end
+
+            local component = self:GetSelectedSpellInspectorComponent()
+            if component then
+                self:CommitSelectedSpell(function()
+                    component.effect.amountMode = value
+                end)
+            end
+        end,
+    })
+    self.SpellInspectorResourceAmountModeGroup:AddChild(self.SpellInspectorResourceAmountModeDropdown)
+    attachMouseWheel(self.SpellInspectorResourceAmountModeDropdown)
+
     self.SpellInspectorSummonPetUnitGroup = createGroup("RPEDataEditorSpellInspectorSummonPetUnitGroup", "Summoned Unit", 18)
     self.SpellInspectorSummonPetUnitDropdown = UI.CreateDropdown(self.SpellInspectorSummonPetUnitGroup:GetFrame(), "RPEDataEditorSpellInspectorSummonPetUnitDropdown", {
         width = self.SpellInspectorFieldWidth,

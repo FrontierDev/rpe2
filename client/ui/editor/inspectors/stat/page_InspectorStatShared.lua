@@ -15,7 +15,7 @@ end
 
 function DataEditor:NormalizeStatDisplayMode(value)
     local mode = tostring(value or "signed_value")
-    if mode == "value" or mode == "signed_percent" then
+    if mode == "value" or mode == "signed_percent" or mode == "equip" or mode == "equip_percent" then
         return mode
     end
 
@@ -297,17 +297,16 @@ function DataEditor:CommitSelectedStat(mutate)
         return
     end
 
+    local before = self:DeepCopyValue(stat)
     mutate(stat, dataset)
     stat.derivedSources = self:GetStatInspectorDerivedSources(stat)
     stat.sourceStatRef = nil
 
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "stats", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, stat) then
+        return
     end
 
-    self:RefreshAfterDatasetEntryChanged("stats")
+    self:QueuePendingDatasetEntryChanged(dataset.id, "stats")
 end
 
 function DataEditor:SetStatInspectorTab(tabKey)

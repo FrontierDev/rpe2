@@ -27,6 +27,28 @@ local function refreshEventManagePage()
     end
 end
 
+local function getTimings()
+    return Addon.Debug and Addon.Debug.Timings or nil
+end
+
+local function startTiming(label, options)
+    local timings = getTimings()
+    if type(timings) ~= "table" or type(timings.Start) ~= "function" then
+        return nil
+    end
+
+    return timings:Start(label, options)
+end
+
+local function stopTiming(timer)
+    local timings = getTimings()
+    if type(timer) == "table" and type(timings) == "table" and type(timings.Stop) == "function" then
+        return timings:Stop(timer)
+    end
+
+    return 0, false
+end
+
 local function deepCopy(value)
     if type(value) ~= "table" then
         return value
@@ -1499,8 +1521,13 @@ function Server:ClearEventNpcUnits()
 end
 
 function Server:StartEvent(data)
+    local totalTimer = startTiming("Server:StartEvent", {
+        context = "event-start",
+        thresholdMs = 50,
+    })
     local sessionState = self:GetState()
     if not sessionState or sessionState.active ~= true or not sessionState.channelName then
+        stopTiming(totalTimer)
         return nil
     end
 
@@ -1508,6 +1535,7 @@ function Server:StartEvent(data)
         if Addon.Debug and Addon.Debug.Warn then
             Addon.Debug.Warn("StartEvent blocked: one or more connected clients have dataset or ruleset hash mismatches.")
         end
+        stopTiming(totalTimer)
         return nil
     end
 
@@ -1540,6 +1568,17 @@ function Server:StartEvent(data)
     elseif draftState then
         sourceUnits = draftState.units
     end
+    local buildUnitsTimer = startTiming("buildEventUnits", {
+        context = "event-start",
+        thresholdMs = 15,
+    })
+    local eventUnits = buildEventUnits(sessionState, sourceUnits, hostName)
+    stopTiming(buildUnitsTimer)
+
+    local buildStateTimer = startTiming("buildEventState", {
+        context = "event-start",
+        thresholdMs = 10,
+    })
     local eventState = buildEventState({
         id = eventData.id or buildEventId(),
         name = eventName,
@@ -1550,7 +1589,7 @@ function Server:StartEvent(data)
         startedAt = tonumber(eventData.startedAt) or Common.GetNow(),
         endedAt = 0,
         active = true,
-        units = buildEventUnits(sessionState, sourceUnits, hostName),
+        units = eventUnits,
         difficulty = eventDifficulty,
         teams = eventTeams,
         eventAuras = eventAuras,
@@ -1563,8 +1602,13 @@ function Server:StartEvent(data)
     })
     markEventUnitsPending(eventState)
     normalizeEventStepState(eventState)
+    stopTiming(buildStateTimer)
 
     self.EventState = eventState
+    local buildDraftTimer = startTiming("buildEventDraftState", {
+        context = "event-start",
+        thresholdMs = 10,
+    })
     self.EventDraftState = buildEventState({
         id = nil,
         name = eventName,
@@ -1587,9 +1631,14 @@ function Server:StartEvent(data)
         lootRefs = cloneStringList(eventState.lootRefs),
         teamColors = eventTeamColors,
     })
+    stopTiming(buildDraftTimer)
 
     local broadcasted = false
     if sessionState.channelId then
+        local broadcastTimer = startTiming("broadcastEventStart", {
+            context = "event-start",
+            thresholdMs = 15,
+        })
         broadcasted = Comms:SendToChannel(
             sessionState.channelId,
             EVENT_START_OPCODE,
@@ -1610,10 +1659,12 @@ function Server:StartEvent(data)
             buildEventStateArguments(eventState),
             buildSendMetadata(EVENT_STATE_OPCODE)
         )
+        stopTiming(broadcastTimer)
     end
 
     eventState.broadcasted = broadcasted
     refreshEventManagePage()
+    stopTiming(totalTimer)
     return eventState
 end
 

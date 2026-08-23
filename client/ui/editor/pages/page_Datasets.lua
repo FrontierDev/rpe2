@@ -6,6 +6,47 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
+local Registry = Addon.Internal and Addon.Internal.Registry or {}
+
+local DATASET_TYPE_ITEMS = {
+    { label = "General", value = "general" },
+    { label = "Campaign", value = "campaign" },
+    { label = "Crafting", value = "crafting" },
+    { label = "Class", value = "class" },
+    { label = "Items", value = "items" },
+}
+
+local DATASET_TYPE_LABELS = {
+    general = "General",
+    campaign = "Campaign",
+    crafting = "Crafting",
+    class = "Class",
+    items = "Items",
+}
+
+local DATASET_TYPE_ICONS = {
+    general = "Interface\\ICONS\\INV_Misc_Book_09",
+    campaign = "Interface\\ICONS\\Achievement_Quests_Completed_08",
+    crafting = "Interface\\ICONS\\Trade_BlackSmithing",
+    class = "Interface\\ICONS\\Achievement_Level_10",
+    items = "Interface\\ICONS\\INV_Misc_Bag_08",
+}
+
+local function getDatasetTypeLabel(datasetType)
+    local normalized = tostring(datasetType or "general")
+    return DATASET_TYPE_LABELS[normalized] or DATASET_TYPE_LABELS.general
+end
+
+local function getDatasetTypeIcon(datasetType)
+    local normalized = tostring(datasetType or "general")
+    return DATASET_TYPE_ICONS[normalized] or DATASET_TYPE_ICONS.general
+end
+
+local function buildDatasetListLabel(self, dataset)
+    local icon = getDatasetTypeIcon(dataset and dataset.datasetType)
+    local name = self:GetDatasetDisplayName(dataset)
+    return ("  |T%s:12:12:0:0|t %s"):format(icon, name)
+end
 
 local function buildDatasetStatus(dataset)
     if not dataset then
@@ -50,8 +91,7 @@ local function buildDatasetTooltip(self, dataset)
         return nil
     end
 
-    local lockState = dataset.lockState ~= nil and tostring(dataset.lockState) or "open"
-    local tagState = dataset.tagState ~= nil and tostring(dataset.tagState) or "standard"
+    local datasetType = getDatasetTypeLabel(dataset.datasetType)
     local activated = self:IsDatasetActivated(dataset.id)
     local dependencyNames = {}
     local dependencies = dataset.dependencies or {}
@@ -68,43 +108,88 @@ local function buildDatasetTooltip(self, dataset)
         lines = {
             ("ID: %s"):format(dataset.id or "-"),
             ("Group: %s"):format(buildDatasetGroupLabel(self, dataset)),
+            ("Type: %s"):format(datasetType),
             ("State: %s"):format(activated and "Activated" or "Inactive"),
-            ("Lock: %s"):format(lockState),
-            ("Tag: %s"):format(tagState),
             ("Depends On: %s"):format(#dependencyNames > 0 and table.concat(dependencyNames, ", ") or "-"),
         },
     }
 end
 
-local function commitDatasetName(self)
-    local dataset = self:GetSelectedDataset()
-    if not dataset or not self.DatasetPaneNameInput or not self.Database or not self.Database.RenameDataset then
-        return
+local function resolveRecipeOutputName(recipe)
+    local itemRef = recipe and recipe.output and recipe.output.itemRef or nil
+    if itemRef == nil or itemRef == "" or type(Registry.ResolveItemReference) ~= "function" then
+        return nil
     end
 
-    self.Database.RenameDataset(dataset.id, self.DatasetPaneNameInput:GetText())
-    self:RefreshAll()
+    local _, item = Registry:ResolveItemReference(itemRef)
+    local name = item and item.name ~= nil and tostring(item.name) or ""
+    if name == "" then
+        return nil
+    end
+
+    return name
 end
 
-local function commitDatasetGroupName(self)
-    local dataset = self:GetSelectedDataset()
-    if not dataset or not self.DatasetPaneGroupInput or not self.Database or not self.Database.UpdateDatasetMetadata then
-        return
+function DataEditor:RefreshDatasetRecipeNames(dataset)
+    if type(dataset) ~= "table" or not dataset.id then
+        return 0
     end
 
-    self.Database.UpdateDatasetMetadata(dataset.id, {
-        groupName = self.DatasetPaneGroupInput:GetText(),
+    local recipes = dataset.recipes or {}
+    local changed = 0
+    for index = 1, #recipes do
+        local recipe = recipes[index]
+        local outputName = resolveRecipeOutputName(recipe)
+        if outputName and tostring(recipe.name or "") ~= outputName then
+            recipe.name = outputName
+            changed = changed + 1
+        end
+    end
+
+    if changed <= 0 then
+        return 0
+    end
+
+    self:QueuePendingDatasetEntryChanged(dataset.id, "recipes", {
+        changeCount = changed,
+        reason = "recipe-names",
     })
-    self:RefreshAll()
+    if self.RefreshRecipeDataPage then
+        self:RefreshRecipeDataPage()
+    end
+    if self.RefreshRecipeInspectorPage then
+        self:RefreshRecipeInspectorPage()
+    end
+
+    return changed
 end
 
-local function updateDatasetMetadata(self, values)
-    local dataset = self:GetSelectedDataset()
-    if not dataset or not self.Database or not self.Database.UpdateDatasetMetadata then
+local function saveDatasetMetadataWindow(self)
+    local datasetId = self.MetadataWindowDatasetId
+    local database = self.Database
+    if not datasetId or not database then
         return
     end
 
-    self.Database.UpdateDatasetMetadata(dataset.id, values)
+    local name = self.DatasetMetadataNameInput and self.DatasetMetadataNameInput.GetText and self.DatasetMetadataNameInput:GetText() or ""
+    local groupName = self.DatasetMetadataGroupInput and self.DatasetMetadataGroupInput.GetText and self.DatasetMetadataGroupInput:GetText() or ""
+    local datasetType = self.DatasetMetadataTypeDropdown and self.DatasetMetadataTypeDropdown.GetSelectedValue and self.DatasetMetadataTypeDropdown:GetSelectedValue() or "general"
+
+    if database.RenameDataset then
+        database.RenameDataset(datasetId, name)
+    end
+
+    if database.UpdateDatasetMetadata then
+        database.UpdateDatasetMetadata(datasetId, {
+            groupName = groupName,
+            datasetType = datasetType,
+        })
+    end
+
+    if self.DatasetMetadataWindow and self.DatasetMetadataWindow.Hide then
+        self.DatasetMetadataWindow:Hide()
+    end
+
     self:RefreshAll()
 end
 
@@ -176,7 +261,7 @@ function DataEditor:BuildDatasetsPane(parent)
         fitChildrenWidth = true,
         fitChildrenHeight = false,
     })
-    UI.Utils.AnchorFill(root, content, 0, 0, 0, 12)
+    UI.Utils.AnchorFill(root, content, 0, 0, 0, 0)
 
     local toolbar = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorDatasetsToolbar", {
         spacing = 8,
@@ -198,7 +283,9 @@ function DataEditor:BuildDatasetsPane(parent)
 
     local listPanel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorDatasetListPanel", {
         width = 160,
-        height = 126,
+        height = 300,
+        expandHeight = true,
+        weight = 1,
         contentInset = 2,
         showBorder = false,
     })
@@ -207,8 +294,8 @@ function DataEditor:BuildDatasetsPane(parent)
     self.DatasetList = UI.ScrollLayout:New({
         name = "RPEDataEditorDatasetList",
         width = 156,
-        height = 122,
-        visibleRows = 7,
+        height = 296,
+        visibleRows = 18,
         rowHeight = 16,
         rowSpacing = 0,
         border = false,
@@ -276,7 +363,7 @@ function DataEditor:BuildDatasetsPane(parent)
         local isActivated = dataset and dataset.id and self:IsDatasetActivated(dataset.id) or false
 
         if row.SetCategory then
-            row:SetCategory(("  %s"):format(self:GetDatasetDisplayName(dataset)))
+            row:SetCategory(buildDatasetListLabel(self, dataset))
         end
         if row.SetTestName then
             row:SetTestName("")
@@ -328,109 +415,6 @@ function DataEditor:BuildDatasetsPane(parent)
     self.DatasetList:Create()
     UI.Utils.AnchorFill(self.DatasetList, listPanel:GetContentFrame(), 0, 0, 0, 0)
 
-    local renamePanel = UI.CreatePanel(content, "RPEDataEditorDatasetRenamePanel", {
-        width = 152,
-        height = 154,
-        contentInset = 4,
-        showBorder = true,
-    })
-    renamePanel:GetFrame():ClearAllPoints()
-    renamePanel:GetFrame():SetPoint("BOTTOMLEFT", content, "BOTTOMLEFT", 0, 12)
-    renamePanel:GetFrame():SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -8, 12)
-
-    local detailsLayout = UI.CreateLayout(UI.VerticalLayoutGroup, renamePanel:GetContentFrame(), "RPEDataEditorDatasetDetailsLayout", {
-        spacing = 4,
-        fitChildrenWidth = true,
-        fitChildrenHeight = false,
-    })
-    UI.Utils.AnchorFill(detailsLayout, renamePanel:GetContentFrame(), 0, 0, 0, 0)
-
-    self.DatasetPaneNameInput = UI.CreateTextInput(detailsLayout:GetFrame(), "RPEDataEditorDatasetPaneNameInput", {
-        width = 136,
-        height = 24,
-        text = "",
-        borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    self.DatasetPaneNameInput:SetScript("OnEnterPressed", function()
-        commitDatasetName(self)
-    end)
-    self.DatasetPaneNameInput:SetScript("OnEditFocusLost", function()
-        commitDatasetName(self)
-    end)
-    detailsLayout:AddChild(self.DatasetPaneNameInput)
-
-    self.DatasetPaneGroupLabel = UI.CreateText(detailsLayout:GetFrame(), "RPEDataEditorDatasetPaneGroupLabel", "Group", {
-        fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
-        fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Body) or 8,
-        textColor = UI.ResolveColor(nil, "text.secondary"),
-        width = 136,
-        height = 12,
-        justifyH = "LEFT",
-    })
-    detailsLayout:AddChild(self.DatasetPaneGroupLabel)
-
-    self.DatasetPaneGroupInput = UI.CreateTextInput(detailsLayout:GetFrame(), "RPEDataEditorDatasetPaneGroupInput", {
-        width = 136,
-        height = 24,
-        text = "",
-        borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    self.DatasetPaneGroupInput:SetScript("OnEnterPressed", function()
-        commitDatasetGroupName(self)
-    end)
-    self.DatasetPaneGroupInput:SetScript("OnEditFocusLost", function()
-        commitDatasetGroupName(self)
-    end)
-    detailsLayout:AddChild(self.DatasetPaneGroupInput)
-
-    self.DatasetPaneIdText = UI.CreateText(detailsLayout:GetFrame(), "RPEDataEditorDatasetPaneIdText", "ID: -", {
-        fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
-        fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Body) or 8,
-        textColor = UI.ResolveColor(nil, "text.secondary"),
-        width = 136,
-        height = 12,
-        justifyH = "LEFT",
-    })
-    detailsLayout:AddChild(self.DatasetPaneIdText)
-
-    self.DatasetPaneAuthorText = UI.CreateText(detailsLayout:GetFrame(), "RPEDataEditorDatasetPaneAuthorText", "Author: -", {
-        fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
-        fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Body) or 8,
-        textColor = UI.ResolveColor(nil, "text.secondary"),
-        width = 136,
-        height = 12,
-        justifyH = "LEFT",
-    })
-    detailsLayout:AddChild(self.DatasetPaneAuthorText)
-
-    self.DatasetPaneLockDropdown = UI.CreateDropdown(detailsLayout:GetFrame(), "RPEDataEditorDatasetPaneLockDropdown", {
-        width = 136,
-        height = 18,
-        items = {
-            { label = "Open", value = "open" },
-            { label = "Readonly", value = "readonly" },
-            { label = "Secret", value = "secret" },
-        },
-        onValueChanged = function(value)
-            updateDatasetMetadata(self, { lockState = value })
-        end,
-    })
-    detailsLayout:AddChild(self.DatasetPaneLockDropdown)
-
-    self.DatasetPaneTagDropdown = UI.CreateDropdown(detailsLayout:GetFrame(), "RPEDataEditorDatasetPaneTagDropdown", {
-        width = 136,
-        height = 18,
-        items = {
-            { label = "Standard", value = "standard" },
-            { label = "Short-term", value = "short-term" },
-            { label = "Long-term", value = "long-term" },
-        },
-        onValueChanged = function(value)
-            updateDatasetMetadata(self, { tagState = value })
-        end,
-    })
-    detailsLayout:AddChild(self.DatasetPaneTagDropdown)
-
     self:RefreshDatasetsPane()
     return self.DatasetsPane
 end
@@ -442,9 +426,9 @@ function DataEditor:EnsureDatasetContextMenu()
 
     self.DatasetContextMenu = UI.ContextMenu:New({
         name = "RPEDataEditorDatasetContextMenu",
-        width = 140,
-        panelWidth = 140,
-        visibleRows = 4,
+        width = 170,
+        panelWidth = 170,
+        visibleRows = 7,
         rowHeight = 18,
         border = false,
         onItemInvoked = function(item, menu)
@@ -456,6 +440,21 @@ function DataEditor:EnsureDatasetContextMenu()
 
             if action == "toggle-activation" then
                 self:SetDatasetActivated(datasetId, not self:IsDatasetActivated(datasetId))
+            elseif action == "edit-metadata" then
+                self:ShowDatasetMetadataWindow(datasetId)
+            elseif action == "regenerate-spell-templates" then
+                local dataset = self.Database and self.Database.GetDatasetByID and self.Database.GetDatasetByID(datasetId) or nil
+                if dataset and type(self.RegenerateDatasetSpellTemplates) == "function" then
+                    self:RegenerateDatasetSpellTemplates(dataset)
+                end
+            elseif action == "regenerate-aura-templates" then
+                local dataset = self.Database and self.Database.GetDatasetByID and self.Database.GetDatasetByID(datasetId) or nil
+                if dataset and type(self.RegenerateDatasetAuraTemplates) == "function" then
+                    self:RegenerateDatasetAuraTemplates(dataset)
+                end
+            elseif action == "refresh-recipe-names" then
+                local dataset = self.Database and self.Database.GetDatasetByID and self.Database.GetDatasetByID(datasetId) or nil
+                self:RefreshDatasetRecipeNames(dataset)
             elseif action == "export" then
                 self:ExportDatasetToClipboard(datasetId)
             elseif action == "delete" then
@@ -487,6 +486,22 @@ function DataEditor:ShowDatasetContextMenu(anchorFrame, dataset)
             value = "toggle-activation",
         },
         {
+            label = "Edit Metadata",
+            value = "edit-metadata",
+        },
+        {
+            label = "Regenerate Spells",
+            value = "regenerate-spell-templates",
+        },
+        {
+            label = "Regenerate Auras",
+            value = "regenerate-aura-templates",
+        },
+        {
+            label = "Refresh Recipe Names",
+            value = "refresh-recipe-names",
+        },
+        {
             label = "Export",
             value = "export",
         },
@@ -498,38 +513,178 @@ function DataEditor:ShowDatasetContextMenu(anchorFrame, dataset)
     menu:ShowAt(anchorFrame)
 end
 
-function DataEditor:RefreshDatasetsPane()
-    local dataset = self:GetSelectedDataset()
+function DataEditor:BuildDatasetMetadataWindow()
+    if self.DatasetMetadataWindow then
+        return self.DatasetMetadataWindow
+    end
 
+    local window = UI.Window:New({
+        name = "RPEDataEditorDatasetMetadataWindow",
+        width = 340,
+        height = 256,
+        point = "CENTER",
+        relativeTo = UIParent,
+        relativePoint = "CENTER",
+        frameStrata = "HIGH",
+        frameLevel = 30,
+        movable = true,
+        clampedToScreen = true,
+        toplevel = true,
+        hidden = true,
+        contentInsetLeft = 10,
+        contentInsetRight = 10,
+        contentInsetTop = 28,
+        contentInsetBottom = 10,
+    })
+    window:SetTitle("Dataset Metadata")
+    window:Create()
+    self.DatasetMetadataWindow = window
+
+    local root = UI.CreateLayout(UI.VerticalLayoutGroup, window:GetContentFrame(), "RPEDataEditorDatasetMetadataRoot", {
+        spacing = 8,
+        fitChildrenWidth = true,
+        fitChildrenHeight = true,
+    })
+    UI.Utils.AnchorFill(root, window:GetContentFrame(), 0, 0, 0, 0)
+
+    self.DatasetMetadataNameLabel = UI.CreateText(root:GetFrame(), "RPEDataEditorDatasetMetadataNameLabel", "Name", {
+        width = 300,
+        height = 12,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    root:AddChild(self.DatasetMetadataNameLabel)
+
+    self.DatasetMetadataNameInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorDatasetMetadataNameInput", {
+        width = 300,
+        height = 24,
+        text = "",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.DatasetMetadataNameInput:SetScript("OnEnterPressed", function()
+        saveDatasetMetadataWindow(self)
+    end)
+    root:AddChild(self.DatasetMetadataNameInput)
+
+    self.DatasetMetadataGroupLabel = UI.CreateText(root:GetFrame(), "RPEDataEditorDatasetMetadataGroupLabel", "Group", {
+        width = 300,
+        height = 12,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    root:AddChild(self.DatasetMetadataGroupLabel)
+
+    self.DatasetMetadataGroupInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorDatasetMetadataGroupInput", {
+        width = 300,
+        height = 24,
+        text = "",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.DatasetMetadataGroupInput:SetScript("OnEnterPressed", function()
+        saveDatasetMetadataWindow(self)
+    end)
+    root:AddChild(self.DatasetMetadataGroupInput)
+
+    self.DatasetMetadataTypeLabel = UI.CreateText(root:GetFrame(), "RPEDataEditorDatasetMetadataTypeLabel", "Type", {
+        width = 300,
+        height = 12,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    root:AddChild(self.DatasetMetadataTypeLabel)
+
+    self.DatasetMetadataTypeDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorDatasetMetadataTypeDropdown", {
+        width = 300,
+        height = 20,
+        items = DATASET_TYPE_ITEMS,
+        selectedValue = "general",
+    })
+    root:AddChild(self.DatasetMetadataTypeDropdown)
+
+    self.DatasetMetadataIdText = UI.CreateText(root:GetFrame(), "RPEDataEditorDatasetMetadataIdText", "ID: -", {
+        width = 300,
+        height = 12,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    root:AddChild(self.DatasetMetadataIdText)
+
+    self.DatasetMetadataAuthorText = UI.CreateText(root:GetFrame(), "RPEDataEditorDatasetMetadataAuthorText", "Author: -", {
+        width = 300,
+        height = 12,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    root:AddChild(self.DatasetMetadataAuthorText)
+
+    local actions = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorDatasetMetadataActions", {
+        spacing = 6,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+        height = 20,
+    })
+    root:AddChild(actions)
+
+    self.DatasetMetadataSaveButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorDatasetMetadataSaveButton", "Save", 60, function()
+        saveDatasetMetadataWindow(self)
+    end, {
+        height = 20,
+        fontSize = 7,
+    })
+    actions:AddChild(self.DatasetMetadataSaveButton)
+
+    self.DatasetMetadataCancelButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorDatasetMetadataCancelButton", "Cancel", 60, function()
+        if self.DatasetMetadataWindow and self.DatasetMetadataWindow.Hide then
+            self.DatasetMetadataWindow:Hide()
+        end
+    end, {
+        height = 20,
+        fontSize = 7,
+    })
+    actions:AddChild(self.DatasetMetadataCancelButton)
+
+    return window
+end
+
+function DataEditor:ShowDatasetMetadataWindow(datasetId)
+    local database = self.Database
+    local dataset = database and database.GetDatasetByID and database.GetDatasetByID(datasetId) or nil
+    if not dataset then
+        return nil
+    end
+
+    local window = self:BuildDatasetMetadataWindow()
+    self.MetadataWindowDatasetId = dataset.id
+
+    if self.DatasetMetadataNameInput and self.DatasetMetadataNameInput.SetText then
+        self.DatasetMetadataNameInput:SetText(dataset.name or "")
+    end
+    if self.DatasetMetadataGroupInput and self.DatasetMetadataGroupInput.SetText then
+        self.DatasetMetadataGroupInput:SetText(dataset.groupName or "")
+    end
+    if self.DatasetMetadataTypeDropdown and self.DatasetMetadataTypeDropdown.SetSelectedValue then
+        self.DatasetMetadataTypeDropdown:SetSelectedValue(dataset.datasetType or "general", true)
+    end
+    if self.DatasetMetadataIdText and self.DatasetMetadataIdText.SetText then
+        self.DatasetMetadataIdText:SetText(("ID: %s"):format(dataset.id or "-"))
+    end
+    if self.DatasetMetadataAuthorText and self.DatasetMetadataAuthorText.SetText then
+        local authorName = dataset.authorName ~= nil and dataset.authorName ~= "" and dataset.authorName or "-"
+        self.DatasetMetadataAuthorText:SetText(("Author: %s"):format(authorName))
+    end
+
+    if window and window.Show then
+        window:Show()
+    end
+    if self.DatasetMetadataNameInput and self.DatasetMetadataNameInput.Focus then
+        self.DatasetMetadataNameInput:Focus()
+    end
+
+    return window
+end
+
+function DataEditor:RefreshDatasetsPane()
     if self.DatasetList and self.DatasetList.SetItems then
         self.DatasetList:SetItems(self:BuildDatasetListItems())
-    end
-
-    if self.DatasetPaneNameInput and self.DatasetPaneNameInput.SetText then
-        self.DatasetPaneNameInput:SetText(dataset and (dataset.name or "") or "")
-        self.DatasetPaneNameInput:SetEnabled(dataset ~= nil)
-        self.DatasetPaneNameInput:SetReadOnly(dataset == nil)
-    end
-
-    if self.DatasetPaneGroupInput and self.DatasetPaneGroupInput.SetText then
-        self.DatasetPaneGroupInput:SetText(dataset and (dataset.groupName or "") or "")
-        self.DatasetPaneGroupInput:SetEnabled(dataset ~= nil)
-        self.DatasetPaneGroupInput:SetReadOnly(dataset == nil)
-    end
-
-    if self.DatasetPaneIdText and self.DatasetPaneIdText.SetText then
-        self.DatasetPaneIdText:SetText(("ID: %s"):format(dataset and dataset.id or "-"))
-    end
-
-    if self.DatasetPaneAuthorText and self.DatasetPaneAuthorText.SetText then
-        self.DatasetPaneAuthorText:SetText(("Author: %s"):format(dataset and dataset.authorName ~= "" and dataset.authorName or "-"))
-    end
-
-    if self.DatasetPaneLockDropdown and self.DatasetPaneLockDropdown.SetSelectedValue then
-        self.DatasetPaneLockDropdown:SetSelectedValue(dataset and dataset.lockState or "open", true)
-    end
-
-    if self.DatasetPaneTagDropdown and self.DatasetPaneTagDropdown.SetSelectedValue then
-        self.DatasetPaneTagDropdown:SetSelectedValue(dataset and dataset.tagState or "standard", true)
     end
 end

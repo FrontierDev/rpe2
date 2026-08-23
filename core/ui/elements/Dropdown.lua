@@ -8,6 +8,9 @@ local Font = UI.Font or {}
 
 local MAX_MENU_DEPTH = 4
 local CATEGORY_TEXTURE_PATH = "Interface\\AddOns\\RPEngine_Dev\\data\\textures\\ui\\category.png"
+local DEFAULT_POPUP_WIDTH_MULTIPLIER = 0.5
+local DEFAULT_POPUP_MIN_WIDTH = 140
+local DEFAULT_POPUP_MAX_WIDTH = 320
 
 UI.Dropdown = UI.Dropdown or {}
 local Dropdown = UI.Dropdown
@@ -206,6 +209,21 @@ local function CollectSelectedItems(items, selectedValues, output)
     return results
 end
 
+local function Clamp(value, minimum, maximum)
+    local numericValue = tonumber(value) or 0
+    local minValue = tonumber(minimum)
+    local maxValue = tonumber(maximum)
+
+    if minValue and numericValue < minValue then
+        numericValue = minValue
+    end
+    if maxValue and numericValue > maxValue then
+        numericValue = maxValue
+    end
+
+    return numericValue
+end
+
 local function CreatePanelBorder(panel, color)
     local borderColor = color or { r = 0.16, g = 0.18, b = 0.22, a = 1 }
 
@@ -267,7 +285,8 @@ end
 
 function Dropdown:New(options)
     local instance = BaseElement.New(self, options)
-    instance.items = NormalizeItems(options and options.items or {})
+    instance.rawItems = options and options.items or {}
+    instance.items = NormalizeItems(instance.rawItems)
     instance.selectedIndex = options and options.selectedIndex or 1
     instance.selectedValue = options and options.selectedValue or nil
     instance.selectedValues = BuildSelectionSet(options and (options.selectedValues or options.selectedItems) or {})
@@ -280,12 +299,27 @@ function Dropdown:New(options)
     return instance
 end
 
+function Dropdown:GetPopupPanelWidth()
+    local displayWidth = self:GetDisplayWidth()
+    local popupWidth = tonumber(self.options.popupWidth)
+    if popupWidth and popupWidth > 0 then
+        return math.floor(popupWidth + 0.5)
+    end
+
+    local multiplier = tonumber(self.options.popupWidthMultiplier) or DEFAULT_POPUP_WIDTH_MULTIPLIER
+    local minimum = tonumber(self.options.popupMinWidth) or DEFAULT_POPUP_MIN_WIDTH
+    local maximum = tonumber(self.options.popupMaxWidth) or DEFAULT_POPUP_MAX_WIDTH
+    local targetWidth = displayWidth * multiplier
+
+    return math.floor(Clamp(targetWidth, minimum, maximum) + 0.5)
+end
+
 function Dropdown:EnsureContextMenu()
     if Dropdown.SharedContextMenu or not UI.ContextMenu then
         return Dropdown.SharedContextMenu
     end
 
-    local popupWidth = self.options.popupWidth or self.options.width or 140
+    local popupWidth = self:GetPopupPanelWidth()
     Dropdown.SharedContextMenu = UI.ContextMenu:New({
         name = "RPEngineDropdownSharedContextMenu",
         width = popupWidth * 4,
@@ -364,8 +398,13 @@ function Dropdown:ToggleContextMenu()
         return
     end
 
-    contextMenu:SetWidth((self.options.popupWidth or self.options.width or 140) * 4)
-    contextMenu.panelWidth = self.options.popupWidth or self.options.width or 140
+    local popupWidth = self:GetPopupPanelWidth()
+    contextMenu:SetWidth(popupWidth * 4)
+    if contextMenu.SetPanelWidth then
+        contextMenu:SetPanelWidth(popupWidth)
+    else
+        contextMenu.panelWidth = popupWidth
+    end
     contextMenu.multiSelect = self.multiSelect == true
     contextMenu.showSelectionActions = contextMenu.multiSelect and self.options.showSelectionActions ~= false
     contextMenu.maxSelections = self.options.maxSelections
@@ -451,7 +490,13 @@ function Dropdown:GetSelectedValues()
 end
 
 function Dropdown:SetItems(items)
-    self.items = NormalizeItems(items or {})
+    local resolvedItems = items or {}
+    if self.rawItems == resolvedItems then
+        return
+    end
+
+    self.rawItems = resolvedItems
+    self.items = NormalizeItems(resolvedItems)
     if self.multiSelect then
         self.selectedValueOrder = BuildSelectionOrder(self.items, self.selectedValues, {})
     end

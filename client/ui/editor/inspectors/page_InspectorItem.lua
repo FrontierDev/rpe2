@@ -135,6 +135,7 @@ function DataEditor:RefreshItemInspectorPage()
     local isGemModification = isModification and modificationKind == "gem"
     local isItemLevelEligible = hasItem and ItemClass and ItemClass.IsItemLevelEligible and ItemClass.IsItemLevelEligible(item) or false
     local isConsumable = itemType == "consumable"
+    local isMaterial = itemType == "material"
     local hasEmbeddedTrait = hasItem and itemSupportsEmbeddedTrait(item)
     local stackLocked = itemType == "weapon" or itemType == "armor" or itemType == "modification"
     local canEditStackSize = hasItem and item.canStack == true and not stackLocked
@@ -224,6 +225,41 @@ function DataEditor:RefreshItemInspectorPage()
         setCheckboxEnabled(self.ItemInspectorCanDisenchantCheckbox, hasItem)
     end
 
+    if self.ItemInspectorAllowWowConversionGroup then
+        self.ItemInspectorAllowWowConversionGroup:SetChecked(item and item.allowWowConversion == true or false, true)
+        setCheckboxEnabled(self.ItemInspectorAllowWowConversionGroup, hasItem and isMaterial)
+        local frame = self.ItemInspectorAllowWowConversionGroup.GetFrame and self.ItemInspectorAllowWowConversionGroup:GetFrame() or nil
+        if frame then
+            if hasItem and isMaterial then
+                frame:Show()
+            else
+                frame:Hide()
+            end
+        end
+    end
+
+    if self.ItemInspectorWowConversionSkillLabel and self.ItemInspectorWowConversionSkillLabel.GetFrame then
+        local frame = self.ItemInspectorWowConversionSkillLabel:GetFrame()
+        if hasItem and isMaterial then
+            frame:Show()
+        else
+            frame:Hide()
+        end
+    end
+    if self.ItemInspectorWowConversionSkillDropdown then
+        self.ItemInspectorWowConversionSkillDropdown:SetItems(self:BuildItemInspectorCraftingSkillItems())
+        self.ItemInspectorWowConversionSkillDropdown:SetSelectedValue(item and item.wowConversionSkillRef or "", true)
+        setDropdownEnabled(self.ItemInspectorWowConversionSkillDropdown, hasItem and isMaterial and item and item.allowWowConversion == true)
+        local frame = self.ItemInspectorWowConversionSkillDropdown.GetFrame and self.ItemInspectorWowConversionSkillDropdown:GetFrame() or nil
+        if frame then
+            if hasItem and isMaterial then
+                frame:Show()
+            else
+                frame:Hide()
+            end
+        end
+    end
+
     if self.ItemInspectorItemTypeDropdown then
         self.ItemInspectorItemTypeDropdown:SetSelectedValue(item and item.itemType or "none", true)
         setDropdownEnabled(self.ItemInspectorItemTypeDropdown, hasItem)
@@ -301,6 +337,7 @@ function DataEditor:RefreshItemInspectorPage()
 
     local showModificationTypeSection = hasItem and isModification
     local showRestrictionFields = hasItem and isModification and not isGemModification
+    local showTwoHandedRestrictionField = showRestrictionFields
     local showGenericPropertyField = hasItem and isGenericModification
     local showGemPropertyField = hasItem and isGemModification
     local showSocketsSection = hasItem and isEquipment
@@ -324,6 +361,12 @@ function DataEditor:RefreshItemInspectorPage()
         setDropdownEnabled(self.ItemInspectorModificationWeaponTypeDropdown, showRestrictionFields)
     end
     setElementGroupVisible(self.ItemInspectorModificationWeaponTypeGroup, showRestrictionFields)
+
+    if self.ItemInspectorModificationTwoHandedCheckbox then
+        self.ItemInspectorModificationTwoHandedCheckbox:SetChecked(item and item.targetTwoHandedOnly == true or false, true)
+        setCheckboxEnabled(self.ItemInspectorModificationTwoHandedCheckbox, showTwoHandedRestrictionField)
+    end
+    setElementGroupVisible(self.ItemInspectorModificationTwoHandedGroup, showTwoHandedRestrictionField)
 
     if self.ItemInspectorModificationArmorWeightDropdown then
         self.ItemInspectorModificationArmorWeightDropdown:SetSelectedValue(item and item.targetArmorWeight or "none", true)
@@ -424,8 +467,8 @@ function DataEditor:RefreshItemInspectorPage()
         self.ItemInspectorConsumableHintText:SetText(isConsumable
             and "Consumable items can embed one start-phase or end-phase trait."
             or (hasEmbeddedTrait
-                and "Equipped weapons and armor apply their embedded trait automatically while worn."
-                or "Set the item type to Consumable, Weapon, or Armor to author an embedded trait."))
+                and "Equipped weapons, armor, and applied modifications use their embedded trait while active."
+                or "Set the item type to Consumable, Weapon, Armor, or Modification to author an embedded trait."))
     end
     if self.ItemInspectorConsumablePhaseDropdown then
         self.ItemInspectorConsumablePhaseDropdown:SetSelectedValue(consumableTrait and consumableTrait.phase or "event_start", true)
@@ -436,18 +479,28 @@ function DataEditor:RefreshItemInspectorPage()
         self.ItemInspectorConsumableDescriptionInput:SetText(consumableTrait and ensureString(consumableTrait.description) or "")
         setTextElementEnabled(self.ItemInspectorConsumableDescriptionInput, hasEmbeddedTrait)
     end
+    local selectedConsumableStat = consumableTrait and consumableTrait.statBonuses and consumableTrait.statBonuses[tonumber(self.SelectedItemConsumableTraitStatIndex) or 0] or nil
+    local selectedConsumableStatDatasetId = parseDatasetQualifiedRef(selectedConsumableStat and selectedConsumableStat.statRef or "")
     if self.ItemInspectorConsumablePendingStatDatasetDropdown then
         self.ItemInspectorConsumablePendingStatDatasetDropdown:SetItems(self:BuildItemInspectorDatasetItems())
+        self.ItemInspectorConsumablePendingStatDatasetDropdown:SetSelectedValue(selectedConsumableStatDatasetId or "", true)
         setDropdownEnabled(self.ItemInspectorConsumablePendingStatDatasetDropdown, hasEmbeddedTrait)
     end
     if self.ItemInspectorConsumablePendingStatDropdown then
         self:RefreshItemInspectorConsumablePendingStatDropdown()
+        self.ItemInspectorConsumablePendingStatDropdown:SetSelectedValue(selectedConsumableStat and selectedConsumableStat.statRef or "", true)
         setDropdownEnabled(self.ItemInspectorConsumablePendingStatDropdown, hasEmbeddedTrait)
+    end
+    if self.ItemInspectorConsumablePendingStatOperationDropdown then
+        self.ItemInspectorConsumablePendingStatOperationDropdown:SetItems(self:GetAuraInspectorOperationItems())
+        self.ItemInspectorConsumablePendingStatOperationDropdown:SetSelectedValue(selectedConsumableStat and selectedConsumableStat.operation or "flat", true)
+        setDropdownEnabled(self.ItemInspectorConsumablePendingStatOperationDropdown, hasEmbeddedTrait)
     end
     if self.ItemInspectorConsumableSkillsScroll and self.ItemInspectorConsumableSkillsScroll.SetItems then
         self:RefreshItemInspectorConsumableTraitSkillTable()
     end
     if self.ItemInspectorConsumablePendingStatValueInput then
+        self.ItemInspectorConsumablePendingStatValueInput:SetText(tostring(selectedConsumableStat and selectedConsumableStat.value or 0))
         setTextElementEnabled(self.ItemInspectorConsumablePendingStatValueInput, hasEmbeddedTrait)
     end
     if self.ItemInspectorConsumableAddStatButton then
@@ -515,9 +568,12 @@ function DataEditor:RefreshItemInspectorPage()
     if selectedConsumableEffectType == "" then
         selectedConsumableEffectType = ensureString(pendingConsumableEffectType)
     end
+    local isConsumableEventDamage = selectedConsumableEffectType == "damage"
+    local isConsumableEventHeal = selectedConsumableEffectType == "heal"
     local isConsumableEventApplyAura = selectedConsumableEffectType == "apply_aura"
     local isConsumableEventRemoveAura = selectedConsumableEffectType == "remove_aura"
     local isConsumableEventResource = selectedConsumableEffectType == "resource"
+    local consumableEventUsesAmountMode = isConsumableEventDamage or isConsumableEventHeal or isConsumableEventResource
     local consumableEffectNeedsReference = isConsumableEventApplyAura or isConsumableEventRemoveAura or isConsumableEventResource
     if self.ItemInspectorConsumablePendingEffectAmountLabel and self.ItemInspectorConsumablePendingEffectAmountLabel.SetText then
         local amountLabel = "Damage"
@@ -575,6 +631,15 @@ function DataEditor:RefreshItemInspectorPage()
         self.ItemInspectorConsumablePendingEffectAmountInput:SetText(tostring(amountValue))
         setTextElementEnabled(self.ItemInspectorConsumablePendingEffectAmountInput, hasEmbeddedTrait)
     end
+    if self.ItemInspectorConsumablePendingEffectAmountModeDropdown then
+        self.ItemInspectorConsumablePendingEffectAmountModeDropdown:SetItems(self:GetAuraInspectorAmountModeItems())
+        self.ItemInspectorConsumablePendingEffectAmountModeDropdown:SetSelectedValue(selectedConsumableEffect and selectedConsumableEffect.amountMode or "flat", true)
+        setDropdownEnabled(self.ItemInspectorConsumablePendingEffectAmountModeDropdown, hasEmbeddedTrait and consumableEventUsesAmountMode)
+    end
+    if self.ItemInspectorConsumablePendingEventChanceInput then
+        self.ItemInspectorConsumablePendingEventChanceInput:SetText(tostring(selectedConsumableEvent and selectedConsumableEvent.chance or 100))
+        setTextElementEnabled(self.ItemInspectorConsumablePendingEventChanceInput, hasEmbeddedTrait)
+    end
     if self.ItemInspectorConsumablePendingEffectDatasetDropdown then
         self.ItemInspectorConsumablePendingEffectDatasetDropdown:SetItems(self:BuildItemInspectorDatasetItems())
         self.ItemInspectorConsumablePendingEffectDatasetDropdown:SetSelectedValue(consumableEffectDatasetId or "", true)
@@ -590,6 +655,11 @@ function DataEditor:RefreshItemInspectorPage()
         )
         setDropdownEnabled(self.ItemInspectorConsumablePendingEffectReferenceDropdown, hasEmbeddedTrait and consumableEffectNeedsReference)
     end
+    if self.ItemInspectorConsumablePendingEventSchoolDropdown then
+        self.ItemInspectorConsumablePendingEventSchoolDropdown:SetItems(self:BuildSpellInspectorDamageSchoolsAcrossDatasets())
+        self.ItemInspectorConsumablePendingEventSchoolDropdown:SetSelectedValues(selectedConsumableEffect and selectedConsumableEffect.damageSchoolRefs or {}, true)
+        setDropdownEnabled(self.ItemInspectorConsumablePendingEventSchoolDropdown, hasEmbeddedTrait and isConsumableEventDamage)
+    end
     if self.ItemInspectorConsumablePendingEffectAuxInput then
         self.ItemInspectorConsumablePendingEffectAuxInput:SetText(tostring(selectedConsumableEffect and selectedConsumableEffect.duration or 0))
         setTextElementEnabled(self.ItemInspectorConsumablePendingEffectAuxInput, hasEmbeddedTrait and isConsumableEventApplyAura)
@@ -598,12 +668,16 @@ function DataEditor:RefreshItemInspectorPage()
         self.ItemInspectorConsumablePendingEffectExtraInput:SetText(tostring(selectedConsumableEffect and selectedConsumableEffect.basePower or 0))
         setTextElementEnabled(self.ItemInspectorConsumablePendingEffectExtraInput, hasEmbeddedTrait and isConsumableEventApplyAura)
     end
+    setElementGroupVisible(self.ItemInspectorConsumablePendingEventSchoolGroup, hasEmbeddedTrait and isConsumableEventDamage)
     setElementGroupVisible(self.ItemInspectorConsumablePendingEventDetailHeaderRow, hasEmbeddedTrait and consumableEffectNeedsReference)
     setElementGroupVisible(self.ItemInspectorConsumablePendingEventDetailRow, hasEmbeddedTrait and consumableEffectNeedsReference)
     setElementGroupVisible(self.ItemInspectorConsumablePendingEventExtraHeaderRow, hasEmbeddedTrait and isConsumableEventApplyAura)
     setElementGroupVisible(self.ItemInspectorConsumablePendingEventExtraRow, hasEmbeddedTrait and isConsumableEventApplyAura)
     if self.ItemInspectorConsumableAddEventButton then
         self.ItemInspectorConsumableAddEventButton:SetEnabled(hasEmbeddedTrait)
+    end
+    if self.ItemInspectorConsumableNewEventButton then
+        self.ItemInspectorConsumableNewEventButton:SetEnabled(hasEmbeddedTrait)
     end
     if self.ItemInspectorConsumableRemoveEventButton then
         self.ItemInspectorConsumableRemoveEventButton:SetEnabled(hasEmbeddedTrait and tonumber(self.SelectedItemConsumableTraitEventIndex) ~= nil)
@@ -670,7 +744,7 @@ function DataEditor:RefreshItemInspectorPage()
     if self.ItemInspectorConsumableEmptyText then
         self.ItemInspectorConsumableEmptyText:SetText(
             isConsumable and "Edit the selected consumable trait here."
-                or (hasEmbeddedTrait and "Edit the selected equipment trait here." or "This page is only available for consumable, weapon, and armor items.")
+                or (hasEmbeddedTrait and "Edit the selected embedded trait here." or "This page is only available for consumable, weapon, armor, and modification items.")
         )
     end
     if self.ItemInspectorEmptyText then

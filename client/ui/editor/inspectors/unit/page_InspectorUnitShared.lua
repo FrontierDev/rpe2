@@ -238,10 +238,23 @@ function DataEditor:GetReferenceEntrySubgroupInfo(collectionKey, entry)
 end
 
 function DataEditor:BuildReferenceItemsAcrossDatasets(collectionKey, options)
+    self.ReferenceItemsCache = self.ReferenceItemsCache or {}
+    local includeNone = type(options) ~= "table" or options.includeNone ~= false
+    local noneLabel = type(options) == "table" and options.noneLabel or "None"
+    local cacheKey = table.concat({
+        tostring(collectionKey or ""),
+        includeNone and "1" or "0",
+        tostring(noneLabel or ""),
+    }, "::")
+    local cachedItems = self.ReferenceItemsCache[cacheKey]
+    if cachedItems then
+        return cachedItems
+    end
+
     local items = {}
-    if type(options) == "table" and options.includeNone ~= false then
+    if includeNone then
         items[#items + 1] = {
-            label = options.noneLabel or "None",
+            label = noneLabel,
             value = "",
         }
     end
@@ -306,6 +319,7 @@ function DataEditor:BuildReferenceItemsAcrossDatasets(collectionKey, options)
         end
     end
 
+    self.ReferenceItemsCache[cacheKey] = items
     return items
 end
 
@@ -412,16 +426,15 @@ function DataEditor:CommitSelectedUnit(mutate)
         return
     end
 
+    local before = self:DeepCopyValue(unit)
     mutate(unit, dataset)
     applyTable(unit, self:NormalizeUnitDefinition(unit))
 
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "units", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, unit) then
+        return
     end
 
-    self:RefreshAfterDatasetEntryChanged("units")
+    self:QueuePendingDatasetEntryChanged(dataset.id, "units")
 end
 
 function DataEditor:BuildUnitInspectorReferencesAcrossDatasets(collectionKey)

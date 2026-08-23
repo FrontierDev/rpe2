@@ -128,6 +128,18 @@ local function normalizeWeaponDamageMode(value)
     return "none"
 end
 
+local function normalizeAmountMode(value)
+    local mode = string.lower(Normalization.TrimText(value))
+    if mode == "base_percent" then
+        return "base_percent"
+    end
+    if mode == "max_percent" then
+        return "max_percent"
+    end
+
+    return "flat"
+end
+
 local function normalizeHitType(value)
     local hitType = string.lower(Normalization.TrimText(value))
     if hitType == "auto" or hitType == "pet" then
@@ -260,6 +272,7 @@ local function normalizeDamageEffect(value)
     return {
         type = "damage",
         baseDamage = Normalization.NormalizeNumber(data.baseDamage, 0),
+        amountMode = normalizeAmountMode(data.amountMode),
         threatCoefficient = Normalization.NormalizeNumber(data.threatCoefficient, 1),
         weaponDamageMode = normalizeWeaponDamageMode(data.weaponDamageMode),
         weaponDamageCoefficient = Normalization.NormalizeNumber(data.weaponDamageCoefficient, 1),
@@ -283,6 +296,7 @@ local function normalizeHealEffect(value)
     return {
         type = "heal",
         baseHealing = Normalization.NormalizeNumber(data.baseHealing, 0),
+        amountMode = normalizeAmountMode(data.amountMode),
         statScaling = normalizeStatScaling(data.statScaling),
         usesProjectile = Normalization.NormalizeBool(data.usesProjectile, false),
         projectilePath = Normalization.EnsureString(data.projectilePath),
@@ -312,6 +326,7 @@ local function normalizeResourceEffect(value)
         type = "resource",
         resourceRef = Normalization.NormalizeRef(data.resourceRef),
         amount = Normalization.NormalizeNumber(data.amount, 0),
+        amountMode = normalizeAmountMode(data.amountMode),
         targetEvents = normalizeEventList(data.targetEvents),
     }
 end

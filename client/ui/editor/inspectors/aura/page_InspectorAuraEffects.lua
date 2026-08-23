@@ -234,6 +234,24 @@ function DataEditor:BuildAuraInspectorEffectsPage(page)
     self.AuraInspectorBaseAmountGroup:AddChild(self.AuraInspectorBaseAmountInput)
     attachMouseWheel(self.AuraInspectorBaseAmountInput)
 
+    self.AuraInspectorAmountModeGroup = createGroup("RPEDataEditorAuraInspectorAmountModeGroup", "Amount Mode")
+    self.AuraInspectorAmountModeDropdown = UI.CreateDropdown(self.AuraInspectorAmountModeGroup:GetFrame(), "RPEDataEditorAuraInspectorAmountModeDropdown", {
+        width = self.AuraInspectorFieldWidth,
+        height = 18,
+        items = self:GetAuraInspectorAmountModeItems(),
+        onValueChanged = function(value)
+            if self._refreshingAuraInspector then
+                return
+            end
+
+            self:CommitSelectedAuraInspectorEffect(function(effect)
+                effect.amountMode = value
+            end)
+        end,
+    })
+    self.AuraInspectorAmountModeGroup:AddChild(self.AuraInspectorAmountModeDropdown)
+    attachMouseWheel(self.AuraInspectorAmountModeDropdown)
+
     self.AuraInspectorDamageSchoolsGroup = createGroup("RPEDataEditorAuraInspectorDamageSchoolsGroup", "Damage Schools", 18)
     self.AuraInspectorDamageSchoolsDropdown = UI.CreateDropdown(self.AuraInspectorDamageSchoolsGroup:GetFrame(), "RPEDataEditorAuraInspectorDamageSchoolsDropdown", {
         width = self.AuraInspectorFieldWidth,
@@ -420,6 +438,24 @@ function DataEditor:BuildAuraInspectorEffectsPage(page)
     })
     self.AuraInspectorResourceAmountGroup:AddChild(self.AuraInspectorResourceAmountInput)
     attachMouseWheel(self.AuraInspectorResourceAmountInput)
+
+    self.AuraInspectorResourceAmountModeGroup = createGroup("RPEDataEditorAuraInspectorResourceAmountModeGroup", "Amount Mode")
+    self.AuraInspectorResourceAmountModeDropdown = UI.CreateDropdown(self.AuraInspectorResourceAmountModeGroup:GetFrame(), "RPEDataEditorAuraInspectorResourceAmountModeDropdown", {
+        width = self.AuraInspectorFieldWidth,
+        height = 18,
+        items = self:GetAuraInspectorAmountModeItems(),
+        onValueChanged = function(value)
+            if self._refreshingAuraInspector then
+                return
+            end
+
+            self:CommitSelectedAuraInspectorEffect(function(effect)
+                effect.amountMode = value
+            end)
+        end,
+    })
+    self.AuraInspectorResourceAmountModeGroup:AddChild(self.AuraInspectorResourceAmountModeDropdown)
+    attachMouseWheel(self.AuraInspectorResourceAmountModeDropdown)
 
     self.AuraInspectorScalingGroup = createGroup("RPEDataEditorAuraInspectorScalingGroup", "Stat Scaling", 110)
     self.AuraInspectorScalingPanel = UI.CreatePanel(self.AuraInspectorScalingGroup:GetFrame(), "RPEDataEditorAuraInspectorScalingPanel", {

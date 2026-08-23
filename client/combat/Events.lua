@@ -206,7 +206,7 @@ function Events:Run(client, context)
                 eventOtherUnit = targetUnit,
                 casterEventId = sourceEventId,
                 targetEventId = targetEventId,
-                actionContext = context.actionContext,
+                actionContext = context.actionContext or context,
             }) or changed
         end
     end

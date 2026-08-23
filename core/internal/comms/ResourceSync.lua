@@ -545,6 +545,12 @@ function ResourceSync.SerializeTargetedResourceDeltas(targetedResourceDeltas)
 end
 
 function ResourceSync.BuildProfileResourceSnapshot()
+    if type(Profile.IsBootstrapResolvedStateReady) == "function"
+        and Profile.IsBootstrapResolvedStateReady() ~= true
+    then
+        return nil
+    end
+
     local rows = Profile.ListResolvedResources and Profile.ListResolvedResources() or {}
     local trackedResourceRefs = buildTrackedProfileResourceRefLookup()
     local trackedResources = getTrackedLocalPlayerResources() or {}

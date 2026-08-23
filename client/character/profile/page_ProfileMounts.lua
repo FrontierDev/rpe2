@@ -128,7 +128,7 @@ local function formatStatValue(row)
     if displayMode == "value" then
         return ("%g"):format(value)
     end
-    if displayMode == "signed_percent" then
+    if displayMode == "signed_percent" or displayMode == "equip_percent" then
         return ("%g%%"):format(value)
     end
     return ("%g"):format(value)
@@ -562,4 +562,3 @@ function MountsPage:Refresh()
 end
 
 return MountsPage
-

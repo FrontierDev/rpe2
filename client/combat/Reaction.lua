@@ -41,6 +41,104 @@ local normalizeResultToken = Normalization.NormalizeResultToken
 local Dependencies = Database.Dependecies or {}
 local REACTION_ATTACK_TYPES = { "melee", "ranged", "spell" }
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+local SPELLCAST_SLOW_HELPER_MS = 25
+local SPELLCAST_SLOW_TOTAL_MS = 100
+
+local function getNowMilliseconds()
+    if type(GetTimePreciseSec) == "function" then
+        return GetTimePreciseSec() * 1000
+    end
+
+    return (GetTime and GetTime() or 0) * 1000
+end
+
+local function isSpellcastTimingEnabled()
+    return type(Addon.Debug) == "table" and Addon.Debug.SpellcastTiming == true
+end
+
+local function ensureSpellcastInternalLoggingEnabled()
+    if type(Debug) == "table" and type(Debug.EnsureInternalLevelEnabled) == "function" then
+        Debug.EnsureInternalLevelEnabled()
+    end
+end
+
+local function buildTimingSegment(label, elapsed, threshold)
+    local numericElapsed = math.max(0, tonumber(elapsed) or 0)
+    local isSlow = numericElapsed >= (tonumber(threshold) or SPELLCAST_SLOW_HELPER_MS)
+    return ("%s=%.2fms%s"):format(
+        tostring(label or "phase"),
+        numericElapsed,
+        isSlow and " SLOW" or ""
+    ), isSlow
+end
+
+local function logDamageFinalizeTimingLine(contextLabel, parts, totalElapsed, threshold)
+    if not isSpellcastTimingEnabled() or type(Debug) ~= "table" or type(Debug.Internal) ~= "function" then
+        return false
+    end
+
+    ensureSpellcastInternalLoggingEnabled()
+
+    local slowThreshold = tonumber(threshold) or SPELLCAST_SLOW_TOTAL_MS
+    local totalText, totalSlow = buildTimingSegment("total", totalElapsed, slowThreshold)
+    local segments = { totalText }
+    local hasSlow = totalSlow
+
+    for index = 1, #(parts or {}) do
+        local part = parts[index]
+        if type(part) == "table" and type(part.label) == "string" then
+            local segment, isSlow = buildTimingSegment(part.label, part.elapsed, part.threshold or SPELLCAST_SLOW_HELPER_MS)
+            segments[#segments + 1] = segment
+            hasSlow = hasSlow or isSlow
+        end
+    end
+
+    Debug.Internal(
+        "%sSpell damage finalize timing [%s]: %s",
+        hasSlow and "SLOW " or "",
+        tostring(contextLabel or "unknown"),
+        table.concat(segments, ", ")
+    )
+    return true
+end
+
+local function getTasks()
+    return Addon.Internal and Addon.Internal.Tasks or nil
+end
+
+local function enqueueReactionPresentationWork(fn, ...)
+    local tasks = getTasks()
+    if tasks and type(tasks.Enqueue) == "function" then
+        tasks:Enqueue(fn, ...)
+        return true
+    end
+
+    if C_Timer and C_Timer.After then
+        local args = { ... }
+        local argCount = select("#", ...)
+        C_Timer.After(0, function()
+            fn(unpack(args, 1, argCount))
+        end)
+        return true
+    end
+
+    fn(...)
+    return true
+end
+
+local function refreshReactionWidgetDeferred(targetClient, reason)
+    if type(targetClient) ~= "table" then
+        return false
+    end
+
+    if type(targetClient.RefreshReactionWidget) == "function" then
+        targetClient:RefreshReactionWidget(reason)
+    end
+    if type(targetClient.ShowReactionWidget) == "function" then
+        targetClient:ShowReactionWidget()
+    end
+    return true
+end
 
 local function getMountRuleValue(ruleKey, fallback)
     local ruleset = Ruleset.GetActiveRuleset and Ruleset.GetActiveRuleset() or nil
@@ -68,6 +166,10 @@ local function getCombatRuleValue(ruleKey, fallback)
     end
 
     return value
+end
+
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
 end
 
 local function unitHasShield(unit)
@@ -231,15 +333,26 @@ function Combat:ResolveDefenceTextForStat(statRef)
         return ""
     end
 
+    local revision = getConfigurationRevision()
+    self.DefenceTextForStatCache = self.DefenceTextForStatCache or {}
+    local cacheKey = ("%d:%s"):format(revision, normalizedRef)
+    local cached = self.DefenceTextForStatCache[cacheKey]
+    if cached ~= nil then
+        return tostring(cached)
+    end
+
     if type(Registry.ResolveStatReference) == "function" then
         local _, stat = Registry:ResolveStatReference(normalizedRef)
         local defenceLabel = tostring(stat and stat.defenceLabel or ""):gsub("^%s+", ""):gsub("%s+$", "")
         if defenceLabel ~= "" then
+            self.DefenceTextForStatCache[cacheKey] = defenceLabel
             return defenceLabel
         end
     end
 
-    return self:ResolveStatReferenceLabel(normalizedRef)
+    local label = self:ResolveStatReferenceLabel(normalizedRef)
+    self.DefenceTextForStatCache[cacheKey] = label
+    return label
 end
 
 function Combat:ResolveStatDefinition(statRef)
@@ -252,11 +365,29 @@ function Combat:ResolveStatDefinition(statRef)
 end
 
 function Combat:ResolveDefenceActionDisplay(statRef)
+    local normalizedRef = normalizeToken(statRef)
+    if not normalizedRef then
+        return {
+            label = "",
+            icon = DEFAULT_ICON,
+        }
+    end
+
+    local revision = getConfigurationRevision()
+    self.DefenceActionDisplayCache = self.DefenceActionDisplayCache or {}
+    local cacheKey = ("%d:%s"):format(revision, normalizedRef)
+    local cached = self.DefenceActionDisplayCache[cacheKey]
+    if type(cached) == "table" then
+        return cached
+    end
+
     local _, stat = self:ResolveStatDefinition(statRef)
-    return {
-        label = self:ResolveDefenceTextForStat(statRef),
+    local display = {
+        label = self:ResolveDefenceTextForStat(normalizedRef),
         icon = tostring(stat and stat.icon or "") ~= "" and tostring(stat.icon) or DEFAULT_ICON,
     }
+    self.DefenceActionDisplayCache[cacheKey] = display
+    return display
 end
 
 local function enqueueCombatTextEntry(entry)
@@ -404,22 +535,39 @@ function Combat:FinalizeLocalDamageResult(entry, damageResult)
         return false
     end
 
+    local timingEnabled = isSpellcastTimingEnabled()
+    local totalStartTime = timingEnabled and getNowMilliseconds() or nil
+    local timingParts = timingEnabled and {} or nil
     local context = type(entry) == "table" and entry.context or nil
     local castEntry = type(context) == "table" and context.castEntry or nil
     local spell = type(context) == "table" and context.spell or nil
     local state = self.GetOrCreateActionCombatEventState and self:GetOrCreateActionCombatEventState(castEntry, spell) or nil
     if type(state) == "table" and type(self.RegisterActionCasterEventOutcome) == "function" then
+        local outcomeStartTime = timingEnabled and getNowMilliseconds() or nil
         self:RegisterActionCasterEventOutcome(state, { entry.defenderEventId }, {
             effectType = "damage",
             attackType = entry.attackType,
             hitType = damageResult.hitType,
             wasCritical = damageResult.wasCritical == true,
         })
+        if timingEnabled then
+            timingParts[#timingParts + 1] = {
+                label = "caster-outcome",
+                elapsed = getNowMilliseconds() - outcomeStartTime,
+            }
+        end
     end
 
     local resourceDeltas = damageResult.resourceDeltas
     if type(Combat.RegisterActionDamageCombatLog) == "function" then
+        local combatLogStartTime = timingEnabled and getNowMilliseconds() or nil
         Combat:RegisterActionDamageCombatLog(entry, damageResult)
+        if timingEnabled then
+            timingParts[#timingParts + 1] = {
+                label = "combat-log",
+                elapsed = getNowMilliseconds() - combatLogStartTime,
+            }
+        end
     end
     local auraManager = Client.Spellcasting and Client.Spellcasting.AuraManager or nil
     if type(entry.effect) == "table"
@@ -429,30 +577,75 @@ function Combat:FinalizeLocalDamageResult(entry, damageResult)
         and auraManager
         and type(auraManager.ApplyAuraFromContext) == "function"
     then
+        local applyAuraStartTime = timingEnabled and getNowMilliseconds() or nil
         auraManager:ApplyAuraFromContext(Client, entry.context, entry.effect.auraRef, entry.effect.auraStacks or 1, nil, 0)
+        if timingEnabled then
+            timingParts[#timingParts + 1] = {
+                label = "apply-aura",
+                elapsed = getNowMilliseconds() - applyAuraStartTime,
+            }
+        end
     end
 
+    local combatEventsStartTime = timingEnabled and getNowMilliseconds() or nil
     finalizeDamageCombatEvents(Client, entry, true)
+    if timingEnabled then
+        timingParts[#timingParts + 1] = {
+            label = "combat-events",
+            elapsed = getNowMilliseconds() - combatEventsStartTime,
+        }
+    end
+
+    local dismountStartTime = timingEnabled and getNowMilliseconds() or nil
     tryResolveMountedDismount(entry, damageResult)
+    if timingEnabled then
+        timingParts[#timingParts + 1] = {
+            label = "dismount",
+            elapsed = getNowMilliseconds() - dismountStartTime,
+        }
+    end
 
     local auraManager = Client.Spellcasting and Client.Spellcasting.AuraManager or nil
     if auraManager
         and type(auraManager.HandleDamageTaken) == "function"
         and (tonumber(damageResult.appliedDelta) or 0) < 0
     then
+        local damageTakenStartTime = timingEnabled and getNowMilliseconds() or nil
         auraManager:HandleDamageTaken(Client, entry.eventState, entry.defenderEventId, entry.context)
+        if timingEnabled then
+            timingParts[#timingParts + 1] = {
+                label = "damage-taken",
+                elapsed = getNowMilliseconds() - damageTakenStartTime,
+            }
+        end
     end
 
     if type(resourceDeltas) ~= "table" or #resourceDeltas == 0 then
+        if timingEnabled then
+            logDamageFinalizeTimingLine(
+                ("%s/%s"):format(tostring(entry.spellRef or "spell"), tostring(entry.componentKey or "component")),
+                timingParts,
+                getNowMilliseconds() - totalStartTime,
+                SPELLCAST_SLOW_TOTAL_MS
+            )
+        end
         return true
     end
 
     if type(Client.MarkEventUnitInteraction) == "function" then
+        local interactionStartTime = timingEnabled and getNowMilliseconds() or nil
         Client:MarkEventUnitInteraction(entry.eventState, entry.attackerUnit, entry.defenderUnit, damageResult, entry.spellRef)
+        if timingEnabled then
+            timingParts[#timingParts + 1] = {
+                label = "interaction",
+                elapsed = getNowMilliseconds() - interactionStartTime,
+            }
+        end
     end
 
     local spellcasting = Client.Spellcasting or nil
     if spellcasting and type(spellcasting.ShowLocalResourceDeltaCombatText) == "function" then
+        local combatTextStartTime = timingEnabled and getNowMilliseconds() or nil
         spellcasting.ShowLocalResourceDeltaCombatText(
             Client,
             entry.eventState,
@@ -462,6 +655,12 @@ function Combat:FinalizeLocalDamageResult(entry, damageResult)
             damageResult.hitType,
             damageResult
         )
+        if timingEnabled then
+            timingParts[#timingParts + 1] = {
+                label = "combat-text",
+                elapsed = getNowMilliseconds() - combatTextStartTime,
+            }
+        end
     end
 
     local sessionState = entry.sessionState or (Client.GetState and Client:GetState() or nil)
@@ -469,11 +668,20 @@ function Combat:FinalizeLocalDamageResult(entry, damageResult)
         or type(sessionState) ~= "table"
         or sessionState.active ~= true
     then
+        if timingEnabled then
+            logDamageFinalizeTimingLine(
+                ("%s/%s"):format(tostring(entry.spellRef or "spell"), tostring(entry.componentKey or "component")),
+                timingParts,
+                getNowMilliseconds() - totalStartTime,
+                SPELLCAST_SLOW_TOTAL_MS
+            )
+        end
         return true
     end
 
     local immediate = type(entry.context) == "table" and entry.context.immediate == true
-        return Client:QueueClientResourceDeltas(
+    local queueStartTime = timingEnabled and getNowMilliseconds() or nil
+    local queued = Client:QueueClientResourceDeltas(
         sessionState,
         "combat-damage",
         resourceDeltas,
@@ -485,13 +693,29 @@ function Combat:FinalizeLocalDamageResult(entry, damageResult)
             threatUpdates = damageResult and damageResult.threatUpdate and { damageResult.threatUpdate } or nil,
         }
     )
+    if timingEnabled then
+        timingParts[#timingParts + 1] = {
+            label = "resource-queue",
+            elapsed = getNowMilliseconds() - queueStartTime,
+        }
+        logDamageFinalizeTimingLine(
+            ("%s/%s"):format(tostring(entry.spellRef or "spell"), tostring(entry.componentKey or "component")),
+            timingParts,
+            getNowMilliseconds() - totalStartTime,
+            SPELLCAST_SLOW_TOTAL_MS
+        )
+    end
+    return queued
 end
 
 function Combat:BuildReactionActions(entry)
-    local actions = {}
     if type(entry) ~= "table" then
-        return actions
+        return {}
     end
+    if type(entry.reactionActionsCache) == "table" then
+        return entry.reactionActionsCache
+    end
+    local actions = {}
 
     local function appendAction(action)
         if type(action) ~= "table" or type(action.id) ~= "string" or action.id == "" then
@@ -649,6 +873,7 @@ function Combat:BuildReactionActions(entry)
         enabled = true,
     }
 
+    entry.reactionActionsCache = actions
     return actions
 end
 
@@ -670,6 +895,64 @@ function Combat:FindReactionAction(entry, actionId)
 end
 
 function Combat:ChooseAutomaticReactionAction(entry)
+    if type(entry) ~= "table" then
+        return RESULT_PASS
+    end
+
+    if type(entry.sharedHitPreview) == "table" and type(entry.sharedHitPreview.reactionActions) == "table" then
+        local actions = entry.sharedHitPreview.reactionActions
+        for index = 1, #actions do
+            local action = actions[index]
+            if action
+                and action.id
+                and action.id ~= RESULT_PASS
+                and action.enabled ~= false
+                and tostring(action.resolutionSystem or "") == tostring(entry.defenceSystem or "")
+            then
+                return action
+            end
+        end
+
+        for index = 1, #actions do
+            local action = actions[index]
+            if action and action.id and action.id ~= RESULT_PASS and action.enabled ~= false then
+                return action
+            end
+        end
+
+        return RESULT_PASS
+    end
+
+    local defenceSystem = tostring(entry.defenceSystem or "")
+    if defenceSystem == "ac" or defenceSystem == "simple" then
+        return {
+            id = ("%s:resolve"):format(defenceSystem),
+            resolutionSystem = defenceSystem,
+        }
+    end
+
+    if defenceSystem == "complex" then
+        local statRefs = self:ResolveComplexDefenceStats(entry.attackType)
+        local statRef = normalizeToken(statRefs and statRefs[1] or nil)
+        if statRef then
+            return {
+                id = ("complex:%s"):format(statRef),
+                resolutionSystem = "complex",
+                statRef = statRef,
+            }
+        end
+    end
+
+    if defenceSystem == "percent" then
+        local statRefs = self:ResolvePercentResistanceStatRefs(entry.attackType)
+        local statRef = normalizeToken(statRefs and statRefs[1] or nil)
+        return {
+            id = statRef and ("percent:%s"):format(statRef) or "percent:resolve",
+            resolutionSystem = "percent",
+            statRef = statRef,
+        }
+    end
+
     local actions = self:BuildReactionActions(entry)
     for index = 1, #actions do
         local action = actions[index]
@@ -799,12 +1082,7 @@ function Client:ShowNextQueuedCombatReaction()
     end
 
     self:SetActiveCombatReaction(nextEntry)
-    if type(self.RefreshReactionWidget) == "function" then
-        self:RefreshReactionWidget("combat-hit-check-queue")
-    end
-    if type(self.ShowReactionWidget) == "function" then
-        self:ShowReactionWidget()
-    end
+    enqueueReactionPresentationWork(refreshReactionWidgetDeferred, self, "combat-hit-check-queue")
     return true
 end
 
@@ -861,12 +1139,7 @@ function Client:ShowCombatReaction(entry)
     end
 
     self:SetActiveCombatReaction(entry)
-    if type(self.RefreshReactionWidget) == "function" then
-        self:RefreshReactionWidget("combat-hit-check")
-    end
-    if type(self.ShowReactionWidget) == "function" then
-        self:ShowReactionWidget()
-    end
+    enqueueReactionPresentationWork(refreshReactionWidgetDeferred, self, "combat-hit-check")
     return true
 end
 

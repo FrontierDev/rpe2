@@ -166,6 +166,38 @@ function Commands:PrintHelp()
     end
 end
 
+Commands:RegisterCommand({ "debug", "timings" }, function(context)
+    local Debug = Addon.Debug or {}
+    local Timings = Debug.Timings or nil
+    local requestedState = context and context.args and context.args[1] or nil
+    local enabled = nil
+
+    if requestedState == "on" or requestedState == "1" or requestedState == "true" then
+        enabled = true
+    elseif requestedState == "off" or requestedState == "0" or requestedState == "false" then
+        enabled = false
+    elseif Timings and type(Timings.IsEnabled) == "function" then
+        enabled = not Timings:IsEnabled()
+    else
+        enabled = true
+    end
+
+    if Debug.SetLevelEnabled then
+        Debug.SetLevelEnabled("internal", enabled)
+    end
+    if Timings and type(Timings.SetEnabled) == "function" then
+        Timings:SetEnabled(enabled)
+    else
+        Debug.Timings = Debug.Timings or {}
+        Debug.Timings.Enabled = enabled
+    end
+
+    context.router:Print("Debug timings %s.", nil, enabled and "enabled" or "disabled")
+    return true
+end, {
+    description = "Toggle internal timing debug output. Use /rpe debug timings on or off.",
+})
+
 function Commands:Run(message)
     local tokens = tokenizeMessage(message)
     if #tokens == 0 then

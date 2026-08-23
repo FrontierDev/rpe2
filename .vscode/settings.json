@@ -34,6 +34,11 @@
         "ChatEdit_SendText",
         "TooltipDataProcessor",
         "SetRaidTargetIconTexture",
-        "SOUNDKIT"
+        "SOUNDKIT",
+        "ITEM_QUALITY_COLORS",
+        "StaticPopupDialogs",
+        "StaticPopup_Show",
+        "ACCEPT",
+        "CANCEL"
     ]
 }

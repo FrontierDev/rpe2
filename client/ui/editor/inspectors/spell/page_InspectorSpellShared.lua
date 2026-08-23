@@ -72,6 +72,12 @@ local TARGET_DISPOSITION_ITEMS = {
     { label = "Any", value = "any" },
 }
 
+local AMOUNT_MODE_ITEMS = {
+    { label = "Flat", value = "flat" },
+    { label = "% Base", value = "base_percent" },
+    { label = "% Max", value = "max_percent" },
+}
+
 local SPELL_INSPECTOR_PAGE_DEFINITIONS = {
     { key = "general", label = "General" },
     { key = "learning", label = "Learning" },
@@ -232,16 +238,15 @@ function DataEditor:CommitSelectedSpell(mutate)
         return
     end
 
+    local before = self:DeepCopyValue(spell)
     mutate(spell, dataset)
     applyTable(spell, self:NormalizeSpellDefinition(spell))
 
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "spells", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, spell) then
+        return
     end
 
-    self:RefreshAfterDatasetEntryChanged("spells")
+    self:QueuePendingDatasetEntryChanged(dataset.id, "spells")
 end
 
 function DataEditor:GetSpellInspectorCastPhaseItems()
@@ -274,6 +279,10 @@ end
 
 function DataEditor:GetSpellInspectorTargetDispositionItems()
     return TARGET_DISPOSITION_ITEMS
+end
+
+function DataEditor:GetSpellInspectorAmountModeItems()
+    return AMOUNT_MODE_ITEMS
 end
 
 function DataEditor:GetSpellInspectorEventItems()

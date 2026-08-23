@@ -49,6 +49,7 @@ local INSPECTOR_PAGE_BY_COLLECTION = {
     spells = "spell",
     traits = "trait",
     skills = "skill",
+    recipes = "recipe",
     auras = "aura",
     itemSlots = "itemSlot",
     weaponTypes = "weaponType",
@@ -92,6 +93,7 @@ local INSPECTOR_REFRESHER_BY_PAGE = {
     spell = "RefreshSpellInspectorPage",
     trait = "RefreshTraitInspectorPage",
     skill = "RefreshSkillInspectorPage",
+    recipe = "RefreshRecipeInspectorPage",
     aura = "RefreshAuraInspectorPage",
     itemSlot = "RefreshItemSlotInspectorPage",
     weaponType = "RefreshWeaponTypeInspectorPage",
@@ -111,6 +113,7 @@ local INSPECTOR_SELECTION_GETTER_BY_PAGE = {
     spell = "GetSelectedSpell",
     trait = "GetSelectedTrait",
     skill = "GetSelectedSkill",
+    recipe = "GetSelectedRecipe",
     aura = "GetSelectedAura",
     itemSlot = "GetSelectedItemSlot",
     weaponType = "GetSelectedWeaponType",
@@ -121,6 +124,23 @@ local INSPECTOR_SELECTION_GETTER_BY_PAGE = {
     race = "GetSelectedRace",
     class = "GetSelectedClass",
 }
+
+local function collectionQueuesDependencyRecompute(collectionKey)
+    return collectionKey == "units"
+        or collectionKey == "mounts"
+        or collectionKey == "stats"
+        or collectionKey == "resources"
+        or collectionKey == "items"
+        or collectionKey == "spells"
+        or collectionKey == "traits"
+        or collectionKey == "skills"
+        or collectionKey == "races"
+        or collectionKey == "classes"
+        or collectionKey == "itemSlots"
+        or collectionKey == "weaponTypes"
+        or collectionKey == "damageSchools"
+        or collectionKey == "auras"
+end
 
 function DataEditor:GetEntryDefinition(collectionKey)
     return ENTRY_DEFINITIONS[collectionKey]
@@ -242,12 +262,12 @@ function DataEditor:BuildDataPageFilterBar(parent, name, collectionKey, config)
     })
     input:SetScript("OnTextChanged", function(_, text)
         self:SetCollectionFilterText(collectionKey, text)
-        self:RefreshAll()
+        self:RefreshContentPageByKey(collectionKey)
     end)
     input:SetScript("OnEscapePressed", function()
         self:SetCollectionFilterText(collectionKey, "")
         input:SetText("")
-        self:RefreshAll()
+        self:RefreshContentPageByKey(collectionKey)
     end)
     if input.GetEditBox and input:GetEditBox() and config.placeholder and input:GetEditBox().SetTextInsets then
         input:GetEditBox():SetTextInsets(6, 6, 0, 0)
@@ -266,7 +286,7 @@ function DataEditor:BuildDataPageFilterBar(parent, name, collectionKey, config)
             selectedValue = self:GetCollectionDropdownFilterValue(collectionKey),
             onValueChanged = function(value)
                 self:SetCollectionDropdownFilterValue(collectionKey, value)
-                self:RefreshAll()
+                self:RefreshContentPageByKey(collectionKey)
             end,
         })
         bar:AddChild(dropdown)
@@ -281,7 +301,7 @@ function DataEditor:BuildDataPageFilterBar(parent, name, collectionKey, config)
         if dropdown and dropdown.SetSelectedValue then
             dropdown:SetSelectedValue("all", true)
         end
-        self:RefreshAll()
+        self:RefreshContentPageByKey(collectionKey)
     end, {
         height = 20,
         fontSize = 7,
@@ -332,7 +352,9 @@ function DataEditor:SetSelectedDatasetEntryIndex(collectionKey, index)
         end
     end
 
-    self:RefreshAll()
+    self:RefreshVisibleSelectionState({
+        contentPageKey = collectionKey,
+    })
 end
 
 function DataEditor:CreateDatasetEntry(collectionKey)
@@ -361,6 +383,8 @@ function DataEditor:CreateDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = "trait"
         elseif collectionKey == "skills" then
             self.ActiveInspectorPageKey = "skill"
+        elseif collectionKey == "recipes" then
+            self.ActiveInspectorPageKey = "recipe"
         elseif collectionKey == "auras" then
             self.ActiveInspectorPageKey = "aura"
         elseif collectionKey == "itemSlots" then
@@ -411,6 +435,8 @@ function DataEditor:CloneSelectedDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = "trait"
         elseif collectionKey == "skills" then
             self.ActiveInspectorPageKey = "skill"
+        elseif collectionKey == "recipes" then
+            self.ActiveInspectorPageKey = "recipe"
         elseif collectionKey == "auras" then
             self.ActiveInspectorPageKey = "aura"
         elseif collectionKey == "itemSlots" then
@@ -467,6 +493,8 @@ function DataEditor:DeleteSelectedDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = nextIndex and "trait" or "dataset"
         elseif collectionKey == "skills" then
             self.ActiveInspectorPageKey = nextIndex and "skill" or "dataset"
+        elseif collectionKey == "recipes" then
+            self.ActiveInspectorPageKey = nextIndex and "recipe" or "dataset"
         elseif collectionKey == "auras" then
             self.ActiveInspectorPageKey = nextIndex and "aura" or "dataset"
         elseif collectionKey == "itemSlots" then
@@ -700,6 +728,38 @@ function DataEditor:RefreshInspectorPageByKey(pageKey)
     end
 end
 
+function DataEditor:RefreshActiveInspectorPage()
+    local activeInspectorPageKey = self:NormalizeActiveInspectorPageKey()
+    self:ShowInspectorPage(activeInspectorPageKey)
+    self:RefreshInspectorPageByKey(activeInspectorPageKey)
+    return activeInspectorPageKey
+end
+
+function DataEditor:RefreshVisibleSelectionState(options)
+    options = type(options) == "table" and options or {}
+    self:GetSelectedDataset()
+
+    if options.refreshDatasetsPane == true and self.RefreshDatasetsPane then
+        self:RefreshDatasetsPane()
+    end
+
+    if options.refreshContentSelector == true then
+        self:RefreshContentPageSelector()
+    end
+
+    local contentPageKey = options.contentPageKey
+    if contentPageKey == nil and options.refreshActiveContentPage == true then
+        contentPageKey = self:GetActiveContentPageKey()
+    end
+    if contentPageKey then
+        self:RefreshContentPageByKey(contentPageKey)
+    end
+
+    if options.refreshInspectorPage ~= false then
+        self:RefreshActiveInspectorPage()
+    end
+end
+
 function DataEditor:NormalizeActiveInspectorPageKey()
     local activePageKey = self.ActiveInspectorPageKey or "dataset"
     local getterName = INSPECTOR_SELECTION_GETTER_BY_PAGE[activePageKey]
@@ -713,23 +773,7 @@ function DataEditor:NormalizeActiveInspectorPageKey()
 end
 
 function DataEditor:RefreshAfterDatasetEntryChanged(collectionKey)
-    self:GetSelectedDataset()
-
-    if self.RefreshDatasetsPane then
-        self:RefreshDatasetsPane()
-    end
-
-    if self:GetActiveContentPageKey() == collectionKey then
-        self:RefreshContentPageByKey(collectionKey)
-    end
-
-    local activeInspectorPageKey = self:NormalizeActiveInspectorPageKey()
-    local targetInspectorPageKey = self:GetInspectorPageKeyForCollection(collectionKey)
-    if activeInspectorPageKey == "dataset" or activeInspectorPageKey == targetInspectorPageKey then
-        self:RefreshInspectorPageByKey(activeInspectorPageKey)
-    end
-
-    self:ShowInspectorPage(activeInspectorPageKey)
+    return collectionKey
 end
 
 function DataEditor:SetActiveContentPage(index)
@@ -824,6 +868,243 @@ function DataEditor:GetDatasetDisplayName(dataset)
     end
 
     return tostring(name)
+end
+
+function DataEditor:DeepCopyValue(value)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local copy = {}
+    for key, nestedValue in pairs(value) do
+        copy[key] = self:DeepCopyValue(nestedValue)
+    end
+
+    return copy
+end
+
+function DataEditor:DeepEqualValues(left, right)
+    local leftType = type(left)
+    local rightType = type(right)
+    if leftType ~= rightType then
+        return false
+    end
+
+    if leftType ~= "table" then
+        return left == right
+    end
+
+    for key, leftValue in pairs(left) do
+        if not self:DeepEqualValues(leftValue, right[key]) then
+            return false
+        end
+    end
+
+    for key in pairs(right) do
+        if left[key] == nil then
+            return false
+        end
+    end
+
+    return true
+end
+
+function DataEditor:IsWindowVisible()
+    local frame = self.Window and self.Window.GetFrame and self.Window:GetFrame() or nil
+    return frame and frame.IsShown and frame:IsShown() or false
+end
+
+function DataEditor:ShouldDeferConfigurationRefresh()
+    return self:IsWindowVisible()
+end
+
+function DataEditor:MarkConfigurationDirty(reason)
+    self.HasDeferredConfigurationChanges = true
+    self.DeferredConfigurationRefreshReason = reason or self.DeferredConfigurationRefreshReason or "configuration-changed"
+    self:UpdateRefreshButtonState()
+    return true
+end
+
+function DataEditor:ApplyDeferredConfigurationPreview(reason, datasetIds)
+    local normalizedReason = reason or self.DeferredConfigurationRefreshReason or "configuration-changed"
+    local dependencies = self.Database and self.Database.Dependecies or nil
+    local recomputed = {}
+
+    for index = 1, #(datasetIds or {}) do
+        local datasetId = tostring(datasetIds[index] or "")
+        if datasetId ~= ""
+            and recomputed[datasetId] ~= true
+            and type(dependencies) == "table"
+            and type(dependencies.RecomputeDatasetDependencies) == "function"
+        then
+            recomputed[datasetId] = true
+            dependencies.RecomputeDatasetDependencies(datasetId)
+        end
+    end
+
+    Addon.Internal = Addon.Internal or {}
+    Addon.Internal.ConfigurationRevision = math.max(0, math.floor(tonumber(Addon.Internal.ConfigurationRevision) or 0)) + 1
+
+    local client = Addon.Client or nil
+    if client and type(client.HandleLocalConfigurationChanged) == "function" then
+        client:HandleLocalConfigurationChanged(normalizedReason)
+    end
+
+    self:RefreshAll()
+    self:UpdateRefreshButtonState()
+    return true
+end
+
+function DataEditor:QueuePendingDatasetEntryChanged(datasetId, collectionKey, options)
+    if datasetId == nil or collectionKey == nil or collectionKey == "" then
+        return false
+    end
+
+    self.PendingDatasetEntryNotifications = self.PendingDatasetEntryNotifications or {}
+    local datasetKey = tostring(datasetId)
+    local entry = self.PendingDatasetEntryNotifications[datasetKey]
+    if type(entry) ~= "table" then
+        entry = {
+            collectionKeys = {},
+            requiresDependencyRecompute = false,
+        }
+        self.PendingDatasetEntryNotifications[datasetKey] = entry
+    end
+
+    entry.collectionKeys[collectionKey] = true
+    if collectionQueuesDependencyRecompute(collectionKey) then
+        entry.requiresDependencyRecompute = true
+    end
+
+    local delta = math.max(1, math.floor(tonumber(options and options.changeCount) or 1))
+    self.PendingChangeCount = math.max(0, math.floor(tonumber(self.PendingChangeCount) or 0)) + delta
+    return self:MarkConfigurationDirty(options and options.reason or "dataset-entry")
+end
+
+function DataEditor:CommitPendingChanges()
+    local pendingChangeCount = math.max(0, math.floor(tonumber(self.PendingChangeCount) or 0))
+    if pendingChangeCount <= 0 then
+        self:UpdateRefreshButtonState()
+        return false
+    end
+
+    local reason = self.DeferredConfigurationRefreshReason or "configuration-changed"
+    local notifications = self.PendingDatasetEntryNotifications or {}
+    local dependencies = self.Database and self.Database.Dependecies or nil
+
+    for datasetId, notification in pairs(notifications) do
+        if type(notification) == "table"
+            and notification.requiresDependencyRecompute == true
+            and type(dependencies) == "table"
+            and type(dependencies.RecomputeDatasetDependencies) == "function"
+        then
+            dependencies.RecomputeDatasetDependencies(datasetId)
+        end
+    end
+
+    local nextRevision = math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0)) + 1
+    local crafting = Addon.Client and Addon.Client.Crafting or nil
+    if crafting and type(crafting.RebuildRecipeSkillIndex) == "function" then
+        crafting:RebuildRecipeSkillIndex(nextRevision)
+    end
+
+    Addon.Internal = Addon.Internal or {}
+    Addon.Internal.ConfigurationRevision = math.max(0, math.floor(tonumber(Addon.Internal.ConfigurationRevision) or 0)) + 1
+
+    self.HasDeferredConfigurationChanges = false
+    self.DeferredConfigurationRefreshReason = nil
+    self.PendingDatasetEntryNotifications = {}
+    self.PendingChangeCount = 0
+    self:UpdateRefreshButtonState()
+
+    local client = Addon.Client or nil
+    if client and type(client.HandleLocalConfigurationChanged) == "function" then
+        client:HandleLocalConfigurationChanged(reason)
+    end
+
+    self:RefreshAll()
+    return true
+end
+
+function DataEditor:UpdateRefreshButtonState()
+    local button = self.RefreshHeaderButton
+    local statusText = self.RefreshHeaderStatusText
+    local pendingChangeCount = math.max(0, math.floor(tonumber(self.PendingChangeCount) or 0))
+
+    if button and button.SetText then
+        button:SetText("Commit Changes")
+    end
+    if button and button.SetEnabled then
+        button:SetEnabled(pendingChangeCount > 0)
+    end
+
+    if statusText and statusText.SetText then
+        if pendingChangeCount == 1 then
+            statusText:SetText("1 pending change")
+        else
+            statusText:SetText(("%d pending changes"):format(pendingChangeCount))
+        end
+    end
+
+    if not button and not statusText then
+        return
+    end
+end
+
+function DataEditor:BuildRefreshHeaderButton()
+    if self.RefreshHeaderButton or not self.Window or not self.Window.headerFrame then
+        return self.RefreshHeaderButton
+    end
+
+    self.RefreshHeaderButton = UI.CreateButton(self.Window.headerFrame, "RPEDataEditorRefreshHeaderButton", "Commit Changes", 88, function()
+        self:CommitPendingChanges()
+    end, {
+        height = 14,
+        fontSize = 7,
+    })
+    self.RefreshHeaderStatusText = UI.CreateText(self.Window.headerFrame, "RPEDataEditorRefreshHeaderStatusText", "0 pending changes", {
+        width = 120,
+        height = 14,
+        fontSize = 8,
+        justifyH = "RIGHT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.RefreshHeaderStatusText:SetParent(self.Window.headerFrame)
+    self.RefreshHeaderStatusText:Create()
+
+    local buttonFrame = self.RefreshHeaderButton.GetFrame and self.RefreshHeaderButton:GetFrame() or nil
+    local statusFrame = self.RefreshHeaderStatusText and self.RefreshHeaderStatusText.GetFrame and self.RefreshHeaderStatusText:GetFrame() or nil
+    local closeFrame = self.Window.closeButton and self.Window.closeButton.GetFrame and self.Window.closeButton:GetFrame() or nil
+    if buttonFrame then
+        buttonFrame:ClearAllPoints()
+        if closeFrame then
+            buttonFrame:SetPoint("RIGHT", closeFrame, "LEFT", -6, 0)
+        else
+            buttonFrame:SetPoint("RIGHT", self.Window.headerFrame, "RIGHT", -24, 0)
+        end
+        buttonFrame:SetPoint("TOP", self.Window.headerFrame, "TOP", 0, -1)
+        buttonFrame:SetPoint("BOTTOM", self.Window.headerFrame, "BOTTOM", 0, 1)
+    end
+
+    if statusFrame and buttonFrame then
+        statusFrame:ClearAllPoints()
+        statusFrame:SetPoint("RIGHT", buttonFrame, "LEFT", -6, 0)
+        statusFrame:SetPoint("TOP", self.Window.headerFrame, "TOP", 0, -1)
+        statusFrame:SetPoint("BOTTOM", self.Window.headerFrame, "BOTTOM", 0, 1)
+    end
+
+    if self.Window.titleRegion and buttonFrame then
+        self.Window.titleRegion:ClearAllPoints()
+        self.Window.titleRegion:SetPoint("LEFT", self.Window.headerFrame, "LEFT", 8, 0)
+        if statusFrame then
+            self.Window.titleRegion:SetPoint("RIGHT", statusFrame, "LEFT", -6, 0)
+        else
+            self.Window.titleRegion:SetPoint("RIGHT", buttonFrame, "LEFT", -6, 0)
+        end
+    end
+
+    self:UpdateRefreshButtonState()
+    return self.RefreshHeaderButton
 end
 
 function DataEditor:GetSelectedDataset()
@@ -927,7 +1208,10 @@ function DataEditor:SetSelectedDatasetId(datasetId)
         self.Database.SetActiveDatasetId(datasetId)
     end
 
-    self:RefreshAll()
+    self:RefreshVisibleSelectionState({
+        refreshDatasetsPane = true,
+        refreshActiveContentPage = true,
+    })
 end
 
 function DataEditor:SetSelectedUnitIndex(index)
@@ -1392,6 +1676,7 @@ function DataEditor:ShowInspectorPage(pageKey)
         spell = "BuildSpellInspectorPage",
         trait = "BuildTraitInspectorPage",
         skill = "BuildSkillInspectorPage",
+        recipe = "BuildRecipeInspectorPage",
         aura = "BuildAuraInspectorPage",
         stat = "BuildStatInspectorPage",
         resource = "BuildResourceInspectorPage",
@@ -1423,6 +1708,7 @@ end
 
 function DataEditor:RefreshAll()
     self:GetSelectedDataset()
+    self.ReferenceItemsCache = {}
 
     if self.RefreshDatasetsPane then
         self:RefreshDatasetsPane()
@@ -1511,6 +1797,9 @@ function DataEditor:RefreshAll()
     if self.RefreshSkillInspectorPage then
         self:RefreshSkillInspectorPage()
     end
+    if self.RefreshRecipeInspectorPage then
+        self:RefreshRecipeInspectorPage()
+    end
     if self.RefreshAuraInspectorPage then
         self:RefreshAuraInspectorPage()
     end
@@ -1574,6 +1863,7 @@ function DataEditor:BuildWindow()
     window:Create()
 
     self.Window = window
+    self:BuildRefreshHeaderButton()
 
     local content = window:GetContentFrame()
     self.RootLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, content, "RPEDataEditorRootLayout", {
@@ -1631,17 +1921,25 @@ function DataEditor:BuildWindow()
     UI.Utils.AnchorFill(self.InspectorHost, self.InspectorPanel:GetContentFrame(), 0, 0, 0, 0)
 
     self:SetActiveContentPage(self.ActiveContentPageIndex or 1)
-    self:RefreshAll()
+    self:RefreshActiveInspectorPage()
+    self:UpdateRefreshButtonState()
     return window
 end
 
 function DataEditor:ShowWindow()
+    local hadWindow = self.Window ~= nil
     local window = self:BuildWindow()
     if window and window.Show then
         window:Show()
     end
 
-    self:RefreshAll()
+    self:UpdateRefreshButtonState()
+    if hadWindow then
+        self:RefreshVisibleSelectionState({
+            refreshDatasetsPane = true,
+            refreshActiveContentPage = true,
+        })
+    end
     return window
 end
 

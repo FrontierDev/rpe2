@@ -7,10 +7,26 @@ Addon.Internal.Database = Database
 local Dependecies = Database.Dependecies or {}
 
 local SCHEMA = {
-    profiles = 3,
+    profiles = 4,
     rulesets = 1,
-    datasets = 13,
+    datasets = 14,
     globalSettings = 1,
+}
+
+local DATASET_TYPE_VALUES = {
+    "general",
+    "campaign",
+    "crafting",
+    "class",
+    "items",
+}
+
+local DATASET_TYPE_SORT_ORDER = {
+    general = 1,
+    campaign = 2,
+    crafting = 3,
+    class = 4,
+    items = 5,
 }
 
 local DATASET_ENTRY_DEFINITIONS = {
@@ -80,6 +96,9 @@ end
 local function notifyConfigurationChanged(reason)
     markConfigurationChanged()
     local client = Addon.Client or nil
+    if client and type(client.TryDeferLocalConfigurationChanged) == "function" and client:TryDeferLocalConfigurationChanged(reason) then
+        return
+    end
     if client and type(client.HandleLocalConfigurationChanged) == "function" then
         client:HandleLocalConfigurationChanged(reason)
     end
@@ -257,16 +276,17 @@ local function rewriteDatasetRefs(value, previousDatasetId, nextDatasetId, seen)
     return value
 end
 
-local function getCharacterKey()
+local function resolveCurrentCharacterIdentity()
     if UnitFullName then
         local name, realm = UnitFullName("player")
         if name and name ~= "" then
             realm = realm or (GetRealmName and GetRealmName()) or ""
             if realm ~= "" then
-                return ("%s-%s"):format(name, realm)
+                local characterKey = ("%s-%s"):format(name, realm)
+                return characterKey, characterKey, true
             end
 
-            return name
+            return name, name, true
         end
     end
 
@@ -275,42 +295,25 @@ local function getCharacterKey()
         if name and name ~= "" then
             local realm = (GetRealmName and GetRealmName()) or ""
             if realm ~= "" then
-                return ("%s-%s"):format(name, realm)
+                local characterKey = ("%s-%s"):format(name, realm)
+                return characterKey, characterKey, true
             end
 
-            return name
+            return name, name, true
         end
     end
 
-    return "unknown-player"
+    return "unknown-player", "Unknown Author", false
+end
+
+local function getCharacterKey()
+    local characterKey = select(1, resolveCurrentCharacterIdentity())
+    return characterKey
 end
 
 local function getCharacterDisplayName()
-    if UnitFullName then
-        local name, realm = UnitFullName("player")
-        if name and name ~= "" then
-            realm = realm or (GetRealmName and GetRealmName()) or ""
-            if realm ~= "" then
-                return ("%s-%s"):format(name, realm)
-            end
-
-            return name
-        end
-    end
-
-    if UnitName then
-        local name = UnitName("player")
-        if name and name ~= "" then
-            local realm = (GetRealmName and GetRealmName()) or ""
-            if realm ~= "" then
-                return ("%s-%s"):format(name, realm)
-            end
-
-            return name
-        end
-    end
-
-    return "Unknown Author"
+    local _, displayName = resolveCurrentCharacterIdentity()
+    return displayName
 end
 
 local function resolveCharacterScopedActiveId(root, fieldName)
@@ -366,9 +369,8 @@ local function normalizeDatasetRecord(record, fallbackId, fallbackName)
         name = name,
         groupName = ensureString(data.groupName, ""),
         description = ensureString(data.description, ""),
-        lockState = normalizeDatasetState(data.lockState, { "open", "readonly", "secret" }, "open"),
         authorName = ensureString(data.authorName, getCharacterDisplayName()),
-        tagState = normalizeDatasetState(data.tagState, { "standard", "short-term", "long-term" }, "standard"),
+        datasetType = normalizeDatasetState(data.datasetType, DATASET_TYPE_VALUES, "general"),
         dependencies = ensureTable(data.dependencies),
         units = ensureTable(data.units),
         mounts = ensureTable(data.mounts),
@@ -476,6 +478,58 @@ local function normalizeProfileSpellbook(record)
     end
 
     return normalized
+end
+
+local function normalizeProfileRecipebook(record)
+    local normalized = {}
+
+    for index = 1, #(record or {}) do
+        local recipeRef = ensureString(record[index], "")
+        if recipeRef ~= "" then
+            normalized[#normalized + 1] = recipeRef
+        end
+    end
+
+    return normalized
+end
+
+local function normalizeProfileRecipeRefList(record)
+    local normalized = {}
+    local seen = {}
+
+    for index = 1, #(record or {}) do
+        local recipeRef = ensureString(record[index], "")
+        if recipeRef ~= "" and not seen[recipeRef] then
+            normalized[#normalized + 1] = recipeRef
+            seen[recipeRef] = true
+        end
+    end
+
+    return normalized
+end
+
+local function normalizeProfileRecipeRefBuckets(record)
+    local normalized = {}
+
+    for skillRef, refs in pairs(ensureTable(record)) do
+        local normalizedSkillRef = ensureString(skillRef, "")
+        if normalizedSkillRef ~= "" then
+            normalized[normalizedSkillRef] = normalizeProfileRecipeRefList(refs)
+        end
+    end
+
+    return normalized
+end
+
+local function normalizeProfileRecipeKnowledge(record)
+    local data = ensureTable(record)
+    return {
+        revision = math.max(0, math.floor(tonumber(data.revision) or 0)),
+        knownRecipeRefs = normalizeProfileRecipeRefList(data.knownRecipeRefs),
+        unknownTrainerRecipeRefs = normalizeProfileRecipeRefList(data.unknownTrainerRecipeRefs),
+        knownRecipeRefsBySkill = normalizeProfileRecipeRefBuckets(data.knownRecipeRefsBySkill),
+        unknownTrainerRecipeRefsBySkill = normalizeProfileRecipeRefBuckets(data.unknownTrainerRecipeRefsBySkill),
+    }
 end
 
 local function normalizeProfileSkillLevels(record)
@@ -697,6 +751,12 @@ local function isValidProfileSkillRef(skillRef)
     return datasetId ~= nil and datasetId ~= "" and skillId ~= nil and skillId ~= ""
 end
 
+local function isValidProfileRecipeRef(recipeRef)
+    local normalizedRef = ensureString(recipeRef, "")
+    local datasetId, recipeId = normalizedRef:match("^([^:]+):([^:]+)$")
+    return datasetId ~= nil and datasetId ~= "" and recipeId ~= nil and recipeId ~= ""
+end
+
 local function normalizeProfileRecord(record, fallbackCharacterKey, fallbackName)
     local data = ensureTable(record)
     local characterKey = ensureString(data.characterKey or fallbackCharacterKey, "")
@@ -714,6 +774,8 @@ local function normalizeProfileRecord(record, fallbackCharacterKey, fallbackName
         mountEquipment = normalizeProfileEquipmentMap(data.mountEquipment),
         petEquipment = normalizeProfilePetEquipmentMap(data.petEquipment),
         spellbook = normalizeProfileSpellbook(data.spellbook),
+        recipebook = normalizeProfileRecipebook(data.recipebook),
+        recipeKnowledge = normalizeProfileRecipeKnowledge(data.recipeKnowledge),
         traits = normalizeProfileTraits(data.traits),
         activeTraits = normalizeProfileActiveTraits(data.activeTraits ~= nil and data.activeTraits or data.traits),
         inactiveTraits = normalizeProfileActiveTraits(data.inactiveTraits),
@@ -755,6 +817,83 @@ local function normalizeProfilesCollection(root)
 
     root.profiles = normalized
     return root.profiles
+end
+
+local function isTableEmpty(value)
+    return type(value) ~= "table" or next(value) == nil
+end
+
+local function isDefaultProfileRecord(record)
+    local profile = normalizeProfileRecord(record, "", "")
+    local widgets = normalizeProfileWidgets(profile.widgets)
+    local resourceDisplay = normalizeProfileResourceDisplay(profile.resourceDisplay)
+    local setupWizard = normalizeProfileSetupWizard(profile.setupWizard)
+
+    return math.max(1, math.floor(tonumber(profile.level) or 1)) == getRulesetStartingLevel()
+        and ensureString(profile.raceRef, "") == ""
+        and ensureString(profile.classRef, "") == ""
+        and ensureString(profile.mountRef, "") == ""
+        and ensureString(profile.petRef, "") == ""
+        and profile.mounted ~= true
+        and isTableEmpty(profile.equipment)
+        and isTableEmpty(profile.mountEquipment)
+        and isTableEmpty(profile.petEquipment)
+        and isTableEmpty(profile.spellbook)
+        and isTableEmpty(profile.recipebook)
+        and isTableEmpty(profile.recipeKnowledge)
+        and isTableEmpty(profile.traits)
+        and isTableEmpty(profile.activeTraits)
+        and isTableEmpty(profile.inactiveTraits)
+        and isTableEmpty(profile.skillLevels)
+        and isTableEmpty(profile.preferredConsumables)
+        and isTableEmpty(profile.actionBar)
+        and isTableEmpty(profile.skillActionBar)
+        and isTableEmpty(profile.mountedActionBar)
+        and widgets.unlocked ~= true
+        and isTableEmpty(widgets.actionBar)
+        and ensureString(widgets.actionBarMode, "spells") == "spells"
+        and ensureString(resourceDisplay.primaryResourceRef, "") == ""
+        and ensureString(resourceDisplay.specialResourceRef, "") == ""
+        and ensureString(setupWizard.raceRef, "") == ""
+        and ensureString(setupWizard.classRef, "") == ""
+        and isTableEmpty(setupWizard.startingItemRefs)
+        and isTableEmpty(setupWizard.actionBarSpellRefs)
+        and isTableEmpty(profile.statBonuses)
+        and isTableEmpty(profile.currencies)
+end
+
+local function migrateUnknownPlayerProfile(root)
+    if type(root) ~= "table" then
+        return false, false
+    end
+
+    local profiles = normalizeProfilesCollection(root)
+    local unknownProfile = profiles["unknown-player"]
+    if type(unknownProfile) ~= "table" then
+        return false, false
+    end
+
+    local characterKey, displayName, isStable = resolveCurrentCharacterIdentity()
+    if isStable ~= true or characterKey == "" or characterKey == "unknown-player" then
+        return false, false
+    end
+
+    local authoritativeProfile = profiles[characterKey]
+    if type(authoritativeProfile) == "table" then
+        if isDefaultProfileRecord(unknownProfile) then
+            profiles["unknown-player"] = nil
+            return false, true
+        end
+
+        return false, false
+    end
+
+    local migratedProfile = normalizeProfileRecord(unknownProfile, characterKey, displayName)
+    migratedProfile.characterKey = characterKey
+    migratedProfile.name = displayName ~= "" and displayName or ensureString(migratedProfile.name, displayName)
+    profiles[characterKey] = migratedProfile
+    profiles["unknown-player"] = nil
+    return true, true
 end
 
 local function nextDatasetEntryId(entries, collectionKey, definition)
@@ -1166,6 +1305,7 @@ function Database.EnsureProfiles()
     profiles.lastLFRPChannel = nil
     profiles.currentByChar = nil
     normalizeProfilesCollection(profiles)
+    migrateUnknownPlayerProfile(profiles)
 
     Database.Profiles = profiles
     return profiles
@@ -1174,7 +1314,14 @@ end
 function Database.GetActiveProfile()
     local root = Database.EnsureProfiles()
     local characterKey = getCharacterKey()
-    return root.profiles and root.profiles[characterKey] or nil
+    local profile = root.profiles and root.profiles[characterKey] or nil
+    if type(profile) == "table" then
+        profile.characterKey = characterKey
+        if characterKey ~= "unknown-player" and ensureString(profile.name, "") == "" then
+            profile.name = getCharacterDisplayName()
+        end
+    end
+    return profile
 end
 
 function Database.GetOrCreateActiveProfile()
@@ -1199,6 +1346,8 @@ function Database.GetOrCreateActiveProfile()
         mountEquipment = {},
         petEquipment = {},
         spellbook = {},
+        recipebook = {},
+        recipeKnowledge = {},
         traits = {},
         activeTraits = {},
         inactiveTraits = {},
@@ -1215,6 +1364,14 @@ function Database.GetOrCreateActiveProfile()
     }, characterKey, getCharacterDisplayName())
     root.profiles[characterKey] = profile
     return profile
+end
+
+function Database.ResolveCurrentCharacterIdentity()
+    return resolveCurrentCharacterIdentity()
+end
+
+function Database.IsCurrentCharacterIdentityStable()
+    return select(3, resolveCurrentCharacterIdentity()) == true
 end
 
 function Database.UpdateActiveProfile(mutator)
@@ -1352,6 +1509,30 @@ function Database.ListProfileSpellbook()
     end
 
     return spellbook
+end
+
+function Database.ListProfileRecipebook()
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.recipebook = normalizeProfileRecipebook(profile.recipebook)
+
+    local recipebook = {}
+    for index = 1, #profile.recipebook do
+        recipebook[index] = profile.recipebook[index]
+    end
+
+    return recipebook
+end
+
+function Database.GetProfileRecipeKnowledge()
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.recipeKnowledge = normalizeProfileRecipeKnowledge(profile.recipeKnowledge)
+    return deepCopy(profile.recipeKnowledge)
+end
+
+function Database.SetProfileRecipeKnowledge(recipeKnowledge)
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.recipeKnowledge = normalizeProfileRecipeKnowledge(recipeKnowledge)
+    return deepCopy(profile.recipeKnowledge)
 end
 
 local function isValidProfileTraitRef(traitRef)
@@ -1630,6 +1811,26 @@ function Database.AddProfileSpellbookSpell(spellRef)
     return true
 end
 
+function Database.AddProfileRecipebookRecipe(recipeRef)
+    local normalizedRef = ensureString(recipeRef, "")
+    if not isValidProfileRecipeRef(normalizedRef) then
+        return false
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.recipebook = normalizeProfileRecipebook(profile.recipebook)
+
+    for index = 1, #profile.recipebook do
+        if profile.recipebook[index] == normalizedRef then
+            return false
+        end
+    end
+
+    profile.recipebook[#profile.recipebook + 1] = normalizedRef
+    notifyConfigurationChanged("profile-recipebook")
+    return true
+end
+
 function Database.RemoveProfileSpellbookSpell(spellRef)
     local normalizedRef = ensureString(spellRef, "")
     if normalizedRef == "" then
@@ -1643,6 +1844,26 @@ function Database.RemoveProfileSpellbookSpell(spellRef)
         if profile.spellbook[index] == normalizedRef then
             table.remove(profile.spellbook, index)
             notifyConfigurationChanged("profile-spellbook")
+            return true
+        end
+    end
+
+    return false
+end
+
+function Database.RemoveProfileRecipebookRecipe(recipeRef)
+    local normalizedRef = ensureString(recipeRef, "")
+    if normalizedRef == "" then
+        return false
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.recipebook = normalizeProfileRecipebook(profile.recipebook)
+
+    for index = 1, #profile.recipebook do
+        if profile.recipebook[index] == normalizedRef then
+            table.remove(profile.recipebook, index)
+            notifyConfigurationChanged("profile-recipebook")
             return true
         end
     end
@@ -1664,6 +1885,23 @@ function Database.RemoveProfileSpellbookSpellAt(index)
 
     table.remove(profile.spellbook, removeIndex)
     notifyConfigurationChanged("profile-spellbook")
+    return true
+end
+
+function Database.RemoveProfileRecipebookRecipeAt(index)
+    local removeIndex = tonumber(index)
+    if not removeIndex then
+        return false
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.recipebook = normalizeProfileRecipebook(profile.recipebook)
+    if profile.recipebook[removeIndex] == nil then
+        return false
+    end
+
+    table.remove(profile.recipebook, removeIndex)
+    notifyConfigurationChanged("profile-recipebook")
     return true
 end
 
@@ -2646,6 +2884,12 @@ function Database.ListDatasets()
             return leftGroup < rightGroup
         end
 
+        local leftTypeOrder = DATASET_TYPE_SORT_ORDER[ensureString(left and left.datasetType, "general")] or DATASET_TYPE_SORT_ORDER.general
+        local rightTypeOrder = DATASET_TYPE_SORT_ORDER[ensureString(right and right.datasetType, "general")] or DATASET_TYPE_SORT_ORDER.general
+        if leftTypeOrder ~= rightTypeOrder then
+            return leftTypeOrder < rightTypeOrder
+        end
+
         local leftName = string.lower(Database.GetDatasetDisplayName(left))
         local rightName = string.lower(Database.GetDatasetDisplayName(right))
         if leftName == rightName then
@@ -2803,9 +3047,8 @@ function Database.CreateDataset(name)
         name = name ~= nil and tostring(name) or "New Dataset",
         groupName = "",
         description = "",
-        lockState = "open",
         authorName = getCharacterDisplayName(),
-        tagState = "standard",
+        datasetType = "general",
         dependencies = {},
         units = {},
         mounts = {},
@@ -3053,11 +3296,8 @@ function Database.UpdateDatasetMetadata(datasetId, metadata)
     if values.groupName ~= nil then
         dataset.groupName = ensureString(values.groupName, "")
     end
-    if values.lockState ~= nil then
-        dataset.lockState = normalizeDatasetState(values.lockState, { "open", "readonly", "secret" }, dataset.lockState or "open")
-    end
-    if values.tagState ~= nil then
-        dataset.tagState = normalizeDatasetState(values.tagState, { "standard", "short-term", "long-term" }, dataset.tagState or "standard")
+    if values.datasetType ~= nil then
+        dataset.datasetType = normalizeDatasetState(values.datasetType, DATASET_TYPE_VALUES, dataset.datasetType or "general")
     end
 
     notifyConfigurationChanged("dataset-update")

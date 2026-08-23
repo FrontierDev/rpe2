@@ -219,6 +219,7 @@ function DataEditor:CommitSelectedSkill(mutate)
         return
     end
 
+    local before = self:DeepCopyValue(skill)
     mutate(skill, dataset)
     local normalized = self:NormalizeSkillDefinition(skill)
     for key in pairs(skill) do
@@ -230,13 +231,11 @@ function DataEditor:CommitSelectedSkill(mutate)
         skill[key] = value
     end
 
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "skills", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, skill) then
+        return
     end
 
-    self:RefreshAfterDatasetEntryChanged("skills")
+    self:QueuePendingDatasetEntryChanged(dataset.id, "skills")
 end
 
 function DataEditor:GetSkillInspectorPageDefinitions()

@@ -382,6 +382,62 @@ function Registry:ResolveSkillName(skillRef)
     return "unknown-skill"
 end
 
+function Registry:ResolveItemReference(itemRef)
+    local datasetId, itemId = parseDatasetQualifiedRef(itemRef)
+    if not datasetId or not itemId then
+        return nil, nil
+    end
+
+    return resolveDatasetEntryByCollection(datasetId, itemId, "items")
+end
+
+function Registry:ResolveItemName(itemRef)
+    local _, item = self:ResolveItemReference(itemRef)
+    if item and type(item.name) == "string" and item.name ~= "" then
+        return item.name
+    end
+
+    local _, itemId = parseDatasetQualifiedRef(itemRef)
+    if itemId then
+        return itemId
+    end
+
+    local normalizedRef = type(itemRef) == "string" and itemRef or ""
+    if normalizedRef ~= "" then
+        return normalizedRef
+    end
+
+    return "unknown-item"
+end
+
+function Registry:ResolveRecipeReference(recipeRef)
+    local datasetId, recipeId = parseDatasetQualifiedRef(recipeRef)
+    if not datasetId or not recipeId then
+        return nil, nil
+    end
+
+    return resolveDatasetEntryByCollection(datasetId, recipeId, "recipes")
+end
+
+function Registry:ResolveRecipeName(recipeRef)
+    local _, recipe = self:ResolveRecipeReference(recipeRef)
+    if recipe and type(recipe.name) == "string" and recipe.name ~= "" then
+        return recipe.name
+    end
+
+    local _, recipeId = parseDatasetQualifiedRef(recipeRef)
+    if recipeId then
+        return recipeId
+    end
+
+    local normalizedRef = type(recipeRef) == "string" and recipeRef or ""
+    if normalizedRef ~= "" then
+        return normalizedRef
+    end
+
+    return "unknown-recipe"
+end
+
 function Registry:ResolveRaceReference(raceRef)
     local datasetId, raceId = parseDatasetQualifiedRef(raceRef)
     if not datasetId or not raceId then

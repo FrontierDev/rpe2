@@ -60,6 +60,36 @@ local function bumpAllEventTooltipContextRevisions(eventState)
     end
 end
 
+local function getNowMilliseconds()
+    if type(GetTimePreciseSec) == "function" then
+        return GetTimePreciseSec() * 1000
+    end
+
+    return (GetTime and GetTime() or 0) * 1000
+end
+
+local function isSpellcastTimingEnabled()
+    return type(Addon.Debug) == "table" and Addon.Debug.SpellcastTiming == true
+end
+
+local function logSpellcastTiming(phase, context, detail)
+    local Debug = Addon.Debug or {}
+    if not isSpellcastTimingEnabled() or type(Debug.Internal) ~= "function" then
+        return false
+    end
+
+    if type(Debug.EnsureInternalLevelEnabled) == "function" then
+        Debug.EnsureInternalLevelEnabled()
+    end
+
+    local message = ("Cooldown timing [%s]: %s - %s"):format(
+        tostring(context or "unknown"),
+        tostring(phase or "unknown"),
+        tostring(detail or "")
+    )
+    return Debug.Internal("%s", message)
+end
+
 local function normalizeEventId(eventId)
     return type(eventId) == "string" and eventId or ""
 end
@@ -161,6 +191,10 @@ local function normalizeCooldownGroup(value)
     end
 
     return group
+end
+
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
 end
 
 local function spellIgnoresGlobalCooldown(spell)
@@ -329,6 +363,9 @@ local function listUnitSpellRefs(casterUnit)
 end
 
 local function listCasterSpellRefs(self, eventState, casterUnit)
+    local timingEnabled = isSpellcastTimingEnabled()
+    local totalStartTime = timingEnabled and getNowMilliseconds() or nil
+    
     local refs = {}
     local seen = {}
 
@@ -346,18 +383,40 @@ local function listCasterSpellRefs(self, eventState, casterUnit)
     end
 
     if type(casterUnit) == "table" and casterUnit.isPlayer == true then
-        local knownSpells = Profile.ListKnownSpells and Profile.ListKnownSpells() or {}
-        for index = 1, #knownSpells do
-            appendSpellRef(knownSpells[index] and knownSpells[index].spellRef)
+        -- Optimization: Use cache instead of listing all known spells
+        local cacheKey = casterUnit.isPetCaster == true and "_cachedPetSpellRefsForGCD" or "_cachedSpellRefsForGCD"
+        
+        -- Check if we have a cached list from the last action bar refresh
+        if type(self[cacheKey]) == "table" and #self[cacheKey] > 0 then
+            if timingEnabled then
+                logSpellcastTiming("cache-hit", "spell-refs", ("%.2fms, cached=%d"):format(0, #self[cacheKey]))
+            end
+            return self[cacheKey]
+        end
+        
+        -- Cache miss - build from raw action bar bindings instead of resolved slot details
+        local listStartTime = timingEnabled and getNowMilliseconds() or nil
+        local actionBarBindings = Profile.ListActionBarBindings and Profile.ListActionBarBindings() or {}
+        if timingEnabled then
+            logSpellcastTiming("list-action-bar", "spell-refs", ("%.2fms, action-bar-bindings=%d"):format(math.max(0, getNowMilliseconds() - listStartTime), #actionBarBindings))
+        end
+        
+        local loopStartTime = timingEnabled and getNowMilliseconds() or nil
+        for index = 1, #actionBarBindings do
+            appendSpellRef(actionBarBindings[index])
+        end
+        if timingEnabled then
+            logSpellcastTiming("append-action-bar", "spell-refs", ("%.2fms"):format(math.max(0, getNowMilliseconds() - loopStartTime)))
         end
 
-        if #refs == 0 then
-            local actionBarSlots = Profile.ListActionBarSlots and Profile.ListActionBarSlots() or {}
-            for index = 1, #actionBarSlots do
-                appendSpellRef(actionBarSlots[index] and actionBarSlots[index].spellRef)
-            end
+        -- Cache the result for next spell cast
+        self[cacheKey] = refs
+        
+        if timingEnabled then
+            logSpellcastTiming("cache-build-total", "spell-refs", ("%.2fms, cached=%d"):format(math.max(0, getNowMilliseconds() - totalStartTime), #refs))
         end
     else
+        -- NPC unit path - list their spells
         local unitSpellRefs = listUnitSpellRefs(casterUnit)
         for index = 1, #unitSpellRefs do
             appendSpellRef(unitSpellRefs[index])
@@ -365,6 +424,71 @@ local function listCasterSpellRefs(self, eventState, casterUnit)
     end
 
     return refs
+end
+
+local function buildSpellRefSignature(spellRefs)
+    return table.concat(spellRefs or {}, "\31")
+end
+
+local function buildCooldownSpellMetadata(self, eventState, casterUnit)
+    local spellRefs = listCasterSpellRefs(self, eventState, casterUnit)
+    local metadata = {
+        spellRefs = spellRefs,
+        spellByRef = {},
+        cooldownGroups = {},
+        ignoreGCDSpellRefs = {},
+    }
+
+    for index = 1, #spellRefs do
+        local spellRef = spellRefs[index]
+        local spell = nil
+        if Registry.ResolveSpellReference then
+            local _, resolvedSpell = Registry:ResolveSpellReference(spellRef)
+            spell = resolvedSpell
+        end
+        if type(spell) == "table" then
+            metadata.spellByRef[spellRef] = spell
+
+            local cooldownGroup = normalizeCooldownGroup(spell.cooldownGroup)
+            if cooldownGroup then
+                metadata.cooldownGroups[cooldownGroup] = metadata.cooldownGroups[cooldownGroup] or {}
+                metadata.cooldownGroups[cooldownGroup][#metadata.cooldownGroups[cooldownGroup] + 1] = spellRef
+            end
+
+            if spell.ignoreGCD == true then
+                metadata.ignoreGCDSpellRefs[#metadata.ignoreGCDSpellRefs + 1] = spellRef
+            end
+        end
+    end
+
+    return metadata
+end
+
+local function getCooldownSpellMetadata(self, eventState, casterUnit)
+    if type(casterUnit) ~= "table" or casterUnit.isPlayer ~= true then
+        return buildCooldownSpellMetadata(self, eventState, casterUnit)
+    end
+
+    local cacheKey = casterUnit.isPetCaster == true and "_cachedPetCooldownSpellMetadata" or "_cachedCooldownSpellMetadata"
+    local revision = getConfigurationRevision()
+    local spellRefs = listCasterSpellRefs(self, eventState, casterUnit)
+    local signature = buildSpellRefSignature(spellRefs)
+    local cache = self[cacheKey]
+    if type(cache) == "table"
+        and tonumber(cache.revision) == revision
+        and tostring(cache.signature or "") == signature
+        and type(cache.metadata) == "table"
+    then
+        return cache.metadata
+    end
+
+    local metadata = buildCooldownSpellMetadata(self, eventState, casterUnit)
+    self[cacheKey] = {
+        revision = revision,
+        signature = signature,
+        metadata = metadata,
+    }
+    return metadata
 end
 
 local function resolveSpellReference(spellRef)
@@ -651,11 +775,36 @@ local function advanceSpellLockoutState(entry, advancedTurns)
 end
 
 function Client:QueueActionBarRefresh(reason)
-    if type(self.MarkActionBarSlotsDirty) == "function" then
-        return self:MarkActionBarSlotsDirty(reason)
+    -- Invalidate spell ref caches since action bars changed
+    self._cachedSpellRefsForGCD = nil
+    self._cachedPetSpellRefsForGCD = nil
+    self._cachedCooldownSpellMetadata = nil
+    self._cachedPetCooldownSpellMetadata = nil
+
+    local normalizedReason = tostring(reason or self.PendingActionBarRefreshReason or "cooldown")
+    local eventState = self.GetEventState and self:GetEventState() or nil
+    local startupPending = type(eventState) == "table"
+        and eventState.active == true
+        and (eventState.unitsReady ~= true or eventState.startupReady ~= true)
+    if startupPending and normalizedReason ~= "startup-ready" then
+        self.PendingStartupActionBarRefresh = true
+        self.PendingStartupActionBarRefreshReason = tostring(
+            self.PendingStartupActionBarRefreshReason or normalizedReason
+        )
+        return true
     end
 
-    self.PendingActionBarRefreshReason = tostring(reason or self.PendingActionBarRefreshReason or "cooldown")
+    if normalizedReason == "startup-ready" and type(self.PendingStartupActionBarRefreshReason) == "string" then
+        normalizedReason = self.PendingStartupActionBarRefreshReason
+    end
+    self.PendingStartupActionBarRefresh = false
+    self.PendingStartupActionBarRefreshReason = nil
+
+    if type(self.MarkActionBarSlotsDirty) == "function" then
+        return self:MarkActionBarSlotsDirty(normalizedReason)
+    end
+
+    self.PendingActionBarRefreshReason = normalizedReason
     self.ActionBarRefreshQueued = true
     if type(self.QueueVisualRefreshFlush) == "function" then
         return self:QueueVisualRefreshFlush()
@@ -934,12 +1083,15 @@ function Spellcasting.ApplyLocalSpellCooldown(self, eventState, casterUnit, spel
 
     local triggerCooldownTurns = math.max(0, math.floor(tonumber(normalizeCooldownTurns(spell, false)) or 0))
     local cooldownGroup = normalizeCooldownGroup(spell.cooldownGroup)
+    local cooldownMetadata = (cooldownGroup or spell.ignoreGCD == true)
+        and getCooldownSpellMetadata(self, eventState, casterUnit)
+        or nil
     if cooldownGroup and triggerCooldownTurns > 0 then
-        local casterSpellRefs = listCasterSpellRefs(self, eventState, casterUnit)
+        local casterSpellRefs = cooldownMetadata and cooldownMetadata.cooldownGroups and cooldownMetadata.cooldownGroups[cooldownGroup] or {}
         for index = 1, #casterSpellRefs do
             local candidateSpellRef = casterSpellRefs[index]
             if candidateSpellRef ~= spellRef then
-                local _, candidateSpell = resolveSpellReference(candidateSpellRef)
+                local candidateSpell = cooldownMetadata and cooldownMetadata.spellByRef and cooldownMetadata.spellByRef[candidateSpellRef] or nil
                 if type(candidateSpell) == "table" and normalizeCooldownGroup(candidateSpell.cooldownGroup) == cooldownGroup then
                     changed = applyExternalSpellLockout(unitState, candidateSpellRef, candidateSpell, triggerCooldownTurns) or changed
                 end
@@ -948,11 +1100,11 @@ function Spellcasting.ApplyLocalSpellCooldown(self, eventState, casterUnit, spel
     end
 
     if spell.ignoreGCD == true then
-        local casterSpellRefs = listCasterSpellRefs(self, eventState, casterUnit)
+        local casterSpellRefs = cooldownMetadata and cooldownMetadata.ignoreGCDSpellRefs or {}
         for index = 1, #casterSpellRefs do
             local candidateSpellRef = casterSpellRefs[index]
             if candidateSpellRef ~= spellRef then
-                local _, candidateSpell = resolveSpellReference(candidateSpellRef)
+                local candidateSpell = cooldownMetadata and cooldownMetadata.spellByRef and cooldownMetadata.spellByRef[candidateSpellRef] or nil
                 if type(candidateSpell) == "table" and candidateSpell.ignoreGCD == true then
                     changed = applyExternalSpellLockout(unitState, candidateSpellRef, candidateSpell, 1) or changed
                 end

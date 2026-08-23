@@ -98,6 +98,10 @@ function DataEditor:BuildRecipePage(page)
 end
 
 function DataEditor:RefreshRecipeDataPage()
+    if not self.RecipePageRoot then
+        return
+    end
+
     local dataset = self:GetSelectedDataset()
     local recipes = dataset and dataset.recipes or {}
 

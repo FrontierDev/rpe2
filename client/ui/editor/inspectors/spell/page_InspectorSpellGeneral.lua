@@ -7,6 +7,329 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
 local Client = Addon.Client or {}
+local TooltipTemplate = Addon.Client and Addon.Client.Spellcasting and Addon.Client.Spellcasting.TooltipTemplate or nil
+local Debug = Addon.Debug or {}
+
+local function hasStoredSpellTooltipTemplate(spell)
+    if type(spell) ~= "table" then
+        return false
+    end
+
+    if type(TooltipTemplate) == "table" and type(TooltipTemplate.NormalizeSpellPayload) == "function" then
+        return type(TooltipTemplate.NormalizeSpellPayload(spell.tooltipTemplateData)) == "table"
+    end
+
+    return type(spell.tooltipTemplateData) == "table"
+end
+
+local function logInternal(message, ...)
+    if type(Debug.SetLevelEnabled) == "function" and type(Debug.IsLevelEnabled) == "function" and not Debug.IsLevelEnabled("internal") then
+        Debug.SetLevelEnabled("internal", true)
+    end
+    if type(Debug.Internal) == "function" then
+        Debug.Internal(message, ...)
+    end
+end
+
+local function summarizeText(value, limit)
+    local text = tostring(value or ""):gsub("%s+", " ")
+    limit = math.max(8, math.floor(tonumber(limit) or 80))
+    if text == "" then
+        return "-"
+    end
+    if #text <= limit then
+        return text
+    end
+
+    return text:sub(1, limit - 3) .. "..."
+end
+
+local function summarizeSpellTooltipPayload(payload)
+    if type(payload) ~= "table" then
+        return "payload=nil"
+    end
+
+    return ("main=%s tokens=%d auraSections=%d"):format(
+        summarizeText(payload.mainText, 96),
+        #(payload.tokens or {}),
+        #(payload.auraSections or {})
+    )
+end
+
+local function applyNormalizedDefinition(target, normalized)
+    if type(target) ~= "table" or type(normalized) ~= "table" then
+        return
+    end
+
+    for key in pairs(target) do
+        if normalized[key] == nil then
+            target[key] = nil
+        end
+    end
+    for key, value in pairs(normalized) do
+        target[key] = value
+    end
+end
+
+function DataEditor:GenerateAuraTooltipTemplateForDefinition(dataset, aura, options)
+    if type(dataset) ~= "table" or type(aura) ~= "table" then
+        return false, nil, "missing-dataset-or-aura"
+    end
+
+    local AuraDescriptionBuilder = Addon.Client and Addon.Client.Spellcasting and Addon.Client.Spellcasting.AuraDescriptionBuilder or nil
+    if type(AuraDescriptionBuilder) ~= "table" or type(AuraDescriptionBuilder.BuildTooltipTemplatePayload) ~= "function" then
+        if not (options and options.suppressFailureLog == true) then
+            logInternal("Aura template generate FAILED: aura=%s error=builder-missing", tostring(aura.name or aura.id or "unknown"))
+        end
+        return false, nil, "builder-missing"
+    end
+
+    local auraRef = dataset.id and aura.id and ("%s:%s"):format(dataset.id, aura.id) or aura.id
+    local payload = nil
+    local generationSucceeded, generationError = pcall(function()
+        payload = AuraDescriptionBuilder:BuildTooltipTemplatePayload(aura, {
+            auraRef = auraRef,
+            dataset = dataset,
+            datasetId = dataset.id,
+            spellDatasetId = dataset.id,
+        })
+    end)
+    local normalizedPayload = generationSucceeded
+        and type(TooltipTemplate) == "table"
+        and type(TooltipTemplate.NormalizeAuraPayload) == "function"
+        and TooltipTemplate.NormalizeAuraPayload(payload)
+        or nil
+    local success = generationSucceeded and type(normalizedPayload) == "table"
+
+    aura.tooltipTemplate = success == true
+    aura.tooltipTemplateData = success and normalizedPayload or nil
+
+    local normalizedAura = self:NormalizeAuraDefinition(aura)
+    if type(normalizedAura) == "table" then
+        applyNormalizedDefinition(aura, normalizedAura)
+    end
+
+    if success then
+        if not (options and options.suppressSuccessLog == true) then
+            logInternal(
+                "Aura template generate: aura=%s body=%s",
+                tostring(aura.name or aura.id or "unknown"),
+                summarizeText(normalizedPayload.bodyText, 96)
+            )
+        end
+        return true, normalizedPayload, nil
+    end
+
+    if not (options and options.suppressFailureLog == true) then
+        logInternal(
+            "Aura template generate FAILED: aura=%s generationSucceeded=%s error=%s",
+            tostring(aura.name or aura.id or "unknown"),
+            tostring(generationSucceeded),
+            tostring(generationError or "")
+        )
+    end
+    return false, nil, generationError
+end
+
+function DataEditor:GenerateSpellTooltipTemplateForDefinition(dataset, spell, options)
+    if type(dataset) ~= "table" or type(spell) ~= "table" then
+        return false, nil, "missing-dataset-or-spell", 0
+    end
+
+    local DescriptionBuilder = Addon.Client and Addon.Client.Spellcasting and Addon.Client.Spellcasting.DescriptionBuilder or nil
+    if type(DescriptionBuilder) ~= "table" or type(DescriptionBuilder.BuildTooltipTemplatePayload) ~= "function" then
+        if not (options and options.suppressFailureLog == true) then
+            logInternal("Spell template generate FAILED: spell=%s error=builder-missing", tostring(spell.name or spell.id or "unknown"))
+        end
+        return false, nil, "builder-missing", 0
+    end
+
+    local spellRef = dataset.id and spell.id and ("%s:%s"):format(dataset.id, spell.id) or nil
+    local payload = nil
+    local generationSucceeded, generationError = pcall(function()
+        payload = DescriptionBuilder:BuildTooltipTemplatePayload({
+            dataset = dataset,
+            spellRef = spellRef,
+            spell = spell,
+        })
+    end)
+    local normalizedPayload = generationSucceeded
+        and type(TooltipTemplate) == "table"
+        and type(TooltipTemplate.NormalizeSpellPayload) == "function"
+        and TooltipTemplate.NormalizeSpellPayload(payload)
+        or nil
+    local success = generationSucceeded and type(normalizedPayload) == "table"
+
+    spell.tooltipTemplate = success == true
+    spell.tooltipTemplateData = success and normalizedPayload or nil
+
+    local normalizedSpell = self:NormalizeSpellDefinition(spell)
+    if type(normalizedSpell) == "table" then
+        applyNormalizedDefinition(spell, normalizedSpell)
+    end
+
+    local generatedAuraCount = 0
+    if success and type(dataset.auras) == "table" then
+        local seenAuras = {}
+        for compIndex = 1, #(spell.components or {}) do
+            local component = spell.components[compIndex]
+            local effect = component and component.effect or nil
+            local auraRef = effect and effect.auraRef or nil
+            if auraRef and auraRef ~= "" and not seenAuras[auraRef] then
+                seenAuras[auraRef] = true
+                for auraIndex = 1, #dataset.auras do
+                    local aura = dataset.auras[auraIndex]
+                    if aura and aura.id == auraRef then
+                        local auraSuccess = self:GenerateAuraTooltipTemplateForDefinition(dataset, aura, {
+                            suppressSuccessLog = options and options.suppressAuraSuccessLog,
+                            suppressFailureLog = options and options.suppressAuraFailureLog,
+                        })
+                        if auraSuccess then
+                            generatedAuraCount = generatedAuraCount + 1
+                        end
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    if success then
+        if not (options and options.suppressSuccessLog == true) then
+            logInternal(
+                "Spell template generate: spell=%s %s",
+                tostring(spell.name or spell.id or "unknown"),
+                summarizeSpellTooltipPayload(normalizedPayload)
+            )
+        end
+        return true, normalizedPayload, nil, generatedAuraCount
+    end
+
+    if not (options and options.suppressFailureLog == true) then
+        logInternal(
+            "Spell template generate FAILED: spell=%s generationSucceeded=%s error=%s",
+            tostring(spell.name or spell.id or "unknown"),
+            tostring(generationSucceeded),
+            tostring(generationError or "")
+        )
+    end
+    return false, nil, generationError, 0
+end
+
+function DataEditor:RegenerateDatasetSpellTemplates(dataset)
+    if type(dataset) ~= "table" or dataset.id == nil then
+        return false, "missing-dataset"
+    end
+
+    local spells = dataset.spells or {}
+    if type(spells) ~= "table" or #spells <= 0 then
+        logInternal("Spell template batch: dataset=%s spells=0 generated=0 failed=0 auras=0", tostring(self:GetDatasetDisplayName(dataset)))
+        return true
+    end
+
+    local generatedSpellCount = 0
+    local failedSpellCount = 0
+    local generatedAuraCount = 0
+
+    for spellIndex = 1, #spells do
+        local spell = spells[spellIndex]
+        local success, _, generationError, auraCount = self:GenerateSpellTooltipTemplateForDefinition(dataset, spell, {
+            suppressSuccessLog = true,
+            suppressAuraSuccessLog = true,
+        })
+        if success then
+            generatedSpellCount = generatedSpellCount + 1
+            generatedAuraCount = generatedAuraCount + math.max(0, math.floor(tonumber(auraCount) or 0))
+        else
+            failedSpellCount = failedSpellCount + 1
+            logInternal(
+                "Spell template batch FAILED: dataset=%s spell=%s error=%s",
+                tostring(self:GetDatasetDisplayName(dataset)),
+                tostring(spell and spell.name or spell and spell.id or spellIndex),
+                tostring(generationError or "")
+            )
+        end
+    end
+
+    self:QueuePendingDatasetEntryChanged(dataset.id, "spells", {
+        changeCount = math.max(1, #spells),
+    })
+    if generatedAuraCount > 0 then
+        self:QueuePendingDatasetEntryChanged(dataset.id, "auras", {
+            changeCount = generatedAuraCount,
+        })
+    end
+
+    if type(self.ApplyDeferredConfigurationPreview) == "function" then
+        self:ApplyDeferredConfigurationPreview("dataset-spell-tooltip-templates-generated", {
+            dataset.id,
+        })
+    end
+
+    logInternal(
+        "Spell template batch: dataset=%s spells=%d generated=%d failed=%d auras=%d",
+        tostring(self:GetDatasetDisplayName(dataset)),
+        #spells,
+        generatedSpellCount,
+        failedSpellCount,
+        generatedAuraCount
+    )
+
+    return failedSpellCount <= 0, failedSpellCount > 0 and "spell-generation-failed" or nil
+end
+
+function DataEditor:RegenerateDatasetAuraTemplates(dataset)
+    if type(dataset) ~= "table" or dataset.id == nil then
+        return false, "missing-dataset"
+    end
+
+    local auras = dataset.auras or {}
+    if type(auras) ~= "table" or #auras <= 0 then
+        logInternal("Aura template batch: dataset=%s auras=0 generated=0 failed=0", tostring(self:GetDatasetDisplayName(dataset)))
+        return true
+    end
+
+    local generatedAuraCount = 0
+    local failedAuraCount = 0
+
+    for auraIndex = 1, #auras do
+        local aura = auras[auraIndex]
+        local success, _, generationError = self:GenerateAuraTooltipTemplateForDefinition(dataset, aura, {
+            suppressSuccessLog = true,
+        })
+        if success then
+            generatedAuraCount = generatedAuraCount + 1
+        else
+            failedAuraCount = failedAuraCount + 1
+            logInternal(
+                "Aura template batch FAILED: dataset=%s aura=%s error=%s",
+                tostring(self:GetDatasetDisplayName(dataset)),
+                tostring(aura and aura.name or aura and aura.id or auraIndex),
+                tostring(generationError or "")
+            )
+        end
+    end
+
+    self:QueuePendingDatasetEntryChanged(dataset.id, "auras", {
+        changeCount = math.max(1, #auras),
+    })
+
+    if type(self.ApplyDeferredConfigurationPreview) == "function" then
+        self:ApplyDeferredConfigurationPreview("dataset-aura-tooltip-templates-generated", {
+            dataset.id,
+        })
+    end
+
+    logInternal(
+        "Aura template batch: dataset=%s auras=%d generated=%d failed=%d",
+        tostring(self:GetDatasetDisplayName(dataset)),
+        #auras,
+        generatedAuraCount,
+        failedAuraCount
+    )
+
+    return failedAuraCount <= 0, failedAuraCount > 0 and "aura-generation-failed" or nil
+end
 
 function DataEditor:BuildSpellInspectorGeneralPage(page)
     local root = UI.CreateLayout(UI.VerticalLayoutGroup, page, "RPEDataEditorSpellInspectorGeneralLayout", {
@@ -116,20 +439,15 @@ function DataEditor:BuildSpellInspectorGeneralPage(page)
     end)
     root:AddChild(self.SpellInspectorSeedNPCSpellCheckbox)
 
-    root:AddChild(self:BuildSpellInspectorLabel(root:GetFrame(), "RPEDataEditorSpellInspectorDescriptionLabel", "Description"))
-    self.SpellInspectorDescriptionInput = UI.CreateTextArea(root:GetFrame(), "RPEDataEditorSpellInspectorDescriptionInput", {
-        width = self.SpellInspectorFieldWidth,
-        height = 112,
-        text = "",
-        readOnly = false,
-        borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    self.SpellInspectorDescriptionInput:SetScript("OnEditFocusLost", function()
-        self:CommitSelectedSpell(function(spell)
-            spell.description = self.SpellInspectorDescriptionInput:GetText()
-        end)
+    -- Tooltip Template Status Label
+    self.SpellInspectorTooltipTemplateStatusText = self:BuildSpellInspectorLabel(root:GetFrame(), "RPEDataEditorSpellInspectorTooltipTemplateLabel", "Tooltip Template")
+    root:AddChild(self.SpellInspectorTooltipTemplateStatusText)
+
+    -- Tooltip Template Generation Button
+    self.SpellInspectorGenerateTooltipTemplateButton = UI.CreateButton(root:GetFrame(), "RPEDataEditorSpellInspectorGenerateTooltipTemplateButton", "Generate Template", 120, function()
+        self:GenerateSpellTooltipTemplate()
     end)
-    root:AddChild(self.SpellInspectorDescriptionInput)
+    root:AddChild(self.SpellInspectorGenerateTooltipTemplateButton)
 end
 
 function DataEditor:BuildSpellInspectorLearningPage(page)
@@ -184,4 +502,46 @@ function DataEditor:BuildSpellInspectorLearningPage(page)
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
     root:AddChild(self.SpellInspectorLearningHintText)
+end
+
+function DataEditor:GenerateSpellTooltipTemplate()
+    local dataset, selectedSpell = self:GetSelectedSpellAndDataset()
+    if not dataset or not selectedSpell then
+        return
+    end
+
+    local success, _, _, generatedAuraCount = self:GenerateSpellTooltipTemplateForDefinition(dataset, selectedSpell)
+    self:QueuePendingDatasetEntryChanged(dataset.id, "spells")
+    if math.max(0, math.floor(tonumber(generatedAuraCount) or 0)) > 0 then
+        self:QueuePendingDatasetEntryChanged(dataset.id, "auras", {
+            changeCount = generatedAuraCount,
+        })
+    end
+
+    local _, currentSpell = self:GetSelectedSpellAndDataset()
+    logInternal(
+        "Spell template apply: spell=%s applied=%s hasPayload=%s",
+        tostring(currentSpell and currentSpell.name or selectedSpell.name or selectedSpell.id or "unknown"),
+        tostring(currentSpell and currentSpell.tooltipTemplate == true),
+        tostring(hasStoredSpellTooltipTemplate(currentSpell))
+    )
+
+    if self.SpellInspectorTooltipTemplateStatusText then
+        if success and hasStoredSpellTooltipTemplate(currentSpell) then
+            self.SpellInspectorTooltipTemplateStatusText:SetText("Tooltip Template: Generated")
+        elseif currentSpell and currentSpell.tooltipTemplate == true then
+            self.SpellInspectorTooltipTemplateStatusText:SetText("Tooltip Template: Legacy Flag Only")
+        else
+            self.SpellInspectorTooltipTemplateStatusText:SetText("Tooltip Template: Failed to Generate")
+        end
+    end
+
+    if type(self.RefreshSpellInspectorPage) == "function" then
+        self:RefreshSpellInspectorPage()
+    end
+    if success and type(self.ApplyDeferredConfigurationPreview) == "function" then
+        self:ApplyDeferredConfigurationPreview("spell-tooltip-template-generated", {
+            dataset.id,
+        })
+    end
 end

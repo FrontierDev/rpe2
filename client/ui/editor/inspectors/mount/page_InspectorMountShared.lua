@@ -58,16 +58,15 @@ function DataEditor:CommitSelectedMount(mutate)
         return
     end
 
+    local before = self:DeepCopyValue(mount)
     mutate(mount, dataset)
     applyTable(mount, self:NormalizeMountDefinition(mount))
 
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "mounts", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, mount) then
+        return
     end
 
-    self:RefreshAfterDatasetEntryChanged("mounts")
+    self:QueuePendingDatasetEntryChanged(dataset.id, "mounts")
 end
 
 function DataEditor:SetMountInspectorDropdownEnabled(dropdown, enabled)

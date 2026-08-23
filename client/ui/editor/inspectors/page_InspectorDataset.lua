@@ -55,7 +55,7 @@ function DataEditor:RefreshDatasetInspectorPage()
 
     if self.DatasetInspectorEmptyText and self.DatasetInspectorEmptyText.SetText then
         if dataset then
-            self.DatasetInspectorEmptyText:SetText("Dataset naming is handled in the left pane.")
+            self.DatasetInspectorEmptyText:SetText("Right-click the dataset entry in the left pane to edit its metadata.")
         else
             self.DatasetInspectorEmptyText:SetText("Select a dataset to inspect it.")
         end

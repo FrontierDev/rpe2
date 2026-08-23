@@ -44,6 +44,7 @@ local ARMOR_WEIGHT_LABELS = {
 
 local ITEM_TYPE_LABELS = {
     consumable = "Consumable",
+    tool = "Tool",
     material = "Crafting Reagent",
     modification = "Modification",
     none = "Item",
@@ -131,6 +132,11 @@ local function getWeaponTypeLabel(weaponType)
     end
 
     return ensureString(weaponType, "Weapon")
+end
+
+local function hasWeaponType(item)
+    local weaponTypeRef = ensureString(item and item.weaponTypeRef)
+    return weaponTypeRef ~= ""
 end
 
 local function getArmorWeightLabel(armorWeight)
@@ -307,6 +313,16 @@ end
 
 local function buildWeaponCategoryLine(item)
     local colorR, colorG, colorB = getWhiteLineColor()
+    if not hasWeaponType(item) then
+        return {
+            text = ("Held in %s"):format(resolvePrimarySlotName(item) or "Hand"),
+            r = colorR,
+            g = colorG,
+            b = colorB,
+            wrap = false,
+        }
+    end
+
     return {
         left = getWeaponHandlingLabel(item),
         right = getWeaponTypeLabel(item.weaponTypeRef),
@@ -319,9 +335,21 @@ end
 
 local function buildArmorCategoryLine(item)
     local colorR, colorG, colorB = getWhiteLineColor()
+    local armorWeight = tostring(item and item.armorWeight or "cosmetic")
+    local slotName = resolvePrimarySlotName(item) or "Armor"
+    if armorWeight == "cosmetic" then
+        return {
+            text = slotName,
+            r = colorR,
+            g = colorG,
+            b = colorB,
+            wrap = false,
+        }
+    end
+
     return {
-        left = resolvePrimarySlotName(item) or "Armor",
-        right = getArmorWeightLabel(item.armorWeight),
+        left = slotName,
+        right = getArmorWeightLabel(armorWeight),
         r = colorR,
         g = colorG,
         b = colorB,
@@ -330,6 +358,10 @@ local function buildArmorCategoryLine(item)
 end
 
 local function buildDamageLine(item)
+    if not hasWeaponType(item) then
+        return nil
+    end
+
     local mode = tostring(item and item.damageMode or "fixed")
     if mode == "none" then
         return nil
@@ -421,6 +453,15 @@ local function resolveStatLabel(sourceStatRef)
     end
 
     return statId
+end
+
+local function resolveEquipStatLabel(sourceStatRef)
+    local label = resolveStatLabel(sourceStatRef)
+    if type(label) ~= "string" then
+        return label
+    end
+
+    return string.lower(label)
 end
 
 local function resolveStatDefinition(sourceStatRef)
@@ -596,7 +637,7 @@ local function buildFormattedStatText(value, label, statDefinition)
         return ("%g %s"):format(value, label)
     end
 
-    if displayMode == "signed_percent" then
+    if displayMode == "signed_percent" or displayMode == "equip_percent" then
         return ("%+g%% %s"):format(value, label)
     end
 
@@ -605,7 +646,7 @@ end
 
 local function appendEquipLine(lines, item, options)
     local itemType = tostring(item and item.itemType or "none")
-    if itemType ~= "weapon" and itemType ~= "armor" then
+    if itemType ~= "weapon" and itemType ~= "armor" and itemType ~= "modification" then
         return
     end
 
@@ -721,19 +762,24 @@ local function buildItemStatLines(item)
                 local statDefinition = nil
                 local fallbackLabel = nil
                 statDefinition, fallbackLabel = resolveStatDefinition(entry.sourceStatRef)
-                local label = resolveStatLabel(entry.sourceStatRef) or fallbackLabel or "Stat"
-                local colorR, colorG, colorB = getStatLineColor(statDefinition)
-                statLines[#statLines + 1] = {
-                    sortIndex = index,
-                    priority = getStatPriority(statDefinition),
-                    line = {
-                        text = buildFormattedStatText(value, label, statDefinition),
-                        r = colorR,
-                        g = colorG,
-                        b = colorB,
-                        wrap = false,
-                    },
-                }
+                local displayMode = statDefinition and tostring(statDefinition.displayMode or "signed_value") or "signed_value"
+                
+                -- Skip equip display modes, they're rendered separately
+                if displayMode ~= "equip" and displayMode ~= "equip_percent" then
+                    local label = resolveStatLabel(entry.sourceStatRef) or fallbackLabel or "Stat"
+                    local colorR, colorG, colorB = getStatLineColor(statDefinition)
+                    statLines[#statLines + 1] = {
+                        sortIndex = index,
+                        priority = getStatPriority(statDefinition),
+                        line = {
+                            text = buildFormattedStatText(value, label, statDefinition),
+                            r = colorR,
+                            g = colorG,
+                            b = colorB,
+                            wrap = false,
+                        },
+                    }
+                end
             end
         end
     end
@@ -771,10 +817,10 @@ end
 local function buildModificationEquipValueText(value, statDefinition)
     local displayMode = statDefinition and tostring(statDefinition.displayMode or "signed_value") or "signed_value"
     local amount = math.abs(tonumber(value) or 0)
-    if displayMode == "signed_percent" then
+    if displayMode == "signed_percent" or displayMode == "equip_percent" then
         return (value > 0 and ("%+g%%"):format(value) or ("%g%%"):format(amount))
     end
-    if displayMode == "value" then
+    if displayMode == "value" or displayMode == "equip" then
         return ("%g"):format(amount)
     end
     return value > 0 and ("%+g"):format(value) or ("%g"):format(amount)
@@ -785,7 +831,8 @@ local function appendModificationEquipStatLines(lines, item)
         return
     end
 
-    local statLines = {}
+    local equipStatLines = {}
+    
     for index = 1, #item.stats do
         local entry = item.stats[index]
         local value = type(entry) == "table" and tonumber(entry.value) or 0
@@ -793,32 +840,43 @@ local function appendModificationEquipStatLines(lines, item)
             local statDefinition = nil
             local fallbackLabel = nil
             statDefinition, fallbackLabel = resolveStatDefinition(entry.sourceStatRef)
-            local label = resolveStatLabel(entry.sourceStatRef) or fallbackLabel or "Stat"
+            local displayMode = statDefinition and tostring(statDefinition.displayMode or "signed_value") or "signed_value"
+            local label = resolveEquipStatLabel(entry.sourceStatRef) or fallbackLabel or "stat"
+            local colorR, colorG, colorB = getStatLineColor(statDefinition)
             local verb = value > 0 and "Increases" or "Reduces"
-            local valueText = buildModificationEquipValueText(value, statDefinition)
-            statLines[#statLines + 1] = {
+            local amount = math.abs(value)
+            
+            -- Format based on display mode
+            local valueText = nil
+            if displayMode == "signed_percent" or displayMode == "equip_percent" then
+                valueText = ("%g%%"):format(amount)
+            else
+                valueText = ("%g"):format(amount)
+            end
+            
+            equipStatLines[#equipStatLines + 1] = {
                 sortIndex = index,
                 priority = getStatPriority(statDefinition),
                 line = {
-                    text = ("Equip: %s your %s by %s."):format(verb, label, valueText),
-                    r = 0.12,
-                    g = 1.0,
-                    b = 0.0,
+                    text = ("Equip: %s %s by %s."):format(verb, label, valueText),
+                    r = colorR,
+                    g = colorG,
+                    b = colorB,
                     wrap = true,
                 },
             }
         end
     end
 
-    table.sort(statLines, function(left, right)
+    table.sort(equipStatLines, function(left, right)
         if left.priority == right.priority then
             return left.sortIndex < right.sortIndex
         end
         return left.priority > right.priority
     end)
 
-    for index = 1, #statLines do
-        lines[#lines + 1] = statLines[index].line
+    for index = 1, #equipStatLines do
+        lines[#lines + 1] = equipStatLines[index].line
     end
 end
 
@@ -826,6 +884,64 @@ local function appendStatLines(lines, item)
     local statLines = buildItemStatLines(item)
     for index = 1, #statLines do
         lines[#lines + 1] = statLines[index]
+    end
+end
+
+local function appendEquipStatLines(lines, item)
+    if type(item) ~= "table" or type(item.stats) ~= "table" then
+        return
+    end
+
+    local equipStatLines = {}
+    for index = 1, #item.stats do
+        local entry = item.stats[index]
+        if type(entry) == "table" then
+            local value = tonumber(entry.value) or 0
+            if value ~= 0 then
+                local statDefinition = nil
+                local fallbackLabel = nil
+                statDefinition, fallbackLabel = resolveStatDefinition(entry.sourceStatRef)
+                local displayMode = statDefinition and tostring(statDefinition.displayMode or "signed_value") or "signed_value"
+                
+                if displayMode == "equip" or displayMode == "equip_percent" then
+                    local label = resolveEquipStatLabel(entry.sourceStatRef) or fallbackLabel or "stat"
+                    local verb = value > 0 and "Increases" or "Reduces"
+                    local amount = math.abs(value)
+                    local valueText = nil
+                    
+                    if displayMode == "equip_percent" then
+                        valueText = ("%g%%"):format(amount)
+                    else
+                        valueText = ("%g"):format(amount)
+                    end
+                    
+                    local colorR, colorG, colorB = getStatLineColor(statDefinition)
+                    equipStatLines[#equipStatLines + 1] = {
+                        sortIndex = index,
+                        priority = getStatPriority(statDefinition),
+                        line = {
+                            text = ("Equip: %s %s by %s."):format(verb, label, valueText),
+                            r = colorR,
+                            g = colorG,
+                            b = colorB,
+                            wrap = true,
+                        },
+                    }
+                end
+            end
+        end
+    end
+
+    table.sort(equipStatLines, function(left, right)
+        if left.priority == right.priority then
+            return left.sortIndex < right.sortIndex
+        end
+
+        return left.priority > right.priority
+    end)
+
+    for index = 1, #equipStatLines do
+        lines[#lines + 1] = equipStatLines[index].line
     end
 end
 
@@ -1023,7 +1139,7 @@ end
 
 local function hasRenderedEquipText(item, options)
     local itemType = tostring(item and item.itemType or "none")
-    if itemType ~= "weapon" and itemType ~= "armor" then
+    if itemType ~= "weapon" and itemType ~= "armor" and itemType ~= "modification" then
         return false
     end
 
@@ -1064,6 +1180,37 @@ local function joinTargetLabels(labels, suffix)
     return joined .. " " .. suffix
 end
 
+local function normalizeSlotTargetLabel(slotName)
+    local normalized = string.lower(ensureString(slotName))
+    if normalized == "" then
+        return nil
+    end
+
+    local labels = {
+        mainhand = "main-hand",
+        offhand = "off-hand",
+        onehand = "one-handed",
+        twohand = "two-handed",
+    }
+
+    local key = normalized:gsub("[_%-%s]", "")
+    return labels[key] or normalized
+end
+
+local function buildPluralTargetLabel(baseLabel, suffix)
+    local normalizedBase = ensureString(baseLabel)
+    if normalizedBase == "" then
+        return ""
+    end
+    if suffix ~= nil and suffix ~= "" then
+        return normalizedBase .. " " .. suffix
+    end
+    if string.sub(normalizedBase, -1) == "s" then
+        return normalizedBase
+    end
+    return normalizedBase .. "s"
+end
+
 local function buildModificationApplicationDescription(item)
     if type(item) ~= "table" or tostring(item.itemType or "none") ~= "modification" then
         return nil
@@ -1079,13 +1226,12 @@ local function buildModificationApplicationDescription(item)
     end
 
     local slotTargets = {}
-    local otherTargets = {}
     local seen = {}
     for index = 1, #(item.targetSlotRefs or {}) do
         local slotName = resolveSlotName(item.targetSlotRefs[index])
         if slotName and slotName ~= "" then
-            local label = string.lower(slotName)
-            local key = string.lower(label)
+            local label = normalizeSlotTargetLabel(slotName)
+            local key = string.lower(label or "")
             if not seen[key] then
                 seen[key] = true
                 slotTargets[#slotTargets + 1] = label
@@ -1094,51 +1240,77 @@ local function buildModificationApplicationDescription(item)
     end
 
     local targetWeaponType = tostring(item.targetWeaponTypeRef or "")
-    if targetWeaponType ~= "" then
-        local label = string.lower(getWeaponTypeLabel(targetWeaponType)) .. "s"
-        if not seen[label] then
-            seen[label] = true
-            otherTargets[#otherTargets + 1] = label
-        end
-    end
-
     local targetArmorWeight = tostring(item.targetArmorWeight or "none")
-    if targetArmorWeight ~= "" and targetArmorWeight ~= "none" then
-        local label = string.lower(getArmorWeightLabel(targetArmorWeight)) .. " armor"
-        if not seen[label] then
-            seen[label] = true
-            otherTargets[#otherTargets + 1] = label
+    local targetTwoHandedOnly = item.targetTwoHandedOnly == true
+    local weaponLabel = nil
+    local armorLabel = nil
+
+    if targetWeaponType ~= "" then
+        weaponLabel = string.lower(getWeaponTypeLabel(targetWeaponType))
+        if targetTwoHandedOnly then
+            weaponLabel = "two-handed " .. weaponLabel
         end
+    elseif targetTwoHandedOnly then
+        weaponLabel = "two-handed weapon"
     end
 
-    local targetPhrases = {}
-    if #slotTargets > 0 then
-        targetPhrases[#targetPhrases + 1] = joinTargetLabels(slotTargets, "items")
-    end
-    if #otherTargets > 0 then
-        targetPhrases[#targetPhrases + 1] = joinLabels(otherTargets)
+    if targetArmorWeight ~= "" and targetArmorWeight ~= "none" then
+        armorLabel = string.lower(getArmorWeightLabel(targetArmorWeight))
     end
 
-    if #targetPhrases == 0 then
+    if armorLabel == "shield" then
+        return "Can be applied to shields."
+    end
+
+    local targetPhrase = nil
+    if weaponLabel then
+        if #slotTargets > 0 then
+            targetPhrase = joinTargetLabels(slotTargets, buildPluralTargetLabel(weaponLabel))
+        else
+            targetPhrase = buildPluralTargetLabel(weaponLabel)
+        end
+    elseif armorLabel then
+        if #slotTargets > 0 then
+            targetPhrase = joinTargetLabels(slotTargets, armorLabel .. " armor")
+        else
+            targetPhrase = armorLabel .. " armor"
+        end
+    elseif #slotTargets > 0 then
+        targetPhrase = joinTargetLabels(slotTargets, "items")
+    end
+
+    if not targetPhrase or targetPhrase == "" then
         return "Can be applied to equipment."
     end
-    return ("Can be applied to %s."):format(joinLabels(targetPhrases))
+    return ("Can be applied to %s."):format(targetPhrase)
 end
 
 local function appendDescriptionLine(lines, item)
-    local description = buildModificationApplicationDescription(item) or (type(item) == "table" and item.description or nil)
-    if type(description) ~= "string" or description == "" then
+    local descriptionLines = {}
+    local applicationDescription = buildModificationApplicationDescription(item)
+    if type(applicationDescription) == "string" and applicationDescription ~= "" then
+        descriptionLines[#descriptionLines + 1] = applicationDescription
+    end
+
+    local itemDescription = type(item) == "table" and ensureString(item.description) or ""
+    if itemDescription ~= "" and #descriptionLines == 0 then
+        descriptionLines[#descriptionLines + 1] = itemDescription
+    end
+
+    if #descriptionLines == 0 then
         return
     end
 
     appendSpacerLine(lines)
-    lines[#lines + 1] = {
-        text = ("*%s*"):format(description),
-        r = 1,
-        g = 0.82,
-        b = 0,
-        wrap = true,
-    }
+    for index = 1, #descriptionLines do
+        lines[#lines + 1] = {
+            text = ("*%s*"):format(descriptionLines[index]),
+            r = 1,
+            g = 0.82,
+            b = 0,
+            wrap = true,
+        }
+    end
 end
 
 local function appendSoulboundLine(lines, options)
@@ -1233,7 +1405,7 @@ local function appendEconomyLine(lines, item)
     }
 end
 
-local function appendConditionLines(lines, item, options)
+local function appendConditionLines(lines, item, options, skipSpacer)
     if type(Conditions) ~= "table" or type(Conditions.BuildTooltipLines) ~= "function" or type(item) ~= "table" then
         return
     end
@@ -1249,7 +1421,9 @@ local function appendConditionLines(lines, item, options)
         return
     end
 
-    appendSpacerLine(lines)
+    if skipSpacer ~= true then
+        appendSpacerLine(lines)
+    end
     for index = 1, #conditionLines do
         lines[#lines + 1] = conditionLines[index]
     end
@@ -1332,11 +1506,14 @@ function ItemTooltip:Build(item, options)
         appendSpacerLine(lines)
     end
     appendSkillBonusLines(lines, item)
+    appendConditionLines(lines, item, values, true)
     appendEquipLine(lines, item, values)
+    if itemType ~= "modification" or modificationKind == "gem" then
+        appendEquipStatLines(lines, item)
+    end
     appendUseLine(lines, item, values)
     appendAppliedModificationLines(lines, item, values)
     appendDescriptionLine(lines, item)
-    appendConditionLines(lines, item, values)
     appendEconomyLine(lines, item)
 
     return {

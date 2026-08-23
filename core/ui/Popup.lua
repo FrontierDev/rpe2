@@ -6,11 +6,15 @@ Addon.UI = UI
 UI.Popup = UI.Popup or {}
 local Popup = UI.Popup
 local POPUP_CONTENT_WIDTH = 380
+local POPUP_WINDOW_WIDTH = 420
+local POPUP_WINDOW_WIDTH_DELTA = POPUP_WINDOW_WIDTH - POPUP_CONTENT_WIDTH
 local POPUP_MIN_MESSAGE_HEIGHT = 18
 local POPUP_MIN_DESCRIPTION_HEIGHT = 14
 local POPUP_ACTIONS_HEIGHT = 20
 local POPUP_CHOICE_LABEL_HEIGHT = 12
 local POPUP_CHOICE_DROPDOWN_HEIGHT = 18
+local POPUP_INPUT_LABEL_HEIGHT = 12
+local POPUP_INPUT_FIELD_HEIGHT = 18
 local POPUP_WINDOW_VERTICAL_INSET = 38
 local POPUP_WINDOW_BOTTOM_SLACK = 6
 local POPUP_ROOT_SPACING = 4
@@ -74,6 +78,46 @@ local function setElementVisible(element, visible, height)
     end
 end
 
+local function getPopupContentWidth()
+    return tonumber(Popup and Popup._contentWidth) or POPUP_CONTENT_WIDTH
+end
+
+local function setElementWidth(element, width)
+    if element and element.SetWidth then
+        element:SetWidth(width)
+    end
+end
+
+local function applyPopupWidth(windowWidth)
+    local resolvedWindowWidth = math.max(240, math.floor(tonumber(windowWidth) or POPUP_WINDOW_WIDTH))
+    local contentWidth = math.max(200, resolvedWindowWidth - POPUP_WINDOW_WIDTH_DELTA)
+    Popup._contentWidth = contentWidth
+
+    if Popup.Window and Popup.Window.SetWidth then
+        Popup.Window:SetWidth(resolvedWindowWidth)
+    end
+
+    setElementWidth(Popup.MessageText, contentWidth)
+    setElementWidth(Popup.ChoiceGroup, contentWidth)
+    setElementWidth(Popup.ChoiceLabel, contentWidth)
+    setElementWidth(Popup.ChoiceDropdown, contentWidth)
+    setElementWidth(Popup.ChoiceDescriptionText, contentWidth)
+    setElementWidth(Popup.TextInputGroup, contentWidth)
+    setElementWidth(Popup.TextInputLabel, contentWidth)
+    setElementWidth(Popup.TextInput, contentWidth)
+    setElementWidth(Popup.TraitGridGroup, contentWidth)
+    setElementWidth(Popup.TraitGridLabel, contentWidth)
+    setElementWidth(Popup.TraitGridHost, contentWidth)
+    setElementWidth(Popup.ActionsLayout, contentWidth)
+
+    if Popup.TraitGridScrollFrame and Popup.TraitGridScrollFrame.SetWidth then
+        Popup.TraitGridScrollFrame:SetWidth(contentWidth - POPUP_TRAIT_GRID_SCROLLBAR_WIDTH - POPUP_TRAIT_GRID_SCROLLBAR_GAP)
+    end
+    if Popup.TraitGridScrollChild and Popup.TraitGridScrollChild.SetWidth then
+        Popup.TraitGridScrollChild:SetWidth(contentWidth)
+    end
+end
+
 local function copyArray(values)
     local copy = {}
     for index = 1, #(values or {}) do
@@ -113,6 +157,10 @@ local function refreshConfirmEnabled()
         enabled = not requiresChoice or selectedChoice ~= ""
     end
 
+    if enabled and Popup._hasTextInput == true and spec.requireInput == true then
+        enabled = tostring(spec.inputText or "") ~= ""
+    end
+
     if Popup.ConfirmButton and Popup.ConfirmButton.SetEnabled then
         Popup.ConfirmButton:SetEnabled(enabled)
     end
@@ -121,17 +169,22 @@ end
 local function refreshPopupLayout()
     local hasChoices = Popup._hasChoices == true
     local hasTraitGrid = Popup._hasTraitGrid == true
+    local hasTextInput = Popup._hasTextInput == true
     local messageHeight = Popup._messageHeight or POPUP_MIN_MESSAGE_HEIGHT
     local selectionHeight = hasTraitGrid and (Popup._traitGridGroupHeight or POPUP_TRAIT_GRID_GROUP_HEIGHT)
         or (hasChoices and (Popup._choiceGroupHeight or 0) or 0)
+    local inputHeight = hasTextInput and (Popup._textInputGroupHeight or (POPUP_INPUT_LABEL_HEIGHT + 2 + POPUP_INPUT_FIELD_HEIGHT)) or 0
     local hasSelection = hasTraitGrid or hasChoices
-    local visibleBlockCount = 1 + (hasSelection and 1 or 0) + 1
-    local contentHeight = messageHeight + selectionHeight + POPUP_ACTIONS_HEIGHT
+    local visibleBlockCount = 1 + (hasSelection and 1 or 0) + (hasTextInput and 1 or 0) + 1
+    local contentHeight = messageHeight + selectionHeight + inputHeight + POPUP_ACTIONS_HEIGHT
     local spacingHeight = math.max(0, visibleBlockCount - 1) * POPUP_ROOT_SPACING
     local targetHeight = POPUP_WINDOW_VERTICAL_INSET + contentHeight + spacingHeight + POPUP_WINDOW_BOTTOM_SLACK
 
     if Popup.ChoiceGroup and Popup.ChoiceGroup.RefreshLayout then
         Popup.ChoiceGroup:RefreshLayout()
+    end
+    if Popup.TextInputGroup and Popup.TextInputGroup.RefreshLayout then
+        Popup.TextInputGroup:RefreshLayout()
     end
     if Popup.TraitGridGroup and Popup.TraitGridGroup.RefreshLayout then
         Popup.TraitGridGroup:RefreshLayout()
@@ -202,7 +255,7 @@ local function getTraitGridMetrics(spec)
     local columns = math.max(1, math.floor(tonumber(spec and spec.gridVisibleColumns) or POPUP_TRAIT_GRID_COLUMNS))
     local rows = math.max(1, math.floor(tonumber(spec and spec.gridVisibleRows) or POPUP_TRAIT_GRID_ROWS))
     local showLabel = spec and spec.hideGridLabel ~= true
-    local viewportWidth = POPUP_CONTENT_WIDTH - POPUP_TRAIT_GRID_SCROLLBAR_WIDTH - POPUP_TRAIT_GRID_SCROLLBAR_GAP
+    local viewportWidth = getPopupContentWidth() - POPUP_TRAIT_GRID_SCROLLBAR_WIDTH - POPUP_TRAIT_GRID_SCROLLBAR_GAP
     local entryWidth = math.max(84, math.floor((viewportWidth - ((columns - 1) * POPUP_TRAIT_GRID_SPACING_X)) / columns))
     local contentWidth = (entryWidth * columns) + ((columns - 1) * POPUP_TRAIT_GRID_SPACING_X)
     local hostHeight = (rows * POPUP_TRAIT_GRID_ENTRY_HEIGHT) + ((rows - 1) * POPUP_TRAIT_GRID_SPACING_Y)
@@ -448,7 +501,7 @@ function Popup:Build()
 
     local window = UI.Window:New({
         name = "RPEPopupWindow",
-        width = 420,
+        width = POPUP_WINDOW_WIDTH,
         height = 198,
         point = "CENTER",
         relativeTo = UIParent,
@@ -480,7 +533,7 @@ function Popup:Build()
     self.RootLayout = root
 
     self.MessageText = UI.CreateText(root:GetFrame(), "RPEPopupMessageText", "", {
-        width = POPUP_CONTENT_WIDTH,
+        width = getPopupContentWidth(),
         height = POPUP_MIN_MESSAGE_HEIGHT,
         justifyH = "LEFT",
         justifyV = "TOP",
@@ -498,7 +551,7 @@ function Popup:Build()
     root:AddChild(self.ChoiceGroup)
 
     self.ChoiceLabel = UI.CreateText(self.ChoiceGroup:GetFrame(), "RPEPopupChoiceLabel", "Select", {
-        width = POPUP_CONTENT_WIDTH,
+        width = getPopupContentWidth(),
         height = POPUP_CHOICE_LABEL_HEIGHT,
         justifyH = "LEFT",
         textColor = UI.ResolveColor(nil, "text.secondary"),
@@ -506,7 +559,7 @@ function Popup:Build()
     self.ChoiceGroup:AddChild(self.ChoiceLabel)
 
     self.ChoiceDropdown = UI.CreateDropdown(self.ChoiceGroup:GetFrame(), "RPEPopupChoiceDropdown", {
-        width = POPUP_CONTENT_WIDTH,
+        width = getPopupContentWidth(),
         height = POPUP_CHOICE_DROPDOWN_HEIGHT,
         items = {
             { label = "None", value = "" },
@@ -525,7 +578,7 @@ function Popup:Build()
     self.ChoiceGroup:AddChild(self.ChoiceDropdown)
 
     self.ChoiceDescriptionText = UI.CreateText(self.ChoiceGroup:GetFrame(), "RPEPopupChoiceDescriptionText", "", {
-        width = POPUP_CONTENT_WIDTH,
+        width = getPopupContentWidth(),
         height = POPUP_MIN_DESCRIPTION_HEIGHT,
         justifyH = "LEFT",
         justifyV = "TOP",
@@ -536,6 +589,44 @@ function Popup:Build()
     setElementVisible(self.ChoiceDescriptionText, false, POPUP_MIN_DESCRIPTION_HEIGHT)
     setElementVisible(self.ChoiceGroup, false, POPUP_CHOICE_LABEL_HEIGHT + 2 + POPUP_CHOICE_DROPDOWN_HEIGHT)
 
+    self.TextInputGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEPopupTextInputGroup", {
+        spacing = 2,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+        height = POPUP_INPUT_LABEL_HEIGHT + 2 + POPUP_INPUT_FIELD_HEIGHT,
+    })
+    root:AddChild(self.TextInputGroup)
+
+    self.TextInputLabel = UI.CreateText(self.TextInputGroup:GetFrame(), "RPEPopupTextInputLabel", "Value", {
+        width = getPopupContentWidth(),
+        height = POPUP_INPUT_LABEL_HEIGHT,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.TextInputGroup:AddChild(self.TextInputLabel)
+
+    self.TextInput = UI.CreateTextInput(self.TextInputGroup:GetFrame(), "RPEPopupTextInput", {
+        width = getPopupContentWidth(),
+        height = POPUP_INPUT_FIELD_HEIGHT,
+        text = "",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.TextInput:SetScript("OnTextChanged", function(input)
+        local spec = Popup.PendingSpec or {}
+        spec.inputText = tostring(input and input.GetText and input:GetText() or "")
+        Popup.PendingSpec = spec
+        refreshConfirmEnabled()
+        if type(spec.onInputChanged) == "function" then
+            spec.onInputChanged(spec.inputText, spec, input)
+        end
+    end)
+    self.TextInput:SetScript("OnEnterPressed", function()
+        Popup:HandleConfirm()
+    end)
+    self.TextInputGroup:AddChild(self.TextInput)
+    self._textInputGroupHeight = POPUP_INPUT_LABEL_HEIGHT + 2 + POPUP_INPUT_FIELD_HEIGHT
+    setElementVisible(self.TextInputGroup, false, self._textInputGroupHeight)
+
     self.TraitGridGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEPopupTraitGridGroup", {
         spacing = POPUP_TRAIT_GRID_LABEL_SPACING,
         fitChildrenWidth = true,
@@ -545,7 +636,7 @@ function Popup:Build()
     root:AddChild(self.TraitGridGroup)
 
     self.TraitGridLabel = UI.CreateText(self.TraitGridGroup:GetFrame(), "RPEPopupTraitGridLabel", "Consumables", {
-        width = POPUP_CONTENT_WIDTH,
+        width = getPopupContentWidth(),
         height = POPUP_TRAIT_GRID_LABEL_HEIGHT,
         justifyH = "LEFT",
         textColor = UI.ResolveColor(nil, "text.secondary"),
@@ -553,7 +644,7 @@ function Popup:Build()
     self.TraitGridGroup:AddChild(self.TraitGridLabel)
 
     self.TraitGridHost = UI.CreatePanel(self.TraitGridGroup:GetFrame(), "RPEPopupTraitGridHost", {
-        width = POPUP_CONTENT_WIDTH,
+        width = getPopupContentWidth(),
         height = POPUP_TRAIT_GRID_HOST_HEIGHT,
         showBorder = false,
         panelBackgroundColor = { r = 0, g = 0, b = 0, a = 0 },
@@ -563,7 +654,7 @@ function Popup:Build()
     self.TraitGridScrollFrame = CreateFrame("ScrollFrame", "RPEPopupTraitGridScrollFrame", self.TraitGridHost:GetContentFrame())
     self.TraitGridScrollFrame:SetPoint("TOPLEFT", self.TraitGridHost:GetContentFrame(), "TOPLEFT", 0, 0)
     self.TraitGridScrollFrame:SetPoint("BOTTOMLEFT", self.TraitGridHost:GetContentFrame(), "BOTTOMLEFT", 0, 0)
-    self.TraitGridScrollFrame:SetWidth(POPUP_CONTENT_WIDTH - POPUP_TRAIT_GRID_SCROLLBAR_WIDTH - POPUP_TRAIT_GRID_SCROLLBAR_GAP)
+    self.TraitGridScrollFrame:SetWidth(getPopupContentWidth() - POPUP_TRAIT_GRID_SCROLLBAR_WIDTH - POPUP_TRAIT_GRID_SCROLLBAR_GAP)
     self.TraitGridScrollFrame:EnableMouseWheel(true)
     if self.TraitGridScrollFrame.SetClipsChildren then
         self.TraitGridScrollFrame:SetClipsChildren(true)
@@ -571,7 +662,7 @@ function Popup:Build()
 
     self.TraitGridScrollChild = CreateFrame("Frame", "RPEPopupTraitGridScrollChild", self.TraitGridScrollFrame)
     self.TraitGridScrollChild:SetPoint("TOPLEFT", self.TraitGridScrollFrame, "TOPLEFT", 0, 0)
-    self.TraitGridScrollChild:SetSize(POPUP_CONTENT_WIDTH, POPUP_TRAIT_GRID_HOST_HEIGHT)
+    self.TraitGridScrollChild:SetSize(getPopupContentWidth(), POPUP_TRAIT_GRID_HOST_HEIGHT)
     self.TraitGridScrollFrame:SetScrollChild(self.TraitGridScrollChild)
     self.TraitGridScrollFrame:SetScript("OnMouseWheel", function(_, delta)
         local rowStride = self.TraitGridMetrics and self.TraitGridMetrics.rowStride or (POPUP_TRAIT_GRID_ENTRY_HEIGHT + POPUP_TRAIT_GRID_SPACING_Y)
@@ -644,7 +735,7 @@ function Popup:Build()
 
     local actions = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEPopupActions", {
         spacing = 6,
-        width = POPUP_CONTENT_WIDTH,
+        width = getPopupContentWidth(),
         fitChildrenWidth = true,
         fitChildrenHeight = false,
         height = POPUP_ACTIONS_HEIGHT,
@@ -692,6 +783,10 @@ function Popup:HandleConfirm()
     local spec = self.PendingSpec or {}
     local onConfirm = spec.onConfirm
 
+    if self._hasTextInput == true and self.TextInput and self.TextInput.GetText then
+        spec.inputText = tostring(self.TextInput:GetText() or "")
+    end
+
     self.PendingSpec = nil
     self:Hide()
 
@@ -727,14 +822,17 @@ function Popup:ShowConfirmation(options)
         window:SetTitle(tostring(spec.title or "Confirm"))
     end
 
+    applyPopupWidth(spec.width)
     self:RefreshMessageText()
 
     local gridItems = type(spec.gridItems) == "table" and spec.gridItems or nil
     local hasTraitGrid = gridItems ~= nil and #gridItems > 0
     local choiceItems = type(spec.choiceItems) == "table" and spec.choiceItems or nil
     local hasChoices = not hasTraitGrid and choiceItems ~= nil and #choiceItems > 0
+    local hasTextInput = spec.inputLabel ~= nil or spec.inputText ~= nil or spec.requireInput == true or type(spec.onInputChanged) == "function"
     self._hasChoices = hasChoices
     self._hasTraitGrid = hasTraitGrid
+    self._hasTextInput = hasTextInput
     if hasChoices and self.ChoiceLabel and self.ChoiceLabel.SetText then
         self.ChoiceLabel:SetText(tostring(spec.choiceLabel or "Select"))
     end
@@ -766,6 +864,14 @@ function Popup:ShowConfirmation(options)
         setElementVisible(self.TraitGridGroup, false, self._traitGridGroupHeight or POPUP_TRAIT_GRID_GROUP_HEIGHT)
     end
 
+    if hasTextInput and self.TextInputLabel and self.TextInputLabel.SetText then
+        self.TextInputLabel:SetText(tostring(spec.inputLabel or "Value"))
+    end
+    if hasTextInput and self.TextInput and self.TextInput.SetText then
+        self.TextInput:SetText(tostring(spec.inputText or ""))
+    end
+    setElementVisible(self.TextInputGroup, hasTextInput, self._textInputGroupHeight or (POPUP_INPUT_LABEL_HEIGHT + 2 + POPUP_INPUT_FIELD_HEIGHT))
+
     if self.ConfirmButton and self.ConfirmButton.SetText then
         self.ConfirmButton:SetText(tostring(spec.confirmText or "Confirm"))
     end
@@ -779,6 +885,13 @@ function Popup:ShowConfirmation(options)
 
     if window and window.Show then
         window:Show()
+    end
+    if hasTextInput and self.TextInput and self.TextInput.Focus then
+        self.TextInput:Focus()
+        local editBox = self.TextInput.GetEditBox and self.TextInput:GetEditBox() or nil
+        if editBox and editBox.HighlightText then
+            editBox:HighlightText()
+        end
     end
 
     return window

@@ -12,6 +12,7 @@ local function getItemTypeLabel(itemType)
     local labels = {
         weapon = "Weapon",
         armor = "Armor",
+        tool = "Tool",
         consumable = "Consumable",
         material = "Material",
         modification = "Modification",
@@ -40,7 +41,7 @@ local function matchesItemDropdownFilter(item, filterValue)
         return true
     end
 
-    if filterValue == "weapon" or filterValue == "armor" or filterValue == "consumable" or filterValue == "material" or filterValue == "modification" then
+    if filterValue == "weapon" or filterValue == "armor" or filterValue == "tool" or filterValue == "consumable" or filterValue == "material" or filterValue == "modification" then
         return tostring(item and item.itemType or "none") == filterValue
     end
 
@@ -75,6 +76,7 @@ function DataEditor:BuildItemsPage(page)
                 { label = "All", value = "all" },
                 { label = "Weapons", value = "weapon" },
                 { label = "Armor", value = "armor" },
+                { label = "Tools", value = "tool" },
                 { label = "Consumables", value = "consumable" },
                 { label = "Materials", value = "material" },
                 { label = "Mods", value = "modification" },

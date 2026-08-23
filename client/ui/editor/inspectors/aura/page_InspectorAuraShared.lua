@@ -41,11 +41,23 @@ local OPERATION_ITEMS = {
     { label = "Percent", value = "percent" },
 }
 
+local AMOUNT_MODE_ITEMS = {
+    { label = "Flat", value = "flat" },
+    { label = "% Base", value = "base_percent" },
+    { label = "% Max", value = "max_percent" },
+}
+
 local TRIGGER_TARGET_ITEMS = {
     { label = "Event Other", value = "event_other" },
     { label = "Event Source", value = "event_source" },
     { label = "Aura Caster", value = "aura_caster" },
     { label = "Aura Target", value = "aura_target" },
+}
+
+local AMOUNT_MODE_ITEMS = {
+    { label = "Flat", value = "flat" },
+    { label = "% Base", value = "base_percent" },
+    { label = "% Max", value = "max_percent" },
 }
 
 local AURA_INSPECTOR_PAGE_DEFINITIONS = {
@@ -106,6 +118,15 @@ local function normalizeTriggerTarget(value)
     end
 
     return "event_other"
+end
+
+local function normalizeChancePercent(value)
+    local numericValue = tonumber(value)
+    if numericValue == nil then
+        return 100
+    end
+
+    return math.max(0, math.min(100, numericValue))
 end
 
 local function resolveItemLabel(items, value, fallback)
@@ -240,16 +261,15 @@ function DataEditor:CommitSelectedAura(mutate)
         return
     end
 
+    local before = self:DeepCopyValue(aura)
     mutate(aura, dataset)
     applyTable(aura, self:NormalizeAuraDefinition(aura))
 
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "auras", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, aura) then
+        return
     end
 
-    self:RefreshAfterDatasetEntryChanged("auras")
+    self:QueuePendingDatasetEntryChanged(dataset.id, "auras")
 end
 
 function DataEditor:GetAuraInspectorStackBehaviorItems()
@@ -262,6 +282,10 @@ end
 
 function DataEditor:GetAuraInspectorEventEffectTypeItems()
     return EVENT_EFFECT_TYPE_ITEMS
+end
+
+function DataEditor:GetAuraInspectorAmountModeItems()
+    return AMOUNT_MODE_ITEMS
 end
 
 function DataEditor:GetAuraInspectorOperationItems()
@@ -382,6 +406,10 @@ function DataEditor:NormalizeAuraInspectorEffect(effect)
     if effectType == "heal" then
         effect.type = "heal"
         effect.baseHealing = tonumber(effect.baseHealing) or 0
+        effect.amountMode = tostring(effect.amountMode or "flat")
+        if effect.amountMode ~= "base_percent" and effect.amountMode ~= "max_percent" then
+            effect.amountMode = "flat"
+        end
         effect.baseDamage = nil
         effect.statRef = nil
         effect.operation = nil
@@ -494,6 +522,10 @@ function DataEditor:NormalizeAuraInspectorEffect(effect)
         effect.type = "resource"
         effect.resourceRef = effect.resourceRef ~= nil and tostring(effect.resourceRef) ~= "" and tostring(effect.resourceRef) or nil
         effect.amount = tonumber(effect.amount) or tonumber(effect.baseAmount) or 0
+        effect.amountMode = tostring(effect.amountMode or "flat")
+        if effect.amountMode ~= "base_percent" and effect.amountMode ~= "max_percent" then
+            effect.amountMode = "flat"
+        end
         effect.baseDamage = nil
         effect.baseHealing = nil
         effect.statScaling = nil
@@ -515,6 +547,10 @@ function DataEditor:NormalizeAuraInspectorEffect(effect)
 
     effect.type = "damage"
     effect.baseDamage = tonumber(effect.baseDamage) or 0
+    effect.amountMode = tostring(effect.amountMode or "flat")
+    if effect.amountMode ~= "base_percent" and effect.amountMode ~= "max_percent" then
+        effect.amountMode = "flat"
+    end
     effect.damageSchoolRefs = effect.damageSchoolRefs or {}
     effect.baseHealing = nil
     effect.statRef = nil
@@ -544,6 +580,10 @@ function DataEditor:NormalizeAuraInspectorEventEffect(effect)
     if effectType == "heal" then
         effect.type = "heal"
         effect.baseHealing = tonumber(effect.baseHealing) or 0
+        effect.amountMode = tostring(effect.amountMode or "flat")
+        if effect.amountMode ~= "base_percent" and effect.amountMode ~= "max_percent" then
+            effect.amountMode = "flat"
+        end
         effect.damageSchoolRefs = nil
         effect.auraRef = nil
         effect.stacks = nil
@@ -588,6 +628,10 @@ function DataEditor:NormalizeAuraInspectorEventEffect(effect)
         effect.type = "resource"
         effect.resourceRef = effect.resourceRef ~= nil and tostring(effect.resourceRef) ~= "" and tostring(effect.resourceRef) or nil
         effect.amount = tonumber(effect.amount) or tonumber(effect.baseAmount) or 0
+        effect.amountMode = tostring(effect.amountMode or "flat")
+        if effect.amountMode ~= "base_percent" and effect.amountMode ~= "max_percent" then
+            effect.amountMode = "flat"
+        end
         effect.baseDamage = nil
         effect.baseHealing = nil
         effect.statScaling = nil
@@ -601,6 +645,10 @@ function DataEditor:NormalizeAuraInspectorEventEffect(effect)
 
     effect.type = "damage"
     effect.baseDamage = tonumber(effect.baseDamage) or 0
+    effect.amountMode = tostring(effect.amountMode or "flat")
+    if effect.amountMode ~= "base_percent" and effect.amountMode ~= "max_percent" then
+        effect.amountMode = "flat"
+    end
     effect.damageSchoolRefs = effect.damageSchoolRefs or {}
     effect.auraRef = nil
     effect.stacks = nil
@@ -617,6 +665,7 @@ function DataEditor:NormalizeAuraInspectorEvent(auraEvent)
 
     auraEvent.combatEventId = normalizeCombatEventId(auraEvent.combatEventId)
     auraEvent.triggerTarget = auraEvent.combatEventId and normalizeTriggerTarget(auraEvent.triggerTarget) or nil
+    auraEvent.chance = normalizeChancePercent(auraEvent.chance)
     auraEvent.effects = auraEvent.effects or {}
 
     for index = #auraEvent.effects, 1, -1 do
@@ -845,6 +894,7 @@ function DataEditor:AddAuraEvent()
         aura.events[#aura.events + 1] = {
             combatEventId = self:GetDefaultAuraInspectorCombatEventId(),
             triggerTarget = "event_other",
+            chance = 100,
             effects = {
                 {
                     type = "damage",

@@ -18,15 +18,15 @@ local function commitSelectedCurrency(self, mutate)
         return
     end
 
+    local before = self:DeepCopyValue(currency)
     mutate(currency, dataset)
     currency.max = math.max(0, math.floor(tonumber(currency.max) or 0))
 
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "currencies", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, currency) then
+        return
     end
-    self:RefreshAfterDatasetEntryChanged("currencies")
+
+    self:QueuePendingDatasetEntryChanged(dataset.id, "currencies")
 end
 
 function DataEditor:BuildCurrencyInspectorPage(parent)

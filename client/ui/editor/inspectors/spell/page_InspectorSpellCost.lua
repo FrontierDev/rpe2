@@ -10,6 +10,7 @@ local UI = Addon.UI or {}
 local RESOURCE_COST_MODE_ITEMS = {
     { label = "Flat", value = "flat" },
     { label = "% Base", value = "base_percent" },
+    { label = "% Max", value = "max_percent" },
 }
 
 function DataEditor:EnsureSpellInspectorResourceCostContextMenu()

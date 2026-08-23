@@ -25,6 +25,7 @@ function DataEditor:BuildSpellInspectorCastingPage(page)
         step = 1,
         value = 0,
         valueFormat = "%d",
+        deferValueChangedUntilMouseUp = true,
         onValueChanged = function(value)
             if self._refreshingSpellInspector then
                 return

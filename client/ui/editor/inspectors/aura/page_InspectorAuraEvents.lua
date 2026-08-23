@@ -247,6 +247,16 @@ function DataEditor:BuildAuraInspectorEventsPage(page)
     self.AuraInspectorTriggerTargetGroup:AddChild(self.AuraInspectorTriggerTargetDropdown)
     attachMouseWheel(self.AuraInspectorTriggerTargetDropdown)
 
+    self.AuraInspectorEventChanceGroup = createGroup("RPEDataEditorAuraInspectorEventChanceGroup", "Trigger Chance %", 18)
+    self.AuraInspectorEventChanceInput = UI.CreateTextInput(self.AuraInspectorEventChanceGroup:GetFrame(), "RPEDataEditorAuraInspectorEventChanceInput", {
+        width = self.AuraInspectorFieldWidth,
+        height = self.AuraInspectorControlHeight,
+        text = "100",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.AuraInspectorEventChanceGroup:AddChild(self.AuraInspectorEventChanceInput)
+    attachMouseWheel(self.AuraInspectorEventChanceInput)
+
     self.AuraInspectorSelectedEventEffectHeader = UI.CreateText(root:GetFrame(), "RPEDataEditorAuraInspectorSelectedEventEffectHeader", "Select an event effect to edit it.", {
         width = self.AuraInspectorFieldWidth,
         height = 12,
@@ -373,6 +383,24 @@ function DataEditor:BuildAuraInspectorEventsPage(page)
     self.AuraInspectorEventBaseAmountGroup:AddChild(self.AuraInspectorEventBaseAmountInput)
     attachMouseWheel(self.AuraInspectorEventBaseAmountInput)
 
+    self.AuraInspectorEventAmountModeGroup = createGroup("RPEDataEditorAuraInspectorEventAmountModeGroup", "Amount Mode")
+    self.AuraInspectorEventAmountModeDropdown = UI.CreateDropdown(self.AuraInspectorEventAmountModeGroup:GetFrame(), "RPEDataEditorAuraInspectorEventAmountModeDropdown", {
+        width = self.AuraInspectorFieldWidth,
+        height = 18,
+        items = self:GetAuraInspectorAmountModeItems(),
+        onValueChanged = function(value)
+            if self._refreshingAuraInspector then
+                return
+            end
+
+            self:CommitSelectedAuraInspectorEventEffect(function(effect)
+                effect.amountMode = value
+            end)
+        end,
+    })
+    self.AuraInspectorEventAmountModeGroup:AddChild(self.AuraInspectorEventAmountModeDropdown)
+    attachMouseWheel(self.AuraInspectorEventAmountModeDropdown)
+
     self.AuraInspectorEventDamageSchoolsGroup = createGroup("RPEDataEditorAuraInspectorEventDamageSchoolsGroup", "Damage Schools", 18)
     self.AuraInspectorEventDamageSchoolsDropdown = UI.CreateDropdown(self.AuraInspectorEventDamageSchoolsGroup:GetFrame(), "RPEDataEditorAuraInspectorEventDamageSchoolsDropdown", {
         width = self.AuraInspectorFieldWidth,
@@ -467,6 +495,24 @@ function DataEditor:BuildAuraInspectorEventsPage(page)
     })
     self.AuraInspectorEventResourceAmountGroup:AddChild(self.AuraInspectorEventResourceAmountInput)
     attachMouseWheel(self.AuraInspectorEventResourceAmountInput)
+
+    self.AuraInspectorEventResourceAmountModeGroup = createGroup("RPEDataEditorAuraInspectorEventResourceAmountModeGroup", "Amount Mode")
+    self.AuraInspectorEventResourceAmountModeDropdown = UI.CreateDropdown(self.AuraInspectorEventResourceAmountModeGroup:GetFrame(), "RPEDataEditorAuraInspectorEventResourceAmountModeDropdown", {
+        width = self.AuraInspectorFieldWidth,
+        height = 18,
+        items = self:GetAuraInspectorAmountModeItems(),
+        onValueChanged = function(value)
+            if self._refreshingAuraInspector then
+                return
+            end
+
+            self:CommitSelectedAuraInspectorEventEffect(function(effect)
+                effect.amountMode = value
+            end)
+        end,
+    })
+    self.AuraInspectorEventResourceAmountModeGroup:AddChild(self.AuraInspectorEventResourceAmountModeDropdown)
+    attachMouseWheel(self.AuraInspectorEventResourceAmountModeDropdown)
 
     self.AuraInspectorEventScalingGroup = createGroup("RPEDataEditorAuraInspectorEventScalingGroup", "Stat Scaling", 110)
     self.AuraInspectorEventScalingPanel = UI.CreatePanel(self.AuraInspectorEventScalingGroup:GetFrame(), "RPEDataEditorAuraInspectorEventScalingPanel", {
@@ -638,6 +684,12 @@ function DataEditor:BuildAuraInspectorEventsPage(page)
     bindInput("AuraInspectorEventResourceAmountInput", function()
         self:CommitSelectedAuraInspectorEventEffect(function(effect)
             effect.amount = tonumber(self.AuraInspectorEventResourceAmountInput:GetText()) or 0
+        end)
+    end)
+    bindInput("AuraInspectorEventChanceInput", function()
+        self:CommitSelectedAuraInspectorEvent(function(auraEvent)
+            auraEvent.chance = tonumber(self.AuraInspectorEventChanceInput:GetText()) or 100
+            self:NormalizeAuraInspectorEvent(auraEvent)
         end)
     end)
 

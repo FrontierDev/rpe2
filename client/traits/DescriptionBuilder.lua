@@ -455,7 +455,8 @@ end
 
 local function isPercentDisplayStat(statRef)
     local resolvedRow = type(Profile.GetResolvedStatRow) == "function" and Profile.GetResolvedStatRow(statRef) or nil
-    if type(resolvedRow) == "table" and tostring(resolvedRow.displayMode or "") == "signed_percent" then
+    local resolvedDisplayMode = type(resolvedRow) == "table" and tostring(resolvedRow.displayMode or "") or ""
+    if resolvedDisplayMode == "signed_percent" or resolvedDisplayMode == "equip_percent" then
         return true
     end
 
@@ -466,7 +467,8 @@ local function isPercentDisplayStat(statRef)
 
     if datasetId and statId and type(Registry.ResolveStatReference) == "function" then
         local _, stat = Registry:ResolveStatReference(statRef)
-        return tostring(stat and stat.displayMode or "") == "signed_percent"
+        local displayMode = tostring(stat and stat.displayMode or "")
+        return displayMode == "signed_percent" or displayMode == "equip_percent"
     end
 
     return false
@@ -660,6 +662,15 @@ local function resolveCombatTriggerLabel(combatEventId)
     return "When triggered"
 end
 
+local function normalizeChancePercent(value)
+    local numericValue = tonumber(value)
+    if numericValue == nil then
+        return 100
+    end
+
+    return math.max(0, math.min(100, numericValue))
+end
+
 local function buildStatBonusSentence(entry)
     local amount = tonumber(entry and entry.value) or 0
     if amount == 0 then
@@ -668,7 +679,7 @@ local function buildStatBonusSentence(entry)
 
     local statName = resolveStatName(entry and entry.statRef or nil)
     local amountText = tostring(math.abs(amount))
-    if isPercentDisplayStat(entry and entry.statRef or nil) then
+    if tostring(entry and entry.operation or "flat") == "percent" or isPercentDisplayStat(entry and entry.statRef or nil) then
         amountText = amountText .. "%"
     end
     if amount > 0 then
@@ -676,6 +687,19 @@ local function buildStatBonusSentence(entry)
     end
 
     return ("Reduce %s by %s."):format(statName, amountText)
+end
+
+local function formatEventAmountText(amount, amountMode, suffix)
+    local normalizedMode = tostring(amountMode or "flat")
+    local normalizedSuffix = suffix and (" " .. suffix) or ""
+    if normalizedMode == "base_percent" then
+        return ("%g%% of Base%s"):format(math.abs(tonumber(amount) or 0), normalizedSuffix)
+    end
+    if normalizedMode == "max_percent" then
+        return ("%g%% of Max%s"):format(math.abs(tonumber(amount) or 0), normalizedSuffix)
+    end
+
+    return tostring(math.abs(tonumber(amount) or 0))
 end
 
 local function buildSkillBonusSentence(entry)
@@ -714,10 +738,19 @@ local function buildEventDamageClause(casterUnit, effect, targetContext)
         return nil
     end
 
-    local minimum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min"), effect)
-    local maximum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max"), effect)
     local schoolLabel = resolveDamageSchoolLabel(effect)
-    return ("deal %s %s damage to %s"):format(formatValueRange(minimum, maximum), schoolLabel, targetContext.object)
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    if amountMode == "flat" then
+        local minimum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min"), effect)
+        local maximum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max"), effect)
+        return ("deal %s %s damage to %s"):format(formatValueRange(minimum, maximum), schoolLabel, targetContext.object)
+    end
+
+    return ("deal %s %s damage to %s"):format(
+        formatEventAmountText(effect and effect.baseDamage, amountMode),
+        schoolLabel,
+        targetContext.object
+    )
 end
 
 local function buildEventHealClause(casterUnit, effect, targetContext)
@@ -725,9 +758,17 @@ local function buildEventHealClause(casterUnit, effect, targetContext)
         return nil
     end
 
-    local minimum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min"), effect)
-    local maximum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max"), effect)
-    return ("heal %s for %s health"):format(targetContext.object, formatValueRange(minimum, maximum))
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    if amountMode == "flat" then
+        local minimum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min"), effect)
+        local maximum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max"), effect)
+        return ("heal %s for %s health"):format(targetContext.object, formatValueRange(minimum, maximum))
+    end
+
+    return ("heal %s for %s health"):format(
+        targetContext.object,
+        formatEventAmountText(effect and effect.baseHealing, amountMode)
+    )
 end
 
 local function buildEventResourceClause(effect, targetContext)
@@ -737,15 +778,18 @@ local function buildEventResourceClause(effect, targetContext)
     end
 
     local resourceName = resolveResourceName(effect and effect.resourceRef or nil)
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    local restoreText = formatEventAmountText(amount, amountMode, resourceName)
+    local lossText = formatEventAmountText(amount, amountMode)
     if amount > 0 then
-        return ("restore %d %s to %s"):format(amount, resourceName, targetContext.object)
+        return ("restore %s to %s"):format(restoreText, targetContext.object)
     end
 
     if targetContext.object == "yourself" then
-        return ("lose %d %s"):format(math.abs(amount), resourceName)
+        return ("lose %s"):format(lossText)
     end
 
-    return ("reduce %s %s by %d"):format(targetContext.possessive, resourceName, math.abs(amount))
+    return ("reduce %s %s by %s"):format(targetContext.possessive, resourceName, lossText)
 end
 
 local function buildEventApplyAuraClause(detail, effect, targetContext)
@@ -836,7 +880,12 @@ function TraitDescriptionBuilder:BuildGeneratedDescription(detail, casterUnit)
         end
 
         if #clauses > 0 then
-            sentences[#sentences + 1] = resolveCombatTriggerLabel(eventEntry and eventEntry.combatEventId or nil) .. ", " .. joinClauses(clauses) .. "."
+            local prefix = resolveCombatTriggerLabel(eventEntry and eventEntry.combatEventId or nil)
+            local chance = normalizeChancePercent(eventEntry and eventEntry.chance)
+            if chance < 100 then
+                prefix = ("%s (%g%% chance)"):format(prefix, chance)
+            end
+            sentences[#sentences + 1] = prefix .. ", " .. joinClauses(clauses) .. "."
         end
     end
 

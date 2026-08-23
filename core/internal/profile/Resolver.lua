@@ -184,12 +184,16 @@ local function isTraitCategoryAllowed(category)
     return true
 end
 
-local function accumulateTraitStatBonuses(bonuses, payload)
+local function accumulateTraitStatBonuses(flatBonuses, percentBonuses, payload)
     for index = 1, #(payload and payload.statBonuses or {}) do
         local statBonus = payload.statBonuses[index]
         local statRef = type(statBonus) == "table" and ensureString(statBonus.statRef) or ""
         if statRef ~= "" then
-            bonuses[statRef] = (bonuses[statRef] or 0) + (tonumber(statBonus.value) or 0)
+            if tostring(type(statBonus) == "table" and statBonus.operation or "flat") == "percent" then
+                percentBonuses[statRef] = (percentBonuses[statRef] or 0) + (tonumber(statBonus.value) or 0)
+            else
+                flatBonuses[statRef] = (flatBonuses[statRef] or 0) + (tonumber(statBonus.value) or 0)
+            end
         end
     end
 end
@@ -218,6 +222,7 @@ end
 
 local function buildTraitStatBonusMap()
     local bonuses = {}
+    local percentBonuses = {}
     local activeTraits = type(Profile.ListActiveTraits) == "function" and Profile.ListActiveTraits() or type(Profile.ListKnownTraits) == "function" and Profile.ListKnownTraits() or {}
 
     for index = 1, #activeTraits do
@@ -232,7 +237,7 @@ local function buildTraitStatBonusMap()
                 traitRef = row and row.traitRef,
             })
         then
-            accumulateTraitStatBonuses(bonuses, trait)
+            accumulateTraitStatBonuses(bonuses, percentBonuses, trait)
         end
     end
 
@@ -252,7 +257,7 @@ local function buildTraitStatBonusMap()
                 equipmentScope = row.sourceType == "mount_equipment" and "mount" or nil,
             })
         then
-            accumulateTraitStatBonuses(bonuses, row.payload or row.equipmentTrait)
+            accumulateTraitStatBonuses(bonuses, percentBonuses, row.payload or row.equipmentTrait)
         end
     end
 
@@ -269,11 +274,12 @@ local function buildTraitStatBonusMap()
                     itemRef = entry and entry.itemRef,
                 })
             then
-                accumulateTraitStatBonuses(bonuses, entry and entry.payload or nil)
+                accumulateTraitStatBonuses(bonuses, percentBonuses, entry and entry.payload or nil)
             end
         end
     end
 
+    bonuses.__percentBonuses = percentBonuses
     return bonuses
 end
 
@@ -345,6 +351,7 @@ local function buildEmptyResolvedComponents()
         classBaseValue = 0,
         profileBonusBaseValue = 0,
         traitBonusBaseValue = 0,
+        traitPercentBonus = 0,
         baseValue = 0,
         derivedContribution = 0,
         equipmentBonus = 0,
@@ -555,6 +562,10 @@ local function resolveStatComponents(entry, byRef, cache, activeRefs, profileBon
     local classBaseValue = tonumber(progressionContext and progressionContext.classStatValues and progressionContext.classStatValues[entry.ref]) or 0
     local profileBonusBaseValue = tonumber(profileBonuses[entry.ref]) or 0
     local traitBonusBaseValue = tonumber(equipmentBonuses.__traitBonuses and equipmentBonuses.__traitBonuses[entry.ref]) or 0
+    local traitPercentBonus = tonumber(
+        equipmentBonuses.__traitPercentBonuses
+            and equipmentBonuses.__traitPercentBonuses[entry.ref]
+    ) or 0
     local baseValue = definitionBaseValue + raceBaseValue + classBaseValue + profileBonusBaseValue + traitBonusBaseValue
     local derivedContribution = 0
     local equipmentBonus = tonumber(equipmentBonuses[entry.ref]) or 0
@@ -574,10 +585,11 @@ local function resolveStatComponents(entry, byRef, cache, activeRefs, profileBon
 
     local auraFlatBonus, auraPercentBonus = resolveAuraBonusesForStat(auraContext, entry.ref)
     local value = baseValue + derivedContribution + equipmentBonus + auraFlatBonus
-    if auraPercentBonus ~= 0 then
-        value = value * (1 + (auraPercentBonus / 100))
+    local totalPercentBonus = traitPercentBonus + auraPercentBonus
+    if totalPercentBonus ~= 0 then
+        value = value * (1 + (totalPercentBonus / 100))
     end
-    if auraFlatBonus ~= 0 or auraPercentBonus ~= 0 then
+    if auraFlatBonus ~= 0 or totalPercentBonus ~= 0 then
         value = roundResolvedValue(value)
     end
 
@@ -587,6 +599,7 @@ local function resolveStatComponents(entry, byRef, cache, activeRefs, profileBon
         classBaseValue = classBaseValue,
         profileBonusBaseValue = profileBonusBaseValue,
         traitBonusBaseValue = traitBonusBaseValue,
+        traitPercentBonus = traitPercentBonus,
         baseValue = baseValue,
         derivedContribution = derivedContribution,
         equipmentBonus = equipmentBonus,
@@ -779,7 +792,9 @@ local function buildStatResolutionContext(options)
     local entries, byRef = collectActivatedStats()
     local profileBonuses = buildProfileStatBonusMap()
     local bonuses = buildItemStatBonusMap()
-    bonuses.__traitBonuses = buildTraitStatBonusMap()
+    local traitBonuses = buildTraitStatBonusMap()
+    bonuses.__traitBonuses = traitBonuses
+    bonuses.__traitPercentBonuses = traitBonuses.__percentBonuses or {}
 
     return {
         entries = entries,
@@ -1058,7 +1073,7 @@ end
 
 local function getFixedSkillCap(skillType)
     if skillType == "crafting" then
-        return math.max(0, math.floor(tonumber(getRulesetRuleValue("skills", "crafting_skill_max_level", 100)) or 100))
+        return math.max(1, math.floor(tonumber(getRulesetRuleValue("skills", "crafting_skill_max_level", 100)) or 100))
     end
     if skillType == "language" then
         return math.max(0, math.floor(tonumber(getRulesetRuleValue("skills", "language_skill_max_level", 100)) or 100))
@@ -1067,10 +1082,138 @@ local function getFixedSkillCap(skillType)
     return math.max(0, math.floor(tonumber(getRulesetRuleValue("skills", "noncombat_skill_max_level", 100)) or 100))
 end
 
+local function buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, itemBonuses, traitBonuses, raceBonuses, classBonuses, auraContext, level, weaponMultiplier)
+    local skill = entry and entry.skill or {}
+    local skillType = ensureString(skill.skillType)
+    if not isSkillTypeEnabled(skillType) then
+        return nil
+    end
+
+    local maxValue = 0
+    local storedValue = math.max(0, math.floor(tonumber(storedLevels and storedLevels[entry.ref]) or 0))
+    local baseValue = 0
+    local derivedValue = 0
+    local hasDerivedStat = type(skill.derivedStatRef) == "string" and skill.derivedStatRef ~= ""
+
+    if skillType == "weapon" then
+        maxValue = math.max(0, math.floor((tonumber(level) or 0) * (tonumber(weaponMultiplier) or 0)))
+        baseValue = clampNumber(storedValue, 0, maxValue)
+    elseif skillType == "crafting" or skillType == "language" then
+        maxValue = getFixedSkillCap(skillType)
+        if skillType == "crafting" then
+            baseValue = clampNumber(math.max(1, storedValue), 1, maxValue)
+        else
+            baseValue = storedValue
+        end
+    else
+        maxValue = getFixedSkillCap(skillType)
+        if hasDerivedStat then
+            local statRow = resolvedStatsByRef and resolvedStatsByRef[skill.derivedStatRef] or nil
+            local statValue = tonumber(statRow and statRow.value) or 0
+            derivedValue = roundResolvedValue(statValue * (tonumber(skill.derivedMultiplier) or 0))
+            baseValue = storedValue + derivedValue
+        else
+            baseValue = storedValue
+        end
+    end
+
+    local name = ensureString(skill.name)
+    if name == "" then
+        name = ensureString(skill.id)
+    end
+    if name == "" then
+        name = "Unnamed Skill"
+    end
+
+    local itemBonus = tonumber(itemBonuses and itemBonuses[entry.ref]) or 0
+    local traitBonus = tonumber(traitBonuses and traitBonuses[entry.ref]) or 0
+    local raceBonus = tonumber(raceBonuses and raceBonuses[entry.ref]) or 0
+    local classBonus = tonumber(classBonuses and classBonuses[entry.ref]) or 0
+    local auraBonus = resolveAuraBonusForSkill(auraContext, entry.ref)
+    local bonusValue = itemBonus + traitBonus + raceBonus + classBonus + auraBonus
+    local resolvedValue = math.max(0, baseValue + bonusValue)
+    if skillType == "crafting" then
+        resolvedValue = clampNumber(math.max(1, resolvedValue), 1, maxValue)
+    end
+
+    return {
+        ref = entry.ref,
+        datasetId = entry.dataset and entry.dataset.id or nil,
+        skillId = skill.id,
+        name = name,
+        icon = ensureString(skill.icon),
+        description = ensureString(skill.description),
+        skillType = skillType ~= "" and skillType or "noncombat",
+        weaponTypeRef = skillType == "weapon" and ensureString(skill.weaponTypeRef) or nil,
+        learnMode = ensureString(skill.learnMode) ~= "" and ensureString(skill.learnMode) or "always_available",
+        rollable = skill.rollable == true,
+        derivedStatRef = skill.derivedStatRef,
+        derivedMultiplier = tonumber(skill.derivedMultiplier) or 0,
+        storedValue = storedValue,
+        baseValue = baseValue,
+        derivedValue = hasDerivedStat and derivedValue or nil,
+        maxValue = maxValue,
+        itemBonus = itemBonus,
+        traitBonus = traitBonus,
+        raceBonus = raceBonus,
+        classBonus = classBonus,
+        auraBonus = auraBonus,
+        bonusValue = bonusValue,
+        value = resolvedValue,
+        resolvedValue = resolvedValue,
+        progressValue = math.min(resolvedValue, maxValue),
+        isDerived = hasDerivedStat,
+        skill = skill,
+    }
+end
+
+local function buildResolvedStatsByRef(statRows)
+    local resolvedStatsByRef = {}
+
+    for index = 1, #(type(statRows) == "table" and statRows or {}) do
+        local statRow = statRows[index]
+        if statRow and statRow.ref then
+            resolvedStatsByRef[statRow.ref] = statRow
+        end
+    end
+
+    return resolvedStatsByRef
+end
+
+local function requestedSkillEntries(skillRefs)
+    local requestedRefs = type(skillRefs) == "table" and skillRefs or {}
+    local requestedSet = {}
+    local requestedEntries = {}
+    local needsResolvedStats = false
+    local entries = collectActivatedSkills()
+
+    for index = 1, #requestedRefs do
+        local skillRef = ensureString(requestedRefs[index])
+        if skillRef ~= "" then
+            requestedSet[skillRef] = true
+        end
+    end
+
+    for index = 1, #entries do
+        local entry = entries[index]
+        local entryRef = ensureString(entry and entry.ref)
+        if requestedSet[entryRef] then
+            requestedEntries[#requestedEntries + 1] = entry
+            local skill = entry and entry.skill or nil
+            local skillType = ensureString(skill and skill.skillType)
+            local derivedStatRef = ensureString(skill and skill.derivedStatRef)
+            if skillType ~= "weapon" and skillType ~= "crafting" and skillType ~= "language" and derivedStatRef ~= "" then
+                needsResolvedStats = true
+            end
+        end
+    end
+
+    return requestedEntries, needsResolvedStats
+end
+
 function Resolver.ListResolvedSkills(options)
     local entries = collectActivatedSkills()
-    local statRows = Resolver.ListResolvedStats(options)
-    local resolvedStatsByRef = {}
+    local resolvedStatsByRef = buildResolvedStatsByRef(Resolver.ListResolvedStats(options))
     local storedLevels = buildProfileSkillLevelMap()
     local itemBonuses = buildItemSkillBonusMap()
     local traitBonuses = buildTraitSkillBonusMap()
@@ -1081,87 +1224,11 @@ function Resolver.ListResolvedSkills(options)
     local weaponMultiplier = tonumber(getRulesetRuleValue("skills", "weapon_skill_level_multiplier", 5)) or 5
     local rows = {}
 
-    for index = 1, #statRows do
-        local statRow = statRows[index]
-        if statRow and statRow.ref then
-            resolvedStatsByRef[statRow.ref] = statRow
-        end
-    end
-
     for index = 1, #entries do
         local entry = entries[index]
-        local skill = entry.skill or {}
-        local skillType = ensureString(skill.skillType)
-        if isSkillTypeEnabled(skillType) then
-            local maxValue = 0
-            local storedValue = math.max(0, math.floor(tonumber(storedLevels[entry.ref]) or 0))
-            local baseValue = 0
-            local derivedValue = 0
-            local hasDerivedStat = type(skill.derivedStatRef) == "string" and skill.derivedStatRef ~= ""
-
-            if skillType == "weapon" then
-                maxValue = math.max(0, math.floor(level * weaponMultiplier))
-                baseValue = clampNumber(storedValue, 0, maxValue)
-            elseif skillType == "crafting" or skillType == "language" then
-                maxValue = getFixedSkillCap(skillType)
-                baseValue = storedValue
-            else
-                maxValue = getFixedSkillCap(skillType)
-                if hasDerivedStat then
-                    local statRow = resolvedStatsByRef[skill.derivedStatRef]
-                    local statValue = tonumber(statRow and statRow.value) or 0
-                    derivedValue = roundResolvedValue(statValue * (tonumber(skill.derivedMultiplier) or 0))
-                    baseValue = storedValue + derivedValue
-                else
-                    baseValue = storedValue
-                end
-            end
-
-            local name = ensureString(skill.name)
-            if name == "" then
-                name = ensureString(skill.id)
-            end
-            if name == "" then
-                name = "Unnamed Skill"
-            end
-
-            local itemBonus = tonumber(itemBonuses[entry.ref]) or 0
-            local traitBonus = tonumber(traitBonuses[entry.ref]) or 0
-            local raceBonus = tonumber(raceBonuses[entry.ref]) or 0
-            local classBonus = tonumber(classBonuses[entry.ref]) or 0
-            local auraBonus = resolveAuraBonusForSkill(auraContext, entry.ref)
-            local bonusValue = itemBonus + traitBonus + raceBonus + classBonus + auraBonus
-            local resolvedValue = math.max(0, baseValue + bonusValue)
-
-            rows[#rows + 1] = {
-                ref = entry.ref,
-                datasetId = entry.dataset and entry.dataset.id or nil,
-                skillId = skill.id,
-                name = name,
-                icon = ensureString(skill.icon),
-                description = ensureString(skill.description),
-                skillType = skillType ~= "" and skillType or "noncombat",
-                weaponTypeRef = skillType == "weapon" and ensureString(skill.weaponTypeRef) or nil,
-                learnMode = ensureString(skill.learnMode) ~= "" and ensureString(skill.learnMode) or "always_available",
-                rollable = skill.rollable == true,
-                derivedStatRef = skill.derivedStatRef,
-                derivedMultiplier = tonumber(skill.derivedMultiplier) or 0,
-                storedValue = storedValue,
-                baseValue = baseValue,
-                derivedValue = hasDerivedStat and derivedValue or nil,
-                maxValue = maxValue,
-                itemBonus = itemBonus,
-                traitBonus = traitBonus,
-                raceBonus = raceBonus,
-                classBonus = classBonus,
-                auraBonus = auraBonus,
-                bonusValue = bonusValue,
-                value = resolvedValue,
-                resolvedValue = resolvedValue,
-                progressValue = math.min(resolvedValue, maxValue),
-                isDerived = hasDerivedStat,
-                skill = skill,
-            }
+        local row = buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, itemBonuses, traitBonuses, raceBonuses, classBonuses, auraContext, level, weaponMultiplier)
+        if row then
+            rows[#rows + 1] = row
         end
     end
 
@@ -1180,6 +1247,40 @@ function Resolver.ListResolvedSkills(options)
     end)
 
     return rows
+end
+
+function Resolver.GetResolvedSkillRowsByRefs(skillRefs, options)
+    local requestedRefs = type(skillRefs) == "table" and skillRefs or {}
+    local entries, needsResolvedStats = requestedSkillEntries(requestedRefs)
+    local resolvedStatsByRef = needsResolvedStats and buildResolvedStatsByRef(Resolver.ListResolvedStats(options)) or {}
+    local storedLevels = buildProfileSkillLevelMap()
+    local itemBonuses = buildItemSkillBonusMap()
+    local traitBonuses = buildTraitSkillBonusMap()
+    local raceBonuses = buildOriginSkillBonusMap("races")
+    local classBonuses = buildOriginSkillBonusMap("classes")
+    local auraContext = resolveLocalAuraContext(options)
+    local level = getProfileLevel()
+    local weaponMultiplier = tonumber(getRulesetRuleValue("skills", "weapon_skill_level_multiplier", 5)) or 5
+    local rowsByRef = {}
+
+    for index = 1, #entries do
+        local entry = entries[index]
+        local row = buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, itemBonuses, traitBonuses, raceBonuses, classBonuses, auraContext, level, weaponMultiplier)
+        if row then
+            rowsByRef[row.ref] = row
+        end
+    end
+
+    local resolved = {}
+    for index = 1, #requestedRefs do
+        local skillRef = ensureString(requestedRefs[index])
+        local row = rowsByRef[skillRef]
+        if row then
+            resolved[#resolved + 1] = row
+        end
+    end
+
+    return resolved
 end
 
 Resolver.BuildUnitRuntimeStatRows = buildRuntimeStatRows

@@ -14,6 +14,38 @@ local Event = Addon.Internal.Database.Classes.Event
 local ResourceSync = Addon.Internal.Comms and Addon.Internal.Comms.ResourceSync or {}
 local EventUnit = Addon.Internal.Database.Classes.EventUnit
 
+local function getTimings()
+    return Addon.Debug and Addon.Debug.Timings or nil
+end
+
+local function getTimingNowMilliseconds()
+    local timings = getTimings()
+    return type(timings) == "table" and type(timings.GetNowMilliseconds) == "function"
+        and timings.GetNowMilliseconds()
+        or 0
+end
+
+local function logTimingParts(label, context, parts, totalElapsedMs, thresholdMs)
+    local timings = getTimings()
+    if type(timings) == "table" and type(timings.LogParts) == "function" then
+        return timings:LogParts(label, context, parts, totalElapsedMs, thresholdMs)
+    end
+
+    return false
+end
+
+local function appendTimingPart(parts, label, startedAtMs, thresholdMs)
+    if type(parts) ~= "table" or startedAtMs == nil then
+        return
+    end
+
+    parts[#parts + 1] = {
+        label = label,
+        elapsedMs = getTimingNowMilliseconds() - startedAtMs,
+        thresholdMs = thresholdMs,
+    }
+end
+
 local function getInline()
     return Addon.UI and Addon.UI.Inline or nil
 end
@@ -65,10 +97,116 @@ end
 Client.EventState = Client.EventState or nil
 Client.LastEventEndReason = Client.LastEventEndReason or nil
 Client.EventWidgetRefreshQueued = Client.EventWidgetRefreshQueued or false
+Client.EventStartupRuntimeByEventId = Client.EventStartupRuntimeByEventId or {}
 Client.ControlledEventUnitId = Client.ControlledEventUnitId or nil
 Client.TurnEndPending = Client.TurnEndPending or false
 Client.EventUnitInteractionMarkers = Client.EventUnitInteractionMarkers or {}
 Client.LastLocalInteractionMarker = Client.LastLocalInteractionMarker or nil
+
+local EVENT_STARTUP_STEP_COUNT = 6
+
+local function getEventStartupRuntime(client, eventId, createIfMissing)
+    local normalizedEventId = tostring(eventId or "")
+    if normalizedEventId == "" then
+        return nil
+    end
+
+    client.EventStartupRuntimeByEventId = client.EventStartupRuntimeByEventId or {}
+    local runtime = client.EventStartupRuntimeByEventId[normalizedEventId]
+    if runtime or not createIfMissing then
+        return runtime
+    end
+
+    runtime = {
+        queued = false,
+        startupStateReceived = false,
+        actionBarPrimed = false,
+        visualGate = "",
+        traitRuntimeRefreshed = false,
+        automaticAurasSynced = false,
+        eventAurasSynced = false,
+        resolvedStateRefreshed = false,
+        consumablesQueued = false,
+    }
+    client.EventStartupRuntimeByEventId[normalizedEventId] = runtime
+    return runtime
+end
+
+local function resetEventStartupRuntime(client, eventId)
+    local normalizedEventId = tostring(eventId or "")
+    if normalizedEventId == "" then
+        return false
+    end
+
+    client.EventStartupRuntimeByEventId = client.EventStartupRuntimeByEventId or {}
+    local existed = client.EventStartupRuntimeByEventId[normalizedEventId] ~= nil
+    client.EventStartupRuntimeByEventId[normalizedEventId] = nil
+    return existed
+end
+
+local function getStartupProgressReceived(runtime)
+    if type(runtime) ~= "table" then
+        return 0
+    end
+
+    local completed = 0
+    if runtime.actionBarPrimed == true then
+        completed = completed + 1
+    end
+    if runtime.traitRuntimeRefreshed == true then
+        completed = completed + 1
+    end
+    if runtime.automaticAurasSynced == true then
+        completed = completed + 1
+    end
+    if runtime.eventAurasSynced == true then
+        completed = completed + 1
+    end
+    if runtime.resolvedStateRefreshed == true then
+        completed = completed + 1
+    end
+    if runtime.consumablesQueued == true then
+        completed = completed + 1
+    end
+
+    return completed
+end
+
+local function setEventStartupPhase(eventState, runtime, phase)
+    if type(eventState) ~= "table" then
+        return false
+    end
+
+    eventState.startupPhase = tostring(phase or "starting")
+    eventState.startupProgressExpected = EVENT_STARTUP_STEP_COUNT
+    eventState.startupProgressReceived = getStartupProgressReceived(runtime)
+    eventState.startupReady = eventState.startupPhase == "ready"
+    return true
+end
+
+local function refreshEventStartupPhase(eventState, runtime)
+    if type(eventState) ~= "table" then
+        return false
+    end
+
+    if eventState.startupReady == true then
+        return setEventStartupPhase(eventState, runtime, "ready")
+    end
+    if eventState.unitsReady ~= true then
+        return setEventStartupPhase(eventState, runtime, "waiting-units")
+    end
+    if type(runtime) ~= "table" or runtime.startupStateReceived ~= true then
+        return setEventStartupPhase(eventState, runtime, "waiting-state")
+    end
+
+    return setEventStartupPhase(eventState, runtime, "syncing-local")
+end
+
+local function isEventStartupPending(eventState)
+    return type(eventState) == "table"
+        and eventState.active == true
+        and (eventState.unitsReady ~= true or eventState.startupReady ~= true)
+end
 
 local function getMovementTracker()
     return type(RPE) == "table" and type(RPE.Core) == "table" and type(RPE.Core.Movement) == "table" and RPE.Core.Movement or nil
@@ -90,23 +228,30 @@ local function queueSharedEventVisualRefresh(client, reason, options)
         return false
     end
 
+    local totalStartTime = getTimingNowMilliseconds()
+    local timingParts = totalStartTime > 0 and {} or nil
     options = type(options) == "table" and options or {}
     local refreshed = false
     local normalizedReason = tostring(reason or "event")
 
+    local eventStartTime = timingParts and getTimingNowMilliseconds() or nil
     if options.eventWidget ~= false and type(client.QueueEventWidgetRefresh) == "function" then
         refreshed = client:QueueEventWidgetRefresh(normalizedReason) or refreshed
     end
+    appendTimingPart(timingParts, "event-widget", eventStartTime, 10)
 
     if options.targeting ~= false then
+        local targetingStartTime = timingParts and getTimingNowMilliseconds() or nil
         if type(client.QueueTargetingWidgetRefresh) == "function" then
             refreshed = client:QueueTargetingWidgetRefresh(normalizedReason) or refreshed
         elseif type(client.RefreshTargetingWidget) == "function" then
             refreshed = client:RefreshTargetingWidget(normalizedReason) or refreshed
         end
+        appendTimingPart(timingParts, "targeting", targetingStartTime, 10)
     end
 
     if options.actionBar ~= false then
+        local actionBarStartTime = timingParts and getTimingNowMilliseconds() or nil
         if type(client.QueueActionBarRefresh) == "function" then
             refreshed = client:QueueActionBarRefresh(normalizedReason) or refreshed
         elseif type(client.RefreshActionBarWidget) == "function" then
@@ -114,8 +259,21 @@ local function queueSharedEventVisualRefresh(client, reason, options)
         else
             refreshActionBarBars(normalizedReason)
         end
+        appendTimingPart(timingParts, "action-bar", actionBarStartTime, 10)
     elseif options.companionBars == true then
+        local companionStartTime = timingParts and getTimingNowMilliseconds() or nil
         refreshActionBarBars(normalizedReason)
+        appendTimingPart(timingParts, "companion-bars", companionStartTime, 10)
+    end
+
+    if timingParts then
+        logTimingParts(
+            tostring(normalizedReason),
+            "event-visual-enqueue",
+            timingParts,
+            getTimingNowMilliseconds() - totalStartTime,
+            15
+        )
     end
 
     return refreshed
@@ -244,11 +402,13 @@ local function syncMovementTracking(client, wasLocalTurn, eventState, previousTu
         if type(tracker.OnPlayerTurnStart) == "function" then
             tracker:OnPlayerTurnStart()
         end
-        queueSharedEventVisualRefresh(client, "local-turn-start", {
-            eventWidget = false,
-            targeting = false,
-            actionBar = true,
-        })
+        if not isEventStartupPending(eventState) then
+            queueSharedEventVisualRefresh(client, "local-turn-start", {
+                eventWidget = false,
+                targeting = false,
+                actionBar = true,
+            })
+        end
         return true
     end
 
@@ -262,11 +422,13 @@ local function syncMovementTracking(client, wasLocalTurn, eventState, previousTu
     if type(tracker.OnPlayerTurnEnd) == "function" then
         tracker:OnPlayerTurnEnd()
     end
-    queueSharedEventVisualRefresh(client, "local-turn-end", {
-        eventWidget = false,
-        targeting = false,
-        actionBar = true,
-    })
+    if not isEventStartupPending(eventState) then
+        queueSharedEventVisualRefresh(client, "local-turn-end", {
+            eventWidget = false,
+            targeting = false,
+            actionBar = true,
+        })
+    end
     return true
 end
 
@@ -289,6 +451,206 @@ local function deferEventWidget(fn, ...)
     end
 
     fn(...)
+end
+
+local function deferEventPresentation(fn, ...)
+    if Addon.Internal and Addon.Internal.Tasks and type(Addon.Internal.Tasks.Enqueue) == "function" then
+        Addon.Internal.Tasks:Enqueue(fn, ...)
+        return true
+    end
+
+    if C_Timer and C_Timer.After then
+        local args = { ... }
+        local argCount = select("#", ...)
+        C_Timer.After(0, function()
+            fn(unpack(args, 1, argCount))
+        end)
+        return true
+    end
+
+    fn(...)
+    return true
+end
+
+local function enqueueClientTask(fn, ...)
+    if Addon.Internal and Addon.Internal.Tasks and type(Addon.Internal.Tasks.Enqueue) == "function" then
+        Addon.Internal.Tasks:Enqueue(fn, ...)
+        return true
+    end
+
+    if C_Timer and C_Timer.After then
+        local args = { ... }
+        local argCount = select("#", ...)
+        C_Timer.After(0, function()
+            fn(unpack(args, 1, argCount))
+        end)
+        return true
+    end
+
+    fn(...)
+    return true
+end
+
+local function queueDeferredMovementSync(client, wasLocalTurn, eventState, previousTurnNumber, previousTickNumber, reason)
+    local expectedEventId = tostring(type(eventState) == "table" and eventState.id or "")
+    if expectedEventId == "" then
+        return false
+    end
+
+    return enqueueClientTask(function(targetClient, queuedEventId, queuedWasLocalTurn, queuedPreviousTurnNumber, queuedPreviousTickNumber)
+        if type(targetClient) ~= "table" then
+            return
+        end
+
+        local currentEventState = targetClient.GetEventState and targetClient:GetEventState() or targetClient.EventState
+        if type(currentEventState) ~= "table"
+            or currentEventState.active ~= true
+            or tostring(currentEventState.id or "") ~= queuedEventId
+        then
+            return
+        end
+
+        syncMovementTracking(
+            targetClient,
+            queuedWasLocalTurn == true,
+            currentEventState,
+            queuedPreviousTurnNumber,
+            queuedPreviousTickNumber
+        )
+    end, client, expectedEventId, wasLocalTurn == true, previousTurnNumber, previousTickNumber, reason)
+end
+
+local tryQueueInitialLocalResourceSync
+
+local function runEventStartupStep(targetClient, queuedEventId)
+    if type(targetClient) ~= "table" then
+        return false
+    end
+
+    local eventState = targetClient.GetEventState and targetClient:GetEventState() or targetClient.EventState
+    if type(eventState) ~= "table"
+        or eventState.active ~= true
+        or tostring(eventState.id or "") ~= tostring(queuedEventId or "")
+    then
+        return false
+    end
+
+    local runtime = getEventStartupRuntime(targetClient, eventState.id, true)
+    if type(runtime) ~= "table" then
+        return false
+    end
+
+    if eventState.unitsReady ~= true then
+        refreshEventStartupPhase(eventState, runtime)
+        if type(targetClient.QueueEventWidgetRefresh) == "function" then
+            targetClient:QueueEventWidgetRefresh("startup-waiting-units")
+        end
+        return false
+    end
+
+    if runtime.startupStateReceived ~= true then
+        refreshEventStartupPhase(eventState, runtime)
+        if type(targetClient.QueueEventWidgetRefresh) == "function" then
+            targetClient:QueueEventWidgetRefresh("startup-waiting-state")
+        end
+        return false
+    end
+
+    setEventStartupPhase(eventState, runtime, "syncing-local")
+    if type(targetClient.QueueEventWidgetRefresh) == "function" then
+        targetClient:QueueEventWidgetRefresh("startup-syncing")
+    end
+
+    if runtime.actionBarPrimed ~= true and runtime.visualGate ~= "syncing-local" then
+        runtime.visualGate = "syncing-local"
+        runtime.actionBarPrimed = true
+        queueSharedEventVisualRefresh(targetClient, "startup-action-bar", {
+            eventWidget = false,
+            targeting = false,
+            actionBar = true,
+        })
+        setEventStartupPhase(eventState, runtime, "syncing-local")
+        return true
+    end
+
+    if runtime.traitRuntimeRefreshed ~= true and type(targetClient.RefreshTraitRuntimeEntries) == "function" then
+        targetClient:RefreshTraitRuntimeEntries(eventState)
+        runtime.traitRuntimeRefreshed = true
+        setEventStartupPhase(eventState, runtime, "syncing-local")
+        return true
+    end
+
+    if runtime.automaticAurasSynced ~= true and type(targetClient.SyncAutomaticTraitAuras) == "function" then
+        targetClient:SyncAutomaticTraitAuras(eventState, { suppressResolvedRefresh = true })
+        runtime.automaticAurasSynced = true
+        setEventStartupPhase(eventState, runtime, "syncing-local")
+        return true
+    end
+
+    if runtime.eventAurasSynced ~= true and type(targetClient.SyncEventAuras) == "function" then
+        targetClient:SyncEventAuras(eventState, { suppressResolvedRefresh = true })
+        runtime.eventAurasSynced = true
+        setEventStartupPhase(eventState, runtime, "syncing-local")
+        return true
+    end
+
+    if runtime.resolvedStateRefreshed ~= true and type(targetClient.RefreshTraitResolvedState) == "function" then
+        targetClient:RefreshTraitResolvedState(eventState, "startup")
+        runtime.resolvedStateRefreshed = true
+        local sessionState = targetClient.GetState and targetClient:GetState() or targetClient.State
+        tryQueueInitialLocalResourceSync(targetClient, sessionState, eventState, "startup-resolved-state")
+        setEventStartupPhase(eventState, runtime, "syncing-local")
+        return true
+    end
+
+    if runtime.consumablesQueued ~= true and type(targetClient.QueueDeferredConsumablePrompt) == "function" then
+        targetClient:QueueDeferredConsumablePrompt(eventState, "event_start")
+        runtime.consumablesQueued = true
+        setEventStartupPhase(eventState, runtime, "syncing-local")
+        return true
+    end
+
+    setEventStartupPhase(eventState, runtime, "ready")
+    runtime.visualGate = "ready"
+    if type(targetClient.QueueEventWidgetRefresh) == "function" then
+        targetClient:QueueEventWidgetRefresh("startup-ready")
+    end
+    if type(targetClient.QueueActionBarRefresh) == "function" then
+        targetClient:QueueActionBarRefresh("startup-ready")
+    end
+    if type(targetClient.QueueActionBarCompanionBarsRefresh) == "function" then
+        targetClient:QueueActionBarCompanionBarsRefresh("startup-ready", { immediate = true })
+    elseif type(targetClient.RefreshActionBarCompanionBars) == "function" then
+        targetClient:RefreshActionBarCompanionBars("startup-ready")
+    end
+    return false
+end
+
+local function queueEventStartupWork(client, eventState, reason)
+    if type(client) ~= "table" or type(eventState) ~= "table" or eventState.active ~= true then
+        return false
+    end
+
+    local runtime = getEventStartupRuntime(client, eventState.id, true)
+    if type(runtime) ~= "table" or runtime.queued == true then
+        return runtime ~= nil
+    end
+
+    runtime.queued = true
+    local queuedEventId = tostring(eventState.id or "")
+    return enqueueClientTask(function(targetClient, expectedEventId, queueReason)
+        local currentRuntime = getEventStartupRuntime(targetClient, expectedEventId, false)
+        if type(currentRuntime) == "table" then
+            currentRuntime.queued = false
+        end
+
+        if runEventStartupStep(targetClient, expectedEventId) then
+            if type(targetClient.QueueEventWidgetRefresh) == "function" then
+                targetClient:QueueEventWidgetRefresh("startup-progress")
+            end
+            queueEventStartupWork(targetClient, targetClient.GetEventState and targetClient:GetEventState() or targetClient.EventState, queueReason)
+        end
+    end, client, queuedEventId, reason or "startup")
 end
 
 local function hasLocalSessionMember(sessionState)
@@ -405,7 +767,7 @@ local function countPlayerUnits(units)
     return playerCount
 end
 
-local function tryQueueInitialLocalResourceSync(client, sessionState, eventState, reason)
+tryQueueInitialLocalResourceSync = function(client, sessionState, eventState, reason)
     if type(client) ~= "table"
         or type(sessionState) ~= "table"
         or sessionState.active ~= true
@@ -418,13 +780,20 @@ local function tryQueueInitialLocalResourceSync(client, sessionState, eventState
         return false
     end
 
-    local queued = client:QueueClientResourceSync(reason or "event-start")
-    if queued then
-        sessionState.lastResourceSyncEventId = eventState.id
-        return true
+    local profileLogic = Addon.Internal and Addon.Internal.Profile or nil
+    if type(profileLogic) == "table" then
+        if type(profileLogic.WarmResolvedBootstrapState) == "function" then
+            if profileLogic.WarmResolvedBootstrapState(reason or "event-start") ~= true then
+                return false
+            end
+        elseif type(profileLogic.IsBootstrapResolvedStateReady) == "function"
+            and profileLogic.IsBootstrapResolvedStateReady() ~= true
+        then
+            return false
+        end
     end
 
-    return false
+    return client:QueueClientResourceSync(reason or "event-start") or false
 end
 
 local function applyLocalProfileResourcesToEventUnits(sessionState, units)
@@ -446,7 +815,13 @@ local function applyLocalProfileResourcesToEventUnits(sessionState, units)
         and type(sessionState.membersByName) == "table"
         and sessionState.membersByName[localPlayerName]
         or nil
-    if sessionMember and (type(sessionMember.resources) ~= "table" or #sessionMember.resources == 0) then
+    if sessionMember
+        and (
+            type(sessionMember.resources) ~= "table"
+            or #sessionMember.resources == 0
+            or not (ResourceSync.ResourcesEqual and ResourceSync.ResourcesEqual(sessionMember.resources, resources))
+        )
+    then
         sessionMember.resources = ResourceSync.CloneResources and ResourceSync.CloneResources(resources) or resources
     end
 
@@ -455,7 +830,13 @@ local function applyLocalProfileResourcesToEventUnits(sessionState, units)
         local unit = units[index]
         if unit and unit.isPlayer == true then
             local ownerName = Common.NormalizeName and Common.NormalizeName(unit.ownerID or unit.controllerID or unit.name) or ""
-            if ownerName == localPlayerName and (type(unit.resources) ~= "table" or #unit.resources == 0) then
+            if ownerName == localPlayerName
+                and (
+                    type(unit.resources) ~= "table"
+                    or #unit.resources == 0
+                    or not (ResourceSync.ResourcesEqual and ResourceSync.ResourcesEqual(unit.resources, resources))
+                )
+            then
                 unit.resources = ResourceSync.CloneResources and ResourceSync.CloneResources(resources) or resources
                 updated = true
             end
@@ -926,6 +1307,8 @@ function Client:ResetEventState(reason)
     self.ControlledEventUnitId = nil
     self.TurnEndPending = false
     self.LastAppliedTurnRegenKey = nil
+    self.PendingStartupActionBarRefresh = false
+    self.PendingStartupActionBarRefreshReason = nil
     self.EventUnitInteractionMarkers = {}
     self.LastLocalInteractionMarker = nil
     if self.ClearEventWidgetCombatLog then
@@ -937,6 +1320,7 @@ function Client:ResetEventState(reason)
     if self.ResetTraitRuntime then
         self:ResetTraitRuntime(state and state.id or nil)
     end
+    resetEventStartupRuntime(self, state and state.id or nil)
     if self.CancelSpellTargeting then
         self:CancelSpellTargeting("")
     end
@@ -955,6 +1339,8 @@ function Client:ResetEventState(reason)
 end
 
 function Client:HandleEventStart(arguments, sender)
+    local totalStartTime = getTimingNowMilliseconds()
+    local timingParts = totalStartTime > 0 and {} or nil
     local sessionState = self:GetState()
     if not sessionState or sessionState.active ~= true then
         return false
@@ -965,7 +1351,9 @@ function Client:HandleEventStart(arguments, sender)
         return false
     end
 
+    local parseStartTime = timingParts and getTimingNowMilliseconds() or nil
     local nextState = Event.FromStartArguments(arguments)
+    appendTimingPart(timingParts, "parse-start", parseStartTime, 10)
 
     nextState.hostName = Common.NormalizeName(nextState.hostName ~= "" and nextState.hostName or sender)
     nextState.channelName = channelName
@@ -979,6 +1367,7 @@ function Client:HandleEventStart(arguments, sender)
     nextState.unitsChunkReceived = 0
     nextState.unitsChunkExpected = 0
 
+    local hydrateStartTime = timingParts and getTimingNowMilliseconds() or nil
     if ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
         ResourceSync.ApplyTrackedPlayerResourcesToEventUnits(sessionState.membersByName, nextState.units)
     end
@@ -986,8 +1375,22 @@ function Client:HandleEventStart(arguments, sender)
     if ResourceSync.UpdateEventReadiness then
         ResourceSync.UpdateEventReadiness(nextState)
     end
+    appendTimingPart(timingParts, "hydrate-resources", hydrateStartTime, 10)
 
     self.EventState = nextState
+    local startupRuntime = getEventStartupRuntime(self, nextState.id, true)
+    if startupRuntime then
+        startupRuntime.startupStateReceived = false
+        startupRuntime.actionBarPrimed = false
+        startupRuntime.visualGate = ""
+        startupRuntime.traitRuntimeRefreshed = false
+        startupRuntime.automaticAurasSynced = false
+        startupRuntime.eventAurasSynced = false
+        startupRuntime.resolvedStateRefreshed = false
+        startupRuntime.consumablesQueued = false
+        startupRuntime.queued = false
+    end
+    setEventStartupPhase(nextState, startupRuntime, "starting")
     local wasLocalTurn = false
     self.EventUnitInteractionMarkers = {}
     self.LastLocalInteractionMarker = nil
@@ -1000,22 +1403,36 @@ function Client:HandleEventStart(arguments, sender)
     self.LastEventEndReason = nil
     playEventStartSound()
 
+    local syncStartTime = timingParts and getTimingNowMilliseconds() or nil
     tryQueueInitialLocalResourceSync(self, sessionState, nextState, "event-start")
-    syncMovementTracking(self, wasLocalTurn, nextState)
+    appendTimingPart(timingParts, "resource-sync-queue", syncStartTime, 10)
+
+    local movementStartTime = timingParts and getTimingNowMilliseconds() or nil
+    queueDeferredMovementSync(self, wasLocalTurn, nextState, nil, nil, "event-start")
+    appendTimingPart(timingParts, "movement-sync", movementStartTime, 10)
+
+    local tooltipStartTime = timingParts and getTimingNowMilliseconds() or nil
     bumpAllEventTooltipContextRevisions(nextState)
     if self.InvalidatePendingSpellTargetingDisplayState then
         self:InvalidatePendingSpellTargetingDisplayState()
     end
+    appendTimingPart(timingParts, "tooltip-context", tooltipStartTime, 10)
+
+    local visualsStartTime = timingParts and getTimingNowMilliseconds() or nil
     queueSharedEventVisualRefresh(self, "event-start", {
         eventWidget = true,
         targeting = true,
-        actionBar = true,
+        actionBar = false,
     })
-    if self.ActivateEventTraits and nextState and nextState.rosterReady == true and #(nextState.units or {}) > 0 then
-        self:ActivateEventTraits(nextState)
-    end
-    if self.PromptPhaseConsumableTraits then
-        self:PromptPhaseConsumableTraits(nextState, "event_start")
+    appendTimingPart(timingParts, "visual-queue", visualsStartTime, 10)
+
+    local startupQueueStartTime = timingParts and getTimingNowMilliseconds() or nil
+    refreshEventStartupPhase(nextState, startupRuntime)
+    queueEventStartupWork(self, nextState, "event-start")
+    appendTimingPart(timingParts, "startup-queue", startupQueueStartTime, 10)
+
+    if timingParts then
+        logTimingParts("HandleEventStart", "event-start-handler", timingParts, getTimingNowMilliseconds() - totalStartTime, 25)
     end
     return true
 end
@@ -1050,6 +1467,8 @@ function Client:HandleEventEnd(arguments)
 end
 
 function Client:HandleEventUnits(arguments)
+    local totalStartTime = getTimingNowMilliseconds()
+    local timingParts = totalStartTime > 0 and {} or nil
     local sessionState = self:GetState()
     local eventState = self.EventState
     if not sessionState or sessionState.active ~= true or not eventState or eventState.active ~= true then
@@ -1066,22 +1485,40 @@ function Client:HandleEventUnits(arguments)
         return false
     end
 
+    local previousTurnNumber = tonumber(eventState.turnNumber) or 0
+    local previousTickNumber = tonumber(eventState.tickNumber) or 0
     local wasLocalTurn = self.IsLocalTurnActive and self:IsLocalTurnActive(eventState) or false
+    local startupRuntime = getEventStartupRuntime(self, eventState.id, true)
+    local deserializeStartTime = timingParts and getTimingNowMilliseconds() or nil
     local units = Event.DeserializeUnitsFromNetwork(arguments and arguments[3] or "")
+    appendTimingPart(timingParts, "deserialize-units", deserializeStartTime, 15)
+
+    local resourcesStartTime = timingParts and getTimingNowMilliseconds() or nil
     if ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
         ResourceSync.ApplyTrackedPlayerResourcesToEventUnits(sessionState.membersByName, units)
     end
     applyLocalProfileResourcesToEventUnits(sessionState, units)
+    appendTimingPart(timingParts, "apply-resources", resourcesStartTime, 10)
+
+    local readinessStartTime = timingParts and getTimingNowMilliseconds() or nil
     eventState.units = units
     eventState.rosterReady = true
     eventState.unitsChunkReceived = eventState.unitsChunkExpected or eventState.unitsChunkReceived or 0
     if ResourceSync.UpdateEventReadiness then
         ResourceSync.UpdateEventReadiness(eventState)
     end
+    refreshEventStartupPhase(eventState, startupRuntime)
+    appendTimingPart(timingParts, "readiness", readinessStartTime, 10)
+
+    local syncStartTime = timingParts and getTimingNowMilliseconds() or nil
     tryQueueInitialLocalResourceSync(self, sessionState, eventState, "event-units")
+    appendTimingPart(timingParts, "resource-sync-queue", syncStartTime, 10)
+
+    local cooldownStartTime = timingParts and getTimingNowMilliseconds() or nil
     if self.PruneCooldownState then
         self:PruneCooldownState(eventState)
     end
+    appendTimingPart(timingParts, "cooldown-prune", cooldownStartTime, 10)
     if Addon.Server and Addon.Server.EventState and Addon.Server.EventState.id == eventState.id then
         Addon.Server.EventState.healthResourceRef = eventState.healthResourceRef
         Addon.Server.EventState.rosterReady = eventState.rosterReady
@@ -1094,18 +1531,31 @@ function Client:HandleEventUnits(arguments)
         Addon.Server.EventState.readyProgressReceived = eventState.readyProgressReceived
         Addon.Server.EventState.readyProgressExpected = eventState.readyProgressExpected
     end
-    syncMovementTracking(self, wasLocalTurn, eventState, previousTurnNumber, previousTickNumber)
+    local movementStartTime = timingParts and getTimingNowMilliseconds() or nil
+    queueDeferredMovementSync(self, wasLocalTurn, eventState, previousTurnNumber, previousTickNumber, "event-units")
+    appendTimingPart(timingParts, "movement-sync", movementStartTime, 10)
+
+    local tooltipStartTime = timingParts and getTimingNowMilliseconds() or nil
     bumpAllEventTooltipContextRevisions(eventState)
     if self.InvalidatePendingSpellTargetingDisplayState then
         self:InvalidatePendingSpellTargetingDisplayState()
     end
+    appendTimingPart(timingParts, "tooltip-context", tooltipStartTime, 10)
+
+    local visualsStartTime = timingParts and getTimingNowMilliseconds() or nil
     queueSharedEventVisualRefresh(self, "event-units", {
         eventWidget = true,
         targeting = true,
-        actionBar = true,
+        actionBar = false,
     })
-    if self.ActivateEventTraits then
-        self:ActivateEventTraits(eventState)
+    appendTimingPart(timingParts, "visual-queue", visualsStartTime, 10)
+
+    local startupQueueStartTime = timingParts and getTimingNowMilliseconds() or nil
+    queueEventStartupWork(self, eventState, "event-units")
+    appendTimingPart(timingParts, "startup-queue", startupQueueStartTime, 10)
+
+    if timingParts then
+        logTimingParts("HandleEventUnits", "event-units-handler", timingParts, getTimingNowMilliseconds() - totalStartTime, 30)
     end
     return true
 end
@@ -1175,7 +1625,7 @@ function Client:HandleEventUnitDeltaBatch(arguments)
     return true
 end
 
-function Client:HandleInboundChunkProgress(packet, receivedCount)
+function Client:HandleInboundChunkProgress(packet, receivedCount, distribution, sender, target, startedAtMs)
     if not packet or packet.opcode ~= getEventUnitsOpcode() then
         return false
     end
@@ -1192,6 +1642,7 @@ function Client:HandleInboundChunkProgress(packet, receivedCount)
     if ResourceSync.UpdateEventReadiness then
         ResourceSync.UpdateEventReadiness(eventState)
     end
+    refreshEventStartupPhase(eventState, getEventStartupRuntime(self, eventState.id, true))
 
     if Addon.Server and Addon.Server.EventState and Addon.Server.EventState.id == eventState.id then
         Addon.Server.EventState.healthResourceRef = eventState.healthResourceRef
@@ -1206,6 +1657,16 @@ function Client:HandleInboundChunkProgress(packet, receivedCount)
         Addon.Server.EventState.readyProgressExpected = eventState.readyProgressExpected
     end
 
+    if startedAtMs and tonumber(packet.partCount) and tonumber(packet.partCount) > 1 then
+        logTimingParts(
+            ("EVENT_UNITS %d/%d"):format(received, expectedCount),
+            "event-receive-progress",
+            nil,
+            getTimingNowMilliseconds() - (tonumber(startedAtMs) or 0),
+            25
+        )
+    end
+
     self:QueueEventWidgetRefresh("event-units-progress")
     return true
 end
@@ -1215,6 +1676,8 @@ function Comms:HandleInboundChunkProgress(packet, receivedCount, distribution, s
 end
 
 function Client:HandleEventState(arguments)
+    local totalStartTime = getTimingNowMilliseconds()
+    local timingParts = totalStartTime > 0 and {} or nil
     local sessionState = self:GetState()
     local eventState = self.EventState
     if not sessionState or sessionState.active ~= true or not eventState or eventState.active ~= true then
@@ -1235,7 +1698,9 @@ function Client:HandleEventState(arguments)
     local previousTickNumber = tonumber(eventState.tickNumber) or 0
     local wasLocalTurn = self.IsLocalTurnActive and self:IsLocalTurnActive(eventState) or false
     local wasLocalPlayerTurn = isLocalPlayerTurnActive(self, eventState)
+    local startupRuntime = getEventStartupRuntime(self, eventState.id, true)
 
+    local stateApplyStartTime = timingParts and getTimingNowMilliseconds() or nil
     if Event and Event.ApplyStateArguments then
         Event.ApplyStateArguments(eventState, arguments)
     else
@@ -1243,11 +1708,19 @@ function Client:HandleEventState(arguments)
         eventState.tickNumber = tonumber(arguments and arguments[4]) or eventState.tickNumber or 0
         eventState.totalTicks = tonumber(arguments and arguments[5]) or eventState.totalTicks or 0
     end
+    appendTimingPart(timingParts, "apply-state", stateApplyStartTime, 10)
+    if startupRuntime then
+        startupRuntime.startupStateReceived = true
+        refreshEventStartupPhase(eventState, startupRuntime)
+    end
+
     if previousTurnNumber ~= (tonumber(eventState.turnNumber) or 0)
         or previousTickNumber ~= (tonumber(eventState.tickNumber) or 0)
     then
         self.TurnEndPending = false
     end
+
+    local advanceStateStartTime = timingParts and getTimingNowMilliseconds() or nil
     if self.AdvanceSpellcastState then
         self:AdvanceSpellcastState(previousTurnNumber, previousTickNumber)
     end
@@ -1257,44 +1730,79 @@ function Client:HandleEventState(arguments)
     if self.AdvanceAuraState then
         self:AdvanceAuraState(previousTurnNumber, previousTickNumber)
     end
+    appendTimingPart(timingParts, "advance-state", advanceStateStartTime, 15)
 
+    local turnEffectsStartTime = timingParts and getTimingNowMilliseconds() or nil
+    local turnEffectParts = turnEffectsStartTime and {} or nil
     local isLocalTurn = self.IsLocalTurnActive and self:IsLocalTurnActive(eventState) or false
     local isLocalPlayerTurn = isLocalPlayerTurnActive(self, eventState)
     local stepAdvanced = previousTurnNumber ~= (tonumber(eventState.turnNumber) or 0)
         or previousTickNumber ~= (tonumber(eventState.tickNumber) or 0)
+    local turnAnnouncementStartTime = turnEffectParts and getTimingNowMilliseconds() or nil
     if previousTurnNumber ~= (tonumber(eventState.turnNumber) or 0) then
-        emitTurnStartAnnouncement(eventState)
+        local eventName = getEventDisplayName(eventState)
+        local turnNumber = math.max(1, tonumber(eventState.turnNumber) or 1)
+        deferEventPresentation(function(name, announcedTurnNumber)
+            emitTurnStartAnnouncement({
+                name = name,
+                turnNumber = announcedTurnNumber,
+            })
+        end, eventName, turnNumber)
     end
+    appendTimingPart(turnEffectParts, "announcements", turnAnnouncementStartTime, 10)
+    local turnCueStartTime = turnEffectParts and getTimingNowMilliseconds() or nil
     if stepAdvanced and not wasLocalPlayerTurn and isLocalPlayerTurn then
-        playLocalTurnStartSound()
-        emitLocalTurnStartAnnouncement()
+        deferEventPresentation(function()
+            playLocalTurnStartSound()
+            emitLocalTurnStartAnnouncement()
+        end)
     end
+    appendTimingPart(turnEffectParts, "local-turn-cue", turnCueStartTime, 10)
+    local regenStartTime = turnEffectParts and getTimingNowMilliseconds() or nil
     if previousTurnNumber ~= (tonumber(eventState.turnNumber) or 0)
         and isLocalTurn
         and type(self.ApplyLocalTurnStartResourceRegeneration) == "function"
     then
-        self:ApplyLocalTurnStartResourceRegeneration(sessionState, eventState)
+        self:ApplyLocalTurnStartResourceRegeneration(sessionState, eventState, {
+            suppressLocalVisualRefresh = true,
+        })
     end
-    if stepAdvanced then
-        local tracker = getMovementTracker()
-        if tracker then
-            if isLocalTurn and type(tracker.OnPlayerTurnStart) == "function" then
-                tracker:OnPlayerTurnStart()
-            elseif not isLocalTurn and type(tracker.OnPlayerTurnEnd) == "function" then
-                tracker:OnPlayerTurnEnd()
-            end
-        end
-    else
-        syncMovementTracking(self, wasLocalTurn, eventState)
+    appendTimingPart(turnEffectParts, "resource-regen", regenStartTime, 15)
+    local movementStartTime = turnEffectParts and getTimingNowMilliseconds() or nil
+    queueDeferredMovementSync(self, wasLocalTurn, eventState, previousTurnNumber, previousTickNumber, "event-state")
+    appendTimingPart(turnEffectParts, "movement", movementStartTime, 10)
+    if turnEffectParts then
+        logTimingParts(
+            "HandleEventState turn-effects",
+            "event-state-turn-effects",
+            turnEffectParts,
+            getTimingNowMilliseconds() - turnEffectsStartTime,
+            15
+        )
     end
+    appendTimingPart(timingParts, "turn-effects", turnEffectsStartTime, 15)
+
+    local tooltipStartTime = timingParts and getTimingNowMilliseconds() or nil
     bumpAllEventTooltipContextRevisions(eventState)
     if self.InvalidatePendingSpellTargetingDisplayState then
         self:InvalidatePendingSpellTargetingDisplayState()
     end
+    appendTimingPart(timingParts, "tooltip-context", tooltipStartTime, 10)
+
+    local visualsStartTime = timingParts and getTimingNowMilliseconds() or nil
     queueSharedEventVisualRefresh(self, "event-state", {
         eventWidget = true,
         targeting = true,
-        actionBar = true,
+        actionBar = false,
     })
+    appendTimingPart(timingParts, "visual-queue", visualsStartTime, 10)
+
+    local startupQueueStartTime = timingParts and getTimingNowMilliseconds() or nil
+    queueEventStartupWork(self, eventState, "event-state")
+    appendTimingPart(timingParts, "startup-queue", startupQueueStartTime, 10)
+
+    if timingParts then
+        logTimingParts("HandleEventState", "event-state-handler", timingParts, getTimingNowMilliseconds() - totalStartTime, 25)
+    end
     return true
 end

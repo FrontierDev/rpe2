@@ -480,7 +480,7 @@ function Client:BuildCombatLogArguments(entry)
         normalized.accentColor or "",
         normalized.casterColor or "",
         normalized.targetColor or "",
-        normalized.entryType == "status" and (normalized.detailText ~= "" and normalized.detailText or normalized.labelText) or "",
+        normalized.detailText ~= "" and normalized.detailText or "",
     }
 end
 
@@ -506,7 +506,9 @@ function Client:BuildCombatLogDisplayText(entry)
 
     local casterText = wrapTextWithColor(normalized.casterDisplayName, normalized.casterColor)
     local targetText = wrapTextWithColor(normalized.targetDisplayName, normalized.targetColor)
-    detailText = wrapTextWithColor(detailText, normalized.accentColor)
+    if string.find(detailText, "|c", 1, true) == nil then
+        detailText = wrapTextWithColor(detailText, normalized.accentColor)
+    end
 
     return ("%s %s %s    %s"):format(
         casterText,
@@ -583,7 +585,7 @@ function Client:HandleCombatLog(arguments, sender, distribution, target, message
         accentColor = arguments and arguments[11],
         casterColor = arguments and arguments[12],
         targetColor = arguments and arguments[13],
-        detailText = entryType == "status" and (arguments and arguments[14]) or nil,
+        detailText = arguments and arguments[14],
     })
     if not normalized or normalized.eventId ~= tostring(eventState.id or "") then
         return false

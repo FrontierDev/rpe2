@@ -23,6 +23,92 @@ local function ensureString(value)
     return tostring(value)
 end
 
+local function trimText(value)
+    local text = ensureString(value)
+    text = text:gsub("^%s+", "")
+    text = text:gsub("%s+$", "")
+    return text
+end
+
+local function copyScalarFields(source, keys)
+    local copied = {}
+    for index = 1, #keys do
+        local key = keys[index]
+        local value = type(source) == "table" and source[key] or nil
+        if type(value) == "string" then
+            copied[key] = value
+        elseif type(value) == "number" then
+            copied[key] = value
+        elseif type(value) == "boolean" then
+            copied[key] = value
+        end
+    end
+
+    return copied
+end
+
+local function normalizeTooltipTemplateToken(token)
+    if type(token) ~= "table" then
+        return nil
+    end
+
+    local key = trimText(token.key)
+    local tokenType = trimText(token.tokenType)
+    if key == "" or tokenType == "" then
+        return nil
+    end
+
+    local normalized = copyScalarFields(token, {
+        "componentIndex",
+        "effectIndex",
+        "eventIndex",
+        "baseField",
+        "amountMode",
+        "operation",
+        "resourceRef",
+        "statRef",
+        "skillRef",
+        "auraRef",
+        "targetDisposition",
+        "targetType",
+        "applyMode",
+    })
+    normalized.key = key
+    normalized.tokenType = tokenType
+    return normalized
+end
+
+local function normalizeTooltipTemplateTokens(values)
+    local normalized = {}
+    for index = 1, #(values or {}) do
+        local token = normalizeTooltipTemplateToken(values[index])
+        if token then
+            normalized[#normalized + 1] = token
+        end
+    end
+
+    return normalized
+end
+
+local function normalizeAuraTooltipTemplateData(value)
+    if type(value) ~= "table" then
+        return nil
+    end
+
+    local normalized = {
+        version = math.max(1, math.floor(tonumber(value.version) or 1)),
+        bodyText = trimText(value.bodyText),
+        bodyTokens = normalizeTooltipTemplateTokens(value.bodyTokens),
+        stackingText = trimText(value.stackingText),
+        stackingTokens = normalizeTooltipTemplateTokens(value.stackingTokens),
+    }
+    if normalized.bodyText == "" and normalized.stackingText == "" then
+        return nil
+    end
+
+    return normalized
+end
+
 local function normalizeRef(value)
     local ref = ensureString(value)
     if ref == "" then
@@ -70,6 +156,14 @@ local function normalizeStackBehavior(value)
     end
 
     return "refresh_duration"
+end
+
+local function normalizeBool(value, fallback)
+    if type(value) == "boolean" then
+        return value
+    end
+
+    return fallback == true
 end
 
 local function normalizeStatScaling(values)
@@ -126,6 +220,18 @@ local function normalizeStatOperation(value)
     return "flat"
 end
 
+local function normalizeAmountMode(value)
+    local mode = tostring(value or "flat")
+    if mode == "base_percent" then
+        return "base_percent"
+    end
+    if mode == "max_percent" then
+        return "max_percent"
+    end
+
+    return "flat"
+end
+
 local function normalizeCombatEventId(value)
     local combatEventId = string.lower(ensureString(value))
     if combatEventId == "" then
@@ -147,6 +253,15 @@ local function normalizeTriggerTarget(value)
     return "event_other"
 end
 
+local function normalizeChancePercent(value)
+    local numericValue = tonumber(value)
+    if numericValue == nil then
+        return 100
+    end
+
+    return math.max(0, math.min(100, numericValue))
+end
+
 local function normalizeEffect(value)
     if type(value) ~= "table" then
         return nil
@@ -157,6 +272,7 @@ local function normalizeEffect(value)
         return {
             type = "heal",
             baseHealing = tonumber(value.baseHealing) or 0,
+            amountMode = normalizeAmountMode(value.amountMode),
             statScaling = normalizeStatScaling(value.statScaling),
         }
     end
@@ -204,12 +320,14 @@ local function normalizeEffect(value)
             type = "resource",
             resourceRef = normalizeRef(value.resourceRef),
             amount = tonumber(value.amount) or tonumber(value.baseAmount) or 0,
+            amountMode = normalizeAmountMode(value.amountMode),
         }
     end
 
     return {
         type = "damage",
         baseDamage = tonumber(value.baseDamage) or 0,
+        amountMode = normalizeAmountMode(value.amountMode),
         statScaling = normalizeStatScaling(value.statScaling),
         damageSchoolRefs = normalizeDamageSchoolRefs(value.damageSchoolRefs),
     }
@@ -239,6 +357,7 @@ local function normalizeEventEffect(value)
         return {
             type = "heal",
             baseHealing = tonumber(value.baseHealing) or 0,
+            amountMode = normalizeAmountMode(value.amountMode),
             statScaling = normalizeStatScaling(value.statScaling),
         }
     end
@@ -266,6 +385,7 @@ local function normalizeEventEffect(value)
             type = "resource",
             resourceRef = normalizeRef(value.resourceRef),
             amount = tonumber(value.amount) or tonumber(value.baseAmount) or 0,
+            amountMode = normalizeAmountMode(value.amountMode),
         }
     end
 
@@ -285,6 +405,7 @@ local function normalizeEventEffect(value)
         return {
             type = "damage",
             baseDamage = tonumber(value.baseDamage) or 0,
+            amountMode = normalizeAmountMode(value.amountMode),
             statScaling = normalizeStatScaling(value.statScaling),
             damageSchoolRefs = normalizeDamageSchoolRefs(value.damageSchoolRefs),
         }
@@ -318,6 +439,7 @@ local function normalizeEvent(value)
     return {
         combatEventId = combatEventId,
         triggerTarget = triggerTarget,
+        chance = normalizeChancePercent(value.chance),
         effects = normalizeEventEffects(value.effects),
     }
 end
@@ -341,6 +463,8 @@ function Aura:New(data)
         id = nil,
         name = "",
         description = "",
+        tooltipTemplate = false,
+        tooltipTemplateData = nil,
         icon = nil,
         effects = {},
         events = {},
@@ -364,6 +488,8 @@ function Aura:Merge(data)
 
     self.name = ensureString(self.name)
     self.description = ensureString(self.description)
+    self.tooltipTemplate = normalizeBool(self.tooltipTemplate, false)
+    self.tooltipTemplateData = normalizeAuraTooltipTemplateData(self.tooltipTemplateData)
     self.icon = ensureString(self.icon)
     self.duration = math.max(1, math.floor(tonumber(self.duration) or 1))
     self.stackBehavior = normalizeStackBehavior(self.stackBehavior)
@@ -380,6 +506,8 @@ function Aura:ToTable()
         id = self.id,
         name = self.name,
         description = self.description,
+        tooltipTemplate = self.tooltipTemplate == true,
+        tooltipTemplateData = normalizeAuraTooltipTemplateData(self.tooltipTemplateData),
         icon = self.icon,
         effects = normalizeEffects(self.effects),
         events = normalizeEvents(self.events),

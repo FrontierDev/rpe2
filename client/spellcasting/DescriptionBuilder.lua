@@ -16,12 +16,16 @@ local ResourceSync = Addon.Internal and Addon.Internal.Comms and Addon.Internal.
 local Common = Addon.Utils and Addon.Utils.Common or {}
 local UI = Addon.UI or {}
 local AuraDescriptionBuilder = Spellcasting.AuraDescriptionBuilder or {}
+local TooltipTemplate = Spellcasting.TooltipTemplate or {}
 
 local DescriptionBuilder = Spellcasting.DescriptionBuilder or {}
 Spellcasting.DescriptionBuilder = DescriptionBuilder
 DescriptionBuilder.ProfileTooltipContextRevision = math.max(1, math.floor(tonumber(DescriptionBuilder.ProfileTooltipContextRevision) or 1))
 DescriptionBuilder.EventTooltipContextRevisions = DescriptionBuilder.EventTooltipContextRevisions or {}
 DescriptionBuilder.PseudoCasterUnitCache = DescriptionBuilder.PseudoCasterUnitCache or nil
+
+local prependBasicAttackPrefix
+local appendThreatDescription
 
 local MIN_VARIANCE = 0.9
 local MAX_VARIANCE = 1.1
@@ -481,6 +485,40 @@ local function storeGeneratedTooltipPayload(detail, generatedDescriptionText, ge
     detail.generatedAuraSectionsCacheKey = cacheKey
 end
 
+local function getCachedResolvedTemplateTooltipPayload(detail, cacheKey)
+    if type(detail) ~= "table" or type(cacheKey) ~= "string" or cacheKey == "" then
+        return nil
+    end
+
+    if tostring(detail.resolvedTooltipTemplateCacheKey or "") ~= cacheKey then
+        return nil
+    end
+
+    return type(detail.resolvedTooltipTemplateData) == "table" and detail.resolvedTooltipTemplateData or nil
+end
+
+local function storeResolvedTemplateTooltipPayload(detail, tooltipData, cacheKey)
+    if type(detail) ~= "table" or type(tooltipData) ~= "table" or type(cacheKey) ~= "string" or cacheKey == "" then
+        return nil
+    end
+
+    local cached = {
+        descriptionText = trimText(tooltipData.descriptionText or ""),
+        descriptionSource = ensureString(tooltipData.descriptionSource, "template"),
+        auraSections = type(tooltipData.auraSections) == "table" and tooltipData.auraSections or {},
+    }
+    local errorText = trimText(tooltipData.errorText or "")
+    if errorText ~= "" then
+        cached.errorText = errorText
+    end
+
+    detail.resolvedTooltipTemplateData = cached
+    detail.resolvedTooltipTemplateCacheKey = cacheKey
+    detail.descriptionText = cached.descriptionText
+    detail.descriptionSource = cached.descriptionSource
+    return cached
+end
+
 local function resolveDatasetId(detail)
     if type(detail) ~= "table" then
         return nil
@@ -502,6 +540,26 @@ local function resolveDatasetId(detail)
     end
 
     return nil
+end
+
+local function resolveCurrentSpellDefinition(detail)
+    if type(detail) ~= "table" then
+        return nil, nil
+    end
+
+    local spellRef = type(detail.spellRef) == "string" and detail.spellRef or ""
+    if spellRef ~= "" and type(Registry.ResolveSpellReference) == "function" then
+        local dataset, spell = Registry:ResolveSpellReference(spellRef)
+        if type(dataset) == "table" then
+            detail.dataset = dataset
+        end
+        if type(spell) == "table" then
+            detail.spell = spell
+            return spell, dataset
+        end
+    end
+
+    return type(detail.spell) == "table" and detail.spell or nil, type(detail.dataset) == "table" and detail.dataset or nil
 end
 
 local function resolveDamageSchoolName(detail, schoolRef)
@@ -578,12 +636,41 @@ local function resolveAuraMetadata(detail, auraRef)
         return {
             name = defaultName,
             duration = nil,
+            unresolved = false,
         }
+    end
+
+    local detailDataset = type(detail) == "table" and detail.dataset or nil
+    local detailDatasetId = resolveDatasetId(detail)
+    local localAuraId = auraRef
+    if type(Dependencies.ParseSourceStatRef) == "function" then
+        local parsedDatasetId, parsedAuraId = Dependencies.ParseSourceStatRef(auraRef)
+        if type(parsedDatasetId) == "string" and parsedDatasetId ~= "" then
+            detailDatasetId = parsedDatasetId
+        end
+        if type(parsedAuraId) == "string" and parsedAuraId ~= "" then
+            localAuraId = parsedAuraId
+        end
+    end
+
+    if type(detailDataset) == "table" and tostring(detailDataset.id or "") == tostring(detailDatasetId or "") then
+        for index = 1, #((detailDataset and detailDataset.auras) or {}) do
+            local auraDefinition = detailDataset.auras[index]
+            if type(auraDefinition) == "table" and tostring(auraDefinition.id or "") == tostring(localAuraId or "") then
+                local auraName = trimText(auraDefinition.name)
+                return {
+                    name = auraName ~= "" and auraName or defaultName,
+                    duration = tonumber(auraDefinition.duration) or nil,
+                    unresolved = false,
+                }
+            end
+        end
     end
 
     local auraManager = Spellcasting.AuraManager or nil
     if type(auraManager) == "table" and type(auraManager.ResolveAuraDefinition) == "function" then
         local _, auraDefinition = auraManager:ResolveAuraDefinition(auraRef, {
+            dataset = type(detail) == "table" and detail.dataset or nil,
             datasetId = resolveDatasetId(detail),
             spellDatasetId = resolveDatasetId(detail),
         })
@@ -592,8 +679,21 @@ local function resolveAuraMetadata(detail, auraRef)
             return {
                 name = auraName ~= "" and auraName or defaultName,
                 duration = tonumber(auraDefinition.duration) or nil,
+                unresolved = false,
             }
         end
+    end
+
+    if type(detail) == "table"
+        and type(detail.spell) == "table"
+        and detail.spell.tooltipTemplate == true
+    then
+        return {
+            name = nil,
+            duration = nil,
+            unresolved = true,
+            auraRef = auraRef,
+        }
     end
 
     local _, auraId = nil, nil
@@ -603,7 +703,20 @@ local function resolveAuraMetadata(detail, auraRef)
     return {
         name = ensureString(auraId or auraRef, defaultName),
         duration = nil,
+        unresolved = false,
     }
+end
+
+local function buildTemplateResolutionError(detail, auraRef)
+    local spellName = trimText(type(detail) == "table" and detail.name or "")
+    if spellName == "" then
+        spellName = trimText(type(detail) == "table" and type(detail.spell) == "table" and detail.spell.name or "")
+    end
+    if spellName == "" then
+        spellName = ensureString(type(detail) == "table" and detail.spellRef or "", "Unknown Spell")
+    end
+
+    return ("Tooltip template error: %s could not resolve aura '%s'."):format(spellName, ensureString(auraRef, "unknown"))
 end
 
 local function resolveTargetPhrase(target)
@@ -736,6 +849,9 @@ local function buildAuraClause(detail, effect, standalone)
     end
 
     local metadata = resolveAuraMetadata(detail, auraRef)
+    if metadata.unresolved == true then
+        error(buildTemplateResolutionError(detail, metadata.auraRef or auraRef))
+    end
     local clause = standalone == true and ("Apply %s"):format(metadata.name) or ("and apply %s"):format(metadata.name)
     local stacks = math.max(1, math.floor(tonumber(effect and (effect.stacks or effect.auraStacks) or 1)))
     local duration = tonumber(effect and effect.duration) or metadata.duration
@@ -799,17 +915,32 @@ local function buildResourceSentence(detail, component)
     end
 
     local resourceName = resolveResourceName(effect.resourceRef)
+    local amountMode = tostring(effect.amountMode or "flat")
+    local amountText = ""
+    local reduceAmountText = ""
+    
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base %s"):format(amount, resourceName)
+        reduceAmountText = ("%g%% of Base"):format(amount)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max %s"):format(amount, resourceName)
+        reduceAmountText = ("%g%% of Max"):format(amount)
+    else
+        amountText = ("%d %s"):format(math.floor(amount), resourceName)
+        reduceAmountText = tostring(math.floor(math.abs(amount)))
+    end
+    
     local targetPhrase = resolveTargetPhrase(component.target)
     if amount > 0 then
-        return ("Restore %d %s to %s."):format(amount, resourceName, targetPhrase)
+        return ("Restore %s to %s."):format(amountText, targetPhrase)
     end
 
     local possessive = resolveTargetPossessivePhrase(targetPhrase)
     if possessive then
-        return ("Reduce %s %s by %d."):format(possessive, resourceName, math.abs(amount))
+        return ("Reduce %s %s by %s."):format(possessive, resourceName, reduceAmountText)
     end
 
-    return ("Reduce %s for %s by %d."):format(resourceName, targetPhrase, math.abs(amount))
+    return ("Reduce %s for %s by %s."):format(resourceName, targetPhrase, reduceAmountText)
 end
 
 local function buildApplyAuraSentence(detail, component)
@@ -819,6 +950,9 @@ local function buildApplyAuraSentence(detail, component)
     end
 
     local metadata = resolveAuraMetadata(detail, effect.auraRef)
+    if metadata.unresolved == true then
+        error(buildTemplateResolutionError(detail, metadata.auraRef or effect.auraRef))
+    end
     local targetPhrase = resolveTargetPhrase(component.target)
     local sentence = ("Apply %s to %s"):format(metadata.name, targetPhrase)
     local stacks = math.max(1, math.floor(tonumber(effect.stacks) or 1))
@@ -878,6 +1012,419 @@ local function buildSentence(detail, casterUnit, component)
     return nil
 end
 
+local function buildSpellTemplateError(detail, message)
+    local spellName = trimText(type(detail) == "table" and detail.name or "")
+    if spellName == "" then
+        spellName = trimText(type(detail) == "table" and type(detail.spell) == "table" and detail.spell.name or "")
+    end
+    if spellName == "" then
+        spellName = ensureString(type(detail) == "table" and detail.spellRef or "", "Unknown Spell")
+    end
+
+    local suffix = trimText(message)
+    if suffix == "" then
+        suffix = "template payload is missing."
+    end
+    return ("Tooltip template error: %s %s"):format(spellName, suffix)
+end
+
+local function buildSpellTemplateToken(state, baseKey, tokenType, metadata)
+    if type(TooltipTemplate.AddToken) ~= "function" then
+        return ""
+    end
+
+    return TooltipTemplate.AddToken(state, baseKey, tokenType, metadata)
+end
+
+local function buildDamageSentenceTemplate(detail, componentIndex, component, state)
+    local effect = component and component.effect or nil
+    if type(effect) ~= "table" then
+        return nil
+    end
+
+    local schoolLabel = resolveDamageSchoolLabel(detail, effect)
+    local targetPhrase = resolveTargetPhrase(component.target)
+    local amountMode = tostring(effect.amountMode or "flat")
+    if amountMode == "base_percent" then
+        local sentence = ("Deal %g%% of Base %s damage to %s"):format(tonumber(effect.baseDamage) or 0, schoolLabel, targetPhrase)
+        local auraClause = effect.applyAura == true and buildAuraClause(detail, effect, false) or nil
+        if auraClause then
+            sentence = ("%s %s"):format(sentence, auraClause)
+        end
+        return sentence .. "."
+    end
+    if amountMode == "max_percent" then
+        local sentence = ("Deal %g%% of Max %s damage to %s"):format(tonumber(effect.baseDamage) or 0, schoolLabel, targetPhrase)
+        local auraClause = effect.applyAura == true and buildAuraClause(detail, effect, false) or nil
+        if auraClause then
+            sentence = ("%s %s"):format(sentence, auraClause)
+        end
+        return sentence .. "."
+    end
+    local amountToken = buildSpellTemplateToken(state, "DAMAGE", "spell_damage_range", {
+        componentIndex = componentIndex,
+        applyMode = "damage_range",
+    })
+    local sentence = ("Deal %s %s damage to %s"):format(amountToken, schoolLabel, targetPhrase)
+    local auraClause = effect.applyAura == true and buildAuraClause(detail, effect, false) or nil
+    if auraClause then
+        sentence = ("%s %s"):format(sentence, auraClause)
+    end
+
+    return sentence .. "."
+end
+
+local function buildHealSentenceTemplate(detail, componentIndex, component, state)
+    local effect = component and component.effect or nil
+    if type(effect) ~= "table" then
+        return nil
+    end
+
+    local targetPhrase = resolveTargetPhrase(component.target)
+    local amountMode = tostring(effect.amountMode or "flat")
+    if amountMode == "base_percent" then
+        local sentence = ("Heal %s for %g%% of Base health"):format(targetPhrase, tonumber(effect.baseHealing) or 0)
+        local auraClause = effect.applyAura == true and buildAuraClause(detail, effect, false) or nil
+        if auraClause then
+            sentence = ("%s %s"):format(sentence, auraClause)
+        end
+        return sentence .. "."
+    end
+    if amountMode == "max_percent" then
+        local sentence = ("Heal %s for %g%% of Max health"):format(targetPhrase, tonumber(effect.baseHealing) or 0)
+        local auraClause = effect.applyAura == true and buildAuraClause(detail, effect, false) or nil
+        if auraClause then
+            sentence = ("%s %s"):format(sentence, auraClause)
+        end
+        return sentence .. "."
+    end
+    local amountToken = buildSpellTemplateToken(state, "HEAL", "spell_heal_range", {
+        componentIndex = componentIndex,
+        applyMode = "heal_range",
+    })
+    local sentence = ("Heal %s for %s health"):format(targetPhrase, amountToken)
+    local auraClause = effect.applyAura == true and buildAuraClause(detail, effect, false) or nil
+    if auraClause then
+        sentence = ("%s %s"):format(sentence, auraClause)
+    end
+
+    return sentence .. "."
+end
+
+local function buildResourceSentenceTemplate(detail, componentIndex, component, state)
+    local effect = component and component.effect or nil
+    if type(effect) ~= "table" then
+        return nil
+    end
+
+    local amount = tonumber(effect.amount) or 0
+    if amount == 0 then
+        return nil
+    end
+
+    local resourceName = resolveResourceName(effect.resourceRef)
+    local targetPhrase = resolveTargetPhrase(component.target)
+    local amountMode = tostring(effect.amountMode or "flat")
+    if amount > 0 then
+        if amountMode == "base_percent" then
+            return ("Restore %g%% of Base %s to %s."):format(amount, resourceName, targetPhrase)
+        end
+        if amountMode == "max_percent" then
+            return ("Restore %g%% of Max %s to %s."):format(amount, resourceName, targetPhrase)
+        end
+        local amountToken = buildSpellTemplateToken(state, "RESOURCE_AMOUNT", "spell_resource_amount", {
+            componentIndex = componentIndex,
+            applyMode = "resource_gain_amount",
+        })
+        return ("Restore %s to %s."):format(amountToken, targetPhrase)
+    end
+
+    local possessive = resolveTargetPossessivePhrase(targetPhrase)
+    if amountMode == "base_percent" then
+        if possessive then
+            return ("Reduce %s %s by %g%% of Base."):format(possessive, resourceName, math.abs(amount))
+        end
+        return ("Reduce %s for %s by %g%% of Base."):format(resourceName, targetPhrase, math.abs(amount))
+    end
+    if amountMode == "max_percent" then
+        if possessive then
+            return ("Reduce %s %s by %g%% of Max."):format(possessive, resourceName, math.abs(amount))
+        end
+        return ("Reduce %s for %s by %g%% of Max."):format(resourceName, targetPhrase, math.abs(amount))
+    end
+    local amountToken = buildSpellTemplateToken(state, "RESOURCE_LOSS", "spell_resource_amount", {
+        componentIndex = componentIndex,
+        applyMode = "resource_loss_amount",
+    })
+    if possessive then
+        return ("Reduce %s %s by %s."):format(possessive, resourceName, amountToken)
+    end
+
+    return ("Reduce %s for %s by %s."):format(resourceName, targetPhrase, amountToken)
+end
+
+local function buildTemplateSentence(detail, componentIndex, component, state)
+    local effectType = tostring(component and component.effect and component.effect.type or "")
+    if effectType == "damage" then
+        return buildDamageSentenceTemplate(detail, componentIndex, component, state)
+    end
+    if effectType == "heal" then
+        return buildHealSentenceTemplate(detail, componentIndex, component, state)
+    end
+    if effectType == "resource" then
+        return buildResourceSentenceTemplate(detail, componentIndex, component, state)
+    end
+    if effectType == "apply_aura" then
+        return buildApplyAuraSentence(detail, component)
+    end
+    if effectType == "summon_pet" then
+        return buildSummonPetSentence()
+    end
+    if effectType == "interrupt" then
+        return buildInterruptSentence(component)
+    end
+    if effectType == "revert" then
+        return buildRevertSentence(component)
+    end
+
+    return nil
+end
+
+local function resolveSpellTemplateComponent(detail, token)
+    local spell = resolveCurrentSpellDefinition(detail)
+    local componentIndex = math.floor(tonumber(type(token) == "table" and token.componentIndex or 0) or 0)
+    if type(spell) ~= "table" or componentIndex <= 0 then
+        return nil
+    end
+
+    local rawComponent = (spell.components or {})[componentIndex]
+    return type(Combat.NormalizeComponent) == "function" and Combat:NormalizeComponent(rawComponent) or rawComponent
+end
+
+local function resolveSpellResourceTemplateToken(detail, token)
+    local component = resolveSpellTemplateComponent(detail, token)
+    local effect = type(component) == "table" and component.effect or nil
+    if type(effect) ~= "table" then
+        return nil
+    end
+
+    local amount = tonumber(effect.amount) or 0
+    local amountMode = tostring(effect.amountMode or "flat")
+    local resourceName = resolveResourceName(effect.resourceRef)
+    local applyMode = tostring(token and token.applyMode or "")
+    if applyMode == "resource_gain_amount" then
+        if amountMode == "base_percent" then
+            return ("%g%% of Base %s"):format(amount, resourceName)
+        end
+        if amountMode == "max_percent" then
+            return ("%g%% of Max %s"):format(amount, resourceName)
+        end
+        return ("%d %s"):format(math.floor(amount), resourceName)
+    end
+
+    local lossAmount = math.abs(amount)
+    if amountMode == "base_percent" then
+        return ("%g%% of Base"):format(lossAmount)
+    end
+    if amountMode == "max_percent" then
+        return ("%g%% of Max"):format(lossAmount)
+    end
+    return tostring(math.floor(lossAmount))
+end
+
+local function resolveSpellTemplateToken(detail, casterUnit, token)
+    local applyMode = tostring(token and token.applyMode or "")
+    if applyMode == "damage_range" then
+        local component = resolveSpellTemplateComponent(detail, token)
+        local effect = type(component) == "table" and component.effect or nil
+        if type(effect) ~= "table" or type(Combat.ResolveDamageAmount) ~= "function" then
+            return nil
+        end
+        local minimum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min"), effect)
+        local maximum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max"), effect)
+        return formatValueRange(minimum, maximum)
+    end
+    if applyMode == "heal_range" then
+        local component = resolveSpellTemplateComponent(detail, token)
+        local effect = type(component) == "table" and component.effect or nil
+        if type(effect) ~= "table" or type(Combat.ResolveHealingAmount) ~= "function" then
+            return nil
+        end
+        local minimum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min"), effect)
+        local maximum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max"), effect)
+        return formatValueRange(minimum, maximum)
+    end
+    if applyMode == "resource_gain_amount" or applyMode == "resource_loss_amount" then
+        return resolveSpellResourceTemplateToken(detail, token)
+    end
+
+    return nil
+end
+
+local function resolveTooltipTargetUnit(detail)
+    if type(detail) == "table" and type(detail.activationState) == "table" and type(detail.activationState.targetUnit) == "table" then
+        return detail.activationState.targetUnit
+    end
+    if type(detail) == "table" and type(detail.spellRef) == "string" and detail.spellRef ~= "" and type(Client.ResolveSpellActivationState) == "function" then
+        local activationState = Client:ResolveSpellActivationState(detail.spellRef, {
+            includeTargetCandidates = false,
+        })
+        if type(activationState) == "table" and type(activationState.targetUnit) == "table" then
+            return activationState.targetUnit
+        end
+    end
+
+    return nil
+end
+
+function DescriptionBuilder:BuildTooltipTemplatePayload(detail)
+    local spell = type(detail) == "table" and detail.spell or nil
+    if type(spell) ~= "table" or type(TooltipTemplate.CreateBuildState) ~= "function" then
+        return nil
+    end
+
+    local normalizedComponents = {}
+    local componentIndices = {}
+    local hasNonDefaultPhase = false
+    for index = 1, #(spell.components or {}) do
+        local rawComponent = spell.components[index]
+        local component = type(Combat.NormalizeComponent) == "function" and Combat:NormalizeComponent(rawComponent) or rawComponent
+        if type(component) == "table" and type(component.effect) == "table" then
+            normalizedComponents[#normalizedComponents + 1] = component
+            componentIndices[#componentIndices + 1] = index
+            if tostring(component.castPhase or "on_cast_end") ~= "on_cast_end" then
+                hasNonDefaultPhase = true
+            end
+        end
+    end
+
+    local state = TooltipTemplate.CreateBuildState()
+    local sentences = {}
+    for index = 1, #normalizedComponents do
+        local component = normalizedComponents[index]
+        local sentence = buildTemplateSentence(detail, componentIndices[index], component, state)
+        if sentence and sentence ~= "" then
+            if hasNonDefaultPhase then
+                sentence = buildPhasePrefix(component.castPhase) .. sentence
+            end
+            sentences[#sentences + 1] = sentence
+        end
+    end
+
+    local mainText = appendThreatDescription(detail, prependBasicAttackPrefix(detail, table.concat(sentences, " ")))
+    local casterUnit = resolveCasterUnit(detail)
+    local targetUnit = resolveTooltipTargetUnit(detail)
+    local auraSections = {}
+    local seen = {}
+    for index = 1, #normalizedComponents do
+        local component = normalizedComponents[index]
+        local effect = component and component.effect or nil
+        if type(effect) == "table" then
+            local auraRef = nil
+            local stacks = 1
+            local duration = nil
+            local powerLevel = 0
+            if tostring(effect.type or "") == "apply_aura" then
+                auraRef = effect.auraRef
+                stacks = math.max(1, math.floor(tonumber(effect.stacks) or 1))
+                duration = tonumber(effect.duration) or nil
+                powerLevel = tonumber(effect.basePower) or 0
+            elseif effect.applyAura == true then
+                auraRef = effect.auraRef
+                stacks = math.max(1, math.floor(tonumber(effect.auraStacks) or 1))
+                duration = tonumber(effect.duration) or nil
+                powerLevel = tonumber(effect.basePower) or 0
+            end
+            if type(auraRef) == "string" and auraRef ~= "" then
+                local targetContext = buildAuraTargetContext(component.target)
+                local sectionKey = table.concat({
+                    auraRef,
+                    tostring(stacks),
+                    tostring(duration or ""),
+                    tostring(powerLevel),
+                    tostring(targetContext.subject or ""),
+                }, "\31")
+                if not seen[sectionKey] then
+                    seen[sectionKey] = true
+                    local sectionTemplate, templateError = AuraDescriptionBuilder:BuildTooltipSectionTemplate(auraRef, {
+                        dataset = type(detail) == "table" and detail.dataset or nil,
+                        datasetId = resolveDatasetId(detail),
+                        spellDatasetId = resolveDatasetId(detail),
+                        casterUnit = casterUnit,
+                        targetUnit = targetUnit,
+                        powerLevel = powerLevel,
+                        stacks = stacks,
+                        duration = duration,
+                        targetContext = targetContext,
+                    })
+                    if type(sectionTemplate) ~= "table" then
+                        error(trimText(templateError or buildSpellTemplateError(detail, "could not build linked aura section template.")))
+                    end
+                    auraSections[#auraSections + 1] = sectionTemplate
+                end
+            end
+        end
+    end
+
+    return TooltipTemplate.NormalizeSpellPayload({
+        mainText = mainText,
+        tokens = state.tokens,
+        auraSections = auraSections,
+    })
+end
+
+function DescriptionBuilder:ResolveTooltipTemplatePayload(detail, payload, casterUnit)
+    local normalizedPayload = type(TooltipTemplate.NormalizeSpellPayload) == "function"
+        and TooltipTemplate.NormalizeSpellPayload(payload)
+        or nil
+    if type(normalizedPayload) ~= "table" then
+        return nil, buildSpellTemplateError(detail, "template payload is missing.")
+    end
+
+    casterUnit = casterUnit or resolveCasterUnit(detail)
+    local resolvedMainText, resolveError = TooltipTemplate.ResolveText(normalizedPayload.mainText, normalizedPayload.tokens, function(token)
+        return resolveSpellTemplateToken(detail, casterUnit, token)
+    end)
+    if resolvedMainText == nil then
+        return nil, buildSpellTemplateError(detail, resolveError)
+    end
+
+    local targetUnit = resolveTooltipTargetUnit(detail)
+    local auraSections = {}
+    for index = 1, #(normalizedPayload.auraSections or {}) do
+        local section = normalizedPayload.auraSections[index]
+        local resolvedDescriptionText = nil
+        local sectionError = nil
+        local auraBuilder = AuraDescriptionBuilder
+        if type(auraBuilder) == "table" and type(auraBuilder.ResolveTooltipSectionTemplate) == "function" then
+            resolvedDescriptionText, sectionError = auraBuilder:ResolveTooltipSectionTemplate(section, {
+                dataset = type(detail) == "table" and detail.dataset or nil,
+                datasetId = resolveDatasetId(detail),
+                spellDatasetId = resolveDatasetId(detail),
+                casterUnit = casterUnit,
+                targetUnit = targetUnit,
+            })
+        end
+        resolvedDescriptionText = trimText(resolvedDescriptionText)
+        if resolvedDescriptionText == "" then
+            return nil, buildSpellTemplateError(detail, trimText(sectionError or "could not resolve linked aura section template."))
+        end
+        auraSections[#auraSections + 1] = {
+            auraRef = section.auraRef,
+            name = ensureString(section.nameText, "Aura"),
+            icon = ensureString(section.icon, ""),
+            descriptionText = resolvedDescriptionText,
+            descriptionSource = "template",
+        }
+    end
+
+    return {
+        descriptionText = resolvedMainText,
+        descriptionSource = "template",
+        auraSections = auraSections,
+    }, nil
+end
+
 local function hasAutoAttackDamageComponent(detail)
     local spell = type(detail) == "table" and detail.spell or nil
     if type(spell) ~= "table" then
@@ -899,7 +1446,7 @@ local function hasAutoAttackDamageComponent(detail)
     return false
 end
 
-local function prependBasicAttackPrefix(detail, descriptionText)
+prependBasicAttackPrefix = function(detail, descriptionText)
     local trimmedDescription = trimText(descriptionText or "")
     if not hasAutoAttackDamageComponent(detail) then
         return trimmedDescription
@@ -955,7 +1502,7 @@ local function resolveThreatDescription(detail)
     return ""
 end
 
-local function appendThreatDescription(detail, descriptionText)
+appendThreatDescription = function(detail, descriptionText)
     local trimmedDescription = trimText(descriptionText or "")
     local threatDescription = resolveThreatDescription(detail)
     if threatDescription == "" then
@@ -1199,11 +1746,40 @@ function DescriptionBuilder:QueueDescriptionBuild(detail, cacheKey, owner)
 end
 
 function DescriptionBuilder:BuildTooltipData(detail, options)
-    local authoredDescriptionText = trimText(
+    local currentSpell = resolveCurrentSpellDefinition(detail)
+    local rawAuthoredDescriptionText = trimText(
         type(detail) == "table" and detail.authoredDescriptionText
-            or type(detail) == "table" and type(detail.spell) == "table" and detail.spell.description
+            or type(currentSpell) == "table" and currentSpell.description
             or ""
     )
+    local useTooltipTemplate = type(detail) == "table"
+        and type(currentSpell) == "table"
+        and currentSpell.tooltipTemplate == true
+    if useTooltipTemplate then
+        local spell = currentSpell
+        local casterUnit = resolveCasterUnit(detail)
+        local cacheKey = buildGeneratedDescriptionCacheKey(detail, casterUnit)
+        local cachedTooltipData = getCachedResolvedTemplateTooltipPayload(detail, cacheKey)
+        if type(cachedTooltipData) == "table" then
+            detail.descriptionText = trimText(cachedTooltipData.descriptionText or "")
+            detail.descriptionSource = ensureString(cachedTooltipData.descriptionSource, "template")
+            return cachedTooltipData
+        end
+        local payload = type(spell) == "table" and spell.tooltipTemplateData or nil
+        local tooltipData, resolveError = self:ResolveTooltipTemplatePayload(detail, payload, casterUnit)
+        if type(tooltipData) ~= "table" then
+            local errorText = trimText(resolveError or buildSpellTemplateError(detail, "template payload is missing."))
+            return storeResolvedTemplateTooltipPayload(detail, {
+                descriptionText = "",
+                descriptionSource = "error",
+                auraSections = {},
+                errorText = errorText,
+            }, cacheKey)
+        end
+        return storeResolvedTemplateTooltipPayload(detail, tooltipData, cacheKey)
+    end
+    local authoredDescriptionText = rawAuthoredDescriptionText
+    local requiresGeneratedDescription = authoredDescriptionText == ""
     local cacheKey = buildGeneratedDescriptionCacheKey(detail, nil)
     local hasCachedGeneratedDescription = type(detail) == "table"
         and tostring(detail.generatedDescriptionCacheKey or "") == cacheKey
@@ -1214,12 +1790,13 @@ function DescriptionBuilder:BuildTooltipData(detail, options)
 
     local allowDeferredBuild = not (type(options) == "table" and options.deferGeneration == false)
     local tooltipOwner = type(options) == "table" and options.tooltipOwner or nil
-    if (not hasCachedGeneratedDescription or not hasCachedAuraSections)
+    if requiresGeneratedDescription
+        and (not hasCachedGeneratedDescription or not hasCachedAuraSections)
         and allowDeferredBuild
         and self:QueueDescriptionBuild(detail, cacheKey, tooltipOwner)
     then
         local fallbackDescriptionText = authoredDescriptionText
-        local fallbackSource = "authored"
+        local fallbackSource = useTooltipTemplate and "summary" or "authored"
         if fallbackDescriptionText ~= "" then
             detail.descriptionText = fallbackDescriptionText
             detail.descriptionSource = fallbackSource
@@ -1240,13 +1817,62 @@ function DescriptionBuilder:BuildTooltipData(detail, options)
         }
     end
 
-    if not hasCachedGeneratedDescription or not hasCachedAuraSections then
+    if (requiresGeneratedDescription and not hasCachedGeneratedDescription) or not hasCachedAuraSections then
         local casterUnit = resolveCasterUnit(detail)
-        local generatedDescriptionText, generatedAuraSections = self:BuildGeneratedTooltipPayload(detail, casterUnit)
-        storeGeneratedTooltipPayload(detail, generatedDescriptionText, generatedAuraSections, cacheKey)
+        if requiresGeneratedDescription then
+            local generatedDescriptionText, generatedAuraSections = nil, nil
+            local generatedSuccessfully, generationError = pcall(function()
+                generatedDescriptionText, generatedAuraSections = self:BuildGeneratedTooltipPayload(detail, casterUnit)
+            end)
+            if not generatedSuccessfully then
+                local errorText = trimText(generationError or "")
+                if errorText == "" then
+                    errorText = "Tooltip template error."
+                end
+                detail.descriptionText = ""
+                detail.descriptionSource = "error"
+                detail.generatedDescriptionText = nil
+                detail.generatedDescriptionCacheKey = nil
+                detail.generatedAuraSections = nil
+                detail.generatedAuraSectionsCacheKey = nil
+                clearPendingDescriptionKey(detail, cacheKey)
+                return {
+                    descriptionText = "",
+                    descriptionSource = "error",
+                    auraSections = {},
+                    errorText = errorText,
+                }
+            end
+            storeGeneratedTooltipPayload(detail, generatedDescriptionText, generatedAuraSections, cacheKey)
+            hasCachedGeneratedDescription = true
+            hasCachedAuraSections = true
+        else
+            local generatedAuraSections = nil
+            local generatedSuccessfully, generationError = pcall(function()
+                generatedAuraSections = self:BuildGeneratedAuraSections(detail, casterUnit)
+            end)
+            if not generatedSuccessfully then
+                local errorText = trimText(generationError or "")
+                if errorText == "" then
+                    errorText = "Tooltip template error."
+                end
+                clearPendingDescriptionKey(detail, cacheKey)
+                if useTooltipTemplate then
+                    return {
+                        descriptionText = "",
+                        descriptionSource = "error",
+                        auraSections = {},
+                        errorText = errorText,
+                    }
+                end
+                detail.generatedAuraSections = {}
+            else
+                detail.generatedAuraSections = type(generatedAuraSections) == "table" and generatedAuraSections or {}
+            end
+            detail.generatedAuraSectionsCacheKey = cacheKey
+            hasCachedAuraSections = true
+        end
         clearPendingDescriptionKey(detail, cacheKey)
-        hasCachedGeneratedDescription = true
-        hasCachedAuraSections = true
     end
 
     local descriptionText = authoredDescriptionText

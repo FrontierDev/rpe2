@@ -13,6 +13,7 @@ local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Dependencies = Database and Database.Dependecies or {}
 local ResourceSync = Addon.Internal and Addon.Internal.Comms and Addon.Internal.Comms.ResourceSync or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
+local TooltipTemplate = Spellcasting.TooltipTemplate or {}
 
 local AuraDescriptionBuilder = Spellcasting.AuraDescriptionBuilder or {}
 Spellcasting.AuraDescriptionBuilder = AuraDescriptionBuilder
@@ -95,6 +96,38 @@ local function buildStackingDescription(auraDefinition, options)
 end
 
 local function resolveAuraDefinition(auraRef, options)
+    local normalizedAuraRef = trimText(auraRef)
+    local optionDataset = type(options) == "table" and options.dataset or nil
+    local optionDatasetId = type(options) == "table" and (
+        options.datasetId
+        or (type(optionDataset) == "table" and optionDataset.id)
+        or options.sourceDatasetId
+        or options.spellDatasetId
+    ) or nil
+
+    if normalizedAuraRef ~= "" and type(optionDataset) == "table" then
+        local explicitDatasetId, explicitAuraId = nil, nil
+        if type(Dependencies.ParseSourceStatRef) == "function" then
+            explicitDatasetId, explicitAuraId = Dependencies.ParseSourceStatRef(normalizedAuraRef)
+        end
+        if explicitDatasetId == nil or explicitDatasetId == "" then
+            explicitDatasetId = optionDatasetId
+            explicitAuraId = normalizedAuraRef
+        end
+
+        if type(explicitDatasetId) == "string" and explicitDatasetId ~= ""
+            and type(explicitAuraId) == "string" and explicitAuraId ~= ""
+            and tostring(optionDataset.id or "") == explicitDatasetId
+        then
+            for index = 1, #((optionDataset and optionDataset.auras) or {}) do
+                local aura = optionDataset.auras[index]
+                if type(aura) == "table" and tostring(aura.id or "") == explicitAuraId then
+                    return optionDataset, aura, ("%s:%s"):format(explicitDatasetId, explicitAuraId)
+                end
+            end
+        end
+    end
+
     local auraManager = Spellcasting.AuraManager or nil
     if type(auraManager) ~= "table" or type(auraManager.ResolveAuraDefinition) ~= "function" then
         return nil, nil, nil
@@ -216,7 +249,8 @@ end
 
 local function isPercentDisplayStat(statRef)
     local resolvedRow = type(Profile.GetResolvedStatRow) == "function" and Profile.GetResolvedStatRow(statRef) or nil
-    if type(resolvedRow) == "table" and tostring(resolvedRow.displayMode or "") == "signed_percent" then
+    local resolvedDisplayMode = type(resolvedRow) == "table" and tostring(resolvedRow.displayMode or "") or ""
+    if resolvedDisplayMode == "signed_percent" or resolvedDisplayMode == "equip_percent" then
         return true
     end
 
@@ -227,7 +261,8 @@ local function isPercentDisplayStat(statRef)
 
     if datasetId and statId and type(Registry.ResolveStatReference) == "function" then
         local _, stat = Registry:ResolveStatReference(statRef)
-        return tostring(stat and stat.displayMode or "") == "signed_percent"
+        local displayMode = tostring(stat and stat.displayMode or "")
+        return displayMode == "signed_percent" or displayMode == "equip_percent"
     end
 
     return false
@@ -259,6 +294,7 @@ local function buildAuraEffectContext(options)
             stacks = math.max(1, math.floor(tonumber(type(options) == "table" and options.stacks) or 1)),
         },
         casterUnit = type(options) == "table" and options.casterUnit or nil,
+        targetUnit = type(options) == "table" and options.targetUnit or nil,
     }
 end
 
@@ -278,23 +314,65 @@ end
 
 local function buildPassiveDamageSentence(effect, targetContext, options)
     local amount = math.max(0, resolveAmount(options, effect, "baseDamage"))
+    local amountMode = tostring(effect and effect.amountMode or "flat")
     local schoolLabel = resolveDamageSchoolLabel(effect)
-    return ("Deals %d %s damage each turn."):format(amount, schoolLabel)
+    local amountText = ""
+    
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base"):format(amount)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max"):format(amount)
+    else
+        amountText = tostring(math.floor(amount))
+    end
+    
+    return ("Deals %s %s damage each turn."):format(amountText, schoolLabel)
 end
 
 local function buildPassiveHealSentence(effect, targetContext, options)
     local amount = math.max(0, resolveAmount(options, effect, "baseHealing"))
-    return ("Heals for %d health each turn."):format(amount)
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    local amountText = ""
+    
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base"):format(amount)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max"):format(amount)
+    else
+        amountText = tostring(math.floor(amount))
+    end
+    
+    return ("Heals for %s health each turn."):format(amountText)
 end
 
 local function buildPassiveResourceSentence(effect, targetContext)
     local amount = tonumber(effect and effect.amount) or 0
+    local amountMode = tostring(effect and effect.amountMode or "flat")
     local resourceName = resolveResourceName(effect and effect.resourceRef or nil)
+    local amountText = ""
+    
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base %s"):format(amount, resourceName)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max %s"):format(amount, resourceName)
+    else
+        amountText = ("%d %s"):format(math.floor(amount), resourceName)
+    end
+    
     if amount >= 0 then
-        return ("Restores %d %s each turn."):format(amount, resourceName)
+        return ("Restores %s each turn."):format(amountText)
     end
 
-    return ("Reduces %s by %d each turn."):format(resourceName, math.abs(amount))
+    local reduceAmountText = ""
+    if amountMode == "base_percent" then
+        reduceAmountText = ("%g%% of Base"):format(amount)
+    elseif amountMode == "max_percent" then
+        reduceAmountText = ("%g%% of Max"):format(amount)
+    else
+        reduceAmountText = tostring(math.floor(math.abs(amount)))
+    end
+    
+    return ("Reduces %s by %s each turn."):format(resourceName, reduceAmountText)
 end
 
 local function buildPassiveStatSentence(effect, targetContext, options)
@@ -454,6 +532,15 @@ local function resolveCombatTriggerLabel(combatEventId, targetContext)
     return "When triggered"
 end
 
+local function normalizeChancePercent(value)
+    local numericValue = tonumber(value)
+    if numericValue == nil then
+        return 100
+    end
+
+    return math.max(0, math.min(100, numericValue))
+end
+
 local function resolveTriggeredTargetContext(combatEventId, triggerTarget, auraTargetContext)
     local eventId = tostring(combatEventId or "")
     local targetKey = tostring(triggerTarget or "event_other")
@@ -539,37 +626,75 @@ end
 
 local function buildEventDamageClause(effect, targetContext, options)
     local amount = math.max(0, resolveAmount(options, effect, "baseDamage"))
+    local amountMode = tostring(effect and effect.amountMode or "flat")
     local schoolLabel = resolveDamageSchoolLabel(effect)
+    local amountText = ""
+    
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base"):format(amount)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max"):format(amount)
+    else
+        amountText = tostring(math.floor(amount))
+    end
+    
     if targetContext.subject == "you" then
-        return ("you take %d %s damage"):format(amount, schoolLabel)
+        return ("you take %s %s damage"):format(amountText, schoolLabel)
     end
 
-    return ("%s takes %d %s damage"):format(targetContext.subject, amount, schoolLabel)
+    return ("%s takes %s %s damage"):format(targetContext.subject, amountText, schoolLabel)
 end
 
 local function buildEventHealClause(effect, targetContext, options)
     local amount = math.max(0, resolveAmount(options, effect, "baseHealing"))
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    local amountText = ""
+    
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base"):format(amount)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max"):format(amount)
+    else
+        amountText = tostring(math.floor(amount))
+    end
+    
     if targetContext.object == "you" then
-        return ("heal yourself for %d health"):format(amount)
+        return ("heal yourself for %s health"):format(amountText)
     end
 
-    return ("heal %s for %d health"):format(targetContext.object, amount)
+    return ("heal %s for %s health"):format(targetContext.object, amountText)
 end
 
 local function buildEventResourceClause(effect, targetContext)
     local amount = tonumber(effect and effect.amount) or 0
+    local amountMode = tostring(effect and effect.amountMode or "flat")
     local resourceName = resolveResourceName(effect and effect.resourceRef or nil)
+    
+    local amountText = ""
+    local lossAmountText = ""
+    
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base %s"):format(amount, resourceName)
+        lossAmountText = ("%g%% of Base"):format(amount)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max %s"):format(amount, resourceName)
+        lossAmountText = ("%g%% of Max"):format(amount)
+    else
+        amountText = ("%d %s"):format(math.floor(amount), resourceName)
+        lossAmountText = tostring(math.floor(math.abs(amount)))
+    end
+    
     if amount > 0 then
         if targetContext.object == "you" then
-            return ("restore %d %s"):format(amount, resourceName)
+            return ("restore %s"):format(amountText)
         end
-        return ("restore %d %s to %s"):format(amount, resourceName, targetContext.object)
+        return ("restore %s to %s"):format(amountText, targetContext.object)
     end
 
     if targetContext.object == "you" then
-        return ("lose %d %s"):format(math.abs(amount), resourceName)
+        return ("lose %s"):format(lossAmountText)
     end
-    return ("reduce %s %s by %d"):format(targetContext.possessive, resourceName, math.abs(amount))
+    return ("reduce %s %s by %s"):format(targetContext.possessive, resourceName, lossAmountText)
 end
 
 local function buildEventApplyAuraClause(effect, targetContext, options)
@@ -716,17 +841,632 @@ function AuraDescriptionBuilder:BuildGeneratedDescription(auraDefinition, option
         end
 
         if #clauses > 0 then
-            sentences[#sentences + 1] = resolveCombatTriggerLabel(auraEvent and auraEvent.combatEventId or nil, targetContext) .. ", " .. joinClauses(clauses) .. "."
+            local prefix = resolveCombatTriggerLabel(auraEvent and auraEvent.combatEventId or nil, targetContext)
+            local chance = normalizeChancePercent(auraEvent and auraEvent.chance)
+            if chance < 100 then
+                prefix = ("%s (%g%% chance)"):format(prefix, chance)
+            end
+            sentences[#sentences + 1] = prefix .. ", " .. joinClauses(clauses) .. "."
         end
     end
 
     return table.concat(sentences, " ")
 end
 
+local function buildStackingTemplate(auraDefinition)
+    if type(auraDefinition) ~= "table" or type(TooltipTemplate.CreateBuildState) ~= "function" then
+        return "", {}
+    end
+
+    local state = TooltipTemplate.CreateBuildState()
+    local clauses = {}
+    local maxStacks = math.max(1, math.floor(tonumber(auraDefinition.maxStacks) or 1))
+    if maxStacks > 1 then
+        local appliedToken = TooltipTemplate.AddToken(state, "AURA_APPLIED_STACKS", "aura_stacks", {
+            applyMode = "applied_stacks",
+        })
+        clauses[#clauses + 1] = ("Applies %s stacks."):format(appliedToken)
+        local maxToken = TooltipTemplate.AddToken(state, "AURA_MAX_STACKS", "aura_stacks", {
+            applyMode = "max_stacks",
+        })
+        clauses[#clauses + 1] = ("Stacks up to %s times."):format(maxToken)
+    end
+
+    return table.concat(clauses, " "), state.tokens
+end
+
+local function buildAuraTemplateError(auraRef)
+    local normalizedRef = trimText(auraRef)
+    if normalizedRef == "" then
+        normalizedRef = "unknown"
+    end
+
+    return ("Tooltip template error: could not resolve aura template '%s'."):format(normalizedRef)
+end
+
+local function buildAuraAmountToken(state, baseKey, metadata)
+    if type(TooltipTemplate.AddToken) ~= "function" then
+        return ""
+    end
+
+    return TooltipTemplate.AddToken(state, baseKey, "aura_amount", metadata)
+end
+
+local function buildPassiveDamageSentenceTemplate(effect, effectIndex, state)
+    local schoolLabel = resolveDamageSchoolLabel(effect)
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    if amountMode == "base_percent" then
+        return ("Deals %g%% of Base %s damage each turn."):format(tonumber(effect and effect.baseDamage) or 0, schoolLabel)
+    end
+    if amountMode == "max_percent" then
+        return ("Deals %g%% of Max %s damage each turn."):format(tonumber(effect and effect.baseDamage) or 0, schoolLabel)
+    end
+    local amountToken = buildAuraAmountToken(state, "AURA_DAMAGE", {
+        effectIndex = effectIndex,
+        baseField = "baseDamage",
+        applyMode = "damage_amount",
+    })
+    return ("Deals %s %s damage each turn."):format(amountToken, schoolLabel)
+end
+
+local function buildPassiveHealSentenceTemplate(effect, effectIndex, state)
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    if amountMode == "base_percent" then
+        return ("Heals for %g%% of Base health each turn."):format(tonumber(effect and effect.baseHealing) or 0)
+    end
+    if amountMode == "max_percent" then
+        return ("Heals for %g%% of Max health each turn."):format(tonumber(effect and effect.baseHealing) or 0)
+    end
+    local amountToken = buildAuraAmountToken(state, "AURA_HEAL", {
+        effectIndex = effectIndex,
+        baseField = "baseHealing",
+        applyMode = "heal_amount",
+    })
+    return ("Heals for %s health each turn."):format(amountToken)
+end
+
+local function buildPassiveResourceSentenceTemplate(effect, effectIndex, state)
+    local amount = tonumber(effect and effect.amount) or 0
+    local resourceName = resolveResourceName(effect and effect.resourceRef or nil)
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    if amount >= 0 then
+        if amountMode == "base_percent" then
+            return ("Restores %g%% of Base %s each turn."):format(amount, resourceName)
+        end
+        if amountMode == "max_percent" then
+            return ("Restores %g%% of Max %s each turn."):format(amount, resourceName)
+        end
+        local amountToken = buildAuraAmountToken(state, "AURA_RESOURCE_GAIN", {
+            effectIndex = effectIndex,
+            applyMode = "resource_gain_amount",
+        })
+        return ("Restores %s each turn."):format(amountToken)
+    end
+
+    if amountMode == "base_percent" then
+        return ("Reduces %s by %g%% of Base each turn."):format(resourceName, math.abs(amount))
+    end
+    if amountMode == "max_percent" then
+        return ("Reduces %s by %g%% of Max each turn."):format(resourceName, math.abs(amount))
+    end
+    local amountToken = buildAuraAmountToken(state, "AURA_RESOURCE_LOSS", {
+        effectIndex = effectIndex,
+        applyMode = "resource_loss_amount",
+    })
+    return ("Reduces %s by %s each turn."):format(resourceName, amountToken)
+end
+
+local function buildPassiveStatSentenceTemplate(effect, effectIndex, state)
+    local statName = resolveStatName(effect and effect.statRef or nil)
+    local verb = (tonumber(effect and effect.baseAmount) or 0) >= 0 and "Increases" or "Reduces"
+    if tostring(effect and effect.operation or "flat") == "percent" or isPercentDisplayStat(effect and effect.statRef or nil) then
+        return ("%s %s by %s%%."):format(verb, statName, tostring(math.abs(tonumber(effect and effect.baseAmount) or 0)))
+    end
+    local amountToken = buildAuraAmountToken(state, "AURA_STAT", {
+        effectIndex = effectIndex,
+        baseField = "baseAmount",
+        applyMode = "stat_amount",
+    })
+    return ("%s %s by %s."):format(verb, statName, amountToken)
+end
+
+local function buildPassiveSkillSentenceTemplate(effect, effectIndex, targetContext, state)
+    local skillName = resolveSkillName(effect and effect.skillRef or nil)
+    local possessive = targetContext and targetContext.possessive or "your"
+    local amountToken = buildAuraAmountToken(state, "AURA_SKILL", {
+        effectIndex = effectIndex,
+        baseField = "baseAmount",
+        applyMode = "skill_amount",
+    })
+    if (tonumber(effect and effect.baseAmount) or 0) >= 0 then
+        return ("Increases %s skill in %s by %s."):format(possessive, skillName, amountToken)
+    end
+
+    return ("Reduces %s skill in %s by %s."):format(possessive, skillName, amountToken)
+end
+
+local function buildEventDamageClauseTemplate(effect, eventIndex, effectIndex, targetContext, state)
+    local schoolLabel = resolveDamageSchoolLabel(effect)
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    local amountText = nil
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base"):format(tonumber(effect and effect.baseDamage) or 0)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max"):format(tonumber(effect and effect.baseDamage) or 0)
+    end
+    if amountText then
+        if targetContext.subject == "you" then
+            return ("you take %s %s damage"):format(amountText, schoolLabel)
+        end
+        return ("%s takes %s %s damage"):format(targetContext.subject, amountText, schoolLabel)
+    end
+    local amountToken = buildAuraAmountToken(state, "AURA_EVENT_DAMAGE", {
+        eventIndex = eventIndex,
+        effectIndex = effectIndex,
+        baseField = "baseDamage",
+        applyMode = "damage_amount",
+    })
+    if targetContext.subject == "you" then
+        return ("you take %s %s damage"):format(amountToken, schoolLabel)
+    end
+
+    return ("%s takes %s %s damage"):format(targetContext.subject, amountToken, schoolLabel)
+end
+
+local function buildEventHealClauseTemplate(effect, eventIndex, effectIndex, targetContext, state)
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    local amountText = nil
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base"):format(tonumber(effect and effect.baseHealing) or 0)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max"):format(tonumber(effect and effect.baseHealing) or 0)
+    end
+    if amountText then
+        if targetContext.object == "you" then
+            return ("heal yourself for %s health"):format(amountText)
+        end
+        return ("heal %s for %s health"):format(targetContext.object, amountText)
+    end
+    local amountToken = buildAuraAmountToken(state, "AURA_EVENT_HEAL", {
+        eventIndex = eventIndex,
+        effectIndex = effectIndex,
+        baseField = "baseHealing",
+        applyMode = "heal_amount",
+    })
+    if targetContext.object == "you" then
+        return ("heal yourself for %s health"):format(amountToken)
+    end
+
+    return ("heal %s for %s health"):format(targetContext.object, amountToken)
+end
+
+local function buildEventResourceClauseTemplate(effect, eventIndex, effectIndex, targetContext, state)
+    local amount = tonumber(effect and effect.amount) or 0
+    local resourceName = resolveResourceName(effect and effect.resourceRef or nil)
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    if amount > 0 then
+        if amountMode == "base_percent" then
+            if targetContext.object == "you" then
+                return ("restore %g%% of Base %s"):format(amount, resourceName)
+            end
+            return ("restore %g%% of Base %s to %s"):format(amount, resourceName, targetContext.object)
+        end
+        if amountMode == "max_percent" then
+            if targetContext.object == "you" then
+                return ("restore %g%% of Max %s"):format(amount, resourceName)
+            end
+            return ("restore %g%% of Max %s to %s"):format(amount, resourceName, targetContext.object)
+        end
+        local amountToken = buildAuraAmountToken(state, "AURA_EVENT_RESOURCE_GAIN", {
+            eventIndex = eventIndex,
+            effectIndex = effectIndex,
+            applyMode = "resource_gain_amount",
+        })
+        if targetContext.object == "you" then
+            return ("restore %s"):format(amountToken)
+        end
+        return ("restore %s to %s"):format(amountToken, targetContext.object)
+    end
+
+    if amountMode == "base_percent" then
+        if targetContext.object == "you" then
+            return ("lose %g%% of Base"):format(math.abs(amount))
+        end
+        return ("reduce %s %s by %g%% of Base"):format(targetContext.possessive, resourceName, math.abs(amount))
+    end
+    if amountMode == "max_percent" then
+        if targetContext.object == "you" then
+            return ("lose %g%% of Max"):format(math.abs(amount))
+        end
+        return ("reduce %s %s by %g%% of Max"):format(targetContext.possessive, resourceName, math.abs(amount))
+    end
+    local amountToken = buildAuraAmountToken(state, "AURA_EVENT_RESOURCE_LOSS", {
+        eventIndex = eventIndex,
+        effectIndex = effectIndex,
+        applyMode = "resource_loss_amount",
+    })
+    if targetContext.object == "you" then
+        return ("lose %s"):format(amountToken)
+    end
+    return ("reduce %s %s by %s"):format(targetContext.possessive, resourceName, amountToken)
+end
+
+local function buildEventEffectClauseTemplate(currentAuraName, currentAuraRef, combatEventId, triggerTarget, targetContext, effect, eventIndex, effectIndex, options, state)
+    local effectType = tostring(effect and effect.type or "")
+    local resolvedTargetContext = resolveTriggeredTargetContext(combatEventId, triggerTarget, targetContext)
+    if effectType == "damage" then
+        return buildEventDamageClauseTemplate(effect, eventIndex, effectIndex, resolvedTargetContext, state)
+    end
+    if effectType == "heal" then
+        return buildEventHealClauseTemplate(effect, eventIndex, effectIndex, resolvedTargetContext, state)
+    end
+    if effectType == "resource" then
+        return buildEventResourceClauseTemplate(effect, eventIndex, effectIndex, resolvedTargetContext, state)
+    end
+    if effectType == "apply_aura" then
+        return buildEventApplyAuraClause(effect, resolvedTargetContext, options)
+    end
+    if effectType == "remove_aura" then
+        return buildEventRemoveAuraClause(currentAuraName, currentAuraRef, effect, resolvedTargetContext, options)
+    end
+    if effectType == "interrupt" then
+        return buildEventInterruptClause(resolvedTargetContext)
+    end
+    if effectType == "revert" then
+        return buildEventRevertClause(resolvedTargetContext)
+    end
+
+    return nil
+end
+
+local function resolveAuraTemplateEffect(auraDefinition, token)
+    if type(auraDefinition) ~= "table" or type(token) ~= "table" then
+        return nil
+    end
+
+    local eventIndex = tonumber(token.eventIndex)
+    local effectIndex = tonumber(token.effectIndex)
+    if effectIndex == nil then
+        return nil
+    end
+    effectIndex = math.floor(effectIndex)
+    if effectIndex <= 0 then
+        return nil
+    end
+
+    if eventIndex ~= nil then
+        eventIndex = math.floor(eventIndex)
+        local auraEvent = (auraDefinition.events or {})[eventIndex]
+        return type(auraEvent) == "table" and (auraEvent.effects or {})[effectIndex] or nil
+    end
+
+    return (auraDefinition.effects or {})[effectIndex]
+end
+
+local function resolveAuraTemplateToken(auraDefinition, token, options)
+    local applyMode = tostring(token and token.applyMode or "")
+    if applyMode == "applied_stacks" then
+        return tostring(math.max(1, math.floor(tonumber(type(options) == "table" and options.stacks) or 1)))
+    end
+    if applyMode == "max_stacks" then
+        return tostring(math.max(1, math.floor(tonumber(auraDefinition and auraDefinition.maxStacks) or 1)))
+    end
+
+    local effect = resolveAuraTemplateEffect(auraDefinition, token)
+    if type(effect) ~= "table" then
+        return nil
+    end
+
+    if applyMode == "damage_amount" or applyMode == "heal_amount" or applyMode == "stat_amount" or applyMode == "skill_amount" then
+        local amount = resolveAmount(options, effect, tostring(token.baseField or "baseAmount"))
+        local numericAmount = math.abs(amount)
+        if applyMode == "damage_amount" or applyMode == "heal_amount" then
+            local amountMode = tostring(effect.amountMode or "flat")
+            if amountMode == "base_percent" then
+                return ("%g%% of Base"):format(math.abs(tonumber(effect[token.baseField or "baseAmount"]) or 0))
+            end
+            if amountMode == "max_percent" then
+                return ("%g%% of Max"):format(math.abs(tonumber(effect[token.baseField or "baseAmount"]) or 0))
+            end
+            return tostring(math.floor(numericAmount))
+        end
+        local amountText = tostring(
+            (applyMode == "stat_amount" and (tostring(effect.operation or "flat") == "percent" or isPercentDisplayStat(effect.statRef)))
+                and math.abs(tonumber(effect[token.baseField or "baseAmount"]) or 0)
+                or numericAmount
+        )
+        if applyMode == "stat_amount" and (tostring(effect.operation or "flat") == "percent" or isPercentDisplayStat(effect.statRef)) then
+            amountText = amountText .. "%"
+        end
+        return amountText
+    end
+
+    if applyMode == "resource_gain_amount" or applyMode == "resource_loss_amount" then
+        local amount = tonumber(effect.amount) or 0
+        local amountMode = tostring(effect.amountMode or "flat")
+        local resourceName = resolveResourceName(effect.resourceRef)
+        if applyMode == "resource_gain_amount" then
+            if amountMode == "base_percent" then
+                return ("%g%% of Base %s"):format(math.abs(tonumber(effect.amount) or 0), resourceName)
+            end
+            if amountMode == "max_percent" then
+                return ("%g%% of Max %s"):format(math.abs(tonumber(effect.amount) or 0), resourceName)
+            end
+            return ("%d %s"):format(math.floor(amount), resourceName)
+        end
+
+        local lossAmount = math.abs(amount)
+        if amountMode == "base_percent" then
+            return ("%g%% of Base"):format(lossAmount)
+        end
+        if amountMode == "max_percent" then
+            return ("%g%% of Max"):format(lossAmount)
+        end
+        return tostring(math.floor(lossAmount))
+    end
+
+    return nil
+end
+
+function AuraDescriptionBuilder:BuildTooltipTemplatePayload(auraDefinition, options)
+    if type(auraDefinition) ~= "table" or type(TooltipTemplate.CreateBuildState) ~= "function" then
+        return nil
+    end
+
+    local targetContext = resolveTargetContext(options)
+    local auraName = ensureString(auraDefinition.name, "")
+    local currentAuraRef = type(options) == "table" and options.auraRef or nil
+    local authoredDescriptionText = trimText(auraDefinition.description)
+    local bodyState = TooltipTemplate.CreateBuildState()
+    local bodySentences = {}
+
+    local passiveEffectKeys = sortedNumericKeys(auraDefinition.effects)
+    for index = 1, #passiveEffectKeys do
+        local effectIndex = tonumber(passiveEffectKeys[index].key)
+        local effect = auraDefinition.effects[passiveEffectKeys[index].key]
+        local effectType = tostring(effect and effect.type or "")
+        local sentence = nil
+        if effectType == "damage" then
+            sentence = buildPassiveDamageSentenceTemplate(effect, effectIndex, bodyState)
+        elseif effectType == "heal" then
+            sentence = buildPassiveHealSentenceTemplate(effect, effectIndex, bodyState)
+        elseif effectType == "resource" then
+            sentence = buildPassiveResourceSentenceTemplate(effect, effectIndex, bodyState)
+        elseif effectType == "stat" then
+            sentence = buildPassiveStatSentenceTemplate(effect, effectIndex, bodyState)
+        elseif effectType == "skill" then
+            sentence = buildPassiveSkillSentenceTemplate(effect, effectIndex, targetContext, bodyState)
+        elseif effectType == "control" then
+            sentence = buildPassiveControlSentence(effect, targetContext, options)
+        end
+        if sentence and sentence ~= "" then
+            bodySentences[#bodySentences + 1] = sentence
+        end
+    end
+
+    local eventKeys = sortedNumericKeys(auraDefinition.events)
+    for index = 1, #eventKeys do
+        local eventIndex = tonumber(eventKeys[index].key)
+        local auraEvent = auraDefinition.events[eventKeys[index].key]
+        local clauses = {}
+        local effectKeys = sortedNumericKeys(auraEvent and auraEvent.effects)
+        for effectPosition = 1, #effectKeys do
+            local effectIndex = tonumber(effectKeys[effectPosition].key)
+            local effect = auraEvent.effects[effectKeys[effectPosition].key]
+            local clause = buildEventEffectClauseTemplate(
+                auraName,
+                currentAuraRef,
+                auraEvent and auraEvent.combatEventId or nil,
+                auraEvent and auraEvent.triggerTarget or nil,
+                targetContext,
+                effect,
+                eventIndex,
+                effectIndex,
+                options,
+                bodyState
+            )
+            if clause and clause ~= "" then
+                clauses[#clauses + 1] = clause
+            end
+        end
+
+        if #clauses > 0 then
+            local prefix = resolveCombatTriggerLabel(auraEvent and auraEvent.combatEventId or nil, targetContext)
+            local chance = normalizeChancePercent(auraEvent and auraEvent.chance)
+            if chance < 100 then
+                prefix = ("%s (%g%% chance)"):format(prefix, chance)
+            end
+            bodySentences[#bodySentences + 1] = prefix .. ", " .. joinClauses(clauses) .. "."
+        end
+    end
+
+    local stackingText, stackingTokens = buildStackingTemplate(auraDefinition)
+    return TooltipTemplate.NormalizeAuraPayload({
+        bodyText = #bodySentences > 0 and table.concat(bodySentences, " ") or authoredDescriptionText,
+        bodyTokens = bodyState.tokens,
+        stackingText = stackingText,
+        stackingTokens = stackingTokens,
+    })
+end
+
+function AuraDescriptionBuilder:ResolveTooltipTemplatePayload(auraDefinition, payload, options)
+    local normalizedPayload = type(TooltipTemplate.NormalizeAuraPayload) == "function"
+        and TooltipTemplate.NormalizeAuraPayload(payload)
+        or nil
+    if type(auraDefinition) ~= "table" or type(normalizedPayload) ~= "table" then
+        return nil, buildAuraTemplateError(type(options) == "table" and options.auraRef or nil)
+    end
+
+    local function resolveToken(token)
+        return resolveAuraTemplateToken(auraDefinition, token, options)
+    end
+
+    local bodyText = normalizedPayload.bodyText
+    if bodyText ~= "" then
+        local renderedBody, renderError = TooltipTemplate.ResolveText(bodyText, normalizedPayload.bodyTokens, resolveToken)
+        if renderedBody == nil then
+            return nil, renderError
+        end
+        bodyText = renderedBody
+    end
+
+    local stackingText = normalizedPayload.stackingText
+    if stackingText ~= "" then
+        local renderedStacking, renderError = TooltipTemplate.ResolveText(stackingText, normalizedPayload.stackingTokens, resolveToken)
+        if renderedStacking == nil then
+            return nil, renderError
+        end
+        stackingText = renderedStacking
+    end
+
+    return TooltipTemplate.CombineText(bodyText, stackingText), nil
+end
+
+function AuraDescriptionBuilder:BuildTooltipSectionTemplate(auraRef, options)
+    local dataset, auraDefinition, qualifiedAuraRef = resolveAuraDefinition(auraRef, options)
+    if type(auraDefinition) ~= "table" then
+        return nil, buildAuraTemplateError(auraRef)
+    end
+
+    local resolvedOptions = {
+        auraRef = qualifiedAuraRef or auraRef,
+        datasetId = dataset and dataset.id or (type(options) == "table" and options.datasetId or nil),
+        dataset = dataset or (type(options) == "table" and options.dataset or nil),
+        spellDatasetId = type(options) == "table" and options.spellDatasetId or nil,
+        casterUnit = type(options) == "table" and options.casterUnit or nil,
+        targetUnit = type(options) == "table" and options.targetUnit or nil,
+        powerLevel = type(options) == "table" and options.powerLevel or nil,
+        stacks = type(options) == "table" and options.stacks or nil,
+        duration = type(options) == "table" and options.duration or nil,
+        targetContext = type(options) == "table" and options.targetContext or nil,
+    }
+    local payload = type(TooltipTemplate.NormalizeAuraPayload) == "function"
+        and TooltipTemplate.NormalizeAuraPayload(auraDefinition.tooltipTemplateData)
+        or nil
+    if type(payload) ~= "table" then
+        payload = self:BuildTooltipTemplatePayload(auraDefinition, {
+            auraRef = resolvedOptions.auraRef,
+            datasetId = resolvedOptions.datasetId,
+            dataset = resolvedOptions.dataset,
+            spellDatasetId = resolvedOptions.spellDatasetId,
+            casterUnit = resolvedOptions.casterUnit,
+            targetUnit = resolvedOptions.targetUnit,
+            powerLevel = resolvedOptions.powerLevel,
+            stacks = resolvedOptions.stacks,
+            duration = resolvedOptions.duration,
+            targetContext = resolvedOptions.targetContext,
+        })
+    end
+    if type(payload) == "table" then
+        return {
+            auraRef = qualifiedAuraRef or auraRef,
+            datasetId = dataset and dataset.id or (type(options) == "table" and options.datasetId or nil),
+            spellDatasetId = type(options) == "table" and options.spellDatasetId or nil,
+            nameText = ensureString(auraDefinition.name, ensureString(qualifiedAuraRef or auraRef, "Aura")),
+            icon = ensureString(auraDefinition.icon, "Interface\\Icons\\INV_Misc_QuestionMark"),
+            descriptionText = TooltipTemplate.CombineText(payload.bodyText, payload.stackingText),
+            tokens = TooltipTemplate.MergeTokens(payload.bodyTokens, payload.stackingTokens),
+            powerLevel = type(options) == "table" and options.powerLevel or nil,
+            stacks = type(options) == "table" and options.stacks or nil,
+            duration = type(options) == "table" and options.duration or nil,
+            targetContext = type(options) == "table" and options.targetContext or nil,
+        }, nil
+    end
+
+    local generatedDescriptionText = self:BuildGeneratedDescription(auraDefinition, resolvedOptions)
+    local stackingDescriptionText = buildStackingDescription(auraDefinition, resolvedOptions)
+    local descriptionText = trimText(table.concat({
+        trimText(generatedDescriptionText),
+        trimText(auraDefinition.description),
+        trimText(stackingDescriptionText),
+    }, " "))
+    if descriptionText == "" then
+        return nil, buildAuraTemplateError(auraRef)
+    end
+
+    return {
+        auraRef = qualifiedAuraRef or auraRef,
+        datasetId = resolvedOptions.datasetId,
+        spellDatasetId = resolvedOptions.spellDatasetId,
+        nameText = ensureString(auraDefinition.name, ensureString(qualifiedAuraRef or auraRef, "Aura")),
+        icon = ensureString(auraDefinition.icon, "Interface\\Icons\\INV_Misc_QuestionMark"),
+        descriptionText = descriptionText,
+        tokens = {},
+        powerLevel = resolvedOptions.powerLevel,
+        stacks = resolvedOptions.stacks,
+        duration = resolvedOptions.duration,
+        targetContext = resolvedOptions.targetContext,
+    }, nil
+end
+
+function AuraDescriptionBuilder:ResolveTooltipSectionTemplate(section, options)
+    if type(section) ~= "table" then
+        return nil, buildAuraTemplateError(nil)
+    end
+
+    local dataset, auraDefinition, qualifiedAuraRef = resolveAuraDefinition(section.auraRef, {
+        dataset = type(options) == "table" and options.dataset or nil,
+        datasetId = type(options) == "table" and options.datasetId or section.datasetId,
+        spellDatasetId = type(options) == "table" and options.spellDatasetId or section.spellDatasetId,
+    })
+    if type(auraDefinition) ~= "table" then
+        return nil, buildAuraTemplateError(section.auraRef)
+    end
+
+    local function resolveToken(token)
+        return resolveAuraTemplateToken(auraDefinition, token, {
+            auraRef = qualifiedAuraRef or section.auraRef,
+            datasetId = dataset and dataset.id or section.datasetId,
+            dataset = dataset,
+            spellDatasetId = section.spellDatasetId,
+            casterUnit = type(options) == "table" and options.casterUnit or nil,
+            targetUnit = type(options) == "table" and options.targetUnit or nil,
+            powerLevel = tonumber(section.powerLevel) or 0,
+            stacks = tonumber(section.stacks) or 1,
+            duration = section.duration,
+            targetContext = section.targetContext,
+        })
+    end
+
+    return TooltipTemplate.ResolveText(section.descriptionText or "", section.tokens or {}, resolveToken)
+end
+
 function AuraDescriptionBuilder:BuildTooltipSection(auraRef, options)
     local dataset, auraDefinition, qualifiedAuraRef = resolveAuraDefinition(auraRef, options)
     if type(auraDefinition) ~= "table" then
         return nil
+    end
+
+    if auraDefinition.tooltipTemplate == true then
+        local resolvedDescriptionText, resolveError = self:ResolveTooltipTemplatePayload(auraDefinition, auraDefinition.tooltipTemplateData, {
+            auraRef = qualifiedAuraRef or auraRef,
+            datasetId = dataset and dataset.id or (type(options) == "table" and options.datasetId or nil),
+            dataset = dataset or (type(options) == "table" and options.dataset or nil),
+            spellDatasetId = type(options) == "table" and options.spellDatasetId or nil,
+            casterUnit = type(options) == "table" and options.casterUnit or nil,
+            targetUnit = type(options) == "table" and options.targetUnit or nil,
+            powerLevel = type(options) == "table" and options.powerLevel or nil,
+            stacks = type(options) == "table" and options.stacks or nil,
+            duration = type(options) == "table" and options.duration or nil,
+            targetContext = type(options) == "table" and options.targetContext or nil,
+        })
+        local descriptionText = trimText(resolvedDescriptionText)
+        if descriptionText == "" then
+            return {
+                auraRef = qualifiedAuraRef or auraRef,
+                name = ensureString(auraDefinition.name, ensureString(qualifiedAuraRef or auraRef, "Aura")),
+                icon = ensureString(auraDefinition.icon, "Interface\\Icons\\INV_Misc_QuestionMark"),
+                descriptionText = trimText(resolveError or ""),
+                descriptionSource = "error",
+            }
+        end
+        return {
+            auraRef = qualifiedAuraRef or auraRef,
+            name = ensureString(auraDefinition.name, ensureString(qualifiedAuraRef or auraRef, "Aura")),
+            icon = ensureString(auraDefinition.icon, "Interface\\Icons\\INV_Misc_QuestionMark"),
+            descriptionText = descriptionText,
+            descriptionSource = "template",
+        }
     end
 
     local authoredDescriptionText = trimText(auraDefinition.description)

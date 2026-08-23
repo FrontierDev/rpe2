@@ -12,6 +12,7 @@ local Operations = Comms.Operations
 local Registry = Addon.Internal.Registry or {}
 local NativeJoinChannel = Comms and Comms.JoinChannel or nil
 local NativeResolveChannelId = Comms and Comms.ResolveChannelId or nil
+local SESSION_INTERNAL_TRACE = true
 
 local CLIENT_CONNECT_OPCODE = Operations:GetOpcode("CLIENT_CONNECT")
 local CLIENT_DISCONNECT_OPCODE = Operations:GetOpcode("CLIENT_DISCONNECT")
@@ -35,6 +36,33 @@ local LOCAL_ONLY_CONFIGURATION_REASONS = {
 
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
+end
+
+local function getTimingMilliseconds()
+    if type(debugprofilestop) == "function" then
+        return tonumber(debugprofilestop()) or 0
+    end
+    if type(GetTimePreciseSec) == "function" then
+        return (tonumber(GetTimePreciseSec()) or 0) * 1000
+    end
+    return 0
+end
+
+local function getElapsedMilliseconds(startedAt)
+    local started = tonumber(startedAt) or 0
+    return math.max(0, getTimingMilliseconds() - started)
+end
+
+local function logSessionInternal(message, ...)
+    if SESSION_INTERNAL_TRACE ~= true then
+        return
+    end
+    if Debug and type(Debug.SetLevelEnabled) == "function" and type(Debug.IsLevelEnabled) == "function" and not Debug.IsLevelEnabled("internal") then
+        Debug.SetLevelEnabled("internal", true)
+    end
+    if Debug and type(Debug.Internal) == "function" then
+        Debug.Internal(message, ...)
+    end
 end
 
 local function normalizeConfigurationChangeReason(reason)
@@ -363,8 +391,44 @@ function Client:QueueClientConnectRefresh(reason)
     return true
 end
 
+function Client:TryDeferLocalConfigurationChanged(reason)
+    local editor = Addon.Client and Addon.Client.UI and Addon.Client.UI.Editor or nil
+    if type(editor) ~= "table" or type(editor.ShouldDeferConfigurationRefresh) ~= "function" then
+        return false
+    end
+
+    if editor:ShouldDeferConfigurationRefresh(reason) ~= true then
+        return false
+    end
+
+    if type(editor.MarkConfigurationDirty) == "function" then
+        editor:MarkConfigurationDirty(reason)
+    end
+
+    return true
+end
+
 function Client:HandleLocalConfigurationChanged(reason)
+    local startedAt = getTimingMilliseconds()
     local normalizedReason = normalizeConfigurationChangeReason(reason)
+    local profileLogic = Addon.Internal and Addon.Internal.Profile or nil
+    local resolvedBootstrapReady = true
+    if self.Crafting and type(self.Crafting.GetRecipeSkillIndex) == "function" then
+        self.Crafting:GetRecipeSkillIndex()
+    end
+    if Addon.Internal
+        and Addon.Internal.Profile
+        and type(Addon.Internal.Profile.RebuildPersistedRecipeKnowledge) == "function"
+    then
+        Addon.Internal.Profile.RebuildPersistedRecipeKnowledge()
+    end
+    if type(profileLogic) == "table" then
+        if type(profileLogic.WarmResolvedBootstrapState) == "function" then
+            resolvedBootstrapReady = profileLogic.WarmResolvedBootstrapState(normalizedReason) == true
+        elseif type(profileLogic.IsBootstrapResolvedStateReady) == "function" then
+            resolvedBootstrapReady = profileLogic.IsBootstrapResolvedStateReady() == true
+        end
+    end
     local eventState = self.GetEventState and self:GetEventState() or nil
     local profileWindowRefreshed = false
     if self.GetTraitRuntimeState and self.SyncAutomaticTraitAuras and type(eventState) == "table" and eventState.active == true then
@@ -417,15 +481,26 @@ function Client:HandleLocalConfigurationChanged(reason)
     if self.QueueClientResourceSync
         and type(eventState) == "table"
         and eventState.active == true
+        and resolvedBootstrapReady == true
         and ConfigurationChangeQueuesResourceSync(normalizedReason)
     then
         self:QueueClientResourceSync(normalizedReason)
     end
 
     if not ConfigurationChangeQueuesClientConnectRefresh(normalizedReason) then
+        logSessionInternal(
+            "Session: HandleLocalConfigurationChanged reason=%s took=%.2fms",
+            tostring(normalizedReason or ""),
+            getElapsedMilliseconds(startedAt)
+        )
         return true
     end
 
+    logSessionInternal(
+        "Session: HandleLocalConfigurationChanged reason=%s took=%.2fms",
+        tostring(normalizedReason or ""),
+        getElapsedMilliseconds(startedAt)
+    )
     return self:QueueClientConnectRefresh(normalizedReason)
 end
 
@@ -809,6 +884,13 @@ function Client:HandleServerStart(arguments, sender)
         joinLogged = false,
     })
     bindStateSessionRuntime(nextState)
+
+    -- The local client does not receive its own CLIENT_CONNECT broadcast. Register
+    -- it immediately so event startup can queue the initial resource snapshot.
+    local localPlayerName = Common.NormalizeName(Common.GetPlayerName and Common.GetPlayerName() or nil)
+    if localPlayerName ~= "" then
+        addMember(nextState, localPlayerName, nextState.joinedAt)
+    end
 
     if nextState.channelJoinReady then
         deferForState(nextState, function(targetState)

@@ -62,6 +62,8 @@ function SliderBar:New(options)
     instance.thumbTexture = nil
     instance.valueText = nil
     instance.dragging = false
+    instance.dragStartValue = instance.value
+    instance.pendingDragCallback = false
     instance.trackColor = nil
     instance.fillColor = nil
     instance.thumbColor = nil
@@ -101,6 +103,11 @@ function SliderBar:SetValue(value, suppressCallback)
     self:UpdateLayout()
 
     if not suppressCallback and self.options.onValueChanged and previous ~= resolved then
+        if self.dragging and self.options.deferValueChangedUntilMouseUp == true then
+            self.pendingDragCallback = true
+            return
+        end
+
         self.options.onValueChanged(self.value, self)
     end
 end
@@ -229,6 +236,8 @@ end
 
 function SliderBar:StartDragging()
     self.dragging = true
+    self.dragStartValue = self.value
+    self.pendingDragCallback = false
     if self.frame and self.frame.SetScript then
         self.frame:SetScript("OnUpdate", function()
             if self.dragging then
@@ -244,6 +253,18 @@ function SliderBar:StopDragging()
     if self.frame and self.frame.SetScript then
         self.frame:SetScript("OnUpdate", nil)
     end
+
+    if self.options.deferValueChangedUntilMouseUp == true
+        and self.pendingDragCallback
+        and self.options.onValueChanged
+        and self.dragStartValue ~= self.value
+    then
+        self.pendingDragCallback = false
+        self.options.onValueChanged(self.value, self)
+        return
+    end
+
+    self.pendingDragCallback = false
 end
 
 function SliderBar:ApplyColors()

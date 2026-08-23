@@ -51,6 +51,7 @@ local ITEM_TYPE_ITEMS = {
     { label = "None", value = "none" },
     { label = "Weapon", value = "weapon" },
     { label = "Armor", value = "armor" },
+    { label = "Tool", value = "tool" },
     { label = "Modification", value = "modification" },
     { label = "Consumable", value = "consumable" },
     { label = "Material", value = "material" },
@@ -79,7 +80,9 @@ local SOCKET_TYPE_ITEMS = {
     { label = "Red", value = "red" },
     { label = "Blue", value = "blue" },
     { label = "Yellow", value = "yellow" },
+    { label = "Orange", value = "orange" },
     { label = "Green", value = "green" },
+    { label = "Purple", value = "purple" },
     { label = "Meta", value = "meta" },
     { label = "Cogwheel", value = "cogwheel" },
     { label = "Prismatic", value = "prismatic" },
@@ -167,6 +170,27 @@ local EVENT_EFFECT_LABELS = {
     remove_aura = "Remove",
     resource = "Resource",
 }
+
+local function formatStatBonusValueText(entry)
+    local valueText = tostring(entry and entry.value or 0)
+    if tostring(entry and entry.operation or "flat") == "percent" then
+        return valueText .. "%"
+    end
+
+    return valueText
+end
+
+local function formatAmountModeValueText(amount, amountMode)
+    local normalizedMode = tostring(amountMode or "flat")
+    if normalizedMode == "base_percent" then
+        return ("%s%% Base"):format(tostring(amount or 0))
+    end
+    if normalizedMode == "max_percent" then
+        return ("%s%% Max"):format(tostring(amount or 0))
+    end
+
+    return tostring(amount or 0)
+end
 
 local function copyTable(values)
     local output = {}
@@ -450,6 +474,7 @@ local function getItemTypeLabel(itemType)
     local labels = {
         weapon = "Weapon",
         armor = "Armor",
+        tool = "Tool",
         modification = "Modification",
         consumable = "Consumable",
         material = "Material",
@@ -564,7 +589,7 @@ end
 
 local function isEquipmentItemType(itemType)
     local normalizedType = tostring(itemType or "none")
-    return normalizedType == "weapon" or normalizedType == "armor"
+    return normalizedType == "weapon" or normalizedType == "armor" or normalizedType == "modification"
 end
 
 local function itemSupportsEmbeddedTrait(item)
@@ -607,6 +632,11 @@ local function applyItemTypeDefaults(item)
     if itemType == "weapon" or itemType == "armor" or itemType == "modification" then
         item.canStack = false
         item.maxStackSize = 1
+    elseif itemType == "tool" then
+        if item.canStack == nil then
+            item.canStack = false
+        end
+        item.maxStackSize = math.max(1, tonumber(item.maxStackSize) or 1)
     elseif itemType == "consumable" or itemType == "material" then
         if item.canStack == nil then
             item.canStack = true
@@ -750,6 +780,29 @@ function DataEditor:BuildItemInspectorDatasetItems()
             label = self:GetDatasetDisplayName(dataset),
             value = dataset.id,
         }
+    end
+
+    return items
+end
+
+function DataEditor:BuildItemInspectorCraftingSkillItems()
+    local items = {
+        { label = "None", value = "" },
+    }
+
+    local datasets = self:GetDatasets()
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local skills = dataset and dataset.skills or {}
+        for skillIndex = 1, #skills do
+            local skill = skills[skillIndex]
+            if skill and skill.id and tostring(skill.skillType or "") == "crafting" then
+                items[#items + 1] = {
+                    label = ("%s / %s"):format(self:GetDatasetDisplayName(dataset), self:GetEntryDisplayName("skills", skill)),
+                    value = ("%s:%s"):format(dataset.id, skill.id),
+                }
+            end
+        end
     end
 
     return items
@@ -1092,7 +1145,7 @@ function DataEditor:BuildItemInspectorConsumableTraitStatRows(item)
             rowIndex = index,
             datasetName = dataset and self:GetDatasetDisplayName(dataset) or (datasetId or "-"),
             statName = statName,
-            valueText = tostring(entry and entry.value or 0),
+            valueText = formatStatBonusValueText(entry),
         }
     end
 
@@ -1142,7 +1195,7 @@ function DataEditor:BuildItemInspectorConsumableTraitEventRows(item)
         local effectType = ensureString(effect and effect.type)
 
         if effectType == "heal" then
-            amountText = tostring(effect and effect.baseHealing or 0)
+            amountText = formatAmountModeValueText(effect and effect.baseHealing or 0, effect and effect.amountMode)
         elseif effectType == "apply_aura" then
             amountText = tostring(effect and effect.stacks or 1)
             detailText = self:ResolveSpellInspectorReferenceLabel("auras", effect and effect.auraRef or "")
@@ -1150,10 +1203,11 @@ function DataEditor:BuildItemInspectorConsumableTraitEventRows(item)
             amountText = tostring(effect and effect.stacks or 1)
             detailText = self:ResolveSpellInspectorReferenceLabel("auras", effect and effect.auraRef or "")
         elseif effectType == "resource" then
-            amountText = tostring(effect and effect.amount or 0)
+            amountText = formatAmountModeValueText(effect and effect.amount or 0, effect and effect.amountMode)
             detailText = self:ResolveSpellInspectorReferenceLabel("resources", effect and effect.resourceRef or "")
         else
-            amountText = tostring(effect and effect.baseDamage or 0)
+            amountText = formatAmountModeValueText(effect and effect.baseDamage or 0, effect and effect.amountMode)
+            detailText = UI.Utils.JoinCommaSeparatedList(effect and effect.damageSchoolRefs or nil)
         end
 
         local effectSummary = EVENT_EFFECT_LABELS[effectType] or ensureString(effectType, "-")
@@ -1179,6 +1233,7 @@ function DataEditor:CommitSelectedItem(mutate)
         return
     end
 
+    local before = self:DeepCopyValue(item)
     mutate(item, dataset)
     applyItemTypeDefaults(item)
     local normalized = ItemClass and ItemClass.New and ItemClass:New(item):ToTable() or item
@@ -1191,13 +1246,11 @@ function DataEditor:CommitSelectedItem(mutate)
         item[key] = value
     end
 
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "items", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, item) then
+        return
     end
 
-    self:RefreshAfterDatasetEntryChanged("items")
+    self:QueuePendingDatasetEntryChanged(dataset.id, "items")
 end
 
 function DataEditor:GetItemInspectorPageDefinitions()
@@ -1316,6 +1369,8 @@ function DataEditor:EnsureItemInspectorStatContextMenu()
                 table.remove(stats, removeIndex)
                 selectedItem.stats = stats
             end)
+            self:SetSelectedItemInspectorStatIndex(nil)
+            self:RefreshItemInspectorStatEditor()
 
             if menu and menu.HideMenus then
                 menu:HideMenus()
@@ -1407,6 +1462,12 @@ function DataEditor:RefreshItemInspectorStatsTable()
 
     if self.ItemInspectorStatsScroll and self.ItemInspectorStatsScroll.SetItems then
         self.ItemInspectorStatsScroll:SetItems(rows)
+    end
+    if self.SetSelectedItemInspectorStatIndex then
+        self:SetSelectedItemInspectorStatIndex(self.SelectedItemInspectorStatIndex)
+    end
+    if self.RefreshItemInspectorStatEditor then
+        self:RefreshItemInspectorStatEditor()
     end
 end
 

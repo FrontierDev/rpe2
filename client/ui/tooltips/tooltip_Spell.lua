@@ -10,7 +10,6 @@ local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local ResourceSync = Addon.Internal and Addon.Internal.Comms and Addon.Internal.Comms.ResourceSync or {}
 local Spellcasting = Addon.Client and Addon.Client.Spellcasting or {}
 local Conditions = Addon.Client and Addon.Client.Conditions or {}
-
 local SpellTooltip = Tooltips.Spell or {}
 Tooltips.Spell = SpellTooltip
 
@@ -20,6 +19,10 @@ local function ensureString(value, fallback)
     end
 
     return tostring(value)
+end
+
+local function trimText(value)
+    return ensureString(value):gsub("^%s+", ""):gsub("%s+$", "")
 end
 
 local function buildAuraHeaderText(section)
@@ -75,9 +78,15 @@ local function buildCostSegment(cost, includePhaseSuffix)
 
     local resourceName = resolveResourceName(tostring(cost.resourceRef or ""))
     local amountMode = tostring(cost.amountMode or "flat")
-    local amountText = amountMode == "base_percent"
-        and ("%g%% of Base %s"):format(amount, resourceName)
-        or ("%g %s"):format(amount, resourceName)
+    local amountText = ""
+    
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base %s"):format(amount, resourceName)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max %s"):format(amount, resourceName)
+    else
+        amountText = ("%g %s"):format(amount, resourceName)
+    end
 
     if not includePhaseSuffix then
         return amountText
@@ -107,27 +116,28 @@ end
 local function buildTooltipDescription(detail, owner)
     local descriptionBuilder = Spellcasting and Spellcasting.DescriptionBuilder or nil
     if type(descriptionBuilder) == "table" and type(descriptionBuilder.BuildTooltipData) == "function" then
-        local tooltipData = descriptionBuilder:BuildTooltipData(detail, {
+        return descriptionBuilder:BuildTooltipData(detail, {
             tooltipOwner = owner,
             deferGeneration = false,
-        })
-        if type(tooltipData) == "table" then
-            tooltipData.descriptionText = ensureString(tooltipData.descriptionText, "")
-            tooltipData.auraSections = type(tooltipData.auraSections) == "table" and tooltipData.auraSections or {}
-            return tooltipData
-        end
-    elseif type(descriptionBuilder) == "table" and type(descriptionBuilder.BuildDescription) == "function" then
+        }) or {
+            descriptionText = "",
+            auraSections = {},
+        }
+    end
+
+    local spell = type(detail) == "table" and detail.spell or nil
+    local authoredDescriptionText = trimText(type(detail) == "table" and detail.authoredDescriptionText or spell and spell.description or "")
+    if authoredDescriptionText ~= "" then
         return {
-            descriptionText = ensureString(descriptionBuilder:BuildDescription(detail, {
-                tooltipOwner = owner,
-                deferGeneration = false,
-            }), ""),
+            descriptionText = authoredDescriptionText,
+            descriptionSource = "authored",
             auraSections = {},
         }
     end
 
     return {
-        descriptionText = ensureString(type(detail) == "table" and detail.descriptionText or "", ""),
+        descriptionText = "",
+        descriptionSource = "summary",
         auraSections = {},
     }
 end
@@ -312,13 +322,10 @@ function SpellTooltip:Build(detail, owner)
         return buildInactiveTooltip(detail)
     end
 
-    local useCompactTooltip = tostring(detail.tooltipVariant or "") == "compact"
-    local tooltipData = useCompactTooltip and {
-        descriptionText = ensureString(detail.descriptionText, ""),
-        auraSections = {},
-    } or buildTooltipDescription(detail, owner)
+    local tooltipData = buildTooltipDescription(detail, owner)
     local runtimeState = buildRuntimeActivationState(detail)
     local description = ensureString(tooltipData and tooltipData.descriptionText, "")
+    local errorText = ensureString(tooltipData and tooltipData.errorText, "")
     local lines = {}
     local costLine = buildCostLine(detail)
     local chargesText = buildChargesText(detail, runtimeState)
@@ -370,6 +377,22 @@ function SpellTooltip:Build(detail, owner)
             r = 1,
             g = 0.82,
             b = 0,
+            wrap = true,
+        }
+    elseif errorText ~= "" then
+        lines[#lines + 1] = {
+            text = errorText,
+            r = 0.6,
+            g = 0.6,
+            b = 0.6,
+            wrap = true,
+        }
+    else
+        lines[#lines + 1] = {
+            text = "A tooltip has not been generated for this spell.",
+            r = 0.6,
+            g = 0.6,
+            b = 0.6,
             wrap = true,
         }
     end

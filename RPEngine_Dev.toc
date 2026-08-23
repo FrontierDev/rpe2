@@ -1,4 +1,4 @@
-## Interface: 120000
+## Interface: 120100
 ## Title: RPEngine 2.0
 ## Notes: Fully-integrated roll system and associated RP tools.
 ## Version: 2.0.0
@@ -8,6 +8,8 @@
 ## Initialisation and Common Files
 Init.lua
 Commands.lua
+core/debug/FormattedDebug.lua
+core/debug/Timings.lua
 data/IconData.lua
 data/ModelData.lua
 
@@ -41,6 +43,7 @@ client/client_Session.lua
 client/client_Resources.lua
 client/client_Commands.lua
 client/character/inventory/Inventory.lua
+client/client_Crafting.lua
 client/conditions/Core.lua
 client/conditions/Level.lua
 client/conditions/Class.lua
@@ -117,6 +120,7 @@ client/combat/effects/Resource.lua
 client/combat/effects/Interrupt.lua
 client/combat/effects/Revert.lua
 client/combat/effects/SummonPet.lua
+client/spellcasting/TooltipTemplate.lua
 client/spellcasting/AuraDescriptionBuilder.lua
 client/spellcasting/DescriptionBuilder.lua
 client/traits/DescriptionBuilder.lua
@@ -124,7 +128,6 @@ client/client_Targeting.lua
 client/client_PendingChanges.lua
 server/server_Spellcasting.lua
 
-core/debug/FormattedDebug.lua
 core/Sound.lua
 api/UI.lua
 core/ui/ColorScheme.lua
@@ -163,6 +166,7 @@ core/ui/Popup.lua
 core/ui/prefabs/UnitPortrait.lua
 core/ui/prefabs/ObjectSlot.lua
 core/ui/prefabs/SpellbookEntry.lua
+core/ui/prefabs/TrainerEntry.lua
 core/ui/prefabs/SkillEntry.lua
 core/ui/prefabs/ResourceBar.lua
 core/ui/prefabs/CurrencyPanel.lua
@@ -260,6 +264,7 @@ client/ui/editor/inspectors/page_InspectorConditions.lua
 client/ui/editor/inspectors/page_InspectorItem.lua
 client/ui/editor/inspectors/page_InspectorTrait.lua
 client/ui/editor/inspectors/page_InspectorSkill.lua
+client/ui/editor/inspectors/page_InspectorRecipe.lua
 client/ui/editor/inspectors/page_InspectorItemSlot.lua
 client/ui/editor/inspectors/page_InspectorWeaponType.lua
 client/ui/editor/inspectors/page_InspectorDamageSchool.lua
@@ -287,3 +292,6 @@ client/ui/editor/inspectors/page_InspectorClass.lua
 client/ui/editor/windows/window_DataEditor.lua
 client/ui/ruleset/inspectors/page_InspectorRuleset.lua
 client/ui/ruleset/window_Ruleset.lua
+
+BagScanTest.lua
+RuneclothDeleteTest.lua

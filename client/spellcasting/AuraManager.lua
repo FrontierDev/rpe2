@@ -28,6 +28,7 @@ local buildEmptyDerivedStateImpact
 local mergeDerivedStateImpact
 local resolveLocalEventUnit
 local resolveLocalEventId
+local sortedNumericKeys
 
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
@@ -42,6 +43,74 @@ local function enqueueAuraWork(fn, ...)
 
     if Debug and Debug.Internal then
         Debug.Internal("Aura sync queue unavailable: Addon.Internal.Tasks is missing.")
+    end
+
+    return false
+end
+
+local function emitTriggeredDamageCombatLog(client, eventState, casterUnit, targetUnit, result, effect)
+    if type(client) ~= "table" or type(eventState) ~= "table" or type(result) ~= "table" then
+        return false
+    end
+
+    local amount = math.max(
+        0,
+        math.floor(
+            tonumber(result.amount)
+                or math.abs(tonumber(result.appliedDelta) or 0)
+                or 0
+        )
+    )
+    if amount <= 0 then
+        return false
+    end
+
+    local schoolRef = type(result.damageSchoolRef) == "string" and result.damageSchoolRef or nil
+    if schoolRef == nil and type(effect) == "table" and type(effect.damageSchoolRefs) == "table" then
+        schoolRef = effect.damageSchoolRefs[1]
+    end
+
+    local iconTexture = tostring(result.damageSchoolIcon or "")
+    local labelText = tostring(result.damageSchoolName or "")
+    local accentColor = nil
+    if type(client.ResolveCombatLogDamageSchoolPresentation) == "function" then
+        local resolvedIcon, resolvedLabel, resolvedColor = client:ResolveCombatLogDamageSchoolPresentation(
+            schoolRef,
+            labelText,
+            iconTexture
+        )
+        iconTexture = resolvedIcon or iconTexture
+        labelText = resolvedLabel or labelText
+        accentColor = resolvedColor
+    end
+
+    if iconTexture == "" then
+        iconTexture = "Interface\\Icons\\INV_Misc_QuestionMark"
+    end
+    if labelText == "" then
+        labelText = "True"
+    end
+
+    local entry = {
+        eventId = eventState.id,
+        entryType = "damage",
+        casterDisplayName = tostring(casterUnit and casterUnit.name or "Unknown"),
+        targetDisplayName = tostring(targetUnit and targetUnit.name or "Unknown"),
+        targetCount = 1,
+        amountMin = amount,
+        amountMax = amount,
+        iconTexture = iconTexture,
+        spellIconTexture = iconTexture,
+        labelText = labelText,
+        detailText = ("+%d %s"):format(amount, labelText),
+        accentColor = accentColor,
+    }
+
+    if type(client.QueueCombatLogEntryEmission) == "function" then
+        return client:QueueCombatLogEntryEmission(entry)
+    end
+    if type(client.EmitCombatLogEntry) == "function" then
+        return client:EmitCombatLogEntry(entry)
     end
 
     return false
@@ -67,10 +136,222 @@ local function ensureBucket(client, eventId, createIfMissing)
     end
 
     bucket = {
+        eventId = normalizedEventId,
         byKey = {},
+        runtimeByKey = {},
+        auraKeysByTarget = {},
+        controlStateByTarget = {},
+        revision = 1,
+        statModifierTotalsCache = {},
     }
     client.ActiveAurasByEventId[normalizedEventId] = bucket
     return bucket
+end
+
+local function bumpAuraBucketRevision(bucket)
+    if type(bucket) ~= "table" then
+        return 0
+    end
+
+    bucket.revision = math.max(1, math.floor(tonumber(bucket.revision) or 1) + 1)
+    bucket.statModifierTotalsCache = {}
+
+    local combat = Addon.Client and Addon.Client.Combat or nil
+    if type(combat) == "table" and type(combat.BumpCombatRuntimeRevision) == "function" then
+        combat:BumpCombatRuntimeRevision(bucket.eventId)
+    end
+
+    if type(Client) == "table"
+        and type(Client.PendingSpellTargeting) == "table"
+        and tostring(Client.PendingSpellTargeting.eventId or "") == tostring(bucket.eventId or "")
+    then
+        if type(Client.InvalidatePendingSpellTargetingDisplayState) == "function" then
+            Client:InvalidatePendingSpellTargetingDisplayState()
+        end
+        if type(Client.QueueTargetingWidgetRefresh) == "function" then
+            Client:QueueTargetingWidgetRefresh("aura-revision")
+        end
+    end
+
+    return bucket.revision
+end
+
+local function invalidateAuraRuntime(bucket, auraKey)
+    if type(bucket) ~= "table" or type(auraKey) ~= "string" or auraKey == "" then
+        return
+    end
+    if type(bucket.runtimeByKey) == "table" then
+        bucket.runtimeByKey[auraKey] = nil
+    end
+end
+
+local function invalidateControlStateCache(bucket, targetEventId)
+    if type(bucket) ~= "table" then
+        return
+    end
+
+    if type(bucket.controlStateByTarget) ~= "table" then
+        bucket.controlStateByTarget = {}
+    end
+
+    local numericTargetEventId = tonumber(targetEventId) or 0
+    if numericTargetEventId > 0 then
+        bucket.controlStateByTarget[numericTargetEventId] = nil
+        return
+    end
+
+    bucket.controlStateByTarget = {}
+end
+
+local function addAuraKeyToTargetIndex(bucket, targetEventId, auraKey)
+    if type(bucket) ~= "table" or type(auraKey) ~= "string" or auraKey == "" then
+        return
+    end
+    bucket.auraKeysByTarget = bucket.auraKeysByTarget or {}
+    local numericTargetEventId = tonumber(targetEventId) or 0
+    if numericTargetEventId <= 0 then
+        return
+    end
+
+    local keyList = bucket.auraKeysByTarget[numericTargetEventId]
+    if type(keyList) ~= "table" then
+        keyList = {}
+        bucket.auraKeysByTarget[numericTargetEventId] = keyList
+    end
+    for index = 1, #keyList do
+        if keyList[index] == auraKey then
+            return
+        end
+    end
+    keyList[#keyList + 1] = auraKey
+end
+
+local function removeAuraKeyFromTargetIndex(bucket, targetEventId, auraKey)
+    if type(bucket) ~= "table" or type(bucket.auraKeysByTarget) ~= "table" then
+        return
+    end
+    local numericTargetEventId = tonumber(targetEventId) or 0
+    local keyList = bucket.auraKeysByTarget[numericTargetEventId]
+    if type(keyList) ~= "table" then
+        return
+    end
+    for index = #keyList, 1, -1 do
+        if keyList[index] == auraKey then
+            table.remove(keyList, index)
+        end
+    end
+    if #keyList == 0 then
+        bucket.auraKeysByTarget[numericTargetEventId] = nil
+    end
+end
+
+local function getBucketAuraEntriesForTarget(bucket, targetEventId)
+    local numericTargetEventId = tonumber(targetEventId) or 0
+    if type(bucket) ~= "table" or numericTargetEventId <= 0 then
+        return {}
+    end
+
+    local entries = {}
+    local indexedKeys = type(bucket.auraKeysByTarget) == "table" and bucket.auraKeysByTarget[numericTargetEventId] or nil
+    if type(indexedKeys) == "table" then
+        for index = 1, #indexedKeys do
+            local entry = bucket.byKey and bucket.byKey[indexedKeys[index]] or nil
+            if type(entry) == "table" and (tonumber(entry.stacks) or 0) > 0 then
+                entries[#entries + 1] = entry
+            end
+        end
+        return entries
+    end
+
+    for auraKey, entry in pairs(bucket.byKey or {}) do
+        if type(entry) == "table"
+            and tonumber(entry.targetEventId) == numericTargetEventId
+            and (tonumber(entry.stacks) or 0) > 0
+        then
+            entries[#entries + 1] = entry
+            addAuraKeyToTargetIndex(bucket, numericTargetEventId, auraKey)
+        end
+    end
+    return entries
+end
+
+local function buildAuraRuntimeEntry(self, bucket, entry)
+    if type(bucket) ~= "table" or type(entry) ~= "table" then
+        return nil
+    end
+
+    bucket.runtimeByKey = bucket.runtimeByKey or {}
+    local runtime = bucket.runtimeByKey[entry.auraKey]
+    if type(runtime) == "table"
+        and runtime.definition == entry.definition
+        and runtime.datasetId == entry.datasetId
+        and runtime.auraRef == entry.auraRef
+    then
+        return runtime
+    end
+
+    local auraDefinition = entry.definition
+    local _, resolvedAuraDefinition = self:ResolveAuraDefinition(entry.auraRef, { datasetId = entry.datasetId })
+    if type(resolvedAuraDefinition) == "table" then
+        entry.definition = resolvedAuraDefinition
+        auraDefinition = resolvedAuraDefinition
+    end
+    if type(auraDefinition) ~= "table" then
+        return nil
+    end
+
+    runtime = {
+        auraRef = entry.auraRef,
+        datasetId = entry.datasetId,
+        definition = auraDefinition,
+        effectKeys = sortedNumericKeys(auraDefinition.effects),
+        eventEntriesByCombatEventId = {},
+        control = {
+            cancelOnDamage = false,
+            preventCasting = false,
+            movementRangeOverride = nil,
+            forceAutoHitAgainstTarget = false,
+        },
+    }
+
+    for effectKeyIndex = 1, #runtime.effectKeys do
+        local effect = auraDefinition.effects[runtime.effectKeys[effectKeyIndex].key]
+        if type(effect) == "table" and tostring(effect.type or "") == "control" then
+            runtime.control.cancelOnDamage = runtime.control.cancelOnDamage or effect.cancelOnDamage == true
+            runtime.control.preventCasting = runtime.control.preventCasting or effect.preventCasting == true
+            runtime.control.forceAutoHitAgainstTarget = runtime.control.forceAutoHitAgainstTarget or effect.forceAutoHitAgainstTarget == true
+            if effect.movementRangeOverride ~= nil then
+                local overrideValue = tonumber(effect.movementRangeOverride)
+                if overrideValue ~= nil then
+                    runtime.control.movementRangeOverride = runtime.control.movementRangeOverride ~= nil
+                        and math.min(runtime.control.movementRangeOverride, overrideValue)
+                        or overrideValue
+                end
+            end
+        end
+    end
+
+    local auraEventKeys = sortedNumericKeys(auraDefinition.events)
+    for auraEventKeyIndex = 1, #auraEventKeys do
+        local auraEventIndex = auraEventKeys[auraEventKeyIndex].key
+        local auraEvent = auraDefinition.events[auraEventIndex]
+        local combatEventId = self:GetCombatEventId(auraEvent)
+        if combatEventId then
+            local eventEntries = runtime.eventEntriesByCombatEventId[combatEventId]
+            if type(eventEntries) ~= "table" then
+                eventEntries = {}
+                runtime.eventEntriesByCombatEventId[combatEventId] = eventEntries
+            end
+            eventEntries[#eventEntries + 1] = {
+                auraEventIndex = auraEventIndex,
+                auraEvent = auraEvent,
+                effectKeys = sortedNumericKeys(auraEvent and auraEvent.effects or nil),
+            }
+        end
+    end
+
+    bucket.runtimeByKey[entry.auraKey] = runtime
+    return runtime
 end
 
 local function parseDatasetQualifiedRef(reference)
@@ -135,7 +416,96 @@ local function normalizeAuraEventId(value)
     return combatEventId and string.lower(combatEventId) or nil
 end
 
-local function sortedNumericKeys(values)
+local function normalizeChancePercent(value)
+    local numericValue = tonumber(value)
+    if numericValue == nil then
+        return 100
+    end
+
+    return math.max(0, math.min(100, numericValue))
+end
+
+local function rollSucceedsForChance(chancePercent)
+    local normalizedChance = normalizeChancePercent(chancePercent)
+    if normalizedChance <= 0 then
+        return false
+    end
+    if normalizedChance >= 100 then
+        return true
+    end
+
+    return math.random() * 100 <= normalizedChance
+end
+
+local function evaluateProcChance(chancePercent)
+    local normalizedChance = normalizeChancePercent(chancePercent)
+    if normalizedChance <= 0 then
+        return false, normalizedChance, nil
+    end
+    if normalizedChance >= 100 then
+        return true, normalizedChance, nil
+    end
+
+    local roll = math.random() * 100
+    return roll <= normalizedChance, normalizedChance, roll
+end
+
+local function buildProcRollText(normalizedChance, roll)
+    if normalizedChance <= 0 then
+        return "blocked"
+    end
+    if normalizedChance >= 100 or roll == nil then
+        return "auto"
+    end
+
+    return ("%.2f"):format(tonumber(roll) or 0)
+end
+
+local function logAuraProcDebug(auraEntry, auraDefinition, casterUnit, targetUnit, combatEventId, effect, chancePercent, chanceRoll, outcome, result)
+    if type(Debug) ~= "table" or type(Debug.Internal) ~= "function" then
+        return false
+    end
+
+    if type(Debug.EnsureInternalLevelEnabled) == "function" then
+        Debug.EnsureInternalLevelEnabled()
+    end
+
+    local amount = math.max(
+        0,
+        math.floor(
+            tonumber(type(result) == "table" and result.amount or nil)
+                or math.abs(tonumber(type(result) == "table" and result.appliedDelta or nil) or 0)
+                or 0
+        )
+    )
+    local appliedDelta = math.floor(tonumber(type(result) == "table" and result.appliedDelta or 0) or 0)
+    local hitResult = tostring(type(result) == "table" and (result.hitCheckResult or result.resultType) or "n/a")
+    local applied = type(result) == "table" and result.applied == true or false
+    local effectType = tostring(effect and effect.type or "unknown")
+    local auraName = tostring(
+        type(auraDefinition) == "table" and auraDefinition.name
+        or type(auraEntry) == "table" and auraEntry.auraRef
+        or "unknown"
+    )
+
+    return Debug.Internal(
+        "Aura proc: aura=%s caster=%s target=%s event=%s effect=%s chance=%.1f roll=%s outcome=%s applied=%s hit=%s amount=%d delta=%d",
+        auraName,
+        tostring(casterUnit and casterUnit.name or "unknown"),
+        tostring(targetUnit and targetUnit.name or "unknown"),
+        tostring(combatEventId or "unknown"),
+        effectType,
+        tonumber(chancePercent) or 0,
+        buildProcRollText(tonumber(chancePercent) or 0, chanceRoll),
+        tostring(outcome or "unknown"),
+        tostring(applied),
+        hitResult,
+        amount,
+        appliedDelta
+    )
+end
+
+sortedNumericKeys = function(values)
     local keys = {}
     for key in pairs(values or {}) do
         local numericKey = tonumber(key)
@@ -630,11 +1000,11 @@ local function hasRefs(target)
 end
 
 local function getNowMilliseconds()
-    if type(debugprofilestop) == "function" then
-        return debugprofilestop()
+    if type(GetTimePreciseSec) == "function" then
+        return GetTimePreciseSec() * 1000
     end
 
-    return (os.clock() or 0) * 1000
+    return (GetTime and GetTime() or 0) * 1000
 end
 
 local function isSpellcastTimingEnabled()
@@ -1064,6 +1434,10 @@ local function refreshLocalPlayerAuraDerivedState(eventState, targetEventId, imp
         and rebuildLocalPlayerResolvedStateSubset(eventState, localUnit, impact)
         or rebuildLocalPlayerResolvedState(eventState, localUnit)
     if refreshed then
+        local combat = Addon.Client and Addon.Client.Combat or nil
+        if type(combat) == "table" and type(combat.BumpCombatRuntimeRevision) == "function" then
+            combat:BumpCombatRuntimeRevision(eventState.id, numericTargetEventId)
+        end
         refreshProfileWindowIfVisible()
     end
     return refreshed
@@ -1296,6 +1670,39 @@ local function resolveTriggeredAuraTarget(auraEvent, auraCasterUnit, auraTargetU
     return eventOtherUnit
 end
 
+function AuraManager:ResolveAuraEffectAmount(targetUnit, effect)
+    if type(effect) ~= "table" then
+        return 0
+    end
+
+    local amountMode = tostring(effect.amountMode or "flat")
+    local amount = math.max(0, tonumber(effect.amount) or tonumber(effect.baseAmount) or tonumber(effect.baseDamage) or tonumber(effect.baseHealing) or 0)
+
+    if amountMode == "flat" then
+        return amount
+    end
+
+    local resourceRef = tostring(effect.resourceRef or "")
+    local resourceValue = 0
+
+    if type(targetUnit) == "table" and targetUnit.resources ~= nil then
+        local resources = targetUnit.resources or {}
+        for index = 1, #resources do
+            local entry = resources[index]
+            if type(entry) == "table" and tostring(entry.ref or "") == resourceRef then
+                if amountMode == "base_percent" then
+                    resourceValue = tonumber(entry.maxValue) or tonumber(entry.currentValue) or 0
+                else -- max_percent
+                    resourceValue = tonumber(entry.maxValue) or tonumber(entry.currentValue) or 0
+                end
+                break
+            end
+        end
+    end
+
+    return math.max(0, math.ceil(resourceValue * amount / 100))
+end
+
 function AuraManager:RegisterEffect(definition)
     if type(definition) ~= "table" or type(definition.type) ~= "string" or definition.type == "" then
         return nil
@@ -1331,6 +1738,17 @@ function AuraManager:ResolveAuraDefinition(auraRef, context)
         return nil, nil, nil
     end
 
+    local contextDataset = type(context) == "table" and context.dataset or nil
+    if type(contextDataset) == "table" and tostring(contextDataset.id or "") == datasetId then
+        local contextAuras = contextDataset.auras or nil
+        for index = 1, #(contextAuras or {}) do
+            local aura = contextAuras[index]
+            if type(aura) == "table" and tostring(aura.id or "") == auraId then
+                return contextDataset, aura, ("%s:%s"):format(datasetId, auraId)
+            end
+        end
+    end
+
     local dataset = type(Database.GetDatasetByID) == "function" and Database.GetDatasetByID(datasetId) or nil
     local auras = type(dataset) == "table" and dataset.auras or nil
     for index = 1, #(auras or {}) do
@@ -1346,20 +1764,43 @@ end
 function AuraManager:ResolveEffectAmount(context, effect, baseField)
     local auraEntry = type(context) == "table" and context.aura or nil
     local casterUnit = type(context) == "table" and context.casterUnit or nil
-    local amount = tonumber(effect and effect[baseField] or 0) or 0
-    amount = amount + (tonumber(auraEntry and auraEntry.powerLevel) or 0)
+    local targetUnit = type(context) == "table" and context.targetUnit or nil
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+
+    local baseAmount = tonumber(effect and effect[baseField] or 0) or 0
+    baseAmount = baseAmount + (tonumber(auraEntry and auraEntry.powerLevel) or 0)
 
     for index = 1, #(effect and effect.statScaling or {}) do
         local scaling = effect.statScaling[index]
         local statRef = type(scaling) == "table" and normalizeRef(scaling.statRef) or nil
         if statRef then
             local statValue = type(Lookup.GetStatValue) == "function" and Lookup.GetStatValue(casterUnit, statRef, 0) or 0
-            amount = amount + (statValue * (tonumber(scaling.coefficient) or 0))
+            baseAmount = baseAmount + (statValue * (tonumber(scaling.coefficient) or 0))
         end
     end
 
-    amount = amount * math.max(1, math.floor(tonumber(auraEntry and auraEntry.stacks) or 1))
-    return amount
+    local stacks = math.max(1, math.floor(tonumber(auraEntry and auraEntry.stacks) or 1))
+
+    -- Handle percentage modes
+    if amountMode == "base_percent" or amountMode == "max_percent" then
+        local resourceRef = tostring(effect.resourceRef or "")
+        local resourceValue = 0
+
+        if type(targetUnit) == "table" and targetUnit.resources ~= nil then
+            local resources = targetUnit.resources or {}
+            for index = 1, #resources do
+                local entry = resources[index]
+                if type(entry) == "table" and tostring(entry.ref or "") == resourceRef then
+                    resourceValue = tonumber(entry.maxValue) or tonumber(entry.currentValue) or 0
+                    break
+                end
+            end
+        end
+
+        baseAmount = math.max(0, math.ceil(resourceValue * baseAmount / 100))
+    end
+
+    return baseAmount * stacks
 end
 
 function AuraManager:ResolveApplyAuraPowerLevel(context, effect)
@@ -1378,6 +1819,11 @@ end
 
 function AuraManager:GetEventAuraBucket(client, eventId, createIfMissing)
     return ensureBucket(client, eventId, createIfMissing)
+end
+
+function AuraManager:GetEventAuraRevision(client, eventId)
+    local bucket = self:GetEventAuraBucket(client or Client, eventId, false)
+    return math.max(0, math.floor(tonumber(bucket and bucket.revision) or 0))
 end
 
 function AuraManager:GetUnitAuras(client, eventState, unitEventId)
@@ -1447,6 +1893,19 @@ function AuraManager:GetUnitAuras(client, eventState, unitEventId)
 end
 
 function AuraManager:BuildUnitAuraTooltipLines(client, eventState, unitEventId)
+    -- Implement caching to avoid regenerating tooltip lines on every hover
+    -- Use event signature to detect when auras have changed
+    local cacheKey = self:BuildUnitAuraSignature(client, eventState, unitEventId)
+
+    if type(client) == "table" then
+        client.AuraTooltipLinesCached = client.AuraTooltipLinesCached or {}
+        client.AuraTooltipLinesCacheSignature = client.AuraTooltipLinesCacheSignature or {}
+
+        if client.AuraTooltipLinesCacheSignature[unitEventId] == cacheKey and type(client.AuraTooltipLinesCached[unitEventId]) == "table" then
+            return client.AuraTooltipLinesCached[unitEventId]
+        end
+    end
+
     local rows = self:GetUnitAuras(client, eventState, unitEventId)
     if #rows == 0 then
         return {}
@@ -1471,6 +1930,12 @@ function AuraManager:BuildUnitAuraTooltipLines(client, eventState, unitEventId)
             colorToken = colorToken,
             rightColorToken = colorToken,
         }
+    end
+
+    -- Cache the lines for next time
+    if type(client) == "table" then
+        client.AuraTooltipLinesCached[unitEventId] = lines
+        client.AuraTooltipLinesCacheSignature[unitEventId] = cacheKey
     end
 
     return lines
@@ -1506,6 +1971,12 @@ function AuraManager:ClearEventAuraBucket(client, eventId)
     end
 
     client.ActiveAurasByEventId[normalizedEventId] = nil
+
+    -- Clear aura tooltip cache for this event
+    if type(client) == "table" and type(client.AuraTooltipLinesCached) == "table" then
+        client.AuraTooltipLinesCached[normalizedEventId] = nil
+        client.AuraTooltipLinesCacheSignature[normalizedEventId] = nil
+    end
 end
 
 function AuraManager:ResetAuraState(client, eventId)
@@ -1547,6 +2018,11 @@ function AuraManager:ResetAuraState(client, eventId)
     client.PendingAuraDerivedStateRefreshQueued = false
     client.PendingAuraDerivedStateRefreshEventId = nil
     client.PendingAuraDerivedStateRefreshTargetEventId = nil
+
+    -- Clear aura tooltip cache on full reset
+    client.AuraTooltipLinesCached = {}
+    client.AuraTooltipLinesCacheSignature = {}
+
     return true
 end
 
@@ -1555,17 +2031,42 @@ function AuraManager:UpsertAura(client, payload)
     local eventId = type(eventState) == "table" and eventState.id or nil
     local bucket = self:GetEventAuraBucket(client, eventId, true)
     if not bucket then
+        if type(Debug.Internal) == "function" then
+            Debug.Internal(
+                "Aura upsert failed: missing-bucket aura=%s eventId=%s.",
+                tostring(type(payload) == "table" and payload.auraRef or "nil"),
+                tostring(eventId or "nil")
+            )
+        end
         return false, nil
     end
 
     local dataset, auraDefinition, qualifiedAuraRef = self:ResolveAuraDefinition(payload.auraRef, payload)
     if not dataset or not auraDefinition then
+        if type(Debug.Internal) == "function" then
+            Debug.Internal(
+                "Aura upsert failed: unresolved-definition aura=%s datasetId=%s spellDatasetId=%s sourceDatasetId=%s.",
+                tostring(type(payload) == "table" and payload.auraRef or "nil"),
+                tostring(type(payload) == "table" and payload.datasetId or "nil"),
+                tostring(type(payload) == "table" and payload.spellDatasetId or "nil"),
+                tostring(type(payload) == "table" and payload.sourceDatasetId or "nil")
+            )
+        end
         return false, nil
     end
 
     local auraKey = buildAuraKey(qualifiedAuraRef, payload.casterEventId, payload.targetEventId)
     local turnsRemaining = normalizeTurnCount(payload.turns) or normalizeTurnCount(auraDefinition.duration)
     if turnsRemaining == nil then
+        if type(Debug.Internal) == "function" then
+            Debug.Internal(
+                "Aura upsert failed: invalid-duration aura=%s qualifiedAuraRef=%s authoredTurns=%s defaultDuration=%s.",
+                tostring(type(payload) == "table" and payload.auraRef or "nil"),
+                tostring(qualifiedAuraRef or "nil"),
+                tostring(type(payload) == "table" and payload.turns or "nil"),
+                tostring(type(auraDefinition) == "table" and auraDefinition.duration or "nil")
+            )
+        end
         return false, nil
     end
 
@@ -1580,6 +2081,7 @@ function AuraManager:UpsertAura(client, payload)
     local entry = bucket.byKey[auraKey]
 
     if entry then
+        removeAuraKeyFromTargetIndex(bucket, entry.targetEventId, auraKey)
         entry.powerLevel = powerLevel
         entry.definition = auraDefinition
         entry.datasetId = dataset.id
@@ -1611,6 +2113,10 @@ function AuraManager:UpsertAura(client, payload)
 
         entry.lastAdvancedTurnNumber = currentTurnNumber
         entry.lastAdvancedStep = currentStepNumber
+        addAuraKeyToTargetIndex(bucket, entry.targetEventId, auraKey)
+        invalidateAuraRuntime(bucket, auraKey)
+        invalidateControlStateCache(bucket, entry.targetEventId)
+        bumpAuraBucketRevision(bucket)
         return true, entry
     end
 
@@ -1638,6 +2144,10 @@ function AuraManager:UpsertAura(client, payload)
     end
 
     bucket.byKey[auraKey] = entry
+    addAuraKeyToTargetIndex(bucket, entry.targetEventId, auraKey)
+    invalidateAuraRuntime(bucket, auraKey)
+    invalidateControlStateCache(bucket, entry.targetEventId)
+    bumpAuraBucketRevision(bucket)
     return true, entry
 end
 
@@ -1653,7 +2163,11 @@ function AuraManager:RemoveAura(client, eventState, auraRef, casterEventId, targ
         return false, nil
     end
 
+    removeAuraKeyFromTargetIndex(bucket, existing.targetEventId, auraKey)
+    invalidateAuraRuntime(bucket, auraKey)
+    invalidateControlStateCache(bucket, existing.targetEventId)
     bucket.byKey[auraKey] = nil
+    bumpAuraBucketRevision(bucket)
     if next(bucket.byKey) == nil then
         self:ClearEventAuraBucket(client, eventState and eventState.id or nil)
     end
@@ -1672,6 +2186,9 @@ function AuraManager:RemoveAllAurasForUnit(client, eventState, targetEventId, op
     for auraKey, entry in pairs(bucket.byKey or {}) do
         if type(entry) == "table" and tonumber(entry.targetEventId) == numericTargetEventId then
             removedEntries[#removedEntries + 1] = entry
+            removeAuraKeyFromTargetIndex(bucket, entry.targetEventId, auraKey)
+            invalidateAuraRuntime(bucket, auraKey)
+            invalidateControlStateCache(bucket, entry.targetEventId)
             bucket.byKey[auraKey] = nil
         end
     end
@@ -1679,6 +2196,8 @@ function AuraManager:RemoveAllAurasForUnit(client, eventState, targetEventId, op
     if #removedEntries == 0 then
         return false, {}
     end
+
+    bumpAuraBucketRevision(bucket)
 
     if next(bucket.byKey) == nil then
         self:ClearEventAuraBucket(client, eventState and eventState.id or nil)
@@ -2162,6 +2681,18 @@ function AuraManager:ApplyAuraFromContext(client, context, auraRef, stacks, turn
     local casterUnit = type(context) == "table" and context.casterUnit or nil
     local targetUnit = type(context) == "table" and (context.targetUnit or context.target) or nil
     if type(eventState) ~= "table" or eventState.active ~= true or type(casterUnit) ~= "table" or type(targetUnit) ~= "table" then
+        if type(Debug.Internal) == "function" then
+            Debug.Internal(
+                "Aura apply failed: invalid-context aura=%s eventId=%s casterEventId=%s targetEventId=%s hasEvent=%s hasCaster=%s hasTarget=%s.",
+                tostring(auraRef or "nil"),
+                tostring(type(eventState) == "table" and eventState.id or "nil"),
+                tostring(type(casterUnit) == "table" and tonumber(casterUnit.eventID) or 0),
+                tostring(type(targetUnit) == "table" and tonumber(targetUnit.eventID) or 0),
+                tostring(type(eventState) == "table" and eventState.active == true),
+                tostring(type(casterUnit) == "table"),
+                tostring(type(targetUnit) == "table")
+            )
+        end
         return false, nil
     end
 
@@ -2186,6 +2717,20 @@ function AuraManager:ApplyAuraFromContext(client, context, auraRef, stacks, turn
         targetEventId = tonumber(targetUnit.eventID) or 0,
     })
     if not applied then
+        if type(Debug.Internal) == "function" then
+            Debug.Internal(
+                "Aura apply failed: upsert-rejected aura=%s eventId=%s datasetId=%s spellDatasetId=%s casterEventId=%s targetEventId=%s turns=%s stacks=%s power=%s.",
+                tostring(auraRef or "nil"),
+                tostring(eventState.id or "nil"),
+                tostring(type(context) == "table" and context.datasetId or "nil"),
+                tostring(type(context) == "table" and context.spellDatasetId or "nil"),
+                tostring(tonumber(casterUnit.eventID) or 0),
+                tostring(tonumber(targetUnit.eventID) or 0),
+                tostring(turns),
+                tostring(stacks),
+                tostring(powerLevel)
+            )
+        end
         return false, nil
     end
 
@@ -2332,6 +2877,9 @@ function AuraManager:RemoveAuraStacksFromContext(client, context, auraRef, stack
         return self:DispelAuraFromContext(client, context, entry.auraRef, entry.casterEventId, entry.targetEventId, previousEntry), nil
     end
 
+    invalidateControlStateCache(bucket, entry.targetEventId)
+    bumpAuraBucketRevision(bucket)
+
     local queuedApply = self:QueueAuraApply(client, context, entry, {
         stacks = entry.stacks,
         turns = entry.turnsRemaining,
@@ -2471,6 +3019,33 @@ function AuraManager:HandleLocalAuraTriggeredResult(client, context, result, com
         )
     end
 
+    local combat = Addon.Client and Addon.Client.Combat or nil
+    if tostring(result.effectType or "") == "damage"
+    then
+        local registeredTriggeredDamage = false
+        if type(combat) == "table"
+            and type(combat.RegisterTriggeredActionBonusDamage) == "function"
+        then
+            registeredTriggeredDamage = combat:RegisterTriggeredActionBonusDamage(
+                type(context) == "table" and context.actionContext or nil,
+                type(context) == "table" and context.targetUnit or nil,
+                result,
+                effect,
+                combatEventId
+            ) == true
+        end
+        if not registeredTriggeredDamage then
+            emitTriggeredDamageCombatLog(
+                client,
+                type(context) == "table" and context.eventState or nil,
+                type(context) == "table" and context.casterUnit or nil,
+                type(context) == "table" and context.targetUnit or nil,
+                result,
+                effect
+            )
+        end
+    end
+
     local resourceDeltas = result.resourceDeltas
     if type(resourceDeltas) ~= "table" or #resourceDeltas == 0 then
         return false
@@ -2591,88 +3166,127 @@ function AuraManager:HandleCombatEvent(client, context)
 
     local bucket = self:GetEventAuraBucket(client, eventState.id, false)
     local changed = false
-    for _, entry in pairs(bucket and bucket.byKey or {}) do
-        if type(entry) == "table"
-            and tonumber(entry.targetEventId) == recipientEventId
-            and (tonumber(entry.stacks) or 0) > 0
+    local targetEntries = getBucketAuraEntriesForTarget(bucket, recipientEventId)
+    for index = 1, #targetEntries do
+        local entry = targetEntries[index]
+        local runtime = buildAuraRuntimeEntry(self, bucket, entry)
+        local auraDefinition = runtime and runtime.definition or nil
+        local auraCasterUnit = findEventUnit(eventState, entry.casterEventId)
+        local auraTargetUnit = findEventUnit(eventState, entry.targetEventId)
+        local auraEventEntries = runtime and runtime.eventEntriesByCombatEventId and runtime.eventEntriesByCombatEventId[combatEventId] or nil
+        if type(auraDefinition) == "table"
+            and type(auraCasterUnit) == "table"
+            and type(auraTargetUnit) == "table"
+            and type(auraEventEntries) == "table"
+            and #auraEventEntries > 0
+            and shouldExecuteLocalAuraTick(client, eventState, auraTargetUnit)
         then
-            local auraDefinition = entry.definition
-            local _, resolvedAuraDefinition = self:ResolveAuraDefinition(entry.auraRef, { datasetId = entry.datasetId })
-            if type(resolvedAuraDefinition) == "table" then
-                entry.definition = resolvedAuraDefinition
-                auraDefinition = resolvedAuraDefinition
-            end
-            local auraCasterUnit = findEventUnit(eventState, entry.casterEventId)
-            local auraTargetUnit = findEventUnit(eventState, entry.targetEventId)
-            if type(auraDefinition) == "table"
-                and type(auraCasterUnit) == "table"
-                and type(auraTargetUnit) == "table"
-                and shouldExecuteLocalAuraTick(client, eventState, auraTargetUnit)
-            then
-                local auraEventKeys = sortedNumericKeys(auraDefinition.events)
-                for auraEventKeyIndex = 1, #auraEventKeys do
-                    local auraEventIndex = auraEventKeys[auraEventKeyIndex].key
-                    local auraEvent = auraDefinition.events[auraEventIndex]
-                    if self:GetCombatEventId(auraEvent) == combatEventId then
-                        local targetUnit = resolveTriggeredAuraTarget(
-                            auraEvent,
+            for auraEventEntryIndex = 1, #auraEventEntries do
+                local auraEventEntry = auraEventEntries[auraEventEntryIndex]
+                local auraEvent = auraEventEntry.auraEvent
+                local auraEventIndex = auraEventEntry.auraEventIndex
+                local targetUnit = resolveTriggeredAuraTarget(
+                    auraEvent,
+                    auraCasterUnit,
+                    auraTargetUnit,
+                    eventSourceUnit,
+                    eventOtherUnit
+                )
+                if type(targetUnit) ~= "table" then
+                    logAuraProcDebug(
+                        entry,
+                        auraDefinition,
+                        auraCasterUnit,
+                        nil,
+                        combatEventId,
+                        nil,
+                        normalizeChancePercent(auraEvent and auraEvent.chance),
+                        nil,
+                        "no-target",
+                        nil
+                    )
+                else
+                    local procPassed, normalizedChance, chanceRoll = evaluateProcChance(auraEvent and auraEvent.chance)
+                    if not procPassed then
+                        logAuraProcDebug(
+                            entry,
+                            auraDefinition,
                             auraCasterUnit,
-                            auraTargetUnit,
-                            eventSourceUnit,
-                            eventOtherUnit
+                            targetUnit,
+                            combatEventId,
+                            nil,
+                            normalizedChance,
+                            chanceRoll,
+                            "chance-failed",
+                            nil
                         )
-                        if type(targetUnit) == "table" then
-                            local effectKeys = sortedNumericKeys(auraEvent.effects)
-                            if Debug.AuraTracing == true and type(Debug.Info) == "function" then
-                                Debug.Info(
-                                    "Aura trigger event registered actions: aura=%s event=%s actions=%d.",
-                                    tostring(entry and entry.auraRef or "unknown"),
-                                    tostring(combatEventId or "unknown"),
-                                    #effectKeys
+                    else
+                        local effectKeys = auraEventEntry.effectKeys or {}
+                        if Debug.AuraTracing == true and type(Debug.Info) == "function" then
+                            Debug.Info(
+                                "Aura trigger event registered actions: aura=%s event=%s actions=%d.",
+                                tostring(entry and entry.auraRef or "unknown"),
+                                tostring(combatEventId or "unknown"),
+                                #effectKeys
+                            )
+                        end
+                        for effectKeyIndex = 1, #effectKeys do
+                            local effectIndex = effectKeys[effectKeyIndex].key
+                            local effect = auraEvent.effects[effectIndex]
+                            local contract = self:GetEffect(effect and effect.type or nil)
+                            if contract and type(contract.Execute) == "function" then
+                                local applied, result = contract:Execute({
+                                    client = client,
+                                    eventState = eventState,
+                                    sessionState = type(context) == "table" and context.sessionState or (client.GetState and client:GetState() or nil),
+                                    suppressCombatEvents = true,
+                                    actionContext = type(context) == "table" and context.actionContext or nil,
+                                    aura = entry,
+                                    auraDefinition = auraDefinition,
+                                    auraEvent = auraEvent,
+                                    auraEventIndex = auraEventIndex,
+                                    effectIndex = effectIndex,
+                                    casterUnit = auraCasterUnit,
+                                    targetUnit = targetUnit,
+                                    auraCasterUnit = auraCasterUnit,
+                                    auraTargetUnit = auraTargetUnit,
+                                    eventSourceUnit = eventSourceUnit,
+                                    eventOtherUnit = eventOtherUnit,
+                                    healthResourceRef = eventState and eventState.healthResourceRef or (Spellcasting.GetHealthResourceRef and Spellcasting.GetHealthResourceRef()),
+                                }, effect)
+                                if applied then
+                                    changed = true
+                                end
+                                self:HandleLocalAuraTriggeredResult(client, {
+                                    eventState = eventState,
+                                    sessionState = type(context) == "table" and context.sessionState or (client.GetState and client:GetState() or nil),
+                                    suppressCombatEvents = true,
+                                    aura = entry,
+                                    auraDefinition = auraDefinition,
+                                    auraEvent = auraEvent,
+                                    auraEventIndex = auraEventIndex,
+                                    effectIndex = effectIndex,
+                                    effect = effect,
+                                    actionContext = type(context) == "table" and context.actionContext or nil,
+                                    casterUnit = auraCasterUnit,
+                                    targetUnit = targetUnit,
+                                    eventSourceUnit = eventSourceUnit,
+                                    eventOtherUnit = eventOtherUnit,
+                                }, result, combatEventId)
+                                logAuraProcDebug(
+                                    entry,
+                                    auraDefinition,
+                                    auraCasterUnit,
+                                    targetUnit,
+                                    combatEventId,
+                                    effect,
+                                    normalizedChance,
+                                    chanceRoll,
+                                    applied and "executed" or "resolved-no-apply",
+                                    result
                                 )
-                            end
-                            for effectKeyIndex = 1, #effectKeys do
-                                local effectIndex = effectKeys[effectKeyIndex].key
-                                local effect = auraEvent.effects[effectIndex]
-                                local contract = self:GetEffect(effect and effect.type or nil)
-                                if contract and type(contract.Execute) == "function" then
-                                    local applied, result = contract:Execute({
-                                        client = client,
-                                        eventState = eventState,
-                                        sessionState = type(context) == "table" and context.sessionState or (client.GetState and client:GetState() or nil),
-                                        suppressCombatEvents = true,
-                                        aura = entry,
-                                        auraDefinition = auraDefinition,
-                                        auraEvent = auraEvent,
-                                        auraEventIndex = auraEventIndex,
-                                        effectIndex = effectIndex,
-                                        casterUnit = auraCasterUnit,
-                                        targetUnit = targetUnit,
-                                        auraCasterUnit = auraCasterUnit,
-                                        auraTargetUnit = auraTargetUnit,
-                                        eventSourceUnit = eventSourceUnit,
-                                        eventOtherUnit = eventOtherUnit,
-                                        healthResourceRef = eventState and eventState.healthResourceRef or (Spellcasting.GetHealthResourceRef and Spellcasting.GetHealthResourceRef()),
-                                    }, effect)
-                                    if applied then
-                                        changed = true
-                                    end
-                                    self:HandleLocalAuraTriggeredResult(client, {
-                                        eventState = eventState,
-                                        sessionState = type(context) == "table" and context.sessionState or (client.GetState and client:GetState() or nil),
-                                        suppressCombatEvents = true,
-                                        aura = entry,
-                                        auraDefinition = auraDefinition,
-                                        auraEvent = auraEvent,
-                                        auraEventIndex = auraEventIndex,
-                                        effectIndex = effectIndex,
-                                        effect = effect,
-                                        casterUnit = auraCasterUnit,
-                                        targetUnit = targetUnit,
-                                        eventSourceUnit = eventSourceUnit,
-                                        eventOtherUnit = eventOtherUnit,
-                                    }, result, combatEventId)
-                                elseif type(Debug.Internal) == "function" then
+                            else
+                                if type(Debug.Internal) == "function" then
                                     Debug.Internal(
                                         "Aura trigger effect skipped: aura=%s event=%s effectIndex=%s effectType=%s contract=%s.",
                                         tostring(entry and entry.auraRef or "unknown"),
@@ -2682,6 +3296,18 @@ function AuraManager:HandleCombatEvent(client, context)
                                         tostring(contract ~= nil)
                                     )
                                 end
+                                logAuraProcDebug(
+                                    entry,
+                                    auraDefinition,
+                                    auraCasterUnit,
+                                    targetUnit,
+                                    combatEventId,
+                                    effect,
+                                    normalizedChance,
+                                    chanceRoll,
+                                    "missing-contract",
+                                    nil
+                                )
                             end
                         end
                     end
@@ -2691,7 +3317,39 @@ function AuraManager:HandleCombatEvent(client, context)
     end
 
     if type(client) == "table" and type(client.HandleTraitCombatEvent) == "function" then
-        changed = client:HandleTraitCombatEvent(context) or changed
+        if type(Debug) == "table" and type(Debug.Internal) == "function" then
+            if type(Debug.EnsureInternalLevelEnabled) == "function" then
+                Debug.EnsureInternalLevelEnabled()
+            end
+            Debug.Internal(
+                "Trait handoff: event=%s recipient=%s source=%s other=%s",
+                tostring(combatEventId or ""),
+                tostring(recipientEventId or 0),
+                tostring(eventSourceUnit and eventSourceUnit.name or ""),
+                tostring(eventOtherUnit and eventOtherUnit.name or "")
+            )
+        end
+        local ok, traitChangedOrError = xpcall(function()
+            return client:HandleTraitCombatEvent(context)
+        end, function(err)
+            local stackLine = type(debugstack) == "function" and tostring(debugstack(2, 1, 0) or "") or ""
+            if stackLine ~= "" then
+                return ("%s @ %s"):format(tostring(err), stackLine)
+            end
+            return tostring(err)
+        end)
+        if not ok then
+            if type(Debug) == "table" and type(Debug.Error) == "function" then
+                Debug.Error(
+                    "Trait handoff failed: event=%s recipient=%s error=%s",
+                    tostring(combatEventId or ""),
+                    tostring(recipientEventId or 0),
+                    tostring(traitChangedOrError or "")
+                )
+            end
+        else
+            changed = traitChangedOrError or changed
+        end
     end
 
     return changed
@@ -2806,6 +3464,11 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
     end
 
     if changed then
+        local activeBucket = self:GetEventAuraBucket(client, eventId, false)
+        if activeBucket then
+            invalidateControlStateCache(activeBucket, entry and entry.targetEventId or nil)
+            bumpAuraBucketRevision(activeBucket)
+        end
         if localPlayerDerivedStateImpact and localPlayerEventId > 0 then
             queueLocalPlayerAuraDerivedStateRefresh(eventState, localPlayerEventId, localPlayerDerivedStateImpact)
         end
@@ -2877,50 +3540,64 @@ function AuraManager:BuildStatModifierTotals(eventState, unitEventId, statRef)
         return 0, 0
     end
 
-    local flatTotal = 0
-    local percentTotal = 0
     local normalizedStatRef = normalizeRef(statRef)
     if not normalizedStatRef then
         return 0, 0
     end
 
-    for _, entry in pairs(bucket.byKey or {}) do
-        if type(entry) == "table" and tonumber(entry.targetEventId) == (tonumber(unitEventId) or 0) and (tonumber(entry.stacks) or 0) > 0 then
-            local auraDefinition = entry.definition
-            local _, resolvedAuraDefinition = self:ResolveAuraDefinition(entry.auraRef, { datasetId = entry.datasetId })
-            if type(resolvedAuraDefinition) == "table" then
-                entry.definition = resolvedAuraDefinition
-                auraDefinition = resolvedAuraDefinition
-            end
+    local numericUnitEventId = tonumber(unitEventId) or 0
+    if numericUnitEventId <= 0 then
+        return 0, 0
+    end
 
-            local casterUnit = findEventUnit(eventState, entry.casterEventId)
-            if type(auraDefinition) == "table" and casterUnit then
-                local effectKeys = sortedNumericKeys(auraDefinition.effects)
-                for effectKeyIndex = 1, #effectKeys do
-                    local effectIndex = effectKeys[effectKeyIndex].key
-                    local effect = auraDefinition.effects[effectIndex]
-                    local contract = self:GetEffect(effect and effect.type or nil)
-                    if contract and type(contract.Accumulate) == "function" then
-                        local accumulator = {
-                            flat = flatTotal,
-                            percent = percentTotal,
-                        }
-                        contract:Accumulate({
-                            aura = entry,
-                            auraDefinition = auraDefinition,
-                            eventState = eventState,
-                            casterUnit = casterUnit,
-                            targetUnit = findEventUnit(eventState, entry.targetEventId),
-                            statRef = normalizedStatRef,
-                        }, effect, accumulator)
-                        flatTotal = accumulator.flat
-                        percentTotal = accumulator.percent
-                    end
+    bucket.statModifierTotalsCache = bucket.statModifierTotalsCache or {}
+    local revision = math.max(0, math.floor(tonumber(bucket.revision) or 0))
+    local configurationRevision = math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+    local cacheKey = ("%d:%s:%d:%d"):format(numericUnitEventId, normalizedStatRef, revision, configurationRevision)
+    local cached = bucket.statModifierTotalsCache[cacheKey]
+    if type(cached) == "table" then
+        return tonumber(cached.flat) or 0, tonumber(cached.percent) or 0
+    end
+
+    local flatTotal = 0
+    local percentTotal = 0
+    local targetUnit = findEventUnit(eventState, numericUnitEventId)
+    local targetEntries = getBucketAuraEntriesForTarget(bucket, numericUnitEventId)
+    for index = 1, #targetEntries do
+        local entry = targetEntries[index]
+        local runtime = buildAuraRuntimeEntry(self, bucket, entry)
+        local auraDefinition = runtime and runtime.definition or nil
+        local casterUnit = findEventUnit(eventState, entry.casterEventId)
+        if type(auraDefinition) == "table" and casterUnit then
+            local effectKeys = runtime and runtime.effectKeys or {}
+            for effectKeyIndex = 1, #effectKeys do
+                local effectIndex = effectKeys[effectKeyIndex].key
+                local effect = auraDefinition.effects[effectIndex]
+                local contract = self:GetEffect(effect and effect.type or nil)
+                if contract and type(contract.Accumulate) == "function" then
+                    local accumulator = {
+                        flat = flatTotal,
+                        percent = percentTotal,
+                    }
+                    contract:Accumulate({
+                        aura = entry,
+                        auraDefinition = auraDefinition,
+                        eventState = eventState,
+                        casterUnit = casterUnit,
+                        targetUnit = targetUnit or findEventUnit(eventState, entry.targetEventId),
+                        statRef = normalizedStatRef,
+                    }, effect, accumulator)
+                    flatTotal = accumulator.flat
+                    percentTotal = accumulator.percent
                 end
             end
         end
     end
 
+    bucket.statModifierTotalsCache[cacheKey] = {
+        flat = flatTotal,
+        percent = percentTotal,
+    }
     return flatTotal, percentTotal
 end
 
@@ -2982,35 +3659,48 @@ function AuraManager:BuildControlState(eventState, unitEventId)
         return state
     end
 
-    for _, entry in pairs(bucket.byKey or {}) do
-        if type(entry) == "table" and tonumber(entry.targetEventId) == (tonumber(unitEventId) or 0) and (tonumber(entry.stacks) or 0) > 0 then
-            local auraDefinition = entry.definition
-            local _, resolvedAuraDefinition = self:ResolveAuraDefinition(entry.auraRef, { datasetId = entry.datasetId })
-            if type(resolvedAuraDefinition) == "table" then
-                entry.definition = resolvedAuraDefinition
-                auraDefinition = resolvedAuraDefinition
-            end
+    local numericUnitEventId = tonumber(unitEventId) or 0
+    if numericUnitEventId <= 0 then
+        return state
+    end
 
-            local effectKeys = sortedNumericKeys(auraDefinition and auraDefinition.effects)
-            for effectKeyIndex = 1, #effectKeys do
-                local effect = auraDefinition.effects[effectKeys[effectKeyIndex].key]
-                if type(effect) == "table" and tostring(effect.type or "") == "control" then
-                    state.cancelOnDamage = state.cancelOnDamage or effect.cancelOnDamage == true
-                    state.preventCasting = state.preventCasting or effect.preventCasting == true
-                    state.forceAutoHitAgainstTarget = state.forceAutoHitAgainstTarget or effect.forceAutoHitAgainstTarget == true
-                    if effect.movementRangeOverride ~= nil then
-                        local overrideValue = tonumber(effect.movementRangeOverride)
-                        if overrideValue ~= nil then
-                            state.movementRangeOverride = state.movementRangeOverride ~= nil
-                                and math.min(state.movementRangeOverride, overrideValue)
-                                or overrideValue
-                        end
-                    end
+    bucket.controlStateByTarget = type(bucket.controlStateByTarget) == "table" and bucket.controlStateByTarget or {}
+    local cachedState = bucket.controlStateByTarget[numericUnitEventId]
+    if type(cachedState) == "table" then
+        return {
+            cancelOnDamage = cachedState.cancelOnDamage == true,
+            preventCasting = cachedState.preventCasting == true,
+            movementRangeOverride = tonumber(cachedState.movementRangeOverride),
+            forceAutoHitAgainstTarget = cachedState.forceAutoHitAgainstTarget == true,
+        }
+    end
+
+    local targetEntries = getBucketAuraEntriesForTarget(bucket, numericUnitEventId)
+    for index = 1, #targetEntries do
+        local entry = targetEntries[index]
+        local runtime = buildAuraRuntimeEntry(self, bucket, entry)
+        local control = runtime and runtime.control or nil
+        if type(control) == "table" then
+            state.cancelOnDamage = state.cancelOnDamage or control.cancelOnDamage == true
+            state.preventCasting = state.preventCasting or control.preventCasting == true
+            state.forceAutoHitAgainstTarget = state.forceAutoHitAgainstTarget or control.forceAutoHitAgainstTarget == true
+            if control.movementRangeOverride ~= nil then
+                local overrideValue = tonumber(control.movementRangeOverride)
+                if overrideValue ~= nil then
+                    state.movementRangeOverride = state.movementRangeOverride ~= nil
+                        and math.min(state.movementRangeOverride, overrideValue)
+                        or overrideValue
                 end
             end
         end
     end
 
+    bucket.controlStateByTarget[numericUnitEventId] = {
+        cancelOnDamage = state.cancelOnDamage == true,
+        preventCasting = state.preventCasting == true,
+        movementRangeOverride = state.movementRangeOverride,
+        forceAutoHitAgainstTarget = state.forceAutoHitAgainstTarget == true,
+    }
     return state
 end
 
@@ -3044,27 +3734,12 @@ function AuraManager:HandleDamageTaken(client, eventState, targetEventId, source
     end
 
     local removedAny = false
-    for _, entry in pairs(bucket.byKey or {}) do
-        if type(entry) == "table" and tonumber(entry.targetEventId) == (tonumber(targetEventId) or 0) then
-            local auraDefinition = entry.definition
-            local _, resolvedAuraDefinition = self:ResolveAuraDefinition(entry.auraRef, { datasetId = entry.datasetId })
-            if type(resolvedAuraDefinition) == "table" then
-                auraDefinition = resolvedAuraDefinition
-            end
-
-            local shouldRemove = false
-            local effectKeys = sortedNumericKeys(auraDefinition and auraDefinition.effects)
-            for effectKeyIndex = 1, #effectKeys do
-                local effect = auraDefinition.effects[effectKeys[effectKeyIndex].key]
-                if type(effect) == "table" and tostring(effect.type or "") == "control" and effect.cancelOnDamage == true then
-                    shouldRemove = true
-                    break
-                end
-            end
-
-            if shouldRemove then
-                removedAny = self:DispelAuraFromContext(client, sourceContext or { eventState = eventState }, entry.auraRef, entry.casterEventId, entry.targetEventId, entry) or removedAny
-            end
+    local targetEntries = getBucketAuraEntriesForTarget(bucket, targetEventId)
+    for index = 1, #targetEntries do
+        local entry = targetEntries[index]
+        local runtime = buildAuraRuntimeEntry(self, bucket, entry)
+        if type(runtime) == "table" and type(runtime.control) == "table" and runtime.control.cancelOnDamage == true then
+            removedAny = self:DispelAuraFromContext(client, sourceContext or { eventState = eventState }, entry.auraRef, entry.casterEventId, entry.targetEventId, entry) or removedAny
         end
     end
 
@@ -3378,6 +4053,8 @@ function AuraManager:HandleAuraDispelBatch(client, arguments, sender)
     return changed
 end
 
+Addon.Internal = Addon.Internal or {}
+Addon.Internal.AuraManager = AuraManager
 Spellcasting.AuraManager = AuraManager
 Spellcasting.ResetAuraState = function(client, eventId)
     return AuraManager:ResetAuraState(client, eventId)

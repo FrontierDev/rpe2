@@ -56,6 +56,7 @@ function TextInput:New(options)
     instance._syncingText = false
     instance._skipNextFocusLost = false
     instance._skipNextFocusLostText = nil
+    instance._focusStartText = nil
     return instance
 end
 
@@ -250,15 +251,25 @@ function TextInput:Create()
             self:InvokeScript("OnEnterPressed")
             self:ClearFocus()
         end)
+        self.editBox:SetScript("OnEditFocusGained", function()
+            self._focusStartText = NormalizeText(self.editBox:GetText())
+            self:InvokeScript("OnEditFocusGained")
+        end)
         self.editBox:SetScript("OnEditFocusLost", function()
             self.text = NormalizeText(self.editBox:GetText())
             if self._skipNextFocusLost and self._skipNextFocusLostText == self.text then
                 self._skipNextFocusLost = false
                 self._skipNextFocusLostText = nil
+                self._focusStartText = nil
                 return
             end
             self._skipNextFocusLost = false
             self._skipNextFocusLostText = nil
+            if self._focusStartText == self.text then
+                self._focusStartText = nil
+                return
+            end
+            self._focusStartText = nil
             self:InvokeScript("OnEditFocusLost")
         end)
         self.editBox:SetScript("OnEscapePressed", function()
@@ -267,6 +278,7 @@ function TextInput:Create()
             self._syncingText = false
             self._skipNextFocusLost = true
             self._skipNextFocusLostText = self.text
+            self._focusStartText = nil
             self:InvokeScript("OnEscapePressed")
             self:ClearFocus()
         end)

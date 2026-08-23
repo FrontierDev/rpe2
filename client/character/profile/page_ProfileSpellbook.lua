@@ -29,6 +29,10 @@ local SPELLBOOK_NAV_HEIGHT = 24
 local SPELLBOOK_ENTRIES_PER_PAGE = SPELLBOOK_COLUMNS * SPELLBOOK_ROWS
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
 local function trimString(value)
     local text = tostring(value or "")
     text = text:gsub("^%s+", ""):gsub("%s+$", "")
@@ -54,15 +58,15 @@ local function getSpellDescriptionBuilder()
     return nil
 end
 
-local function buildNavigationRows()
+local function buildNavigationRows(knownSpells)
     local datasets = Registry.GetActivatedDatasets and Registry:GetActivatedDatasets() or {}
-    local knownSpells = Profile.ListKnownSpells and Profile.ListKnownSpells() or {}
+    local resolvedKnownSpells = knownSpells or {}
     local spellCountsByDataset = {}
     local spellCountsByDatasetAndCategory = {}
     local rows = {}
 
-    for index = 1, #knownSpells do
-        local row = knownSpells[index]
+    for index = 1, #resolvedKnownSpells do
+        local row = resolvedKnownSpells[index]
         local dataset = row and row.dataset or nil
         if dataset and dataset.id then
             local datasetId = tostring(dataset.id)
@@ -158,16 +162,40 @@ local function sliceSpellPageRows(rows, pageIndex)
     return sliced
 end
 
-function SpellbookPage:GetSelectedDatasetSpells()
-    local rows = Profile.ListKnownSpells and Profile.ListKnownSpells() or {}
+function SpellbookPage:GetKnownSpellRows()
+    local revision = getConfigurationRevision()
+    if tonumber(self.KnownSpellRowsRevision) == revision and type(self.KnownSpellRows) == "table" then
+        return self.KnownSpellRows
+    end
+
+    self.KnownSpellRows = Profile.ListKnownSpells and Profile.ListKnownSpells({
+        lightweight = true,
+    }) or {}
+    self.KnownSpellRowsRevision = revision
+    return self.KnownSpellRows
+end
+
+function SpellbookPage:GetNavigationRows(knownSpellRows)
+    local revision = getConfigurationRevision()
+    if tonumber(self.NavigationRowsRevision) == revision and type(self.NavigationRowsData) == "table" then
+        return self.NavigationRowsData
+    end
+
+    self.NavigationRowsData = buildNavigationRows(knownSpellRows)
+    self.NavigationRowsRevision = revision
+    return self.NavigationRowsData
+end
+
+function SpellbookPage:GetSelectedDatasetSpells(rows)
+    local sourceRows = rows or self.KnownSpellRows or {}
     if not self.SelectedDatasetId or self.SelectedDatasetId == "" then
         return {}
     end
 
     local filtered = {}
     local selectedCategory = normalizeSpellbookCategory(self.SelectedSpellbookCategory)
-    for index = 1, #rows do
-        local row = rows[index]
+    for index = 1, #sourceRows do
+        local row = sourceRows[index]
         local dataset = row and row.dataset or nil
         if dataset and tostring(dataset.id or "") == tostring(self.SelectedDatasetId) then
             local rowCategory = normalizeSpellbookCategory(row and row.spellbookCategory)
@@ -336,7 +364,7 @@ function SpellbookPage:HandleSpellLeftClick(spellRef)
     end
 
     self:RefreshActionBarWidget("spellbook-left-click")
-    self:Refresh()
+    self:RefreshVisibleState()
     return true
 end
 
@@ -371,7 +399,7 @@ function SpellbookPage:EnsureSpellContextMenu()
             end
 
             self:RefreshActionBarWidget("spellbook-context-menu")
-            self:Refresh()
+            self:RefreshVisibleState()
 
             if menu and menu.HideMenus then
                 menu:HideMenus()
@@ -507,19 +535,20 @@ function SpellbookPage:RefreshSpellPageControls(totalRows, pageCount)
     end
 end
 
-function SpellbookPage:RefreshSpellEntries()
-    local rows = self:GetSelectedDatasetSpells()
-    local pageCount = getSpellPageCount(#rows)
+function SpellbookPage:RefreshSpellEntries(rows)
+    local selectedRows = self:GetSelectedDatasetSpells(rows)
+    local totalRows = #selectedRows
+    local pageCount = getSpellPageCount(totalRows)
     if pageCount <= 0 then
         self.CurrentSpellPage = 1
     else
         self.CurrentSpellPage = math.max(1, math.min(math.floor(tonumber(self.CurrentSpellPage) or 1), pageCount))
     end
 
-    local pageRows = sliceSpellPageRows(rows, self.CurrentSpellPage)
+    local pageRows = sliceSpellPageRows(selectedRows, self.CurrentSpellPage)
     self.VisibleSpellRows = pageRows
     self:LayoutSpellEntries()
-    self:RefreshSpellPageControls(#rows, pageCount)
+    self:RefreshSpellPageControls(totalRows, pageCount)
 
     if self.EntryListFrame and self.EntryListFrame.Show and self.EntryListFrame.Hide then
         if #pageRows > 0 then
@@ -576,7 +605,7 @@ function SpellbookPage:RefreshSpellEntries()
     if self.GridEmptyText and self.GridEmptyText.SetText then
         if not self.SelectedDatasetId then
             self.LastGridEmptyStateText = "Activate a dataset to browse known spells."
-        elseif #rows == 0 then
+        elseif totalRows == 0 then
             if normalizeSpellbookCategory(self.SelectedSpellbookCategory) then
                 self.LastGridEmptyStateText = "No known spells in this category."
             else
@@ -593,20 +622,44 @@ function SpellbookPage:PreviousSpellPage()
     end
 
     self.CurrentSpellPage = math.max(1, (tonumber(self.CurrentSpellPage) or 1) - 1)
-    self:RefreshSpellEntries()
+    self:RefreshSpellEntries(self.KnownSpellRows)
     return true
 end
 
 function SpellbookPage:NextSpellPage()
-    local rows = self:GetSelectedDatasetSpells()
+    local rows = self:GetSelectedDatasetSpells(self.KnownSpellRows)
     local pageCount = getSpellPageCount(#rows)
     if pageCount <= 0 or (tonumber(self.CurrentSpellPage) or 1) >= pageCount then
         return false
     end
 
     self.CurrentSpellPage = math.min(pageCount, (tonumber(self.CurrentSpellPage) or 1) + 1)
-    self:RefreshSpellEntries()
+    self:RefreshSpellEntries(self.KnownSpellRows)
     return true
+end
+
+function SpellbookPage:RefreshVisibleState()
+    if not self.frame then
+        return nil
+    end
+
+    local datasetRows = self.DatasetRows or {}
+    local selectedDatasetName = self:GetSelectedNavigationLabel(datasetRows)
+
+    if self.DatasetList and self.DatasetList.RefreshRows then
+        self.DatasetList:RefreshRows()
+    end
+
+    if self.GridTitle and self.GridTitle.SetText then
+        self.GridTitle:SetText(selectedDatasetName)
+    end
+
+    if self.GridHintText and self.GridHintText.SetText then
+        self.GridHintText:SetText("Left-click to bind/unbind. Right-click for action bar slot options.")
+    end
+
+    self:RefreshSpellEntries(self.KnownSpellRows)
+    return self.frame
 end
 
 function SpellbookPage:Build(parent, owner)
@@ -680,7 +733,7 @@ function SpellbookPage:Build(parent, owner)
             frame:SetScript("OnMouseUp", function(_, button)
                 if button == "LeftButton" and item and item.datasetId then
                     self:SelectNavigationItem(item)
-                    self:Refresh()
+                    self:RefreshVisibleState()
                 end
             end)
 
@@ -798,7 +851,8 @@ function SpellbookPage:Refresh()
         return nil
     end
 
-    local datasetRows = buildNavigationRows()
+    local knownSpellRows = self:GetKnownSpellRows()
+    local datasetRows = self:GetNavigationRows(knownSpellRows)
     self.DatasetRows = datasetRows
     self:EnsureDatasetSelection(datasetRows)
 
@@ -814,18 +868,7 @@ function SpellbookPage:Refresh()
         self.DatasetEmptyText:SetText(self.LastDatasetEmptyStateText)
     end
 
-    local selectedDatasetName = self:GetSelectedNavigationLabel(datasetRows)
-
-    if self.GridTitle and self.GridTitle.SetText then
-        self.GridTitle:SetText(selectedDatasetName)
-    end
-
-    if self.GridHintText and self.GridHintText.SetText then
-        self.GridHintText:SetText("Left-click to bind/unbind. Right-click for action bar slot options.")
-    end
-
-    self:RefreshSpellEntries()
-    return self.frame
+    return self:RefreshVisibleState()
 end
 
 return SpellbookPage

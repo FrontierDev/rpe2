@@ -12,6 +12,8 @@ local DISPLAY_MODE_ITEMS = {
     { label = "+X Value", value = "signed_value" },
     { label = "X Value", value = "value" },
     { label = "+X% Value", value = "signed_percent" },
+    { label = "Equip", value = "equip" },
+    { label = "Equip %", value = "equip_percent" },
 }
 
 local CATEGORY_ITEMS = {

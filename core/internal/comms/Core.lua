@@ -27,6 +27,36 @@ local getNow = Common.GetNow
 local getPlayerName = Common.GetPlayerName
 local normalizeName = Common.NormalizeName
 
+local function getTimings()
+    return Addon.Debug and Addon.Debug.Timings or nil
+end
+
+local function getTimingNowMilliseconds()
+    local timings = getTimings()
+    return type(timings) == "table" and type(timings.GetNowMilliseconds) == "function"
+        and timings.GetNowMilliseconds()
+        or 0
+end
+
+local function getTimedEventOpcodeKey(opcode)
+    local operation = Operations and Operations.Get and Operations:Get(opcode) or nil
+    local key = type(operation) == "table" and tostring(operation.key or "") or ""
+    if key == "EVENT_START" or key == "EVENT_UNITS" or key == "EVENT_STATE" then
+        return key
+    end
+
+    return nil
+end
+
+local function logTimingParts(label, context, parts, totalElapsedMs, thresholdMs)
+    local timings = getTimings()
+    if type(timings) == "table" and type(timings.LogParts) == "function" then
+        return timings:LogParts(label, context, parts, totalElapsedMs, thresholdMs)
+    end
+
+    return false
+end
+
 local function buildInboundChunkKey(sender, opcode)
     return table.concat({
         tostring(sender or ""),
@@ -67,17 +97,21 @@ local function shouldEchoOutboundChannel(distribution, target)
     return channelId ~= nil and channelId > 0
 end
 
+local function shouldDeliverImmediateLocalEcho(distribution, target, opcode)
+    return shouldEchoOutboundChannel(distribution, target) and getTimedEventOpcodeKey(opcode) ~= nil
+end
+
 local function getEventUnitsOpcode()
     return Operations and Operations.GetOpcode and Operations:GetOpcode("EVENT_UNITS") or nil
 end
 
-local function notifyInboundChunkProgress(packet, distribution, sender, target, receivedCount)
+local function notifyInboundChunkProgress(packet, distribution, sender, target, receivedCount, startedAtMs)
     if not packet or packet.opcode ~= getEventUnitsOpcode() then
         return
     end
 
     if type(Comms.HandleInboundChunkProgress) == "function" then
-        Comms:HandleInboundChunkProgress(packet, receivedCount, distribution, sender, target)
+        Comms:HandleInboundChunkProgress(packet, receivedCount, distribution, sender, target, startedAtMs)
     end
 end
 
@@ -281,6 +315,7 @@ function Comms:BuildOutboundMessage(opcodeOrPayload, argumentsOrTarget, targetOr
 end
 
 function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, targetOrMetadata, metadata)
+    local totalStartTime = getTimingNowMilliseconds()
     local opcode, argumentsText, target, diagnosticsMetadata = self:BuildOutboundMessage(
         opcodeOrPayload,
         argumentsOrTarget,
@@ -304,7 +339,10 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
         return false
     end
 
+    local timedOpcodeKey = getTimedEventOpcodeKey(opcode)
+    local chunkPlanStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
     local chunkLength, partCount = self:ResolveChunkPlan(argumentsText, opcode)
+    local chunkPlanElapsedMs = chunkPlanStartTime and (getTimingNowMilliseconds() - chunkPlanStartTime) or 0
     if not chunkLength or not partCount then
         if Diagnostics.RecordSendFailure then
             Diagnostics:RecordSendFailure("packet-too-large")
@@ -312,16 +350,24 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
         return false
     end
 
+    local queueCheckStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
     if MessageQueue.CanAccept and not MessageQueue:CanAccept(partCount) then
         if Diagnostics.RecordSendFailure then
             Diagnostics:RecordSendFailure("queue-full")
         end
         return false
     end
+    local queueCheckElapsedMs = queueCheckStartTime and (getTimingNowMilliseconds() - queueCheckStartTime) or 0
 
     local sendState = {
         failed = false,
         pendingParts = partCount,
+        timedOpcodeKey = timedOpcodeKey,
+        totalStartTime = totalStartTime,
+        enqueueElapsedMs = 0,
+        chunkPlanElapsedMs = chunkPlanElapsedMs,
+        queueCheckElapsedMs = queueCheckElapsedMs,
+        immediateLocalEcho = shouldDeliverImmediateLocalEcho(distribution, target, opcode),
     }
 
     for partIndex = 1, partCount do
@@ -342,6 +388,18 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
             return false
         end
 
+        if sendState.immediateLocalEcho == true then
+            self:ReceiveMessage(
+                self.Prefix,
+                packet,
+                distribution,
+                Common.GetPlayerName and Common.GetPlayerName() or (getPlayerName and getPlayerName() or ""),
+                target,
+                { localEcho = true, immediateLocalEcho = true }
+            )
+        end
+
+        local enqueueStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
         MessageQueue:EnqueueAddonMessage(self.Prefix, packet, distribution, target, {
             chunkPartIndex = partIndex,
             chunkPartCount = partCount,
@@ -353,7 +411,7 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
                     return
                 end
 
-                if shouldEchoOutboundChannel(distribution, target) then
+                if sendState.immediateLocalEcho ~= true and shouldEchoOutboundChannel(distribution, target) then
                     self:ReceiveMessage(
                         self.Prefix,
                         item.payload,
@@ -368,6 +426,21 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
                 if sendState.pendingParts == 0 then
                     if Diagnostics.RecordSendSuccess then
                         Diagnostics:RecordSendSuccess(diagnosticsMetadata, distribution, target, argumentsText, partCount)
+                    end
+
+                    if sendState.timedOpcodeKey then
+                        local deliveredElapsedMs = getTimingNowMilliseconds() - sendState.totalStartTime
+                        logTimingParts(
+                            ("%s chunks=%d"):format(sendState.timedOpcodeKey, partCount),
+                            "event-send",
+                            {
+                                { label = "chunk-plan", elapsedMs = sendState.chunkPlanElapsedMs },
+                                { label = "queue-check", elapsedMs = sendState.queueCheckElapsedMs },
+                                { label = "enqueue", elapsedMs = sendState.enqueueElapsedMs },
+                            },
+                            deliveredElapsedMs,
+                            sendState.timedOpcodeKey == "EVENT_UNITS" and 25 or 15
+                        )
                     end
 
                     Common.InvokeCallback(deliveredCallback, item, result)
@@ -386,6 +459,9 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
                 Common.InvokeCallback(failedCallback, item, result)
             end,
         })
+        if enqueueStartTime then
+            sendState.enqueueElapsedMs = sendState.enqueueElapsedMs + (getTimingNowMilliseconds() - enqueueStartTime)
+        end
     end
 
     return true
@@ -401,6 +477,9 @@ function Comms:SendToChannel(channelId, opcodeOrPayload, argumentsOrMetadata, me
 end
 
 function Comms:FinalizeInbound(packet, distribution, sender, target)
+    local timedOpcodeKey = packet and getTimedEventOpcodeKey(packet.opcode) or nil
+    local totalStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
+    local deserializeStartTime = totalStartTime
     local message = {
         prefix = packet.prefix,
         opcode = packet.opcode,
@@ -412,13 +491,28 @@ function Comms:FinalizeInbound(packet, distribution, sender, target)
         chunkCount = packet.partCount,
         receivedAt = getNow(),
     }
+    local deserializeElapsedMs = totalStartTime and (getTimingNowMilliseconds() - deserializeStartTime) or 0
 
     if Diagnostics.RecordInboundMessage then
         Diagnostics:RecordInboundMessage(packet.argumentsText, distribution, sender, target, packet.partCount, packet.opcode)
     end
 
+    local dispatchStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
     if Operations.Dispatch then
         Operations:Dispatch(message.opcode, message.arguments, sender, distribution, target, message)
+    end
+    if timedOpcodeKey then
+        local dispatchElapsedMs = getTimingNowMilliseconds() - dispatchStartTime
+        logTimingParts(
+            ("%s chunks=%d"):format(timedOpcodeKey, math.max(1, tonumber(packet.partCount) or 1)),
+            "event-receive",
+            {
+                { label = "deserialize", elapsedMs = deserializeElapsedMs },
+                { label = "dispatch", elapsedMs = dispatchElapsedMs },
+            },
+            getTimingNowMilliseconds() - totalStartTime,
+            timedOpcodeKey == "EVENT_UNITS" and 25 or 15
+        )
     end
 
     return message
@@ -451,7 +545,7 @@ function Comms:ReceiveMessage(prefix, message, distribution, sender, target, opt
     cleanupIncomingChunks(self, now)
 
     if packet.partCount == 1 then
-        notifyInboundChunkProgress(packet, distribution, sender, target, 1)
+        notifyInboundChunkProgress(packet, distribution, sender, target, 1, now * 1000)
         return self:FinalizeInbound(packet, distribution, sender, target)
     end
 
@@ -466,6 +560,7 @@ function Comms:ReceiveMessage(prefix, message, distribution, sender, target, opt
             target = target,
             parts = {},
             receivedAt = now,
+            startedAtMs = getTimingNowMilliseconds(),
         }
         self.IncomingChunks[chunkKey] = entry
     end
@@ -488,7 +583,7 @@ function Comms:ReceiveMessage(prefix, message, distribution, sender, target, opt
         entry.receivedCount = (entry.receivedCount or 0) + 1
     end
     entry.receivedAt = now
-    notifyInboundChunkProgress(packet, distribution, sender, target, entry.receivedCount or 0)
+    notifyInboundChunkProgress(packet, distribution, sender, target, entry.receivedCount or 0, entry.startedAtMs)
 
     for index = 1, entry.partCount do
         if entry.parts[index] == nil then
@@ -497,6 +592,17 @@ function Comms:ReceiveMessage(prefix, message, distribution, sender, target, opt
     end
 
     self.IncomingChunks[chunkKey] = nil
+    if getTimedEventOpcodeKey(packet.opcode) == "EVENT_UNITS" then
+        logTimingParts(
+            ("EVENT_UNITS chunks=%d"):format(entry.partCount),
+            "event-receive",
+            {
+                { label = "chunk-assembly", elapsedMs = getTimingNowMilliseconds() - (tonumber(entry.startedAtMs) or 0) },
+            },
+            getTimingNowMilliseconds() - (tonumber(entry.startedAtMs) or 0),
+            25
+        )
+    end
     return self:FinalizeInbound({
         prefix = packet.prefix,
         opcode = packet.opcode,

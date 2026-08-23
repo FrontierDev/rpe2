@@ -269,6 +269,7 @@ local function buildConsumablePage(self, page)
     self.ItemInspectorConsumablePendingStatRow:AddChild(self.ItemInspectorConsumablePendingStatDropdown)
 
     self.ItemInspectorConsumablePendingStatActionLabels = createHorizontalFieldLabels(statsLayout, "RPEDataEditorItemInspectorConsumablePendingStatActionLabels", {
+        { text = "Mode", width = 58 },
         { text = "Bonus Value", width = 90, expandWidth = true },
         { text = "", width = 36 },
         { text = "", width = 28 },
@@ -283,6 +284,13 @@ local function buildConsumablePage(self, page)
     })
     self.ItemInspectorConsumablePendingStatActionsRow._visibleHeight = 18
     statsLayout:AddChild(self.ItemInspectorConsumablePendingStatActionsRow)
+
+    self.ItemInspectorConsumablePendingStatOperationDropdown = UI.CreateDropdown(self.ItemInspectorConsumablePendingStatActionsRow:GetFrame(), "RPEDataEditorItemInspectorConsumablePendingStatOperationDropdown", {
+        width = 58,
+        height = 18,
+        items = self:GetAuraInspectorOperationItems(),
+    })
+    self.ItemInspectorConsumablePendingStatActionsRow:AddChild(self.ItemInspectorConsumablePendingStatOperationDropdown)
 
     self.ItemInspectorConsumablePendingStatValueInput = UI.CreateTextInput(self.ItemInspectorConsumablePendingStatActionsRow:GetFrame(), "RPEDataEditorItemInspectorConsumablePendingStatValueInput", {
         width = 90,
@@ -304,12 +312,14 @@ local function buildConsumablePage(self, page)
         end
 
         local value = tonumber(self.ItemInspectorConsumablePendingStatValueInput and self.ItemInspectorConsumablePendingStatValueInput:GetText()) or 0
+        local operation = self.ItemInspectorConsumablePendingStatOperationDropdown and self.ItemInspectorConsumablePendingStatOperationDropdown.GetSelectedValue and self.ItemInspectorConsumablePendingStatOperationDropdown:GetSelectedValue() or "flat"
         local editIndex = tonumber(self.SelectedItemConsumableTraitStatIndex)
         self:CommitSelectedItem(function(item)
             local trait = getEmbeddedItemTrait(item) or {}
             local bonuses = normalizeConsumableTraitStatBonuses(trait.statBonuses)
             local entry = {
                 statRef = statRef,
+                operation = operation,
                 value = value,
             }
             if editIndex and bonuses[editIndex] then
@@ -792,8 +802,11 @@ local function buildConsumablePage(self, page)
     self.ItemInspectorConsumablePendingEventRow:AddChild(self.ItemInspectorConsumablePendingEffectDropdown)
 
     local _, eventActionLabels = createHorizontalFieldLabels(eventsLayout, "RPEDataEditorItemInspectorConsumablePendingEventActionLabels", {
-        { text = "Magnitude", width = 90, expandWidth = true },
-        { text = "", width = 36 },
+        { text = "Magnitude", width = 52, expandWidth = true },
+        { text = "Mode", width = 48 },
+        { text = "Chance %", width = 40 },
+        { text = "", width = 28 },
+        { text = "", width = 28 },
         { text = "", width = 28 },
     })
     self.ItemInspectorConsumablePendingEffectAmountLabel = eventActionLabels[1]
@@ -809,13 +822,38 @@ local function buildConsumablePage(self, page)
     eventsLayout:AddChild(self.ItemInspectorConsumablePendingEventActionRow)
 
     self.ItemInspectorConsumablePendingEffectAmountInput = UI.CreateTextInput(self.ItemInspectorConsumablePendingEventActionRow:GetFrame(), "RPEDataEditorItemInspectorConsumablePendingEffectAmountInput", {
-        width = 90,
+        width = 52,
         height = 18,
         text = "0",
         expandWidth = true,
         borderColor = UI.ResolveColor(nil, "panel.border"),
     })
     self.ItemInspectorConsumablePendingEventActionRow:AddChild(self.ItemInspectorConsumablePendingEffectAmountInput)
+
+    self.ItemInspectorConsumablePendingEffectAmountModeDropdown = UI.CreateDropdown(self.ItemInspectorConsumablePendingEventActionRow:GetFrame(), "RPEDataEditorItemInspectorConsumablePendingEffectAmountModeDropdown", {
+        width = 48,
+        height = 18,
+        items = self:GetAuraInspectorAmountModeItems(),
+    })
+    self.ItemInspectorConsumablePendingEventActionRow:AddChild(self.ItemInspectorConsumablePendingEffectAmountModeDropdown)
+
+    self.ItemInspectorConsumablePendingEventChanceInput = UI.CreateTextInput(self.ItemInspectorConsumablePendingEventActionRow:GetFrame(), "RPEDataEditorItemInspectorConsumablePendingEventChanceInput", {
+        width = 40,
+        height = 18,
+        text = "100",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.ItemInspectorConsumablePendingEventActionRow:AddChild(self.ItemInspectorConsumablePendingEventChanceInput)
+
+    self.ItemInspectorConsumableNewEventButton = UI.CreateButton(self.ItemInspectorConsumablePendingEventActionRow:GetFrame(), "RPEDataEditorItemInspectorConsumableNewEventButton", "New", 28, function()
+        self.SelectedItemConsumableTraitEventIndex = nil
+        self:RefreshItemInspectorPage()
+    end, {
+        height = 18,
+        fontSize = 7,
+        expandWidth = false,
+    })
+    self.ItemInspectorConsumablePendingEventActionRow:AddChild(self.ItemInspectorConsumableNewEventButton)
 
     local detailHeaderRow, detailLabels = createHorizontalFieldLabels(eventsLayout, "RPEDataEditorItemInspectorConsumablePendingEventDetailLabels", {
         { text = "Reference Dataset", width = 72, expandWidth = true },
@@ -858,6 +896,15 @@ local function buildConsumablePage(self, page)
     })
     self.ItemInspectorConsumablePendingEventDetailRow:AddChild(self.ItemInspectorConsumablePendingEffectReferenceDropdown)
 
+    self.ItemInspectorConsumablePendingEventSchoolGroup = createEquipmentFieldGroup(eventsLayout, "RPEDataEditorItemInspectorConsumablePendingEventSchoolGroup", "Damage Schools", 18)
+    self.ItemInspectorConsumablePendingEventSchoolDropdown = UI.CreateDropdown(self.ItemInspectorConsumablePendingEventSchoolGroup:GetFrame(), "RPEDataEditorItemInspectorConsumablePendingEventSchoolDropdown", {
+        width = FIELD_WIDTH,
+        height = 18,
+        multiSelect = true,
+        items = self:BuildSpellInspectorDamageSchoolsAcrossDatasets(),
+    })
+    self.ItemInspectorConsumablePendingEventSchoolGroup:AddChild(self.ItemInspectorConsumablePendingEventSchoolDropdown)
+
     local extraHeaderRow, extraLabels = createHorizontalFieldLabels(eventsLayout, "RPEDataEditorItemInspectorConsumablePendingEventExtraLabels", {
         { text = "Aura Duration", width = 26, expandWidth = true },
         { text = "Base Power", width = 26, expandWidth = true },
@@ -893,7 +940,7 @@ local function buildConsumablePage(self, page)
     })
     self.ItemInspectorConsumablePendingEventExtraRow:AddChild(self.ItemInspectorConsumablePendingEffectExtraInput)
 
-    self.ItemInspectorConsumableAddEventButton = UI.CreateButton(self.ItemInspectorConsumablePendingEventActionRow:GetFrame(), "RPEDataEditorItemInspectorConsumableAddEventButton", "Save", 36, function()
+    self.ItemInspectorConsumableAddEventButton = UI.CreateButton(self.ItemInspectorConsumablePendingEventActionRow:GetFrame(), "RPEDataEditorItemInspectorConsumableAddEventButton", "Save", 28, function()
         if self._refreshingItemInspector then
             return
         end
@@ -906,7 +953,10 @@ local function buildConsumablePage(self, page)
         local triggerTarget = self.ItemInspectorConsumablePendingTriggerTargetDropdown:GetSelectedValue() or "event_other"
         local effectType = self.ItemInspectorConsumablePendingEffectDropdown:GetSelectedValue() or "damage"
         local amount = tonumber(self.ItemInspectorConsumablePendingEffectAmountInput:GetText()) or 0
+        local amountMode = self.ItemInspectorConsumablePendingEffectAmountModeDropdown and self.ItemInspectorConsumablePendingEffectAmountModeDropdown.GetSelectedValue and self.ItemInspectorConsumablePendingEffectAmountModeDropdown:GetSelectedValue() or "flat"
+        local chance = tonumber(self.ItemInspectorConsumablePendingEventChanceInput:GetText()) or 100
         local effectRef = self.ItemInspectorConsumablePendingEffectReferenceDropdown and self.ItemInspectorConsumablePendingEffectReferenceDropdown.GetSelectedValue and self.ItemInspectorConsumablePendingEffectReferenceDropdown:GetSelectedValue() or ""
+        local damageSchoolRefs = self.ItemInspectorConsumablePendingEventSchoolDropdown and self.ItemInspectorConsumablePendingEventSchoolDropdown.GetSelectedValues and self.ItemInspectorConsumablePendingEventSchoolDropdown:GetSelectedValues() or {}
         local auxValue = tonumber(self.ItemInspectorConsumablePendingEffectAuxInput:GetText()) or 0
         local extraValue = tonumber(self.ItemInspectorConsumablePendingEffectExtraInput:GetText()) or 0
         local editIndex = tonumber(self.SelectedItemConsumableTraitEventIndex)
@@ -920,6 +970,7 @@ local function buildConsumablePage(self, page)
             effectEntry = {
                 type = "heal",
                 baseHealing = amount,
+                amountMode = amountMode,
             }
         elseif effectType == "apply_aura" then
             effectEntry = {
@@ -940,11 +991,14 @@ local function buildConsumablePage(self, page)
                 type = "resource",
                 resourceRef = effectRef,
                 amount = amount,
+                amountMode = amountMode,
             }
         else
             effectEntry = {
                 type = "damage",
                 baseDamage = amount,
+                amountMode = amountMode,
+                damageSchoolRefs = damageSchoolRefs,
             }
         end
 
@@ -954,6 +1008,7 @@ local function buildConsumablePage(self, page)
             local entry = {
                 combatEventId = combatEventId,
                 triggerTarget = triggerTarget,
+                chance = chance,
                 effects = {
                     effectEntry,
                 },

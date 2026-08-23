@@ -266,6 +266,21 @@ local function GetMenuRootFrame()
     return UIParent or WorldFrame
 end
 
+local function Clamp(value, minimum, maximum)
+    local numericValue = tonumber(value) or 0
+    local minValue = tonumber(minimum)
+    local maxValue = tonumber(maximum)
+
+    if minValue and numericValue < minValue then
+        numericValue = minValue
+    end
+    if maxValue and numericValue > maxValue then
+        numericValue = maxValue
+    end
+
+    return numericValue
+end
+
 function ContextMenu:New(options)
     local instance = BaseElement.New(self, options)
     local floating = not (options and options.floating == false)
@@ -474,6 +489,28 @@ function ContextMenu:SetItems(items)
 
     self.activePath = {}
     self:RefreshVisiblePanels()
+end
+
+function ContextMenu:SetPanelWidth(width)
+    local resolvedWidth = math.floor(Clamp(width, 1, nil) + 0.5)
+    self.panelWidth = resolvedWidth
+
+    for depth = 1, MAX_MENU_DEPTH do
+        local panel = self.panels[depth]
+        if panel and panel.SetWidth then
+            panel:SetWidth(resolvedWidth)
+        end
+
+        local scroll = self.scrollLayouts[depth]
+        if scroll and scroll.SetWidth then
+            scroll:SetWidth(resolvedWidth)
+        end
+    end
+
+    if self.rootLayout and self.rootLayout.RefreshLayout then
+        self.rootLayout:RefreshLayout()
+    end
+    self:UpdateVisibleWidth()
 end
 
 function ContextMenu:SetPanelVisible(depth, isVisible)

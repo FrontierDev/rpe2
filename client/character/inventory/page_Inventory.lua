@@ -50,6 +50,7 @@ local QUALITY_LABELS = {
 local ITEM_TYPE_LABELS = {
     weapon = "Weapon",
     armor = "Armor",
+    tool = "Tool",
     consumable = "Consumable",
     material = "Material",
     modification = "Modification",

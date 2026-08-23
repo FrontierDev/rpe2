@@ -9,12 +9,16 @@ local Client = Addon.Client
 local Comms = Addon.Internal.Comms or {}
 local Operations = Comms.Operations or {}
 local Registry = Addon.Internal.Registry or {}
+local Serialization = Comms.Serialization or {}
 local Spellcasting = Client.Spellcasting
 local Conditions = Client.Conditions or {}
+local Debug = Addon.Debug or {}
 
 local SPELLCAST_START_OPCODE = Operations:GetOpcode("SPELLCAST_START")
 local SPELLCAST_COMPLETE_OPCODE = Operations:GetOpcode("SPELLCAST_COMPLETE")
 local SPELLCAST_INTERRUPT_OPCODE = Operations:GetOpcode("SPELLCAST_INTERRUPT")
+local SPELLCAST_SLOW_TOTAL_MS = 100
+local SPELLCAST_SLOW_HELPER_MS = 25
 
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
@@ -41,44 +45,116 @@ local function enqueueSpellcastWork(fn, ...)
 end
 
 local function getNowMilliseconds()
-    if type(debugprofilestop) == "function" then
-        return debugprofilestop()
+    if type(GetTimePreciseSec) == "function" then
+        return GetTimePreciseSec() * 1000
     end
 
-    return (os.clock() or 0) * 1000
+    return (GetTime and GetTime() or 0) * 1000
 end
 
 local function isSpellcastTimingEnabled()
     return type(Addon.Debug) == "table" and Addon.Debug.SpellcastTiming == true
 end
 
-local function logSpellcastTiming(spellRef, phases)
+local function ensureSpellcastInternalLoggingEnabled()
+    if type(Debug) == "table" and type(Debug.EnsureInternalLevelEnabled) == "function" then
+        Debug.EnsureInternalLevelEnabled()
+    end
+end
+
+local function buildTimingSegment(label, elapsed, threshold)
+    local numericElapsed = math.max(0, tonumber(elapsed) or 0)
+    local isSlow = numericElapsed >= (tonumber(threshold) or SPELLCAST_SLOW_HELPER_MS)
+    return ("%s=%.2fms%s"):format(
+        tostring(label or "phase"),
+        numericElapsed,
+        isSlow and " SLOW" or ""
+    ), isSlow
+end
+
+local function appendTimingPhase(phases, label, elapsed, threshold)
+    if type(phases) ~= "table" then
+        return
+    end
+
+    phases[#phases + 1] = {
+        label = label,
+        elapsed = math.max(0, tonumber(elapsed) or 0),
+        threshold = threshold,
+    }
+end
+
+local function logSpellcastTiming(kind, spellRef, phases, totalElapsed, threshold)
     if not isSpellcastTimingEnabled() or type(Debug) ~= "table" or type(Debug.Internal) ~= "function" then
         return false
     end
 
+    ensureSpellcastInternalLoggingEnabled()
+
+    local slowThreshold = tonumber(threshold) or SPELLCAST_SLOW_TOTAL_MS
+    local totalText, totalSlow = buildTimingSegment("total", totalElapsed, slowThreshold)
     local parts = {}
+    local hasSlow = totalSlow
     for index = 1, #(phases or {}) do
         local phase = phases[index]
         if type(phase) == "table" and type(phase.label) == "string" then
-            parts[#parts + 1] = ("%s=%.2fms"):format(phase.label, tonumber(phase.elapsed) or 0)
+            local partText, partSlow = buildTimingSegment(phase.label, phase.elapsed, phase.threshold)
+            parts[#parts + 1] = partText
+            hasSlow = hasSlow or partSlow
         end
     end
 
     Debug.Internal(
-        "Spellcast timing [%s]: %s",
+        "%sSpellcast %s timing [%s]: %s%s",
+        hasSlow and "SLOW " or "",
+        tostring(kind or "phase"),
         tostring(spellRef or ""),
-        table.concat(parts, ", ")
+        totalText,
+        #parts > 0 and (", " .. table.concat(parts, ", ")) or ""
     )
     return true
 end
 
-local function sendSpellcastPacket(channelId, opcode, arguments)
+local function sendSpellcastPacket(channelId, opcode, arguments, options)
     if type(Comms.SendToChannel) ~= "function" then
         return false
     end
 
-    return Comms:SendToChannel(channelId, opcode, arguments, Spellcasting.BuildSendMetadata(opcode))
+    local metadata = Spellcasting.BuildSendMetadata(opcode)
+    local timingEnabled = isSpellcastTimingEnabled()
+    local sendStartTime = timingEnabled and getNowMilliseconds() or nil
+    local partCount = 0
+    local payloadLength = 0
+    if timingEnabled and type(Serialization.SerializeArguments) == "function" and type(Comms.ResolveChunkPlan) == "function" then
+        local argumentsText = type(arguments) == "table"
+            and Serialization:SerializeArguments(arguments)
+            or tostring(arguments or "")
+        payloadLength = #argumentsText
+        local _, resolvedPartCount = Comms:ResolveChunkPlan(argumentsText, opcode)
+        partCount = tonumber(resolvedPartCount) or 0
+    end
+
+    local sent = Comms:SendToChannel(channelId, opcode, arguments, metadata)
+    if timingEnabled then
+        logSpellcastTiming(
+            "comms",
+            ("%s/%s"):format(
+                tostring(type(options) == "table" and options.kind or opcode or "opcode"),
+                tostring(type(options) == "table" and options.spellRef or "")
+            ),
+            {
+                {
+                    label = ("parts=%d bytes=%d result=%s"):format(partCount, payloadLength, sent and "queued" or "failed"),
+                    elapsed = getNowMilliseconds() - sendStartTime,
+                    threshold = SPELLCAST_SLOW_HELPER_MS,
+                },
+            },
+            getNowMilliseconds() - sendStartTime,
+            SPELLCAST_SLOW_HELPER_MS
+        )
+    end
+
+    return sent
 end
 
 local function getActiveContext(self)
@@ -380,12 +456,20 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
     local timingPhases = timingEnabled and {} or nil
     local totalStartTime = timingEnabled and getNowMilliseconds() or nil
 
+    local contextStartTime = timingEnabled and getNowMilliseconds() or nil
     local sessionState, eventState = getActiveContext(self)
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "context", getNowMilliseconds() - contextStartTime, SPELLCAST_SLOW_HELPER_MS)
+    end
     if not sessionState or not eventState then
         return false
     end
 
+    local channelStartTime = timingEnabled and getNowMilliseconds() or nil
     local channelId = Spellcasting.ResolveSessionChannelId(sessionState)
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "channel", getNowMilliseconds() - channelStartTime, SPELLCAST_SLOW_HELPER_MS)
+    end
     if not channelId then
         return false
     end
@@ -393,35 +477,40 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
     local activationStartTime = timingEnabled and getNowMilliseconds() or nil
     local snapshot = resolveSpellcastActivationSnapshot(self, spellRef, activationSnapshot)
     if timingEnabled then
-        timingPhases[#timingPhases + 1] = {
-            label = "activation",
-            elapsed = getNowMilliseconds() - activationStartTime,
-        }
+        appendTimingPhase(timingPhases, "activation", getNowMilliseconds() - activationStartTime, SPELLCAST_SLOW_HELPER_MS)
     end
     if type(snapshot) ~= "table" or snapshot.canCast ~= true then
         return false
     end
 
-    local validationStartTime = timingEnabled and getNowMilliseconds() or nil
+    local resolutionStartTime = timingEnabled and getNowMilliseconds() or nil
     local casterUnit = snapshot.casterUnit
     local activeEventState = snapshot.eventState or eventState
     local dataset = snapshot.dataset
     local spell = snapshot.spell
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "resolve", getNowMilliseconds() - resolutionStartTime, SPELLCAST_SLOW_HELPER_MS)
+    end
     if not casterUnit or not dataset or not spell then
         return false
     end
 
+    local conditionStartTime = timingEnabled and getNowMilliseconds() or nil
     local queuedTargetSelection = Spellcasting.PeekQueuedSpellTargetSelection and Spellcasting.PeekQueuedSpellTargetSelection(self, spellRef) or nil
     local queuedTargetUnit = resolveLifecycleTargetUnit(activeEventState or eventState, queuedTargetSelection)
     local conditionState = snapshot.conditionState
     if queuedTargetUnit ~= nil then
         conditionState = evaluateLifecycleSpellConditions(spellRef, spell, sessionState, activeEventState or eventState, casterUnit, queuedTargetUnit)
     end
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "conditions", getNowMilliseconds() - conditionStartTime, SPELLCAST_SLOW_HELPER_MS)
+    end
     if conditionState and conditionState.passed ~= true then
         return false
     end
 
     local auraManager = self.Spellcasting and self.Spellcasting.AuraManager or nil
+    local auraStartTime = timingEnabled and getNowMilliseconds() or nil
     if auraManager
         and type(auraManager.CanUnitCast) == "function"
         and auraManager:CanUnitCast(eventState, casterUnit.eventID) ~= true
@@ -429,10 +518,7 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
         return false
     end
     if timingEnabled then
-        timingPhases[#timingPhases + 1] = {
-            label = "validate",
-            elapsed = getNowMilliseconds() - validationStartTime,
-        }
+        appendTimingPhase(timingPhases, "aura", getNowMilliseconds() - auraStartTime, SPELLCAST_SLOW_HELPER_MS)
     end
 
     local numericCastTime = Spellcasting.NormalizeTurnCount(castTime)
@@ -443,19 +529,27 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
     local startCosts = snapshot.startCosts or Spellcasting.GetSpellResourceCostsForPhase(spell, "on_cast_start")
     local resolvedStartCostAmounts = nil
     if #startCosts > 0 then
-        local resourceStartTime = timingEnabled and getNowMilliseconds() or nil
-        local applied, updates, resolvedAmounts = Spellcasting.ApplySpellResourceCostsToUnit(casterUnit, spell, "on_cast_start", false)
+        local resourceApplyStartTime = timingEnabled and getNowMilliseconds() or nil
+        local applied, updates, resolvedAmounts = Spellcasting.ApplySpellResourceCostsToUnit(
+            casterUnit,
+            spell,
+            "on_cast_start",
+            false
+        )
+        if timingEnabled then
+            appendTimingPhase(timingPhases, "resource-apply", getNowMilliseconds() - resourceApplyStartTime, SPELLCAST_SLOW_HELPER_MS)
+        end
         if not applied then
             return false
         end
 
         resolvedStartCostAmounts = resolvedAmounts
-        sendSpellcasterResourceSync(self, casterUnit, "spellcast-start-resource", updates)
         if timingEnabled then
-            timingPhases[#timingPhases + 1] = {
-                label = "resources",
-                elapsed = getNowMilliseconds() - resourceStartTime,
-            }
+            local resourceSyncStartTime = getNowMilliseconds()
+            sendSpellcasterResourceSync(self, casterUnit, "spellcast-start-resource", updates)
+            appendTimingPhase(timingPhases, "resource-sync", getNowMilliseconds() - resourceSyncStartTime, SPELLCAST_SLOW_HELPER_MS)
+        else
+            sendSpellcasterResourceSync(self, casterUnit, "spellcast-start-resource", updates)
         end
     end
 
@@ -463,25 +557,21 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
         local cooldownStartTime = timingEnabled and getNowMilliseconds() or nil
         self:ApplyLocalSpellCooldown(eventState, casterUnit, spellRef, spell)
         if timingEnabled then
-            timingPhases[#timingPhases + 1] = {
-                label = "cooldown",
-                elapsed = getNowMilliseconds() - cooldownStartTime,
-            }
+            appendTimingPhase(timingPhases, "cooldown", getNowMilliseconds() - cooldownStartTime, SPELLCAST_SLOW_HELPER_MS)
         end
     end
 
     if numericCastTime == nil then
+        local instantDispatchStartTime = timingEnabled and getNowMilliseconds() or nil
         local instantCastEntry = Spellcasting.ConsumeQueuedSpellTargetSelection and Spellcasting.ConsumeQueuedSpellTargetSelection(self, spellRef) or nil
         if timingEnabled then
-            timingPhases[#timingPhases + 1] = {
-                label = "schedule",
-                elapsed = math.max(0, getNowMilliseconds() - (totalStartTime or 0)),
-            }
-            logSpellcastTiming(spellRef, timingPhases)
+            appendTimingPhase(timingPhases, "instant-dispatch", getNowMilliseconds() - instantDispatchStartTime, SPELLCAST_SLOW_HELPER_MS)
+            logSpellcastTiming("start", spellRef, timingPhases, getNowMilliseconds() - (totalStartTime or 0), SPELLCAST_SLOW_TOTAL_MS)
         end
         return queueLocalInstantSpellcastCompletion(self, spellRef, instantCastEntry)
     end
 
+    local stateStartTime = timingEnabled and getNowMilliseconds() or nil
     local entry = Spellcasting.BuildCastEntryWithSelection(
         self,
         spellRef,
@@ -499,77 +589,152 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
 
     Spellcasting.SetCastEntry(self, eventState.id, casterUnit.eventID, entry)
     Spellcasting.LogLifecycle("start", casterUnit.isPlayer == true and "player" or "npc", casterUnit.name, Spellcasting.ResolveSpellName(spellRef), numericCastTime)
-    refreshSpellcastVisualState("spellcast-start-local", casterUnit.eventID)
     if timingEnabled then
-        timingPhases[#timingPhases + 1] = {
-            label = "schedule",
-            elapsed = getNowMilliseconds() - (totalStartTime or 0),
-        }
-        logSpellcastTiming(spellRef, timingPhases)
+        appendTimingPhase(timingPhases, "state", getNowMilliseconds() - stateStartTime, SPELLCAST_SLOW_HELPER_MS)
     end
 
-    return sendSpellcastPacket(channelId, SPELLCAST_START_OPCODE, {
+    local visualStartTime = timingEnabled and getNowMilliseconds() or nil
+    refreshSpellcastVisualState("spellcast-start-local", casterUnit.eventID)
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "visuals", getNowMilliseconds() - visualStartTime, SPELLCAST_SLOW_HELPER_MS)
+    end
+
+    local commsStartTime = timingEnabled and getNowMilliseconds() or nil
+    local sent = sendSpellcastPacket(channelId, SPELLCAST_START_OPCODE, {
         sessionState.channelName,
         eventState.id,
         casterUnit.eventID,
         spellRef,
         numericCastTime,
         casterUnit.isPlayer == true and "player" or "npc",
+    }, {
+        kind = "start",
+        spellRef = spellRef,
     })
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "comms", getNowMilliseconds() - commsStartTime, SPELLCAST_SLOW_HELPER_MS)
+        logSpellcastTiming("start", spellRef, timingPhases, getNowMilliseconds() - (totalStartTime or 0), SPELLCAST_SLOW_TOTAL_MS)
+    end
+
+    return sent
 end
 
 function Client:OnSpellcastComplete(spellRef, castEntryOverride)
+    local timingEnabled = isSpellcastTimingEnabled()
+    local timingPhases = timingEnabled and {} or nil
+    local totalStartTime = timingEnabled and getNowMilliseconds() or nil
+
+    local contextStartTime = timingEnabled and getNowMilliseconds() or nil
     local sessionState, eventState = getActiveContext(self)
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "context", getNowMilliseconds() - contextStartTime, SPELLCAST_SLOW_HELPER_MS)
+    end
     if not sessionState or not eventState then
         return false
     end
 
+    local channelStartTime = timingEnabled and getNowMilliseconds() or nil
     local channelId = Spellcasting.ResolveSessionChannelId(sessionState)
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "channel", getNowMilliseconds() - channelStartTime, SPELLCAST_SLOW_HELPER_MS)
+    end
     if not channelId then
         return false
     end
 
+    local casterResolveStartTime = timingEnabled and getNowMilliseconds() or nil
     local activeCasterUnit = self:ResolveActiveSpellcasterUnit(eventState)
     local candidateEntry = castEntryOverride
     if type(candidateEntry) ~= "table" and type(Spellcasting.GetCastEntry) == "function" and type(activeCasterUnit) == "table" then
         candidateEntry = Spellcasting.GetCastEntry(self, eventState.id, tonumber(activeCasterUnit.eventID) or 0)
     end
     local casterUnit = resolveLifecycleCasterUnit(self, eventState, candidateEntry, activeCasterUnit)
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "resolve-caster", getNowMilliseconds() - casterResolveStartTime, SPELLCAST_SLOW_HELPER_MS)
+    end
+
+    local spellResolveStartTime = timingEnabled and getNowMilliseconds() or nil
     local dataset, spell = nil, nil
     if Registry.ResolveSpellReference then
         dataset, spell = Registry:ResolveSpellReference(spellRef)
+    end
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "resolve-spell", getNowMilliseconds() - spellResolveStartTime, SPELLCAST_SLOW_HELPER_MS)
     end
     if not casterUnit or not dataset or not spell then
         return false
     end
 
+    local targetResolveStartTime = timingEnabled and getNowMilliseconds() or nil
     local targetUnit = resolveLifecycleTargetUnit(eventState, candidateEntry)
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "resolve-target", getNowMilliseconds() - targetResolveStartTime, SPELLCAST_SLOW_HELPER_MS)
+    end
+
+    local conditionStartTime = timingEnabled and getNowMilliseconds() or nil
     local conditionState = evaluateLifecycleSpellConditions(spellRef, spell, sessionState, eventState, casterUnit, targetUnit)
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "conditions", getNowMilliseconds() - conditionStartTime, SPELLCAST_SLOW_HELPER_MS)
+    end
     if conditionState and conditionState.passed ~= true then
         return false
     end
 
     local endCosts = Spellcasting.GetSpellResourceCostsForPhase(spell, "on_cast_end")
     if #endCosts > 0 then
+        local resourceApplyStartTime = timingEnabled and getNowMilliseconds() or nil
         local applied, updates = Spellcasting.ApplySpellResourceCostsToUnit(casterUnit, spell, "on_cast_end", false)
+        if timingEnabled then
+            appendTimingPhase(timingPhases, "resource-apply", getNowMilliseconds() - resourceApplyStartTime, SPELLCAST_SLOW_HELPER_MS)
+        end
         if applied then
-            sendSpellcasterResourceSync(self, casterUnit, "spellcast-complete-resource", updates)
+            if timingEnabled then
+                local resourceSyncStartTime = getNowMilliseconds()
+                sendSpellcasterResourceSync(self, casterUnit, "spellcast-complete-resource", updates)
+                appendTimingPhase(timingPhases, "resource-sync", getNowMilliseconds() - resourceSyncStartTime, SPELLCAST_SLOW_HELPER_MS)
+            else
+                sendSpellcasterResourceSync(self, casterUnit, "spellcast-complete-resource", updates)
+            end
         end
     end
 
+    local stateStartTime = timingEnabled and getNowMilliseconds() or nil
     local previous = Spellcasting.RemoveCastEntry(self, eventState.id, casterUnit.eventID)
     local castEntry = previous or castEntryOverride or (Spellcasting.ConsumeQueuedSpellTargetSelection and Spellcasting.ConsumeQueuedSpellTargetSelection(self, spellRef)) or nil
-    Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUnit, dataset, spell, spellRef, "on_cast_end", castEntry)
-    Spellcasting.LogLifecycle("complete", casterUnit.isPlayer == true and "player" or "npc", casterUnit.name, (previous and previous.spellName) or Spellcasting.ResolveSpellName(spellRef))
-    refreshSpellcastVisualState("spellcast-complete-local", casterUnit.eventID)
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "state", getNowMilliseconds() - stateStartTime, SPELLCAST_SLOW_HELPER_MS)
+    end
 
-    return sendSpellcastPacket(channelId, SPELLCAST_COMPLETE_OPCODE, {
+    local componentStartTime = timingEnabled and getNowMilliseconds() or nil
+    Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUnit, dataset, spell, spellRef, "on_cast_end", castEntry)
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "components", getNowMilliseconds() - componentStartTime, SPELLCAST_SLOW_TOTAL_MS)
+    end
+    Spellcasting.LogLifecycle("complete", casterUnit.isPlayer == true and "player" or "npc", casterUnit.name, (previous and previous.spellName) or Spellcasting.ResolveSpellName(spellRef))
+
+    local visualStartTime = timingEnabled and getNowMilliseconds() or nil
+    refreshSpellcastVisualState("spellcast-complete-local", casterUnit.eventID)
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "visuals", getNowMilliseconds() - visualStartTime, SPELLCAST_SLOW_HELPER_MS)
+    end
+
+    local commsStartTime = timingEnabled and getNowMilliseconds() or nil
+    local sent = sendSpellcastPacket(channelId, SPELLCAST_COMPLETE_OPCODE, {
         sessionState.channelName,
         eventState.id,
         casterUnit.eventID,
         spellRef,
         casterUnit.isPlayer == true and "player" or "npc",
+    }, {
+        kind = "finish",
+        spellRef = spellRef,
     })
+    if timingEnabled then
+        appendTimingPhase(timingPhases, "comms", getNowMilliseconds() - commsStartTime, SPELLCAST_SLOW_HELPER_MS)
+        logSpellcastTiming("finish", spellRef, timingPhases, getNowMilliseconds() - (totalStartTime or 0), SPELLCAST_SLOW_TOTAL_MS)
+    end
+
+    return sent
 end
 
 function Client:OnSpellcastInterrupted(spellRef, castEntryOverride)
@@ -644,6 +809,9 @@ function Client:OnSpellcastInterrupted(spellRef, castEntryOverride)
         casterUnit.eventID,
         spellRef,
         casterUnit.isPlayer == true and "player" or "npc",
+    }, {
+        kind = "interrupt",
+        spellRef = spellRef,
     })
 end
 

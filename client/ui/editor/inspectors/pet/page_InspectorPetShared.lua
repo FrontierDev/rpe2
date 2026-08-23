@@ -53,16 +53,15 @@ function DataEditor:CommitSelectedPet(mutate)
         return
     end
 
+    local before = self:DeepCopyValue(pet)
     mutate(pet, dataset)
     applyTable(pet, self:NormalizePetDefinition(pet))
 
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "pets", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, pet) then
+        return
     end
 
-    self:RefreshAfterDatasetEntryChanged("pets")
+    self:QueuePendingDatasetEntryChanged(dataset.id, "pets")
 end
 
 function DataEditor:SetPetInspectorDropdownEnabled(dropdown, enabled)

@@ -27,13 +27,12 @@ local function commitSelectedItemSlot(self, mutate)
         return
     end
 
+    local before = self:DeepCopyValue(itemSlot)
     mutate(itemSlot, dataset)
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "itemSlots", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, itemSlot) then
+        return
     end
-    self:RefreshAfterDatasetEntryChanged("itemSlots")
+    self:QueuePendingDatasetEntryChanged(dataset.id, "itemSlots")
 end
 
 function DataEditor:BuildItemSlotInspectorPage(parent)

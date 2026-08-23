@@ -14,7 +14,9 @@ local SOCKET_TYPE_ORDER = {
     "red",
     "blue",
     "yellow",
+    "orange",
     "green",
+    "purple",
     "meta",
     "cogwheel",
     "prismatic",
@@ -24,10 +26,21 @@ local SOCKET_TYPE_FLAGS = {
     red = true,
     blue = true,
     yellow = true,
+    orange = true,
     green = true,
+    purple = true,
     meta = true,
     cogwheel = true,
     prismatic = true,
+}
+
+local SOCKET_COLOR_COMPONENTS = {
+    red = { red = true },
+    blue = { blue = true },
+    yellow = { yellow = true },
+    orange = { red = true, yellow = true },
+    green = { blue = true, yellow = true },
+    purple = { blue = true, red = true },
 }
 
 local MODIFICATION_KINDS = {
@@ -274,12 +287,31 @@ local function canGemFitSocket(gemColor, socketColor)
         return true
     end
     if normalizedSocketColor == "prismatic" then
-        return normalizedGemColor == "red"
-            or normalizedGemColor == "green"
-            or normalizedGemColor == "yellow"
-            or normalizedGemColor == "prismatic"
+        return true
     end
-    return normalizedGemColor == normalizedSocketColor
+    if normalizedGemColor == normalizedSocketColor then
+        return true
+    end
+    if normalizedGemColor == "meta" or normalizedSocketColor == "meta" then
+        return false
+    end
+    if normalizedGemColor == "cogwheel" or normalizedSocketColor == "cogwheel" then
+        return false
+    end
+
+    local gemComponents = SOCKET_COLOR_COMPONENTS[normalizedGemColor]
+    local socketComponents = SOCKET_COLOR_COMPONENTS[normalizedSocketColor]
+    if not gemComponents or not socketComponents then
+        return false
+    end
+
+    for component in pairs(socketComponents) do
+        if gemComponents[component] ~= true then
+            return false
+        end
+    end
+
+    return true
 end
 
 local function buildGemSocketAssignments(item, modifications)
@@ -544,6 +576,9 @@ function Modifications.CanApplyModificationToRecord(targetRecord, modificationRe
             return false, "weapon-type-mismatch"
         end
         if requiredWeaponTypeRef ~= "" and requiredWeaponTypeRef ~= targetWeaponTypeRef then
+            return false, "weapon-type-mismatch"
+        end
+        if modItem.targetTwoHandedOnly == true and (targetItem.itemType ~= "weapon" or targetItem.isTwoHanded ~= true) then
             return false, "weapon-type-mismatch"
         end
 

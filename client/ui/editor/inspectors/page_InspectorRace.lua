@@ -100,13 +100,12 @@ local function commitSelectedDefinition(self, collectionKey, mutate)
         return
     end
 
+    local before = self:DeepCopyValue(definition)
     mutate(definition, dataset)
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, collectionKey, {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, definition) then
+        return
     end
-    self:RefreshAfterDatasetEntryChanged(collectionKey)
+    self:QueuePendingDatasetEntryChanged(dataset.id, collectionKey)
 end
 
 local function getInspectorState(self, collectionKey)

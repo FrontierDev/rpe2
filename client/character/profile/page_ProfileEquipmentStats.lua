@@ -290,12 +290,12 @@ local function formatStatValue(row)
     local value = tonumber(row and row.value) or 0
 
     if displayMode == "value" then
-        return ("%g"):format(value)
+        return ("%.0f"):format(value)
     end
-    if displayMode == "signed_percent" then
-        return ("%g%%"):format(value)
+    if displayMode == "signed_percent" or displayMode == "equip_percent" then
+        return ("%.2f%%"):format(value)
     end
-    return ("%g"):format(value)
+    return ("%.0f"):format(value)
 end
 
 local function buildStatMitigationTooltipLines(statRow)
@@ -411,7 +411,7 @@ local function refreshHealthEntry(page, resourceRows, healthResourceRef)
     if healthRow then
         healthEntry:SetIcon(ensureString(healthRow.icon, "Interface\\Icons\\INV_Misc_QuestionMark"))
         healthEntry:SetStatName("Max Health")
-        healthEntry:SetStatValue(("%g"):format(tonumber(healthRow.value) or 0))
+        healthEntry:SetStatValue(("%.0f"):format(tonumber(healthRow.value) or 0))
         if frame.Show then
             frame:Show()
         end
@@ -421,7 +421,7 @@ local function refreshHealthEntry(page, resourceRows, healthResourceRef)
         if primaryEntry and primaryResourceRow and primaryResourceRow.ref ~= healthRow.ref then
             primaryEntry:SetIcon(ensureString(primaryResourceRow.icon, "Interface\\Icons\\INV_Misc_QuestionMark"))
             primaryEntry:SetStatName(ensureString(primaryResourceRow.name, "Resource"))
-            primaryEntry:SetStatValue(("%g"):format(tonumber(primaryResourceRow.value) or 0))
+            primaryEntry:SetStatValue(("%.0f"):format(tonumber(primaryResourceRow.value) or 0))
             if primaryFrame and primaryFrame.Show then
                 primaryFrame:Show()
             end

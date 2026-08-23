@@ -363,6 +363,7 @@ function DataEditor:CommitSelectedTrait(mutate)
         return
     end
 
+    local before = self:DeepCopyValue(trait)
     mutate(trait, dataset)
     local normalized = self:NormalizeTraitDefinition(trait)
     for key in pairs(trait) do
@@ -374,13 +375,11 @@ function DataEditor:CommitSelectedTrait(mutate)
         trait[key] = value
     end
 
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "traits", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, trait) then
+        return
     end
 
-    self:RefreshAfterDatasetEntryChanged("traits")
+    self:QueuePendingDatasetEntryChanged(dataset.id, "traits")
 end
 
 function DataEditor:BuildTraitInspectorDatasetItems()
@@ -696,6 +695,7 @@ function DataEditor:AddTraitInspectorEvent()
         trait.events[#trait.events + 1] = {
             combatEventId = self:GetDefaultTraitInspectorCombatEventId(),
             triggerTarget = "event_other",
+            chance = 100,
             effects = {
                 {
                     type = "damage",
@@ -1771,6 +1771,16 @@ local function buildTraitInspectorEventsPage(self, page)
     self.TraitInspectorTriggerTargetGroup:AddChild(self.TraitInspectorTriggerTargetDropdown)
     attachMouseWheel(self.TraitInspectorTriggerTargetDropdown)
 
+    self.TraitInspectorEventChanceGroup = createGroup("RPEDataEditorTraitInspectorEventChanceGroup", "Trigger Chance %", 18)
+    self.TraitInspectorEventChanceInput = UI.CreateTextInput(self.TraitInspectorEventChanceGroup:GetFrame(), "RPEDataEditorTraitInspectorEventChanceInput", {
+        width = FIELD_WIDTH,
+        height = 18,
+        text = "100",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.TraitInspectorEventChanceGroup:AddChild(self.TraitInspectorEventChanceInput)
+    attachMouseWheel(self.TraitInspectorEventChanceInput)
+
     self.TraitInspectorSelectedEventEffectHeader = UI.CreateText(root:GetFrame(), "RPEDataEditorTraitInspectorSelectedEventEffectHeader", "Select an event effect to edit it.", {
         width = FIELD_WIDTH,
         height = 12,
@@ -2142,6 +2152,12 @@ local function buildTraitInspectorEventsPage(self, page)
             effect.amount = tonumber(self.TraitInspectorEventResourceAmountInput:GetText()) or 0
         end)
     end)
+    bindInput("TraitInspectorEventChanceInput", function()
+        self:CommitSelectedTraitInspectorEvent(function(traitEvent)
+            traitEvent.chance = tonumber(self.TraitInspectorEventChanceInput:GetText()) or 100
+            self:NormalizeAuraInspectorEvent(traitEvent)
+        end)
+    end)
 
     local function refreshScrollBounds()
         local frame = root:GetFrame()
@@ -2366,6 +2382,10 @@ function DataEditor:RefreshTraitInspectorPage()
         self.TraitInspectorTriggerTargetDropdown:SetSelectedValue(traitEvent and traitEvent.triggerTarget or "event_other", true)
         setDropdownEnabled(self.TraitInspectorTriggerTargetDropdown, traitEvent ~= nil and hasTraitEventTrigger)
     end
+    if self.TraitInspectorEventChanceInput then
+        self.TraitInspectorEventChanceInput:SetText(tostring(traitEvent and traitEvent.chance or 100))
+        setTextElementEnabled(self.TraitInspectorEventChanceInput, traitEvent ~= nil)
+    end
     if self.TraitInspectorAddEventButton then
         self.TraitInspectorAddEventButton:SetEnabled(hasTrait)
     end
@@ -2461,6 +2481,7 @@ function DataEditor:RefreshTraitInspectorPage()
 
     setGroupVisible(self.TraitInspectorCombatEventGroup, traitEvent ~= nil)
     setGroupVisible(self.TraitInspectorTriggerTargetGroup, traitEvent ~= nil and hasTraitEventTrigger)
+    setGroupVisible(self.TraitInspectorEventChanceGroup, traitEvent ~= nil)
     setGroupVisible(self.TraitInspectorEventEffectTypeGroup, eventEffect ~= nil)
     setGroupVisible(self.TraitInspectorEventBaseAmountGroup, eventEffect ~= nil and (isEventDamage or isEventHeal))
     setGroupVisible(self.TraitInspectorEventDamageSchoolsGroup, eventEffect ~= nil and isEventDamage)

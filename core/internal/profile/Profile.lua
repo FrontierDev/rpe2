@@ -9,6 +9,7 @@ local Database = Addon.Internal.Database or {}
 local TraitClass = Database.Classes and Database.Classes.Trait or {}
 local Equipment = Profile.Equipment or {}
 local Resolver = Profile.Resolver or {}
+local RECIPE_PROFILE_INTERNAL_TRACE = false
 
 local function getItemClass()
     return Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Item or nil
@@ -20,6 +21,34 @@ local function ensureString(value)
     end
 
     return tostring(value)
+end
+
+local function getTimingMilliseconds()
+    if type(debugprofilestop) == "function" then
+        return tonumber(debugprofilestop()) or 0
+    end
+    if type(GetTimePreciseSec) == "function" then
+        return (tonumber(GetTimePreciseSec()) or 0) * 1000
+    end
+    return 0
+end
+
+local function getElapsedMilliseconds(startedAt)
+    local started = tonumber(startedAt) or 0
+    return math.max(0, getTimingMilliseconds() - started)
+end
+
+local function logProfileInternal(message, ...)
+    local debugObject = Addon.Debug or {}
+    if RECIPE_PROFILE_INTERNAL_TRACE ~= true then
+        return
+    end
+    if type(debugObject.SetLevelEnabled) == "function" and type(debugObject.IsLevelEnabled) == "function" and not debugObject.IsLevelEnabled("internal") then
+        debugObject.SetLevelEnabled("internal", true)
+    end
+    if type(debugObject.Internal) == "function" then
+        debugObject.Internal(message, ...)
+    end
 end
 
 local function getInventory()
@@ -234,7 +263,441 @@ local function buildKnownSpellRefs()
     return refs
 end
 
-local function isSpellProvidedBySelectedMount(spellRef)
+local recipeKnowledgeCache = {
+    revision = -1,
+    data = nil,
+}
+
+local function buildRecipeRefSet(refs)
+    local set = {}
+    for index = 1, #(refs or {}) do
+        local recipeRef = ensureString(refs[index])
+        if recipeRef ~= "" then
+            set[recipeRef] = true
+        end
+    end
+    return set
+end
+
+local function buildProfileRecipeKnowledge()
+    local revision = math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+    local recipeSkillIndex = Addon.Internal and Addon.Internal.RecipeSkillIndex or nil
+    local manualRecipebook = Database.ListProfileRecipebook and Database.ListProfileRecipebook() or {}
+    local knownRecipeRefs = {}
+    local knownRecipeSet = {}
+    local knownRecipeRefsBySkill = {}
+    local unknownTrainerRecipeRefs = {}
+    local unknownTrainerRecipeSet = {}
+    local unknownTrainerRecipeRefsBySkill = {}
+
+    local function appendUnique(target, seen, recipeRef)
+        local normalizedRef = ensureString(recipeRef)
+        if normalizedRef == "" or seen[normalizedRef] then
+            return false
+        end
+
+        target[#target + 1] = normalizedRef
+        seen[normalizedRef] = true
+        return true
+    end
+
+    local alwaysLearnedRefsBySkill = recipeSkillIndex and recipeSkillIndex.alwaysLearnedRefsBySkill or {}
+    for _, skillRefs in pairs(alwaysLearnedRefsBySkill) do
+        for index = 1, #(skillRefs or {}) do
+            appendUnique(knownRecipeRefs, knownRecipeSet, skillRefs[index])
+        end
+    end
+
+    for index = 1, #manualRecipebook do
+        appendUnique(knownRecipeRefs, knownRecipeSet, manualRecipebook[index])
+    end
+
+    local orderedRecipeRefsBySkill = recipeSkillIndex and recipeSkillIndex.orderedRecipeRefsBySkill or {}
+    for skillRef, recipeRefs in pairs(orderedRecipeRefsBySkill) do
+        local normalizedSkillRef = ensureString(skillRef)
+        if normalizedSkillRef ~= "" then
+            local bucket = {}
+            for index = 1, #(recipeRefs or {}) do
+                local recipeRef = ensureString(recipeRefs[index])
+                if recipeRef ~= "" and knownRecipeSet[recipeRef] then
+                    bucket[#bucket + 1] = recipeRef
+                end
+            end
+            knownRecipeRefsBySkill[normalizedSkillRef] = bucket
+        end
+    end
+
+    local trainerRecipeRefsBySkill = recipeSkillIndex and recipeSkillIndex.trainerRecipeRefsBySkill or {}
+    for skillRef, recipeRefs in pairs(trainerRecipeRefsBySkill) do
+        local normalizedSkillRef = ensureString(skillRef)
+        if normalizedSkillRef ~= "" then
+            local bucket = {}
+            for index = 1, #(recipeRefs or {}) do
+                local recipeRef = ensureString(recipeRefs[index])
+                if recipeRef ~= "" and knownRecipeSet[recipeRef] ~= true then
+                    bucket[#bucket + 1] = recipeRef
+                    appendUnique(unknownTrainerRecipeRefs, unknownTrainerRecipeSet, recipeRef)
+                end
+            end
+            unknownTrainerRecipeRefsBySkill[normalizedSkillRef] = bucket
+        end
+    end
+
+    return {
+        revision = revision,
+        knownRecipeRefs = knownRecipeRefs,
+        unknownTrainerRecipeRefs = unknownTrainerRecipeRefs,
+        knownRecipeRefsBySkill = knownRecipeRefsBySkill,
+        unknownTrainerRecipeRefsBySkill = unknownTrainerRecipeRefsBySkill,
+    }
+end
+
+local function invalidateRecipeKnowledgeCache()
+    recipeKnowledgeCache.revision = -1
+    recipeKnowledgeCache.data = nil
+end
+
+local function getRecipeKnowledgeState()
+    local revision = math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+    local cached = recipeKnowledgeCache.data
+    if recipeKnowledgeCache.revision == revision and type(cached) == "table" then
+        return cached
+    end
+
+    local stored = Database.GetProfileRecipeKnowledge and Database.GetProfileRecipeKnowledge() or nil
+    if type(stored) ~= "table" or tonumber(stored.revision) ~= revision then
+        stored = buildProfileRecipeKnowledge()
+        if Database.SetProfileRecipeKnowledge then
+            stored = Database.SetProfileRecipeKnowledge(stored)
+        end
+    end
+
+    stored.knownRecipeSet = buildRecipeRefSet(stored.knownRecipeRefs)
+    stored.unknownTrainerRecipeSet = buildRecipeRefSet(stored.unknownTrainerRecipeRefs)
+    recipeKnowledgeCache.revision = revision
+    recipeKnowledgeCache.data = stored
+    return stored
+end
+
+function Profile.RebuildPersistedRecipeKnowledge()
+    local startedAt = getTimingMilliseconds()
+    local stored = buildProfileRecipeKnowledge()
+    if Database.SetProfileRecipeKnowledge then
+        stored = Database.SetProfileRecipeKnowledge(stored)
+    end
+    invalidateRecipeKnowledgeCache()
+    logProfileInternal(
+        "Profile: RebuildPersistedRecipeKnowledge revision=%d known=%d unknownTrainer=%d took=%.2fms",
+        tonumber(stored and stored.revision) or 0,
+        #(stored and stored.knownRecipeRefs or {}),
+        #(stored and stored.unknownTrainerRecipeRefs or {}),
+        getElapsedMilliseconds(startedAt)
+    )
+    return getRecipeKnowledgeState()
+end
+
+local function getProfileConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
+local function getProfileRuntimeRevision()
+    local builder = Addon.Client and Addon.Client.Spellcasting and Addon.Client.Spellcasting.DescriptionBuilder or nil
+    return math.max(1, math.floor(tonumber(builder and builder.ProfileTooltipContextRevision) or 1))
+end
+
+local function getProfileIdentityKey()
+    if type(Database.ResolveCurrentCharacterIdentity) == "function" then
+        local characterKey, _, isStable = Database.ResolveCurrentCharacterIdentity()
+        if isStable == true then
+            return tostring(characterKey or "")
+        end
+    end
+
+    return ""
+end
+
+function Profile.InvalidateResolvedLookupCaches()
+    Profile.ResolvedStatLookupCache = nil
+    Profile.ResolvedResourceLookupCache = nil
+end
+
+local function getResolvedBootstrapReadiness()
+    local identityKey = getProfileIdentityKey()
+    local activeProfile = type(Database.GetActiveProfile) == "function" and Database.GetActiveProfile() or nil
+    local rulesetLogic = getRuleset()
+    local activeRuleset = type(rulesetLogic.GetActiveRuleset) == "function" and rulesetLogic:GetActiveRuleset() or nil
+    local activatedDatasetIds = type(Database.ListActivatedDatasetIds) == "function" and Database.ListActivatedDatasetIds() or {}
+    local hasActivatedDatasets = type(activatedDatasetIds) == "table" and #activatedDatasetIds > 0
+    local ready = identityKey ~= ""
+        and type(activeProfile) == "table"
+        and type(activeRuleset) == "table"
+        and hasActivatedDatasets
+
+    return {
+        ready = ready,
+        identityKey = identityKey,
+        hasProfile = type(activeProfile) == "table",
+        hasRuleset = type(activeRuleset) == "table",
+        hasActivatedDatasets = hasActivatedDatasets,
+    }
+end
+
+local function refreshResolvedBootstrapReadiness()
+    local readiness = getResolvedBootstrapReadiness()
+    local nextReady = readiness.ready == true
+    local nextIdentityKey = nextReady and tostring(readiness.identityKey or "") or ""
+    local previousReady = Profile.ResolvedBootstrapReady == true
+    local previousIdentityKey = tostring(Profile.ResolvedBootstrapIdentityKey or "")
+
+    if previousReady ~= nextReady or previousIdentityKey ~= nextIdentityKey then
+        Profile.InvalidateResolvedLookupCaches()
+    end
+
+    Profile.ResolvedBootstrapReady = nextReady
+    Profile.ResolvedBootstrapIdentityKey = nextIdentityKey
+    return readiness
+end
+
+function Profile.IsBootstrapResolvedStateReady()
+    return refreshResolvedBootstrapReadiness().ready == true
+end
+
+local getCachedResolvedStatLookup
+local getCachedResolvedResourceLookup
+
+function Profile.WarmResolvedBootstrapState(_)
+    local readiness = refreshResolvedBootstrapReadiness()
+    if readiness.ready ~= true then
+        return false, readiness
+    end
+
+    getCachedResolvedStatLookup({ includeAuraBonuses = false })
+    getCachedResolvedResourceLookup(nil)
+    return true, readiness
+end
+
+local function canUseDefaultResolvedResourceCache(options)
+    return type(options) ~= "table" or next(options) == nil
+end
+
+local function canUseDefaultResolvedStatCache(options)
+    if type(options) ~= "table" then
+        return false
+    end
+
+    local sawBaseStatRequest = false
+    for key, value in pairs(options) do
+        if key == "includeAuraBonuses" and value == false then
+            sawBaseStatRequest = true
+        else
+            return false
+        end
+    end
+
+    return sawBaseStatRequest
+end
+
+local function cloneResolvedResourceRow(row)
+    if type(row) ~= "table" then
+        return nil
+    end
+
+    local cloned = {}
+    for key, value in pairs(row) do
+        if type(value) == "table" then
+            local child = {}
+            for childKey, childValue in pairs(value) do
+                child[childKey] = childValue
+            end
+            cloned[key] = child
+        else
+            cloned[key] = value
+        end
+    end
+    return cloned
+end
+
+local cloneResolvedStatRow = cloneResolvedResourceRow
+
+local function buildResolvedStatRowsByRef(rows)
+    local rowsByRef = {}
+    for index = 1, #(rows or {}) do
+        local row = rows[index]
+        local statRef = ensureString(row and row.ref)
+        if statRef ~= "" then
+            rowsByRef[statRef] = row
+        end
+    end
+
+    return rowsByRef
+end
+
+getCachedResolvedStatLookup = function(options)
+    if not canUseDefaultResolvedStatCache(options) then
+        local rows = Resolver.ListResolvedStats and Resolver.ListResolvedStats(options) or {}
+        return rows, buildResolvedStatRowsByRef(rows)
+    end
+
+    local readiness = refreshResolvedBootstrapReadiness()
+    local configurationRevision = getProfileConfigurationRevision()
+    local runtimeRevision = getProfileRuntimeRevision()
+    local identityKey = getProfileIdentityKey()
+    local cacheKey = ("%d:%d:%s:base"):format(configurationRevision, runtimeRevision, identityKey)
+    local cache = Profile.ResolvedStatLookupCache
+    if type(cache) == "table"
+        and tostring(cache.key or "") == cacheKey
+        and type(cache.rows) == "table"
+        and type(cache.rowsByRef) == "table"
+    then
+        return cache.rows, cache.rowsByRef
+    end
+
+    local rows = Resolver.ListResolvedStats and Resolver.ListResolvedStats(options) or {}
+    local rowsByRef = buildResolvedStatRowsByRef(rows)
+    if readiness.ready == true then
+        Profile.ResolvedStatLookupCache = {
+            key = cacheKey,
+            configurationRevision = configurationRevision,
+            runtimeRevision = runtimeRevision,
+            identityKey = identityKey,
+            rows = rows,
+            rowsByRef = rowsByRef,
+        }
+    end
+    return rows, rowsByRef
+end
+
+local function buildResolvedResourceRowsByRef(rows)
+    local rowsByRef = {}
+    for index = 1, #(rows or {}) do
+        local row = rows[index]
+        local resourceRef = ensureString(row and row.ref)
+        if resourceRef ~= "" then
+            rowsByRef[resourceRef] = row
+        end
+    end
+
+    return rowsByRef
+end
+
+getCachedResolvedResourceLookup = function(options)
+    if not canUseDefaultResolvedResourceCache(options) then
+        local rows = Resolver.ListResolvedResources and Resolver.ListResolvedResources(options) or {}
+        return rows, buildResolvedResourceRowsByRef(rows)
+    end
+
+    local readiness = refreshResolvedBootstrapReadiness()
+    local configurationRevision = getProfileConfigurationRevision()
+    local runtimeRevision = getProfileRuntimeRevision()
+    local identityKey = getProfileIdentityKey()
+    local cacheKey = ("%d:%d:%s:base"):format(configurationRevision, runtimeRevision, identityKey)
+    local cache = Profile.ResolvedResourceLookupCache
+    if type(cache) == "table"
+        and tostring(cache.key or "") == cacheKey
+        and type(cache.rows) == "table"
+        and type(cache.rowsByRef) == "table"
+    then
+        return cache.rows, cache.rowsByRef
+    end
+
+    local rows = Resolver.ListResolvedResources and Resolver.ListResolvedResources(options) or {}
+    local rowsByRef = buildResolvedResourceRowsByRef(rows)
+    if readiness.ready == true then
+        Profile.ResolvedResourceLookupCache = {
+            key = cacheKey,
+            configurationRevision = configurationRevision,
+            runtimeRevision = runtimeRevision,
+            identityKey = identityKey,
+            rows = rows,
+            rowsByRef = rowsByRef,
+        }
+    end
+    return rows, rowsByRef
+end
+
+local function canUseDefaultResolvedSkillCache(options)
+    return options == nil or (type(options) == "table" and next(options) == nil)
+end
+
+local function buildResolvedWeaponSkillRowsByWeaponType(rows)
+    local rowsByWeaponTypeRef = {}
+    for index = 1, #(rows or {}) do
+        local row = rows[index]
+        local weaponTypeRef = ensureString(type(row) == "table" and row.weaponTypeRef)
+        if weaponTypeRef ~= "" and tostring(row and row.skillType or "") == "weapon" then
+            local bucket = rowsByWeaponTypeRef[weaponTypeRef]
+            if type(bucket) ~= "table" then
+                bucket = {}
+                rowsByWeaponTypeRef[weaponTypeRef] = bucket
+            end
+            bucket[#bucket + 1] = row
+        end
+    end
+    return rowsByWeaponTypeRef
+end
+
+local function getCachedResolvedWeaponSkillLookup(options)
+    if not canUseDefaultResolvedSkillCache(options) then
+        local rows = Resolver.ListResolvedSkills and Resolver.ListResolvedSkills(options) or {}
+        return rows, buildResolvedWeaponSkillRowsByWeaponType(rows)
+    end
+
+    local revision = getProfileConfigurationRevision()
+    local cache = Profile.ResolvedWeaponSkillLookupCache
+    if type(cache) == "table"
+        and tonumber(cache.revision) == revision
+        and type(cache.rows) == "table"
+        and type(cache.rowsByWeaponTypeRef) == "table"
+    then
+        return cache.rows, cache.rowsByWeaponTypeRef
+    end
+
+    local rows = Resolver.ListResolvedSkills and Resolver.ListResolvedSkills(options) or {}
+    local rowsByWeaponTypeRef = buildResolvedWeaponSkillRowsByWeaponType(rows)
+    Profile.ResolvedWeaponSkillLookupCache = {
+        revision = revision,
+        rows = rows,
+        rowsByWeaponTypeRef = rowsByWeaponTypeRef,
+    }
+    return rows, rowsByWeaponTypeRef
+end
+
+local function getSpellRefFallbackName(spellRef)
+    local normalizedRef = ensureString(spellRef)
+    local _, spellId = normalizedRef:match("^([^:]+):(.+)$")
+    if spellId and spellId ~= "" then
+        return spellId
+    end
+
+    return normalizedRef
+end
+
+local isSpellProvidedBySelectedMount
+
+local function buildKnownSpellLightweightRow(spellRef, rowIndex)
+    local normalizedRef = ensureString(spellRef)
+    if normalizedRef == "" then
+        return nil
+    end
+
+    local registry = getRegistry()
+    local dataset, spell = nil, nil
+    if registry.ResolveSpellReference then
+        dataset, spell = registry:ResolveSpellReference(normalizedRef)
+    end
+
+    return {
+        rowIndex = rowIndex,
+        spellRef = normalizedRef,
+        name = type(spell) == "table" and trimString(spell.name) ~= "" and spell.name or getSpellRefFallbackName(normalizedRef),
+        isMissing = spell == nil,
+        dataset = dataset,
+        spell = spell,
+        spellbookCategory = isSpellProvidedBySelectedMount(normalizedRef) and "Mounted" or (spell and trimString(spell.spellbookCategory) or ""),
+    }
+end
+
+function isSpellProvidedBySelectedMount(spellRef)
     local normalizedRef = ensureString(spellRef)
     if normalizedRef == "" then
         return false
@@ -1403,7 +1866,12 @@ function Profile.UnequipSlotToInventory(slotKey)
 end
 
 function Profile.ListResolvedStats(options)
-    return Resolver.ListResolvedStats and Resolver.ListResolvedStats(options) or {}
+    local rows = select(1, getCachedResolvedStatLookup(options))
+    local cloned = {}
+    for index = 1, #(rows or {}) do
+        cloned[index] = cloneResolvedStatRow(rows[index])
+    end
+    return cloned
 end
 
 function Profile.GetResolvedStatRow(statRef, options)
@@ -1412,20 +1880,18 @@ function Profile.GetResolvedStatRow(statRef, options)
         return nil
     end
 
+    if canUseDefaultResolvedStatCache(options) then
+        local _, rowsByRef = getCachedResolvedStatLookup(options)
+        return cloneResolvedStatRow(rowsByRef and rowsByRef[normalizedRef] or nil)
+    end
+
     if Resolver.GetResolvedStatRowsByRefs then
         local rows = Resolver.GetResolvedStatRowsByRefs({ normalizedRef }, options)
         return rows[1]
     end
 
-    local rows = Profile.ListResolvedStats(options)
-    for index = 1, #rows do
-        local row = rows[index]
-        if type(row) == "table" and row.ref == normalizedRef then
-            return row
-        end
-    end
-
-    return nil
+    local _, rowsByRef = getCachedResolvedStatLookup(options)
+    return cloneResolvedStatRow(rowsByRef and rowsByRef[normalizedRef] or nil)
 end
 
 function Profile.GetResolvedStatValue(statRef, fallback, options)
@@ -1443,13 +1909,23 @@ function Profile.GetResolvedStatValue(statRef, fallback, options)
 end
 
 function Profile.ListResolvedResources(options)
-    return Resolver.ListResolvedResources and Resolver.ListResolvedResources(options) or {}
+    local rows = getCachedResolvedResourceLookup(options)
+    local cloned = {}
+    for index = 1, #(rows or {}) do
+        cloned[index] = cloneResolvedResourceRow(rows[index])
+    end
+    return cloned
 end
 
 function Profile.GetResolvedResourceRow(resourceRef, options)
     local normalizedRef = ensureString(resourceRef)
     if normalizedRef == "" then
         return nil
+    end
+
+    if canUseDefaultResolvedResourceCache(options) then
+        local _, rowsByRef = getCachedResolvedResourceLookup(options)
+        return cloneResolvedResourceRow(rowsByRef and rowsByRef[normalizedRef] or nil)
     end
 
     if Resolver.GetResolvedResourceRowsByRefs then
@@ -1469,6 +1945,19 @@ function Profile.GetResolvedResourceRow(resourceRef, options)
 end
 
 function Profile.GetResolvedStatRowsByRefs(statRefs, options)
+    if canUseDefaultResolvedStatCache(options) then
+        local _, rowsByRef = getCachedResolvedStatLookup(options)
+        local rows = {}
+        for index = 1, #(statRefs or {}) do
+            local statRef = ensureString(statRefs[index])
+            local row = rowsByRef and rowsByRef[statRef] or nil
+            if row then
+                rows[#rows + 1] = cloneResolvedStatRow(row)
+            end
+        end
+        return rows
+    end
+
     if Resolver.GetResolvedStatRowsByRefs then
         return Resolver.GetResolvedStatRowsByRefs(statRefs, options)
     end
@@ -1484,6 +1973,19 @@ function Profile.GetResolvedStatRowsByRefs(statRefs, options)
 end
 
 function Profile.GetResolvedResourceRowsByRefs(resourceRefs, options)
+    if canUseDefaultResolvedResourceCache(options) then
+        local _, rowsByRef = getCachedResolvedResourceLookup(options)
+        local rows = {}
+        for index = 1, #(resourceRefs or {}) do
+            local resourceRef = ensureString(resourceRefs[index])
+            local row = rowsByRef and rowsByRef[resourceRef] or nil
+            if row then
+                rows[#rows + 1] = cloneResolvedResourceRow(row)
+            end
+        end
+        return rows
+    end
+
     if Resolver.GetResolvedResourceRowsByRefs then
         return Resolver.GetResolvedResourceRowsByRefs(resourceRefs, options)
     end
@@ -1502,10 +2004,35 @@ function Profile.ListResolvedSkills(options)
     return Resolver.ListResolvedSkills and Resolver.ListResolvedSkills(options) or {}
 end
 
+function Profile.GetResolvedWeaponSkillRowsByWeaponType(options)
+    local _, rowsByWeaponTypeRef = getCachedResolvedWeaponSkillLookup(options)
+    return rowsByWeaponTypeRef
+end
+
+function Profile.GetResolvedSkillRowsByRefs(skillRefs, options)
+    if Resolver.GetResolvedSkillRowsByRefs then
+        return Resolver.GetResolvedSkillRowsByRefs(skillRefs, options)
+    end
+
+    local rows = {}
+    for index = 1, #(skillRefs or {}) do
+        local row = Profile.GetResolvedSkillRow(skillRefs[index], options)
+        if row then
+            rows[#rows + 1] = row
+        end
+    end
+    return rows
+end
+
 function Profile.GetResolvedSkillRow(skillRef, options)
     local normalizedRef = ensureString(skillRef)
     if normalizedRef == "" then
         return nil
+    end
+
+    if Resolver.GetResolvedSkillRowsByRefs then
+        local rows = Resolver.GetResolvedSkillRowsByRefs({ normalizedRef }, options)
+        return rows[1]
     end
 
     local rows = Profile.ListResolvedSkills(options)
@@ -1519,25 +2046,48 @@ function Profile.GetResolvedSkillRow(skillRef, options)
     return nil
 end
 
-function Profile.ListKnownSpells()
+function Profile.ListKnownSpells(options)
+    local lightweight = type(options) == "table" and options.lightweight == true
+    if lightweight then
+        local revision = getProfileConfigurationRevision()
+        local cache = Profile.KnownSpellLightweightCache
+        if type(cache) == "table" and tonumber(cache.revision) == revision and type(cache.rows) == "table" then
+            return cache.rows
+        end
+    end
+
     local spellbook = buildKnownSpellRefs()
     local rows = {}
 
     for index = 1, #spellbook do
-        local detail = Profile.GetKnownSpellDetails and Profile.GetKnownSpellDetails(spellbook[index]) or nil
-        if detail then
-            rows[#rows + 1] = {
-                rowIndex = index,
-                spellRef = detail.spellRef,
-                name = detail.name,
-                statusText = detail.statusText,
-                detailText = detail.summaryText,
-                isMissing = detail.isMissing,
-                dataset = detail.dataset,
-                spell = detail.spell,
-                spellbookCategory = detail.spellbookCategory,
-            }
+        if lightweight then
+            local row = buildKnownSpellLightweightRow(spellbook[index], index)
+            if row then
+                rows[#rows + 1] = row
+            end
+        else
+            local detail = Profile.GetKnownSpellDetails and Profile.GetKnownSpellDetails(spellbook[index]) or nil
+            if detail then
+                rows[#rows + 1] = {
+                    rowIndex = index,
+                    spellRef = detail.spellRef,
+                    name = detail.name,
+                    statusText = detail.statusText,
+                    detailText = detail.summaryText,
+                    isMissing = detail.isMissing,
+                    dataset = detail.dataset,
+                    spell = detail.spell,
+                    spellbookCategory = detail.spellbookCategory,
+                }
+            end
         end
+    end
+
+    if lightweight then
+        Profile.KnownSpellLightweightCache = {
+            revision = getProfileConfigurationRevision(),
+            rows = rows,
+        }
     end
 
     return rows
@@ -1590,6 +2140,54 @@ end
 function Profile.ListEquippedItemTraits()
     local rows = {}
     local equipped = Equipment.ListEquippedSlots and Equipment.ListEquippedSlots() or {}
+    local modificationService = Profile.Modifications or {}
+
+    local function appendItemTraitRow(rowData)
+        local item = rowData and rowData.item or nil
+        local entry = rowData and rowData.entry or nil
+        local dataset = rowData and rowData.dataset or nil
+        local payloadSource = rowData and rowData.payloadSource or nil
+        local sourceType = rowData and rowData.sourceType or "equipment"
+        local nameFallback = rowData and rowData.nameFallback or "Equipment Trait"
+        local payload = type(payloadSource) == "table" and normalizeTraitPayload(payloadSource) or nil
+        if not item or type(payload) ~= "table" then
+            return
+        end
+
+        local itemName = trimString(item.name)
+        local authoredDescriptionText = trimString(payload.description)
+        local summaryText = getTraitSummaryText(payload, "No effects")
+        local conditionOptions = {
+            itemRef = rowData and rowData.itemRef or (entry and entry.itemRef or nil),
+            item = item,
+            equipmentScope = rowData and rowData.equipmentScope or nil,
+            sourceItemRef = rowData and rowData.sourceItemRef or nil,
+            sourceItem = rowData and rowData.sourceItem or nil,
+        }
+        local itemConditionState = evaluateDetailConditions("item", item, conditionOptions)
+        local payloadConditionState = evaluateDetailConditions("trait", payload, conditionOptions)
+
+        rows[#rows + 1] = {
+            sourceType = sourceType,
+            category = "equipment",
+            slotKey = rowData and rowData.slotKey or nil,
+            item = item,
+            itemRef = conditionOptions.itemRef,
+            itemName = itemName,
+            name = itemName ~= "" and itemName or nameFallback,
+            payload = payload,
+            summaryText = summaryText,
+            authoredDescriptionText = authoredDescriptionText,
+            descriptionText = authoredDescriptionText ~= "" and authoredDescriptionText or summaryText,
+            descriptionSource = authoredDescriptionText ~= "" and "authored" or "summary",
+            icon = ensureString(item.icon),
+            dataset = dataset,
+            datasetId = dataset and dataset.id or nil,
+            equipmentTrait = payloadSource,
+            isMissing = false,
+            conditionFailureText = itemConditionState.passed ~= true and itemConditionState.failureText or (payloadConditionState.passed ~= true and payloadConditionState.failureText or ""),
+        }
+    end
 
     for index = 1, #equipped do
         local slotEntry = equipped[index]
@@ -1601,38 +2199,37 @@ function Profile.ListEquippedItemTraits()
 
         local equipmentTrait = item and item.equipmentTrait or nil
         if item and type(equipmentTrait) == "table" then
-            local payload = normalizeTraitPayload(equipmentTrait)
-            local itemName = trimString(item.name)
-            local authoredDescriptionText = trimString(payload.description)
-            local summaryText = getTraitSummaryText(payload, "No effects")
-            local itemConditionState = evaluateDetailConditions("item", item, {
-                itemRef = entry and entry.itemRef or nil,
-                item = item,
-            })
-            local payloadConditionState = evaluateDetailConditions("trait", payload, {
-                itemRef = entry and entry.itemRef or nil,
-                item = item,
-            })
-            rows[#rows + 1] = {
+            appendItemTraitRow({
                 sourceType = "equipment",
-                category = "equipment",
                 slotKey = slotEntry and slotEntry.slotKey or nil,
                 item = item,
                 itemRef = entry and entry.itemRef or nil,
-                itemName = itemName,
-                name = itemName ~= "" and itemName or "Equipment Trait",
-                payload = payload,
-                summaryText = summaryText,
-                authoredDescriptionText = authoredDescriptionText,
-                descriptionText = authoredDescriptionText ~= "" and authoredDescriptionText or summaryText,
-                descriptionSource = authoredDescriptionText ~= "" and "authored" or "summary",
-                icon = ensureString(item.icon),
+                entry = entry,
                 dataset = dataset,
-                datasetId = dataset and dataset.id or nil,
-                equipmentTrait = equipmentTrait,
-                isMissing = false,
-                conditionFailureText = itemConditionState.passed ~= true and itemConditionState.failureText or (payloadConditionState.passed ~= true and payloadConditionState.failureText or ""),
-            }
+                payloadSource = equipmentTrait,
+                nameFallback = "Equipment Trait",
+            })
+        end
+
+        local appliedMods = type(modificationService.ListAppliedModifications) == "function" and modificationService.ListAppliedModifications(entry and entry.modifications or nil) or {}
+        for modIndex = 1, #appliedMods do
+            local appliedMod = appliedMods[modIndex]
+            local modItem = appliedMod and appliedMod.item or nil
+            local modTrait = modItem and modItem.equipmentTrait or nil
+            if type(modTrait) == "table" then
+                appendItemTraitRow({
+                    sourceType = "equipment_modification",
+                    slotKey = slotEntry and slotEntry.slotKey or nil,
+                    item = modItem,
+                    itemRef = appliedMod and appliedMod.itemRef or nil,
+                    entry = entry,
+                    dataset = appliedMod and appliedMod.dataset or nil,
+                    payloadSource = modTrait,
+                    nameFallback = "Modification Effect",
+                    sourceItemRef = entry and entry.itemRef or nil,
+                    sourceItem = item,
+                })
+            end
         end
     end
 
@@ -1648,40 +2245,39 @@ function Profile.ListEquippedItemTraits()
 
             local equipmentTrait = item and item.equipmentTrait or nil
             if item and type(equipmentTrait) == "table" then
-                local payload = normalizeTraitPayload(equipmentTrait)
-                local itemName = trimString(item.name)
-                local authoredDescriptionText = trimString(payload.description)
-                local summaryText = getTraitSummaryText(payload, "No effects")
-                local itemConditionState = evaluateDetailConditions("item", item, {
-                    itemRef = entry and entry.itemRef or nil,
-                    item = item,
-                    equipmentScope = "mount",
-                })
-                local payloadConditionState = evaluateDetailConditions("trait", payload, {
-                    itemRef = entry and entry.itemRef or nil,
-                    item = item,
-                    equipmentScope = "mount",
-                })
-                rows[#rows + 1] = {
+                appendItemTraitRow({
                     sourceType = "mount_equipment",
-                    category = "equipment",
                     slotKey = slotEntry and slotEntry.slotKey or nil,
                     item = item,
                     itemRef = entry and entry.itemRef or nil,
-                    itemName = itemName,
-                    name = itemName ~= "" and itemName or "Mount Equipment Trait",
-                    payload = payload,
-                    summaryText = summaryText,
-                    authoredDescriptionText = authoredDescriptionText,
-                    descriptionText = authoredDescriptionText ~= "" and authoredDescriptionText or summaryText,
-                    descriptionSource = authoredDescriptionText ~= "" and "authored" or "summary",
-                    icon = ensureString(item.icon),
+                    entry = entry,
                     dataset = dataset,
-                    datasetId = dataset and dataset.id or nil,
-                    equipmentTrait = equipmentTrait,
-                    isMissing = false,
-                    conditionFailureText = itemConditionState.passed ~= true and itemConditionState.failureText or (payloadConditionState.passed ~= true and payloadConditionState.failureText or ""),
-                }
+                    payloadSource = equipmentTrait,
+                    nameFallback = "Mount Equipment Trait",
+                    equipmentScope = "mount",
+                })
+            end
+
+            local appliedMods = type(modificationService.ListAppliedModifications) == "function" and modificationService.ListAppliedModifications(entry and entry.modifications or nil) or {}
+            for modIndex = 1, #appliedMods do
+                local appliedMod = appliedMods[modIndex]
+                local modItem = appliedMod and appliedMod.item or nil
+                local modTrait = modItem and modItem.equipmentTrait or nil
+                if type(modTrait) == "table" then
+                    appendItemTraitRow({
+                        sourceType = "mount_equipment_modification",
+                        slotKey = slotEntry and slotEntry.slotKey or nil,
+                        item = modItem,
+                        itemRef = appliedMod and appliedMod.itemRef or nil,
+                        entry = entry,
+                        dataset = appliedMod and appliedMod.dataset or nil,
+                        payloadSource = modTrait,
+                        nameFallback = "Mount Modification Effect",
+                        equipmentScope = "mount",
+                        sourceItemRef = entry and entry.itemRef or nil,
+                        sourceItem = item,
+                    })
+                end
             end
         end
     end
@@ -2180,6 +2776,71 @@ function Profile.RemoveKnownSpellAt(index)
     if Database.RemoveProfileSpellbookSpellAt then
         local changed = Database.RemoveProfileSpellbookSpellAt(index)
         if changed then
+            bumpProfileTooltipContextRevision()
+        end
+        return changed
+    end
+
+    return false
+end
+
+function Profile.ListKnownRecipes()
+    return getRecipeKnowledgeState().knownRecipeRefs or {}
+end
+
+function Profile.IsRecipeKnown(recipeRef)
+    local normalizedRef = ensureString(recipeRef)
+    if normalizedRef == "" then
+        return false
+    end
+
+    local state = getRecipeKnowledgeState()
+    return state.knownRecipeSet and state.knownRecipeSet[normalizedRef] == true or false
+end
+
+function Profile.ListKnownRecipeRefsForSkill(skillRef)
+    local normalizedSkillRef = ensureString(skillRef)
+    local state = getRecipeKnowledgeState()
+    return state.knownRecipeRefsBySkill and state.knownRecipeRefsBySkill[normalizedSkillRef] or {}
+end
+
+function Profile.ListUnknownTrainerRecipeRefsForSkill(skillRef)
+    local normalizedSkillRef = ensureString(skillRef)
+    local state = getRecipeKnowledgeState()
+    return state.unknownTrainerRecipeRefsBySkill and state.unknownTrainerRecipeRefsBySkill[normalizedSkillRef] or {}
+end
+
+function Profile.AddKnownRecipe(recipeRef)
+    if Database.AddProfileRecipebookRecipe then
+        local changed = Database.AddProfileRecipebookRecipe(recipeRef)
+        if changed then
+            Profile.RebuildPersistedRecipeKnowledge()
+            bumpProfileTooltipContextRevision()
+        end
+        return changed
+    end
+
+    return false
+end
+
+function Profile.RemoveKnownRecipe(recipeRef)
+    if Database.RemoveProfileRecipebookRecipe then
+        local changed = Database.RemoveProfileRecipebookRecipe(recipeRef)
+        if changed then
+            Profile.RebuildPersistedRecipeKnowledge()
+            bumpProfileTooltipContextRevision()
+        end
+        return changed
+    end
+
+    return false
+end
+
+function Profile.RemoveKnownRecipeAt(index)
+    if Database.RemoveProfileRecipebookRecipeAt then
+        local changed = Database.RemoveProfileRecipebookRecipeAt(index)
+        if changed then
+            Profile.RebuildPersistedRecipeKnowledge()
             bumpProfileTooltipContextRevision()
         end
         return changed

@@ -124,6 +124,7 @@ local function commitSelectedResource(self, mutate)
         return
     end
 
+    local before = self:DeepCopyValue(resource)
     mutate(resource, dataset)
 
     if resource.valueMode ~= "derived" then
@@ -133,13 +134,11 @@ local function commitSelectedResource(self, mutate)
         resource.regenSourceStatRef = nil
     end
 
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "resources", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, resource) then
+        return
     end
 
-    self:RefreshAfterDatasetEntryChanged("resources")
+    self:QueuePendingDatasetEntryChanged(dataset.id, "resources")
 end
 
 local function setInspectorTab(self, tabKey)

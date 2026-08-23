@@ -182,6 +182,31 @@ local function buildModificationsPage(self, page)
     })
     self.ItemInspectorModificationWeaponTypeGroup:AddChild(self.ItemInspectorModificationWeaponTypeDropdown)
 
+    self.ItemInspectorModificationTwoHandedGroup = createModificationGroup("RPEDataEditorItemInspectorModificationTwoHandedGroup", "Weapon Handling", 18)
+    self.ItemInspectorModificationTwoHandedCheckbox = UI.Checkbox:New({
+        name = "RPEDataEditorItemInspectorModificationTwoHandedCheckbox",
+        width = FIELD_WIDTH,
+        height = 18,
+        text = "Only two-handed weapons",
+        checked = false,
+        border = false,
+        fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
+        fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Checkbox) or 8,
+        labelColor = UI.ResolveColor(nil, "text.primary"),
+        onValueChanged = function(value)
+            if self._refreshingItemInspector then
+                return
+            end
+
+            self:CommitSelectedItem(function(item)
+                item.targetTwoHandedOnly = value == true
+            end)
+        end,
+    })
+    self.ItemInspectorModificationTwoHandedCheckbox:SetParent(self.ItemInspectorModificationTwoHandedGroup:GetFrame())
+    self.ItemInspectorModificationTwoHandedCheckbox:Create()
+    self.ItemInspectorModificationTwoHandedGroup:AddChild(self.ItemInspectorModificationTwoHandedCheckbox)
+
     self.ItemInspectorModificationArmorWeightGroup = createModificationGroup("RPEDataEditorItemInspectorModificationArmorWeightGroup", "Target Armor Weight", 18)
     self.ItemInspectorModificationArmorWeightDropdown = UI.CreateDropdown(self.ItemInspectorModificationArmorWeightGroup:GetFrame(), "RPEDataEditorItemInspectorModificationArmorWeightDropdown", {
         width = FIELD_WIDTH,

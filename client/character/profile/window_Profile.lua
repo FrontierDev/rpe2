@@ -159,7 +159,6 @@ function ProfileWindow:BuildWindow()
                     refreshPageOnShow(page, function()
                         self:RefreshTab("spellbook")
                     end)
-                    self.spellbookPage:Refresh()
                 end,
             },
             {
@@ -227,6 +226,9 @@ function ProfileWindow:Show()
 end
 
 function ProfileWindow:Hide()
+    if Client.Crafting and Client.Crafting.HandleProfileWindowClosed then
+        Client.Crafting:HandleProfileWindowClosed()
+    end
     if self.window and self.window.Hide then
         self.window:Hide()
     end

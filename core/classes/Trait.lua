@@ -82,6 +82,7 @@ local function normalizeStatBonuses(values)
         if statRef then
             normalized[#normalized + 1] = {
                 statRef = statRef,
+                operation = type(entry) == "table" and tostring(entry.operation or "flat") == "percent" and "percent" or "flat",
                 value = tonumber(entry.value) or 0,
             }
         end
@@ -199,6 +200,27 @@ local function normalizeTriggerTarget(value)
     return "event_other"
 end
 
+local function normalizeChancePercent(value)
+    local numericValue = tonumber(value)
+    if numericValue == nil then
+        return 100
+    end
+
+    return math.max(0, math.min(100, numericValue))
+end
+
+local function normalizeAmountMode(value)
+    local mode = tostring(value or "flat")
+    if mode == "base_percent" then
+        return "base_percent"
+    end
+    if mode == "max_percent" then
+        return "max_percent"
+    end
+
+    return "flat"
+end
+
 local function normalizeEventEffectType(value)
     local effectType = string.lower(ensureString(value))
     if effectType == "heal" then
@@ -227,6 +249,7 @@ local function normalizeEventEffect(value)
         return {
             type = "heal",
             baseHealing = tonumber(value.baseHealing) or tonumber(value.baseAmount) or 0,
+            amountMode = normalizeAmountMode(value.amountMode),
             statScaling = normalizeStatScaling(value.statScaling),
         }
     end
@@ -246,6 +269,7 @@ local function normalizeEventEffect(value)
             type = "resource",
             resourceRef = normalizeRef(value.resourceRef),
             amount = tonumber(value.amount) or tonumber(value.baseAmount) or 0,
+            amountMode = normalizeAmountMode(value.amountMode),
         }
     end
 
@@ -260,6 +284,7 @@ local function normalizeEventEffect(value)
     return {
         type = "damage",
         baseDamage = tonumber(value.baseDamage) or tonumber(value.baseAmount) or 0,
+        amountMode = normalizeAmountMode(value.amountMode),
         statScaling = normalizeStatScaling(value.statScaling),
         damageSchoolRefs = normalizeDamageSchoolRefs(value.damageSchoolRefs),
     }
@@ -292,6 +317,7 @@ local function normalizeEvent(value)
     return {
         combatEventId = combatEventId,
         triggerTarget = normalizeTriggerTarget(value.triggerTarget),
+        chance = normalizeChancePercent(value.chance),
         effects = normalizeEventEffects(value.effects),
     }
 end

@@ -58,7 +58,9 @@ local SOCKET_TYPE_FLAGS = {
     red = true,
     blue = true,
     yellow = true,
+    orange = true,
     green = true,
+    purple = true,
     meta = true,
     cogwheel = true,
     prismatic = true,
@@ -287,7 +289,9 @@ local function countSocketsByColor(sockets)
         red = 0,
         blue = 0,
         yellow = 0,
+        orange = 0,
         green = 0,
+        purple = 0,
         meta = 0,
         cogwheel = 0,
         prismatic = 0,
@@ -452,11 +456,14 @@ function Item:New(data)
         itemLevel = 0,
         canDisenchant = true,
         itemType = "none",
+        allowWowConversion = false,
+        wowConversionSkillRef = nil,
         modificationKind = "generic",
         gemColor = "none",
         genericModificationKey = "",
         targetSlotRefs = {},
         targetWeaponTypeRef = nil,
+        targetTwoHandedOnly = false,
         targetArmorWeight = "none",
         sockets = {},
         maxGenericModificationCounts = {},
@@ -522,11 +529,14 @@ function Item:Merge(data)
     self.bindingFlag = ensureString(self.bindingFlag)
     self.itemLevel = normalizeItemLevel(self.itemLevel)
     self.itemType = ensureString(self.itemType)
+    self.allowWowConversion = self.allowWowConversion == true
+    self.wowConversionSkillRef = normalizeRef(self.wowConversionSkillRef)
     self.modificationKind = normalizeModificationKind(self.modificationKind)
     local requestedGemColor = string.lower(ensureString(data.gemColor ~= nil and data.gemColor or self.gemColor))
     self.gemColor = SOCKET_TYPE_FLAGS[requestedGemColor] == true and requestedGemColor or "none"
     self.genericModificationKey = string.lower(ensureString(self.genericModificationKey)):gsub("^%s+", ""):gsub("%s+$", "")
     self.targetWeaponTypeRef = normalizeRef(self.targetWeaponTypeRef)
+    self.targetTwoHandedOnly = self.targetTwoHandedOnly == true
     self.targetArmorWeight = ensureString(self.targetArmorWeight)
     local nextConsumableType = self.consumableType
     if data.consumableType ~= nil then
@@ -574,7 +584,11 @@ function Item:Merge(data)
         self.consumableElixirType = ""
         self.consumableTrait = nil
     end
-    if self.itemType ~= "weapon" and self.itemType ~= "armor" then
+    if self.itemType ~= "material" then
+        self.allowWowConversion = false
+        self.wowConversionSkillRef = nil
+    end
+    if self.itemType ~= "weapon" and self.itemType ~= "armor" and self.itemType ~= "modification" then
         self.equipmentTrait = nil
     end
     if self.weaponTypeRef ~= nil and type(Registry.ResolveWeaponTypeReference) == "function" then
@@ -595,7 +609,6 @@ function Item:Merge(data)
         self.consumableType = ""
         self.consumableElixirType = ""
         self.consumableTrait = nil
-        self.equipmentTrait = nil
         if self.modificationKind == "gem" then
             if self.gemColor == "none" and #self.socketTypes > 0 then
                 local fallbackColor = string.lower(ensureString(self.socketTypes[1]))
@@ -604,6 +617,7 @@ function Item:Merge(data)
             self.genericModificationKey = ""
             self.targetSlotRefs = {}
             self.targetWeaponTypeRef = nil
+            self.targetTwoHandedOnly = false
             self.targetArmorWeight = "none"
         elseif self.modificationKind == "enchant" then
             self.gemColor = "none"
@@ -620,6 +634,7 @@ function Item:Merge(data)
         self.genericModificationKey = ""
         self.targetSlotRefs = {}
         self.targetWeaponTypeRef = nil
+        self.targetTwoHandedOnly = false
         self.targetArmorWeight = "none"
         self.socketTypes = {}
         if self.itemType ~= "weapon" and self.itemType ~= "armor" then
@@ -650,11 +665,14 @@ function Item:ToTable()
         itemLevel = normalizeItemLevel(self.itemLevel),
         canDisenchant = self.canDisenchant,
         itemType = self.itemType,
+        allowWowConversion = self.itemType == "material" and self.allowWowConversion == true or false,
+        wowConversionSkillRef = self.itemType == "material" and normalizeRef(self.wowConversionSkillRef) or nil,
         modificationKind = self.itemType == "modification" and self.modificationKind or "generic",
         gemColor = self.itemType == "modification" and self.modificationKind == "gem" and self.gemColor or "none",
         genericModificationKey = self.itemType == "modification" and self.modificationKind == "generic" and self.genericModificationKey or "",
         targetSlotRefs = normalizeStringList(self.targetSlotRefs),
         targetWeaponTypeRef = normalizeRef(self.targetWeaponTypeRef),
+        targetTwoHandedOnly = self.itemType == "modification" and self.targetTwoHandedOnly == true or false,
         targetArmorWeight = self.targetArmorWeight,
         sockets = normalizeSockets(self.sockets, self),
         socketTypes = self.itemType == "modification" and self.modificationKind == "gem" and self.gemColor ~= "none" and { self.gemColor } or {},

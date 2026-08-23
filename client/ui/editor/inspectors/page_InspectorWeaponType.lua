@@ -26,13 +26,12 @@ local function commitSelectedWeaponType(self, mutate)
         return
     end
 
+    local before = self:DeepCopyValue(weaponType)
     mutate(weaponType, dataset)
-    if self.Database and self.Database.NotifyDatasetEntryChanged then
-        self.Database.NotifyDatasetEntryChanged(dataset.id, "weaponTypes", {
-            deferConfigurationChanged = true,
-        })
+    if self:DeepEqualValues(before, weaponType) then
+        return
     end
-    self:RefreshAfterDatasetEntryChanged("weaponTypes")
+    self:QueuePendingDatasetEntryChanged(dataset.id, "weaponTypes")
 end
 
 function DataEditor:BuildWeaponTypeInspectorPage(parent)

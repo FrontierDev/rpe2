@@ -7,6 +7,55 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
 local Client = Addon.Client or {}
+local TooltipTemplate = Addon.Client and Addon.Client.Spellcasting and Addon.Client.Spellcasting.TooltipTemplate or nil
+local Debug = Addon.Debug or {}
+
+local function hasStoredAuraTooltipTemplate(aura)
+    if type(aura) ~= "table" then
+        return false
+    end
+
+    if type(TooltipTemplate) == "table" and type(TooltipTemplate.NormalizeAuraPayload) == "function" then
+        return type(TooltipTemplate.NormalizeAuraPayload(aura.tooltipTemplateData)) == "table"
+    end
+
+    return type(aura.tooltipTemplateData) == "table"
+end
+
+local function logInternal(message, ...)
+    if type(Debug.SetLevelEnabled) == "function" and type(Debug.IsLevelEnabled) == "function" and not Debug.IsLevelEnabled("internal") then
+        Debug.SetLevelEnabled("internal", true)
+    end
+    if type(Debug.Internal) == "function" then
+        Debug.Internal(message, ...)
+    end
+end
+
+local function summarizeText(value, limit)
+    local text = tostring(value or ""):gsub("%s+", " ")
+    limit = math.max(8, math.floor(tonumber(limit) or 80))
+    if text == "" then
+        return "-"
+    end
+    if #text <= limit then
+        return text
+    end
+
+    return text:sub(1, limit - 3) .. "..."
+end
+
+local function summarizeAuraTooltipPayload(payload)
+    if type(payload) ~= "table" then
+        return "payload=nil"
+    end
+
+    return ("body=%s bodyTokens=%d stacking=%s stackingTokens=%d"):format(
+        summarizeText(payload.bodyText, 72),
+        #(payload.bodyTokens or {}),
+        summarizeText(payload.stackingText, 48),
+        #(payload.stackingTokens or {})
+    )
+end
 
 function DataEditor:BuildAuraInspectorGeneralPage(page)
     local root = UI.CreateLayout(UI.VerticalLayoutGroup, page, "RPEDataEditorAuraInspectorGeneralLayout", {
@@ -145,18 +194,88 @@ function DataEditor:BuildAuraInspectorGeneralPage(page)
     end)
     root:AddChild(self.AuraInspectorMaxStacksInput)
 
-    root:AddChild(self:BuildAuraInspectorLabel(root:GetFrame(), "RPEDataEditorAuraInspectorDescriptionLabel", "Description"))
-    self.AuraInspectorDescriptionInput = UI.CreateTextArea(root:GetFrame(), "RPEDataEditorAuraInspectorDescriptionInput", {
-        width = self.AuraInspectorFieldWidth,
-        height = 56,
-        text = "",
-        readOnly = false,
-        borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    self.AuraInspectorDescriptionInput:SetScript("OnEditFocusLost", function()
-        self:CommitSelectedAura(function(aura)
-            aura.description = self.AuraInspectorDescriptionInput:GetText()
-        end)
+    self.AuraInspectorTooltipTemplateStatusText = self:BuildAuraInspectorLabel(root:GetFrame(), "RPEDataEditorAuraInspectorTooltipTemplateLabel", "Tooltip Template")
+    root:AddChild(self.AuraInspectorTooltipTemplateStatusText)
+
+    self.AuraInspectorGenerateTooltipTemplateButton = UI.CreateButton(root:GetFrame(), "RPEDataEditorAuraInspectorGenerateTooltipTemplateButton", "Generate Template", 120, function()
+        self:GenerateAuraTooltipTemplate()
     end)
-    root:AddChild(self.AuraInspectorDescriptionInput)
+    root:AddChild(self.AuraInspectorGenerateTooltipTemplateButton)
+end
+
+function DataEditor:GenerateAuraTooltipTemplate()
+    local dataset, selectedAura = self:GetSelectedAuraAndDataset()
+    if not dataset or not selectedAura then
+        return
+    end
+
+    local AuraDescriptionBuilder = Addon.Client and Addon.Client.Spellcasting and Addon.Client.Spellcasting.AuraDescriptionBuilder or nil
+    if type(AuraDescriptionBuilder) ~= "table" or type(AuraDescriptionBuilder.BuildTooltipTemplatePayload) ~= "function" then
+        logInternal("Aura template generate: aura=%s builder-missing=true", tostring(selectedAura and selectedAura.name or selectedAura and selectedAura.id or "unknown"))
+        return
+    end
+
+    local auraRef = dataset.id and selectedAura.id and ("%s:%s"):format(dataset.id, selectedAura.id) or nil
+    local payload = nil
+    local generationSucceeded, generationError = pcall(function()
+        payload = AuraDescriptionBuilder:BuildTooltipTemplatePayload(selectedAura, {
+            auraRef = auraRef,
+            dataset = dataset,
+            datasetId = dataset.id,
+            spellDatasetId = dataset.id,
+        })
+    end)
+    local normalizedPayload = generationSucceeded
+        and type(TooltipTemplate) == "table"
+        and type(TooltipTemplate.NormalizeAuraPayload) == "function"
+        and TooltipTemplate.NormalizeAuraPayload(payload)
+        or nil
+    local success = generationSucceeded and type(normalizedPayload) == "table"
+
+    if success then
+        logInternal(
+            "Aura template generate: aura=%s %s",
+            tostring(selectedAura.name or selectedAura.id or "unknown"),
+            summarizeAuraTooltipPayload(normalizedPayload)
+        )
+    else
+        logInternal(
+            "Aura template generate FAILED: aura=%s generationSucceeded=%s error=%s",
+            tostring(selectedAura.name or selectedAura.id or "unknown"),
+            tostring(generationSucceeded),
+            tostring(generationError or "")
+        )
+    end
+
+    self:CommitSelectedAura(function(aura)
+        aura.tooltipTemplate = success == true
+        aura.tooltipTemplateData = success and normalizedPayload or nil
+    end)
+
+    local _, currentAura = self:GetSelectedAuraAndDataset()
+    logInternal(
+        "Aura template apply: aura=%s applied=%s hasPayload=%s",
+        tostring(currentAura and currentAura.name or selectedAura.name or selectedAura.id or "unknown"),
+        tostring(currentAura and currentAura.tooltipTemplate == true),
+        tostring(hasStoredAuraTooltipTemplate(currentAura))
+    )
+
+    if self.AuraInspectorTooltipTemplateStatusText then
+        if success and hasStoredAuraTooltipTemplate(currentAura) then
+            self.AuraInspectorTooltipTemplateStatusText:SetText("Tooltip Template: Generated")
+        elseif currentAura and currentAura.tooltipTemplate == true then
+            self.AuraInspectorTooltipTemplateStatusText:SetText("Tooltip Template: Legacy Flag Only")
+        else
+            self.AuraInspectorTooltipTemplateStatusText:SetText("Tooltip Template: Failed to Generate")
+        end
+    end
+
+    if type(self.RefreshAuraInspectorPage) == "function" then
+        self:RefreshAuraInspectorPage()
+    end
+    if success and type(self.ApplyDeferredConfigurationPreview) == "function" then
+        self:ApplyDeferredConfigurationPreview("aura-tooltip-template-generated", {
+            dataset.id,
+        })
+    end
 end

@@ -140,6 +140,38 @@ local function buildBehaviorPage(self, page)
         end)
     end)
     root:AddChild(self.ItemInspectorCanDisenchantCheckbox)
+
+    self.ItemInspectorAllowWowConversionGroup = createCheckbox(root:GetFrame(), "RPEDataEditorItemInspectorAllowWowConversionCheckbox", "Allow WoW Conversion", false, function(checked)
+        if self._refreshingItemInspector then
+            return
+        end
+
+        self:CommitSelectedItem(function(item)
+            item.allowWowConversion = checked == true
+            if item.allowWowConversion ~= true then
+                item.wowConversionSkillRef = nil
+            end
+        end)
+    end)
+    root:AddChild(self.ItemInspectorAllowWowConversionGroup)
+
+    self.ItemInspectorWowConversionSkillLabel = buildLabel(root:GetFrame(), "RPEDataEditorItemInspectorWowConversionSkillLabel", "Conversion Skill")
+    root:AddChild(self.ItemInspectorWowConversionSkillLabel)
+    self.ItemInspectorWowConversionSkillDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorItemInspectorWowConversionSkillDropdown", {
+        width = FIELD_WIDTH,
+        height = 18,
+        items = self:BuildItemInspectorCraftingSkillItems(),
+        onValueChanged = function(value)
+            if self._refreshingItemInspector then
+                return
+            end
+
+            self:CommitSelectedItem(function(item)
+                item.wowConversionSkillRef = value ~= "" and value or nil
+            end)
+        end,
+    })
+    root:AddChild(self.ItemInspectorWowConversionSkillDropdown)
 end
 
 function DataEditor:BuildItemInspectorBehaviorPage(page)

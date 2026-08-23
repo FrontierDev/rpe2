@@ -6,6 +6,19 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
+local TooltipTemplate = Addon.Client and Addon.Client.Spellcasting and Addon.Client.Spellcasting.TooltipTemplate or nil
+
+local function hasStoredSpellTooltipTemplate(spell)
+    if type(spell) ~= "table" then
+        return false
+    end
+
+    if type(TooltipTemplate) == "table" and type(TooltipTemplate.NormalizeSpellPayload) == "function" then
+        return type(TooltipTemplate.NormalizeSpellPayload(spell.tooltipTemplateData)) == "table"
+    end
+
+    return type(spell.tooltipTemplateData) == "table"
+end
 
 local function displayNumber(value)
     local numericValue = tonumber(value) or 0
@@ -133,6 +146,10 @@ end
 function DataEditor:RefreshSpellInspectorPage()
     local _, spell = self:GetSelectedSpellAndDataset()
     local hasSpell = spell ~= nil
+    local activeTabKey = self.ActiveSpellInspectorTabKey or "general"
+    local shouldRefreshConditions = activeTabKey == "conditions"
+    local shouldRefreshCost = activeTabKey == "cost"
+    local shouldRefreshComponents = activeTabKey == "components"
 
     self._refreshingSpellInspector = true
 
@@ -164,9 +181,18 @@ function DataEditor:RefreshSpellInspectorPage()
         self.SpellInspectorSpellbookCategoryInput:SetText(spell and (spell.spellbookCategory or "") or "")
         self:SetSpellInspectorTextElementEnabled(self.SpellInspectorSpellbookCategoryInput, hasSpell)
     end
-    if self.SpellInspectorDescriptionInput then
-        self.SpellInspectorDescriptionInput:SetText(spell and (spell.description or "") or "")
-        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorDescriptionInput, hasSpell)
+    if self.SpellInspectorTooltipTemplateStatusText then
+        local hasStoredTemplate = hasStoredSpellTooltipTemplate(spell)
+        if hasStoredTemplate then
+            self.SpellInspectorTooltipTemplateStatusText:SetText("Tooltip Template: Generated")
+        elseif spell and spell.tooltipTemplate == true then
+            self.SpellInspectorTooltipTemplateStatusText:SetText("Tooltip Template: Legacy Flag Only")
+        else
+            self.SpellInspectorTooltipTemplateStatusText:SetText("Tooltip Template: Not Generated")
+        end
+    end
+    if self.SpellInspectorGenerateTooltipTemplateButton then
+        self.SpellInspectorGenerateTooltipTemplateButton:SetEnabled(hasSpell)
     end
 
     if self.SpellInspectorCastTimeSlider then
@@ -224,8 +250,12 @@ function DataEditor:RefreshSpellInspectorPage()
         self.SpellInspectorAddResourceCostButton:SetEnabled(hasSpell)
     end
 
-    self:RefreshSpellInspectorConditionsPage()
-    self:RefreshSpellInspectorComponentsTable()
+    if shouldRefreshConditions then
+        self:RefreshSpellInspectorConditionsPage()
+    end
+    if shouldRefreshComponents then
+        self:RefreshSpellInspectorComponentsTable()
+    end
 
     local component = self:GetSelectedSpellInspectorComponent()
     local target = component and component.target or {}
@@ -246,9 +276,13 @@ function DataEditor:RefreshSpellInspectorPage()
     local isCasterTarget = targetType == "caster"
     local supportsTargetSelection = component ~= nil and not isCasterTarget and not isSummonPet and not isPetTarget
 
-    self:RefreshSpellInspectorResourceCostsTable()
-    self:RefreshSpellInspectorScalingTable()
-    if self.RefreshSpellInspectorComponentsScrollBounds then
+    if shouldRefreshCost then
+        self:RefreshSpellInspectorResourceCostsTable()
+    end
+    if shouldRefreshComponents then
+        self:RefreshSpellInspectorScalingTable()
+    end
+    if shouldRefreshComponents and self.RefreshSpellInspectorComponentsScrollBounds then
         self:RefreshSpellInspectorComponentsScrollBounds()
     end
 
@@ -329,6 +363,10 @@ function DataEditor:RefreshSpellInspectorPage()
         self.SpellInspectorResourceEffectDropdown:SetSelectedValue(effect.resourceRef or "", true)
         self:SetSpellInspectorDropdownEnabled(self.SpellInspectorResourceEffectDropdown, isResource and component ~= nil)
     end
+    if self.SpellInspectorResourceAmountModeDropdown then
+        self.SpellInspectorResourceAmountModeDropdown:SetSelectedValue(effect.amountMode or "flat", true)
+        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorResourceAmountModeDropdown, isResource and component ~= nil)
+    end
     if self.SpellInspectorSummonPetUnitDropdown then
         self.SpellInspectorSummonPetUnitDropdown:SetItems(self:BuildSpellInspectorUnitsAcrossDatasets())
         self.SpellInspectorSummonPetUnitDropdown:SetSelectedValue(effect.unitRef or "", true)
@@ -397,6 +435,7 @@ function DataEditor:RefreshSpellInspectorPage()
     self:SetSpellInspectorGroupVisible(self.SpellInspectorAuraStacksGroup, showsAuraApplicationControls)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorApplyAuraDurationGroup, isApplyAura)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceAmountGroup, isResource)
+    self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceAmountModeGroup, isResource)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorTargetEventsGroup, not isSummonPet)
     if self.SpellInspectorComponentsRoot and self.SpellInspectorComponentsRoot.RefreshLayout then
         self.SpellInspectorComponentsRoot:RefreshLayout()

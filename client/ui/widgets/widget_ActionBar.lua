@@ -34,6 +34,12 @@ local MOUNT_BUTTON_TEXTURE = "Interface\\Icons\\Ability_Mount_RidingHorse"
 local DISMOUNT_BUTTON_TEXTURE = "Interface\\Icons\\INV_Misc_Foot_Centaur"
 local PET_BUTTON_TEXTURE = "Interface\\Icons\\Ability_Hunter_BeastCall"
 
+local function isStartupPending(eventState)
+    return type(eventState) == "table"
+        and eventState.active == true
+        and (eventState.unitsReady ~= true or eventState.startupReady ~= true)
+end
+
 local function buildSignature(...)
     local parts = {}
     for index = 1, select("#", ...) do
@@ -277,9 +283,7 @@ local function resolveRuntimeSpellDetail(detail)
     end
 
     local eventState = type(Client.GetEventState) == "function" and Client:GetEventState() or nil
-    local waitingForEventUnits = type(eventState) == "table"
-        and eventState.active == true
-        and eventState.unitsReady ~= true
+    local waitingForEventStartup = isStartupPending(eventState)
 
     local activationState = type(Client.ResolveSpellActivationRuntimeState) == "function"
         and Client:ResolveSpellActivationRuntimeState(resolved.spellRef)
@@ -288,9 +292,9 @@ local function resolveRuntimeSpellDetail(detail)
             includeTargetCandidates = false,
         }) or nil)
     if type(activationState) ~= "table" then
-        resolved.canCast = waitingForEventUnits
+        resolved.canCast = waitingForEventStartup
         resolved.cooldownOverlayText = resolved.cooldownOverlayText or ""
-        resolved.pendingActivationState = waitingForEventUnits
+        resolved.pendingActivationState = waitingForEventStartup
         return resolved
     end
 
@@ -343,14 +347,12 @@ local function resolveRuntimeSpellDetailWithActivationState(detail, activationSt
     end
 
     local eventState = type(Client.GetEventState) == "function" and Client:GetEventState() or nil
-    local waitingForEventUnits = type(eventState) == "table"
-        and eventState.active == true
-        and eventState.unitsReady ~= true
+    local waitingForEventStartup = isStartupPending(eventState)
 
     if type(activationState) ~= "table" then
-        resolved.canCast = waitingForEventUnits
+        resolved.canCast = waitingForEventStartup
         resolved.cooldownOverlayText = resolved.cooldownOverlayText or ""
-        resolved.pendingActivationState = waitingForEventUnits
+        resolved.pendingActivationState = waitingForEventStartup
         resolved.activationState = nil
         return resolved
     end
@@ -406,27 +408,50 @@ local function resolveActionBarDetail(detail)
     return resolveRuntimeSpellDetail(detail)
 end
 
-local function buildActionBarActivationStateMap(rows)
-    local activationStatesBySpellRef = {}
+local function collectActionBarSpellRefs(rows)
+    local refs = {}
+    local seen = {}
     for index = 1, #((rows) or {}) do
         local row = rows[index]
         local spellRef = type(row) == "table" and tostring(row.spellRef or "") or ""
-        if spellRef ~= "" and activationStatesBySpellRef[spellRef] == nil then
-            activationStatesBySpellRef[spellRef] = type(Client.ResolveSpellActivationRuntimeState) == "function"
-                and Client:ResolveSpellActivationRuntimeState(spellRef)
-                or (type(Client.ResolveSpellActivationState) == "function"
-                    and Client:ResolveSpellActivationState(spellRef, {
-                        includeText = false,
-                        includeTargetCandidates = false,
-                    })
-                    or false)
+        if spellRef ~= "" and seen[spellRef] ~= true then
+            seen[spellRef] = true
+            refs[#refs + 1] = spellRef
         end
     end
 
-    return activationStatesBySpellRef
+    return refs
 end
 
-local function resolveActionBarDetailWithActivationState(detail, activationStatesBySpellRef)
+local function resolvePlanActivationState(plan, spellRef)
+    if type(plan) ~= "table" then
+        return nil
+    end
+
+    local normalizedSpellRef = tostring(spellRef or "")
+    if normalizedSpellRef == "" or plan.deferActivation == true then
+        return nil
+    end
+
+    plan.activationStatesBySpellRef = type(plan.activationStatesBySpellRef) == "table" and plan.activationStatesBySpellRef or {}
+    local cached = plan.activationStatesBySpellRef[normalizedSpellRef]
+    if cached ~= nil then
+        return cached == false and nil or cached
+    end
+
+    local activationState = type(Client.ResolveSpellActivationRuntimeState) == "function"
+        and Client:ResolveSpellActivationRuntimeState(normalizedSpellRef)
+        or (type(Client.ResolveSpellActivationState) == "function"
+            and Client:ResolveSpellActivationState(normalizedSpellRef, {
+                includeText = false,
+                includeTargetCandidates = false,
+            })
+            or nil)
+    plan.activationStatesBySpellRef[normalizedSpellRef] = activationState or false
+    return activationState
+end
+
+local function resolveActionBarDetailWithPlan(detail, plan)
     if isSkillActionBarDetail(detail) then
         return detail
     end
@@ -436,11 +461,7 @@ local function resolveActionBarDetailWithActivationState(detail, activationState
         return resolveRuntimeSpellDetailWithActivationState(detail, nil)
     end
 
-    local activationState = type(activationStatesBySpellRef) == "table" and activationStatesBySpellRef[spellRef] or nil
-    if activationState == false then
-        activationState = nil
-    end
-    return resolveRuntimeSpellDetailWithActivationState(detail, activationState)
+    return resolveRuntimeSpellDetailWithActivationState(detail, resolvePlanActivationState(plan, spellRef))
 end
 
 local function applyActionBarSlotDetail(self, slot, slotHost, index, detail, npcControlActive, contentInset)
@@ -1189,18 +1210,22 @@ function ActionBarWidget:Refresh(reason)
     self:ApplyAnchor()
     self:UpdateMovableState()
 
+    local eventState = Client.GetEventState and Client:GetEventState() or nil
     if self.lastRefreshSignature == refreshSignature then
-        if self.RefreshControlState then
+        if self.RefreshControlState and not isStartupPending(eventState) then
             self:RefreshControlState(reason or "action-bar-refresh")
         end
         return true
     end
 
-    local activationStatesBySpellRef = buildActionBarActivationStateMap(rows)
+    local plan = {
+        activationStatesBySpellRef = {},
+        deferActivation = isStartupPending(eventState),
+    }
 
     for index = 1, size do
         local slot = self:EnsureSlot(index)
-        local detail = resolveActionBarDetailWithActivationState(rows[index], activationStatesBySpellRef)
+        local detail = resolveActionBarDetailWithPlan(rows[index], plan)
         applyActionBarSlotDetail(self, slot, slotHost, index, detail, npcControlActive, contentInset)
     end
 
@@ -1212,7 +1237,7 @@ function ActionBarWidget:Refresh(reason)
         end
     end
 
-    if self.RefreshControlState then
+    if self.RefreshControlState and not isStartupPending(eventState) then
         self:RefreshControlState(reason or "action-bar-refresh")
     end
 
@@ -1237,15 +1262,8 @@ function ActionBarWidget:BuildIncrementalRefreshPlan(reason)
     local contentInset = self.GetContentInset and self:GetContentInset() or ROOT_PADDING
     local refreshSignature = buildActionBarRefreshSignature(self, rows, controlContext, slotCount)
     local structureSignature = buildActionBarStructureSignature(self, rows, controlContext, slotCount)
-    local activationStatesBySpellRef = buildActionBarActivationStateMap(rows)
-    self:RefreshActionRowButtons()
-    local baseWidth = (slotCount * SLOT_SIZE) + (math.max(0, slotCount - 1) * SLOT_SPACING) + (contentInset * 2)
-    rootFrame:SetSize(baseWidth, ROOT_HEIGHT)
-    self:ApplyAnchor()
-    self:UpdateMovableState()
-
+    local eventState = Client.GetEventState and Client:GetEventState() or nil
     local plan = {
-        reason = reason,
         rows = rows,
         controlContext = controlContext,
         npcControlActive = npcControlActive,
@@ -1255,10 +1273,12 @@ function ActionBarWidget:BuildIncrementalRefreshPlan(reason)
         contentInset = contentInset,
         refreshSignature = refreshSignature,
         structureSignature = structureSignature,
+        deferActivation = isStartupPending(eventState),
         actionBarRevision = type(Client.DirtyUiRefreshState) == "table"
             and math.max(0, math.floor(tonumber(Client.DirtyUiRefreshState.actionBarRevision) or 0))
             or 0,
-        activationStatesBySpellRef = activationStatesBySpellRef,
+        activationStatesBySpellRef = {},
+        pendingActivationSpellRefs = collectActionBarSpellRefs(rows),
         nextSlotIndex = 1,
         fullRefresh = false,
     }
@@ -1271,6 +1291,11 @@ function ActionBarWidget:PrepareIncrementalRefresh(reason, dirtyState)
     local structureChanged = self.lastStructureSignature ~= plan.structureSignature
         or (type(dirtyState) == "table" and dirtyState.actionBarStructuralDirty == true)
     if structureChanged then
+        self:RefreshActionRowButtons()
+        local baseWidth = (plan.slotCount * SLOT_SIZE) + (math.max(0, plan.slotCount - 1) * SLOT_SPACING) + (plan.contentInset * 2)
+        plan.rootFrame:SetSize(baseWidth, ROOT_HEIGHT)
+        self:ApplyAnchor()
+        self:UpdateMovableState()
         for index = 1, plan.slotCount do
             local slot = self:EnsureSlot(index)
             local frame = slot:GetFrame()
@@ -1288,7 +1313,8 @@ function ActionBarWidget:PrepareIncrementalRefresh(reason, dirtyState)
         self.lastStructureSignature = plan.structureSignature
     end
 
-    if self.RefreshControlState then
+    local eventState = Client.GetEventState and Client:GetEventState() or nil
+    if self.RefreshControlState and not isStartupPending(eventState) then
         self:RefreshControlState(reason or "action-bar-refresh")
     end
 
@@ -1306,7 +1332,6 @@ function ActionBarWidget:DrainIncrementalRefresh(reason, dirtyState, maxSlots)
         and math.max(0, math.floor(tonumber(dirtyState.actionBarRevision) or 0))
         or 0
     if type(plan) ~= "table"
-        or plan.reason ~= reason
         or math.max(0, math.floor(tonumber(plan.actionBarRevision) or 0)) ~= currentRevision
     then
         plan = self:PrepareIncrementalRefresh(reason, dirtyState)
@@ -1318,30 +1343,38 @@ function ActionBarWidget:DrainIncrementalRefresh(reason, dirtyState, maxSlots)
 
     local processed = 0
     local ran = false
+    while processed < slotBudget and #(plan.pendingActivationSpellRefs or {}) > 0 do
+        local spellRef = table.remove(plan.pendingActivationSpellRefs, 1)
+        if spellRef and spellRef ~= "" then
+            resolvePlanActivationState(plan, spellRef)
+            processed = processed + 1
+            ran = true
+        end
+    end
     if refreshAll == true then
         for index = math.max(1, tonumber(plan.nextSlotIndex) or 1), plan.slotCount do
+            if processed >= slotBudget then
+                break
+            end
             local slot = self:EnsureSlot(index)
-            local detail = resolveActionBarDetailWithActivationState(plan.rows[index], plan.activationStatesBySpellRef)
+            local detail = resolveActionBarDetailWithPlan(plan.rows[index], plan)
             applyActionBarSlotDetail(self, slot, plan.slotHost, index, detail, plan.npcControlActive, plan.contentInset)
             processed = processed + 1
             ran = true
             plan.nextSlotIndex = index + 1
-            if processed >= slotBudget then
-                break
-            end
         end
     else
         for index = 1, plan.slotCount do
+            if processed >= slotBudget then
+                break
+            end
             if dirtySlots[index] == true then
                 local slot = self:EnsureSlot(index)
-                local detail = resolveActionBarDetailWithActivationState(plan.rows[index], plan.activationStatesBySpellRef)
+                local detail = resolveActionBarDetailWithPlan(plan.rows[index], plan)
                 applyActionBarSlotDetail(self, slot, plan.slotHost, index, detail, plan.npcControlActive, plan.contentInset)
                 dirtySlots[index] = nil
                 processed = processed + 1
                 ran = true
-                if processed >= slotBudget then
-                    break
-                end
             end
         end
     end
@@ -1353,8 +1386,8 @@ function ActionBarWidget:DrainIncrementalRefresh(reason, dirtyState, maxSlots)
         end
     end
 
-    local morePending = refreshAll == true
-        and math.max(1, tonumber(plan.nextSlotIndex) or 1) <= plan.slotCount
+    local morePending = #(plan.pendingActivationSpellRefs or {}) > 0
+        or (refreshAll == true and math.max(1, tonumber(plan.nextSlotIndex) or 1) <= plan.slotCount)
         or next(dirtySlots) ~= nil
 
     if morePending ~= true then

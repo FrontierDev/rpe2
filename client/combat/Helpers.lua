@@ -32,6 +32,69 @@ local normalizeToken = Normalization.NormalizeToken or function(value)
     return token
 end
 
+local function normalizeColorHex(value)
+    local normalized = tostring(value or "")
+    normalized = normalized:gsub("^|c", ""):gsub("|r", ""):gsub("#", "")
+    normalized = normalized:gsub("[^0-9a-fA-F]", "")
+    if #normalized == 6 then
+        normalized = "ff" .. normalized
+    end
+    if #normalized ~= 8 then
+        return nil
+    end
+
+    return string.lower(normalized)
+end
+
+local function wrapTextWithColor(text, colorHex)
+    local normalized = normalizeColorHex(colorHex)
+    if normalized == nil or tostring(text or "") == "" then
+        return tostring(text or "")
+    end
+
+    return ("|c%s%s|r"):format(normalized, tostring(text))
+end
+
+local function buildDamageAmountText(amountMin, amountMax)
+    local minimum = math.max(0, math.floor(tonumber(amountMin) or 0))
+    local maximum = math.max(0, math.floor(tonumber(amountMax) or minimum))
+    if maximum < minimum then
+        minimum, maximum = maximum, minimum
+    end
+    if minimum == maximum then
+        return tostring(minimum)
+    end
+
+    return ("%d-%d"):format(minimum, maximum)
+end
+
+local function buildAggregateDamageDetailText(aggregate)
+    if type(aggregate) ~= "table" or type(aggregate.bonusDamageEntries) ~= "table" or #aggregate.bonusDamageEntries == 0 then
+        return nil
+    end
+
+    local baseText = ("%s %s"):format(
+        buildDamageAmountText(aggregate.amountMin, aggregate.amountMax),
+        tostring(aggregate.labelText or "") ~= "" and tostring(aggregate.labelText) or "True"
+    )
+    baseText = wrapTextWithColor(baseText, aggregate.accentColor)
+
+    local bonusParts = {}
+    for index = 1, #aggregate.bonusDamageEntries do
+        local bonusEntry = aggregate.bonusDamageEntries[index]
+        local amount = math.max(0, math.floor(tonumber(bonusEntry and bonusEntry.amount) or 0))
+        if amount > 0 then
+            bonusParts[#bonusParts + 1] = wrapTextWithColor(("+" .. tostring(amount)), bonusEntry and bonusEntry.colorHex or nil)
+        end
+    end
+
+    if #bonusParts == 0 then
+        return nil
+    end
+
+    return ("%s (%s)"):format(baseText, table.concat(bonusParts, ", "))
+end
+
 local function normalizeHealthResourceRef(resourceRef)
     if type(resourceRef) ~= "string" or resourceRef == "" then
         return nil
@@ -213,6 +276,24 @@ function Combat:GetDamageSchoolMitigationReferenceLevel()
     return math.max(1, math.floor(tonumber(rawValue) or 60))
 end
 
+function Combat:GetCriticalDamageMitigationModel(combatRules)
+    local rawValue = type(combatRules) == "table" and combatRules.criticalDamageMitigationModel
+        or (self.GetCombatRule and self:GetCombatRule("critical_damage_mitigation_model", "legacy"))
+        or self:GetRuleValue("combat", "critical_damage_mitigation_model", "legacy")
+    local model = string.lower(trimText(rawValue or "legacy"))
+    if model == "fixed_percent" or model == "level_scaled_percent" then
+        return model
+    end
+    return "legacy"
+end
+
+function Combat:GetCriticalDamageMitigationReferenceLevel(combatRules)
+    local rawValue = type(combatRules) == "table" and combatRules.criticalDamageMitigationReferenceLevel
+        or (self.GetCombatRule and self:GetCombatRule("critical_damage_mitigation_reference_level", 60))
+        or self:GetRuleValue("combat", "critical_damage_mitigation_reference_level", 60)
+    return math.max(1, math.floor(tonumber(rawValue) or 60))
+end
+
 function Combat:ResolveDamageSchoolReference(schoolRef)
     local normalizedSchoolRef = normalizeToken(schoolRef)
     if not normalizedSchoolRef
@@ -275,6 +356,54 @@ function Combat:ResolveDamageSchoolMitigation(damageSchool, statValue, unitLevel
     if model == "level_scaled_percent" and self:IsLevelSystemEnabled() then
         local numericUnitLevel = math.max(1, math.floor(tonumber(unitLevel) or self:GetDamageSchoolMitigationReferenceLevel()))
         local referenceLevel = self:GetDamageSchoolMitigationReferenceLevel()
+        effectiveReferenceAmount = referenceAmount * (numericUnitLevel / referenceLevel)
+    end
+
+    local rawPercent = 0
+    if effectiveReferenceAmount > 0 and referencePercent ~= 0 then
+        rawPercent = (numericStatValue / effectiveReferenceAmount) * referencePercent
+    end
+    local mitigationPercent = math.max(0, math.min(100, rawPercent))
+    return {
+        mode = "percent",
+        percent = mitigationPercent,
+        rawPercent = rawPercent,
+        flat = 0,
+        effectiveReferenceAmount = effectiveReferenceAmount,
+    }
+end
+
+function Combat:ResolveCriticalDamageMitigation(combatRules, statValue, unitLevel)
+    local numericStatValue = tonumber(statValue) or 0
+    local model = self:GetCriticalDamageMitigationModel(combatRules)
+    if model == "legacy" then
+        local mitigationValue = numericStatValue * (tonumber(type(combatRules) == "table" and combatRules.criticalDamageMitigationCoefficient or 1) or 1)
+        if tostring(type(combatRules) == "table" and combatRules.criticalDamageMitigationMode or "direct") == "percent" then
+            local mitigationPercent = math.max(0, math.min(100, mitigationValue))
+            return {
+                mode = "percent",
+                percent = mitigationPercent,
+                rawPercent = mitigationValue,
+                flat = 0,
+                effectiveReferenceAmount = 0,
+            }
+        end
+
+        return {
+            mode = "direct",
+            percent = nil,
+            rawPercent = nil,
+            flat = mitigationValue,
+            effectiveReferenceAmount = 0,
+        }
+    end
+
+    local referenceAmount = tonumber(type(combatRules) == "table" and combatRules.criticalDamageMitigationReferenceAmount or 0) or 0
+    local referencePercent = tonumber(type(combatRules) == "table" and combatRules.criticalDamageMitigationReferencePercent or 0) or 0
+    local effectiveReferenceAmount = referenceAmount
+    if model == "level_scaled_percent" and self:IsLevelSystemEnabled() then
+        local numericUnitLevel = math.max(1, math.floor(tonumber(unitLevel) or self:GetCriticalDamageMitigationReferenceLevel(combatRules)))
+        local referenceLevel = self:GetCriticalDamageMitigationReferenceLevel(combatRules)
         effectiveReferenceAmount = referenceAmount * (numericUnitLevel / referenceLevel)
     end
 
@@ -435,20 +564,9 @@ function Combat:ResolveWeaponSkillContext(context, effect, component)
     local weaponMultiplier = tonumber(self:GetRuleValue("skills", "weapon_skill_level_multiplier", 5)) or 5
     result.expectedWeaponSkill = math.max(1, math.floor(eventLevel * weaponMultiplier))
 
-    local resolvedSkills = type(Profile.ListResolvedSkills) == "function" and Profile.ListResolvedSkills() or {}
-    local rowsByWeaponTypeRef = {}
-    for index = 1, #resolvedSkills do
-        local row = resolvedSkills[index]
-        local weaponTypeRef = type(row) == "table" and Normalization.NormalizeToken(row.weaponTypeRef) or nil
-        if tostring(row and row.skillType or "") == "weapon" and weaponTypeRef then
-            local bucket = rowsByWeaponTypeRef[weaponTypeRef]
-            if not bucket then
-                bucket = {}
-                rowsByWeaponTypeRef[weaponTypeRef] = bucket
-            end
-            bucket[#bucket + 1] = row
-        end
-    end
+    local rowsByWeaponTypeRef = type(Profile.GetResolvedWeaponSkillRowsByWeaponType) == "function"
+        and Profile.GetResolvedWeaponSkillRowsByWeaponType()
+        or {}
 
     local resolvedValues = {}
     for index = 1, #result.contributingWeapons do
@@ -510,9 +628,16 @@ function Combat:ResolveWeaponSkillHitPenaltyValue(defenceSystem, weaponSkillCont
     return math.floor(((penaltyPercent * rollMax) / 100) + 0.5)
 end
 
-function Combat:ResolveAttackStatContribution(attackerUnit, defenceSystem, attackType)
+function Combat:ResolveAttackStatContribution(attackerUnit, defenceSystem, attackType, context)
     local statRef = self:ResolveAttackStatRef(defenceSystem, attackType)
-    local statValue = statRef and (Lookup.GetStatValue and Lookup.GetStatValue(attackerUnit, statRef, 0) or 0) or 0
+    local statValue = 0
+    if statRef then
+        if type(self.GetCachedCombatStatValue) == "function" then
+            statValue = self:GetCachedCombatStatValue(context, attackerUnit, statRef, 0)
+        else
+            statValue = Lookup.GetStatValue and Lookup.GetStatValue(attackerUnit, statRef, 0) or 0
+        end
+    end
 
     return {
         statRef = statRef,
@@ -520,9 +645,15 @@ function Combat:ResolveAttackStatContribution(attackerUnit, defenceSystem, attac
     }
 end
 
-function Combat:ResolveAttackModifierContext(attackerUnit, defenceSystem, attackType, weaponSkillContext)
-    local statContribution = self:ResolveAttackStatContribution(attackerUnit, defenceSystem, attackType)
-    local penaltyValue = self:ResolveWeaponSkillHitPenaltyValue(defenceSystem, weaponSkillContext)
+function Combat:ResolveAttackModifierContext(attackerUnit, defenceSystem, attackType, weaponSkillContext, context)
+    local statContribution = self:ResolveAttackStatContribution(attackerUnit, defenceSystem, attackType, context)
+    local penaltyValue = type(weaponSkillContext) == "table" and tonumber(weaponSkillContext.hitPenaltyValue) or nil
+    if penaltyValue == nil then
+        penaltyValue = self:ResolveWeaponSkillHitPenaltyValue(defenceSystem, weaponSkillContext)
+        if type(weaponSkillContext) == "table" then
+            weaponSkillContext.hitPenaltyValue = penaltyValue
+        end
+    end
 
     return {
         statRef = statContribution.statRef,
@@ -534,7 +665,10 @@ function Combat:ResolveAttackModifierContext(attackerUnit, defenceSystem, attack
 end
 
 function Combat:ApplyWeaponSkillHitPenalty(attackerTotal, defenceSystem, weaponSkillContext)
-    local penaltyValue = self:ResolveWeaponSkillHitPenaltyValue(defenceSystem, weaponSkillContext)
+    local penaltyValue = type(weaponSkillContext) == "table" and tonumber(weaponSkillContext.hitPenaltyValue) or nil
+    if penaltyValue == nil then
+        penaltyValue = self:ResolveWeaponSkillHitPenaltyValue(defenceSystem, weaponSkillContext)
+    end
     if penaltyValue <= 0 then
         return attackerTotal, 0
     end
@@ -575,9 +709,17 @@ function Combat:ResolveBaseCritChance(critCategory)
 end
 
 function Combat:ResolveCritRoll(defenceSystem, context, actorUnit, critCategory, weaponSkillCritBonusPercent)
-    local baseCritChance = self:ResolveBaseCritChance(critCategory)
-    local statRef = self:ResolveCritStatRef(defenceSystem, critCategory)
-    local statValue = statRef and (Lookup.GetStatValue and Lookup.GetStatValue(actorUnit, statRef, 0) or 0) or 0
+    local critContext = type(context) == "table" and context.critResolutionContext or nil
+    local baseCritChance = critContext and critContext.baseCritChance or self:ResolveBaseCritChance(critCategory)
+    local statRef = critContext and critContext.statRef or self:ResolveCritStatRef(defenceSystem, critCategory)
+    local statValue = 0
+    if statRef then
+        if type(self.GetCachedCombatStatValue) == "function" then
+            statValue = self:GetCachedCombatStatValue(context, actorUnit, statRef, 0)
+        else
+            statValue = Lookup.GetStatValue and Lookup.GetStatValue(actorUnit, statRef, 0) or 0
+        end
+    end
     local critBonusPercent = tonumber(weaponSkillCritBonusPercent) or 0
 
     if defenceSystem == "percent" then
@@ -618,6 +760,12 @@ function Combat:ResolveEffectResultType(context, effect, actorUnit, defenceSyste
     local canCrush = type(weaponSkillContext) == "table"
         and weaponSkillContext.isWeaponDamage == true
         and weaponSkillContext.canCrush == true
+    if type(context) == "table" then
+        context.critResolutionContext = context.critResolutionContext or {
+            baseCritChance = self:ResolveBaseCritChance(critCategory),
+            statRef = self:ResolveCritStatRef(defenceSystem, critCategory),
+        }
+    end
 
     if canCrush then
         local crushingRoll = self:ResolveCritRoll(defenceSystem, context, actorUnit, critCategory, critBonusPercent)
@@ -754,7 +902,11 @@ function Combat:GetOrCreateActionCombatEventState(castEntry, spell)
     local state = castEntry.combatEventState
     local spellCasterEvents = self:CloneValue(type(spell) == "table" and spell.casterEvents or {})
     if type(state) == "table" then
-        if state.pendingDamageCount == 0 and state.spellCasterEventsEmitted == true then
+        local hasPendingDamageLog = false
+        if type(state.damageLogsByComponentKey) == "table" then
+            hasPendingDamageLog = next(state.damageLogsByComponentKey) ~= nil
+        end
+        if state.pendingDamageCount == 0 and state.spellCasterEventsEmitted == true and hasPendingDamageLog ~= true then
             state.spellCasterEvents = spellCasterEvents
             state.spellCasterTargetEventIds = {}
             state.spellCasterTargetEventIdSet = {}
@@ -809,6 +961,7 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
                 or nil,
             labelText = "",
             accentColor = nil,
+            bonusDamageEntries = {},
         }
         state.damageLogsByComponentKey[componentKey] = aggregate
     end
@@ -872,6 +1025,61 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
     return true
 end
 
+function Combat:RegisterTriggeredActionBonusDamage(actionContext, targetUnit, damageResult, effect, combatEventId)
+    if type(actionContext) ~= "table" or type(damageResult) ~= "table" then
+        return false
+    end
+
+    local castEntry = type(actionContext) == "table" and actionContext.castEntry or nil
+    local spell = type(actionContext) == "table" and actionContext.spell or nil
+    local componentKey = normalizeToken(type(actionContext) == "table" and actionContext.componentKey or nil)
+    local state = self:GetOrCreateActionCombatEventState(castEntry, spell)
+    if type(state) ~= "table" or componentKey == nil then
+        return false
+    end
+
+    local aggregate = type(state.damageLogsByComponentKey) == "table" and state.damageLogsByComponentKey[componentKey] or nil
+    if type(aggregate) ~= "table" then
+        return false
+    end
+
+    local amount = math.max(
+        0,
+        math.floor(
+            tonumber(damageResult.amount)
+                or math.abs(tonumber(damageResult.appliedDelta) or 0)
+                or 0
+        )
+    )
+    if amount <= 0 then
+        return false
+    end
+
+    local schoolRef = type(damageResult.damageSchoolRef) == "string" and damageResult.damageSchoolRef or nil
+    if schoolRef == nil and type(effect) == "table" and type(effect.damageSchoolRefs) == "table" then
+        schoolRef = effect.damageSchoolRefs[1]
+    end
+
+    local colorHex = nil
+    if type(Addon.Client) == "table" and type(Addon.Client.ResolveCombatLogDamageSchoolPresentation) == "function" then
+        local _, _, resolvedColor = Addon.Client:ResolveCombatLogDamageSchoolPresentation(
+            schoolRef,
+            damageResult.damageSchoolName,
+            damageResult.damageSchoolIcon
+        )
+        colorHex = resolvedColor
+    end
+
+    aggregate.bonusDamageEntries = aggregate.bonusDamageEntries or {}
+    aggregate.bonusDamageEntries[#aggregate.bonusDamageEntries + 1] = {
+        amount = amount,
+        colorHex = colorHex,
+        targetEventId = tonumber(targetUnit and targetUnit.eventID) or 0,
+        combatEventId = tostring(combatEventId or ""),
+    }
+    return true
+end
+
 function Combat:FlushActionDamageCombatLog(client, context, castEntry, spell, componentKey)
     local state = self:GetOrCreateActionCombatEventState(castEntry, spell)
     if type(state) ~= "table" then
@@ -906,6 +1114,7 @@ function Combat:FlushActionDamageCombatLog(client, context, castEntry, spell, co
         iconTexture = aggregate.iconTexture,
         spellIconTexture = aggregate.spellIconTexture,
         labelText = tostring(aggregate.labelText or "") ~= "" and tostring(aggregate.labelText) or "True",
+        detailText = buildAggregateDamageDetailText(aggregate),
         accentColor = aggregate.accentColor,
     })
 end
@@ -1214,17 +1423,24 @@ function Combat:CompleteActionDamageResolution(client, entry, landed)
 
     state.pendingDamageCount = math.max(0, math.floor(tonumber(state.pendingDamageCount) or 0) - 1)
     local flushedCombatLog = false
+    local shouldRunCasterHooks = landed == true and state.pendingDamageCount == 0
     if componentKey and type(state.pendingDamageCountByComponentKey) == "table" then
         local nextCount = math.max(0, math.floor(tonumber(state.pendingDamageCountByComponentKey[componentKey]) or 0) - 1)
         if nextCount > 0 then
             state.pendingDamageCountByComponentKey[componentKey] = nextCount
         else
             state.pendingDamageCountByComponentKey[componentKey] = nil
-            flushedCombatLog = self:FlushActionDamageCombatLog(client, context, castEntry, spell, componentKey) or flushedCombatLog
+            if shouldRunCasterHooks ~= true then
+                flushedCombatLog = self:FlushActionDamageCombatLog(client, context, castEntry, spell, componentKey) or flushedCombatLog
+            end
         end
     end
-    if landed == true and state.pendingDamageCount == 0 then
-        return self:RunCasterHooks(client, context, castEntry, spell) or flushedCombatLog
+    if shouldRunCasterHooks == true then
+        local ranCasterHooks = self:RunCasterHooks(client, context, castEntry, spell) or false
+        if componentKey then
+            flushedCombatLog = self:FlushActionDamageCombatLog(client, context, castEntry, spell, componentKey) or flushedCombatLog
+        end
+        return ranCasterHooks or flushedCombatLog
     end
 
     return flushedCombatLog

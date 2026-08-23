@@ -15,6 +15,7 @@ local Common = Addon.Utils.Common or {}
 local Lookup = Addon.Utils.Lookup or {}
 local Comms = Addon.Internal.Comms or {}
 local Debug = Addon.Debug
+local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Registry = Addon.Internal.Registry or {}
 local ResourceSync = Comms.ResourceSync or {}
 local Ruleset = Addon.Internal.Ruleset or {}
@@ -28,6 +29,80 @@ Client.SpellImpactHistoryByEventId = Client.SpellImpactHistoryByEventId or {}
 
 local DEFAULT_MAX_EVENT_UNITS = 5
 local DEFAULT_TARGET_SELECTION_GROUP = "default"
+local SPELLCAST_SLOW_TOTAL_MS = 100
+local SPELLCAST_SLOW_HELPER_MS = 25
+
+local function getTimings()
+    return Addon.Debug and Addon.Debug.Timings or nil
+end
+
+local function logEventTimingParts(label, parts, totalElapsed, threshold)
+    local timings = getTimings()
+    if type(timings) == "table" and type(timings.LogParts) == "function" then
+        return timings:LogParts(label, "event-visual-phase", parts, totalElapsed, threshold)
+    end
+
+    return false
+end
+
+local function getNowMilliseconds()
+    if type(GetTimePreciseSec) == "function" then
+        return GetTimePreciseSec() * 1000
+    end
+
+    return (GetTime and GetTime() or 0) * 1000
+end
+
+local function isSpellcastTimingEnabled()
+    return type(Addon.Debug) == "table" and Addon.Debug.SpellcastTiming == true
+end
+
+local function ensureSpellcastInternalLoggingEnabled()
+    if type(Debug) == "table" and type(Debug.EnsureInternalLevelEnabled) == "function" then
+        Debug.EnsureInternalLevelEnabled()
+    end
+end
+
+local function buildTimingSegment(label, elapsed, threshold)
+    local numericElapsed = math.max(0, tonumber(elapsed) or 0)
+    local isSlow = numericElapsed >= (tonumber(threshold) or SPELLCAST_SLOW_HELPER_MS)
+    return ("%s=%.2fms%s"):format(
+        tostring(label or "phase"),
+        numericElapsed,
+        isSlow and " SLOW" or ""
+    ), isSlow
+end
+
+local function logSpellcastTimingLine(prefix, context, parts, totalElapsed, threshold)
+    if not isSpellcastTimingEnabled() or type(Debug) ~= "table" or type(Debug.Internal) ~= "function" then
+        return false
+    end
+
+    ensureSpellcastInternalLoggingEnabled()
+
+    local slowThreshold = tonumber(threshold) or SPELLCAST_SLOW_HELPER_MS
+    local totalText, totalSlow = buildTimingSegment("total", totalElapsed, slowThreshold)
+    local segments = { totalText }
+    local hasSlow = totalSlow
+
+    for index = 1, #(parts or {}) do
+        local part = parts[index]
+        if type(part) == "table" and type(part.label) == "string" then
+            local segment, isSlow = buildTimingSegment(part.label, part.elapsed, part.threshold or slowThreshold)
+            segments[#segments + 1] = segment
+            hasSlow = hasSlow or isSlow
+        end
+    end
+
+    Debug.Internal(
+        "%s%s [%s]: %s",
+        hasSlow and "SLOW " or "",
+        tostring(prefix or "Spellcast timing"),
+        tostring(context or "unknown"),
+        table.concat(segments, ", ")
+    )
+    return true
+end
 
 local function getEventClass()
     return Addon.Internal
@@ -270,6 +345,7 @@ local function consumeVisualPhase(targetClient, phase)
         return false
     end
 
+    local timingStartTime = getNowMilliseconds()
     local dirtyState = ensureDirtyUiRefreshState(targetClient)
     local eventRefreshQueued = targetClient.EventWidgetRefreshQueued == true
     local actionBarRefreshQueued = targetClient.ActionBarRefreshQueued == true
@@ -295,6 +371,9 @@ local function consumeVisualPhase(targetClient, phase)
                 targetClient.PendingActionBarRefreshReason = nil
                 targetClient.ActionBarRefreshQueued = false
             end
+            if ran == true then
+                logEventTimingParts("phase-1-action-bar", nil, getNowMilliseconds() - timingStartTime, 15)
+            end
             return ran == true
         end
 
@@ -302,6 +381,7 @@ local function consumeVisualPhase(targetClient, phase)
         targetClient.ActionBarRefreshQueued = false
         if type(targetClient.RefreshActionBarWidget) == "function" then
             targetClient:RefreshActionBarWidget(refreshReason)
+            logEventTimingParts("phase-1-action-bar", nil, getNowMilliseconds() - timingStartTime, 15)
             return true
         end
         return false
@@ -309,7 +389,9 @@ local function consumeVisualPhase(targetClient, phase)
 
     if phase == 2 then
         local ran = false
+        local timingParts = {}
         if targetingRefreshQueued then
+            local targetingStartTime = getNowMilliseconds()
             local refreshReason = targetClient.PendingTargetingWidgetRefreshReason or "targeting"
             targetClient.PendingTargetingWidgetRefreshReason = nil
             targetClient.TargetingWidgetRefreshQueued = false
@@ -319,10 +401,16 @@ local function consumeVisualPhase(targetClient, phase)
             if targetingVisible and type(targetClient.RefreshTargetingWidget) == "function" then
                 targetClient:RefreshTargetingWidget(refreshReason)
             end
+            timingParts[#timingParts + 1] = {
+                label = "targeting",
+                elapsedMs = getNowMilliseconds() - targetingStartTime,
+                thresholdMs = 15,
+            }
             ran = true
         end
 
         if eventRefreshQueued == true then
+            local eventStartTime = getNowMilliseconds()
             local refreshReason = targetClient.PendingEventWidgetRefreshReason or "event"
             targetClient.PendingEventWidgetRefreshReason = nil
             targetClient.EventWidgetRefreshQueued = false
@@ -347,7 +435,25 @@ local function consumeVisualPhase(targetClient, phase)
                 targetClient:HideEventWidget()
             end
 
+            timingParts[#timingParts + 1] = {
+                label = "event-widget",
+                elapsedMs = getNowMilliseconds() - eventStartTime,
+                thresholdMs = 15,
+            }
+            if type(targetClient.FlushDeferredConsumablePrompt) == "function" then
+                enqueueVisualWork(function(nextClient, currentEventState)
+                    if type(nextClient) ~= "table" or type(currentEventState) ~= "table" or currentEventState.active ~= true then
+                        return
+                    end
+
+                    nextClient:FlushDeferredConsumablePrompt(currentEventState, "event_start")
+                end, targetClient, eventState)
+            end
             ran = true
+        end
+
+        if ran then
+            logEventTimingParts("phase-2-targeting-event", timingParts, getNowMilliseconds() - timingStartTime, 20)
         end
 
         return ran
@@ -356,6 +462,7 @@ local function consumeVisualPhase(targetClient, phase)
     if phase == 3 then
         local ran = false
         if immediateCompanionBars or deferredCompanionBars then
+            local companionStartTime = getNowMilliseconds()
             local refreshReason = targetClient.PendingActionBarCompanionBarsRefreshReason or "action-bar-companion"
             targetClient.PendingActionBarCompanionBarsRefreshReason = nil
             targetClient.ActionBarCompanionBarsRefreshQueued = false
@@ -367,6 +474,12 @@ local function consumeVisualPhase(targetClient, phase)
             if type(targetClient.RefreshActionBarCompanionBars) == "function" then
                 targetClient:RefreshActionBarCompanionBars(refreshReason)
             end
+            logEventTimingParts(
+                immediateCompanionBars and "phase-3-companion-bars-immediate" or "phase-3-companion-bars",
+                nil,
+                getNowMilliseconds() - companionStartTime,
+                15
+            )
             ran = true
         end
 
@@ -378,6 +491,7 @@ local function consumeVisualPhase(targetClient, phase)
             return false
         end
 
+        local tooltipStartTime = getNowMilliseconds()
         local refreshReason = targetClient.PendingVisiblePlayerTooltipRefreshReason or "tooltip"
         local payload = dirtyState and dirtyState.visibleTooltipPayload or nil
         targetClient.PendingVisiblePlayerTooltipRefreshReason = nil
@@ -389,6 +503,7 @@ local function consumeVisualPhase(targetClient, phase)
         if hasVisiblePlayerTooltip() then
             refreshVisiblePlayerTooltipImmediate(refreshReason, payload)
         end
+        logEventTimingParts("phase-4-tooltip", nil, getNowMilliseconds() - tooltipStartTime, 15)
         return true
     end
 
@@ -1023,7 +1138,109 @@ local function findResourceEntry(resources, resourceRef)
     return nil
 end
 
-local function resolveSpellcastingResourceTable(target, options)
+local function buildResourceEntriesByRef(resources)
+    local entriesByRef = {}
+
+    for index = 1, #(resources or {}) do
+        local entry = resources[index]
+        local resourceRef = type(entry) == "table" and tostring(entry.resourceRef or "") or ""
+        if resourceRef ~= "" and entriesByRef[resourceRef] == nil then
+            entriesByRef[resourceRef] = entry
+        end
+    end
+
+    return entriesByRef
+end
+
+local function collectCostResourceRefs(costs)
+    local resourceRefs = {}
+    local seen = {}
+
+    for index = 1, #(costs or {}) do
+        local resourceRef = type(costs[index]) == "table" and tostring(costs[index].resourceRef or "") or ""
+        if resourceRef ~= "" and seen[resourceRef] ~= true then
+            seen[resourceRef] = true
+            resourceRefs[#resourceRefs + 1] = resourceRef
+        end
+    end
+
+    return resourceRefs
+end
+
+local function buildPlayerResolvedResourceRowsByRef(resourceRefs)
+    local rowsByRef = {}
+    local rows = type(Profile.GetResolvedResourceRowsByRefs) == "function"
+        and Profile.GetResolvedResourceRowsByRefs(resourceRefs)
+        or nil
+
+    for index = 1, #(rows or {}) do
+        local row = rows[index]
+        local resourceRef = type(row) == "table" and tostring(row.ref or "") or ""
+        if resourceRef ~= "" then
+            rowsByRef[resourceRef] = row
+        end
+    end
+
+    return rowsByRef
+end
+
+local resolveSpellcastingResourceTable
+
+local function buildSpellResourceContext(target, costs, options)
+    if type(target) ~= "table" then
+        return nil
+    end
+
+    options = type(options) == "table" and options or {}
+    local resources = options.resources
+    if type(resources) ~= "table" then
+        resources = resolveSpellcastingResourceTable(target, {
+            applyFallbackToUnit = options.applyFallbackToUnit == true,
+        })
+    end
+    if type(resources) ~= "table" then
+        return nil
+    end
+
+    local resourceRefs = options.resourceRefs
+    if type(resourceRefs) ~= "table" then
+        resourceRefs = collectCostResourceRefs(costs)
+    end
+
+    local context = {
+        target = target,
+        resources = resources,
+        entriesByRef = buildResourceEntriesByRef(resources),
+        costs = costs,
+    }
+
+    if target.isPlayer == true and #resourceRefs > 0 then
+        context.resourceRowsByRef = buildPlayerResolvedResourceRowsByRef(resourceRefs)
+    else
+        context.resourceRowsByRef = {}
+    end
+
+    return context
+end
+
+local function resolveSpellResourceCostAmounts(target, costs, context)
+    local resolvedAmountsByIndex = {}
+    local resolvedAmountsByRef = {}
+
+    for index = 1, #(costs or {}) do
+        local cost = costs[index]
+        local resourceRef = type(cost) == "table" and tostring(cost.resourceRef or "") or ""
+        local amount = Spellcasting.ResolveSpellResourceCostAmount(target, cost, context)
+        resolvedAmountsByIndex[index] = amount
+        if resourceRef ~= "" and amount > 0 then
+            resolvedAmountsByRef[resourceRef] = (resolvedAmountsByRef[resourceRef] or 0) + amount
+        end
+    end
+
+    return resolvedAmountsByIndex, resolvedAmountsByRef
+end
+
+resolveSpellcastingResourceTable = function(target, options)
     if type(target) ~= "table" then
         return nil
     end
@@ -1043,41 +1260,55 @@ local function resolveSpellcastingResourceTable(target, options)
     return target
 end
 
-function Spellcasting.ResolveSpellResourceCostAmount(target, cost)
+function Spellcasting.ResolveSpellResourceCostAmount(target, cost, context)
     if type(cost) ~= "table" then
         return 0
     end
 
     local amountMode = tostring(cost.amountMode or "flat")
     local amount = math.max(0, tonumber(cost.amount) or 0)
-    if amountMode ~= "base_percent" then
+    
+    if amountMode == "flat" then
         return amount
     end
 
     local resourceRef = tostring(cost.resourceRef or "")
-    local baseResourceValue = 0
+    local resourceValue = 0
 
-    if type(target) == "table" and target.resources ~= nil then
-        local eventUnit = target
-        if eventUnit.isPlayer == true then
-            local profile = Addon.Internal and Addon.Internal.Profile or {}
-            local row = profile.GetResolvedResourceRow and profile.GetResolvedResourceRow(resourceRef) or nil
-            baseResourceValue = tonumber(row and row.baseResourceValue) or 0
+    local eventUnit = type(target) == "table" and target.resources ~= nil and target or nil
+    if type(eventUnit) == "table" and eventUnit.isPlayer == true then
+        local row = type(context) == "table" and type(context.resourceRowsByRef) == "table" and context.resourceRowsByRef[resourceRef] or nil
+        if type(row) ~= "table" and type(Profile.GetResolvedResourceRow) == "function" then
+            row = Profile.GetResolvedResourceRow(resourceRef, {
+                includeAuraBonuses = true,
+            })
+        end
+        if amountMode == "base_percent" then
+            resourceValue = tonumber(row and row.baseResourceValue) or 0
         else
-            local entry = findResourceEntry(eventUnit.resources, resourceRef)
-            baseResourceValue = tonumber(entry and entry.maxValue) or tonumber(entry and entry.currentValue) or 0
+            resourceValue = tonumber(row and row.value) or tonumber(row and row.baseResourceValue) or 0
         end
     else
-        local entry = findResourceEntry(target, resourceRef)
-        baseResourceValue = tonumber(entry and entry.maxValue) or tonumber(entry and entry.currentValue) or 0
+        local entry = type(context) == "table" and type(context.entriesByRef) == "table" and context.entriesByRef[resourceRef]
+            or findResourceEntry(eventUnit and eventUnit.resources or target, resourceRef)
+        resourceValue = tonumber(entry and entry.maxValue) or tonumber(entry and entry.currentValue) or 0
     end
 
-    return math.max(0, math.ceil(baseResourceValue * amount / 100))
+    return math.max(0, math.ceil(resourceValue * amount / 100))
 end
 
 function Spellcasting.GetSpellResourceCostsForPhase(spell, phase)
-    local costs = {}
     local targetPhase = tostring(phase or "on_cast_end")
+    if type(spell) ~= "table" then
+        return {}
+    end
+
+    spell._resourceCostsByPhase = spell._resourceCostsByPhase or {}
+    if type(spell._resourceCostsByPhase[targetPhase]) == "table" then
+        return spell._resourceCostsByPhase[targetPhase]
+    end
+
+    local costs = {}
 
     for index = 1, #(spell and spell.resourceCosts or {}) do
         local cost = spell.resourceCosts[index]
@@ -1086,43 +1317,29 @@ function Spellcasting.GetSpellResourceCostsForPhase(spell, phase)
         end
     end
 
+    spell._resourceCostsByPhase[targetPhase] = costs
     return costs
 end
 
-function Spellcasting.CanAffordResourceCosts(target, costs)
+function Spellcasting.CanAffordResourceCosts(target, costs, context)
     if type(target) ~= "table" or type(costs) ~= "table" then
         return false
     end
 
-    local resources = resolveSpellcastingResourceTable(target)
-    if type(resources) ~= "table" then
+    local resourceContext = type(context) == "table" and context or buildSpellResourceContext(target, costs)
+    if type(resourceContext) ~= "table" or type(resourceContext.resources) ~= "table" then
         return false
     end
 
-    local requiredByRef = {}
-    for index = 1, #costs do
-        local cost = costs[index]
-        local resourceRef = type(cost) == "table" and tostring(cost.resourceRef or "") or ""
-        local amount = Spellcasting.ResolveSpellResourceCostAmount(target, cost)
-        if resourceRef ~= "" and amount > 0 then
-            requiredByRef[resourceRef] = (requiredByRef[resourceRef] or 0) + amount
-        end
+    local requiredByRef = type(resourceContext.resolvedAmountsByRef) == "table" and resourceContext.resolvedAmountsByRef or nil
+    if type(requiredByRef) ~= "table" then
+        _, requiredByRef = resolveSpellResourceCostAmounts(target, costs, resourceContext)
+        resourceContext.resolvedAmountsByRef = requiredByRef
     end
 
     for resourceRef, requiredAmount in pairs(requiredByRef) do
-        local currentValue = 0
-        for index = 1, #resources do
-            local entry = resources[index]
-            if entry and entry.resourceRef == resourceRef then
-                if entry.currentValue ~= nil then
-                    currentValue = tonumber(entry.currentValue) or 0
-                else
-                    currentValue = 0
-                end
-                break
-            end
-        end
-
+        local entry = resourceContext.entriesByRef and resourceContext.entriesByRef[resourceRef] or nil
+        local currentValue = tonumber(entry and entry.currentValue) or 0
         if currentValue < requiredAmount then
             return false
         end
@@ -1131,7 +1348,7 @@ function Spellcasting.CanAffordResourceCosts(target, costs)
     return true
 end
 
-function Spellcasting.ApplyResourceDelta(resources, resourceRef, delta)
+function Spellcasting.ApplyResourceDelta(resources, resourceRef, delta, context)
     if type(resources) ~= "table" or type(resourceRef) ~= "string" or resourceRef == "" then
         return false, 0, nil
     end
@@ -1141,50 +1358,65 @@ function Spellcasting.ApplyResourceDelta(resources, resourceRef, delta)
         return false, 0, nil
     end
 
-    for index = 1, #resources do
-        local entry = resources[index]
-        if entry and entry.resourceRef == resourceRef then
-            local currentValue = tonumber(entry.currentValue)
-            if currentValue == nil then
-                currentValue = tonumber(entry.maxValue) or 0
-            end
-
-            local maxValue = tonumber(entry.maxValue)
-            if maxValue == nil then
-                maxValue = currentValue
-            end
-
-            local nextValue = currentValue + numericDelta
-            if nextValue < 0 then
-                nextValue = 0
-            elseif maxValue ~= nil and maxValue >= 0 and nextValue > maxValue then
-                nextValue = maxValue
-            end
-
-            local appliedDelta = nextValue - currentValue
-            if appliedDelta ~= 0 then
-                entry.currentValue = nextValue
-                if entry.maxValue == nil then
-                    entry.maxValue = math.max(nextValue, maxValue or nextValue)
-                end
-                return true, appliedDelta, entry
-            end
-
-            return false, 0, entry
+    local entry = type(context) == "table" and type(context.entriesByRef) == "table" and context.entriesByRef[resourceRef] or nil
+    if not entry then
+        entry = findResourceEntry(resources, resourceRef)
+        if entry and type(context) == "table" and type(context.entriesByRef) == "table" then
+            context.entriesByRef[resourceRef] = entry
         end
     end
 
-    return false, 0, nil
+    if not entry then
+        return false, 0, nil
+    end
+
+    local currentValue = tonumber(entry.currentValue)
+    if currentValue == nil then
+        currentValue = tonumber(entry.maxValue) or 0
+    end
+
+    local maxValue = tonumber(entry.maxValue)
+    if maxValue == nil then
+        maxValue = currentValue
+    end
+
+    local nextValue = currentValue + numericDelta
+    if nextValue < 0 then
+        nextValue = 0
+    elseif maxValue ~= nil and maxValue >= 0 and nextValue > maxValue then
+        nextValue = maxValue
+    end
+
+    local appliedDelta = nextValue - currentValue
+    if appliedDelta ~= 0 then
+        entry.currentValue = nextValue
+        if entry.maxValue == nil then
+            entry.maxValue = math.max(nextValue, maxValue or nextValue)
+        end
+        return true, appliedDelta, entry
+    end
+
+    return false, 0, entry
 end
 
-function Spellcasting.ApplySpellResourceCostsToUnit(eventUnit, spell, phase, isInterrupt)
+function Spellcasting.ApplySpellResourceCostsToUnit(eventUnit, spell, phase, isInterrupt, context)
     if type(eventUnit) ~= "table" or type(spell) ~= "table" then
         return false, nil
     end
 
-    local currentResources = resolveSpellcastingResourceTable(eventUnit, {
+    local timingEnabled = isSpellcastTimingEnabled()
+    local totalStartTime = timingEnabled and getNowMilliseconds() or nil
+    local relevantCosts = type(context) == "table" and type(context.costs) == "table"
+        and context.costs
+        or Spellcasting.GetSpellResourceCostsForPhase(spell, phase)
+    if #relevantCosts == 0 then
+        return false, nil, {}
+    end
+
+    local resourceContext = type(context) == "table" and context or buildSpellResourceContext(eventUnit, relevantCosts, {
         applyFallbackToUnit = true,
     })
+    local currentResources = resourceContext and resourceContext.resources or nil
     if type(currentResources) ~= "table" then
         return false, nil
     end
@@ -1192,18 +1424,28 @@ function Spellcasting.ApplySpellResourceCostsToUnit(eventUnit, spell, phase, isI
     local changed = false
     local resourceDeltas = {}
     local resolvedAmountsByRef = {}
+    local timingParts = timingEnabled and {} or nil
 
-    local relevantCosts = Spellcasting.GetSpellResourceCostsForPhase(spell, phase)
+    local affordabilityStartTime = timingEnabled and getNowMilliseconds() or nil
     if phase == "on_cast_start" then
-        if not Spellcasting.CanAffordResourceCosts(eventUnit, relevantCosts) then
+        if not Spellcasting.CanAffordResourceCosts(eventUnit, relevantCosts, resourceContext) then
             return false, nil
         end
+    end
+    if timingEnabled then
+        timingParts[#timingParts + 1] = {
+            label = ("affordability[%d]"):format(#relevantCosts),
+            elapsed = getNowMilliseconds() - affordabilityStartTime,
+        }
     end
 
     for index = 1, #relevantCosts do
         local cost = relevantCosts[index]
+        local costStartTime = timingEnabled and getNowMilliseconds() or nil
         local resourceRef = type(cost) == "table" and tostring(cost.resourceRef or "") or ""
-        local amount = Spellcasting.ResolveSpellResourceCostAmount(eventUnit, cost)
+        local amount = type(resourceContext.resolvedAmountsByIndex) == "table" and resourceContext.resolvedAmountsByIndex[index]
+            or Spellcasting.ResolveSpellResourceCostAmount(eventUnit, cost, resourceContext)
+        local applyElapsed = 0
         if resourceRef ~= "" and amount > 0 then
             resolvedAmountsByRef[index] = amount
             local delta = 0
@@ -1217,7 +1459,11 @@ function Spellcasting.ApplySpellResourceCostsToUnit(eventUnit, spell, phase, isI
             end
 
             if delta ~= 0 then
-                local mutated, appliedDelta, entry = Spellcasting.ApplyResourceDelta(currentResources, resourceRef, delta)
+                local applyStartTime = timingEnabled and getNowMilliseconds() or nil
+                local mutated, appliedDelta, entry = Spellcasting.ApplyResourceDelta(currentResources, resourceRef, delta, resourceContext)
+                if timingEnabled then
+                    applyElapsed = getNowMilliseconds() - applyStartTime
+                end
                 changed = changed or mutated
                 if mutated then
                     resourceDeltas[#resourceDeltas + 1] = {
@@ -1229,6 +1475,27 @@ function Spellcasting.ApplySpellResourceCostsToUnit(eventUnit, spell, phase, isI
                 end
             end
         end
+
+        if timingEnabled then
+            timingParts[#timingParts + 1] = {
+                label = ("cost[%d:%s]=%d/%d"):format(index, resourceRef ~= "" and resourceRef or "none", amount, math.floor(applyElapsed + 0.5)),
+                elapsed = getNowMilliseconds() - costStartTime,
+            }
+        end
+    end
+
+    if timingEnabled then
+        logSpellcastTimingLine(
+            "Spellcast resource timing",
+            ("%s/%s/%s"):format(
+                tostring(spell.id or spell.name or "spell"),
+                tostring(phase or "phase"),
+                isInterrupt == true and "interrupt" or "apply"
+            ),
+            timingParts,
+            getNowMilliseconds() - totalStartTime,
+            SPELLCAST_SLOW_HELPER_MS
+        )
     end
 
     if not changed then
@@ -1237,6 +1504,9 @@ function Spellcasting.ApplySpellResourceCostsToUnit(eventUnit, spell, phase, isI
 
     return true, resourceDeltas, resolvedAmountsByRef
 end
+
+Spellcasting.BuildSpellResourceContext = buildSpellResourceContext
+Spellcasting.ResolveSpellResourceCostAmounts = resolveSpellResourceCostAmounts
 
 function Spellcasting.BuildResourceSyncPayload(resources, updatedRefs)
     local updateFilter = type(updatedRefs) == "table" and updatedRefs or nil
@@ -2035,10 +2305,13 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
         return false, {}
     end
 
+    local timingEnabled = isSpellcastTimingEnabled()
+    local totalStartTime = timingEnabled and getNowMilliseconds() or nil
     local targetPhase = combat.NormalizeCastPhase and combat.NormalizeCastPhase(phase) or tostring(phase or "on_cast_end")
     local healthResourceRef = type(eventState) == "table" and eventState.healthResourceRef or Spellcasting.GetHealthResourceRef()
     local results = {}
     local executed = false
+    local executedComponentCount = 0
     local combatEventState = type(combat.GetOrCreateActionCombatEventState) == "function"
         and combat:GetOrCreateActionCombatEventState(castEntry, spell)
         or nil
@@ -2049,10 +2322,13 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
         local normalizedComponent = combat.NormalizeComponent and combat.NormalizeComponent(component) or component
         local componentPhase = normalizedComponent and normalizedComponent.castPhase or nil
         if normalizedComponent and componentPhase == targetPhase and normalizedComponent.effect then
+            local componentStartTime = timingEnabled and getNowMilliseconds() or nil
+            local targetResolveStartTime = timingEnabled and getNowMilliseconds() or nil
             local targets = Spellcasting.ResolveComponentTargets(eventState, casterUnit, normalizedComponent, castEntry)
             if #(targets or {}) == 0 and normalizedComponent.target and normalizedComponent.target.type == "caster" then
                 targets = { casterUnit }
             end
+            local targetResolveElapsed = timingEnabled and (getNowMilliseconds() - targetResolveStartTime) or 0
 
             local resolvedTargetEventIds = {}
             for targetIndex = 1, #(targets or {}) do
@@ -2064,12 +2340,21 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
             end
             local effectType = tostring(normalizedComponent and normalizedComponent.effect and normalizedComponent.effect.type or "")
             local componentResults = {}
+            local beginDamageElapsed = 0
+            local dispatchElapsed = 0
+            local hookElapsed = 0
+            local processElapsed = 0
+            local emitElapsed = 0
             if effectType == "damage" then
                 local targetCount = #(targets or {})
                 hasPendingDamage = targetCount > 0
                 if type(combat.BeginActionDamageResolution) == "function" then
+                    local beginDamageStartTime = timingEnabled and getNowMilliseconds() or nil
                     for targetIndex = 1, targetCount do
                         combat:BeginActionDamageResolution(castEntry, spell, normalizedComponent.key)
+                    end
+                    if timingEnabled then
+                        beginDamageElapsed = getNowMilliseconds() - beginDamageStartTime
                     end
                 end
             end
@@ -2080,6 +2365,7 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
                 if effectType ~= "damage" and type(combat.RegisterActionCombatEventTargets) == "function" then
                     combat:RegisterActionCombatEventTargets(combatEventState, resolvedTargetEventIds)
                 end
+                local dispatchStartTime = timingEnabled and getNowMilliseconds() or nil
                 local applied, result = combat:DispatchComponentEffect(normalizedComponent, {
                     sessionState = self.GetState and self:GetState() or nil,
                     eventState = eventState,
@@ -2101,6 +2387,9 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
                     combatEventState = combatEventState,
                     spellCasterEvents = type(spell) == "table" and spell.casterEvents or nil,
                 })
+                if timingEnabled then
+                    dispatchElapsed = dispatchElapsed + (getNowMilliseconds() - dispatchStartTime)
+                end
                 executed = true
                 if effectType == "heal"
                     and type(combat.RegisterActionCasterEventOutcome) == "function"
@@ -2117,6 +2406,7 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
                     and type(combat.RunTargetHooks) == "function"
                     and (applied or type(result) == "table" and tostring(result.resultType or "") ~= "invalid")
                 then
+                    local hookStartTime = timingEnabled and getNowMilliseconds() or nil
                     combat:RunTargetHooks(
                         self,
                         {
@@ -2144,6 +2434,9 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
                         normalizedComponent and normalizedComponent.effect and normalizedComponent.effect.targetEvents or nil,
                         { tonumber(targetUnit and targetUnit.eventID) or 0 }
                     )
+                    if timingEnabled then
+                        hookElapsed = hookElapsed + (getNowMilliseconds() - hookStartTime)
+                    end
                 end
                 results[#results + 1] = {
                     componentKey = normalizedComponent.key,
@@ -2156,11 +2449,43 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
                     applied = applied,
                     result = result,
                 }
+                local processStartTime = timingEnabled and getNowMilliseconds() or nil
                 Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, targetUnit, normalizedComponent, result, spellRef)
+                if timingEnabled then
+                    processElapsed = processElapsed + (getNowMilliseconds() - processStartTime)
+                end
             end
 
             if effectType == "heal" then
+                local emitStartTime = timingEnabled and getNowMilliseconds() or nil
                 emitResolvedHealCombatLog(self, eventState, casterUnit, componentResults, healthResourceRef, spell, spellRef)
+                if timingEnabled then
+                    emitElapsed = getNowMilliseconds() - emitStartTime
+                end
+            end
+
+            if timingEnabled then
+                executedComponentCount = executedComponentCount + 1
+                logSpellcastTimingLine(
+                    "Spellcast component timing",
+                    ("%s/%s/%s targets=%d effect=%s"):format(
+                        tostring(spellRef or spell.id or spell.name or "spell"),
+                        tostring(targetPhase or "phase"),
+                        tostring(normalizedComponent.key or index),
+                        #(targets or {}),
+                        effectType ~= "" and effectType or "unknown"
+                    ),
+                    {
+                        { label = "targets", elapsed = targetResolveElapsed },
+                        { label = "begin-damage", elapsed = beginDamageElapsed },
+                        { label = "dispatch", elapsed = dispatchElapsed },
+                        { label = "hooks", elapsed = hookElapsed },
+                        { label = "process", elapsed = processElapsed },
+                        { label = "emit", elapsed = emitElapsed },
+                    },
+                    getNowMilliseconds() - componentStartTime,
+                    SPELLCAST_SLOW_HELPER_MS
+                )
             end
         end
     end
@@ -2180,6 +2505,21 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
             combatEventState = combatEventState,
             spellCasterEvents = type(spell) == "table" and spell.casterEvents or nil,
         }, castEntry, spell)
+    end
+
+    if timingEnabled then
+        logSpellcastTimingLine(
+            "Spellcast component phase timing",
+            ("%s/%s components=%d targets=%d"):format(
+                tostring(spellRef or spell.id or spell.name or "spell"),
+                tostring(targetPhase or "phase"),
+                executedComponentCount,
+                #results
+            ),
+            nil,
+            getNowMilliseconds() - totalStartTime,
+            SPELLCAST_SLOW_TOTAL_MS
+        )
     end
 
     return executed, results
@@ -2275,6 +2615,8 @@ function Client:MarkTargetingDirty(reason)
 end
 
 function Spellcasting.RefreshVisiblePlayerTooltip(reason, options)
+    local timingEnabled = isSpellcastTimingEnabled()
+    local totalStartTime = timingEnabled and getNowMilliseconds() or nil
     local refreshed = false
     local immediate = type(options) == "table" and options.immediate == true
     local skipCompanionBars = type(options) == "table" and options.skipCompanionBars == true
@@ -2284,9 +2626,23 @@ function Spellcasting.RefreshVisiblePlayerTooltip(reason, options)
         if skipCompanionBars ~= true and type(Client.RefreshActionBarCompanionBars) == "function" then
             refreshed = Client:RefreshActionBarCompanionBars(reason) or refreshed
         end
+        if timingEnabled then
+            logSpellcastTimingLine(
+                "Spellcast visual timing",
+                ("%s/immediate"):format(tostring(reason or "visual")),
+                {
+                    { label = "tooltip", elapsed = getNowMilliseconds() - totalStartTime },
+                },
+                getNowMilliseconds() - totalStartTime,
+                SPELLCAST_SLOW_HELPER_MS
+            )
+        end
         return refreshed
     end
 
+    local tooltipElapsed = 0
+    local companionElapsed = 0
+    local tooltipStartTime = timingEnabled and getNowMilliseconds() or nil
     if type(Client.MarkVisiblePlayerTooltipDirty) == "function" then
         refreshed = Client:MarkVisiblePlayerTooltipDirty(reason, payload) or refreshed
     elseif type(Client.QueueVisiblePlayerTooltipRefresh) == "function" then
@@ -2294,13 +2650,30 @@ function Spellcasting.RefreshVisiblePlayerTooltip(reason, options)
     else
         refreshed = refreshVisiblePlayerTooltipImmediate(reason, payload) or refreshed
     end
+    if timingEnabled then
+        tooltipElapsed = getNowMilliseconds() - tooltipStartTime
+    end
 
+    local companionStartTime = timingEnabled and getNowMilliseconds() or nil
     if skipCompanionBars ~= true and type(Client.MarkActionBarCompanionBarsDirty) == "function" then
         refreshed = Client:MarkActionBarCompanionBarsDirty(reason) or refreshed
     elseif skipCompanionBars ~= true and type(Client.QueueActionBarCompanionBarsRefresh) == "function" then
         refreshed = Client:QueueActionBarCompanionBarsRefresh(reason) or refreshed
     elseif skipCompanionBars ~= true and type(Client.RefreshActionBarCompanionBars) == "function" then
         refreshed = Client:RefreshActionBarCompanionBars(reason) or refreshed
+    end
+    if timingEnabled then
+        companionElapsed = getNowMilliseconds() - companionStartTime
+        logSpellcastTimingLine(
+            "Spellcast visual timing",
+            ("%s/deferred"):format(tostring(reason or "visual")),
+            {
+                { label = "tooltip", elapsed = tooltipElapsed },
+                { label = "companion-bars", elapsed = companionElapsed },
+            },
+            getNowMilliseconds() - totalStartTime,
+            SPELLCAST_SLOW_HELPER_MS
+        )
     end
 
     return refreshed

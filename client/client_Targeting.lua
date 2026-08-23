@@ -31,6 +31,30 @@ local function enqueueTargetingWork(fn, ...)
     return false
 end
 
+local function getCombatTargetingRevisionToken(pending, selectedEventId)
+    local Combat = Client.Combat or nil
+    local eventId = tostring(pending and pending.eventId or "")
+    local combatRevision = 0
+    if type(Combat) == "table" and type(Combat.CombatRuntimeRevisionsByEventId) == "table" then
+        combatRevision = math.max(0, math.floor(tonumber(Combat.CombatRuntimeRevisionsByEventId[eventId]) or 0))
+    end
+
+    local auraRevision = 0
+    local auraManager = Client.Spellcasting and Client.Spellcasting.AuraManager or nil
+    if type(auraManager) == "table" and type(auraManager.GetEventAuraRevision) == "function" then
+        auraRevision = math.max(0, math.floor(tonumber(auraManager:GetEventAuraRevision(Client, eventId)) or 0))
+    end
+
+    local descriptionBuilder = Client.Spellcasting and Client.Spellcasting.DescriptionBuilder or nil
+    return table.concat({
+        tostring(combatRevision),
+        tostring(auraRevision),
+        tostring(math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))),
+        tostring(math.max(1, math.floor(tonumber(descriptionBuilder and descriptionBuilder.ProfileTooltipContextRevision) or 1))),
+        tostring(tonumber(selectedEventId) or 0),
+    }, ":")
+end
+
 local function buildPendingSpellTargetingMetricsKey(pending, revision, selectedEventId)
     return table.concat({
         tostring(pending and pending.spellRef or ""),
@@ -38,6 +62,7 @@ local function buildPendingSpellTargetingMetricsKey(pending, revision, selectedE
         tostring(tonumber(pending and pending.casterEventId) or 0),
         tostring(math.max(0, math.floor(tonumber(revision) or 0))),
         tostring(tonumber(selectedEventId) or 0),
+        getCombatTargetingRevisionToken(pending, selectedEventId),
     }, "\31")
 end
 local function getEventClass()
@@ -198,6 +223,22 @@ local function formatSignedValue(value)
     return tostring(numericValue)
 end
 
+local function formatSignedPercentValue(value)
+    local numericValue = tonumber(value) or 0
+    local roundedValue = math.floor((numericValue * 10) + (numericValue >= 0 and 0.5 or -0.5)) / 10
+    if math.abs(roundedValue - math.floor(roundedValue)) < 0.001 then
+        if roundedValue > 0 then
+            return ("+%d"):format(math.floor(roundedValue + 0.5))
+        end
+        return tostring(math.floor(roundedValue + (roundedValue >= 0 and 0.5 or -0.5)))
+    end
+
+    if roundedValue > 0 then
+        return ("+%.1f"):format(roundedValue)
+    end
+    return ("%.1f"):format(roundedValue)
+end
+
 local function resolveStatLabel(combatModule, statRef)
     if type(combatModule) == "table" and type(combatModule.ResolveStatReferenceLabel) == "function" then
         local label = tostring(combatModule:ResolveStatReferenceLabel(statRef) or "")
@@ -313,51 +354,94 @@ local function findFirstCriticalSpellComponent(spell)
     return nil, nil
 end
 
-local function buildSelectedUnitHitInfo(pending, eventState, casterUnit, targetUnit)
+local function buildPendingTargetPreviewContext(pending, eventState, casterUnit, targetUnit)
     local Combat = Client.Combat or nil
     if type(pending) ~= "table"
         or type(eventState) ~= "table"
         or type(casterUnit) ~= "table"
         or type(targetUnit) ~= "table"
         or type(Combat) ~= "table"
-        or type(Combat.ResolveDefenceSystem) ~= "function"
-        or type(Combat.ResolveHitCheckAttackType) ~= "function"
-        or type(Combat.ResolveWeaponSkillContext) ~= "function"
-        or type(Combat.ResolveAttackModifierContext) ~= "function"
+        or type(Combat.BuildHitPreviewEntry) ~= "function"
+    then
+        return nil
+    end
+
+    local previewContext = {
+        damageEffect = nil,
+        damageComponent = nil,
+        damagePreviewEntry = nil,
+        critEffect = nil,
+        critComponent = nil,
+        critPreviewEntry = nil,
+    }
+
+    local damageEffect, damageComponent = findFirstDamageSpellComponent(pending.spell)
+    if damageEffect and damageComponent then
+        previewContext.damageEffect = damageEffect
+        previewContext.damageComponent = damageComponent
+        previewContext.damagePreviewEntry = Combat:BuildHitPreviewEntry({
+            attackerUnit = casterUnit,
+            casterUnit = casterUnit,
+            defenderUnit = targetUnit,
+            targetUnit = targetUnit,
+            eventState = eventState,
+            spellRef = pending.spellRef,
+            componentKey = damageComponent.key,
+            spell = pending.spell,
+        }, damageEffect, damageComponent)
+    end
+
+    local critEffect, critComponent = findFirstCriticalSpellComponent(pending.spell)
+    if critEffect and critComponent then
+        previewContext.critEffect = critEffect
+        previewContext.critComponent = critComponent
+        if damageComponent and critComponent.key == damageComponent.key then
+            previewContext.critPreviewEntry = previewContext.damagePreviewEntry
+        else
+            previewContext.critPreviewEntry = Combat:BuildHitPreviewEntry({
+                attackerUnit = casterUnit,
+                casterUnit = casterUnit,
+                defenderUnit = targetUnit,
+                targetUnit = targetUnit,
+                eventState = eventState,
+                spellRef = pending.spellRef,
+                componentKey = critComponent.key,
+                spell = pending.spell,
+            }, critEffect, critComponent)
+        end
+    end
+
+    return previewContext
+end
+
+local function buildSelectedUnitHitInfo(pending, eventState, casterUnit, targetUnit, previewContext)
+    local Combat = Client.Combat or nil
+    if type(pending) ~= "table"
+        or type(eventState) ~= "table"
+        or type(casterUnit) ~= "table"
+        or type(targetUnit) ~= "table"
+        or type(Combat) ~= "table"
     then
         return nil, nil, nil
     end
 
-    local effect, component = findFirstDamageSpellComponent(pending.spell)
-    if not effect or not component then
+    local resolvedPreviewContext = type(previewContext) == "table" and previewContext or buildPendingTargetPreviewContext(pending, eventState, casterUnit, targetUnit)
+    local previewEntry = type(resolvedPreviewContext) == "table" and resolvedPreviewContext.damagePreviewEntry or nil
+    if type(previewEntry) ~= "table" then
         return nil, nil, nil
     end
 
-    local defenceSystem = Combat:ResolveDefenceSystem()
-    if not defenceSystem then
-        return nil, nil, nil
-    end
-
-    local attackType = Combat:ResolveHitCheckAttackType(effect, component)
-    local weaponSkillContext = Combat:ResolveWeaponSkillContext({
-        attackerUnit = casterUnit,
-        casterUnit = casterUnit,
-        defenderUnit = targetUnit,
-        targetUnit = targetUnit,
-        eventState = eventState,
-        spellRef = pending.spellRef,
-        componentKey = component.key,
-        spell = pending.spell,
-    }, effect, component)
-    local modifierContext = Combat:ResolveAttackModifierContext(casterUnit, defenceSystem, attackType, weaponSkillContext)
-    if type(modifierContext) ~= "table" then
+    local defenceSystem = type(previewEntry) == "table" and tostring(previewEntry.defenceSystem or "") or nil
+    local modifierContext = type(previewEntry) == "table" and previewEntry.attackModifierContext or nil
+    if not defenceSystem or type(modifierContext) ~= "table" then
         return nil, nil, nil
     end
 
     local statValue = tonumber(modifierContext.statValue) or 0
     local weaponSkillPenaltyValue = tonumber(modifierContext.weaponSkillPenaltyValue) or 0
     local totalModifierValue = tonumber(modifierContext.totalModifierValue) or 0
-    if statValue == 0 and weaponSkillPenaltyValue <= 0 then
+    local hasMeaningfulModifier = totalModifierValue ~= 0 or weaponSkillPenaltyValue ~= 0 or modifierContext.statRef ~= nil
+    if hasMeaningfulModifier ~= true then
         return nil, nil, nil
     end
 
@@ -369,9 +453,15 @@ local function buildSelectedUnitHitInfo(pending, eventState, casterUnit, targetU
     end
 
     if defenceSystem == "percent" then
+        local percentStatValue = statValue
+        if modifierContext.statRef and type(Combat.GetCachedCombatStatValue) == "function" then
+            percentStatValue = tonumber(Combat:GetCachedCombatStatValue(previewEntry.context, casterUnit, modifierContext.statRef, statValue)) or statValue
+        end
+        local weaponSkillPenaltyPercent = tonumber(modifierContext.weaponSkillPenaltyPercent) or weaponSkillPenaltyValue or 0
+        local totalModifierPercent = percentStatValue - weaponSkillPenaltyPercent
         return statLabel, statIcon, {
-            value = totalModifierValue,
-            text = ("Bonus Hit Chance: %s%%"):format(formatSignedValue(totalModifierValue)),
+            value = totalModifierPercent,
+            text = ("Bonus Hit Chance: %s%%"):format(formatSignedPercentValue(totalModifierPercent)),
         }
     end
 
@@ -381,50 +471,39 @@ local function buildSelectedUnitHitInfo(pending, eventState, casterUnit, targetU
     }
 end
 
-local function buildSelectedUnitCritInfo(pending, eventState, casterUnit, targetUnit)
+local function buildSelectedUnitCritInfo(pending, eventState, casterUnit, targetUnit, previewContext)
     local Combat = Client.Combat or nil
     if type(pending) ~= "table"
         or type(eventState) ~= "table"
         or type(casterUnit) ~= "table"
         or type(targetUnit) ~= "table"
         or type(Combat) ~= "table"
-        or type(Combat.ResolveDefenceSystem) ~= "function"
-        or type(Combat.ResolveCritCategory) ~= "function"
-        or type(Combat.ResolveCritStatRef) ~= "function"
-        or type(Combat.ResolveBaseCritChance) ~= "function"
     then
         return nil
     end
 
-    local effect, component = findFirstCriticalSpellComponent(pending.spell)
-    if not effect or not component then
+    local resolvedPreviewContext = type(previewContext) == "table" and previewContext or buildPendingTargetPreviewContext(pending, eventState, casterUnit, targetUnit)
+    local previewEntry = type(resolvedPreviewContext) == "table" and resolvedPreviewContext.critPreviewEntry or nil
+    if type(previewEntry) ~= "table" then
         return nil
     end
 
-    local defenceSystem = Combat:ResolveDefenceSystem()
-    if not defenceSystem then
+    local defenceSystem = type(previewEntry) == "table" and tostring(previewEntry.defenceSystem or "") or nil
+    local sharedHitPreview = type(previewEntry) == "table" and previewEntry.sharedHitPreview or nil
+    if not defenceSystem or type(sharedHitPreview) ~= "table" then
         return nil
     end
 
-    local critCategory = Combat:ResolveCritCategory(effect)
-    local critStatRef = Combat:ResolveCritStatRef(defenceSystem, critCategory)
-    local critStatValue = critStatRef and (Lookup.GetStatValue and Lookup.GetStatValue(casterUnit, critStatRef, 0) or 0) or 0
-    local baseCritChance = tonumber(Combat:ResolveBaseCritChance(critCategory)) or 0
-    local weaponSkillCritBonusPercent = 0
-
-    if tostring(effect.type or "") == "damage" and type(Combat.ResolveWeaponSkillContext) == "function" then
-        local weaponSkillContext = Combat:ResolveWeaponSkillContext({
-            attackerUnit = casterUnit,
-            casterUnit = casterUnit,
-            defenderUnit = targetUnit,
-            targetUnit = targetUnit,
-            eventState = eventState,
-            spellRef = pending.spellRef,
-            componentKey = component.key,
-            spell = pending.spell,
-        }, effect, component)
-        weaponSkillCritBonusPercent = type(weaponSkillContext) == "table" and (tonumber(weaponSkillContext.critBonusPercent) or 0) or 0
+    local critStatRef = sharedHitPreview.critStatRef
+    local critRoll = type(sharedHitPreview.critRoll) == "table" and sharedHitPreview.critRoll or nil
+    local critStatValue = critRoll and tonumber(critRoll.statValue) or nil
+    if critStatValue == nil and critStatRef and type(Combat.GetCachedCombatStatValue) == "function" then
+        critStatValue = Combat:GetCachedCombatStatValue(previewEntry.context, casterUnit, critStatRef, 0)
     end
+    critStatValue = tonumber(critStatValue) or 0
+    local baseCritChance = tonumber(sharedHitPreview.baseCritChance) or 0
+    local weaponSkillContext = type(previewEntry) == "table" and previewEntry.weaponSkillContext or nil
+    local weaponSkillCritBonusPercent = type(weaponSkillContext) == "table" and (tonumber(weaponSkillContext.critBonusPercent) or 0) or 0
 
     if defenceSystem == "percent" then
         local chancePercent = baseCritChance + critStatValue + weaponSkillCritBonusPercent
@@ -792,6 +871,8 @@ function Client:QueuePendingSpellTargetingMetricsRefresh(pending, revision, even
             return
         end
 
+        local previewContext = buildPendingTargetPreviewContext(requestPending, currentEventState, currentCasterUnit, currentSelectedUnit)
+
         local selectedUnitHitStatName = nil
         local selectedUnitHitStatIcon = nil
         local selectedUnitHitText = nil
@@ -800,13 +881,25 @@ function Client:QueuePendingSpellTargetingMetricsRefresh(pending, revision, even
         local selectedUnitCritValue = nil
 
         local hitDisplay = nil
-        selectedUnitHitStatName, selectedUnitHitStatIcon, hitDisplay = buildSelectedUnitHitInfo(requestPending, currentEventState, currentCasterUnit, currentSelectedUnit)
+        selectedUnitHitStatName, selectedUnitHitStatIcon, hitDisplay = buildSelectedUnitHitInfo(
+            requestPending,
+            currentEventState,
+            currentCasterUnit,
+            currentSelectedUnit,
+            previewContext
+        )
         if type(hitDisplay) == "table" then
             selectedUnitHitText = hitDisplay.text
             selectedUnitHitValue = tonumber(hitDisplay.value) or 0
         end
 
-        local critDisplay = buildSelectedUnitCritInfo(requestPending, currentEventState, currentCasterUnit, currentSelectedUnit)
+        local critDisplay = buildSelectedUnitCritInfo(
+            requestPending,
+            currentEventState,
+            currentCasterUnit,
+            currentSelectedUnit,
+            previewContext
+        )
         if type(critDisplay) == "table" then
             selectedUnitCritText = critDisplay.text
             selectedUnitCritValue = tonumber(critDisplay.value) or 0

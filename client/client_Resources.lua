@@ -660,6 +660,13 @@ local function applyInboundResourceDeltasForTarget(targetClient, state, eventSta
         end
     end
 
+    if (cachedChanged or eventUpdated)
+        and type(targetClient) == "table"
+        and type(targetClient.BumpCombatRuntimeRevision) == "function"
+    then
+        targetClient:BumpCombatRuntimeRevision(eventState, targetEventId)
+    end
+
     return {
         changed = cachedChanged or eventUpdated,
         eventUpdated = eventUpdated,
@@ -687,7 +694,7 @@ local function shouldDeferTurnResourceDeltas(targetClient, state, options)
         and eventState.channelName == state.channelName
 end
 
-local function applyQueuedLocalResourceDeltas(targetClient, state, targetEventId, resourceDeltas)
+local function applyQueuedLocalResourceDeltas(targetClient, state, targetEventId, resourceDeltas, options)
     local eventState = targetClient.GetEventState and targetClient:GetEventState() or nil
     local playerName = getPlayerNameForState(state) or ""
     if playerName == "" or type(eventState) ~= "table" or eventState.active ~= true then
@@ -703,12 +710,15 @@ local function applyQueuedLocalResourceDeltas(targetClient, state, targetEventId
         targetEventId,
         resourceDeltas
     )
-    if result.eventUpdated and type(targetClient.QueueEventWidgetRefresh) == "function" then
+    local suppressLocalVisualRefresh = type(options) == "table" and options.suppressLocalVisualRefresh == true
+    if result.eventUpdated and type(targetClient.QueueEventWidgetRefresh) == "function" and not suppressLocalVisualRefresh then
         queueScopedEventPortraitRefresh(targetClient, "resource-delta-local", targetEventId)
         bumpEventTooltipContextRevision(eventState, targetEventId)
         refreshTargetingForEventState(targetClient, "resource-delta-local")
     end
-    if shouldRefreshActionBarSlotsForTarget(targetClient, eventState, result.targetUnit, targetEventId, playerName) then
+    if not suppressLocalVisualRefresh
+        and shouldRefreshActionBarSlotsForTarget(targetClient, eventState, result.targetUnit, targetEventId, playerName)
+    then
         if type(targetClient.QueueActionBarRefresh) == "function" then
             targetClient:QueueActionBarRefresh("resource-delta-local")
         elseif type(targetClient.RefreshActionBarWidget) == "function" then
@@ -895,7 +905,7 @@ function Client:ResetResourceState()
     self.LastAppliedTurnRegenKey = nil
 end
 
-function Client:ApplyLocalTurnStartResourceRegeneration(stateOverride, eventStateOverride)
+function Client:ApplyLocalTurnStartResourceRegeneration(stateOverride, eventStateOverride, options)
     local state = stateOverride or self.State
     local eventState = eventStateOverride or (self.GetEventState and self:GetEventState() or nil)
     if type(state) ~= "table"
@@ -973,6 +983,7 @@ function Client:ApplyLocalTurnStartResourceRegeneration(stateOverride, eventStat
         {
             allowLocalEchoApply = true,
             scope = "turn",
+            suppressLocalVisualRefresh = type(options) == "table" and options.suppressLocalVisualRefresh == true,
         }
     )
     if queued then
@@ -1084,7 +1095,7 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
 
     if shouldDeferTurnResourceDeltas(self, state, options) then
         if allowLocalEchoApply then
-            applyQueuedLocalResourceDeltas(self, state, targetEventId, resourceDeltas)
+            applyQueuedLocalResourceDeltas(self, state, targetEventId, resourceDeltas, options)
         end
         if type(self.QueueActionBarRefresh) == "function" then
             self:QueueActionBarRefresh("pending-resource")
@@ -1208,6 +1219,14 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
             )
         end
         return false
+    end
+
+    local currentEventState = self.GetEventState and self:GetEventState() or self.EventState
+    if type(currentEventState) == "table"
+        and currentEventState.active == true
+        and currentEventState.channelName == state.channelName
+    then
+        state.lastResourceSyncEventId = currentEventState.id
     end
 
     return true
@@ -1526,6 +1545,16 @@ function Client:HandleResource(arguments, sender)
     syncServerEventState(eventState)
 
     if not cachedChanged and not eventUpdated then
+        if shouldRefreshActionBarSlotsForTarget(self, eventState, nil, targetEventId, playerName) then
+            if type(self.QueueActionBarRefresh) == "function" then
+                self:QueueActionBarRefresh("resource-received")
+            end
+        end
+        if shouldRefreshCompanionBarsForTarget(self, eventState, nil, targetEventId)
+            and type(self.QueueActionBarCompanionBarsRefresh) == "function"
+        then
+            self:QueueActionBarCompanionBarsRefresh("resource-received", { immediate = true })
+        end
         return true
     end
 

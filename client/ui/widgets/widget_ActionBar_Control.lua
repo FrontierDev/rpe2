@@ -47,6 +47,12 @@ local function getMovementTracker()
     return type(RPE) == "table" and type(RPE.Core) == "table" and type(RPE.Core.Movement) == "table" and RPE.Core.Movement or nil
 end
 
+local function isStartupPending(eventState)
+    return type(eventState) == "table"
+        and eventState.active == true
+        and (eventState.unitsReady ~= true or eventState.startupReady ~= true)
+end
+
 local function normalizeName(value)
     if Common.NormalizeName then
         return Common.NormalizeName(value)
@@ -437,23 +443,25 @@ function ActionBarWidget:RefreshControlState(reason)
     if self.RefreshActionRowButtons then
         self:RefreshActionRowButtons()
     end
-    local movementTracker = self.BindMovementTracker and self:BindMovementTracker() or getMovementTracker()
-    if movementTracker and type(movementTracker.RefreshMaxDistance) == "function" then
-        movementTracker:RefreshMaxDistance()
-    end
 
     local controlContext = Client.GetActionBarControlContext and Client:GetActionBarControlContext() or nil
     local hasEventContext = type(controlContext) == "table" and type(controlContext.eventState) == "table"
+    local eventState = hasEventContext and controlContext.eventState or nil
+    local startupPending = isStartupPending(eventState)
+    local movementTracker = self.BindMovementTracker and self:BindMovementTracker() or getMovementTracker()
+    if not startupPending and movementTracker and type(movementTracker.RefreshMaxDistance) == "function" then
+        movementTracker:RefreshMaxDistance()
+    end
     local isControlled = type(controlContext) == "table" and controlContext.isControlled == true and controlContext.controlledUnit ~= nil
     local controlledUnit = isControlled and controlContext.controlledUnit or nil
     local rootFrame = self.rootPanel:GetFrame()
     local baseWidth = rootFrame and rootFrame.GetWidth and rootFrame:GetWidth() or 0
     local contentInset = getHorizontalContentInset(self)
     local labelText = isControlled and buildControlLabel(controlledUnit) or ""
-    local isLocalTurn = Client.IsLocalTurnActive and Client:IsLocalTurnActive(controlContext and controlContext.eventState) or false
-    local isLocalHost = Client.IsLocalEventHost and Client:IsLocalEventHost(controlContext and controlContext.eventState) or false
+    local isLocalTurn = not startupPending and Client.IsLocalTurnActive and Client:IsLocalTurnActive(eventState) or false
+    local isLocalHost = Client.IsLocalEventHost and Client:IsLocalEventHost(eventState) or false
     local showMovementBar = isMovementBarActive(controlContext)
-    local movementDisplayState = showMovementBar and buildMovementDisplayState() or nil
+    local movementDisplayState = (not startupPending) and showMovementBar and buildMovementDisplayState() or nil
     local showCloseButton = isControlled and labelText ~= ""
     local showEndTurnButton = hasEventContext and not isLocalHost
     local showActionRowButtons = not isControlled

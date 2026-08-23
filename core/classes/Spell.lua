@@ -28,6 +28,140 @@ local function ensureString(value)
     return tostring(value)
 end
 
+local function trimText(value)
+    local text = ensureString(value)
+    text = text:gsub("^%s+", "")
+    text = text:gsub("%s+$", "")
+    return text
+end
+
+local function copyScalarFields(source, keys)
+    local copied = {}
+    for index = 1, #keys do
+        local key = keys[index]
+        local value = type(source) == "table" and source[key] or nil
+        if type(value) == "string" then
+            copied[key] = value
+        elseif type(value) == "number" then
+            copied[key] = value
+        elseif type(value) == "boolean" then
+            copied[key] = value
+        end
+    end
+
+    return copied
+end
+
+local function normalizeTooltipTemplateToken(token)
+    if type(token) ~= "table" then
+        return nil
+    end
+
+    local key = trimText(token.key)
+    local tokenType = trimText(token.tokenType)
+    if key == "" or tokenType == "" then
+        return nil
+    end
+
+    local normalized = copyScalarFields(token, {
+        "componentIndex",
+        "effectIndex",
+        "eventIndex",
+        "baseField",
+        "amountMode",
+        "operation",
+        "resourceRef",
+        "statRef",
+        "skillRef",
+        "auraRef",
+        "targetDisposition",
+        "targetType",
+        "applyMode",
+    })
+    normalized.key = key
+    normalized.tokenType = tokenType
+    return normalized
+end
+
+local function normalizeTooltipTemplateTokens(values)
+    local normalized = {}
+    for index = 1, #(values or {}) do
+        local token = normalizeTooltipTemplateToken(values[index])
+        if token then
+            normalized[#normalized + 1] = token
+        end
+    end
+
+    return normalized
+end
+
+local function normalizeTooltipTargetContext(value)
+    if type(value) ~= "table" then
+        return nil
+    end
+
+    return {
+        subject = ensureString(value.subject),
+        object = ensureString(value.object),
+        possessive = ensureString(value.possessive),
+        reflexive = ensureString(value.reflexive),
+    }
+end
+
+local function normalizeSpellAuraSectionTemplate(section)
+    if type(section) ~= "table" then
+        return nil
+    end
+
+    local nameText = trimText(section.nameText)
+    local descriptionText = trimText(section.descriptionText)
+    if nameText == "" and descriptionText == "" then
+        return nil
+    end
+
+    local normalized = {
+        auraRef = ensureString(section.auraRef),
+        datasetId = ensureString(section.datasetId),
+        spellDatasetId = ensureString(section.spellDatasetId),
+        nameText = nameText,
+        icon = ensureString(section.icon),
+        descriptionText = descriptionText,
+        tokens = normalizeTooltipTemplateTokens(section.tokens),
+        powerLevel = tonumber(section.powerLevel) or 0,
+        stacks = math.max(1, math.floor(tonumber(section.stacks) or 1)),
+    }
+    if section.duration ~= nil then
+        normalized.duration = math.max(0, math.floor(tonumber(section.duration) or 0))
+    end
+    normalized.targetContext = normalizeTooltipTargetContext(section.targetContext)
+    return normalized
+end
+
+local function normalizeSpellTooltipTemplateData(value)
+    if type(value) ~= "table" then
+        return nil
+    end
+
+    local normalized = {
+        version = math.max(1, math.floor(tonumber(value.version) or 1)),
+        mainText = trimText(value.mainText),
+        tokens = normalizeTooltipTemplateTokens(value.tokens),
+        auraSections = {},
+    }
+    for index = 1, #(value.auraSections or {}) do
+        local section = normalizeSpellAuraSectionTemplate(value.auraSections[index])
+        if section then
+            normalized.auraSections[#normalized.auraSections + 1] = section
+        end
+    end
+
+    if normalized.mainText == "" and #normalized.auraSections == 0 then
+        return nil
+    end
+
+    return normalized
+end
+
 local function normalizeCooldownGroup(value)
     local group = ensureString(value)
     if group == "" then
@@ -105,6 +239,9 @@ local function normalizeResourceCostAmountMode(value)
     local mode = tostring(value or "flat")
     if mode == "base_percent" then
         return "base_percent"
+    end
+    if mode == "max_percent" then
+        return "max_percent"
     end
 
     return "flat"
@@ -288,6 +425,7 @@ local function buildDefaultEffect(effectType)
         return {
             type = "heal",
             baseHealing = 0,
+            amountMode = "flat",
             statScaling = {},
             usesProjectile = false,
             projectilePath = "",
@@ -324,6 +462,7 @@ local function buildDefaultEffect(effectType)
             type = "resource",
             resourceRef = nil,
             amount = 0,
+            amountMode = "flat",
             targetEvents = {},
         }
     end
@@ -331,6 +470,7 @@ local function buildDefaultEffect(effectType)
         return {
             type = "damage",
             baseDamage = 0,
+            amountMode = "flat",
             threatCoefficient = 1,
             weaponDamageMode = "none",
             weaponDamageCoefficient = 1,
@@ -355,6 +495,7 @@ local function normalizeEffect(value)
 
     if effect.type == "damage" then
         effect.baseDamage = tonumber(data.baseDamage) or 0
+        effect.amountMode = normalizeResourceCostAmountMode(data.amountMode)
         effect.threatCoefficient = tonumber(data.threatCoefficient) or 1
         effect.weaponDamageMode = normalizeWeaponDamageMode(data.weaponDamageMode)
         effect.weaponDamageCoefficient = tonumber(data.weaponDamageCoefficient) or 1
@@ -375,6 +516,7 @@ local function normalizeEffect(value)
 
     if effect.type == "heal" then
         effect.baseHealing = tonumber(data.baseHealing) or 0
+        effect.amountMode = normalizeResourceCostAmountMode(data.amountMode)
         effect.statScaling = normalizeStatScaling(data.statScaling)
         effect.usesProjectile = normalizeBool(data.usesProjectile, false)
         effect.projectilePath = ensureString(data.projectilePath)
@@ -415,6 +557,7 @@ local function normalizeEffect(value)
 
     effect.resourceRef = normalizeRef(data.resourceRef)
     effect.amount = tonumber(data.amount) or 0
+    effect.amountMode = normalizeResourceCostAmountMode(data.amountMode)
     effect.targetEvents = normalizeEventList(data.targetEvents)
     return effect
 end
@@ -500,6 +643,8 @@ function Spell:New(data)
         id = nil,
         name = "",
         description = "",
+        tooltipTemplate = false,
+        tooltipTemplateData = nil,
         icon = "",
         seedNPCSpell = false,
         learnMode = "trainer",
@@ -537,6 +682,8 @@ function Spell:Merge(data)
     end
 
     self.description = ensureString(self.description)
+    self.tooltipTemplate = normalizeBool(self.tooltipTemplate, false)
+    self.tooltipTemplateData = normalizeSpellTooltipTemplateData(self.tooltipTemplateData)
     self.icon = ensureString(self.icon)
     self.seedNPCSpell = normalizeBool(self.seedNPCSpell, false)
     self.learnMode = normalizeLearnMode(self.learnMode)
@@ -571,6 +718,8 @@ function Spell:ToTable()
         id = self.id,
         name = self.name,
         description = self.description,
+        tooltipTemplate = self.tooltipTemplate,
+        tooltipTemplateData = normalizeSpellTooltipTemplateData(self.tooltipTemplateData),
         icon = self.icon,
         seedNPCSpell = self.seedNPCSpell == true,
         learnMode = self.learnMode,

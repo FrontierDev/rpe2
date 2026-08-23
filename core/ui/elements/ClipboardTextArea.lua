@@ -55,6 +55,7 @@ function ClipboardTextArea:New(options)
     instance.scripts = {}
     instance._syncingText = false
     instance.enabled = options == nil or options.enabled ~= false
+    instance._focusStartText = nil
     return instance
 end
 
@@ -371,12 +372,19 @@ function ClipboardTextArea:Create()
             self:ClearFocus()
         end)
         self.editBox:SetScript("OnEditFocusGained", function()
+            self._focusStartText = NormalizeText(self.editBox:GetText())
             self:InvokeScript("OnEditFocusGained")
             if self:GetOption("autoHighlightOnFocus", false) then
                 self:HighlightText()
             end
         end)
         self.editBox:SetScript("OnEditFocusLost", function()
+            self.text = NormalizeText(self.editBox:GetText())
+            if self._focusStartText == self.text then
+                self._focusStartText = nil
+                return
+            end
+            self._focusStartText = nil
             self:InvokeScript("OnEditFocusLost")
         end)
         self.editBox:SetScript("OnMouseDown", function()

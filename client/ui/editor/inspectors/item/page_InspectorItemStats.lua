@@ -10,8 +10,78 @@ local Shared = DataEditor.ItemInspectorShared or {}
 local FIELD_WIDTH = Shared.FIELD_WIDTH or 236
 local buildLabel = Shared.buildLabel
 local getDependenciesApi = Shared.getDependenciesApi
+local getSelectedItemAndDataset = Shared.getSelectedItemAndDataset
 local normalizeItemStats = Shared.normalizeItemStats
 local normalizeItemSkillBonuses = Shared.normalizeItemSkillBonuses
+
+function DataEditor:SetSelectedItemInspectorStatIndex(index)
+    local _, item = getSelectedItemAndDataset(self)
+    local stats = normalizeItemStats(item)
+    index = tonumber(index)
+
+    if not index or not stats[index] then
+        self.SelectedItemInspectorStatIndex = nil
+    else
+        self.SelectedItemInspectorStatIndex = index
+    end
+end
+
+function DataEditor:GetSelectedItemInspectorStat()
+    local _, item = getSelectedItemAndDataset(self)
+    local stats = normalizeItemStats(item)
+    local index = tonumber(self.SelectedItemInspectorStatIndex)
+    if not index or not stats[index] then
+        return nil, nil
+    end
+
+    return stats[index], index
+end
+
+function DataEditor:FindItemInspectorStatIndexBySourceStatRef(sourceStatRef, ignoreIndex)
+    local _, item = getSelectedItemAndDataset(self)
+    local stats = normalizeItemStats(item)
+    local targetRef = tostring(sourceStatRef or "")
+    if targetRef == "" then
+        return nil
+    end
+
+    for index = 1, #stats do
+        local entry = stats[index]
+        if index ~= ignoreIndex and tostring(entry and entry.sourceStatRef or "") == targetRef then
+            return index
+        end
+    end
+
+    return nil
+end
+
+function DataEditor:RefreshItemInspectorStatEditor()
+    local dependencies = getDependenciesApi()
+    local stat, index = self:GetSelectedItemInspectorStat()
+    local datasetId, statId = "", ""
+    if stat and dependencies.ParseSourceStatRef then
+        datasetId, statId = dependencies.ParseSourceStatRef(stat.sourceStatRef)
+    end
+
+    local wasRefreshing = self._refreshingItemInspector
+    self._refreshingItemInspector = true
+
+    if self.ItemInspectorPendingStatDatasetDropdown and self.ItemInspectorPendingStatDatasetDropdown.SetSelectedValue then
+        self.ItemInspectorPendingStatDatasetDropdown:SetSelectedValue(datasetId or "", true)
+    end
+    self:RefreshItemInspectorPendingStatDropdown()
+    if self.ItemInspectorPendingStatDropdown and self.ItemInspectorPendingStatDropdown.SetSelectedValue then
+        self.ItemInspectorPendingStatDropdown:SetSelectedValue(statId or "", true)
+    end
+    if self.ItemInspectorPendingStatValueInput then
+        self.ItemInspectorPendingStatValueInput:SetText(tostring(stat and stat.value or 0))
+    end
+    if self.ItemInspectorAddStatButton and self.ItemInspectorAddStatButton.SetText then
+        self.ItemInspectorAddStatButton:SetText(index and "Apply" or "Add")
+    end
+
+    self._refreshingItemInspector = wasRefreshing
+end
 
 local function buildStatsPage(self, page)
     local root = UI.CreateLayout(UI.VerticalLayoutGroup, page, "RPEDataEditorItemInspectorStatsLayout", {
@@ -88,7 +158,10 @@ local function buildStatsPage(self, page)
         end
         if row.SetRowMouseUpHandler then
             row:SetRowMouseUpHandler(function(tableRow, button, rowData)
-                if button == "RightButton" then
+                if button == "LeftButton" then
+                    self:SetSelectedItemInspectorStatIndex(rowData and rowData.rowIndex or nil)
+                    self:RefreshItemInspectorStatEditor()
+                elseif button == "RightButton" then
                     local anchor = tableRow and tableRow.GetFrame and tableRow:GetFrame() or nil
                     self:ShowItemInspectorStatContextMenu(anchor, rowData)
                 end
@@ -158,14 +231,24 @@ local function buildStatsPage(self, page)
             return
         end
 
+        local _, selectedIndex = self:GetSelectedItemInspectorStat()
+        local overwriteIndex = self:FindItemInspectorStatIndexBySourceStatRef(sourceStatRef, selectedIndex)
         self:CommitSelectedItem(function(item)
             local stats = normalizeItemStats(item)
-            stats[#stats + 1] = {
-                sourceStatRef = sourceStatRef,
-                value = value,
-            }
+            local targetIndex = selectedIndex or overwriteIndex
+            if targetIndex and stats[targetIndex] then
+                stats[targetIndex].sourceStatRef = sourceStatRef
+                stats[targetIndex].value = value
+            else
+                stats[#stats + 1] = {
+                    sourceStatRef = sourceStatRef,
+                    value = value,
+                }
+            end
             item.stats = stats
         end)
+        self:SetSelectedItemInspectorStatIndex(nil)
+        self:RefreshItemInspectorStatEditor()
     end, {
         height = 18,
         fontSize = 7,
@@ -318,6 +401,8 @@ local function buildStatsPage(self, page)
         fontSize = 7,
     })
     self.ItemInspectorPendingSkillRow:AddChild(self.ItemInspectorAddSkillButton)
+
+    self:RefreshItemInspectorStatEditor()
 end
 
 function DataEditor:BuildItemInspectorStatsPage(page)

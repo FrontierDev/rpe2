@@ -31,6 +31,7 @@ Debug.EnabledLevels = Debug.EnabledLevels or {
 
 Debug.CommsTracing = Debug.CommsTracing == true
 Debug.ResourceTracing = Debug.ResourceTracing == true
+Debug.SpellcastTiming = false
 
 local PREFIX = ("|cff33ff99%s|r"):format(Addon.Name or "Addon")
 
@@ -136,6 +137,15 @@ end
 
 function Debug.Internal(message, ...)
     return Debug.FormattedDebug("internal", message, ...)
+end
+
+function Debug.EnsureInternalLevelEnabled()
+    if type(Debug.SetLevelEnabled) == "function"
+        and type(Debug.IsLevelEnabled) == "function"
+        and not Debug.IsLevelEnabled("internal")
+    then
+        Debug.SetLevelEnabled("internal", true)
+    end
 end
 
 function Debug.SetLevelEnabled(level, enabled)
