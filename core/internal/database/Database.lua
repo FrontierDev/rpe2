@@ -9,7 +9,7 @@ local Dependecies = Database.Dependecies or {}
 local SCHEMA = {
     profiles = 5,
     rulesets = 1,
-    datasets = 15,
+    datasets = 16,
     globalSettings = 1,
 }
 
@@ -360,6 +360,49 @@ local function normalizeDatasetState(value, allowed, fallback)
     return fallback
 end
 
+local function normalizeGuildSettingEntry(record)
+    local source = type(record) == "table" and record or {}
+    local classes = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes or {}
+    local guildSettingClass = classes and classes.GuildSetting or nil
+
+    if guildSettingClass
+        and type(guildSettingClass.FromTable) == "function"
+        and type(guildSettingClass.ToTable) == "function"
+    then
+        local instance = guildSettingClass.FromTable(deepCopy(source))
+        local normalized = guildSettingClass.ToTable(instance)
+        if type(normalized) == "table" then
+            local merged = deepCopy(source)
+            for key, value in pairs(normalized) do
+                merged[key] = value
+            end
+            return merged
+        end
+    end
+
+    -- GuildSetting.lua loads after Database.lua. This keeps old records safe
+    -- during Database.Initialize; later normalizations apply the full class
+    -- contract once the class is available.
+    local normalized = deepCopy(source)
+    if normalized.wowGuildRankIndices == nil then
+        normalized.wowGuildRankIndices = {}
+    end
+    return normalized
+end
+
+local function normalizeGuildSettings(value)
+    if type(value) ~= "table" then
+        return {}
+    end
+
+    local normalized = {}
+    for index = 1, #value do
+        normalized[index] = normalizeGuildSettingEntry(value[index])
+    end
+
+    return normalized
+end
+
 local function normalizeDatasetRecord(record, fallbackId, fallbackName)
     local data = ensureTable(record)
     local datasetId = ensureString(data.id or fallbackId, "")
@@ -392,7 +435,7 @@ local function normalizeDatasetRecord(record, fallbackId, fallbackName)
         auras = ensureTable(data.auras),
         interactions = ensureTable(data.interactions),
         achievements = ensureTable(data.achievements),
-        guildSettings = ensureTable(data.guildSettings),
+        guildSettings = normalizeGuildSettings(data.guildSettings),
         currencies = ensureTable(data.currencies),
     }
 end

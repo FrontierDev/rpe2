@@ -47,6 +47,27 @@ local function normalizeOptionalRankIndex(value)
     return math.floor(numeric)
 end
 
+local function normalizeWowGuildRankIndices(value)
+    if type(value) ~= "table" then
+        return {}
+    end
+
+    local normalized = {}
+    local seen = {}
+    for index = 1, #value do
+        local numeric = tonumber(value[index])
+        if isFiniteNumber(numeric) and numeric >= 0 and numeric == math.floor(numeric) then
+            local rankIndex = math.floor(numeric)
+            if not seen[rankIndex] then
+                normalized[#normalized + 1] = rankIndex
+                seen[rankIndex] = true
+            end
+        end
+    end
+
+    return normalized
+end
+
 local function normalizeBoolean(value)
     return value == true
 end
@@ -128,6 +149,7 @@ local function normalizeRequisition(value, index, usedIds)
         itemRef = normalizeReference(source.itemRef),
         quantity = normalizeInteger(source.quantity, 1, 1),
         costs = normalizeCosts(source.costs),
+        -- Legacy compatibility field; the new Guild Rank mapping is not inferred from it.
         requiredGuildRankIndex = normalizeOptionalRankIndex(source.requiredGuildRankIndex),
         characterLimit = normalizeInteger(source.characterLimit, 1, 1),
     }
@@ -236,6 +258,7 @@ function GuildSetting:New(data)
         name = "",
         description = "",
         guildName = "",
+        wowGuildRankIndices = {},
         general = {
             enableRequisitions = false,
             enableDailyRewards = false,
@@ -263,6 +286,7 @@ function GuildSetting:Merge(data)
     self.name = ensureString(self.name)
     self.description = ensureString(self.description)
     self.guildName = ensureString(self.guildName)
+    self.wowGuildRankIndices = normalizeWowGuildRankIndices(self.wowGuildRankIndices)
     self.general = normalizeGeneral(self.general)
     self.requisitions = normalizeRequisitions(self.requisitions)
     self.dailyRewards = normalizeDailyRewards(self.dailyRewards)
@@ -278,6 +302,7 @@ function GuildSetting:ToTable()
         name = ensureString(self.name),
         description = ensureString(self.description),
         guildName = ensureString(self.guildName),
+        wowGuildRankIndices = normalizeWowGuildRankIndices(self.wowGuildRankIndices),
         general = normalizeGeneral(self.general),
         requisitions = normalizeRequisitions(self.requisitions),
         dailyRewards = normalizeDailyRewards(self.dailyRewards),
