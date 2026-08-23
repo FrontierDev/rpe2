@@ -1,109 +1,95 @@
+# Task 7 Revision — Fix Requisition Currency Spending
+
 ## Goal
-Activate Requisition purchasing using only the character's valid assigned RPE Guild Rank.
 
-Depends on: #15
+Fix the currency-spending bug in `Guild:TryRequisition()`.
 
-## Primary files
-- `client/client_Guild.lua` or a focused Guild transaction module consistent with current organization
-- `core/internal/profile/Guild.lua`
-- `core/internal/profile/Currencies.lua`
-- `client/character/inventory/Inventory.lua` only as the existing award path/consumer
-- `client/character/guild/page_GuildRequisitions.lua`
+Do not redesign the transaction system or change unrelated Task 7 behavior.
 
-## Required transaction API
-Use one central Guild operation such as:
+## Problem
+
+The current code uses:
 
 ```lua
-Guild:TryRequisition(guildRankRef, requisitionId)
+local spent, updated = pcall(Profile.SpendCurrencyAmount, cost.currencyRef, cost.amount)
 ```
 
-Exact naming may follow current patterns, but the UI must not perform transaction business logic directly.
-
-## Validation order
-Before spending any currency or awarding an item, validate:
-
-```text
-player is in the relevant guild
-guild context is loaded
-valid assigned RPE Guild Rank exists
-requested guildRankRef equals the assigned rank
-enableRequisitions is true
-Requisition exists in that assigned rank
-itemRef resolves
-character lifetime limit is not reached
-all currency refs resolve
-all costs are affordable
-inventory award is possible
-```
-
-Only then begin the commit.
-
-Do not use legacy:
+However, `Profile.SpendCurrencyAmount()` returns:
 
 ```lua
-requiredGuildRankIndex
+success, updatedAmount
 ```
 
-for eligibility. Rank access is determined by the manually assigned RPE Guild Rank.
+Therefore `pcall()` returns:
 
-## Transaction commit
-On success:
-- spend every required currency through existing Profile currency APIs;
-- grant the configured quantity through `Client.Inventory.AddItem()`;
-- increment the Profile Guild requisition ledger keyed by `guildRankRef` and Requisition ID;
-- refresh the Guild/Requisitions UI.
-
-The Requisition ledger is per character and per guild. `characterLimit` remains the lifetime limit for that Requisition definition within that RPE Guild Rank.
-
-## Transaction safety
-All costs must be validated before the first deduction.
-
-If an unexpected failure occurs after spending begins, restore balances/state so the operation cannot leave a partial transaction.
-
-Do not allow:
-
-```text
-some costs spent + no item
-item granted + ledger not updated in a way that permits duplicate claiming
-partial multi-currency deductions
+```lua
+callOk, spendOk, updatedAmount
 ```
 
-Follow existing currency cap/normalization semantics rather than implementing a second currency system.
+The current implementation captures only the first two values, meaning `updated` receives the boolean `spendOk` instead of the new numeric balance.
 
-## Requisitions UI
-Enable the existing Requisition action only when the centralized transaction API reports/derives valid eligibility.
+This causes the subsequent comparison:
 
-Unavailable state should explain the reason where practical, for example:
-
-```text
-No RPE Guild Rank assigned
-Requisitions disabled
-Insufficient <currency>
-Character limit reached
+```lua
+updated ~= expected
 ```
 
-The UI is informative only; the transaction API must independently repeat validation.
+to always fail for a successful currency spend, so any Requisition with a currency cost rolls back.
+
+## Required Fix
+
+Capture all three return values from `pcall()`.
+
+Use logic equivalent to:
+
+```lua
+local callOk, spendOk, updated =
+    pcall(Profile.SpendCurrencyAmount, cost.currencyRef, cost.amount)
+
+local gotAfter, after =
+    pcall(Profile.GetCurrencyAmount, cost.currencyRef)
+
+after = gotAfter and tonumber(after) or nil
+
+if not callOk
+    or spendOk ~= true
+    or not gotAfter
+    or updated ~= expected
+    or after ~= expected
+then
+    local restored = rollbackCurrencies()
+    return false,
+        restored and "currency-transaction-failed" or "rollback-failed",
+        detail
+end
+```
 
 ## Constraints
-- Do not infer eligibility from the player's WoW rank at purchase time beyond validating the existing assigned rank through the Guild facade.
-- Do not use legacy minimum-rank hierarchy logic.
-- Do not directly mutate Inventory storage outside `Client.Inventory.AddItem()`.
-- Do not introduce Daily Reward behavior in this task.
-- Do not change Achievement or Progression runtime.
 
-## Acceptance criteria
-- [ ] No assigned rank -> cannot requisition.
-- [ ] Invalid assigned rank -> cannot requisition.
-- [ ] Requisition from another rank -> rejected.
-- [ ] Disabled Requisitions -> rejected.
-- [ ] Multiple arbitrary currency costs work.
-- [ ] Built-in `copper` works without dataset dependency assumptions.
+- Fix this bug only.
+- Preserve the existing validation order.
+- Preserve the existing rollback mechanism.
+- Preserve the existing Requisition ledger behavior.
+- Preserve `Client.Inventory.AddItem()` as the item-award path.
+- Do not add Daily Reward behavior.
+- Do not change Guild Rank eligibility behavior.
+- Do not use legacy `requiredGuildRankIndex`.
+- Do not modify unrelated systems.
+
+## Acceptance Criteria
+
+- [ ] A Requisition with one currency cost succeeds when the player can afford it.
+- [ ] A Requisition with multiple currency costs succeeds when all costs are affordable.
+- [ ] Built-in `copper` costs work.
 - [ ] Insufficient currency causes no spending.
-- [ ] Character lifetime limit is enforced per rank/requisition.
-- [ ] Item grant uses `Client.Inventory.AddItem()`.
-- [ ] Failed transaction cannot leave partial currency deductions.
-- [ ] Successful usage persists through reload.
-- [ ] Legacy minimum WoW-rank field is ignored.
+- [ ] A failure after one or more currency deductions restores the original balances.
+- [ ] Existing item-award and Requisition-ledger rollback behavior remains intact.
+- [ ] No unrelated Task 7 behavior is changed.
 
-## Coding-agent instructions
-Read the revised PDD and implementation plan, then inspect current Profile currency, Inventory and Guild-state APIs before editing. Implement Task 7 only. Keep transaction validation centralized and atomic; do not rely on UI gating. Report changed files, validation performed and any deviation from this issue.
+## Coding-Agent Instructions
+
+Inspect the current `Guild:TryRequisition()` implementation and `Profile.SpendCurrencyAmount()` return contract before editing.
+
+Implement this fix only.
+
+When finished, review the diff against every acceptance criterion above and report any deviation.

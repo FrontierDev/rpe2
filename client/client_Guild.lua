@@ -951,10 +951,10 @@ function Guild:TryRequisition(guildRankRef, requisitionId)
         local cost = detail.costs[index]
         local before = snapshots[index].amount
         local expected = before - cost.amount
-        local spent, updated = pcall(Profile.SpendCurrencyAmount, cost.currencyRef, cost.amount)
+        local callOk, spendOk, updated = pcall(Profile.SpendCurrencyAmount, cost.currencyRef, cost.amount)
         local gotAfter, after = pcall(Profile.GetCurrencyAmount, cost.currencyRef)
         after = gotAfter and (tonumber(after) or 0) or nil
-        if not spent or not gotAfter or updated ~= expected or after ~= expected then
+        if not callOk or spendOk ~= true or not gotAfter or updated ~= expected or after ~= expected then
             local restored = rollbackCurrencies()
             return false, restored and "currency-transaction-failed" or "rollback-failed", detail
         end
