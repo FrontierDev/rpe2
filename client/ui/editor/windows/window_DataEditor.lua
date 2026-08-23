@@ -56,6 +56,7 @@ local INSPECTOR_PAGE_BY_COLLECTION = {
     damageSchools = "damageSchool",
     stats = "stat",
     resources = "resource",
+    achievements = "achievement",
     currencies = "currency",
     races = "race",
     classes = "class",
@@ -100,6 +101,7 @@ local INSPECTOR_REFRESHER_BY_PAGE = {
     damageSchool = "RefreshDamageSchoolInspectorPage",
     stat = "RefreshStatInspectorPage",
     resource = "RefreshResourceInspectorPage",
+    achievement = "RefreshAchievementInspectorPage",
     currency = "RefreshCurrencyInspectorPage",
     race = "RefreshRaceInspectorPage",
     class = "RefreshClassInspectorPage",
@@ -120,6 +122,7 @@ local INSPECTOR_SELECTION_GETTER_BY_PAGE = {
     damageSchool = "GetSelectedDamageSchool",
     stat = "GetSelectedStat",
     resource = "GetSelectedResource",
+    achievement = "GetSelectedAchievement",
     currency = "GetSelectedCurrency",
     race = "GetSelectedRace",
     class = "GetSelectedClass",
@@ -140,6 +143,7 @@ local function collectionQueuesDependencyRecompute(collectionKey)
         or collectionKey == "weaponTypes"
         or collectionKey == "damageSchools"
         or collectionKey == "auras"
+        or collectionKey == "achievements"
 end
 
 function DataEditor:GetEntryDefinition(collectionKey)
@@ -397,6 +401,8 @@ function DataEditor:CreateDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = "stat"
         elseif collectionKey == "resources" then
             self.ActiveInspectorPageKey = "resource"
+        elseif collectionKey == "achievements" then
+            self.ActiveInspectorPageKey = "achievement"
         elseif collectionKey == "currencies" then
             self.ActiveInspectorPageKey = "currency"
         elseif collectionKey == "races" then
@@ -449,6 +455,8 @@ function DataEditor:CloneSelectedDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = "stat"
         elseif collectionKey == "resources" then
             self.ActiveInspectorPageKey = "resource"
+        elseif collectionKey == "achievements" then
+            self.ActiveInspectorPageKey = "achievement"
         elseif collectionKey == "currencies" then
             self.ActiveInspectorPageKey = "currency"
         elseif collectionKey == "races" then
@@ -507,6 +515,8 @@ function DataEditor:DeleteSelectedDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = nextIndex and "stat" or "dataset"
         elseif collectionKey == "resources" then
             self.ActiveInspectorPageKey = nextIndex and "resource" or "dataset"
+        elseif collectionKey == "achievements" then
+            self.ActiveInspectorPageKey = nextIndex and "achievement" or "dataset"
         elseif collectionKey == "currencies" then
             self.ActiveInspectorPageKey = nextIndex and "currency" or "dataset"
         elseif collectionKey == "races" then
@@ -1169,6 +1179,10 @@ function DataEditor:GetSelectedResource()
     return self:GetSelectedDatasetEntry("resources")
 end
 
+function DataEditor:GetSelectedAchievement()
+    return self:GetSelectedDatasetEntry("achievements")
+end
+
 function DataEditor:GetSelectedCurrency()
     return self:GetSelectedDatasetEntry("currencies")
 end
@@ -1680,6 +1694,7 @@ function DataEditor:ShowInspectorPage(pageKey)
         aura = "BuildAuraInspectorPage",
         stat = "BuildStatInspectorPage",
         resource = "BuildResourceInspectorPage",
+        achievement = "BuildAchievementInspectorPage",
         currency = "BuildCurrencyInspectorPage",
         race = "BuildRaceInspectorPage",
         class = "BuildClassInspectorPage",
@@ -1820,6 +1835,9 @@ function DataEditor:RefreshAll()
     end
     if self.RefreshCurrencyInspectorPage then
         self:RefreshCurrencyInspectorPage()
+    end
+    if self.RefreshAchievementInspectorPage then
+        self:RefreshAchievementInspectorPage()
     end
     if self.RefreshRaceInspectorPage then
         self:RefreshRaceInspectorPage()

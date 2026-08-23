@@ -1,0 +1,794 @@
+local _, Addon = ...
+
+Addon.Client = Addon.Client or {}
+Addon.Client.UI = Addon.Client.UI or {}
+Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
+
+local DataEditor = Addon.Client.UI.Editor
+local UI = Addon.UI or {}
+local Client = Addon.Client or {}
+local AchievementClass = Addon.Internal
+    and Addon.Internal.Database
+    and Addon.Internal.Database.Classes
+    and Addon.Internal.Database.Classes.Achievement
+
+local INSPECTOR_SIDE_PADDING = 8
+local CONTROL_HEIGHT = 20
+local FIELD_WIDTH = 236
+local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+
+local INSPECTOR_PAGE_DEFINITIONS = {
+    { key = "general", label = "General" },
+    { key = "criteria", label = "Criteria" },
+    { key = "rewards", label = "Rewards" },
+}
+
+local TRIGGER_ITEMS = {
+    { label = "Manual", value = "manual" },
+    { label = "Currency Gain", value = "currency_gain" },
+    { label = "RPE Kill", value = "rpe_kill" },
+    { label = "Achievement Earned", value = "achievement_earned" },
+    { label = "RPE Event Complete", value = "rpe_event_complete" },
+}
+
+local function applyTable(target, source)
+    if type(target) ~= "table" or type(source) ~= "table" then
+        return
+    end
+
+    for key in pairs(target) do
+        if source[key] == nil then
+            target[key] = nil
+        end
+    end
+
+    for key, value in pairs(source) do
+        target[key] = value
+    end
+end
+
+local function trim(value)
+    return tostring(value or ""):match("^%s*(.-)%s*$")
+end
+
+local function setTextElementEnabled(element, enabled)
+    if not element then
+        return
+    end
+
+    if element.SetEnabled then
+        element:SetEnabled(enabled == true)
+    end
+    if element.SetReadOnly then
+        element:SetReadOnly(enabled ~= true)
+    end
+end
+
+local function setDropdownEnabled(dropdown, enabled)
+    local frame = dropdown and dropdown.GetFrame and dropdown:GetFrame() or nil
+    if not frame then
+        return
+    end
+
+    if frame.EnableMouse then
+        frame:EnableMouse(enabled == true)
+    end
+    if frame.SetAlpha then
+        frame:SetAlpha(enabled == true and 1 or 0.5)
+    end
+end
+
+local function setGroupVisible(group, visible)
+    if not group then
+        return
+    end
+
+    local frame = group.GetFrame and group:GetFrame() or nil
+    local targetHeight = visible and group._visibleHeight or 0
+    if group.SetHeight then
+        group:SetHeight(targetHeight or 0)
+    elseif group.options then
+        group.options.height = targetHeight or 0
+    end
+
+    if frame then
+        if frame.SetHeight then
+            frame:SetHeight(targetHeight or 0)
+        end
+        if visible then
+            frame:Show()
+        else
+            frame:Hide()
+        end
+    end
+end
+
+local function createLabel(parent, name, text, width)
+    return UI.CreateText(parent, name, text, {
+        fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
+        fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Body) or 8,
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+        width = width or FIELD_WIDTH,
+        height = 12,
+        justifyH = "LEFT",
+    })
+end
+
+local function createCheckbox(parent, name, text, onValueChanged)
+    local checkbox = UI.Checkbox:New({
+        name = name,
+        width = FIELD_WIDTH,
+        height = 18,
+        text = text,
+        checked = false,
+        border = false,
+        fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
+        fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Checkbox) or 8,
+        labelColor = UI.ResolveColor(nil, "text.primary"),
+        onValueChanged = onValueChanged,
+    })
+    checkbox:SetParent(parent)
+    checkbox:Create()
+    return checkbox
+end
+
+local function getCriterion(achievement, index)
+    local criteria = achievement and achievement.criteria or nil
+    index = tonumber(index)
+    if type(criteria) ~= "table" or not index or not criteria[index] then
+        return nil
+    end
+
+    return criteria[index], index
+end
+
+local function buildCriterionId(criteria, ignoredIndex)
+    local used = {}
+    for index = 1, #(criteria or {}) do
+        if index ~= ignoredIndex then
+            local criterion = criteria[index]
+            local id = trim(criterion and criterion.id)
+            if id ~= "" then
+                used[id] = true
+            end
+        end
+    end
+
+    local index = 1
+    while used["criterion_" .. index] do
+        index = index + 1
+    end
+    return "criterion_" .. index
+end
+
+local function getFilter(criterion)
+    if type(criterion.filters) ~= "table" then
+        criterion.filters = {}
+    end
+    return criterion.filters
+end
+
+function DataEditor:NormalizeAchievementDefinition(achievement)
+    if AchievementClass and AchievementClass.New and AchievementClass.ToTable then
+        return AchievementClass:New(achievement):ToTable()
+    end
+
+    return achievement or {}
+end
+
+function DataEditor:CommitSelectedAchievement(mutate)
+    local dataset = self:GetSelectedDataset()
+    local achievement = self:GetSelectedAchievement()
+    if not dataset or not achievement or type(mutate) ~= "function" then
+        return achievement
+    end
+
+    local before = self:DeepCopyValue(achievement)
+    mutate(achievement, dataset)
+    applyTable(achievement, self:NormalizeAchievementDefinition(achievement))
+
+    if self:DeepEqualValues(before, achievement) then
+        return achievement
+    end
+
+    self:QueuePendingDatasetEntryChanged(dataset.id, "achievements")
+    return achievement
+end
+
+function DataEditor:GetAchievementInspectorPageDefinitions()
+    return INSPECTOR_PAGE_DEFINITIONS
+end
+
+function DataEditor:GetAchievementInspectorPageIndexByKey(key)
+    for index = 1, #INSPECTOR_PAGE_DEFINITIONS do
+        if INSPECTOR_PAGE_DEFINITIONS[index].key == key then
+            return index
+        end
+    end
+    return 1
+end
+
+function DataEditor:BuildAchievementInspectorPageSelectorItems()
+    local items = {}
+    for index = 1, #INSPECTOR_PAGE_DEFINITIONS do
+        items[#items + 1] = {
+            label = INSPECTOR_PAGE_DEFINITIONS[index].label,
+            value = INSPECTOR_PAGE_DEFINITIONS[index].key,
+        }
+    end
+    return items
+end
+
+function DataEditor:RefreshAchievementInspectorPageSelector()
+    local pageCount = #INSPECTOR_PAGE_DEFINITIONS
+    local activeIndex = math.max(1, math.min(self.ActiveAchievementInspectorPageIndex or 1, pageCount))
+    self.ActiveAchievementInspectorPageIndex = activeIndex
+    self.ActiveAchievementInspectorTabKey = INSPECTOR_PAGE_DEFINITIONS[activeIndex].key
+
+    if self.AchievementInspectorPageDropdown then
+        self._refreshingAchievementInspectorPageSelector = true
+        self.AchievementInspectorPageDropdown:SetSelectedValue(self.ActiveAchievementInspectorTabKey, true)
+        self._refreshingAchievementInspectorPageSelector = false
+    end
+    if self.AchievementInspectorPreviousButton and self.AchievementInspectorPreviousButton.SetEnabled then
+        self.AchievementInspectorPreviousButton:SetEnabled(activeIndex > 1)
+    end
+    if self.AchievementInspectorNextButton and self.AchievementInspectorNextButton.SetEnabled then
+        self.AchievementInspectorNextButton:SetEnabled(activeIndex < pageCount)
+    end
+end
+
+function DataEditor:SetAchievementInspectorTab(tabKey)
+    local activeIndex = self:GetAchievementInspectorPageIndexByKey(tabKey or "general")
+    self.ActiveAchievementInspectorPageIndex = activeIndex
+    self.ActiveAchievementInspectorTabKey = INSPECTOR_PAGE_DEFINITIONS[activeIndex].key
+
+    local pages = {
+        general = self.AchievementInspectorGeneralPage,
+        criteria = self.AchievementInspectorCriteriaPage,
+        rewards = self.AchievementInspectorRewardsPage,
+    }
+    for key, page in pairs(pages) do
+        if page then
+            if key == self.ActiveAchievementInspectorTabKey then
+                page:Show()
+            else
+                page:Hide()
+            end
+        end
+    end
+    self:RefreshAchievementInspectorPageSelector()
+end
+
+function DataEditor:BuildAchievementInspectorPage(parent)
+    if self.AchievementInspectorPage then
+        self:RefreshAchievementInspectorPage()
+        return self.AchievementInspectorPage
+    end
+
+    self.AchievementInspectorPage = CreateFrame("Frame", "RPEDataEditorAchievementInspectorPage", parent)
+    self.AchievementInspectorSelectorBar = UI.CreateLayout(UI.HorizontalLayoutGroup, self.AchievementInspectorPage, "RPEDataEditorAchievementInspectorSelectorBar", {
+        spacing = 4,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+        height = 20,
+    })
+    self.AchievementInspectorSelectorBar:GetFrame():SetPoint("TOPLEFT", self.AchievementInspectorPage, "TOPLEFT", 0, 0)
+    self.AchievementInspectorSelectorBar:GetFrame():SetPoint("TOPRIGHT", self.AchievementInspectorPage, "TOPRIGHT", 0, 0)
+
+    self.AchievementInspectorPreviousButton = UI.CreateButton(self.AchievementInspectorSelectorBar:GetFrame(), "RPEDataEditorAchievementInspectorPreviousButton", "Prev", 40, function()
+        local definition = INSPECTOR_PAGE_DEFINITIONS[(self.ActiveAchievementInspectorPageIndex or 1) - 1]
+        self:SetAchievementInspectorTab(definition and definition.key or "general")
+    end, { height = 20, fontSize = 7 })
+    self.AchievementInspectorSelectorBar:AddChild(self.AchievementInspectorPreviousButton)
+
+    self.AchievementInspectorPageDropdown = UI.CreateDropdown(self.AchievementInspectorSelectorBar:GetFrame(), "RPEDataEditorAchievementInspectorPageDropdown", {
+        width = 118,
+        height = 18,
+        expandWidth = true,
+        weight = 1,
+        items = self:BuildAchievementInspectorPageSelectorItems(),
+        onValueChanged = function(value)
+            if not self._refreshingAchievementInspectorPageSelector then
+                self:SetAchievementInspectorTab(value)
+            end
+        end,
+    })
+    self.AchievementInspectorSelectorBar:AddChild(self.AchievementInspectorPageDropdown)
+
+    self.AchievementInspectorNextButton = UI.CreateButton(self.AchievementInspectorSelectorBar:GetFrame(), "RPEDataEditorAchievementInspectorNextButton", "Next", 40, function()
+        local definition = INSPECTOR_PAGE_DEFINITIONS[(self.ActiveAchievementInspectorPageIndex or 1) + 1]
+        self:SetAchievementInspectorTab(definition and definition.key or "rewards")
+    end, { height = 20, fontSize = 7 })
+    self.AchievementInspectorSelectorBar:AddChild(self.AchievementInspectorNextButton)
+
+    local function createPage(name)
+        local page = CreateFrame("Frame", name, self.AchievementInspectorPage)
+        page:SetPoint("TOPLEFT", self.AchievementInspectorPage, "TOPLEFT", INSPECTOR_SIDE_PADDING, -24)
+        page:SetPoint("TOPRIGHT", self.AchievementInspectorPage, "TOPRIGHT", -INSPECTOR_SIDE_PADDING, -24)
+        page:SetPoint("BOTTOMLEFT", self.AchievementInspectorPage, "BOTTOMLEFT", INSPECTOR_SIDE_PADDING, 24)
+        page:SetPoint("BOTTOMRIGHT", self.AchievementInspectorPage, "BOTTOMRIGHT", -INSPECTOR_SIDE_PADDING, 24)
+        return page
+    end
+
+    self.AchievementInspectorGeneralPage = createPage("RPEDataEditorAchievementInspectorGeneralPage")
+    self:BuildAchievementInspectorGeneralPage(self.AchievementInspectorGeneralPage)
+    self.AchievementInspectorCriteriaPage = createPage("RPEDataEditorAchievementInspectorCriteriaPage")
+    self:BuildAchievementInspectorCriteriaPage(self.AchievementInspectorCriteriaPage)
+    self.AchievementInspectorRewardsPage = createPage("RPEDataEditorAchievementInspectorRewardsPage")
+    self:BuildAchievementInspectorRewardsPage(self.AchievementInspectorRewardsPage)
+
+    self.AchievementInspectorEmptyText = createLabel(self.AchievementInspectorPage, "RPEDataEditorAchievementInspectorEmptyText", "", FIELD_WIDTH)
+    self.AchievementInspectorEmptyText:GetFrame():SetPoint("BOTTOMLEFT", self.AchievementInspectorPage, "BOTTOMLEFT", 0, 0)
+
+    self:SetAchievementInspectorTab("general")
+    self:RefreshAchievementInspectorPage()
+    return self.AchievementInspectorPage
+end
+
+function DataEditor:BuildAchievementInspectorGeneralPage(parent)
+    local root = UI.CreateLayout(UI.VerticalLayoutGroup, parent, "RPEDataEditorAchievementInspectorGeneralLayout", {
+        spacing = 3,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorNameLabel", "Name"))
+    self.AchievementInspectorNameInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAchievementInspectorNameInput", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitName = function()
+        self:CommitSelectedAchievement(function(achievement)
+            achievement.name = self.AchievementInspectorNameInput:GetText()
+        end)
+    end
+    self.AchievementInspectorNameInput:SetScript("OnEnterPressed", commitName)
+    self.AchievementInspectorNameInput:SetScript("OnEditFocusLost", commitName)
+    root:AddChild(self.AchievementInspectorNameInput)
+
+    self.AchievementInspectorIdText = createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorIdText", "ID: -")
+    root:AddChild(self.AchievementInspectorIdText)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorIconLabel", "Icon"))
+    self.AchievementInspectorIconField = UI.EditorIconField:New({
+        name = "RPEDataEditorAchievementInspectorIconField",
+        width = FIELD_WIDTH,
+        height = CONTROL_HEIGHT,
+        buttonText = "Select Icon",
+        labelText = "-",
+        iconTexture = DEFAULT_ICON,
+        border = false,
+    })
+    self.AchievementInspectorIconField:SetParent(root:GetFrame())
+    self.AchievementInspectorIconField:Create()
+    local iconButton = self.AchievementInspectorIconField:GetButton()
+    if iconButton and iconButton.SetScript then
+        iconButton:SetScript("OnClick", function()
+            local achievement = self:GetSelectedAchievement()
+            if not achievement or not Client.OpenIconFinder then
+                return
+            end
+            Client:OpenIconFinder(function(_, filePath)
+                self:CommitSelectedAchievement(function(selectedAchievement)
+                    selectedAchievement.icon = filePath or ""
+                end)
+            end, { filter = achievement.icon or "" })
+        end)
+    end
+    root:AddChild(self.AchievementInspectorIconField)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorTagsLabel", "Tags"))
+    self.AchievementInspectorTagsInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAchievementInspectorTagsInput", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitTags = function()
+        self:CommitSelectedAchievement(function(achievement)
+            achievement.tags = UI.Utils.ParseCommaSeparatedList(self.AchievementInspectorTagsInput:GetText())
+        end)
+    end
+    self.AchievementInspectorTagsInput:SetScript("OnEnterPressed", commitTags)
+    self.AchievementInspectorTagsInput:SetScript("OnEditFocusLost", commitTags)
+    root:AddChild(self.AchievementInspectorTagsInput)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorDescriptionLabel", "Description"))
+    self.AchievementInspectorDescriptionInput = UI.CreateTextArea(root:GetFrame(), "RPEDataEditorAchievementInspectorDescriptionInput", {
+        width = FIELD_WIDTH, height = 92, text = "", readOnly = false, borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.AchievementInspectorDescriptionInput:SetScript("OnEditFocusLost", function()
+        self:CommitSelectedAchievement(function(achievement)
+            achievement.description = self.AchievementInspectorDescriptionInput:GetText()
+        end)
+    end)
+    root:AddChild(self.AchievementInspectorDescriptionInput)
+end
+
+function DataEditor:BuildAchievementInspectorCriteriaPage(parent)
+    local root = UI.CreateLayout(UI.VerticalLayoutGroup, parent, "RPEDataEditorAchievementInspectorCriteriaLayout", {
+        spacing = 2,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorCriteriaLabel", "Criteria"))
+    local criteriaPanel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorAchievementInspectorCriteriaPanel", {
+        width = FIELD_WIDTH,
+        height = 70,
+        contentInset = 2,
+        showBorder = false,
+    })
+    root:AddChild(criteriaPanel)
+    self.AchievementInspectorCriteriaScroll = UI.ScrollLayout:New({
+        name = "RPEDataEditorAchievementInspectorCriteriaScroll",
+        width = FIELD_WIDTH - 4,
+        height = 66,
+        visibleRows = 4,
+        autoFitRows = true,
+        rowHeight = 16,
+        rowSpacing = 0,
+        border = false,
+        rowElementClass = UI.ScrollListEntry,
+        categoryWidth = 118,
+        statusWidth = 72,
+        categoryInsetLeft = 4,
+        statusInsetRight = 4,
+    })
+    self.AchievementInspectorCriteriaScroll:SetParent(criteriaPanel:GetContentFrame())
+    self.AchievementInspectorCriteriaScroll:SetRowRenderer(function(row, criterion, index)
+        row:SetCategory(tostring(criterion and criterion.id or "-"))
+        row:SetTestName("")
+        row:SetStatus(tostring(criterion and criterion.trigger or "manual"))
+        row:SetDetail(tostring(criterion and criterion.description or ""))
+
+        local frame = row.GetFrame and row:GetFrame() or nil
+        if frame then
+            frame:EnableMouse(true)
+            frame:SetScript("OnMouseUp", function(_, button)
+                if button == "LeftButton" then
+                    self.SelectedAchievementCriterionIndex = index
+                    self:RefreshAchievementCriteriaInspector()
+                end
+            end)
+            local selected = tonumber(self.SelectedAchievementCriterionIndex) == tonumber(index)
+            if row.entryBackground and row.entryBackground.SetColorTexture then
+                local token = selected and "list.rowHover" or "list.rowBackground"
+                local color = UI.ResolveColor(nil, token)
+                row.entryBackground:SetColorTexture(color.r or 0.08, color.g or 0.09, color.b or 0.11, color.a or 0.85)
+            end
+        end
+    end)
+    self.AchievementInspectorCriteriaScroll:Create()
+    self.AchievementInspectorCriteriaScroll:SetPoint("TOPLEFT", criteriaPanel:GetContentFrame(), "TOPLEFT", 0, 0)
+    self.AchievementInspectorCriteriaScroll:SetPoint("BOTTOMRIGHT", criteriaPanel:GetContentFrame(), "BOTTOMRIGHT", 0, 0)
+
+    local actions = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorCriteriaActions", {
+        spacing = 2, height = 20, fitChildrenWidth = true, fitChildrenHeight = false,
+    })
+    self.AchievementInspectorAddCriterionButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorAchievementInspectorAddCriterionButton", "Add Criterion", 86, function()
+        local achievement = self:CommitSelectedAchievement(function(selectedAchievement)
+            selectedAchievement.criteria = selectedAchievement.criteria or {}
+            selectedAchievement.criteria[#selectedAchievement.criteria + 1] = {
+                id = buildCriterionId(selectedAchievement.criteria),
+                description = "",
+                trigger = "manual",
+                goal = 1,
+                filters = {},
+            }
+        end)
+        self.SelectedAchievementCriterionIndex = achievement and #(achievement.criteria or {}) or nil
+        self:RefreshAchievementCriteriaInspector()
+    end, { height = 20, fontSize = 7 })
+    actions:AddChild(self.AchievementInspectorAddCriterionButton)
+    self.AchievementInspectorDeleteCriterionButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorAchievementInspectorDeleteCriterionButton", "Delete", 48, function()
+        local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+        local achievement = self:CommitSelectedAchievement(function(selectedAchievement)
+            if selectedIndex and selectedAchievement.criteria and selectedAchievement.criteria[selectedIndex] then
+                table.remove(selectedAchievement.criteria, selectedIndex)
+            end
+        end)
+        local criteria = achievement and achievement.criteria or {}
+        self.SelectedAchievementCriterionIndex = #criteria > 0 and math.min(selectedIndex or 1, #criteria) or nil
+        self:RefreshAchievementCriteriaInspector()
+    end, { height = 20, fontSize = 7 })
+    actions:AddChild(self.AchievementInspectorDeleteCriterionButton)
+    root:AddChild(actions)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorCriterionIdLabel", "Criterion ID"))
+    self.AchievementInspectorCriterionIdInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAchievementInspectorCriterionIdInput", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitCriterionId = function()
+        local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+        self:CommitSelectedAchievement(function(achievement)
+            local criterion = getCriterion(achievement, selectedIndex)
+            if criterion then
+                local id = trim(self.AchievementInspectorCriterionIdInput:GetText())
+                criterion.id = id ~= "" and id or buildCriterionId(achievement.criteria, selectedIndex)
+            end
+        end)
+        self:RefreshAchievementCriteriaInspector()
+    end
+    self.AchievementInspectorCriterionIdInput:SetScript("OnEnterPressed", commitCriterionId)
+    self.AchievementInspectorCriterionIdInput:SetScript("OnEditFocusLost", commitCriterionId)
+    root:AddChild(self.AchievementInspectorCriterionIdInput)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorCriterionDescriptionLabel", "Criterion Description"))
+    self.AchievementInspectorCriterionDescriptionInput = UI.CreateTextArea(root:GetFrame(), "RPEDataEditorAchievementInspectorCriterionDescriptionInput", {
+        width = FIELD_WIDTH, height = 38, text = "", readOnly = false, borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.AchievementInspectorCriterionDescriptionInput:SetScript("OnEditFocusLost", function()
+        local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+        self:CommitSelectedAchievement(function(achievement)
+            local criterion = getCriterion(achievement, selectedIndex)
+            if criterion then
+                criterion.description = self.AchievementInspectorCriterionDescriptionInput:GetText()
+            end
+        end)
+    end)
+    root:AddChild(self.AchievementInspectorCriterionDescriptionInput)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorCriterionTriggerLabel", "Trigger"))
+    self.AchievementInspectorCriterionTriggerDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorAchievementInspectorCriterionTriggerDropdown", {
+        width = FIELD_WIDTH,
+        height = CONTROL_HEIGHT,
+        items = TRIGGER_ITEMS,
+        onValueChanged = function(value)
+            if self._refreshingAchievementCriteria then
+                return
+            end
+            local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+            self:CommitSelectedAchievement(function(achievement)
+                local criterion = getCriterion(achievement, selectedIndex)
+                if criterion then
+                    criterion.trigger = value
+                end
+            end)
+            self:RefreshAchievementCriteriaInspector()
+        end,
+    })
+    root:AddChild(self.AchievementInspectorCriterionTriggerDropdown)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorCriterionGoalLabel", "Goal"))
+    self.AchievementInspectorCriterionGoalInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAchievementInspectorCriterionGoalInput", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "1", borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitCriterionGoal = function()
+        local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+        self:CommitSelectedAchievement(function(achievement)
+            local criterion = getCriterion(achievement, selectedIndex)
+            if criterion then
+                criterion.goal = math.max(1, math.floor(tonumber(self.AchievementInspectorCriterionGoalInput:GetText()) or 1))
+            end
+        end)
+    end
+    self.AchievementInspectorCriterionGoalInput:SetScript("OnEnterPressed", commitCriterionGoal)
+    self.AchievementInspectorCriterionGoalInput:SetScript("OnEditFocusLost", commitCriterionGoal)
+    root:AddChild(self.AchievementInspectorCriterionGoalInput)
+
+    self.AchievementInspectorCurrencyFilterGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorCurrencyFilterGroup", {
+        spacing = 2, height = 42, fitChildrenWidth = true, fitChildrenHeight = false,
+    })
+    self.AchievementInspectorCurrencyFilterGroup._visibleHeight = 42
+    self.AchievementInspectorCurrencyFilterGroup:AddChild(createLabel(self.AchievementInspectorCurrencyFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorCurrencyRefLabel", "Currency Reference"))
+    self.AchievementInspectorCurrencyRefInput = UI.CreateTextInput(self.AchievementInspectorCurrencyFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorCurrencyRefInput", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitCurrencyRef = function()
+        local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+        self:CommitSelectedAchievement(function(achievement)
+            local criterion = getCriterion(achievement, selectedIndex)
+            if criterion then
+                getFilter(criterion).currencyRef = self.AchievementInspectorCurrencyRefInput:GetText()
+            end
+        end)
+    end
+    self.AchievementInspectorCurrencyRefInput:SetScript("OnEnterPressed", commitCurrencyRef)
+    self.AchievementInspectorCurrencyRefInput:SetScript("OnEditFocusLost", commitCurrencyRef)
+    self.AchievementInspectorCurrencyFilterGroup:AddChild(self.AchievementInspectorCurrencyRefInput)
+    root:AddChild(self.AchievementInspectorCurrencyFilterGroup)
+
+    self.AchievementInspectorKillFilterGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorKillFilterGroup", {
+        spacing = 2, height = 62, fitChildrenWidth = true, fitChildrenHeight = false,
+    })
+    self.AchievementInspectorKillFilterGroup._visibleHeight = 62
+    self.AchievementInspectorKillFilterGroup:AddChild(createLabel(self.AchievementInspectorKillFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorUnitRefLabel", "Unit Reference"))
+    self.AchievementInspectorUnitRefInput = UI.CreateTextInput(self.AchievementInspectorKillFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorUnitRefInput", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitUnitRef = function()
+        local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+        self:CommitSelectedAchievement(function(achievement)
+            local criterion = getCriterion(achievement, selectedIndex)
+            if criterion then
+                getFilter(criterion).unitRef = self.AchievementInspectorUnitRefInput:GetText()
+            end
+        end)
+    end
+    self.AchievementInspectorUnitRefInput:SetScript("OnEnterPressed", commitUnitRef)
+    self.AchievementInspectorUnitRefInput:SetScript("OnEditFocusLost", commitUnitRef)
+    self.AchievementInspectorKillFilterGroup:AddChild(self.AchievementInspectorUnitRefInput)
+    self.AchievementInspectorEnemyOnlyCheckbox = createCheckbox(self.AchievementInspectorKillFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorEnemyOnlyCheckbox", "Enemy only", function(value)
+        if self._refreshingAchievementCriteria then
+            return
+        end
+        local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+        self:CommitSelectedAchievement(function(achievement)
+            local criterion = getCriterion(achievement, selectedIndex)
+            if criterion then
+                getFilter(criterion).enemyOnly = value == true
+            end
+        end)
+    end)
+    self.AchievementInspectorKillFilterGroup:AddChild(self.AchievementInspectorEnemyOnlyCheckbox)
+    root:AddChild(self.AchievementInspectorKillFilterGroup)
+
+    self.AchievementInspectorEarnedFilterGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorEarnedFilterGroup", {
+        spacing = 2, height = 42, fitChildrenWidth = true, fitChildrenHeight = false,
+    })
+    self.AchievementInspectorEarnedFilterGroup._visibleHeight = 42
+    self.AchievementInspectorEarnedFilterGroup:AddChild(createLabel(self.AchievementInspectorEarnedFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorAchievementRefLabel", "Achievement Reference"))
+    self.AchievementInspectorAchievementRefInput = UI.CreateTextInput(self.AchievementInspectorEarnedFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorAchievementRefInput", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitAchievementRef = function()
+        local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+        self:CommitSelectedAchievement(function(achievement)
+            local criterion = getCriterion(achievement, selectedIndex)
+            if criterion then
+                getFilter(criterion).achievementRef = self.AchievementInspectorAchievementRefInput:GetText()
+            end
+        end)
+    end
+    self.AchievementInspectorAchievementRefInput:SetScript("OnEnterPressed", commitAchievementRef)
+    self.AchievementInspectorAchievementRefInput:SetScript("OnEditFocusLost", commitAchievementRef)
+    self.AchievementInspectorEarnedFilterGroup:AddChild(self.AchievementInspectorAchievementRefInput)
+    root:AddChild(self.AchievementInspectorEarnedFilterGroup)
+
+    self.AchievementInspectorFilterHint = createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorFilterHint", "", FIELD_WIDTH)
+    self.AchievementInspectorFilterHint:SetTextColor(UI.ResolveColor(nil, "text.secondary").r, UI.ResolveColor(nil, "text.secondary").g, UI.ResolveColor(nil, "text.secondary").b, UI.ResolveColor(nil, "text.secondary").a)
+    root:AddChild(self.AchievementInspectorFilterHint)
+end
+
+function DataEditor:BuildAchievementInspectorRewardsPage(parent)
+    local root = UI.CreateLayout(UI.VerticalLayoutGroup, parent, "RPEDataEditorAchievementInspectorRewardsLayout", {
+        spacing = 4,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardsTitle", "Rewards"))
+    self.AchievementInspectorRewardsSummary = UI.CreateTextArea(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardsSummary", {
+        width = FIELD_WIDTH,
+        height = 116,
+        text = "",
+        readOnly = true,
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    root:AddChild(self.AchievementInspectorRewardsSummary)
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardsNote", "Rewards are preserved by Data Editor import/export and by edits to the other Achievement fields. Phase 1 does not define reward execution or a reward editing schema."))
+end
+
+function DataEditor:RefreshAchievementCriteriaInspector()
+    local achievement = self:GetSelectedAchievement()
+    local criteria = achievement and achievement.criteria or {}
+    local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+    if selectedIndex and not criteria[selectedIndex] then
+        selectedIndex = #criteria > 0 and math.min(selectedIndex, #criteria) or nil
+        self.SelectedAchievementCriterionIndex = selectedIndex
+    end
+    local criterion = selectedIndex and criteria[selectedIndex] or nil
+    local hasCriterion = criterion ~= nil
+    local trigger = criterion and criterion.trigger or "manual"
+    local filters = criterion and getFilter(criterion) or {}
+
+    self._refreshingAchievementCriteria = true
+    if self.AchievementInspectorCriteriaScroll then
+        self.AchievementInspectorCriteriaScroll:SetItems(criteria)
+    end
+    if self.AchievementInspectorCriterionIdInput then
+        self.AchievementInspectorCriterionIdInput:SetText(criterion and (criterion.id or "") or "")
+        setTextElementEnabled(self.AchievementInspectorCriterionIdInput, hasCriterion)
+    end
+    if self.AchievementInspectorCriterionDescriptionInput then
+        self.AchievementInspectorCriterionDescriptionInput:SetText(criterion and (criterion.description or "") or "")
+        setTextElementEnabled(self.AchievementInspectorCriterionDescriptionInput, hasCriterion)
+    end
+    if self.AchievementInspectorCriterionTriggerDropdown then
+        self.AchievementInspectorCriterionTriggerDropdown:SetSelectedValue(trigger, true)
+        setDropdownEnabled(self.AchievementInspectorCriterionTriggerDropdown, hasCriterion)
+    end
+    if self.AchievementInspectorCriterionGoalInput then
+        self.AchievementInspectorCriterionGoalInput:SetText(tostring(math.max(1, math.floor(tonumber(criterion and criterion.goal) or 1))))
+        setTextElementEnabled(self.AchievementInspectorCriterionGoalInput, hasCriterion)
+    end
+    if self.AchievementInspectorCurrencyRefInput then
+        self.AchievementInspectorCurrencyRefInput:SetText(tostring(filters.currencyRef or ""))
+        setTextElementEnabled(self.AchievementInspectorCurrencyRefInput, hasCriterion and trigger == "currency_gain")
+    end
+    if self.AchievementInspectorUnitRefInput then
+        self.AchievementInspectorUnitRefInput:SetText(tostring(filters.unitRef or ""))
+        setTextElementEnabled(self.AchievementInspectorUnitRefInput, hasCriterion and trigger == "rpe_kill")
+    end
+    if self.AchievementInspectorEnemyOnlyCheckbox then
+        self.AchievementInspectorEnemyOnlyCheckbox:SetChecked(filters.enemyOnly == true, true)
+        self.AchievementInspectorEnemyOnlyCheckbox:SetEnabled(hasCriterion and trigger == "rpe_kill")
+    end
+    if self.AchievementInspectorAchievementRefInput then
+        self.AchievementInspectorAchievementRefInput:SetText(tostring(filters.achievementRef or ""))
+        setTextElementEnabled(self.AchievementInspectorAchievementRefInput, hasCriterion and trigger == "achievement_earned")
+    end
+    if self.AchievementInspectorAddCriterionButton then
+        self.AchievementInspectorAddCriterionButton:SetEnabled(achievement ~= nil)
+    end
+    if self.AchievementInspectorDeleteCriterionButton then
+        self.AchievementInspectorDeleteCriterionButton:SetEnabled(hasCriterion)
+    end
+
+    setGroupVisible(self.AchievementInspectorCurrencyFilterGroup, hasCriterion and trigger == "currency_gain")
+    setGroupVisible(self.AchievementInspectorKillFilterGroup, hasCriterion and trigger == "rpe_kill")
+    setGroupVisible(self.AchievementInspectorEarnedFilterGroup, hasCriterion and trigger == "achievement_earned")
+    if self.AchievementInspectorFilterHint then
+        local hint = "Select a criterion to edit its trigger and filters."
+        if hasCriterion and trigger == "manual" then
+            hint = "Manual criteria have no required filters."
+        elseif hasCriterion and trigger == "rpe_event_complete" then
+            hint = "RPE event complete criteria have no required filters in Phase 1."
+        elseif hasCriterion and trigger == "currency_gain" then
+            hint = "Set the currency reference used by this criterion."
+        elseif hasCriterion and trigger == "rpe_kill" then
+            hint = "Unit reference and Enemy only are optional filters."
+        elseif hasCriterion and trigger == "achievement_earned" then
+            hint = "Set the achievement reference used by this criterion."
+        end
+        self.AchievementInspectorFilterHint:SetText(hint)
+    end
+    self._refreshingAchievementCriteria = false
+end
+
+function DataEditor:RefreshAchievementInspectorPage()
+    local achievement = self:GetSelectedAchievement()
+    local hasAchievement = achievement ~= nil
+
+    self._refreshingAchievementInspectorPage = true
+    if self.AchievementInspectorNameInput then
+        self.AchievementInspectorNameInput:SetText(achievement and (achievement.name or "") or "")
+        setTextElementEnabled(self.AchievementInspectorNameInput, hasAchievement)
+    end
+    if self.AchievementInspectorIdText then
+        self.AchievementInspectorIdText:SetText(("ID: %s"):format(achievement and tostring(achievement.id or "") or "-"))
+    end
+    if self.AchievementInspectorIconField then
+        local icon = achievement and achievement.icon or ""
+        self.AchievementInspectorIconField:SetIcon(icon ~= "" and icon or DEFAULT_ICON)
+        self.AchievementInspectorIconField:SetLabelText(icon ~= "" and icon or "-")
+        self.AchievementInspectorIconField:SetEnabled(hasAchievement)
+    end
+    if self.AchievementInspectorTagsInput then
+        self.AchievementInspectorTagsInput:SetText(achievement and UI.Utils.JoinCommaSeparatedList(achievement.tags or {}) or "")
+        setTextElementEnabled(self.AchievementInspectorTagsInput, hasAchievement)
+    end
+    if self.AchievementInspectorDescriptionInput then
+        self.AchievementInspectorDescriptionInput:SetText(achievement and (achievement.description or "") or "")
+        setTextElementEnabled(self.AchievementInspectorDescriptionInput, hasAchievement)
+    end
+
+    local selectedId = achievement and achievement.id or nil
+    if selectedId ~= self._achievementInspectorSelectedId then
+        self._achievementInspectorSelectedId = selectedId
+        self.SelectedAchievementCriterionIndex = achievement and #(achievement.criteria or {}) > 0 and 1 or nil
+    end
+
+    self:RefreshAchievementCriteriaInspector()
+    if self.AchievementInspectorRewardsSummary then
+        local rewards = achievement and achievement.rewards or {}
+        self.AchievementInspectorRewardsSummary:SetText(("This Achievement has %d reward entr%s.\n\nReward data is preserved as authored data. Use Export/Import to round-trip reward fields without introducing Phase 1 reward semantics."):format(#rewards, #rewards == 1 and "y" or "ies"))
+        setTextElementEnabled(self.AchievementInspectorRewardsSummary, false)
+    end
+    if self.AchievementInspectorEmptyText then
+        self.AchievementInspectorEmptyText:SetText(hasAchievement and "" or "Select an Achievement to inspect it.")
+    end
+    self:RefreshAchievementInspectorPageSelector()
+    self._refreshingAchievementInspectorPage = false
+end
