@@ -123,14 +123,6 @@ local function normalizeInteger(value, fallback, minimum)
     return math.max(minimum, math.floor(numeric))
 end
 
-local function normalizeOptionalRank(value)
-    local numeric = tonumber(trim(value))
-    if not numeric or numeric ~= numeric or numeric == math.huge or numeric == -math.huge or numeric < 0 then
-        return nil
-    end
-    return math.floor(numeric)
-end
-
 local function buildUniqueStableId(entries, ignoredIndex, requestedId, prefix)
     local baseId = trim(requestedId)
     if baseId == "" then
@@ -388,6 +380,27 @@ function DataEditor:BuildGuildSettingInspectorGeneralPage(parent)
     self.GuildSettingInspectorGuildNameInput:SetScript("OnEditFocusLost", commitGuildName)
     root:AddChild(self.GuildSettingInspectorGuildNameInput)
 
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorWowGuildRankIndicesLabel", "Eligible WoW Guild Ranks"))
+    self.GuildSettingInspectorWowGuildRankIndicesHint = UI.CreateText(root:GetFrame(), "RPEDataEditorGuildSettingInspectorWowGuildRankIndicesHint", "Enter comma-separated non-negative indexes. 0 = highest WoW guild rank. Blank means any WoW guild rank.", {
+        width = FIELD_WIDTH,
+        height = 28,
+        justifyH = "LEFT",
+        wordWrap = true,
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    root:AddChild(self.GuildSettingInspectorWowGuildRankIndicesHint)
+    self.GuildSettingInspectorWowGuildRankIndicesInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorGuildSettingInspectorWowGuildRankIndicesInput", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitWowGuildRankIndices = function()
+        self:CommitSelectedGuildSetting(function(guildSetting)
+            guildSetting.wowGuildRankIndices = UI.Utils.ParseCommaSeparatedList(self.GuildSettingInspectorWowGuildRankIndicesInput:GetText())
+        end)
+    end
+    self.GuildSettingInspectorWowGuildRankIndicesInput:SetScript("OnEnterPressed", commitWowGuildRankIndices)
+    self.GuildSettingInspectorWowGuildRankIndicesInput:SetScript("OnEditFocusLost", commitWowGuildRankIndices)
+    root:AddChild(self.GuildSettingInspectorWowGuildRankIndicesInput)
+
     self.GuildSettingInspectorEnableRequisitionsCheckbox = createCheckbox(root:GetFrame(), "RPEDataEditorGuildSettingInspectorEnableRequisitionsCheckbox", "Enable Requisitions", function(value)
         if self._refreshingGuildSettingInspector then
             return
@@ -486,7 +499,6 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
                 id = buildUniqueStableId(selected.requisitions, nil, "", "requisition"),
                 itemRef = "",
                 quantity = 1,
-                requiredGuildRankIndex = nil,
                 characterLimit = 1,
                 costs = {},
             }
@@ -550,24 +562,19 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     local numberLabels = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionNumberLabels", {
         spacing = 2, height = 12, fitChildrenWidth = true, fitChildrenHeight = false,
     })
-    numberLabels:AddChild(createLabel(numberLabels:GetFrame(), "RPEDataEditorGuildSettingInspectorQuantityLabel", "Quantity", 76))
-    numberLabels:AddChild(createLabel(numberLabels:GetFrame(), "RPEDataEditorGuildSettingInspectorRankLabel", "Minimum Guild Rank Index", 76))
-    numberLabels:AddChild(createLabel(numberLabels:GetFrame(), "RPEDataEditorGuildSettingInspectorLimitLabel", "Character Limit", 76))
+    numberLabels:AddChild(createLabel(numberLabels:GetFrame(), "RPEDataEditorGuildSettingInspectorQuantityLabel", "Quantity", 114))
+    numberLabels:AddChild(createLabel(numberLabels:GetFrame(), "RPEDataEditorGuildSettingInspectorLimitLabel", "Character Limit", 114))
     root:AddChild(numberLabels)
 
     local numberInputs = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionNumberInputs", {
         spacing = 2, height = 18, fitChildrenWidth = true, fitChildrenHeight = false,
     })
     self.GuildSettingInspectorRequisitionQuantityInput = UI.CreateTextInput(numberInputs:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionQuantityInput", {
-        width = 76, height = 18, text = "1", borderColor = UI.ResolveColor(nil, "panel.border"),
+        width = 114, height = 18, text = "1", borderColor = UI.ResolveColor(nil, "panel.border"),
     })
     numberInputs:AddChild(self.GuildSettingInspectorRequisitionQuantityInput)
-    self.GuildSettingInspectorRequisitionRankInput = UI.CreateTextInput(numberInputs:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionRankInput", {
-        width = 76, height = 18, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    numberInputs:AddChild(self.GuildSettingInspectorRequisitionRankInput)
     self.GuildSettingInspectorRequisitionLimitInput = UI.CreateTextInput(numberInputs:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionLimitInput", {
-        width = 76, height = 18, text = "1", borderColor = UI.ResolveColor(nil, "panel.border"),
+        width = 114, height = 18, text = "1", borderColor = UI.ResolveColor(nil, "panel.border"),
     })
     numberInputs:AddChild(self.GuildSettingInspectorRequisitionLimitInput)
     local commitRequisitionNumbers = function()
@@ -576,12 +583,11 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
             local requisition = guildSetting.requisitions and guildSetting.requisitions[selectedIndex]
             if requisition then
                 requisition.quantity = normalizeInteger(self.GuildSettingInspectorRequisitionQuantityInput:GetText(), 1, 1)
-                requisition.requiredGuildRankIndex = normalizeOptionalRank(self.GuildSettingInspectorRequisitionRankInput:GetText())
                 requisition.characterLimit = normalizeInteger(self.GuildSettingInspectorRequisitionLimitInput:GetText(), 1, 1)
             end
         end)
     end
-    for _, input in ipairs({ self.GuildSettingInspectorRequisitionQuantityInput, self.GuildSettingInspectorRequisitionRankInput, self.GuildSettingInspectorRequisitionLimitInput }) do
+    for _, input in ipairs({ self.GuildSettingInspectorRequisitionQuantityInput, self.GuildSettingInspectorRequisitionLimitInput }) do
         input:SetScript("OnEnterPressed", commitRequisitionNumbers)
         input:SetScript("OnEditFocusLost", commitRequisitionNumbers)
     end
@@ -1115,6 +1121,10 @@ function DataEditor:RefreshGuildSettingInspectorGeneralPage(guildSetting)
         self.GuildSettingInspectorGuildNameInput:SetText(guildSetting and (guildSetting.guildName or "") or "")
         setTextElementEnabled(self.GuildSettingInspectorGuildNameInput, hasGuildSetting)
     end
+    if self.GuildSettingInspectorWowGuildRankIndicesInput then
+        self.GuildSettingInspectorWowGuildRankIndicesInput:SetText(guildSetting and UI.Utils.JoinCommaSeparatedList(guildSetting.wowGuildRankIndices or {}) or "")
+        setTextElementEnabled(self.GuildSettingInspectorWowGuildRankIndicesInput, hasGuildSetting)
+    end
     if self.GuildSettingInspectorEnableRequisitionsCheckbox then
         self.GuildSettingInspectorEnableRequisitionsCheckbox:SetChecked(general.enableRequisitions == true, true)
         self.GuildSettingInspectorEnableRequisitionsCheckbox:SetEnabled(hasGuildSetting)
@@ -1170,10 +1180,6 @@ function DataEditor:RefreshGuildSettingRequisitionsPage()
     if self.GuildSettingInspectorRequisitionQuantityInput then
         self.GuildSettingInspectorRequisitionQuantityInput:SetText(tostring(normalizeInteger(requisition and requisition.quantity, 1, 1)))
         setTextElementEnabled(self.GuildSettingInspectorRequisitionQuantityInput, requisition ~= nil)
-    end
-    if self.GuildSettingInspectorRequisitionRankInput then
-        self.GuildSettingInspectorRequisitionRankInput:SetText(requisition and requisition.requiredGuildRankIndex ~= nil and tostring(requisition.requiredGuildRankIndex) or "")
-        setTextElementEnabled(self.GuildSettingInspectorRequisitionRankInput, requisition ~= nil)
     end
     if self.GuildSettingInspectorRequisitionLimitInput then
         self.GuildSettingInspectorRequisitionLimitInput:SetText(tostring(normalizeInteger(requisition and requisition.characterLimit, 1, 1)))
@@ -1324,7 +1330,7 @@ function DataEditor:RefreshGuildSettingInspectorPage()
     self:RefreshGuildSettingDailyRewardsPage()
     self:RefreshGuildSettingProgressionPage()
     if self.GuildSettingInspectorEmptyText then
-        self.GuildSettingInspectorEmptyText:SetText(hasGuildSetting and "" or "Select a Guild Setting to inspect it.")
+        self.GuildSettingInspectorEmptyText:SetText(hasGuildSetting and "" or "Select a Guild Rank to inspect it.")
     end
     self:RefreshGuildSettingInspectorPageSelector()
     self._refreshingGuildSettingInspector = false

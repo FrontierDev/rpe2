@@ -38,7 +38,7 @@ local ENTRY_DEFINITIONS = {
     auras = { className = "Aura", singular = "Aura", buttonLabel = "New Aura", emptyName = "Unnamed Aura", assignsId = true },
     interactions = { className = "Interaction", singular = "Interaction", buttonLabel = "New Interaction", emptyName = "Unnamed Interaction", assignsId = true },
     achievements = { className = "Achievement", singular = "Achievement", buttonLabel = "New Achievement", emptyName = "Unnamed Achievement", assignsId = true },
-    guildSettings = { className = "GuildSetting", singular = "Guild Setting", buttonLabel = "New Guild Setting", emptyName = "Unnamed Guild Setting", assignsId = true },
+    guildSettings = { className = "GuildSetting", singular = "Guild Rank", buttonLabel = "New Guild Rank", emptyName = "Unnamed Guild Rank", assignsId = true },
     currencies = { className = "Currency", singular = "Currency", buttonLabel = "New Currency", emptyName = "Unnamed Currency", assignsId = true },
 }
 
@@ -643,7 +643,7 @@ local CONTENT_PAGE_DEFINITIONS = {
     { key = "auras", label = "Aura", builder = "BuildAuraPage" },
     { key = "interactions", label = "Interaction", builder = "BuildInteractionPage" },
     { key = "achievements", label = "Achievement", builder = "BuildAchievementPage" },
-    { key = "guildSettings", label = "Guild Settings", builder = "BuildGuildSettingPage" },
+    { key = "guildSettings", label = "Guild Ranks", builder = "BuildGuildSettingPage" },
     { key = "currencies", label = "Currency", builder = "BuildCurrencyPage" },
 }
 

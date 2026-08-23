@@ -119,9 +119,9 @@ function DataEditor:RefreshGuildSettingDataPage()
 
     if self.GuildSettingPageEmptyText and self.GuildSettingPageEmptyText.SetText then
         if not dataset then
-            self.GuildSettingPageEmptyText:SetText("Create or select a dataset to view Guild Settings.")
+            self.GuildSettingPageEmptyText:SetText("Create or select a dataset to view Guild Ranks.")
         elseif #guildSettings == 0 then
-            self.GuildSettingPageEmptyText:SetText("This dataset has no Guild Settings yet.")
+            self.GuildSettingPageEmptyText:SetText("This dataset has no Guild Ranks yet.")
         else
             self.GuildSettingPageEmptyText:SetText("")
         end

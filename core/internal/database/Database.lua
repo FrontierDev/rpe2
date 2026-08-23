@@ -49,7 +49,7 @@ local DATASET_ENTRY_DEFINITIONS = {
     auras = { className = "Aura", singular = "Aura", assignsId = true },
     interactions = { className = "Interaction", singular = "Interaction", assignsId = true },
     achievements = { className = "Achievement", singular = "Achievement", assignsId = true },
-    guildSettings = { className = "GuildSetting", singular = "Guild Setting", assignsId = true },
+    guildSettings = { className = "GuildSetting", singular = "Guild Rank", assignsId = true },
     currencies = { className = "Currency", singular = "Currency", assignsId = true },
 }
 
