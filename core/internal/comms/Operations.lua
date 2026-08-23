@@ -458,6 +458,54 @@ Operations.Opcodes = Operations.Opcodes or {
             return client:HandleCombatLog(arguments, sender, distribution, target, message)
         end,
     },
+    [24] = {
+        key = "GUILD_ADMIN_QUERY",
+        name = "guild-admin-query",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local guild = Addon.Client and Addon.Client.Guild
+            if not guild or type(guild.HandleGuildAdminQuery) ~= "function" then
+                return false
+            end
+
+            return guild:HandleGuildAdminQuery(arguments, sender, distribution, target, message)
+        end,
+    },
+    [25] = {
+        key = "GUILD_ADMIN_QUERY_RESPONSE",
+        name = "guild-admin-query-response",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local guild = Addon.Client and Addon.Client.Guild
+            if not guild or type(guild.HandleGuildAdminQueryResponse) ~= "function" then
+                return false
+            end
+
+            return guild:HandleGuildAdminQueryResponse(arguments, sender, distribution, target, message)
+        end,
+    },
+    [26] = {
+        key = "GUILD_ADMIN_MUTATION",
+        name = "guild-admin-mutation",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local guild = Addon.Client and Addon.Client.Guild
+            if not guild or type(guild.HandleGuildAdminMutation) ~= "function" then
+                return false
+            end
+
+            return guild:HandleGuildAdminMutation(arguments, sender, distribution, target, message)
+        end,
+    },
+    [27] = {
+        key = "GUILD_ADMIN_MUTATION_RESPONSE",
+        name = "guild-admin-mutation-response",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local guild = Addon.Client and Addon.Client.Guild
+            if not guild or type(guild.HandleGuildAdminMutationResponse) ~= "function" then
+                return false
+            end
+
+            return guild:HandleGuildAdminMutationResponse(arguments, sender, distribution, target, message)
+        end,
+    },
 }
 
 Operations:ResetRegistry()

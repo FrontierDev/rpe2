@@ -7,6 +7,19 @@ local Client = Addon.Client
 local Guild = Addon.Client.Guild
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
+local Comms = Addon.Internal and Addon.Internal.Comms or {}
+local Operations = Comms.Operations or {}
+local Common = Addon.Utils and Addon.Utils.Common or {}
+
+local GUILD_ADMIN_PROTOCOL_VERSION = "1"
+local GUILD_ADMIN_REQUEST_TIMEOUT = 8
+local GUILD_ADMIN_QUERY_OPCODE = Operations.GetOpcode and Operations:GetOpcode("GUILD_ADMIN_QUERY") or nil
+local GUILD_ADMIN_QUERY_RESPONSE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("GUILD_ADMIN_QUERY_RESPONSE") or nil
+local GUILD_ADMIN_MUTATION_OPCODE = Operations.GetOpcode and Operations:GetOpcode("GUILD_ADMIN_MUTATION") or nil
+local GUILD_ADMIN_MUTATION_RESPONSE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("GUILD_ADMIN_MUTATION_RESPONSE") or nil
+
+Guild._guildAdminPending = Guild._guildAdminPending or {}
+Guild._guildAdminRequestSequence = tonumber(Guild._guildAdminRequestSequence) or 0
 
 local function ensureString(value)
     if value == nil then
@@ -18,6 +31,35 @@ end
 
 local function trimText(value)
     return ensureString(value):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function normalizePlayerName(value)
+    local name = trimText(value)
+    if name == "" then
+        return ""
+    end
+
+    if type(Common.NormalizeName) == "function" then
+        return trimText(Common.NormalizeName(name))
+    end
+
+    return name
+end
+
+local function getLocalPlayerName()
+    if type(Common.GetPlayerName) == "function" then
+        return normalizePlayerName(Common.GetPlayerName())
+    end
+
+    if type(GetUnitName) == "function" then
+        return normalizePlayerName(GetUnitName("player", true) or GetUnitName("player"))
+    end
+
+    if type(UnitName) == "function" then
+        return normalizePlayerName(UnitName("player"))
+    end
+
+    return ""
 end
 
 local function callGlobal(name, ...)
@@ -168,6 +210,182 @@ local function isGuildRankEligibleForWowRank(setting, wowRankIndex)
     end
 
     return false
+end
+
+local function getArgument(arguments, index)
+    return trimText(arguments and arguments[index])
+end
+
+local function isSuccessfulArgument(value)
+    local normalized = string.lower(trimText(value))
+    return normalized == "1" or normalized == "true" or normalized == "success"
+end
+
+local function getGuildAdminRequestId()
+    Guild._guildAdminRequestSequence = (tonumber(Guild._guildAdminRequestSequence) or 0) + 1
+    local now = type(Common.GetNow) == "function" and tonumber(Common.GetNow()) or 0
+    return ("guild-admin-%d-%d"):format(math.floor(now), Guild._guildAdminRequestSequence)
+end
+
+local function findRosterMember(self, targetName)
+    local normalizedTarget = normalizePlayerName(targetName)
+    if normalizedTarget == "" or type(self.GetRoster) ~= "function" then
+        return nil
+    end
+
+    local roster = self:GetRoster()
+    for index = 1, #(roster or {}) do
+        local member = roster[index]
+        if normalizePlayerName(member and member.name) == normalizedTarget then
+            return member
+        end
+    end
+
+    return nil
+end
+
+local function sendGuildAdminMessage(opcode, targetName, arguments)
+    local normalizedTarget = trimText(targetName)
+    if not opcode or normalizedTarget == "" or type(Comms.SendMessage) ~= "function" then
+        return false
+    end
+
+    return Comms:SendMessage("WHISPER", opcode, arguments, normalizedTarget, {
+        opcode = opcode,
+        scope = "client",
+    }) == true
+end
+
+local function hasGuildOfficerCapability(member)
+    local rankIndex = normalizeWowGuildRankIndex(member and member.rankIndex)
+    if rankIndex == nil then
+        return false
+    end
+
+    local guildInfo = _G and _G.C_GuildInfo or nil
+    local getRankFlags = guildInfo and guildInfo.GuildControlGetRankFlags or nil
+    if type(getRankFlags) == "function" then
+        -- GetGuildRosterInfo uses a zero-based rankIndex; GuildInfo uses a
+        -- one-based rankOrder for permission flags.
+        local ok, permissions = pcall(getRankFlags, rankIndex + 1)
+        if ok and type(permissions) == "table" then
+            -- Treat officer-chat and guild-management permissions as the WoW
+            -- officer capability. Sender-provided fields are never consulted.
+            return permissions[3] == true
+                or permissions[4] == true
+                or permissions[5] == true
+                or permissions[6] == true
+                or permissions[7] == true
+                or permissions[8] == true
+                or permissions[9] == true
+                or permissions[11] == true
+                or permissions[12] == true
+                or permissions[13] == true
+        end
+    end
+
+    -- Compatibility fallback for clients that cannot expose rank flags. The
+    -- guild master and first officer rank are the stable roster-only fallback.
+    return rankIndex <= 1
+end
+
+local function invokeGuildAdminCallback(pending, response)
+    if type(pending and pending.callback) == "function" then
+        pending.callback(response)
+    end
+end
+
+local function completeGuildAdminPending(self, requestId, response)
+    local pending = self._guildAdminPending and self._guildAdminPending[requestId] or nil
+    if not pending then
+        return false
+    end
+
+    self._guildAdminPending[requestId] = nil
+    invokeGuildAdminCallback(pending, response)
+    return true
+end
+
+local function failGuildAdminPending(self, requestId, reason)
+    return completeGuildAdminPending(self, requestId, {
+        requestId = requestId,
+        protocolVersion = GUILD_ADMIN_PROTOCOL_VERSION,
+        success = false,
+        reason = reason or "no-response",
+    })
+end
+
+local function registerGuildAdminPending(self, requestId, pending)
+    self._guildAdminPending[requestId] = pending
+    if C_Timer and type(C_Timer.After) == "function" then
+        C_Timer.After(GUILD_ADMIN_REQUEST_TIMEOUT, function()
+            if self._guildAdminPending[requestId] == pending then
+                failGuildAdminPending(self, requestId, "no-response")
+            end
+        end)
+    end
+end
+
+local function validateGuildAdminRequest(self, arguments, sender, distribution, targetIndex)
+    local requestId = getArgument(arguments, 1)
+    local protocolVersion = getArgument(arguments, 2)
+    if requestId == "" or protocolVersion ~= GUILD_ADMIN_PROTOCOL_VERSION or distribution ~= "WHISPER" then
+        return requestId ~= "" and requestId or nil, "incompatible-protocol", nil
+    end
+
+    local identity = getGuildIdentity()
+    if not identity.inGuild then
+        return requestId, "sender-not-in-guild", nil
+    end
+
+    local senderMember = findRosterMember(self, sender)
+    if not senderMember then
+        return requestId, "sender-not-in-guild", nil
+    end
+
+    if not hasGuildOfficerCapability(senderMember) then
+        return requestId, "sender-not-officer", nil
+    end
+
+    local requestedTarget = normalizePlayerName(getArgument(arguments, targetIndex))
+    local localPlayerName = getLocalPlayerName()
+    if requestedTarget == "" or localPlayerName == "" or requestedTarget ~= localPlayerName then
+        return requestId, "wrong-target", nil
+    end
+
+    return requestId, nil, identity
+end
+
+local function getResolvedGuildRankReference(guildRankRef)
+    if type(Registry.ResolveGuildSettingReference) ~= "function" then
+        return nil, nil
+    end
+
+    return Registry:ResolveGuildSettingReference(guildRankRef)
+end
+
+local function buildQueryResponseArguments(requestId, success, reason, identity, assignedRankRef)
+    return {
+        requestId,
+        GUILD_ADMIN_PROTOCOL_VERSION,
+        success and "1" or "0",
+        reason or (success and "ok" or "unknown-error"),
+        assignedRankRef or "",
+        identity and identity.guildRankIndex or "",
+        identity and identity.guildRankName or "",
+        identity and identity.guildName or "",
+    }
+end
+
+local function buildMutationResponseArguments(requestId, operation, success, reason, assignedRankRef)
+    return {
+        requestId,
+        GUILD_ADMIN_PROTOCOL_VERSION,
+        operation or "",
+        success and "1" or "0",
+        reason or (success and "ok" or "unknown-error"),
+        assignedRankRef or "",
+    }
 end
 
 local function hasOfficerPermission()
@@ -410,6 +628,311 @@ function Guild:GetAssignedGuildRank()
     end
 
     return result.rank, result
+end
+
+function Guild:IsGuildAdminTargetAvailable(targetName)
+    local identity = getGuildIdentity()
+    if not identity.inGuild then
+        return false, "sender-not-in-guild"
+    end
+
+    if self:IsLocalPlayerOfficer() ~= true then
+        return false, "sender-not-officer"
+    end
+
+    local member = findRosterMember(self, targetName)
+    if not member then
+        return false, "target-not-in-guild"
+    end
+
+    if member.online ~= true then
+        return false, "target-offline"
+    end
+
+    return true, nil, member
+end
+
+local function sendGuildAdminRequest(self, opcode, targetName, arguments, pending)
+    local requestId = pending.requestId
+    registerGuildAdminPending(self, requestId, pending)
+    if sendGuildAdminMessage(opcode, targetName, arguments) then
+        return true, requestId
+    end
+
+    self._guildAdminPending[requestId] = nil
+    invokeGuildAdminCallback(pending, {
+        requestId = requestId,
+        protocolVersion = GUILD_ADMIN_PROTOCOL_VERSION,
+        success = false,
+        reason = "send-failed",
+    })
+    return false, "send-failed"
+end
+
+function Guild:QueryGuildAdminMember(targetName, callback)
+    local available, reason, member = self:IsGuildAdminTargetAvailable(targetName)
+    if not available then
+        invokeGuildAdminCallback({ callback = callback }, {
+            success = false,
+            reason = reason,
+        })
+        return false, reason
+    end
+
+    local requestId = getGuildAdminRequestId()
+    return sendGuildAdminRequest(self, GUILD_ADMIN_QUERY_OPCODE, member.name, {
+        requestId,
+        GUILD_ADMIN_PROTOCOL_VERSION,
+        member.name,
+    }, {
+        requestId = requestId,
+        kind = "query",
+        targetName = member.name,
+        callback = callback,
+    })
+end
+
+function Guild:SetGuildRankForMember(targetName, guildRankRef, callback)
+    local available, reason, member = self:IsGuildAdminTargetAvailable(targetName)
+    local normalizedRef = trimText(guildRankRef)
+    if not available then
+        invokeGuildAdminCallback({ callback = callback }, {
+            success = false,
+            reason = reason,
+        })
+        return false, reason
+    end
+
+    if normalizedRef == "" then
+        invokeGuildAdminCallback({ callback = callback }, {
+            success = false,
+            reason = "unknown-guild-rank",
+        })
+        return false, "unknown-guild-rank"
+    end
+
+    local requestId = getGuildAdminRequestId()
+    return sendGuildAdminRequest(self, GUILD_ADMIN_MUTATION_OPCODE, member.name, {
+        requestId,
+        GUILD_ADMIN_PROTOCOL_VERSION,
+        "set_guild_rank",
+        member.name,
+        normalizedRef,
+    }, {
+        requestId = requestId,
+        kind = "mutation",
+        operation = "set_guild_rank",
+        targetName = member.name,
+        callback = callback,
+    })
+end
+
+function Guild:ClearGuildRankForMember(targetName, callback)
+    local available, reason, member = self:IsGuildAdminTargetAvailable(targetName)
+    if not available then
+        invokeGuildAdminCallback({ callback = callback }, {
+            success = false,
+            reason = reason,
+        })
+        return false, reason
+    end
+
+    local requestId = getGuildAdminRequestId()
+    return sendGuildAdminRequest(self, GUILD_ADMIN_MUTATION_OPCODE, member.name, {
+        requestId,
+        GUILD_ADMIN_PROTOCOL_VERSION,
+        "clear_guild_rank",
+        member.name,
+        "",
+    }, {
+        requestId = requestId,
+        kind = "mutation",
+        operation = "clear_guild_rank",
+        targetName = member.name,
+        callback = callback,
+    })
+end
+
+local function getPendingResponse(self, arguments, sender, distribution)
+    local requestId = getArgument(arguments, 1)
+    local pending = self._guildAdminPending and self._guildAdminPending[requestId] or nil
+    if not pending or distribution ~= "WHISPER" then
+        return nil, nil
+    end
+
+    if normalizePlayerName(sender) ~= normalizePlayerName(pending.targetName) then
+        return nil, nil
+    end
+
+    return requestId, pending
+end
+
+function Guild:HandleGuildAdminQueryResponse(arguments, sender, distribution, target, message)
+    local requestId, pending = getPendingResponse(self, arguments, sender, distribution)
+    if not requestId or not pending or pending.kind ~= "query" then
+        return false
+    end
+
+    local protocolVersion = getArgument(arguments, 2)
+    if protocolVersion ~= GUILD_ADMIN_PROTOCOL_VERSION then
+        return completeGuildAdminPending(self, requestId, {
+            requestId = requestId,
+            protocolVersion = protocolVersion,
+            success = false,
+            reason = "incompatible-protocol",
+            sender = sender,
+        })
+    end
+
+    return completeGuildAdminPending(self, requestId, {
+        requestId = requestId,
+        protocolVersion = protocolVersion,
+        success = isSuccessfulArgument(getArgument(arguments, 3)),
+        reason = getArgument(arguments, 4),
+        assignedRankRef = getArgument(arguments, 5),
+        guildRankIndex = tonumber(getArgument(arguments, 6)),
+        guildRankName = getArgument(arguments, 7),
+        guildName = getArgument(arguments, 8),
+        sender = sender,
+    })
+end
+
+function Guild:HandleGuildAdminMutationResponse(arguments, sender, distribution, target, message)
+    local requestId, pending = getPendingResponse(self, arguments, sender, distribution)
+    if not requestId or not pending or pending.kind ~= "mutation" then
+        return false
+    end
+
+    local protocolVersion = getArgument(arguments, 2)
+    local operation = getArgument(arguments, 3)
+    if protocolVersion ~= GUILD_ADMIN_PROTOCOL_VERSION or operation ~= pending.operation then
+        return completeGuildAdminPending(self, requestId, {
+            requestId = requestId,
+            protocolVersion = protocolVersion,
+            operation = operation,
+            success = false,
+            reason = "incompatible-protocol",
+            sender = sender,
+        })
+    end
+
+    return completeGuildAdminPending(self, requestId, {
+        requestId = requestId,
+        protocolVersion = protocolVersion,
+        operation = operation,
+        success = isSuccessfulArgument(getArgument(arguments, 4)),
+        reason = getArgument(arguments, 5),
+        assignedRankRef = getArgument(arguments, 6),
+        sender = sender,
+    })
+end
+
+function Guild:HandleGuildAdminQuery(arguments, sender, distribution, target, message)
+    local requestId, reason, identity = validateGuildAdminRequest(self, arguments, sender, distribution, 3)
+    if not requestId then
+        return false
+    end
+
+    if reason then
+        return sendGuildAdminMessage(
+            GUILD_ADMIN_QUERY_RESPONSE_OPCODE,
+            sender,
+            buildQueryResponseArguments(requestId, false, reason)
+        )
+    end
+
+    return sendGuildAdminMessage(
+        GUILD_ADMIN_QUERY_RESPONSE_OPCODE,
+        sender,
+        buildQueryResponseArguments(requestId, true, "ok", identity, getAssignedGuildRankRef(identity))
+    )
+end
+
+function Guild:HandleGuildAdminMutation(arguments, sender, distribution, target, message)
+    local operation = getArgument(arguments, 3)
+    local requestId, reason, identity = validateGuildAdminRequest(self, arguments, sender, distribution, 4)
+    if not requestId then
+        return false
+    end
+
+    if reason then
+        return sendGuildAdminMessage(
+            GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
+            sender,
+            buildMutationResponseArguments(requestId, operation, false, reason)
+        )
+    end
+
+    if operation == "set_guild_rank" then
+        local guildRankRef = getArgument(arguments, 5)
+        local applicableRanks = self:GetApplicableGuildRanks()
+        local applicableMatch = findMatchByRef(applicableRanks, guildRankRef)
+        if not applicableMatch then
+            local _, rank = getResolvedGuildRankReference(guildRankRef)
+            reason = rank and "rank-not-applicable" or "unknown-guild-rank"
+        elseif normalizeWowGuildRankIndex(identity.guildRankIndex) == nil then
+            reason = "rank-not-eligible"
+        else
+            local eligibleRanks = self:GetEligibleGuildRanksForWoWRank(identity.guildRankIndex)
+            if not findMatchByRef(eligibleRanks, guildRankRef) then
+                reason = "rank-not-eligible"
+            elseif type(Profile.SetAssignedGuildRank) ~= "function" then
+                reason = "persistence-failed"
+            else
+                local assignment = Profile.SetAssignedGuildRank(getGuildKey(identity), guildRankRef, {
+                    assignedRankAt = type(Common.GetNow) == "function" and Common.GetNow() or nil,
+                    assignedRankBy = tostring(sender or ""),
+                })
+                if not assignment then
+                    reason = "persistence-failed"
+                else
+                    self:RefreshWindow()
+                    return sendGuildAdminMessage(
+                        GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
+                        sender,
+                        buildMutationResponseArguments(requestId, operation, true, "ok", guildRankRef)
+                    )
+                end
+            end
+        end
+
+        return sendGuildAdminMessage(
+            GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
+            sender,
+            buildMutationResponseArguments(requestId, operation, false, reason)
+        )
+    end
+
+    if operation == "clear_guild_rank" then
+        if type(Profile.ClearAssignedGuildRank) ~= "function" then
+            reason = "persistence-failed"
+        else
+            local existingRankRef = getAssignedGuildRankRef(identity)
+            local cleared = Profile.ClearAssignedGuildRank(getGuildKey(identity))
+            if not cleared and existingRankRef then
+                reason = "persistence-failed"
+            else
+                self:RefreshWindow()
+                return sendGuildAdminMessage(
+                    GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
+                    sender,
+                    buildMutationResponseArguments(requestId, operation, true, "ok")
+                )
+            end
+        end
+
+        return sendGuildAdminMessage(
+            GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
+            sender,
+            buildMutationResponseArguments(requestId, operation, false, reason)
+        )
+    end
+
+    return sendGuildAdminMessage(
+        GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
+        sender,
+        buildMutationResponseArguments(requestId, operation, false, "unsupported-operation")
+    )
 end
 
 -- Compatibility facade for the existing Guild pages. The complete catalogue is
