@@ -37,6 +37,7 @@ local function createInstance()
         spellbookPage = ProfileUI.SpellbookPage,
         traitsPage = ProfileUI.TraitsPage,
         skillsPage = ProfileUI.SkillsPage,
+        achievementsPage = ProfileUI.AchievementsPage,
     }, ProfileWindow)
 end
 
@@ -95,6 +96,10 @@ function ProfileWindow:RefreshTab(tabKey)
     elseif normalizedKey == "skills" then
         if self.skillsPage and self.skillsPage.Refresh then
             self.skillsPage:Refresh()
+        end
+    elseif normalizedKey == "achievements" then
+        if self.achievementsPage and self.achievementsPage.Refresh then
+            self.achievementsPage:Refresh()
         end
     end
 end
@@ -183,6 +188,18 @@ function ProfileWindow:BuildWindow()
                         self:RefreshTab("skills")
                     end)
                     self.skillsPage:Refresh()
+                end,
+            },
+            {
+                name = "achievements",
+                label = "Achievements",
+                width = 96,
+                builder = function(page)
+                    self.achievementsPage:Build(page, self)
+                    refreshPageOnShow(page, function()
+                        self:RefreshTab("achievements")
+                    end)
+                    self.achievementsPage:Refresh()
                 end,
             },
         },

@@ -207,6 +207,7 @@ client/character/profile/page_ProfileEquipmentStats.lua
 client/character/profile/page_ProfileSpellbook.lua
 client/character/profile/page_ProfileTraits.lua
 client/character/profile/page_ProfileSkills.lua
+client/character/profile/page_ProfileAchievements.lua
 client/character/profile/window_Profile.lua
 core/debug/Clipboard.lua
 server/ui/window_EventUnit.lua
