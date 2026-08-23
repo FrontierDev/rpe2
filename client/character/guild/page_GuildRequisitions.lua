@@ -5,6 +5,7 @@ Addon.Client.UI = Addon.Client.UI or {}
 Addon.Client.UI.Guild = Addon.Client.UI.Guild or {}
 
 local GuildUI = Addon.Client.UI.Guild
+local Client = Addon.Client
 local UI = Addon.UI or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
@@ -32,11 +33,58 @@ local function resolveCurrencyName(currencyRef)
     return tostring(currencyRef or "unknown-currency")
 end
 
+local function setSelectedRow(row, selected)
+    if not row or not row.entryBackground or not row.entryBackground.SetColorTexture then
+        return
+    end
+
+    local color = UI.ResolveColor(nil, selected and "list.rowHover" or "list.rowBackground")
+    row.entryBackground:SetColorTexture(color.r or 0, color.g or 0, color.b or 0, color.a or 1)
+end
+
+local function describeEligibilityFailure(reason, detail)
+    reason = tostring(reason or "unavailable")
+    if reason == "not-in-guild" then
+        return "Not in a guild"
+    elseif reason == "guild-loading" then
+        return "Guild information is still loading"
+    elseif reason == "no-assigned-rank" then
+        return "No RPE Guild Rank assigned"
+    elseif reason == "invalid-assigned-rank" then
+        return "Assigned RPE Guild Rank is no longer valid"
+    elseif reason == "rank-mismatch" then
+        return "This requisition is not in the assigned RPE Guild Rank"
+    elseif reason == "requisitions-disabled" then
+        return "Requisitions disabled for this Guild Rank"
+    elseif reason == "requisition-unavailable" then
+        return "Requisition unavailable"
+    elseif reason == "item-unavailable" then
+        return "Item unavailable"
+    elseif reason == "character-limit-reached" then
+        return "Character limit reached"
+    elseif reason == "insufficient-currency" then
+        return "Insufficient " .. resolveCurrencyName(detail and detail.currencyRef)
+    elseif reason == "currency-unavailable" or reason == "currency-api-unavailable" then
+        return "Currency unavailable"
+    elseif reason == "inventory-unavailable" or reason == "inventory-award-failed" then
+        return "Inventory award unavailable"
+    elseif reason == "ledger-unavailable" or reason == "ledger-update-failed" then
+        return "Requisition usage could not be recorded"
+    end
+
+    return "Requisition unavailable"
+end
+
 function RequisitionsPage:Build(parent, owner)
     self.owner = owner
     if self.frame then
         return self.frame
     end
+
+    self.SelectedRequisitionIndex = nil
+    self.SelectedRequisitionItems = {}
+    self.RequisitionActionMessage = nil
+    self.RequisitionPending = false
 
     self.frame = CreateFrame("Frame", "RPEGuildRequisitionsPage", parent)
     self.frame:SetAllPoints(parent)
@@ -135,7 +183,7 @@ function RequisitionsPage:Build(parent, owner)
         rowWordWrap = true,
     })
     self.RequisitionList:SetParent(self.RequisitionPanel:GetContentFrame())
-    self.RequisitionList:SetRowRenderer(function(row, requisition)
+    self.RequisitionList:SetRowRenderer(function(row, requisition, requisitionIndex)
         local ref = tostring(requisition and requisition.itemRef or "")
         local label = resolveItemName(ref)
         local details = { ref }
@@ -153,11 +201,24 @@ function RequisitionsPage:Build(parent, owner)
         end
         row:SetCategory(tostring(requisition and requisition.id or "Requisition"))
         row:SetTestName(("%s x%d"):format(label, tonumber(requisition and requisition.quantity) or 1))
-        row:SetStatus("Read-only")
+        row:SetStatus(tonumber(self.SelectedRequisitionIndex) == tonumber(requisitionIndex) and "Selected" or "Select")
         row:SetDetail(table.concat(details, "\n"))
+
+        local frame = row.GetFrame and row:GetFrame() or nil
+        if frame then
+            frame:EnableMouse(true)
+            frame:SetScript("OnMouseUp", function(_, button)
+                if button == "LeftButton" then
+                    self.SelectedRequisitionIndex = requisitionIndex
+                    self.RequisitionActionMessage = nil
+                    self:Refresh()
+                end
+            end)
+            setSelectedRow(row, tonumber(self.SelectedRequisitionIndex) == tonumber(requisitionIndex))
+        end
     end)
     self.RequisitionList:Create()
-    UI.Utils.AnchorFill(self.RequisitionList, self.RequisitionPanel:GetContentFrame(), 0, 20, 0, 0)
+    UI.Utils.AnchorFill(self.RequisitionList, self.RequisitionPanel:GetContentFrame(), 0, 20, 0, 30)
     self.RequisitionEmptyText = UI.CreateText(self.RequisitionPanel:GetContentFrame(), "RPEGuildRequisitionsEmptyText", "", {
         width = 300,
         height = 30,
@@ -166,8 +227,65 @@ function RequisitionsPage:Build(parent, owner)
     })
     self.RequisitionEmptyText:GetFrame():SetPoint("CENTER", self.RequisitionPanel:GetContentFrame(), "CENTER", 0, 0)
 
+    self.RequisitionButton = UI.CreateButton(self.RequisitionPanel:GetContentFrame(), "RPEGuildRequisitionActionButton", "Requisition", 96, function()
+        self:TrySelectedRequisition()
+    end, {
+        height = 22,
+        fontSize = 8,
+    })
+    self.RequisitionButton:GetFrame():SetPoint("BOTTOMLEFT", self.RequisitionPanel:GetContentFrame(), "BOTTOMLEFT", 4, 2)
+    self.RequisitionActionStatus = UI.CreateText(self.RequisitionPanel:GetContentFrame(), "RPEGuildRequisitionActionStatus", "", {
+        width = 402,
+        height = 24,
+        justifyH = "LEFT",
+        wordWrap = true,
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.RequisitionActionStatus:GetFrame():SetPoint("BOTTOMLEFT", self.RequisitionPanel:GetContentFrame(), "BOTTOMLEFT", 108, 1)
+
     self:Refresh()
     return self.frame
+end
+
+function RequisitionsPage:TrySelectedRequisition()
+    if self.RequisitionPending == true then
+        return false, "pending"
+    end
+
+    local Guild = Client.Guild
+    local index = tonumber(self.SelectedRequisitionIndex)
+    local requisition = index and self.SelectedRequisitionItems[index] or nil
+    if not Guild or type(Guild.TryRequisition) ~= "function" or not requisition then
+        return false, "requisition-unavailable"
+    end
+
+    local assignment = type(Guild.GetAssignedGuildRankStatus) == "function"
+        and Guild:GetAssignedGuildRankStatus()
+        or nil
+    if not assignment or assignment.status ~= "valid" then
+        self.RequisitionActionMessage = describeEligibilityFailure(
+            assignment and assignment.status or "invalid-assigned-rank"
+        )
+        self:Refresh()
+        return false, assignment and assignment.status or "invalid-assigned-rank"
+    end
+
+    self.RequisitionPending = true
+    self.RequisitionActionMessage = "Requisition pending..."
+    self:Refresh()
+
+    local success, reason, result = Guild:TryRequisition(assignment.assignedRankRef, requisition.id)
+    self.RequisitionPending = false
+    if success then
+        self.RequisitionActionMessage = ("Requisition succeeded: %s x%d."):format(
+            resolveItemName(result and result.itemRef or requisition.itemRef),
+            tonumber(result and result.quantity or requisition.quantity) or 1
+        )
+    else
+        self.RequisitionActionMessage = describeEligibilityFailure(reason, result)
+    end
+    self:Refresh()
+    return success, reason, result
 end
 
 function RequisitionsPage:Refresh()
@@ -183,16 +301,65 @@ function RequisitionsPage:Refresh()
     local assignedRank = assignment and assignment.status == "valid" and assignment.rank or nil
     local hasAssignedRank = assignedRank ~= nil
     self.StatusText:SetText(hasAssignedRank
-        and (assignmentText .. ". Requisitions and Daily Rewards are read-only.")
+        and (assignmentText .. ". Daily Rewards are read-only; Requisitions can be claimed below.")
         or (assignmentText or "Guild Rank: Unavailable"))
     local dailyRewards = hasAssignedRank and assignedRank.dailyRewards or {}
     local requisitions = hasAssignedRank and assignedRank.requisitions or {}
+    self.SelectedRequisitionItems = requisitions or {}
+    if not self.SelectedRequisitionIndex
+        or self.SelectedRequisitionIndex < 1
+        or self.SelectedRequisitionIndex > #self.SelectedRequisitionItems then
+        self.SelectedRequisitionIndex = nil
+    end
     self.DailyList:SetItems(dailyRewards or {})
     self.RequisitionList:SetItems(requisitions or {})
     self.DailyEmptyText:SetText(not hasAssignedRank and (assignmentText or "Guild Rank unavailable.")
         or (#dailyRewards == 0 and "No daily rewards configured." or ""))
     self.RequisitionEmptyText:SetText(not hasAssignedRank and (assignmentText or "Guild Rank unavailable.")
         or (#requisitions == 0 and "No requisitions configured." or ""))
+
+    local selectedRequisition = self.SelectedRequisitionIndex
+        and self.SelectedRequisitionItems[self.SelectedRequisitionIndex]
+        or nil
+    local eligible = false
+    local reason = nil
+    local detail = nil
+    if selectedRequisition and hasAssignedRank then
+        local Guild = Client.Guild
+        if Guild and type(Guild.GetRequisitionEligibility) == "function" then
+            eligible, reason, detail = Guild:GetRequisitionEligibility(
+                assignment.assignedRankRef,
+                selectedRequisition.id
+            )
+        else
+            reason = "inventory-unavailable"
+        end
+    elseif not hasAssignedRank then
+        reason = assignment and assignment.status or "invalid-assigned-rank"
+    elseif #self.SelectedRequisitionItems == 0 then
+        reason = "requisition-unavailable"
+    else
+        reason = "select-requisition"
+    end
+
+    if self.RequisitionButton then
+        self.RequisitionButton:SetEnabled(eligible == true and self.RequisitionPending ~= true)
+    end
+    if self.RequisitionActionStatus then
+        local actionMessage = self.RequisitionActionMessage
+        if not actionMessage then
+            if reason == "select-requisition" then
+                actionMessage = "Select a requisition to continue."
+            elseif eligible then
+                actionMessage = "Ready to requisition."
+            elseif reason == "requisition-unavailable" and #self.SelectedRequisitionItems == 0 and hasAssignedRank then
+                actionMessage = "No requisitions configured."
+            else
+                actionMessage = describeEligibilityFailure(reason, detail)
+            end
+        end
+        self.RequisitionActionStatus:SetText(actionMessage)
+    end
     return self.frame
 end
 

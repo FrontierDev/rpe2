@@ -626,6 +626,410 @@ function Guild:GetAssignedGuildRank()
     return result.rank, result
 end
 
+local function getInventoryService()
+    return Client.Inventory or {}
+end
+
+local function findRequisition(rank, requisitionId)
+    local normalizedId = trimText(requisitionId)
+    if normalizedId == "" or type(rank and rank.requisitions) ~= "table" then
+        return nil
+    end
+
+    for index = 1, #rank.requisitions do
+        local requisition = rank.requisitions[index]
+        if trimText(requisition and requisition.id) == normalizedId then
+            return requisition
+        end
+    end
+
+    return nil
+end
+
+local function parseItemReference(itemRef)
+    local reference = trimText(itemRef)
+    local separatorIndex = string.find(reference, ":", 1, true)
+    if not separatorIndex then
+        return nil, nil
+    end
+
+    local datasetId = trimText(string.sub(reference, 1, separatorIndex - 1))
+    local itemId = trimText(string.sub(reference, separatorIndex + 1))
+    if datasetId == "" or itemId == "" then
+        return nil, nil
+    end
+
+    return datasetId, itemId
+end
+
+local function getCurrencyCosts(costs)
+    if type(Profile.NormalizeCurrencyKey) ~= "function"
+        or type(Profile.ResolveCurrencyDefinition) ~= "function" then
+        return nil, "currency-api-unavailable"
+    end
+
+    local normalizedCosts = {}
+    local byCurrency = {}
+    local costList = type(costs) == "table" and costs or {}
+    for index = 1, #costList do
+        local cost = costList[index]
+        local currencyRef = Profile.NormalizeCurrencyKey(cost and cost.currencyRef)
+        if currencyRef == "" then
+            return nil, "currency-unavailable", {
+                costIndex = index,
+            }
+        end
+
+        local resolved, definition = pcall(Profile.ResolveCurrencyDefinition, currencyRef)
+        if not resolved or type(definition) ~= "table" or definition.isMissing == true then
+            return nil, "currency-unavailable", {
+                currencyRef = currencyRef,
+                costIndex = index,
+            }
+        end
+
+        local amount = tonumber(cost and cost.amount)
+        if not amount or amount ~= amount or amount == math.huge or amount == -math.huge or amount < 0 then
+            return nil, "invalid-currency-cost", {
+                currencyRef = currencyRef,
+                costIndex = index,
+            }
+        end
+        amount = math.floor(amount)
+
+        local entry = byCurrency[currencyRef]
+        if not entry then
+            entry = {
+                currencyRef = currencyRef,
+                amount = 0,
+                definition = definition,
+            }
+            byCurrency[currencyRef] = entry
+            normalizedCosts[#normalizedCosts + 1] = entry
+        end
+        entry.amount = entry.amount + amount
+    end
+
+    return normalizedCosts
+end
+
+local function getInventoryItemQuantity(inventory, datasetId, itemId)
+    if type(inventory.GetItems) ~= "function" then
+        return nil
+    end
+
+    local ok, items = pcall(inventory.GetItems)
+    if not ok or type(items) ~= "table" then
+        return nil
+    end
+
+    local quantity = 0
+    for index = 1, #items do
+        local item = items[index]
+        if tostring(item and item.dataset or "") == datasetId
+            and tostring(item and item.id or "") == itemId then
+            quantity = quantity + math.max(0, math.floor(tonumber(item.quantity or item.count) or 0))
+        end
+    end
+
+    return quantity
+end
+
+local function removeInventoryItemQuantity(inventory, datasetId, itemId, quantity)
+    local remaining = math.max(0, math.floor(tonumber(quantity) or 0))
+    if remaining == 0 then
+        return true
+    end
+    if type(inventory.GetItems) ~= "function" or type(inventory.RemoveItem) ~= "function" then
+        return false
+    end
+
+    local ok, items = pcall(inventory.GetItems)
+    if not ok or type(items) ~= "table" then
+        return false
+    end
+
+    for index = #items, 1, -1 do
+        local item = items[index]
+        if tostring(item and item.dataset or "") == datasetId
+            and tostring(item and item.id or "") == itemId then
+            local itemQuantity = math.max(1, math.floor(tonumber(item.quantity or item.count) or 1))
+            local removeQuantity = math.min(itemQuantity, remaining)
+            local removed, result = pcall(inventory.RemoveItem, index, removeQuantity)
+            if not removed or not result then
+                return false
+            end
+
+            remaining = remaining - removeQuantity
+            if remaining <= 0 then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+local function restoreCurrencySnapshots(snapshots)
+    local restored = true
+    if type(Profile.SetCurrencyAmount) ~= "function" or type(Profile.GetCurrencyAmount) ~= "function" then
+        return false
+    end
+
+    for index = #snapshots, 1, -1 do
+        local snapshot = snapshots[index]
+        local ok, result = pcall(Profile.SetCurrencyAmount, snapshot.currencyRef, snapshot.amount)
+        local gotAmount, actual = pcall(Profile.GetCurrencyAmount, snapshot.currencyRef)
+        actual = gotAmount and (tonumber(actual) or 0) or nil
+        if not ok or result == nil or not gotAmount or actual ~= snapshot.amount then
+            restored = false
+        end
+    end
+
+    return restored
+end
+
+local function buildRequisitionFailure(reason, detail)
+    return false, reason, detail
+end
+
+function Guild:GetRequisitionEligibility(guildRankRef, requisitionId)
+    local identity = getGuildIdentity()
+    if not identity.inGuild then
+        return buildRequisitionFailure("not-in-guild")
+    end
+
+    local guildKey = getGuildKey(identity)
+    if guildKey == "" then
+        return buildRequisitionFailure("guild-loading")
+    end
+
+    local ok, assignment = pcall(self.GetAssignedGuildRankStatus, self)
+    if not ok or type(assignment) ~= "table" then
+        return buildRequisitionFailure("invalid-assigned-rank")
+    end
+
+    if assignment.status == "not-in-guild" or assignment.status == "guild-loading" then
+        return buildRequisitionFailure(assignment.status)
+    end
+    if assignment.status == "unassigned" then
+        return buildRequisitionFailure("no-assigned-rank")
+    end
+    if assignment.status ~= "valid" or type(assignment.rank) ~= "table" then
+        return buildRequisitionFailure("invalid-assigned-rank", assignment)
+    end
+
+    local assignedRankRef = trimText(assignment.assignedRankRef)
+    local requestedRankRef = trimText(guildRankRef)
+    if requestedRankRef == "" or requestedRankRef ~= assignedRankRef then
+        return buildRequisitionFailure("rank-mismatch", {
+            assignedRankRef = assignedRankRef,
+            requestedRankRef = requestedRankRef,
+        })
+    end
+
+    local general = type(assignment.rank.general) == "table" and assignment.rank.general or {}
+    if general.enableRequisitions ~= true then
+        return buildRequisitionFailure("requisitions-disabled", assignment)
+    end
+
+    local normalizedRequisitionId = trimText(requisitionId)
+    local requisition = findRequisition(assignment.rank, normalizedRequisitionId)
+    if not requisition then
+        return buildRequisitionFailure("requisition-unavailable")
+    end
+
+    local itemRef = trimText(requisition.itemRef)
+    local itemDataset, item = nil, nil
+    if type(Registry.ResolveItemReference) == "function" then
+        local resolved
+        resolved, itemDataset, item = pcall(Registry.ResolveItemReference, Registry, itemRef)
+        if not resolved then
+            itemDataset, item = nil, nil
+        end
+    end
+    if type(itemDataset) ~= "table" or type(item) ~= "table" then
+        return buildRequisitionFailure("item-unavailable", {
+            itemRef = itemRef,
+        })
+    end
+
+    local datasetId, itemId = parseItemReference(itemRef)
+    if not datasetId or not itemId then
+        return buildRequisitionFailure("item-unavailable", {
+            itemRef = itemRef,
+        })
+    end
+
+    if type(Profile.GetGuildRequisitionUsage) ~= "function" then
+        return buildRequisitionFailure("ledger-unavailable")
+    end
+    local usage = Profile.GetGuildRequisitionUsage(guildKey, assignedRankRef, normalizedRequisitionId)
+    usage = math.max(0, math.floor(tonumber(usage) or 0))
+    local characterLimit = tonumber(requisition.characterLimit)
+    if not characterLimit or characterLimit ~= characterLimit or characterLimit == math.huge or characterLimit == -math.huge then
+        characterLimit = 1
+    end
+    characterLimit = math.max(1, math.floor(characterLimit))
+    if usage >= characterLimit then
+        return buildRequisitionFailure("character-limit-reached", {
+            usage = usage,
+            characterLimit = characterLimit,
+            requisitionId = normalizedRequisitionId,
+        })
+    end
+
+    local normalizedCosts, costReason, costDetail = getCurrencyCosts(requisition.costs)
+    if not normalizedCosts then
+        return buildRequisitionFailure(costReason, costDetail)
+    end
+
+    if type(Profile.GetCurrencyAmount) ~= "function" then
+        return buildRequisitionFailure("currency-api-unavailable")
+    end
+    for index = 1, #normalizedCosts do
+        local cost = normalizedCosts[index]
+        local balance = tonumber(Profile.GetCurrencyAmount(cost.currencyRef)) or 0
+        if balance < cost.amount then
+            return buildRequisitionFailure("insufficient-currency", {
+                currencyRef = cost.currencyRef,
+                balance = balance,
+                amount = cost.amount,
+            })
+        end
+    end
+
+    local inventory = getInventoryService()
+    if type(inventory.AddItem) ~= "function" then
+        return buildRequisitionFailure("inventory-unavailable")
+    end
+
+    return true, nil, {
+        identity = identity,
+        guildKey = guildKey,
+        assignment = assignment,
+        assignedRankRef = assignedRankRef,
+        requisitionId = normalizedRequisitionId,
+        requisition = requisition,
+        itemRef = itemRef,
+        itemDataset = itemDataset,
+        item = item,
+        datasetId = datasetId,
+        itemId = itemId,
+        quantity = math.max(1, math.floor(tonumber(requisition.quantity) or 1)),
+        costs = normalizedCosts,
+        usage = usage,
+        characterLimit = characterLimit,
+    }
+end
+
+function Guild:TryRequisition(guildRankRef, requisitionId)
+    local eligible, reason, detail = self:GetRequisitionEligibility(guildRankRef, requisitionId)
+    if not eligible then
+        return false, reason, detail
+    end
+
+    local snapshots = {}
+    for index = 1, #detail.costs do
+        local cost = detail.costs[index]
+        local balance = tonumber(Profile.GetCurrencyAmount(cost.currencyRef)) or 0
+        snapshots[#snapshots + 1] = {
+            currencyRef = cost.currencyRef,
+            amount = balance,
+        }
+    end
+
+    local function rollbackCurrencies()
+        return restoreCurrencySnapshots(snapshots)
+    end
+
+    if type(Profile.SpendCurrencyAmount) ~= "function" then
+        return false, "currency-api-unavailable", detail
+    end
+
+    for index = 1, #detail.costs do
+        local cost = detail.costs[index]
+        local before = snapshots[index].amount
+        local expected = before - cost.amount
+        local spent, updated = pcall(Profile.SpendCurrencyAmount, cost.currencyRef, cost.amount)
+        local gotAfter, after = pcall(Profile.GetCurrencyAmount, cost.currencyRef)
+        after = gotAfter and (tonumber(after) or 0) or nil
+        if not spent or not gotAfter or updated ~= expected or after ~= expected then
+            local restored = rollbackCurrencies()
+            return false, restored and "currency-transaction-failed" or "rollback-failed", detail
+        end
+    end
+
+    local inventory = getInventoryService()
+    local quantityBefore = getInventoryItemQuantity(inventory, detail.datasetId, detail.itemId)
+    local added, addedRecord = pcall(inventory.AddItem, {
+        dataset = detail.datasetId,
+        id = detail.itemId,
+        quantity = detail.quantity,
+    })
+    if not added or not addedRecord then
+        local restored = rollbackCurrencies()
+        return false, restored and "inventory-award-failed" or "rollback-failed", detail
+    end
+
+    local quantityAfter = getInventoryItemQuantity(inventory, detail.datasetId, detail.itemId)
+    local awardedQuantity = detail.quantity
+    if quantityBefore ~= nil and quantityAfter ~= nil then
+        awardedQuantity = math.max(0, quantityAfter - quantityBefore)
+    end
+
+    local expectedUsage = detail.usage + 1
+    local updatedUsage = nil
+    if type(Profile.IncrementGuildRequisitionUsage) == "function" then
+        local incremented
+        incremented, updatedUsage = pcall(Profile.IncrementGuildRequisitionUsage,
+            detail.guildKey,
+            detail.assignedRankRef,
+            detail.requisitionId
+        )
+        if not incremented then
+            updatedUsage = nil
+        end
+    end
+
+    if updatedUsage ~= expectedUsage then
+        local itemRestored = removeInventoryItemQuantity(
+            inventory,
+            detail.datasetId,
+            detail.itemId,
+            awardedQuantity
+        )
+        local ledgerRestored = false
+        if itemRestored and type(Profile.SetGuildRequisitionUsage) == "function" then
+            local restored, restoredUsage = pcall(Profile.SetGuildRequisitionUsage,
+                detail.guildKey,
+                detail.assignedRankRef,
+                detail.requisitionId,
+                detail.usage
+            )
+            ledgerRestored = restored and restoredUsage == detail.usage
+        end
+        local currenciesRestored = rollbackCurrencies()
+        if itemRestored and ledgerRestored and currenciesRestored then
+            return false, "ledger-update-failed", detail
+        end
+
+        -- If the item cannot be removed, leave a successful ledger increment
+        -- intact when possible so a granted item cannot be claimed a second time.
+        return false, "rollback-failed", detail
+    end
+
+    pcall(self.RefreshWindow, self)
+    return true, "ok", {
+        guildRankRef = detail.assignedRankRef,
+        requisitionId = detail.requisitionId,
+        itemRef = detail.itemRef,
+        quantity = detail.quantity,
+        usage = updatedUsage,
+        characterLimit = detail.characterLimit,
+    }
+end
+
 function Guild:IsGuildAdminTargetAvailable(targetName)
     local identity = getGuildIdentity()
     if not identity.inGuild then

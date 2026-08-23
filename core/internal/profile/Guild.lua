@@ -18,6 +18,21 @@ local function normalizeGuildRankRef(value)
     return reference
 end
 
+local function normalizeRequisitionId(value)
+    local requisitionId = tostring(value or "")
+    requisitionId = requisitionId:gsub("^%s+", ""):gsub("%s+$", "")
+    return requisitionId
+end
+
+local function normalizeRequisitionUsage(value)
+    local usage = tonumber(value)
+    if not usage or usage ~= usage or usage == math.huge or usage == -math.huge then
+        return 0
+    end
+
+    return math.max(0, math.floor(usage))
+end
+
 function Profile.GetGuildState()
     if Database.GetProfileGuildState then
         return Database.GetProfileGuildState()
@@ -104,4 +119,57 @@ function Profile.ClearAssignedGuildRank(guildKey)
     bucket.assignedRankBy = nil
     local persistedState = Profile.SetGuildState(state)
     return type(persistedState) == "table"
+end
+
+function Profile.GetGuildRequisitionUsage(guildKey, guildRankRef, requisitionId)
+    local normalizedGuildKey = normalizeGuildKey(guildKey)
+    local normalizedRankRef = normalizeGuildRankRef(guildRankRef)
+    local normalizedRequisitionId = normalizeRequisitionId(requisitionId)
+    if normalizedGuildKey == "" or normalizedRankRef == "" or normalizedRequisitionId == "" then
+        return 0
+    end
+
+    local bucket = Profile.GetGuildBucket(normalizedGuildKey)
+    local requisitions = type(bucket) == "table" and bucket.requisitions or nil
+    local rankLedger = type(requisitions) == "table" and requisitions[normalizedRankRef] or nil
+    return normalizeRequisitionUsage(type(rankLedger) == "table" and rankLedger[normalizedRequisitionId] or 0)
+end
+
+function Profile.SetGuildRequisitionUsage(guildKey, guildRankRef, requisitionId, usage)
+    local normalizedGuildKey = normalizeGuildKey(guildKey)
+    local normalizedRankRef = normalizeGuildRankRef(guildRankRef)
+    local normalizedRequisitionId = normalizeRequisitionId(requisitionId)
+    if normalizedGuildKey == "" or normalizedRankRef == "" or normalizedRequisitionId == "" then
+        return nil
+    end
+
+    local normalizedUsage = normalizeRequisitionUsage(usage)
+    local state = Profile.GetGuildState()
+    state.byGuild = type(state.byGuild) == "table" and state.byGuild or {}
+    local bucket = type(state.byGuild[normalizedGuildKey]) == "table"
+        and state.byGuild[normalizedGuildKey]
+        or {}
+    bucket.requisitions = type(bucket.requisitions) == "table" and bucket.requisitions or {}
+    bucket.requisitions[normalizedRankRef] = type(bucket.requisitions[normalizedRankRef]) == "table"
+        and bucket.requisitions[normalizedRankRef]
+        or {}
+
+    if normalizedUsage > 0 then
+        bucket.requisitions[normalizedRankRef][normalizedRequisitionId] = normalizedUsage
+    else
+        bucket.requisitions[normalizedRankRef][normalizedRequisitionId] = nil
+    end
+
+    state.byGuild[normalizedGuildKey] = bucket
+    local persistedState = Profile.SetGuildState(state)
+    if type(persistedState) ~= "table" then
+        return nil
+    end
+
+    return Profile.GetGuildRequisitionUsage(normalizedGuildKey, normalizedRankRef, normalizedRequisitionId)
+end
+
+function Profile.IncrementGuildRequisitionUsage(guildKey, guildRankRef, requisitionId)
+    local currentUsage = Profile.GetGuildRequisitionUsage(guildKey, guildRankRef, requisitionId)
+    return Profile.SetGuildRequisitionUsage(guildKey, guildRankRef, requisitionId, currentUsage + 1)
 end
