@@ -7,7 +7,7 @@ Addon.Internal.Database = Database
 local Dependecies = Database.Dependecies or {}
 
 local SCHEMA = {
-    profiles = 6,
+    profiles = 7,
     rulesets = 1,
     datasets = 17,
     globalSettings = 1,
@@ -570,7 +570,67 @@ local function normalizeNonNegativeInteger(value)
     return math.max(0, math.floor(numeric))
 end
 
-local function normalizeProfileAchievementState(record)
+local PROFILE_ACHIEVEMENT_REWARD_STATUSES = {
+    ["pending"] = true,
+    ["in-progress"] = true,
+    ["complete"] = true,
+    ["failed"] = true,
+    ["recovery-required"] = true,
+    ["legacy-skipped"] = true,
+}
+
+local function normalizeProfileAchievementRewardStatus(value, fallback)
+    if type(value) ~= "string" then
+        return fallback
+    end
+
+    local status = value:gsub("^%s+", ""):gsub("%s+$", "")
+    if status == "" then
+        return fallback
+    end
+
+    local normalizedStatus = string.lower(status)
+    if PROFILE_ACHIEVEMENT_REWARD_STATUSES[normalizedStatus] then
+        return normalizedStatus
+    end
+
+    -- Keep unknown status values intact so newer reward runtimes can migrate
+    -- them without an older client destroying future state.
+    return value
+end
+
+local function normalizeProfileAchievementRewardEntry(record)
+    if type(record) ~= "table" then
+        return deepCopy(record)
+    end
+
+    local normalized = deepCopy(record)
+    if record.status ~= nil then
+        normalized.status = normalizeProfileAchievementRewardStatus(record.status, record.status)
+    end
+    return normalized
+end
+
+local function normalizeProfileAchievementRewardState(record, completedAt)
+    if type(record) ~= "table" then
+        return deepCopy(record)
+    end
+
+    local defaultStatus = completedAt ~= nil and "legacy-skipped" or "pending"
+    local normalized = deepCopy(record)
+    normalized.status = normalizeProfileAchievementRewardStatus(record.status, defaultStatus)
+
+    if type(record.entries) == "table" then
+        normalized.entries = deepCopy(record.entries)
+        for rewardId, entry in pairs(record.entries) do
+            normalized.entries[rewardId] = normalizeProfileAchievementRewardEntry(entry)
+        end
+    end
+
+    return normalized
+end
+
+local function normalizeProfileAchievementState(record, markLegacyCompleted)
     local data = ensureTable(record)
     local criteria = {}
 
@@ -586,19 +646,32 @@ local function normalizeProfileAchievementState(record)
         completedAt = nil
     end
 
-    return {
-        criteria = criteria,
-        completedAt = completedAt,
-    }
+    local normalized = deepCopy(data)
+    normalized.criteria = criteria
+    normalized.completedAt = completedAt
+
+    if data.rewardState ~= nil then
+        normalized.rewardState = normalizeProfileAchievementRewardState(data.rewardState, completedAt)
+    elseif completedAt ~= nil and markLegacyCompleted == true then
+        -- A completed state without reward metadata predates reward delivery.
+        -- Mark it explicitly so a later runtime cannot treat it as pending.
+        normalized.rewardState = {
+            status = "legacy-skipped",
+        }
+    else
+        normalized.rewardState = nil
+    end
+
+    return normalized
 end
 
-local function normalizeProfileAchievements(record)
+local function normalizeProfileAchievements(record, markLegacyCompleted)
     local normalized = {}
 
     for achievementRef, state in pairs(ensureTable(record)) do
         local normalizedAchievementRef = ensureString(achievementRef, "")
         if normalizedAchievementRef ~= "" then
-            normalized[normalizedAchievementRef] = normalizeProfileAchievementState(state)
+            normalized[normalizedAchievementRef] = normalizeProfileAchievementState(state, markLegacyCompleted)
         end
     end
 
@@ -933,7 +1006,7 @@ local function isValidProfileRecipeRef(recipeRef)
     return datasetId ~= nil and datasetId ~= "" and recipeId ~= nil and recipeId ~= ""
 end
 
-local function normalizeProfileRecord(record, fallbackCharacterKey, fallbackName)
+local function normalizeProfileRecord(record, fallbackCharacterKey, fallbackName, markLegacyCompleted)
     local data = ensureTable(record)
     local characterKey = ensureString(data.characterKey or fallbackCharacterKey, "")
 
@@ -965,7 +1038,7 @@ local function normalizeProfileRecord(record, fallbackCharacterKey, fallbackName
         setupWizard = normalizeProfileSetupWizard(data.setupWizard),
         statBonuses = normalizeProfileStatBonuses(data.statBonuses),
         currencies = normalizeProfileCurrencies(data.currencies),
-        achievements = normalizeProfileAchievements(data.achievements),
+        achievements = normalizeProfileAchievements(data.achievements, markLegacyCompleted),
         guild = normalizeProfileGuildState(data.guild),
     }
 end
@@ -978,14 +1051,14 @@ getRulesetStartingLevel = function()
     return math.max(1, math.floor(tonumber(rawValue) or 1))
 end
 
-local function normalizeProfilesCollection(root)
+local function normalizeProfilesCollection(root, markLegacyCompleted)
     local profiles = ensureTable(root and root.profiles)
     local normalized = {}
 
     for key, value in pairs(profiles) do
         local characterKey = ensureString(key, "")
         if characterKey ~= "" then
-            local profile = normalizeProfileRecord(value, characterKey, characterKey)
+            local profile = normalizeProfileRecord(value, characterKey, characterKey, markLegacyCompleted)
             profile.level = normalizeProfileLevel(value and value.level)
             profile.raceRef = ensureString(value and value.raceRef, "")
             profile.classRef = ensureString(value and value.classRef, "")
@@ -1086,7 +1159,7 @@ local function migrateUnknownPlayerProfile(root)
         return false, false
     end
 
-    local migratedProfile = normalizeProfileRecord(unknownProfile, characterKey, displayName)
+    local migratedProfile = normalizeProfileRecord(unknownProfile, characterKey, displayName, true)
     migratedProfile.characterKey = characterKey
     migratedProfile.name = displayName ~= "" and displayName or ensureString(migratedProfile.name, displayName)
     profiles[characterKey] = migratedProfile
@@ -1495,6 +1568,8 @@ local function ensureSection(rootName, schemaVersion, defaults)
 end
 
 function Database.EnsureProfiles()
+    local existingRoot = rawget(_G, "RPEngineProfilesDB")
+    local previousSchema = type(existingRoot) == "table" and tonumber(existingRoot._schema) or 0
     local profiles = ensureSection("RPEngineProfilesDB", SCHEMA.profiles, {
         currentByChar = {},
         profiles = {},
@@ -1502,7 +1577,7 @@ function Database.EnsureProfiles()
 
     profiles.lastLFRPChannel = nil
     profiles.currentByChar = nil
-    normalizeProfilesCollection(profiles)
+    normalizeProfilesCollection(profiles, previousSchema < SCHEMA.profiles)
     migrateUnknownPlayerProfile(profiles)
 
     Database.Profiles = profiles
@@ -2767,6 +2842,55 @@ function Database.SetProfileAchievementState(achievementRef, state)
     profile.achievements[normalizedAchievementRef] = normalizeProfileAchievementState(state)
     notifyConfigurationChanged("profile-achievements")
     return deepCopy(profile.achievements[normalizedAchievementRef])
+end
+
+function Database.GetProfileAchievementRewardState(achievementRef)
+    local state = Database.GetProfileAchievementState(achievementRef)
+    if type(state) ~= "table" then
+        return nil
+    end
+
+    return deepCopy(state.rewardState)
+end
+
+function Database.SetProfileAchievementRewardState(achievementRef, rewardState)
+    local normalizedAchievementRef = ensureString(achievementRef, "")
+    if normalizedAchievementRef == "" then
+        return nil
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.achievements = normalizeProfileAchievements(profile.achievements)
+    local state = profile.achievements[normalizedAchievementRef]
+    if type(state) ~= "table" then
+        state = {
+            criteria = {},
+            completedAt = nil,
+        }
+        profile.achievements[normalizedAchievementRef] = state
+    end
+
+    state.rewardState = normalizeProfileAchievementRewardState(rewardState, state.completedAt)
+    notifyConfigurationChanged("profile-achievement-rewards")
+    return deepCopy(state.rewardState)
+end
+
+function Database.ClearProfileAchievementRewardState(achievementRef)
+    local normalizedAchievementRef = ensureString(achievementRef, "")
+    if normalizedAchievementRef == "" then
+        return false
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.achievements = normalizeProfileAchievements(profile.achievements)
+    local state = profile.achievements[normalizedAchievementRef]
+    if type(state) ~= "table" or state.rewardState == nil then
+        return false
+    end
+
+    state.rewardState = nil
+    notifyConfigurationChanged("profile-achievement-rewards")
+    return true
 end
 
 function Database.ClearProfileAchievementState(achievementRef)

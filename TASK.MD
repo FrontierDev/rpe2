@@ -1,71 +1,101 @@
 ## Goal
-Replace the current read-only Achievement Rewards summary with editing support for supported Item/Currency reward records while preserving unsupported legacy reward data.
+Add backward-compatible persistent Profile state required for idempotent Achievement reward delivery without changing existing Achievement completion semantics.
 
 Depends on: #30
 
 ## Primary files
-- `client/ui/editor/inspectors/page_InspectorAchievement.lua`
-- adjacent Data Editor list/repeater helpers only if they match current architecture
+- `core/internal/database/Database.lua`
+- `core/internal/profile/Achievements.lua`
 
-## Reward editor
-Support authoring for:
-
-```text
-Add Reward
-Delete Reward
-Reward ID
-Reward Type: Item | Currency
-Reference
-Amount
-```
-
-Use the normalized reward contract from #30. Reward IDs must remain stable during unrelated edits.
-
-## Reference semantics
-Item reward:
+## Profile schema
+Increment only:
 
 ```text
-datasetId:itemId
+Profile schema 6 -> 7
 ```
 
-Currency reward:
+Follow the existing monotonic schema pattern. Do not lower any future higher marker.
+
+## Persisted reward-delivery state
+Exact field names may follow current Profile conventions, but each Achievement state must be able to persist reward-delivery status conceptually equivalent to:
+
+```lua
+profile.achievements[achievementRef] = {
+    criteria = { ... },
+    completedAt = 1787481200,
+
+    rewardState = {
+        status = "pending",
+        startedAt = nil,
+        completedAt = nil,
+        failedAt = nil,
+        reason = nil,
+        entries = {
+            [rewardId] = {
+                status = "applied",
+                amount = 1,
+            },
+        },
+    },
+}
+```
+
+Required status semantics:
 
 ```text
-copper
-valor
-justice
-honor
-conquest
-datasetId:currencyId
+pending
+in-progress
+complete
+failed
+recovery-required
+legacy-skipped
 ```
 
-Follow existing Data Editor conventions for unresolved references. A warning/display fallback is acceptable; do not build a new global reference-validation framework solely for this task.
+Preserve unknown/future reward-state fields where practical rather than destructively constraining nested tables.
 
-## Unsupported legacy records
-Unknown reward records/types preserved by #30 must not be silently rewritten as supported Item/Currency rewards.
+## Narrow Profile API
+Provide thin persistence helpers equivalent to:
 
-Expose them as preserved/unsupported where practical, or otherwise ensure ordinary edits to supported records cannot delete them.
+```lua
+Profile.GetAchievementRewardState(achievementRef)
+Profile.SetAchievementRewardState(achievementRef, state)
+Profile.ClearAchievementRewardState(achievementRef)
+```
 
-## Persistence/normalization
-Commit through the existing Achievement normalization/Data Editor change-notification path. Do not create an editor-only reward schema.
+Use current Database/Profile copy semantics and mutation notification conventions. Callers should not need to edit raw `profile.achievements` tables directly.
+
+## Legacy completion policy
+This is critical:
+
+```text
+completedAt exists
+rewardState absent
+```
+
+means the Achievement predates the Phase 5 reward-delivery runtime.
+
+Migration/login must **not** automatically grant rewards to those already-completed Achievements.
+
+Representing that state as `legacy-skipped` is acceptable, but schema normalization itself must not perform gameplay mutations.
+
+Existing incomplete Achievements remain ordinary incomplete states and can receive normal rewards if they complete after the reward runtime is introduced.
 
 ## Constraints
-- Editing rewards must never execute rewards.
-- Do not modify Profile reward-delivery state.
-- Do not implement reward runtime.
-- Preserve existing General/Criteria pages and stable criterion IDs.
-- Preserve unsupported legacy reward data.
+- Do not execute Item/Currency rewards.
+- Do not change existing criterion progress semantics.
+- Do not re-announce completed Achievements.
+- Do not introduce another SavedVariable root.
+- Do not modify Guild state/schema.
 
 ## Acceptance criteria
-- [ ] Item rewards can be authored.
-- [ ] Built-in Currency rewards can be authored.
-- [ ] Dataset Currency rewards can be authored.
-- [ ] Amount normalizes to a positive integer.
-- [ ] Reward IDs remain stable across unrelated edits.
-- [ ] Multiple supported rewards survive export/import.
-- [ ] Unsupported legacy reward records survive unrelated edits/export/import.
-- [ ] Editing a reward never grants it.
-- [ ] Existing Achievement General/Criteria editor behavior remains functional.
+- [ ] Existing Achievement criterion progress survives schema migration.
+- [ ] Existing `completedAt` survives unchanged.
+- [ ] Reward-delivery state persists through `/reload` and relog.
+- [ ] Profile schema becomes 7 without lowering future markers.
+- [ ] Existing completed Achievements are not automatically rewarded by migration/login.
+- [ ] Existing incomplete Achievements remain eligible for future normal reward delivery after completion.
+- [ ] Thin Profile reward-state APIs are available.
+- [ ] No Item/Currency reward is executed in this task.
 
 ## Coding-agent instructions
-Read issue #30 and inspect the current Achievement Rewards summary, inspector page architecture, nested list editors, commit/normalization flow and export/import behavior before editing. Implement Task 9 only. Use the canonical Achievement reward schema and preserve unknown reward records; do not add runtime execution or a separate editor framework. Review every acceptance criterion and report changed files, validation performed, and deviations.
+Read issue #30 and inspect current Achievement Profile normalization/default-state/accessor patterns throughout `Database.lua` and `core/internal/profile/Achievements.lua` before editing. Implement Task 10 only. Preserve criteria/completedAt exactly, make reward state durable through existing Profile persistence, and enforce the no-retroactive-reward migration policy without performing gameplay mutations. Review every acceptance criterion and report changed files, validation performed, and deviations.
