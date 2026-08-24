@@ -342,6 +342,59 @@ function Achievements:RefreshIndex()
     return self:RebuildIndex()
 end
 
+function Achievements:HandleInventoryChange(payload)
+    if type(payload) ~= "table"
+        or payload.changeType ~= "add"
+        or payload.isCanonicalAdd ~= true
+    then
+        return {
+            trigger = "item_gain",
+            updated = 0,
+            completed = 0,
+        }
+    end
+
+    local detail = type(payload.detail) == "table" and payload.detail or {}
+    local datasetId = trimText(detail.dataset or detail.datasetId)
+    local itemId = trimText(detail.itemId or detail.id)
+    local amount = normalizeInteger(detail.actualAddedQuantity, 0)
+    if amount <= 0 then
+        amount = normalizeInteger(detail.quantity, 0)
+    end
+
+    if datasetId == "" or itemId == "" or amount <= 0 then
+        return {
+            trigger = "item_gain",
+            updated = 0,
+            completed = 0,
+        }
+    end
+
+    return self:ProcessTrigger("item_gain", {
+        itemRef = ("%s:%s"):format(datasetId, itemId),
+        datasetId = datasetId,
+        itemId = itemId,
+        amount = amount,
+        source = "inventory-add",
+    })
+end
+
+function Achievements:Initialize()
+    if self._inventoryListenerId ~= nil then
+        return true
+    end
+
+    local inventory = Client.Inventory
+    if type(inventory) ~= "table" or type(inventory.RegisterChangeListener) ~= "function" then
+        return false
+    end
+
+    self._inventoryListenerId = inventory.RegisterChangeListener(function(payload)
+        self:HandleInventoryChange(payload)
+    end)
+    return self._inventoryListenerId ~= nil
+end
+
 function Achievements:RefreshProfileUI()
     refreshProfileUI()
 end

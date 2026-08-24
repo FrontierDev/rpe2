@@ -1,85 +1,78 @@
 ## Goal
-Expose the six new Phase 5 Achievement trigger types and their supported filters through the existing Achievement Data Editor.
+Advance `item_gain` criteria from actual successful canonical RPE item additions.
 
-Depends on: #23
+Depends on: #23, #24
 
 ## Primary files
-- `client/ui/editor/inspectors/page_InspectorAchievement.lua`
-- related Achievement editor helpers discovered by repository inspection
+- `client/client_Achievements.lua`
+- `client/character/inventory/Inventory.lua` only if a narrow post-add notification/hook is required
+- `core/internal/Runtime.lua` only if listener registration must be deferred
+- `RPEngine_Dev.toc` only if load order needs correction
 
-## Trigger dropdown additions
-Add user-facing choices:
+## Canonical authority
+The canonical gain source is successful:
 
-```text
-Item Gain
-Skill Gain
-RPE Boss Kill
-RPE Damage
-RPE Healing
-RPE Event Started
+```lua
+Client.Inventory.AddItem(...)
 ```
 
-Persist the canonical trigger values introduced by #23:
+Inspect the current Inventory implementation and existing change-notification path before adding anything. If the existing notification exposes enough information, consume it. Otherwise add the smallest post-success listener/callback at the canonical `AddItem` boundary.
+
+Do not count:
 
 ```text
-item_gain
-skill_gain
-rpe_boss_kill
-rpe_damage
-rpe_healing
-rpe_event_started
+Inventory load
+SetItems state replacement
+normalization
+RemoveItem/Delete
+UI refresh
 ```
 
-## Trigger-specific filter controls
-Expose only relevant structured fields:
+## Trigger context
+Provide enough information for matching/progress, conceptually:
 
-```text
-Item Gain
-  Item Ref
-
-Skill Gain
-  Skill Ref
-
-RPE Boss Kill
-  Unit Ref
-  Enemy Only
-
-RPE Damage
-  Unit Ref
-  Enemy Only
-
-RPE Healing
-  Unit Ref
-  Enemy Only
-
-RPE Event Started
-  Event ID
+```lua
+{
+    itemRef = "dataset:item",
+    datasetId = "dataset",
+    itemId = "item",
+    amount = actualAddedQuantity,
+    source = "inventory-add",
+}
 ```
 
-Reuse existing RPE Data Editor primitives and current reference/text/check-box conventions. Do not build a new generic reference-editor framework solely for this task.
+`amount` must be the quantity actually added successfully, not merely requested.
 
-## Preservation behavior
-Changing one criterion's trigger or supported filter must not silently delete:
-- that criterion's stable ID;
-- unrelated criteria;
-- unknown/future filter keys not being edited.
+## Intentional gain sources
+Because they use canonical Inventory awards, these should count naturally:
+- Guild Requisition;
+- Daily Reward;
+- Guild Admin Give Item;
+- future Achievement Item rewards.
 
-Use the normalized Achievement class as the final data contract rather than implementing a competing editor-only normalizer.
+Do not special-case those callers individually if one canonical Inventory gain hook can cover them.
+
+## Filter semantics
+If `filters.itemRef` is configured, require exact qualified-reference match.
+
+## Load order
+Inspect `RPEngine_Dev.toc`: `client_Achievements.lua` and Inventory may not be available in the order a direct file-load registration would assume. Use an existing deferred Runtime/addon-ready pattern where necessary rather than creating a brittle nil-order dependency.
 
 ## Constraints
-- Do not implement runtime progression hooks.
-- Do not modify Profile Achievement state.
-- Do not implement Achievement Reward authoring yet.
-- Preserve existing General/Criteria editor behavior and export/import.
+- Do not change Inventory persistence/stacking/BOP semantics.
+- Do not trigger from Inventory initialization/loading.
+- Do not add a second Inventory event system if the existing notification path is suitable.
+- Do not implement Skill/Event/Combat triggers in this task.
 
 ## Acceptance criteria
-- [ ] All six Phase 5 triggers can be authored.
-- [ ] Existing five trigger types remain authorable.
-- [ ] Appropriate filter controls appear for each new trigger.
-- [ ] Stable criterion IDs survive unrelated edits.
-- [ ] Unknown filter fields survive unrelated edits/export/import.
-- [ ] Existing criterion add/delete/edit behavior remains functional.
-- [ ] Editor actions do not mutate Profile Achievement progress.
+- [ ] Successful `AddItem()` advances matching `item_gain` criteria.
+- [ ] Quantity >1 advances by actual added quantity exactly once.
+- [ ] `itemRef` filter requires exact qualified-reference match.
+- [ ] Nonmatching Items do not progress the criterion.
+- [ ] Inventory load/normalization/`SetItems()` does not count as gain.
+- [ ] Item removal does not count.
+- [ ] Existing stacking/max-stack/BOP behavior is unchanged.
+- [ ] Requisition/Daily Reward/Guild Admin Item grants reach the same canonical gain path.
 
 ## Coding-agent instructions
-Read the PDD and issue #23, then inspect the current Achievement inspector's trigger list, filter refresh/show-hide logic, commit/normalization flow, and neighboring editor controls before editing. Implement Task 2 only. Preserve stable criterion IDs and unknown filter data; do not introduce runtime hooks or a parallel editor architecture. Review the final diff against every acceptance criterion and report changed files, validation performed, and deviations.
+Read the PDD and completed issues #23–#24, then inspect `Inventory.AddItem`, Inventory change notification, TOC load order, and the current Achievement trigger dispatch API before editing. Implement Task 3 only. Prefer one canonical post-success Item gain boundary over caller-specific hooks. Use actual applied quantity and verify that load/removal paths cannot emit progress. Review every acceptance criterion and report changed files, validation performed, and deviations.

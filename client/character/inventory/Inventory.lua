@@ -14,6 +14,7 @@ end
 
 local SCHEMA_VERSION = 1
 local DEFAULT_ROOT_NAME = "RPEngineInventoryDB"
+local CANONICAL_ADD_NOTIFICATION = {}
 
 Inventory._changeListeners = Inventory._changeListeners or {}
 Inventory._nextChangeListenerId = Inventory._nextChangeListenerId or 0
@@ -100,7 +101,7 @@ local function getCharacterKey()
     return "unknown-player"
 end
 
-local function notifyChangeListeners(changeType, detail)
+local function notifyChangeListeners(changeType, detail, notificationToken)
     local listeners = Inventory._changeListeners or {}
     local inventory = Inventory.GetCharacterInventory()
     local payload = {
@@ -108,6 +109,7 @@ local function notifyChangeListeners(changeType, detail)
         characterKey = getCharacterKey(),
         itemCount = #(inventory and inventory.items or {}),
         detail = type(detail) == "table" and deepCopy(detail) or nil,
+        isCanonicalAdd = notificationToken == CANONICAL_ADD_NOTIFICATION,
     }
 
     for _, listener in pairs(listeners) do
@@ -325,7 +327,7 @@ function Inventory.GetItems()
     return items
 end
 
-function Inventory.SetItems(items, changeType, detail)
+function Inventory.SetItems(items, changeType, detail, notificationToken)
     local inventory = Inventory.GetCharacterInventory()
     local normalizedItems = {}
 
@@ -337,7 +339,7 @@ function Inventory.SetItems(items, changeType, detail)
     end
 
     inventory.items = normalizedItems
-    notifyChangeListeners(changeType or "set", detail)
+    notifyChangeListeners(changeType or "set", detail, notificationToken)
     return inventory.items
 end
 
@@ -356,6 +358,7 @@ function Inventory.AddItem(itemRecord)
     local items = Inventory.GetItems()
     local canStack, maxStackSize = canStackRecord(normalized)
     local remaining = math.max(1, math.floor(tonumber(normalized.quantity) or 1))
+    local actualAddedQuantity = remaining
     normalized.quantity = 1
 
     if canStack then
@@ -385,8 +388,10 @@ function Inventory.AddItem(itemRecord)
     Inventory.SetItems(items, "add", {
         dataset = normalized.dataset,
         itemId = normalized.id,
-        quantity = math.max(1, math.floor(tonumber(itemRecord and itemRecord.quantity) or tonumber(itemRecord and itemRecord.count) or 1)),
-    })
+        quantity = actualAddedQuantity,
+        actualAddedQuantity = actualAddedQuantity,
+        source = "inventory-add",
+    }, CANONICAL_ADD_NOTIFICATION)
     return normalized, #items
 end
 

@@ -50,6 +50,12 @@ function Addon.Internal.DispatchEvent(event, ...)
         if Comms and Comms.RegisterPrefix then
             safeCall(Comms.RegisterPrefix, Comms)
         end
+
+        local Client = Addon.Client or nil
+        local Achievements = Client and Client.Achievements or nil
+        if Achievements and Achievements.Initialize then
+            safeCall(Achievements.Initialize, Achievements)
+        end
         return
     end
 
