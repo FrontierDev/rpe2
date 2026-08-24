@@ -101,13 +101,6 @@ local function getGuildIdentity()
         end
     end
 
-    if realmName == "" and type(GetRealmName) == "function" then
-        local ok, currentRealm = pcall(GetRealmName)
-        if ok then
-            realmName = trimText(currentRealm)
-        end
-    end
-
     return {
         inGuild = inGuild,
         guildName = guildName,

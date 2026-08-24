@@ -457,6 +457,11 @@ function Client:HandleLocalConfigurationChanged(reason)
         profileWindowRefreshed = true
     end
 
+    local achievements = self.Achievements or nil
+    if type(achievements) == "table" and type(achievements.RefreshIndex) == "function" then
+        achievements:RefreshIndex()
+    end
+
     local profileWindow = self.UI and self.UI.Profile and self.UI.Profile.Window or nil
     local profileWindowInstance = type(profileWindow) == "table" and profileWindow._singleton or nil
     if not profileWindowRefreshed and type(profileWindowInstance) == "table" then
