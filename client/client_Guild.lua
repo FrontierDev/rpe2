@@ -30,7 +30,10 @@ local function ensureString(value)
 end
 
 local function trimText(value)
-    return ensureString(value):gsub("^%s+", ""):gsub("%s+$", "")
+    local text = ensureString(value)
+    text = text:gsub("^%s+", "")
+    text = text:gsub("%s+$", "")
+    return text
 end
 
 local function normalizePlayerName(value)

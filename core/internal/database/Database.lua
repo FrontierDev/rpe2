@@ -100,6 +100,13 @@ local function notifyConfigurationChanged(reason)
     if client and type(client.TryDeferLocalConfigurationChanged) == "function" and client:TryDeferLocalConfigurationChanged(reason) then
         return
     end
+    if startsWith(reason, "profile-")
+        and client
+        and type(client.QueueLocalConfigurationRefresh) == "function"
+    then
+        client:QueueLocalConfigurationRefresh(reason)
+        return
+    end
     if client and type(client.HandleLocalConfigurationChanged) == "function" then
         client:HandleLocalConfigurationChanged(reason)
     end

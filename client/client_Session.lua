@@ -25,6 +25,7 @@ Client.ServerQueryQueued = Client.ServerQueryQueued or false
 Client.ClientConnectRefreshQueued = Client.ClientConnectRefreshQueued or false
 Client.LocalConfigurationRefreshQueued = Client.LocalConfigurationRefreshQueued or false
 Client.PendingLocalConfigurationRefreshReason = Client.PendingLocalConfigurationRefreshReason or nil
+Client.LocalConfigurationRefreshInProgress = Client.LocalConfigurationRefreshInProgress == true
 
 local LOCAL_ONLY_CONFIGURATION_REASONS = {
     ["profile-action-bar-mode"] = true,
@@ -409,6 +410,11 @@ function Client:TryDeferLocalConfigurationChanged(reason)
 end
 
 function Client:HandleLocalConfigurationChanged(reason)
+    if self.LocalConfigurationRefreshInProgress then
+        return false
+    end
+
+    self.LocalConfigurationRefreshInProgress = true
     local startedAt = getTimingMilliseconds()
     local normalizedReason = normalizeConfigurationChangeReason(reason)
     local profileLogic = Addon.Internal and Addon.Internal.Profile or nil
@@ -488,6 +494,7 @@ function Client:HandleLocalConfigurationChanged(reason)
     end
 
     if not ConfigurationChangeQueuesClientConnectRefresh(normalizedReason) then
+        self.LocalConfigurationRefreshInProgress = false
         logSessionInternal(
             "Session: HandleLocalConfigurationChanged reason=%s took=%.2fms",
             tostring(normalizedReason or ""),
@@ -496,6 +503,7 @@ function Client:HandleLocalConfigurationChanged(reason)
         return true
     end
 
+    self.LocalConfigurationRefreshInProgress = false
     logSessionInternal(
         "Session: HandleLocalConfigurationChanged reason=%s took=%.2fms",
         tostring(normalizedReason or ""),

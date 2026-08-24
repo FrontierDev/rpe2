@@ -1,197 +1,193 @@
 ## Goal
-Audit Tasks 1–11 as one coherent Guild Rank/Achievement implementation and fix **concrete defects only**.
+Fix the immediate runtime crash where assigning an RPE Guild Rank causes multiple expensive full local-configuration rebuilds in sequence, eventually hitting WoW's `script ran too long` watchdog.
 
-Depends on: #10, #11, #12, #13, #14, #15, #16, #17, #18, #19, #20
+This is a **hotfix** and should be addressed before continuing Phase 5 feature work.
 
-Do not start this issue until Tasks 1–11 are implemented and pushed.
-
-## Required audit
-### User-facing terminology
-Search user-facing UI/text for stale:
+## Observed failure
+Assigning a player's RPE Guild Rank produces repeated internal traces such as:
 
 ```text
-Guild Setting
-Guild Settings
-Minimum Guild Rank
+Session: HandleLocalConfigurationChanged reason=profile-guild took=6634.75ms
+Session: HandleLocalConfigurationChanged reason=profile-currency took=6785.50ms
+Session: HandleLocalConfigurationChanged reason=profile-guild took=6859.78ms
+Session: HandleLocalConfigurationChanged reason=profile-guild took=6922.93ms
+...
+Database.lua:57: script ran too long
 ```
 
-Internal compatibility identifiers such as:
+The watchdog location in `Database.lua` is incidental; line 56/57 is near the generic table-normalization helpers. The real problem is the repeated synchronous full refreshes consuming many seconds of Lua execution.
+
+## Root cause identified from current code
+`core/internal/database/Database.lua` uses:
+
+```lua
+local function notifyConfigurationChanged(reason)
+    markConfigurationChanged()
+    local client = Addon.Client or nil
+    if client and type(client.TryDeferLocalConfigurationChanged) == "function"
+        and client:TryDeferLocalConfigurationChanged(reason) then
+        return
+    end
+    if client and type(client.HandleLocalConfigurationChanged) == "function" then
+        client:HandleLocalConfigurationChanged(reason)
+    end
+end
+```
+
+Therefore every Profile mutation synchronously executes the entire:
+
+```lua
+Client:HandleLocalConfigurationChanged(reason)
+```
+
+path.
+
+That handler performs expensive global work including recipe/bootstrap rebuilds, trait/profile refresh, Inventory/Profile UI refresh, Action Bar rebuild/refresh, possible resource sync and client-connect refresh.
+
+`client/client_Session.lua` already has a coalescing API:
+
+```lua
+Client:QueueLocalConfigurationRefresh(reason)
+```
+
+using:
+
+```lua
+Client.LocalConfigurationRefreshQueued
+Client.PendingLocalConfigurationRefreshReason
+```
+
+but `Database.notifyConfigurationChanged()` bypasses it and calls `HandleLocalConfigurationChanged()` directly.
+
+## Why Guild Rank assignment exposes the bug
+The receiver-side `set_guild_rank` path calls:
+
+```lua
+Profile.SetAssignedGuildRank(...)
+```
+
+which persists through `Profile.SetGuildState()` / `Database.SetProfileGuildState()` and emits:
 
 ```text
-GuildSetting
-guildSettings
-requiredGuildRankIndex
+profile-guild
 ```
 
-may remain where required for storage/backward compatibility, but product UI must use **Guild Rank** terminology and must not expose the superseded Requisition-level Minimum Guild Rank authoring/eligibility model.
-
-### Schema and migration smoke test
-Verify backward-compatible normalization for:
+A valid newly assigned rank can then participate in automatic Daily Reward processing. A single Daily Reward transaction can generate several additional Profile mutations:
 
 ```text
-Profile schema 5 -> 6
-Dataset schema 15 -> 16
-old GuildSetting without wowGuildRankIndices
-old Requisitions containing requiredGuildRankIndex
-existing profile.guild.byGuild nested state
+SetDailyRewardTransaction("in-progress") -> profile-guild
+AddCurrencyAmount(...)                  -> profile-currency
+SetDailyRewardClaim(...)                -> profile-guild
+ClearDailyRewardTransaction(...)        -> profile-guild
 ```
 
-Confirm:
-- existing Achievement/Profile state still loads;
-- existing Requisition/Daily Reward/Progression definitions survive;
-- old Guild nested state is preserved;
-- Inventory remains independent/untouched by migration;
-- future higher schema markers are not lowered;
-- migration never automatically assigns an RPE Guild Rank.
+Each currently causes a separate synchronous full `HandleLocalConfigurationChanged()` call. With the observed ~6.5–7 s per refresh, one logical operation can spend tens of seconds rebuilding the same derived state before WoW aborts execution.
 
-### Dataset round-trip
-Construct or inspect a representative Dataset containing:
-- multiple RPE Guild Ranks;
-- two RPE Guild Ranks mapping to the same WoW guild rank;
-- one unrestricted Guild Rank with empty `wowGuildRankIndices`;
-- Requisitions with built-in and dataset Currency refs;
-- Daily item/currency rewards;
-- Progression entries/spell refs;
-- Achievements referenced by the runtime/admin path.
+## Required fix
+Use the existing queued/coalesced refresh path for runtime Profile mutations instead of synchronously rebuilding the entire local configuration for every write.
 
-Export/import and verify definitions, qualified refs, mappings and legacy compatibility fields survive appropriately.
+### Preferred minimal approach
+After preserving the existing Data Editor deferral behavior, `notifyConfigurationChanged()` should route Profile-originated notifications through:
 
-### Guild Rank catalogue
-Verify:
-- exact `guildName` catalogue takes priority over the generic catalogue **as a set**;
-- multiple exact ranks are returned without conflict;
-- multiple generic ranks are returned when no exact catalogue exists;
-- one WoW rank may have multiple eligible RPE Guild Ranks;
-- empty `wowGuildRankIndices` means unrestricted;
-- eligibility uses exact index membership, not numeric hierarchy;
-- there is no implicit RPE rank inheritance.
+```lua
+Client:QueueLocalConfigurationRefresh(reason)
+```
 
-### Manual assignment model
-Verify:
-- a character has at most one assigned RPE Guild Rank per guild;
-- assignment is set/cleared only by the explicit officer admin flow;
-- login, roster refresh and WoW rank changes never automatically assign/remap/clear the rank;
-- stale/invalid assignments return explicit status without mutation;
-- rank assignment persists per guild;
-- receiver validates applicability/eligibility using its own live state.
+when available, falling back safely only when the queue API is unavailable.
 
-### Guild window/UI
-Smoke-test:
-- Launcher -> Guild;
-- `/rpe guild`;
-- Guild -> Requisitions;
-- Guild -> Progression;
-- Guild -> Admin;
-- assigned/unassigned/invalid rank status;
-- Admin roster refresh/officer gating.
-
-Multiple catalogue ranks must not produce the old Phase 1 conflict state.
-
-### Requisition runtime
-Verify:
-- only the valid assigned rank's Requisitions are usable;
-- Requisition from another rank is rejected;
-- legacy `requiredGuildRankIndex` is ignored by runtime;
-- multiple currency costs validate before spending;
-- built-in `copper` works;
-- character lifetime limits are rank/Requisition scoped;
-- Inventory grants use `Client.Inventory.AddItem()`;
-- failures cannot leave partial deductions;
-- usage persists across reload/relog.
-
-### Daily Reward runtime
-Verify:
-- rewards come only from the valid assigned rank;
-- no assigned/valid rank gives no reward;
-- item/currency rewards use canonical APIs;
-- claim is one per character/guild/calendar day;
-- `/reload`, relog and repeated guild events cannot duplicate the claim;
-- changing RPE Guild Rank after claiming does not allow a second claim that day;
-- `dailyRewardRankRef` records which rank supplied the reward.
-
-### Achievement runtime
-Verify:
-- `currency_gain` uses actual positive applied gain after caps;
-- Set/Spend does not count as earning;
-- `rpe_kill` comes only from authoritative alive -> dead transition;
-- already-dead updates do not count again;
-- criterion filters work;
-- `rpe_event_complete` uses the authoritative event-completion path;
-- `achievement_earned` meta progress works;
-- `completedAt` is transition-based and persists;
-- completed Achievements do not re-announce on load;
-- Guild/Raid announcements are normal visible chat;
-- manual `Grant()` uses normal completion handling.
-
-### Guild Admin security boundary
-For **every** remote mutation (Guild Rank, Achievement, Skill, Item, Progression), verify the target member's client independently derives/validates:
+At minimum, reasons beginning with:
 
 ```text
-sender identity from transport
-same-guild membership
-sender WoW officer capability
-target-self state
-requested object/reference validity
-operation-specific numeric/state validity
+profile-
 ```
 
-Do not rely on prior query success, sender-supplied officer flags or UI gating.
+must not directly execute `HandleLocalConfigurationChanged()` synchronously one time per mutation.
 
-Verify:
-- explicit acknowledgement for mutations;
-- no optimistic success in Admin UI;
-- online compatible members only;
-- no direct remote SavedVariable writes.
+Inspect whether routing **all** normal Database configuration notifications through the queue is semantically safe; do not broaden the change blindly if editor/dataset operations rely on different timing.
 
-### Progression runtime/admin
-Verify:
-- only the valid assigned rank's Progression is active/displayed;
-- state is stored under `progression[guildRankRef]`;
-- switching ranks preserves prior rank state but activates only the new/current rank;
-- locked entries cannot be selected;
-- selected spells must exist in configured `spellRefs`;
-- UI supports more than exactly three entries/slots;
-- officer mutations are receiver-validated and acknowledged;
-- core contains no campaign-specific rank/oath terminology.
+### Coalescing requirement
+Back-to-back Profile writes in one transaction/tick must collapse into one deferred local-configuration refresh rather than N complete rebuilds.
 
-### Load order and explicit integration maps
-Review `RPEngine_Dev.toc` and all explicit collection/inspector/refresh maps affected by the revision.
+Persistence itself remains synchronous: a setter must still have written its Profile state before returning. Only the expensive derived-state/UI/session rebuild should be deferred/coalesced.
 
-Verify:
-- classes load before instantiation;
-- Profile Guild/Achievement modules load before client/UI consumers;
-- Guild/Achievement pages load before their windows;
-- Data Editor pages/inspectors load before use;
-- new runtime modules load before hooks/callers that require them;
-- `guildSettings` remains integrated in Database/Data Editor/dependency flows.
+## Re-entrancy protection
+Inspect `HandleLocalConfigurationChanged()` and all functions it invokes for Profile setters/notifications.
 
-### Non-goal audit
-Search the implementation and ensure it has **not** introduced:
+The final design must prevent a refresh already in progress from recursively causing another immediate full refresh. If necessary, add a narrow `LocalConfigurationRefreshInProgress`/equivalent guard in addition to queue coalescing, but do not create a second refresh system.
+
+## Preserve transaction behavior
+Do **not** change the semantics of:
+
+- Guild Rank assignment/validation;
+- Daily Reward claim uniqueness;
+- Daily Reward transaction markers;
+- currency caps;
+- Requisition transactions;
+- Achievement completion;
+- Guild Admin acknowledgement.
+
+The bug is notification/refresh scheduling, not Guild Rank eligibility or Daily Reward business logic.
+
+## Primary files
+
+- `core/internal/database/Database.lua`
+- `client/client_Session.lua`
+- `client/client_Guild.lua` only for validation/instrumentation if required
+- `core/internal/Runtime.lua` only if necessary to verify scheduling; avoid unrelated event changes
+
+## Required validation
+Reproduce/inspect these cases after the fix:
+
+### Guild Rank assignment
+```text
+set_guild_rank
+-> Profile state persists
+-> no repeated synchronous full configuration rebuilds
+-> target acknowledgement still succeeds
+```
+
+### Rank assignment with an available Daily Reward
+For a reward containing at least one Currency:
 
 ```text
-automatic RPE Guild Rank assignment
-automatic rank remapping/clearing
-multiple simultaneous assigned RPE Guild Ranks
-implicit RPE Guild Rank hierarchy/inheritance
-offline remote Profile mutation
-direct remote SavedVariable writes
-another Guild Admin messaging subsystem
-another Inventory/currency storage system
+rank assignment
+daily transaction marker
+currency award
+claim persistence
+marker cleanup
 ```
 
-## Definition of done
-- [ ] Existing Phase 1 data remains loadable.
-- [ ] Guild Rank is the external terminology.
-- [ ] Dataset mappings support many RPE ranks per WoW rank.
-- [ ] Character rank is officer-assigned only.
-- [ ] Rank assignment is stored per guild and receiver-validated.
-- [ ] Requisitions are rank-scoped and transactional.
-- [ ] Daily Rewards are rank-scoped and once-per-guild/day.
-- [ ] Achievement runtime works without Guild Rank coupling.
-- [ ] General Guild Admin mutations are receiver-validated.
-- [ ] Progression is rank-scoped and persistent.
-- [ ] No prohibited automatic rank behavior exists.
-- [ ] Load order, schemas, exports/imports and dependency handling remain coherent.
+must complete without one full rebuild per mutation.
+
+Expected behavior: the writes are persisted normally and their derived refresh work is coalesced.
+
+### Multiple Profile mutations in one call stack
+Exercise at least:
+
+```text
+profile-guild
+profile-currency
+profile-achievement
+profile-skill
+```
+
+where practical and confirm queued refresh state prevents repeated immediate rebuilds.
+
+### Existing editor/configuration behavior
+Verify Dataset/Data Editor changes still refresh correctly and existing `TryDeferLocalConfigurationChanged()` behavior has not been broken.
+
+## Acceptance criteria
+
+- [ ] Assigning an RPE Guild Rank no longer causes multiple synchronous `HandleLocalConfigurationChanged()` executions.
+- [ ] A Daily Reward transaction with several Profile writes does not run a full configuration rebuild once per write.
+- [ ] Back-to-back Profile notifications coalesce through the existing local-configuration refresh queue (or an equally narrow existing mechanism).
+- [ ] Profile persistence remains synchronous and correct before setter return.
+- [ ] No `script ran too long` occurs from the reproduced Guild Rank/Daily Reward flow.
+- [ ] No immediate refresh recursion/re-entry remains possible.
+- [ ] Daily Reward transaction/rollback/claim semantics are unchanged.
+- [ ] Guild Rank assignment acknowledgement still succeeds.
+- [ ] Data Editor configuration refresh/defer behavior remains functional.
+- [ ] No second notification/refresh subsystem is introduced.
 
 ## Coding-agent instructions
-Treat the current `FrontierDev/rpe2` repository, revised `RPE2-Achievements-Guild-Systems-PDD.md`, and completed Tasks 1–11 as authoritative. Compare every checklist item against the implemented state. Fix concrete omissions/regressions only; do not expand scope or redesign working systems during the audit. Report the audit performed, files changed, validation results and any unresolved deviation before considering the task complete.
+Read this issue, inspect the current `Database.notifyConfigurationChanged`, `Client:QueueLocalConfigurationRefresh`, `Client:HandleLocalConfigurationChanged`, Profile Guild/Currency setters, and Daily Reward transaction path before editing. Treat the repository as authoritative. Fix this hotfix only; do not begin Phase 5 tasks. Prefer the smallest scheduling/coalescing change that removes repeated synchronous full rebuilds while preserving persistence and editor semantics. Report the exact call chain found, changed files, before/after refresh behavior, validation performed, and any remaining expensive single-refresh path.
