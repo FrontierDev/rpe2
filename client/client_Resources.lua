@@ -477,6 +477,33 @@ local function queueRPEKillAchievement(targetClient, eventState, actionOwnerName
     return true
 end
 
+local function queueRPEHealthAchievement(targetClient, eventState, actionOwnerName, result, options)
+    if type(targetClient) ~= "table"
+        or type(result) ~= "table"
+        or type(result.targetUnit) ~= "table"
+        or type(options) ~= "table"
+        or options.allowLocalEchoApply ~= true
+    then
+        return false
+    end
+
+    local actualDamage = math.max(0, tonumber(result.actualDamage) or 0)
+    local actualHealing = math.max(0, tonumber(result.actualHealing) or 0)
+    if actualDamage <= 0 and actualHealing <= 0 then
+        return false
+    end
+
+    targetClient.PendingRPEHealthAchievements = targetClient.PendingRPEHealthAchievements or {}
+    targetClient.PendingRPEHealthAchievements[#targetClient.PendingRPEHealthAchievements + 1] = {
+        eventState = eventState,
+        actionOwnerName = actionOwnerName,
+        result = result,
+        allowLocalEchoApply = true,
+        scope = normalizePendingScope(options.scope),
+    }
+    return true
+end
+
 local function settleQueuedRPEKillAchievements(targetClient, expectedState, aggregate, committed)
     if type(targetClient) ~= "table"
         or type(expectedState) ~= "table"
@@ -513,6 +540,51 @@ local function settleQueuedRPEKillAchievements(targetClient, expectedState, aggr
         then
             if committed == true then
                 notifyRPEKillAchievement(targetClient, queued.eventState, queued.actionOwnerName, queued.result)
+            end
+            table.remove(pending, index)
+            processed = processed + 1
+        end
+    end
+
+    return processed
+end
+
+local function settleQueuedRPEHealthAchievements(targetClient, expectedState, aggregate, committed)
+    if type(targetClient) ~= "table"
+        or type(expectedState) ~= "table"
+        or type(aggregate) ~= "table"
+        or aggregate.allowLocalEchoApply ~= true
+    then
+        return 0
+    end
+
+    local pending = targetClient.PendingRPEHealthAchievements
+    if type(pending) ~= "table" or #pending == 0 then
+        return 0
+    end
+
+    local targetEventIds = {}
+    for index = 1, #(aggregate.targetedResourceDeltas or {}) do
+        local targetEventId = tonumber(aggregate.targetedResourceDeltas[index].targetEventId) or 0
+        if targetEventId > 0 then
+            targetEventIds[targetEventId] = true
+        end
+    end
+
+    local currentEventState = targetClient.GetEventState and targetClient:GetEventState() or nil
+    local processed = 0
+    for index = #pending, 1, -1 do
+        local queued = pending[index]
+        local targetEventId = tonumber(queued and queued.result and queued.result.targetEventId) or 0
+        if queued
+            and queued.eventState == currentEventState
+            and queued.eventState
+            and queued.allowLocalEchoApply == true
+            and queued.scope == normalizePendingScope(aggregate.scope)
+            and targetEventIds[targetEventId]
+        then
+            if committed == true then
+                notifyRPEHealthAchievement(targetClient, queued.eventState, queued.actionOwnerName, queued.result)
             end
             table.remove(pending, index)
             processed = processed + 1
@@ -941,6 +1013,7 @@ local function applyQueuedLocalResourceDeltas(targetClient, state, targetEventId
         resourceDeltas
     )
     queueRPEKillAchievement(targetClient, eventState, playerName, result, options)
+    queueRPEHealthAchievement(targetClient, eventState, playerName, result, options)
     local suppressLocalVisualRefresh = type(options) == "table" and options.suppressLocalVisualRefresh == true
     if result.eventUpdated and type(targetClient.QueueEventWidgetRefresh) == "function" and not suppressLocalVisualRefresh then
         queueScopedEventPortraitRefresh(targetClient, "resource-delta-local", targetEventId)
@@ -1038,6 +1111,11 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
                 scope = scope,
                 targetedResourceDeltas = aggregate.targetedResourceDeltas,
             }, sent == true)
+            settleQueuedRPEHealthAchievements(targetClient, expectedState, {
+                allowLocalEchoApply = aggregate.allowLocalEchoApply == true,
+                scope = scope,
+                targetedResourceDeltas = aggregate.targetedResourceDeltas,
+            }, sent == true)
             flushed = sent or flushed
         end
     end
@@ -1118,6 +1196,11 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
         scope = "turn",
         targetedResourceDeltas = targetedResourceDeltas,
     }, sent == true)
+    settleQueuedRPEHealthAchievements(self, state, {
+        allowLocalEchoApply = true,
+        scope = "turn",
+        targetedResourceDeltas = targetedResourceDeltas,
+    }, sent == true)
     return sent
 end
 
@@ -1145,6 +1228,7 @@ function Client:ResetResourceState()
     self.PendingLocalResourceDeltaEchoSignatures = {}
     self.PendingLocalResourceDeltaBatchEchoSignatures = {}
     self.PendingRPEKillAchievements = {}
+    self.PendingRPEHealthAchievements = {}
     self.LastAppliedTurnRegenKey = nil
 end
 
