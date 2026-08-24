@@ -379,20 +379,56 @@ function Achievements:HandleInventoryChange(payload)
     })
 end
 
+function Achievements:HandleSkillChange(payload)
+    if type(payload) ~= "table" then
+        return {
+            trigger = "skill_gain",
+            updated = 0,
+            completed = 0,
+        }
+    end
+
+    local skillRef = trimText(payload.skillRef)
+    local previousLevel = normalizeInteger(payload.previousLevel, 0)
+    local updatedLevel = normalizeInteger(payload.updatedLevel, 0)
+    local actualGain = updatedLevel - previousLevel
+    if skillRef == "" or actualGain <= 0 then
+        return {
+            trigger = "skill_gain",
+            updated = 0,
+            completed = 0,
+        }
+    end
+
+    return self:ProcessTrigger("skill_gain", {
+        skillRef = skillRef,
+        previousLevel = previousLevel,
+        updatedLevel = updatedLevel,
+        amount = actualGain,
+        source = "profile-skill-change",
+    })
+end
+
 function Achievements:Initialize()
-    if self._inventoryListenerId ~= nil then
-        return true
+    if self._inventoryListenerId == nil then
+        local inventory = Client.Inventory
+        if type(inventory) == "table" and type(inventory.RegisterChangeListener) == "function" then
+            self._inventoryListenerId = inventory.RegisterChangeListener(function(payload)
+                self:HandleInventoryChange(payload)
+            end)
+        end
     end
 
-    local inventory = Client.Inventory
-    if type(inventory) ~= "table" or type(inventory.RegisterChangeListener) ~= "function" then
-        return false
+    if self._skillListenerId == nil
+        and type(Profile) == "table"
+        and type(Profile.RegisterSkillChangeListener) == "function"
+    then
+        self._skillListenerId = Profile.RegisterSkillChangeListener(function(payload)
+            self:HandleSkillChange(payload)
+        end)
     end
 
-    self._inventoryListenerId = inventory.RegisterChangeListener(function(payload)
-        self:HandleInventoryChange(payload)
-    end)
-    return self._inventoryListenerId ~= nil
+    return self._inventoryListenerId ~= nil or self._skillListenerId ~= nil
 end
 
 function Achievements:RefreshProfileUI()

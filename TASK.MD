@@ -1,78 +1,79 @@
 ## Goal
-Advance `item_gain` criteria from actual successful canonical RPE item additions.
+Advance `skill_gain` criteria from actual positive persisted Skill increases.
 
 Depends on: #23, #24
 
 ## Primary files
+- `core/internal/profile/Profile.lua`
+- `core/internal/database/Database.lua` only if the canonical setter must expose final applied level more clearly
 - `client/client_Achievements.lua`
-- `client/character/inventory/Inventory.lua` only if a narrow post-add notification/hook is required
-- `core/internal/Runtime.lua` only if listener registration must be deferred
-- `RPEngine_Dev.toc` only if load order needs correction
+- existing direct Skill mutation call sites found by repository search
 
-## Canonical authority
-The canonical gain source is successful:
+## Canonical change boundary
+Prefer a small Profile-level Skill change listener/callback rather than making Profile persistence directly depend on `Client.Achievements`.
+
+Emit only after a successful canonical:
 
 ```lua
-Client.Inventory.AddItem(...)
+Profile.SetSkillLevel(skillRef, value)
 ```
 
-Inspect the current Inventory implementation and existing change-notification path before adding anything. If the existing notification exposes enough information, consume it. Otherwise add the smallest post-success listener/callback at the canonical `AddItem` boundary.
-
-Do not count:
+Calculate:
 
 ```text
-Inventory load
-SetItems state replacement
-normalization
-RemoveItem/Delete
-UI refresh
+previousLevel
+updatedLevel
+actualGain = updatedLevel - previousLevel
 ```
 
+Dispatch only when:
+
+```text
+actualGain > 0
+```
+
+Use the actual persisted result, not the requested delta/value when normalization or bounds change it.
+
+## Runtime call-site audit
+Search for gameplay/Admin code that bypasses the Profile API with direct `Database.SetProfileSkillLevel(...)` calls. Runtime mutation should converge on the canonical Profile API so one Skill-gain boundary exists.
+
+Database normalization/loading must not emit gain events.
+
 ## Trigger context
-Provide enough information for matching/progress, conceptually:
+Conceptually:
 
 ```lua
 {
-    itemRef = "dataset:item",
-    datasetId = "dataset",
-    itemId = "item",
-    amount = actualAddedQuantity,
-    source = "inventory-add",
+    skillRef = "dataset:skill",
+    previousLevel = 4,
+    updatedLevel = 6,
+    amount = 2,
+    source = "profile-skill-change",
 }
 ```
 
-`amount` must be the quantity actually added successfully, not merely requested.
-
-## Intentional gain sources
-Because they use canonical Inventory awards, these should count naturally:
-- Guild Requisition;
-- Daily Reward;
-- Guild Admin Give Item;
-- future Achievement Item rewards.
-
-Do not special-case those callers individually if one canonical Inventory gain hook can cover them.
-
 ## Filter semantics
-If `filters.itemRef` is configured, require exact qualified-reference match.
+If `filters.skillRef` exists, require exact qualified-reference match.
 
-## Load order
-Inspect `RPEngine_Dev.toc`: `client_Achievements.lua` and Inventory may not be available in the order a direct file-load registration would assume. Use an existing deferred Runtime/addon-ready pattern where necessary rather than creating a brittle nil-order dependency.
+## Expected Guild Admin behavior
+An officer `adjust_skill` increase should count naturally because the member's canonical Profile Skill state increased. A decrease remains a valid Admin mutation but must not count as `skill_gain`.
 
 ## Constraints
-- Do not change Inventory persistence/stacking/BOP semantics.
-- Do not trigger from Inventory initialization/loading.
-- Do not add a second Inventory event system if the existing notification path is suitable.
-- Do not implement Skill/Event/Combat triggers in this task.
+- Do not emit from Profile load/normalization.
+- Do not count decreases or same-value writes.
+- Do not bypass existing Skill bounds/normalization.
+- Do not implement Item/Event/Combat triggers here.
 
 ## Acceptance criteria
-- [ ] Successful `AddItem()` advances matching `item_gain` criteria.
-- [ ] Quantity >1 advances by actual added quantity exactly once.
-- [ ] `itemRef` filter requires exact qualified-reference match.
-- [ ] Nonmatching Items do not progress the criterion.
-- [ ] Inventory load/normalization/`SetItems()` does not count as gain.
-- [ ] Item removal does not count.
-- [ ] Existing stacking/max-stack/BOP behavior is unchanged.
-- [ ] Requisition/Daily Reward/Guild Admin Item grants reach the same canonical gain path.
+- [ ] Positive actual Skill increase advances matching criteria.
+- [ ] Decrease does not progress.
+- [ ] Same-value set does not progress.
+- [ ] Progress amount equals actual persisted positive difference.
+- [ ] `skillRef` filter requires exact match.
+- [ ] Profile load/normalization does not emit gain.
+- [ ] Guild Admin increase counts through the canonical path.
+- [ ] Guild Admin decrease remains valid but does not count.
+- [ ] Existing Skill bounds/normalization remain authoritative.
 
 ## Coding-agent instructions
-Read the PDD and completed issues #23–#24, then inspect `Inventory.AddItem`, Inventory change notification, TOC load order, and the current Achievement trigger dispatch API before editing. Implement Task 3 only. Prefer one canonical post-success Item gain boundary over caller-specific hooks. Use actual applied quantity and verify that load/removal paths cannot emit progress. Review every acceptance criterion and report changed files, validation performed, and deviations.
+Read the PDD and issues #23–#24, then inspect `Profile.GetSkillLevel`, `Profile.SetSkillLevel`, Database persistence/normalization, and every runtime Skill mutation call site before editing. Implement Task 4 only. Create one canonical post-persist Skill-gain boundary, use the actual applied positive delta, and keep persistence layers decoupled from client runtime where possible. Review every acceptance criterion and report changed files, validation performed, and deviations.

@@ -11,6 +11,9 @@ local Equipment = Profile.Equipment or {}
 local Resolver = Profile.Resolver or {}
 local RECIPE_PROFILE_INTERNAL_TRACE = false
 
+Profile._skillChangeListeners = Profile._skillChangeListeners or {}
+Profile._nextSkillChangeListenerId = Profile._nextSkillChangeListenerId or 0
+
 local function getItemClass()
     return Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Item or nil
 end
@@ -21,6 +24,30 @@ local function ensureString(value)
     end
 
     return tostring(value)
+end
+
+local function normalizeSkillLevel(value)
+    return math.max(0, math.floor(tonumber(value) or 0))
+end
+
+local function notifySkillChangeListeners(skillRef, previousLevel, updatedLevel)
+    local actualGain = updatedLevel - previousLevel
+    if actualGain <= 0 then
+        return
+    end
+
+    local payload = {
+        skillRef = skillRef,
+        previousLevel = previousLevel,
+        updatedLevel = updatedLevel,
+        amount = actualGain,
+        source = "profile-skill-change",
+    }
+    for _, listener in pairs(Profile._skillChangeListeners or {}) do
+        if type(listener) == "function" then
+            pcall(listener, payload)
+        end
+    end
 end
 
 local function getTimingMilliseconds()
@@ -3392,6 +3419,27 @@ function Profile.ListSkillLevels()
     return {}
 end
 
+function Profile.RegisterSkillChangeListener(listener)
+    if type(listener) ~= "function" then
+        return nil
+    end
+
+    Profile._nextSkillChangeListenerId = (tonumber(Profile._nextSkillChangeListenerId) or 0) + 1
+    local listenerId = Profile._nextSkillChangeListenerId
+    Profile._skillChangeListeners[listenerId] = listener
+    return listenerId
+end
+
+function Profile.UnregisterSkillChangeListener(listenerId)
+    local normalizedId = tonumber(listenerId)
+    if not normalizedId or Profile._skillChangeListeners[normalizedId] == nil then
+        return false
+    end
+
+    Profile._skillChangeListeners[normalizedId] = nil
+    return true
+end
+
 function Profile.GetSkillLevel(skillRef)
     if Database.GetProfileSkillLevel then
         return Database.GetProfileSkillLevel(skillRef)
@@ -3402,7 +3450,17 @@ end
 
 function Profile.SetSkillLevel(skillRef, value)
     if Database.SetProfileSkillLevel then
-        return Database.SetProfileSkillLevel(skillRef, value)
+        local previousLevel = normalizeSkillLevel(Profile.GetSkillLevel(skillRef))
+        local updatedLevel = Database.SetProfileSkillLevel(skillRef, value)
+        if updatedLevel ~= nil then
+            local normalizedUpdatedLevel = normalizeSkillLevel(updatedLevel)
+            notifySkillChangeListeners(
+                ensureString(skillRef),
+                previousLevel,
+                normalizedUpdatedLevel
+            )
+        end
+        return updatedLevel
     end
 
     return nil
