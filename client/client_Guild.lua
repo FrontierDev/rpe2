@@ -81,6 +81,15 @@ local function getGuildIdentity()
     local guildRankName = ""
     local guildRankIndex = nil
     local realmName = ""
+    local guildClubId = ""
+
+    local club = _G and _G.C_Club or nil
+    if club and type(club.GetGuildClubId) == "function" then
+        local ok, value = pcall(club.GetGuildClubId)
+        if ok then
+            guildClubId = trimText(value)
+        end
+    end
 
     if type(GetGuildInfo) == "function" then
         local ok, name, rankName, rankIndex, guildRealmName = pcall(GetGuildInfo, "player")
@@ -105,6 +114,7 @@ local function getGuildIdentity()
         guildRankName = guildRankName,
         guildRankIndex = guildRankIndex,
         realmName = realmName,
+        guildClubId = guildClubId,
     }
 end
 

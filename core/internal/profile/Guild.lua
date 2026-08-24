@@ -12,6 +12,15 @@ local function normalizeGuildKey(value)
     return key
 end
 
+local function normalizeGuildClubId(value)
+    local clubId = normalizeGuildKey(value)
+    if clubId == "" or clubId == "0" then
+        return ""
+    end
+
+    return clubId
+end
+
 local function cloneGuildValue(value)
     if type(value) ~= "table" then
         return value
@@ -43,20 +52,58 @@ local function mergeMissingGuildFields(target, source)
     return changed
 end
 
+local function appendUniqueGuildKey(keys, value)
+    local normalizedKey = normalizeGuildKey(value)
+    if normalizedKey == "" then
+        return
+    end
+
+    for index = 1, #keys do
+        if keys[index] == normalizedKey then
+            return
+        end
+    end
+
+    keys[#keys + 1] = normalizedKey
+end
+
+local function getLegacyGuildKeys(identity)
+    local keys = {}
+    local guildName = normalizeGuildKey(identity and identity.guildName)
+    if guildName == "" then
+        return keys
+    end
+
+    local realmName = normalizeGuildKey(identity and identity.realmName)
+    if realmName == "" then
+        realmName = normalizeGuildKey(identity and identity.guildRealm)
+    end
+    if realmName == "" then
+        realmName = normalizeGuildKey(identity and identity.realm)
+    end
+
+    -- The realm-qualified form is newer than the original name-only form,
+    -- so it wins when both legacy buckets contain conflicting fields.
+    if realmName ~= "" then
+        appendUniqueGuildKey(keys, guildName .. "-" .. realmName)
+    end
+    appendUniqueGuildKey(keys, guildName)
+    return keys
+end
+
 local function migrateLegacyGuildBucket(identity, guildKey)
     if type(identity) ~= "table" or identity.inGuild == false then
         return
     end
 
-    local legacyKey = normalizeGuildKey(identity.guildName)
-    if legacyKey == "" or guildKey == "" or legacyKey == guildKey then
+    local legacyKeys = getLegacyGuildKeys(identity)
+    if #legacyKeys == 0 or guildKey == "" then
         return
     end
 
     local state = Profile.GetGuildState()
     local byGuild = type(state) == "table" and state.byGuild or nil
-    local sourceBucket = type(byGuild) == "table" and byGuild[legacyKey] or nil
-    if type(sourceBucket) ~= "table" then
+    if type(byGuild) ~= "table" then
         return
     end
 
@@ -67,8 +114,21 @@ local function migrateLegacyGuildBucket(identity, guildKey)
         return
     end
 
-    targetBucket = targetBucket or {}
-    if not mergeMissingGuildFields(targetBucket, sourceBucket) then
+    local changed = false
+    for index = 1, #legacyKeys do
+        local legacyKey = legacyKeys[index]
+        if legacyKey ~= guildKey then
+            local sourceBucket = byGuild[legacyKey]
+            if type(sourceBucket) == "table" then
+                targetBucket = targetBucket or {}
+                if mergeMissingGuildFields(targetBucket, sourceBucket) then
+                    changed = true
+                end
+            end
+        end
+    end
+
+    if not changed then
         return
     end
 
@@ -76,9 +136,9 @@ local function migrateLegacyGuildBucket(identity, guildKey)
     Profile.SetGuildState(state)
 end
 
--- GetGuildInfo exposes guild name and realm, but not a guild GUID on the
--- target interface. Use the name/realm pair when the realm is available and
--- retain the old name-only key as the deterministic compatibility fallback.
+-- C_Club.GetGuildClubId is the strongest stable guild identity exposed by
+-- the target interface. Keep the name/realm and name-only forms as
+-- deterministic compatibility fallbacks.
 function Profile.GetGuildKey(identity)
     if type(identity) ~= "table" then
         return normalizeGuildKey(identity)
@@ -86,6 +146,17 @@ function Profile.GetGuildKey(identity)
 
     if identity.inGuild == false then
         return ""
+    end
+
+    local clubId = normalizeGuildClubId(identity.guildClubId)
+    if clubId == "" then
+        clubId = normalizeGuildClubId(identity.clubId)
+    end
+
+    if clubId ~= "" then
+        local guildKey = "guild:" .. clubId
+        migrateLegacyGuildBucket(identity, guildKey)
+        return guildKey
     end
 
     local guildName = normalizeGuildKey(identity.guildName)
@@ -100,6 +171,7 @@ function Profile.GetGuildKey(identity)
     if realmName == "" then
         realmName = normalizeGuildKey(identity.realm)
     end
+
     local guildKey = guildName
     if realmName ~= "" then
         guildKey = guildName .. "-" .. realmName
