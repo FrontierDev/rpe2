@@ -1,88 +1,71 @@
 ## Goal
-Replace the current opaque-only Achievement reward model with a backward-compatible structured schema for supported Item and Currency rewards while preserving unknown existing reward records.
+Replace the current read-only Achievement Rewards summary with editing support for supported Item/Currency reward records while preserving unsupported legacy reward data.
 
-Depends on: #23
-
-This is a **new design extension** beyond the current PDD's initial Achievement runtime. The PDD preserves `Achievement.rewards` but does not define execution semantics; keep this task deliberately narrow.
+Depends on: #30
 
 ## Primary files
-- `core/classes/Achievement.lua`
-- `core/internal/database/Database.lua`
-- `core/internal/database/Dependecies.lua`
+- `client/ui/editor/inspectors/page_InspectorAchievement.lua`
+- adjacent Data Editor list/repeater helpers only if they match current architecture
 
-## Supported reward schema
-Support normalized records:
-
-```lua
-{
-    id = "reward_1",
-    type = "item", -- item | currency
-    ref = "dataset:item-or-currency",
-    amount = 1,
-}
-```
-
-Supported types in Phase 5 are **only**:
+## Reward editor
+Support authoring for:
 
 ```text
-item
-currency
+Add Reward
+Delete Reward
+Reward ID
+Reward Type: Item | Currency
+Reference
+Amount
 ```
 
-Do not add arbitrary scripts, spells, Skills, Guild Rank assignment, Progression mutation, or other reward types.
+Use the normalized reward contract from #30. Reward IDs must remain stable during unrelated edits.
 
-## Normalization
-For supported reward records:
-- stable non-empty `id`;
-- deterministic duplicate handling consistent with current Achievement/Guild nested IDs;
-- `type` restricted to `item` or `currency`;
-- trimmed non-empty `ref` where valid authored data supplies one;
-- positive integer `amount`;
-- deterministic surviving order.
-
-Inspect current `Achievement.lua` opaque reward preservation before deciding how supported and unknown records coexist.
-
-## Unknown/legacy reward compatibility
-Current datasets may already contain opaque reward tables or unknown types/fields.
-
-Do **not** silently discard or coerce unknown records into Item/Currency rewards.
-
-Preserve unsupported legacy records during normalization/export/import. Later runtime must ignore unsupported reward types safely rather than execute them by implication.
-
-## Dataset schema
-Increment only:
+## Reference semantics
+Item reward:
 
 ```text
-Dataset schema 16 -> 17
+datasetId:itemId
 ```
 
-Follow current monotonic schema behavior; never lower a future higher marker.
+Currency reward:
 
-## Dependency extraction
-For supported rewards:
-- Item reward `ref` -> Item dataset dependency;
-- dataset Currency `ref` -> Currency dataset dependency;
-- built-in currencies such as `copper`, `valor`, `justice`, `honor`, `conquest` -> no dataset dependency.
+```text
+copper
+valor
+justice
+honor
+conquest
+datasetId:currencyId
+```
 
-Do not broadly interpret arbitrary unknown reward strings as dependencies.
+Follow existing Data Editor conventions for unresolved references. A warning/display fallback is acceptable; do not build a new global reference-validation framework solely for this task.
+
+## Unsupported legacy records
+Unknown reward records/types preserved by #30 must not be silently rewritten as supported Item/Currency rewards.
+
+Expose them as preserved/unsupported where practical, or otherwise ensure ordinary edits to supported records cannot delete them.
+
+## Persistence/normalization
+Commit through the existing Achievement normalization/Data Editor change-notification path. Do not create an editor-only reward schema.
 
 ## Constraints
-- Do not implement reward execution.
-- Do not modify Profile schema/state.
-- Do not add reward UI yet.
-- Preserve existing Achievement criteria/trigger behavior.
-- Preserve unsupported reward data.
+- Editing rewards must never execute rewards.
+- Do not modify Profile reward-delivery state.
+- Do not implement reward runtime.
+- Preserve existing General/Criteria pages and stable criterion IDs.
+- Preserve unsupported legacy reward data.
 
 ## Acceptance criteria
-- [ ] Existing Achievement definitions load without reward data loss.
-- [ ] Supported Item rewards normalize and round-trip.
-- [ ] Supported built-in/dataset Currency rewards normalize and round-trip.
-- [ ] Supported reward IDs are stable and duplicate-safe.
-- [ ] Unsupported legacy reward records are preserved.
-- [ ] Supported reward refs participate in dependency extraction.
-- [ ] Built-in Currency refs do not create bogus Dataset dependencies.
-- [ ] Dataset schema becomes 17 without lowering future markers.
-- [ ] No reward gameplay mutation occurs in this task.
+- [ ] Item rewards can be authored.
+- [ ] Built-in Currency rewards can be authored.
+- [ ] Dataset Currency rewards can be authored.
+- [ ] Amount normalizes to a positive integer.
+- [ ] Reward IDs remain stable across unrelated edits.
+- [ ] Multiple supported rewards survive export/import.
+- [ ] Unsupported legacy reward records survive unrelated edits/export/import.
+- [ ] Editing a reward never grants it.
+- [ ] Existing Achievement General/Criteria editor behavior remains functional.
 
 ## Coding-agent instructions
-Read the PDD, inspect current `Achievement.lua` reward preservation, Database Dataset schema/migration/export-import behavior, nested stable-ID patterns, Currency built-in resolution, and dependency extraction before editing. Implement Task 8 only. This task defines safe structured data while retaining opaque/unknown legacy records; do not invent execution semantics or additional reward types. Review every acceptance criterion and report changed files, validation performed, and deviations.
+Read issue #30 and inspect the current Achievement Rewards summary, inspector page architecture, nested list editors, commit/normalization flow and export/import behavior before editing. Implement Task 9 only. Use the canonical Achievement reward schema and preserve unknown reward records; do not add runtime execution or a separate editor framework. Review every acceptance criterion and report changed files, validation performed, and deviations.

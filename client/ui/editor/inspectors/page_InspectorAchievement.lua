@@ -37,6 +37,11 @@ local TRIGGER_ITEMS = {
     { label = "RPE Event Started", value = "rpe_event_started" },
 }
 
+local REWARD_TYPE_ITEMS = {
+    { label = "Item", value = "item" },
+    { label = "Currency", value = "currency" },
+}
+
 local function applyTable(target, source)
     if type(target) ~= "table" or type(source) ~= "table" then
         return
@@ -82,6 +87,16 @@ local function setDropdownEnabled(dropdown, enabled)
     if frame.SetAlpha then
         frame:SetAlpha(enabled == true and 1 or 0.5)
     end
+end
+
+local function setRowSelection(row, selected)
+    if not row or not row.entryBackground or not row.entryBackground.SetColorTexture then
+        return
+    end
+
+    local token = selected and "list.rowHover" or "list.rowBackground"
+    local color = UI.ResolveColor(nil, token)
+    row.entryBackground:SetColorTexture(color.r or 0.08, color.g or 0.09, color.b or 0.11, color.a or 0.85)
 end
 
 local function setGroupVisible(group, visible)
@@ -193,11 +208,71 @@ local function buildUniqueCriterionId(criteria, ignoredIndex, requestedId)
     return candidate
 end
 
+local function normalizeRewardType(value)
+    local rewardType = string.lower(trim(value))
+    if rewardType == "item" or rewardType == "currency" then
+        return rewardType
+    end
+
+    return nil
+end
+
+local function normalizeRewardAmount(value)
+    local numeric = tonumber(value)
+    if not numeric
+        or numeric ~= numeric
+        or numeric == math.huge
+        or numeric == -math.huge
+    then
+        numeric = 1
+    end
+
+    return math.max(1, math.floor(numeric))
+end
+
+local function isSupportedReward(reward)
+    return type(reward) == "table" and normalizeRewardType(reward.type) ~= nil
+end
+
+local function buildUniqueRewardId(rewards, ignoredIndex, requestedId)
+    local baseId = trim(requestedId)
+    if baseId == "" then
+        baseId = "reward_1"
+    end
+
+    local used = {}
+    for index = 1, #(rewards or {}) do
+        if index ~= ignoredIndex then
+            local reward = rewards[index]
+            local rewardId = trim(reward and reward.id)
+            if rewardId ~= "" then
+                used[rewardId] = true
+            end
+        end
+    end
+
+    local candidate = baseId
+    local suffix = 2
+    while used[candidate] do
+        candidate = ("%s_%d"):format(baseId, suffix)
+        suffix = suffix + 1
+    end
+
+    return candidate
+end
+
 local function getFilter(criterion)
     if type(criterion.filters) ~= "table" then
         criterion.filters = {}
     end
     return criterion.filters
+end
+
+local function getSelectedAchievementReward(self)
+    local achievement = self:GetSelectedAchievement()
+    local rewards = achievement and achievement.rewards or {}
+    local index = tonumber(self.SelectedAchievementRewardIndex)
+    return achievement, rewards, index, index and rewards[index] or nil
 end
 
 function DataEditor:NormalizeAchievementDefinition(achievement)
@@ -753,22 +828,214 @@ end
 
 function DataEditor:BuildAchievementInspectorRewardsPage(parent)
     local root = UI.CreateLayout(UI.VerticalLayoutGroup, parent, "RPEDataEditorAchievementInspectorRewardsLayout", {
-        spacing = 4,
+        spacing = 2,
         fitChildrenWidth = true,
         fitChildrenHeight = false,
     })
     UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
 
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardsTitle", "Rewards"))
-    self.AchievementInspectorRewardsSummary = UI.CreateTextArea(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardsSummary", {
+    local rewardPanel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardPanel", {
         width = FIELD_WIDTH,
-        height = 116,
+        height = 80,
+        contentInset = 2,
+        showBorder = false,
+    })
+    root:AddChild(rewardPanel)
+    self.AchievementInspectorRewardScroll = UI.ScrollLayout:New({
+        name = "RPEDataEditorAchievementInspectorRewardScroll",
+        width = FIELD_WIDTH - 4,
+        height = 76,
+        visibleRows = 4,
+        autoFitRows = true,
+        rowHeight = 18,
+        rowSpacing = 0,
+        border = false,
+        rowElementClass = UI.ScrollListEntry,
+        categoryWidth = 112,
+        statusWidth = 68,
+        categoryInsetLeft = 4,
+        statusInsetRight = 4,
+    })
+    self.AchievementInspectorRewardScroll:SetParent(rewardPanel:GetContentFrame())
+    self.AchievementInspectorRewardScroll:SetRowRenderer(function(row, reward, itemIndex)
+        local supported = isSupportedReward(reward)
+        local rewardType = supported and normalizeRewardType(reward.type) or nil
+        local rewardId = type(reward) == "table" and trim(reward.id) or ""
+        local rewardRef = type(reward) == "table" and trim(reward.ref) or ""
+
+        if supported then
+            row:SetCategory(rewardId ~= "" and rewardId or "-")
+            row:SetStatus(rewardType)
+            row:SetDetail(("%s x%d"):format(rewardRef, normalizeRewardAmount(reward.amount)))
+        else
+            row:SetCategory(rewardId ~= "" and rewardId or "Legacy")
+            row:SetStatus("Unsupported")
+            row:SetDetail("Preserved legacy reward data")
+        end
+        row:SetTestName("")
+
+        local frame = row.GetFrame and row:GetFrame() or nil
+        if frame then
+            frame:EnableMouse(true)
+            frame:SetScript("OnMouseUp", function(_, button)
+                if button == "LeftButton" then
+                    self.SelectedAchievementRewardIndex = itemIndex
+                    self:RefreshAchievementRewardsInspector()
+                end
+            end)
+            setRowSelection(row, tonumber(self.SelectedAchievementRewardIndex) == tonumber(itemIndex))
+        end
+    end)
+    self.AchievementInspectorRewardScroll:Create()
+    UI.Utils.AnchorFill(self.AchievementInspectorRewardScroll, rewardPanel:GetContentFrame(), 0, 0, 0, 0)
+
+    local actions = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorRewardActions", {
+        spacing = 2,
+        height = 18,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    self.AchievementInspectorAddRewardButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorAchievementInspectorAddRewardButton", "Add Reward", 76, function()
+        local achievement = self:CommitSelectedAchievement(function(selected)
+            selected.rewards = selected.rewards or {}
+            selected.rewards[#selected.rewards + 1] = {
+                id = buildUniqueRewardId(selected.rewards, nil, ""),
+                type = "item",
+                ref = "",
+                amount = 1,
+            }
+        end)
+        self.SelectedAchievementRewardIndex = achievement and #(achievement.rewards or {}) or nil
+        self:RefreshAchievementRewardsInspector()
+    end, { height = 18, fontSize = 7 })
+    actions:AddChild(self.AchievementInspectorAddRewardButton)
+    self.AchievementInspectorDeleteRewardButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorAchievementInspectorDeleteRewardButton", "Delete Reward", 78, function()
+        local _, rewards, selectedIndex, reward = getSelectedAchievementReward(self)
+        if not isSupportedReward(reward) then
+            return
+        end
+
+        local achievement = self:CommitSelectedAchievement(function(selected)
+            if selectedIndex and selected.rewards and isSupportedReward(selected.rewards[selectedIndex]) then
+                table.remove(selected.rewards, selectedIndex)
+            end
+        end)
+        local updatedRewards = achievement and achievement.rewards or rewards
+        self.SelectedAchievementRewardIndex = #updatedRewards > 0
+            and math.min(selectedIndex or 1, #updatedRewards)
+            or nil
+        self:RefreshAchievementRewardsInspector()
+    end, { height = 18, fontSize = 7 })
+    actions:AddChild(self.AchievementInspectorDeleteRewardButton)
+    root:AddChild(actions)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardIdLabel", "Reward ID"))
+    self.AchievementInspectorRewardIdInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardIdInput", {
+        width = FIELD_WIDTH,
+        height = 18,
         text = "",
-        readOnly = true,
         borderColor = UI.ResolveColor(nil, "panel.border"),
     })
-    root:AddChild(self.AchievementInspectorRewardsSummary)
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardsNote", "Rewards are preserved by Data Editor import/export and by edits to the other Achievement fields. Phase 1 does not define reward execution or a reward editing schema."))
+    local commitRewardId = function()
+        local _, _, selectedIndex, reward = getSelectedAchievementReward(self)
+        if not isSupportedReward(reward) then
+            return
+        end
+
+        self:CommitSelectedAchievement(function(achievement)
+            local selectedReward = achievement.rewards and achievement.rewards[selectedIndex]
+            if isSupportedReward(selectedReward) then
+                selectedReward.id = buildUniqueRewardId(
+                    achievement.rewards,
+                    selectedIndex,
+                    self.AchievementInspectorRewardIdInput:GetText()
+                )
+            end
+        end)
+        self:RefreshAchievementRewardsInspector()
+    end
+    self.AchievementInspectorRewardIdInput:SetScript("OnEnterPressed", commitRewardId)
+    self.AchievementInspectorRewardIdInput:SetScript("OnEditFocusLost", commitRewardId)
+    root:AddChild(self.AchievementInspectorRewardIdInput)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardTypeLabel", "Reward Type"))
+    self.AchievementInspectorRewardTypeDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardTypeDropdown", {
+        width = FIELD_WIDTH,
+        height = 18,
+        items = REWARD_TYPE_ITEMS,
+        onValueChanged = function(value)
+            if self._refreshingAchievementRewards then
+                return
+            end
+
+            local _, _, selectedIndex, reward = getSelectedAchievementReward(self)
+            if not isSupportedReward(reward) then
+                return
+            end
+
+            self:CommitSelectedAchievement(function(achievement)
+                local selectedReward = achievement.rewards and achievement.rewards[selectedIndex]
+                if isSupportedReward(selectedReward) then
+                    selectedReward.type = value
+                end
+            end)
+            self:RefreshAchievementRewardsInspector()
+        end,
+    })
+    root:AddChild(self.AchievementInspectorRewardTypeDropdown)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardRefLabel", "Reference"))
+    self.AchievementInspectorRewardRefInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardRefInput", {
+        width = FIELD_WIDTH,
+        height = 18,
+        text = "",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitRewardRef = function()
+        local _, _, selectedIndex, reward = getSelectedAchievementReward(self)
+        if not isSupportedReward(reward) then
+            return
+        end
+
+        self:CommitSelectedAchievement(function(achievement)
+            local selectedReward = achievement.rewards and achievement.rewards[selectedIndex]
+            if isSupportedReward(selectedReward) then
+                selectedReward.ref = self.AchievementInspectorRewardRefInput:GetText()
+            end
+        end)
+    end
+    self.AchievementInspectorRewardRefInput:SetScript("OnEnterPressed", commitRewardRef)
+    self.AchievementInspectorRewardRefInput:SetScript("OnEditFocusLost", commitRewardRef)
+    root:AddChild(self.AchievementInspectorRewardRefInput)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardAmountLabel", "Amount"))
+    self.AchievementInspectorRewardAmountInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardAmountInput", {
+        width = FIELD_WIDTH,
+        height = 18,
+        text = "1",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitRewardAmount = function()
+        local _, _, selectedIndex, reward = getSelectedAchievementReward(self)
+        if not isSupportedReward(reward) then
+            return
+        end
+
+        self:CommitSelectedAchievement(function(achievement)
+            local selectedReward = achievement.rewards and achievement.rewards[selectedIndex]
+            if isSupportedReward(selectedReward) then
+                selectedReward.amount = normalizeRewardAmount(self.AchievementInspectorRewardAmountInput:GetText())
+            end
+        end)
+    end
+    self.AchievementInspectorRewardAmountInput:SetScript("OnEnterPressed", commitRewardAmount)
+    self.AchievementInspectorRewardAmountInput:SetScript("OnEditFocusLost", commitRewardAmount)
+    root:AddChild(self.AchievementInspectorRewardAmountInput)
+
+    self.AchievementInspectorRewardHint = createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardHint", "", FIELD_WIDTH)
+    self.AchievementInspectorRewardHint:SetTextColor(UI.ResolveColor(nil, "text.secondary").r, UI.ResolveColor(nil, "text.secondary").g, UI.ResolveColor(nil, "text.secondary").b, UI.ResolveColor(nil, "text.secondary").a)
+    root:AddChild(self.AchievementInspectorRewardHint)
 end
 
 function DataEditor:RefreshAchievementCriteriaInspector()
@@ -873,6 +1140,58 @@ function DataEditor:RefreshAchievementCriteriaInspector()
     self._refreshingAchievementCriteria = false
 end
 
+function DataEditor:RefreshAchievementRewardsInspector()
+    local achievement, rewards = self:GetSelectedAchievement(), nil
+    rewards = achievement and achievement.rewards or {}
+    local rewardIndex = tonumber(self.SelectedAchievementRewardIndex)
+    if rewardIndex and not rewards[rewardIndex] then
+        rewardIndex = #rewards > 0 and math.min(rewardIndex, #rewards) or nil
+        self.SelectedAchievementRewardIndex = rewardIndex
+    end
+    local reward = rewardIndex and rewards[rewardIndex] or nil
+    local supported = isSupportedReward(reward)
+    local rewardType = supported and normalizeRewardType(reward.type) or "item"
+
+    self._refreshingAchievementRewards = true
+    if self.AchievementInspectorRewardScroll then
+        self.AchievementInspectorRewardScroll:SetItems(rewards)
+    end
+    if self.AchievementInspectorAddRewardButton then
+        self.AchievementInspectorAddRewardButton:SetEnabled(achievement ~= nil)
+    end
+    if self.AchievementInspectorDeleteRewardButton then
+        self.AchievementInspectorDeleteRewardButton:SetEnabled(supported)
+    end
+    if self.AchievementInspectorRewardIdInput then
+        self.AchievementInspectorRewardIdInput:SetText(reward and tostring(reward.id or "") or "")
+        setTextElementEnabled(self.AchievementInspectorRewardIdInput, supported)
+    end
+    if self.AchievementInspectorRewardTypeDropdown then
+        self.AchievementInspectorRewardTypeDropdown:SetSelectedValue(rewardType, true)
+        setDropdownEnabled(self.AchievementInspectorRewardTypeDropdown, supported)
+    end
+    if self.AchievementInspectorRewardRefInput then
+        self.AchievementInspectorRewardRefInput:SetText(reward and tostring(reward.ref or "") or "")
+        setTextElementEnabled(self.AchievementInspectorRewardRefInput, supported)
+    end
+    if self.AchievementInspectorRewardAmountInput then
+        self.AchievementInspectorRewardAmountInput:SetText(tostring(normalizeRewardAmount(reward and reward.amount)))
+        setTextElementEnabled(self.AchievementInspectorRewardAmountInput, supported)
+    end
+    if self.AchievementInspectorRewardHint then
+        local hint = "Select a reward to edit it. Item refs use datasetId:itemId; currency refs use a built-in or dataset currency ref."
+        if supported and rewardType == "item" then
+            hint = "Item reference: datasetId:itemId. Editing only changes saved Achievement data; it never grants the item."
+        elseif supported and rewardType == "currency" then
+            hint = "Currency reference: copper, valor, justice, honor, conquest, or datasetId:currencyId."
+        elseif reward ~= nil then
+            hint = "Unsupported legacy reward data is preserved and cannot be edited here."
+        end
+        self.AchievementInspectorRewardHint:SetText(hint)
+    end
+    self._refreshingAchievementRewards = false
+end
+
 function DataEditor:RefreshAchievementInspectorPage()
     local achievement = self:GetSelectedAchievement()
     local hasAchievement = achievement ~= nil
@@ -904,14 +1223,11 @@ function DataEditor:RefreshAchievementInspectorPage()
     if selectedId ~= self._achievementInspectorSelectedId then
         self._achievementInspectorSelectedId = selectedId
         self.SelectedAchievementCriterionIndex = achievement and #(achievement.criteria or {}) > 0 and 1 or nil
+        self.SelectedAchievementRewardIndex = achievement and #(achievement.rewards or {}) > 0 and 1 or nil
     end
 
     self:RefreshAchievementCriteriaInspector()
-    if self.AchievementInspectorRewardsSummary then
-        local rewards = achievement and achievement.rewards or {}
-        self.AchievementInspectorRewardsSummary:SetText(("This Achievement has %d reward entr%s.\n\nReward data is preserved as authored data. Use Export/Import to round-trip reward fields without introducing Phase 1 reward semantics."):format(#rewards, #rewards == 1 and "y" or "ies"))
-        setTextElementEnabled(self.AchievementInspectorRewardsSummary, false)
-    end
+    self:RefreshAchievementRewardsInspector()
     if self.AchievementInspectorEmptyText then
         self.AchievementInspectorEmptyText:SetText(hasAchievement and "" or "Select an Achievement to inspect it.")
     end
