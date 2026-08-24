@@ -1,16 +1,25 @@
 ## Goal
-Add the six PDD-deferred Achievement trigger tokens to the normalized Achievement model and runtime trigger-index contract without implementing their actual event hooks yet.
+Expose the six new Phase 5 Achievement trigger types and their supported filters through the existing Achievement Data Editor.
 
-Depends on: #22
+Depends on: #23
 
 ## Primary files
-- `core/classes/Achievement.lua`
-- `client/client_Achievements.lua`
-- `core/internal/database/Dependecies.lua`
-- `core/internal/Registry.lua` only if an existing resolver needs a narrow helper
+- `client/ui/editor/inspectors/page_InspectorAchievement.lua`
+- related Achievement editor helpers discovered by repository inspection
 
-## Trigger additions
-Add support for:
+## Trigger dropdown additions
+Add user-facing choices:
+
+```text
+Item Gain
+Skill Gain
+RPE Boss Kill
+RPE Damage
+RPE Healing
+RPE Event Started
+```
+
+Persist the canonical trigger values introduced by #23:
 
 ```text
 item_gain
@@ -21,77 +30,56 @@ rpe_healing
 rpe_event_started
 ```
 
-Preserve the existing trigger values unchanged:
+## Trigger-specific filter controls
+Expose only relevant structured fields:
 
 ```text
-manual
-currency_gain
-rpe_kill
-rpe_event_complete
-achievement_earned
+Item Gain
+  Item Ref
+
+Skill Gain
+  Skill Ref
+
+RPE Boss Kill
+  Unit Ref
+  Enemy Only
+
+RPE Damage
+  Unit Ref
+  Enemy Only
+
+RPE Healing
+  Unit Ref
+  Enemy Only
+
+RPE Event Started
+  Event ID
 ```
 
-## Supported filter contract
-Formally support these optional filter keys:
+Reuse existing RPE Data Editor primitives and current reference/text/check-box conventions. Do not build a new generic reference-editor framework solely for this task.
 
-```text
-item_gain
-  itemRef
+## Preservation behavior
+Changing one criterion's trigger or supported filter must not silently delete:
+- that criterion's stable ID;
+- unrelated criteria;
+- unknown/future filter keys not being edited.
 
-skill_gain
-  skillRef
-
-rpe_boss_kill
-  unitRef
-  enemyOnly
-
-rpe_damage
-  unitRef
-  enemyOnly
-
-rpe_healing
-  unitRef
-  enemyOnly
-
-rpe_event_started
-  eventId
-```
-
-Treat filters as data comparisons only. Do not make arbitrary filter strings executable.
-
-Unknown/future filter keys must survive unrelated normalization/editing.
-
-## Trigger index
-Extend the current indexed Achievement runtime (`CriteriaByTrigger` or equivalent) so criteria using the new trigger tokens are indexed correctly.
-
-Do **not** wire Inventory, Skill, Event or Resource runtime events in this task.
-
-## Dependency extraction
-Extend known-reference extraction for:
-- `filters.itemRef` -> Item dependency;
-- `filters.skillRef` -> Skill dependency;
-- `filters.unitRef` -> Unit dependency.
-
-Do not automatically treat `eventId` as a Dataset dependency unless current Event definitions use dataset-qualified references and the existing dependency system already provides that semantic contract.
-
-Preserve current dependency behavior for `currencyRef` and `achievementRef`.
+Use the normalized Achievement class as the final data contract rather than implementing a competing editor-only normalizer.
 
 ## Constraints
-- Preserve stable criterion IDs.
-- Do not change Achievement completion semantics.
-- Do not change Profile Achievement state.
-- Do not introduce new runtime listeners/event frames.
-- Do not implement Achievement Rewards yet.
-- Preserve unknown filter fields rather than destructively constraining the table.
+- Do not implement runtime progression hooks.
+- Do not modify Profile Achievement state.
+- Do not implement Achievement Reward authoring yet.
+- Preserve existing General/Criteria editor behavior and export/import.
 
 ## Acceptance criteria
-- [ ] All six new trigger tokens normalize and round-trip.
-- [ ] Existing trigger tokens remain unchanged.
-- [ ] Existing stable criterion IDs remain stable.
-- [ ] New supported filters normalize without deleting unknown filter data.
-- [ ] New qualified-reference filter fields participate in dependency extraction.
-- [ ] The runtime trigger index accepts/indexes all six new trigger keys.
-- [ ] No item/skill/event/combat progress is emitted in this task.
+- [ ] All six Phase 5 triggers can be authored.
+- [ ] Existing five trigger types remain authorable.
+- [ ] Appropriate filter controls appear for each new trigger.
+- [ ] Stable criterion IDs survive unrelated edits.
+- [ ] Unknown filter fields survive unrelated edits/export/import.
+- [ ] Existing criterion add/delete/edit behavior remains functional.
+- [ ] Editor actions do not mutate Profile Achievement progress.
 
 ## Coding-agent instructions
-Read `RPE2-Achievements-Guild-Systems-PDD.md` and inspect the current `Achievement.lua`, Achievement trigger-index construction, criterion filter matching, Registry resolvers and dependency extraction before editing. Implement Task 1 only. Do not add speculative runtime hooks: this task defines and indexes the contract only. Preserve unknown data and stable IDs. When finished, review every acceptance criterion and report changed files, validation performed, and any deviation.
+Read the PDD and issue #23, then inspect the current Achievement inspector's trigger list, filter refresh/show-hide logic, commit/normalization flow, and neighboring editor controls before editing. Implement Task 2 only. Preserve stable criterion IDs and unknown filter data; do not introduce runtime hooks or a parallel editor architecture. Review the final diff against every acceptance criterion and report changed files, validation performed, and deviations.

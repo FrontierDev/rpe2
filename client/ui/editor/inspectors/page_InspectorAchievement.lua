@@ -29,6 +29,12 @@ local TRIGGER_ITEMS = {
     { label = "RPE Kill", value = "rpe_kill" },
     { label = "Achievement Earned", value = "achievement_earned" },
     { label = "RPE Event Complete", value = "rpe_event_complete" },
+    { label = "Item Gain", value = "item_gain" },
+    { label = "Skill Gain", value = "skill_gain" },
+    { label = "RPE Boss Kill", value = "rpe_boss_kill" },
+    { label = "RPE Damage", value = "rpe_damage" },
+    { label = "RPE Healing", value = "rpe_healing" },
+    { label = "RPE Event Started", value = "rpe_event_started" },
 }
 
 local function applyTable(target, source)
@@ -617,6 +623,50 @@ function DataEditor:BuildAchievementInspectorCriteriaPage(parent)
     self.AchievementInspectorCurrencyFilterGroup:AddChild(self.AchievementInspectorCurrencyRefInput)
     root:AddChild(self.AchievementInspectorCurrencyFilterGroup)
 
+    self.AchievementInspectorItemFilterGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorItemFilterGroup", {
+        spacing = 2, height = 42, fitChildrenWidth = true, fitChildrenHeight = false,
+    })
+    self.AchievementInspectorItemFilterGroup._visibleHeight = 42
+    self.AchievementInspectorItemFilterGroup:AddChild(createLabel(self.AchievementInspectorItemFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorItemRefLabel", "Item Ref"))
+    self.AchievementInspectorItemRefInput = UI.CreateTextInput(self.AchievementInspectorItemFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorItemRefInput", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitItemRef = function()
+        local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+        self:CommitSelectedAchievement(function(achievement)
+            local criterion = getCriterion(achievement, selectedIndex)
+            if criterion then
+                getFilter(criterion).itemRef = self.AchievementInspectorItemRefInput:GetText()
+            end
+        end)
+    end
+    self.AchievementInspectorItemRefInput:SetScript("OnEnterPressed", commitItemRef)
+    self.AchievementInspectorItemRefInput:SetScript("OnEditFocusLost", commitItemRef)
+    self.AchievementInspectorItemFilterGroup:AddChild(self.AchievementInspectorItemRefInput)
+    root:AddChild(self.AchievementInspectorItemFilterGroup)
+
+    self.AchievementInspectorSkillFilterGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorSkillFilterGroup", {
+        spacing = 2, height = 42, fitChildrenWidth = true, fitChildrenHeight = false,
+    })
+    self.AchievementInspectorSkillFilterGroup._visibleHeight = 42
+    self.AchievementInspectorSkillFilterGroup:AddChild(createLabel(self.AchievementInspectorSkillFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorSkillRefLabel", "Skill Ref"))
+    self.AchievementInspectorSkillRefInput = UI.CreateTextInput(self.AchievementInspectorSkillFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorSkillRefInput", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitSkillRef = function()
+        local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+        self:CommitSelectedAchievement(function(achievement)
+            local criterion = getCriterion(achievement, selectedIndex)
+            if criterion then
+                getFilter(criterion).skillRef = self.AchievementInspectorSkillRefInput:GetText()
+            end
+        end)
+    end
+    self.AchievementInspectorSkillRefInput:SetScript("OnEnterPressed", commitSkillRef)
+    self.AchievementInspectorSkillRefInput:SetScript("OnEditFocusLost", commitSkillRef)
+    self.AchievementInspectorSkillFilterGroup:AddChild(self.AchievementInspectorSkillRefInput)
+    root:AddChild(self.AchievementInspectorSkillFilterGroup)
+
     self.AchievementInspectorKillFilterGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorKillFilterGroup", {
         spacing = 2, height = 62, fitChildrenWidth = true, fitChildrenHeight = false,
     })
@@ -651,6 +701,28 @@ function DataEditor:BuildAchievementInspectorCriteriaPage(parent)
     end)
     self.AchievementInspectorKillFilterGroup:AddChild(self.AchievementInspectorEnemyOnlyCheckbox)
     root:AddChild(self.AchievementInspectorKillFilterGroup)
+
+    self.AchievementInspectorEventStartedFilterGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorEventStartedFilterGroup", {
+        spacing = 2, height = 42, fitChildrenWidth = true, fitChildrenHeight = false,
+    })
+    self.AchievementInspectorEventStartedFilterGroup._visibleHeight = 42
+    self.AchievementInspectorEventStartedFilterGroup:AddChild(createLabel(self.AchievementInspectorEventStartedFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorEventIdLabel", "Event ID"))
+    self.AchievementInspectorEventIdInput = UI.CreateTextInput(self.AchievementInspectorEventStartedFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorEventIdInput", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitEventId = function()
+        local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+        self:CommitSelectedAchievement(function(achievement)
+            local criterion = getCriterion(achievement, selectedIndex)
+            if criterion then
+                getFilter(criterion).eventId = self.AchievementInspectorEventIdInput:GetText()
+            end
+        end)
+    end
+    self.AchievementInspectorEventIdInput:SetScript("OnEnterPressed", commitEventId)
+    self.AchievementInspectorEventIdInput:SetScript("OnEditFocusLost", commitEventId)
+    self.AchievementInspectorEventStartedFilterGroup:AddChild(self.AchievementInspectorEventIdInput)
+    root:AddChild(self.AchievementInspectorEventStartedFilterGroup)
 
     self.AchievementInspectorEarnedFilterGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorEarnedFilterGroup", {
         spacing = 2, height = 42, fitChildrenWidth = true, fitChildrenHeight = false,
@@ -711,6 +783,10 @@ function DataEditor:RefreshAchievementCriteriaInspector()
     local hasCriterion = criterion ~= nil
     local trigger = criterion and criterion.trigger or "manual"
     local filters = criterion and getFilter(criterion) or {}
+    local combatTrigger = trigger == "rpe_kill"
+        or trigger == "rpe_boss_kill"
+        or trigger == "rpe_damage"
+        or trigger == "rpe_healing"
 
     self._refreshingAchievementCriteria = true
     if self.AchievementInspectorCriteriaScroll then
@@ -736,13 +812,25 @@ function DataEditor:RefreshAchievementCriteriaInspector()
         self.AchievementInspectorCurrencyRefInput:SetText(tostring(filters.currencyRef or ""))
         setTextElementEnabled(self.AchievementInspectorCurrencyRefInput, hasCriterion and trigger == "currency_gain")
     end
+    if self.AchievementInspectorItemRefInput then
+        self.AchievementInspectorItemRefInput:SetText(tostring(filters.itemRef or ""))
+        setTextElementEnabled(self.AchievementInspectorItemRefInput, hasCriterion and trigger == "item_gain")
+    end
+    if self.AchievementInspectorSkillRefInput then
+        self.AchievementInspectorSkillRefInput:SetText(tostring(filters.skillRef or ""))
+        setTextElementEnabled(self.AchievementInspectorSkillRefInput, hasCriterion and trigger == "skill_gain")
+    end
     if self.AchievementInspectorUnitRefInput then
         self.AchievementInspectorUnitRefInput:SetText(tostring(filters.unitRef or ""))
-        setTextElementEnabled(self.AchievementInspectorUnitRefInput, hasCriterion and trigger == "rpe_kill")
+        setTextElementEnabled(self.AchievementInspectorUnitRefInput, hasCriterion and combatTrigger)
     end
     if self.AchievementInspectorEnemyOnlyCheckbox then
         self.AchievementInspectorEnemyOnlyCheckbox:SetChecked(filters.enemyOnly == true, true)
-        self.AchievementInspectorEnemyOnlyCheckbox:SetEnabled(hasCriterion and trigger == "rpe_kill")
+        self.AchievementInspectorEnemyOnlyCheckbox:SetEnabled(hasCriterion and combatTrigger)
+    end
+    if self.AchievementInspectorEventIdInput then
+        self.AchievementInspectorEventIdInput:SetText(tostring(filters.eventId or ""))
+        setTextElementEnabled(self.AchievementInspectorEventIdInput, hasCriterion and trigger == "rpe_event_started")
     end
     if self.AchievementInspectorAchievementRefInput then
         self.AchievementInspectorAchievementRefInput:SetText(tostring(filters.achievementRef or ""))
@@ -756,7 +844,10 @@ function DataEditor:RefreshAchievementCriteriaInspector()
     end
 
     setGroupVisible(self.AchievementInspectorCurrencyFilterGroup, hasCriterion and trigger == "currency_gain")
-    setGroupVisible(self.AchievementInspectorKillFilterGroup, hasCriterion and trigger == "rpe_kill")
+    setGroupVisible(self.AchievementInspectorItemFilterGroup, hasCriterion and trigger == "item_gain")
+    setGroupVisible(self.AchievementInspectorSkillFilterGroup, hasCriterion and trigger == "skill_gain")
+    setGroupVisible(self.AchievementInspectorKillFilterGroup, hasCriterion and combatTrigger)
+    setGroupVisible(self.AchievementInspectorEventStartedFilterGroup, hasCriterion and trigger == "rpe_event_started")
     setGroupVisible(self.AchievementInspectorEarnedFilterGroup, hasCriterion and trigger == "achievement_earned")
     if self.AchievementInspectorFilterHint then
         local hint = "Select a criterion to edit its trigger and filters."
@@ -766,8 +857,14 @@ function DataEditor:RefreshAchievementCriteriaInspector()
             hint = "RPE event complete criteria have no required filters in Phase 1."
         elseif hasCriterion and trigger == "currency_gain" then
             hint = "Set the currency reference used by this criterion."
-        elseif hasCriterion and trigger == "rpe_kill" then
+        elseif hasCriterion and trigger == "item_gain" then
+            hint = "Set the item reference used by this criterion."
+        elseif hasCriterion and trigger == "skill_gain" then
+            hint = "Set the skill reference used by this criterion."
+        elseif hasCriterion and combatTrigger then
             hint = "Unit reference and Enemy only are optional filters."
+        elseif hasCriterion and trigger == "rpe_event_started" then
+            hint = "Set the event ID used by this criterion."
         elseif hasCriterion and trigger == "achievement_earned" then
             hint = "Set the achievement reference used by this criterion."
         end
