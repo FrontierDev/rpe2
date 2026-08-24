@@ -21,6 +21,11 @@ local SUPPORTED_TRIGGERS = {
     rpe_event_started = true,
 }
 
+local SUPPORTED_REWARD_TYPES = {
+    item = true,
+    currency = true,
+}
+
 local function ensureString(value)
     if value == nil then
         return ""
@@ -68,6 +73,19 @@ local function normalizeGoal(value)
     return math.max(1, goal)
 end
 
+local function normalizeRewardAmount(value)
+    local numericAmount = tonumber(value)
+    if not numericAmount
+        or numericAmount ~= numericAmount
+        or numericAmount == math.huge
+        or numericAmount == -math.huge
+    then
+        return 1
+    end
+
+    return math.max(1, math.floor(numericAmount))
+end
+
 local function normalizeFilters(value)
     if type(value) ~= "table" then
         return {}
@@ -76,10 +94,10 @@ local function normalizeFilters(value)
     return deepCopy(value)
 end
 
-local function normalizeCriterionId(value, index, usedIds)
+local function normalizeCriterionId(value, index, usedIds, prefix)
     local baseId = trimText(value)
     if baseId == "" then
-        baseId = ("criterion_%d"):format(index)
+        baseId = ("%s_%d"):format(prefix or "criterion", index)
     end
 
     local criterionId = baseId
@@ -117,6 +135,43 @@ local function normalizeCriteria(value)
     end
 
     return criteria
+end
+
+local function normalizeRewardType(value)
+    local rewardType = string.lower(trimText(value))
+    return SUPPORTED_REWARD_TYPES[rewardType] and rewardType or nil
+end
+
+local function normalizeReward(value, index, usedIds)
+    if type(value) ~= "table" then
+        return deepCopy(value)
+    end
+
+    local rewardType = normalizeRewardType(value.type)
+    if not rewardType then
+        return deepCopy(value)
+    end
+
+    local normalized = deepCopy(value)
+    normalized.id = normalizeCriterionId(value.id, index, usedIds, "reward")
+    normalized.type = rewardType
+    normalized.ref = trimText(value.ref)
+    normalized.amount = normalizeRewardAmount(value.amount)
+    return normalized
+end
+
+local function normalizeRewards(value)
+    if type(value) ~= "table" then
+        return {}
+    end
+
+    local rewards = deepCopy(value)
+    local usedIds = {}
+    for index = 1, #value do
+        rewards[index] = normalizeReward(value[index], index, usedIds)
+    end
+
+    return rewards
 end
 
 local function normalizeTags(value)
@@ -160,7 +215,7 @@ function Achievement:Merge(data)
     self.description = ensureString(self.description)
     self.icon = ensureString(self.icon)
     self.criteria = normalizeCriteria(self.criteria)
-    self.rewards = type(self.rewards) == "table" and deepCopy(self.rewards) or {}
+    self.rewards = normalizeRewards(self.rewards)
     self.tags = normalizeTags(self.tags)
 
     return self
@@ -173,7 +228,7 @@ function Achievement:ToTable()
         description = ensureString(self.description),
         icon = ensureString(self.icon),
         criteria = normalizeCriteria(self.criteria),
-        rewards = type(self.rewards) == "table" and deepCopy(self.rewards) or {},
+        rewards = normalizeRewards(self.rewards),
         tags = normalizeTags(self.tags),
     }
 end

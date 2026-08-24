@@ -1,66 +1,88 @@
 ## Goal
-Emit a boss-specific Achievement kill trigger while preserving the existing ordinary `rpe_kill` behavior and authority model.
+Replace the current opaque-only Achievement reward model with a backward-compatible structured schema for supported Item and Currency rewards while preserving unknown existing reward records.
 
-Depends on: #23, #24, #28
+Depends on: #23
+
+This is a **new design extension** beyond the current PDD's initial Achievement runtime. The PDD preserves `Achievement.rewards` but does not define execution semantics; keep this task deliberately narrow.
 
 ## Primary files
-- `client/client_Resources.lua`
-- `client/client_Achievements.lua`
-- `core/classes/EventUnit.lua` only if a narrow boss-state accessor is useful
+- `core/classes/Achievement.lua`
+- `core/internal/database/Database.lua`
+- `core/internal/database/Dependecies.lua`
 
-## Boss authority
-The current EventUnit model already normalizes a `boss` boolean. Use that authoritative EventUnit state.
+## Supported reward schema
+Support normalized records:
 
-Do not infer boss status from:
-- unit name;
-- raid marker;
-- health quantity;
-- Achievement filters;
-- arbitrary client-side naming conventions.
-
-## Kill semantics
-Reuse the existing authoritative alive->dead transition and transport-bound local action-owner validation.
-
-For an authoritative boss kill credited to the local player, emit both semantic triggers:
-
-```text
-rpe_kill
-rpe_boss_kill
+```lua
+{
+    id = "reward_1",
+    type = "item", -- item | currency
+    ref = "dataset:item-or-currency",
+    amount = 1,
+}
 ```
 
-For an ordinary non-boss kill, emit only:
+Supported types in Phase 5 are **only**:
 
 ```text
-rpe_kill
+item
+currency
 ```
 
-Do not replace or weaken generic kill progression.
+Do not add arbitrary scripts, spells, Skills, Guild Rank assignment, Progression mutation, or other reward types.
 
-## Trigger context
-Reuse the existing trusted kill context rather than constructing a second independent death-analysis path. Add confirmed boss state only as needed for matching/debugging.
+## Normalization
+For supported reward records:
+- stable non-empty `id`;
+- deterministic duplicate handling consistent with current Achievement/Guild nested IDs;
+- `type` restricted to `item` or `currency`;
+- trimmed non-empty `ref` where valid authored data supplies one;
+- positive integer `amount`;
+- deterministic surviving order.
 
-## Filters
-`rpe_boss_kill` must respect the Task 1 filter contract:
-- optional exact `unitRef`;
-- optional `enemyOnly`.
+Inspect current `Achievement.lua` opaque reward preservation before deciding how supported and unknown records coexist.
 
-Use existing Event/team semantics for enemy status.
+## Unknown/legacy reward compatibility
+Current datasets may already contain opaque reward tables or unknown types/fields.
+
+Do **not** silently discard or coerce unknown records into Item/Currency rewards.
+
+Preserve unsupported legacy records during normalization/export/import. Later runtime must ignore unsupported reward types safely rather than execute them by implication.
+
+## Dataset schema
+Increment only:
+
+```text
+Dataset schema 16 -> 17
+```
+
+Follow current monotonic schema behavior; never lower a future higher marker.
+
+## Dependency extraction
+For supported rewards:
+- Item reward `ref` -> Item dataset dependency;
+- dataset Currency `ref` -> Currency dataset dependency;
+- built-in currencies such as `copper`, `valor`, `justice`, `honor`, `conquest` -> no dataset dependency.
+
+Do not broadly interpret arbitrary unknown reward strings as dependencies.
 
 ## Constraints
-- Do not duplicate alive/dead transition tracking.
-- Do not alter generic `rpe_kill` filters/semantics.
-- Do not infer boss status from presentation data.
-- Preserve transport-bound action ownership.
-- Do not implement reward logic here.
+- Do not implement reward execution.
+- Do not modify Profile schema/state.
+- Do not add reward UI yet.
+- Preserve existing Achievement criteria/trigger behavior.
+- Preserve unsupported reward data.
 
 ## Acceptance criteria
-- [ ] Boss alive->dead triggers `rpe_boss_kill` exactly once.
-- [ ] Boss kill continues to trigger ordinary `rpe_kill`.
-- [ ] Non-boss kill never triggers `rpe_boss_kill`.
-- [ ] Already-dead updates cannot repeat either trigger.
-- [ ] Boss status comes from authoritative EventUnit state.
-- [ ] `unitRef` and `enemyOnly` filters work.
-- [ ] Existing transport-bound kill ownership remains intact.
+- [ ] Existing Achievement definitions load without reward data loss.
+- [ ] Supported Item rewards normalize and round-trip.
+- [ ] Supported built-in/dataset Currency rewards normalize and round-trip.
+- [ ] Supported reward IDs are stable and duplicate-safe.
+- [ ] Unsupported legacy reward records are preserved.
+- [ ] Supported reward refs participate in dependency extraction.
+- [ ] Built-in Currency refs do not create bogus Dataset dependencies.
+- [ ] Dataset schema becomes 17 without lowering future markers.
+- [ ] No reward gameplay mutation occurs in this task.
 
 ## Coding-agent instructions
-Read the PDD and completed issues #23, #24 and #28, then inspect the current `rpe_kill` alive->dead path, trusted action-owner helper, EventUnit boss normalization and team/enemy determination before editing. Implement Task 7 only. Extend the existing authoritative kill event rather than building a parallel death detector. Review every acceptance criterion and report changed files, validation performed, and deviations.
+Read the PDD, inspect current `Achievement.lua` reward preservation, Database Dataset schema/migration/export-import behavior, nested stable-ID patterns, Currency built-in resolution, and dependency extraction before editing. Implement Task 8 only. This task defines safe structured data while retaining opaque/unknown legacy records; do not invent execution semantics or additional reward types. Review every acceptance criterion and report changed files, validation performed, and deviations.

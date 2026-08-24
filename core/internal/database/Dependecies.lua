@@ -17,6 +17,14 @@ local function ensureTable(value)
     return {}
 end
 
+local function trimText(value)
+    if type(value) ~= "string" then
+        return ""
+    end
+
+    return value:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
 local function sortKeys(values)
     table.sort(values, function(left, right)
         return tostring(left or "") < tostring(right or "")
@@ -460,6 +468,14 @@ local ACHIEVEMENT_FILTER_REFERENCE_FIELDS = {
     "achievementRef",
 }
 
+local BUILTIN_CURRENCY_REFERENCES = {
+    copper = true,
+    valor = true,
+    justice = true,
+    honor = true,
+    conquest = true,
+}
+
 local function getAchievementSourceRefs(achievement)
     local refs = {}
     if type(achievement) ~= "table" then
@@ -477,6 +493,26 @@ local function getAchievementSourceRefs(achievement)
                 if type(reference) == "string" and reference ~= "" then
                     refs[#refs + 1] = reference
                 end
+            end
+        end
+    end
+
+    local rewards = type(achievement.rewards) == "table" and achievement.rewards or {}
+    for index = 1, #rewards do
+        local reward = rewards[index]
+        if type(reward) == "table" then
+            local rewardType = string.lower(trimText(reward.type))
+            local reference = trimText(reward.ref)
+            local isSupportedReward = rewardType == "item" or rewardType == "currency"
+            local isBuiltinCurrency = rewardType == "currency"
+                and type(reference) == "string"
+                and BUILTIN_CURRENCY_REFERENCES[string.lower(reference)] == true
+            if isSupportedReward
+                and type(reference) == "string"
+                and reference ~= ""
+                and not isBuiltinCurrency
+            then
+                refs[#refs + 1] = reference
             end
         end
     end
@@ -568,6 +604,26 @@ local function pruneAchievementReferences(achievements, deletedDatasetId, delete
                         and isDeletedReference(filters[fieldName], deletedDatasetId, deletedRef)
                     then
                         filters[fieldName] = nil
+                        mutated = true
+                    end
+                end
+            end
+        end
+
+        local rewards = type(achievement) == "table" and achievement.rewards or nil
+        if type(rewards) == "table" then
+            for rewardIndex = 1, #rewards do
+                local reward = rewards[rewardIndex]
+                if type(reward) == "table" then
+                    local rewardType = string.lower(trimText(reward.type))
+                    local rewardCollectionKey = rewardType == "item" and "items"
+                        or rewardType == "currency" and "currencies"
+                        or nil
+                    if rewardCollectionKey
+                        and (not collectionKey or collectionKey == rewardCollectionKey)
+                        and isDeletedReference(trimText(reward.ref), deletedDatasetId, deletedRef)
+                    then
+                        reward.ref = nil
                         mutated = true
                     end
                 end

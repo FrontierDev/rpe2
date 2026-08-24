@@ -9,7 +9,7 @@ local Dependecies = Database.Dependecies or {}
 local SCHEMA = {
     profiles = 6,
     rulesets = 1,
-    datasets = 16,
+    datasets = 17,
     globalSettings = 1,
 }
 
@@ -410,6 +410,48 @@ local function normalizeGuildSettings(value)
     return normalized
 end
 
+local function normalizeAchievementEntry(record)
+    if type(record) ~= "table" then
+        return deepCopy(record)
+    end
+
+    local source = record
+    local classes = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes or {}
+    local achievementClass = classes and classes.Achievement or nil
+
+    if achievementClass
+        and type(achievementClass.FromTable) == "function"
+        and type(achievementClass.ToTable) == "function"
+    then
+        local instance = achievementClass.FromTable(deepCopy(source))
+        local normalized = achievementClass.ToTable(instance)
+        if type(normalized) == "table" then
+            local merged = deepCopy(source)
+            for key, value in pairs(normalized) do
+                merged[key] = value
+            end
+            return merged
+        end
+    end
+
+    -- Achievement.lua loads after Database.lua. Preserve old records during
+    -- the first initialization pass; later passes apply the class contract.
+    return deepCopy(source)
+end
+
+local function normalizeAchievements(value)
+    if type(value) ~= "table" then
+        return {}
+    end
+
+    local normalized = deepCopy(value)
+    for index = 1, #value do
+        normalized[index] = normalizeAchievementEntry(value[index])
+    end
+
+    return normalized
+end
+
 local function normalizeDatasetRecord(record, fallbackId, fallbackName)
     local data = ensureTable(record)
     local datasetId = ensureString(data.id or fallbackId, "")
@@ -441,7 +483,7 @@ local function normalizeDatasetRecord(record, fallbackId, fallbackName)
         recipes = ensureTable(data.recipes),
         auras = ensureTable(data.auras),
         interactions = ensureTable(data.interactions),
-        achievements = ensureTable(data.achievements),
+        achievements = normalizeAchievements(data.achievements),
         guildSettings = normalizeGuildSettings(data.guildSettings),
         currencies = ensureTable(data.currencies),
     }
