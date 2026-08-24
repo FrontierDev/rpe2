@@ -19,6 +19,8 @@ local ENTRY_HEIGHT = 64
 local ENTRY_SPACING = 4
 local ENTRY_ROWS = 4
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+local RETRY_BUTTON_WIDTH = 100
+local RETRY_BUTTON_HEIGHT = 18
 
 local function ensureString(value)
     if value == nil then
@@ -83,6 +85,19 @@ local function getCompletionDate(completedAt)
 
     if type(date) == "function" then
         return date("%Y-%m-%d", timestamp)
+    end
+
+    return tostring(math.floor(timestamp))
+end
+
+local function getTimestampText(timestampValue)
+    local timestamp = tonumber(timestampValue)
+    if not timestamp or timestamp < 0 then
+        return nil
+    end
+
+    if type(date) == "function" then
+        return date("%Y-%m-%d %H:%M:%S", timestamp)
     end
 
     return tostring(math.floor(timestamp))
@@ -229,13 +244,284 @@ local function findCategory(categories, selectedKey)
     return nil
 end
 
-local function getStatusText(row)
-    local completionDate = getCompletionDate(row and row.state and row.state.completedAt)
-    if completionDate then
-        return "Complete\n" .. completionDate
+local function getRewardDefinitions(row)
+    local rewards = row and row.achievement and row.achievement.rewards
+    return type(rewards) == "table" and rewards or {}
+end
+
+local function getRewardState(row)
+    local state = row and row.state
+    local rewardState = type(state) == "table" and state.rewardState or nil
+    return type(rewardState) == "table" and rewardState or nil
+end
+
+local function getRewardEntryId(reward, index, usedIds)
+    local baseId = type(reward) == "table" and trimString(reward.id) or ""
+    if baseId == "" then
+        baseId = ("reward_%d"):format(index)
     end
 
-    return "Incomplete"
+    local rewardId = baseId
+    local suffix = 2
+    while usedIds[rewardId] do
+        rewardId = ("%s_%d"):format(baseId, suffix)
+        suffix = suffix + 1
+    end
+
+    usedIds[rewardId] = true
+    return rewardId
+end
+
+local function getRewardAmountText(amount)
+    local numeric = tonumber(amount)
+    if numeric and numeric == numeric and numeric ~= math.huge and numeric ~= -math.huge then
+        return tostring(math.max(0, math.floor(numeric)))
+    end
+
+    local configured = trimString(amount)
+    return configured ~= "" and configured or "unknown"
+end
+
+local function resolveItemRewardName(itemRef)
+    local normalizedRef = trimString(itemRef)
+    if normalizedRef == "" then
+        return "Unknown item"
+    end
+
+    if type(Registry.ResolveItemReference) == "function" then
+        local callOk, _, item = pcall(Registry.ResolveItemReference, Registry, normalizedRef)
+        if callOk and type(item) == "table" then
+            local name = trimString(item.name)
+            if name ~= "" then
+                return name
+            end
+        end
+    end
+
+    return normalizedRef .. " (unavailable)"
+end
+
+local function resolveCurrencyRewardName(currencyRef)
+    local normalizedRef = trimString(currencyRef)
+    if normalizedRef == "" then
+        return "Unknown currency"
+    end
+
+    local currencyKey = normalizedRef
+    if type(Profile.NormalizeCurrencyKey) == "function" then
+        local normalizeOk, normalized = pcall(Profile.NormalizeCurrencyKey, normalizedRef)
+        if normalizeOk and trimString(normalized) ~= "" then
+            currencyKey = trimString(normalized)
+        end
+    end
+
+    if type(Profile.ResolveCurrencyDefinition) == "function" then
+        local resolveOk, definition = pcall(Profile.ResolveCurrencyDefinition, currencyKey)
+        if resolveOk and type(definition) == "table" then
+            local name = trimString(definition.name)
+            if name ~= "" then
+                return name
+            end
+        end
+    end
+
+    return currencyKey .. " (unavailable)"
+end
+
+local function getRewardEntry(state, rewardId)
+    local entries = state and state.entries
+    local entry = type(entries) == "table" and entries[rewardId] or nil
+    return type(entry) == "table" and entry or nil
+end
+
+local function buildRewardLines(row)
+    local rewards = getRewardDefinitions(row)
+    local rewardState = getRewardState(row)
+    local lines = {}
+    local usedIds = {}
+
+    for index = 1, #rewards do
+        local reward = rewards[index]
+        local rewardId = getRewardEntryId(reward, index, usedIds)
+        local rewardType = type(reward) == "table" and string.lower(trimString(reward.type)) or ""
+        local rewardRef = type(reward) == "table" and trimString(reward.ref) or ""
+        local entry = getRewardEntry(rewardState, rewardId)
+
+        if rewardType == "item" then
+            local name = resolveItemRewardName(rewardRef)
+            local line = ("Item: %s x%s"):format(name, getRewardAmountText(reward.amount))
+            local appliedAmount = tonumber(entry and entry.appliedAmount)
+            if appliedAmount and appliedAmount == appliedAmount and appliedAmount >= 0 then
+                line = ("%s (applied %d)"):format(line, math.floor(appliedAmount))
+            end
+            local appliedAt = getTimestampText(entry and entry.appliedAt)
+            if appliedAt then
+                line = ("%s on %s"):format(line, appliedAt)
+            end
+            local entryReason = trimString(entry and entry.reason)
+            if entryReason ~= "" then
+                line = ("%s; reason: %s"):format(line, entryReason)
+            end
+            lines[#lines + 1] = line
+        elseif rewardType == "currency" then
+            local name = resolveCurrencyRewardName(rewardRef)
+            local line = ("Currency: %s x%s"):format(name, getRewardAmountText(reward.amount))
+            local appliedAmount = tonumber(entry and entry.appliedAmount)
+            if appliedAmount and appliedAmount == appliedAmount and appliedAmount >= 0 then
+                line = ("%s (applied %d)"):format(line, math.floor(appliedAmount))
+            end
+            local appliedAt = getTimestampText(entry and entry.appliedAt)
+            if appliedAt then
+                line = ("%s on %s"):format(line, appliedAt)
+            end
+            local entryReason = trimString(entry and entry.reason)
+            if entryReason ~= "" then
+                line = ("%s; reason: %s"):format(line, entryReason)
+            end
+            lines[#lines + 1] = line
+        else
+            local unsupported = "Unsupported reward data"
+            if rewardType ~= "" then
+                unsupported = ("Unsupported reward: %s"):format(rewardType)
+            end
+            if rewardRef ~= "" then
+                unsupported = ("%s (%s)"):format(unsupported, rewardRef)
+            end
+            lines[#lines + 1] = unsupported
+        end
+    end
+
+    return lines
+end
+
+local function hasUnsupportedRewardData(row)
+    local rewards = getRewardDefinitions(row)
+    for index = 1, #rewards do
+        local reward = rewards[index]
+        local rewardType = type(reward) == "table" and string.lower(trimString(reward.type)) or ""
+        if rewardType ~= "item" and rewardType ~= "currency" then
+            return true
+        end
+    end
+
+    local rewardState = getRewardState(row)
+    if rewardState and rewardState.reason == "unsupported-reward-record" then
+        return true
+    end
+
+    local entries = rewardState and rewardState.entries
+    if type(entries) == "table" then
+        for _, entry in pairs(entries) do
+            if type(entry) == "table" and entry.status == "unsupported" then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+local function getRewardStatusText(row)
+    local rewards = getRewardDefinitions(row)
+    local rewardState = getRewardState(row)
+    local completedAt = row and row.state and row.state.completedAt
+    local hasRewards = #rewards > 0
+
+    if not rewardState then
+        if completedAt ~= nil and hasRewards then
+            return "Rewards: Not retroactively granted (legacy completion)"
+        end
+        if hasUnsupportedRewardData(row) and hasRewards then
+            return "Rewards: Contains unsupported legacy reward data"
+        end
+        if hasRewards then
+            return "Rewards: Pending"
+        end
+        return ""
+    end
+
+    local status = string.lower(trimString(rewardState.status))
+    if status == "complete" then
+        if hasUnsupportedRewardData(row) then
+            return "Rewards: Contains unsupported legacy reward data"
+        end
+        return "Rewards: Received"
+    elseif status == "failed" then
+        return "Rewards: Delivery failed"
+    elseif status == "recovery-required" then
+        return "Rewards: Recovery required"
+    elseif status == "in-progress" then
+        return "Rewards: Delivery in progress"
+    elseif status == "pending" then
+        return "Rewards: Pending"
+    elseif status == "legacy-skipped" then
+        return "Rewards: Not retroactively granted (legacy completion)"
+    end
+
+    if status ~= "" then
+        return ("Rewards: %s"):format(status)
+    end
+
+    return hasRewards and "Rewards: Pending" or ""
+end
+
+local function getRewardTimestampLines(row)
+    local rewardState = getRewardState(row)
+    if not rewardState then
+        return {}
+    end
+
+    local lines = {}
+    local startedAt = getTimestampText(rewardState.startedAt)
+    local completedAt = getTimestampText(rewardState.completedAt)
+    local failedAt = getTimestampText(rewardState.failedAt)
+    if startedAt then
+        lines[#lines + 1] = "Reward started: " .. startedAt
+    end
+    if completedAt then
+        lines[#lines + 1] = "Rewards delivered: " .. completedAt
+    end
+    if failedAt then
+        lines[#lines + 1] = "Reward delivery failed: " .. failedAt
+    end
+
+    local reason = trimString(rewardState.reason)
+    if reason ~= "" then
+        lines[#lines + 1] = "Reward reason: " .. reason
+    end
+
+    return lines
+end
+
+local function findAchievementRow(rows, achievementRef)
+    local normalizedRef = trimString(achievementRef)
+    if normalizedRef == "" then
+        return nil
+    end
+
+    for index = 1, #rows do
+        if rows[index].achievementRef == normalizedRef then
+            return rows[index]
+        end
+    end
+
+    return nil
+end
+
+local function canRetryRewards(row)
+    local rewardState = getRewardState(row)
+    return rewardState and string.lower(trimString(rewardState.status)) == "failed"
+end
+
+local function getStatusText(row)
+    local completionDate = getCompletionDate(row and row.state and row.state.completedAt)
+    local status = completionDate and ("Complete\n" .. completionDate) or "Incomplete"
+    local rewardStatus = getRewardStatusText(row)
+    if rewardStatus ~= "" then
+        status = status .. "\n" .. rewardStatus
+    end
+
+    return status
 end
 
 local function getDisplayText(row)
@@ -249,6 +535,13 @@ local function getDisplayText(row)
     end
     if criterionProgress ~= "" then
         lines[#lines + 1] = criterionProgress
+    end
+    local rewardStatus = getRewardStatusText(row)
+    if rewardStatus ~= "" then
+        lines[#lines + 1] = rewardStatus
+    end
+    for index, rewardLine in ipairs(buildRewardLines(row)) do
+        lines[#lines + 1] = rewardLine
     end
 
     return table.concat(lines, "\n")
@@ -269,6 +562,16 @@ local function getTooltipLines(row)
     end
     if completionDate then
         lines[#lines + 1] = "Completed: " .. completionDate
+    end
+    local rewardStatus = getRewardStatusText(row)
+    if rewardStatus ~= "" then
+        lines[#lines + 1] = rewardStatus
+    end
+    for index, rewardLine in ipairs(buildRewardLines(row)) do
+        lines[#lines + 1] = rewardLine
+    end
+    for index, rewardTimestampLine in ipairs(getRewardTimestampLines(row)) do
+        lines[#lines + 1] = rewardTimestampLine
     end
     if #lines == 0 then
         lines[1] = "No additional achievement details."
@@ -302,6 +605,19 @@ end
 
 function AchievementsPage:GetSelectedAchievementRows()
     return filterAchievementRows(self.AllAchievementRows or {}, self.SelectedCategoryKey)
+end
+
+function AchievementsPage:UpdateRetryButton(selectedRows)
+    if not self.RetryButton then
+        return
+    end
+
+    local selectedRow = findAchievementRow(selectedRows or {}, self.SelectedAchievementRef)
+    if canRetryRewards(selectedRow) then
+        self.RetryButton:Show()
+    else
+        self.RetryButton:Hide()
+    end
 end
 
 function AchievementsPage:Build(parent, owner)
@@ -399,8 +715,34 @@ function AchievementsPage:Build(parent, owner)
     })
     UI.Utils.AnchorFill(self.ContentLayout, self.ContentPanel:GetContentFrame(), CONTENT_PADDING, 0, CONTENT_PADDING, 0)
 
+    self.RetryButton = UI.TextButton:New({
+        name = "RPEProfileAchievementsRetryRewardsButton",
+        width = RETRY_BUTTON_WIDTH,
+        height = RETRY_BUTTON_HEIGHT,
+        text = "Retry Rewards",
+        fontSize = 8,
+        border = false,
+    })
+    self.RetryButton:SetParent(self.ContentPanel:GetContentFrame())
+    self.RetryButton:Create()
+    self.RetryButton:GetFrame():SetPoint("TOPRIGHT", self.ContentPanel:GetContentFrame(), "TOPRIGHT", -CONTENT_PADDING, -2)
+    self.RetryButton:SetScript("OnClick", function()
+        local selectedRow = findAchievementRow(self:GetSelectedAchievementRows(), self.SelectedAchievementRef)
+        if not canRetryRewards(selectedRow) then
+            self:Refresh()
+            return
+        end
+
+        local achievements = Addon.Client and Addon.Client.Achievements or nil
+        if achievements and type(achievements.RetryRewards) == "function" then
+            pcall(achievements.RetryRewards, achievements, selectedRow.achievementRef)
+        end
+        self:Refresh()
+    end)
+    self.RetryButton:Hide()
+
     self.GridTitle = UI.CreateText(self.ContentLayout:GetFrame(), "RPEProfileAchievementsGridTitle", "Achievements", {
-        width = CONTENT_PANEL_WIDTH - (CONTENT_PADDING * 2),
+        width = CONTENT_PANEL_WIDTH - (CONTENT_PADDING * 2) - RETRY_BUTTON_WIDTH - 4,
         height = 18,
         justifyH = "LEFT",
     })
@@ -436,7 +778,7 @@ function AchievementsPage:Build(parent, owner)
         rowElementClass = UI.ScrollListEntry,
         rowWidth = CONTENT_PANEL_WIDTH - (CONTENT_PADDING * 2),
         categoryWidth = 48,
-        statusWidth = 72,
+        statusWidth = 118,
         categoryInsetLeft = 4,
         statusInsetRight = 4,
         rowWordWrap = true,
@@ -444,6 +786,26 @@ function AchievementsPage:Build(parent, owner)
     self.EntryScroll:SetParent(self.EntryPanel:GetContentFrame())
     self.EntryScroll:SetRowRenderer(function(row, achievementRow)
         local achievement = achievementRow and achievementRow.achievement or {}
+        row._achievementRef = achievementRow and achievementRow.achievementRef or ""
+        local rowFrame = row.GetFrame and row:GetFrame() or nil
+        if rowFrame then
+            rowFrame:EnableMouse(true)
+            if not row._achievementSelectionBound then
+                local selectAchievement = function(_, button)
+                    if button == "LeftButton" and row._achievementRef ~= "" then
+                        self.SelectedAchievementRef = row._achievementRef
+                        self:Refresh()
+                    end
+                end
+                if rowFrame.HookScript then
+                    rowFrame:HookScript("OnMouseUp", selectAchievement)
+                    row._achievementSelectionBound = true
+                elseif rowFrame.SetScript then
+                    rowFrame:SetScript("OnMouseUp", selectAchievement)
+                    row._achievementSelectionBound = true
+                end
+            end
+        end
         local iconMarkup = ("|T%s:24:24:0:0|t"):format(getAchievementIcon(achievement))
         row:SetCategory(iconMarkup)
         row:SetTestName(getDisplayText(achievementRow))
@@ -478,6 +840,7 @@ function AchievementsPage:Refresh()
 
     local selectedCategory = findCategory(self.CategoryRows, self.SelectedCategoryKey)
     local selectedRows = self:GetSelectedAchievementRows()
+    self:UpdateRetryButton(selectedRows)
 
     if self.CategoryList and self.CategoryList.SetItems then
         self.CategoryList:SetItems(self.CategoryRows)
