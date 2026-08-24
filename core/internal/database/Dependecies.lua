@@ -454,6 +454,8 @@ end
 
 local ACHIEVEMENT_FILTER_REFERENCE_FIELDS = {
     "currencyRef",
+    "itemRef",
+    "skillRef",
     "unitRef",
     "achievementRef",
 }
@@ -558,6 +560,8 @@ local function pruneAchievementReferences(achievements, deletedDatasetId, delete
                 for fieldIndex = 1, #ACHIEVEMENT_FILTER_REFERENCE_FIELDS do
                     local fieldName = ACHIEVEMENT_FILTER_REFERENCE_FIELDS[fieldIndex]
                     local fieldCollectionKey = fieldName == "currencyRef" and "currencies"
+                        or fieldName == "itemRef" and "items"
+                        or fieldName == "skillRef" and "skills"
                         or fieldName == "unitRef" and "units"
                         or "achievements"
                     if (not collectionKey or collectionKey == fieldCollectionKey)
@@ -1950,7 +1954,12 @@ function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
             end
         end
 
-        if collectionKey == "units" or collectionKey == "currencies" or collectionKey == "achievements" then
+        if collectionKey == "items"
+            or collectionKey == "skills"
+            or collectionKey == "units"
+            or collectionKey == "currencies"
+            or collectionKey == "achievements"
+        then
             if pruneAchievementReferences(dataset.achievements, nil, deletedRef, collectionKey) then
                 mutated = true
             end

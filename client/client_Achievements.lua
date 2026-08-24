@@ -16,6 +16,12 @@ local SUPPORTED_TRIGGERS = {
     rpe_kill = true,
     rpe_event_complete = true,
     achievement_earned = true,
+    item_gain = true,
+    skill_gain = true,
+    rpe_boss_kill = true,
+    rpe_damage = true,
+    rpe_healing = true,
+    rpe_event_started = true,
 }
 
 local function trimText(value)
@@ -153,6 +159,19 @@ local function getLocalPlayerName()
     return ""
 end
 
+local function matchesUnitFilters(filters, event)
+    local configuredUnit = trimText(filters.unitRef)
+    if configuredUnit ~= "" and configuredUnit ~= trimText(event.unitRef) then
+        return false
+    end
+
+    if filters.enemyOnly == true and event.isEnemy ~= true then
+        return false
+    end
+
+    return true
+end
+
 local function matchesCriterion(entry, trigger, context)
     local criterion = entry and entry.criterion or {}
     local filters = type(criterion.filters) == "table" and criterion.filters or {}
@@ -176,12 +195,27 @@ local function matchesCriterion(entry, trigger, context)
             and configuredCurrency ~= normalizeCurrencyReference(event.currencyRef) then
             return false
         end
-    elseif trigger == "rpe_kill" then
-        local configuredUnit = trimText(filters.unitRef)
-        if configuredUnit ~= "" and configuredUnit ~= trimText(event.unitRef) then
+    elseif trigger == "item_gain" then
+        local configuredItem = trimText(filters.itemRef)
+        if configuredItem ~= "" and configuredItem ~= trimText(event.itemRef) then
             return false
         end
-        if filters.enemyOnly == true and event.isEnemy ~= true then
+    elseif trigger == "skill_gain" then
+        local configuredSkill = trimText(filters.skillRef)
+        if configuredSkill ~= "" and configuredSkill ~= trimText(event.skillRef) then
+            return false
+        end
+    elseif trigger == "rpe_kill"
+        or trigger == "rpe_boss_kill"
+        or trigger == "rpe_damage"
+        or trigger == "rpe_healing"
+    then
+        if not matchesUnitFilters(filters, event) then
+            return false
+        end
+    elseif trigger == "rpe_event_started" then
+        local configuredEvent = trimText(filters.eventId)
+        if configuredEvent ~= "" and configuredEvent ~= trimText(event.eventId) then
             return false
         end
     elseif trigger == "achievement_earned" then

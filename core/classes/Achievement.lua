@@ -13,6 +13,12 @@ local SUPPORTED_TRIGGERS = {
     rpe_kill = true,
     rpe_event_complete = true,
     achievement_earned = true,
+    item_gain = true,
+    skill_gain = true,
+    rpe_boss_kill = true,
+    rpe_damage = true,
+    rpe_healing = true,
+    rpe_event_started = true,
 }
 
 local function ensureString(value)
