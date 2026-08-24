@@ -12,6 +12,103 @@ local function normalizeGuildKey(value)
     return key
 end
 
+local function cloneGuildValue(value)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local copy = {}
+    for key, nestedValue in pairs(value) do
+        copy[key] = cloneGuildValue(nestedValue)
+    end
+
+    return copy
+end
+
+local function mergeMissingGuildFields(target, source)
+    local changed = false
+
+    for key, sourceValue in pairs(source) do
+        local targetValue = target[key]
+        if targetValue == nil then
+            target[key] = cloneGuildValue(sourceValue)
+            changed = true
+        elseif type(targetValue) == "table" and type(sourceValue) == "table" then
+            if mergeMissingGuildFields(targetValue, sourceValue) then
+                changed = true
+            end
+        end
+    end
+
+    return changed
+end
+
+local function migrateLegacyGuildBucket(identity, guildKey)
+    if type(identity) ~= "table" or identity.inGuild == false then
+        return
+    end
+
+    local legacyKey = normalizeGuildKey(identity.guildName)
+    if legacyKey == "" or guildKey == "" or legacyKey == guildKey then
+        return
+    end
+
+    local state = Profile.GetGuildState()
+    local byGuild = type(state) == "table" and state.byGuild or nil
+    local sourceBucket = type(byGuild) == "table" and byGuild[legacyKey] or nil
+    if type(sourceBucket) ~= "table" then
+        return
+    end
+
+    local targetBucket = byGuild[guildKey]
+    if targetBucket ~= nil and type(targetBucket) ~= "table" then
+        -- Never replace an existing non-table value while recovering legacy
+        -- state. Keep the legacy bucket intact for compatibility recovery.
+        return
+    end
+
+    targetBucket = targetBucket or {}
+    if not mergeMissingGuildFields(targetBucket, sourceBucket) then
+        return
+    end
+
+    byGuild[guildKey] = targetBucket
+    Profile.SetGuildState(state)
+end
+
+-- GetGuildInfo exposes guild name and realm, but not a guild GUID on the
+-- target interface. Use the name/realm pair when the realm is available and
+-- retain the old name-only key as the deterministic compatibility fallback.
+function Profile.GetGuildKey(identity)
+    if type(identity) ~= "table" then
+        return normalizeGuildKey(identity)
+    end
+
+    if identity.inGuild == false then
+        return ""
+    end
+
+    local guildName = normalizeGuildKey(identity.guildName)
+    if guildName == "" then
+        return ""
+    end
+
+    local realmName = normalizeGuildKey(identity.realmName)
+    if realmName == "" then
+        realmName = normalizeGuildKey(identity.guildRealm)
+    end
+    if realmName == "" then
+        realmName = normalizeGuildKey(identity.realm)
+    end
+    local guildKey = guildName
+    if realmName ~= "" then
+        guildKey = guildName .. "-" .. realmName
+    end
+
+    migrateLegacyGuildBucket(identity, guildKey)
+    return guildKey
+end
+
 local function normalizeGuildRankRef(value)
     local reference = tostring(value or "")
     reference = reference:gsub("^%s+", ""):gsub("%s+$", "")

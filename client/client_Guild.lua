@@ -80,13 +80,22 @@ local function getGuildIdentity()
     local guildName = ""
     local guildRankName = ""
     local guildRankIndex = nil
+    local realmName = ""
 
     if type(GetGuildInfo) == "function" then
-        local ok, name, rankName, rankIndex = pcall(GetGuildInfo, "player")
+        local ok, name, rankName, rankIndex, guildRealmName = pcall(GetGuildInfo, "player")
         if ok then
             guildName = ensureString(name)
             guildRankName = ensureString(rankName)
             guildRankIndex = tonumber(rankIndex)
+            realmName = trimText(guildRealmName)
+        end
+    end
+
+    if realmName == "" and type(GetRealmName) == "function" then
+        local ok, currentRealm = pcall(GetRealmName)
+        if ok then
+            realmName = trimText(currentRealm)
         end
     end
 
@@ -95,6 +104,7 @@ local function getGuildIdentity()
         guildName = guildName,
         guildRankName = guildRankName,
         guildRankIndex = guildRankIndex,
+        realmName = realmName,
     }
 end
 
@@ -166,7 +176,11 @@ local function normalizeProgressionSlotCount(value)
 end
 
 local function getGuildKey(identity)
-    return trimText(identity and identity.guildName)
+    if type(Profile.GetGuildKey) ~= "function" then
+        return ""
+    end
+
+    return trimText(Profile.GetGuildKey(identity))
 end
 
 local function getAssignedGuildRankRef(identity)
