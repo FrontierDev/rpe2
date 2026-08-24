@@ -47,6 +47,7 @@ client/client_Achievements.lua
 client/client_Guild.lua
 client/client_Commands.lua
 client/character/inventory/Inventory.lua
+client/client_AchievementRewards.lua
 client/client_Crafting.lua
 client/conditions/Core.lua
 client/conditions/Level.lua

@@ -445,6 +445,10 @@ function Achievements:Initialize()
         end)
     end
 
+    if type(self.RecoverInProgressRewards) == "function" then
+        self:RecoverInProgressRewards()
+    end
+
     return self._inventoryListenerId ~= nil or self._skillListenerId ~= nil
 end
 
@@ -506,6 +510,12 @@ function Achievements:_CommitState(achievementRef, achievement, state, options)
         self:ProcessTrigger("achievement_earned", dependentContext)
         if not (type(options) == "table" and options.announce == false) then
             announceAchievement(achievement)
+        end
+
+        if type(self.DeliverRewards) == "function" then
+            pcall(self.DeliverRewards, self, achievementRef, achievement, {
+                newlyCompleted = true,
+            })
         end
     end
 
