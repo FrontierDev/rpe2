@@ -72,7 +72,61 @@ local function getInventoryService()
     return Client.Inventory or {}
 end
 
-local function getInventoryItemQuantity(inventory, datasetId, itemId)
+local function deepEqual(left, right)
+    if left == right then
+        return true
+    end
+    if type(left) ~= type(right) then
+        return false
+    end
+    if type(left) ~= "table" then
+        return false
+    end
+
+    for key, value in pairs(left) do
+        if not deepEqual(value, right[key]) then
+            return false
+        end
+    end
+    for key in pairs(right) do
+        if left[key] == nil then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function normalizeInventoryRecord(record)
+    if type(record) ~= "table" then
+        return nil
+    end
+
+    local datasetId = tostring(record.dataset or "")
+    local itemId = tostring(record.id or "")
+    if datasetId == "" or itemId == "" then
+        return nil
+    end
+
+    return {
+        dataset = datasetId,
+        id = itemId,
+        modifications = deepCopy(type(record.modifications) == "table" and record.modifications or {}),
+        soulbound = record.soulbound == true,
+        quantity = math.max(1, math.floor(tonumber(record.quantity or record.count) or 1)),
+    }
+end
+
+local function sameInventoryVariant(left, right)
+    return type(left) == "table"
+        and type(right) == "table"
+        and tostring(left.dataset or "") == tostring(right.dataset or "")
+        and tostring(left.id or "") == tostring(right.id or "")
+        and left.soulbound == right.soulbound
+        and deepEqual(left.modifications or {}, right.modifications or {})
+end
+
+local function getInventoryItemVariants(inventory, datasetId, itemId)
     if type(inventory.GetItems) ~= "function" then
         return nil
     end
@@ -82,20 +136,62 @@ local function getInventoryItemQuantity(inventory, datasetId, itemId)
         return nil
     end
 
-    local quantity = 0
+    local variants = {}
     for index = 1, #items do
-        local item = items[index]
-        if tostring(item and item.dataset or "") == datasetId
-            and tostring(item and item.id or "") == itemId
+        local item = normalizeInventoryRecord(items[index])
+        if item
+            and item.dataset == datasetId
+            and item.id == itemId
         then
-            quantity = quantity + math.max(0, math.floor(tonumber(item.quantity or item.count) or 0))
+            local existing = nil
+            for variantIndex = 1, #variants do
+                if sameInventoryVariant(variants[variantIndex], item) then
+                    existing = variants[variantIndex]
+                    break
+                end
+            end
+
+            if existing then
+                existing.quantity = existing.quantity + item.quantity
+            else
+                variants[#variants + 1] = item
+            end
         end
     end
 
-    return quantity
+    return variants
 end
 
-local function removeInventoryItemQuantity(inventory, datasetId, itemId, quantity)
+local function getInventoryVariantQuantity(variants, variant)
+    for index = 1, #(variants or {}) do
+        local candidate = variants[index]
+        if sameInventoryVariant(candidate, variant) then
+            return math.max(0, math.floor(tonumber(candidate.quantity) or 0))
+        end
+    end
+
+    return 0
+end
+
+local function compareInventoryVariants(before, after)
+    for index = 1, #(before or {}) do
+        local expected = before[index]
+        if getInventoryVariantQuantity(after, expected) ~= getInventoryVariantQuantity(before, expected) then
+            return false
+        end
+    end
+
+    for index = 1, #(after or {}) do
+        local actual = after[index]
+        if getInventoryVariantQuantity(before, actual) ~= getInventoryVariantQuantity(after, actual) then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function removeInventoryVariantQuantity(inventory, variant, quantity)
     local remaining = math.max(0, math.floor(tonumber(quantity) or 0))
     if remaining == 0 then
         return true
@@ -111,11 +207,9 @@ local function removeInventoryItemQuantity(inventory, datasetId, itemId, quantit
     end
 
     for index = #items, 1, -1 do
-        local item = items[index]
-        if tostring(item and item.dataset or "") == datasetId
-            and tostring(item and item.id or "") == itemId
-        then
-            local itemQuantity = math.max(1, math.floor(tonumber(item.quantity or item.count) or 1))
+        local item = normalizeInventoryRecord(items[index])
+        if sameInventoryVariant(item, variant) then
+            local itemQuantity = item.quantity
             local removeQuantity = math.min(itemQuantity, remaining)
             local removedCallOk, removed = pcall(inventory.RemoveItem, index, removeQuantity)
             if not removedCallOk or not removed then
@@ -130,6 +224,17 @@ local function removeInventoryItemQuantity(inventory, datasetId, itemId, quantit
     end
 
     return false
+end
+
+local function findItemSnapshot(snapshots, datasetId, itemId)
+    for index = 1, #(snapshots or {}) do
+        local snapshot = snapshots[index]
+        if snapshot.datasetId == datasetId and snapshot.itemId == itemId then
+            return snapshot
+        end
+    end
+
+    return nil
 end
 
 local function restoreCurrencySnapshots(snapshots)
@@ -366,12 +471,12 @@ local function captureTransactionSnapshots(plan)
         local reward = plan.supported[index]
         if reward.type == "item" then
             if not seenItems[reward.ref] then
-                local quantity = getInventoryItemQuantity(
+                local variants = getInventoryItemVariants(
                     inventory,
                     reward.datasetId,
                     reward.itemId
                 )
-                if quantity == nil then
+                if variants == nil then
                     return nil, "item-snapshot-failed", {
                         rewardId = reward.id,
                         ref = reward.ref,
@@ -383,7 +488,7 @@ local function captureTransactionSnapshots(plan)
                     itemRef = reward.ref,
                     datasetId = reward.datasetId,
                     itemId = reward.itemId,
-                    amount = quantity,
+                    variants = variants,
                 }
             end
         elseif not seenCurrencies[reward.currencyRef] then
@@ -489,10 +594,9 @@ local function rollbackTransaction(transaction)
     local restored = true
     for index = #(transaction.itemAwards or {}), 1, -1 do
         local award = transaction.itemAwards[index]
-        if not removeInventoryItemQuantity(
+        if not removeInventoryVariantQuantity(
             inventory,
-            award.datasetId,
-            award.itemId,
+            award.variant,
             award.amount
         ) then
             restored = false
@@ -505,12 +609,12 @@ local function rollbackTransaction(transaction)
 
     for index = 1, #(transaction.itemSnapshots or {}) do
         local snapshot = transaction.itemSnapshots[index]
-        local actual = getInventoryItemQuantity(
+        local actual = getInventoryItemVariants(
             inventory,
             snapshot.datasetId,
             snapshot.itemId
         )
-        if actual == nil or actual ~= snapshot.amount then
+        if actual == nil or not compareInventoryVariants(snapshot.variants, actual) then
             restored = false
         end
     end
@@ -573,32 +677,61 @@ local function executeRewardPlan(achievementRef, state, plan)
         local reward = plan.supported[index]
         local entry = state.entries[reward.id]
         if reward.type == "item" then
-            local before = getInventoryItemQuantity(
+            local itemSnapshot = findItemSnapshot(
+                transaction.itemSnapshots,
+                reward.datasetId,
+                reward.itemId
+            )
+            local beforeVariants = getInventoryItemVariants(
                 inventory,
                 reward.datasetId,
                 reward.itemId
             )
+            if not itemSnapshot
+                or beforeVariants == nil
+                or not compareInventoryVariants(itemSnapshot.variants, beforeVariants)
+            then
+                return finishFailedTransaction(
+                    achievementRef,
+                    state,
+                    transaction,
+                    reward.id,
+                    "item-snapshot-drift"
+                )
+            end
+
             local addCallOk, addedRecord = pcall(inventory.AddItem, {
                 dataset = reward.datasetId,
                 id = reward.itemId,
                 quantity = reward.amount,
             })
-            local after = getInventoryItemQuantity(
+            local addedVariant = normalizeInventoryRecord(addedRecord)
+            local afterVariants = getInventoryItemVariants(
                 inventory,
                 reward.datasetId,
                 reward.itemId
             )
-            local actualAdded = before ~= nil and after ~= nil and after - before or nil
+            local beforeAdded = addedVariant
+                and getInventoryVariantQuantity(beforeVariants, addedVariant)
+                or nil
+            local afterAdded = addedVariant
+                and getInventoryVariantQuantity(afterVariants, addedVariant)
+                or nil
+            local actualAdded = beforeAdded ~= nil
+                and afterAdded ~= nil
+                and afterAdded - beforeAdded
+                or nil
             if actualAdded and actualAdded > 0 then
                 transaction.itemAwards[#transaction.itemAwards + 1] = {
-                    datasetId = reward.datasetId,
-                    itemId = reward.itemId,
+                    variant = deepCopy(addedVariant),
                     amount = actualAdded,
                 }
             end
 
             if not addCallOk
-                or not addedRecord
+                or addedVariant == nil
+                or beforeVariants == nil
+                or afterVariants == nil
                 or actualAdded ~= reward.amount
             then
                 entry.appliedAmount = math.max(0, tonumber(actualAdded) or 0)
@@ -630,7 +763,9 @@ local function executeRewardPlan(achievementRef, state, plan)
                 or addedAmount == nil
                 or before == nil
                 or not afterCallOk
-                or actualAdded ~= reward.amount
+                or actualAdded == nil
+                or actualAdded < 0
+                or actualAdded > reward.amount
             then
                 entry.appliedAmount = math.max(0, tonumber(actualAdded) or 0)
                 return finishFailedTransaction(
@@ -645,6 +780,11 @@ local function executeRewardPlan(achievementRef, state, plan)
             entry.status = "applied"
             entry.appliedAmount = actualAdded
             entry.appliedAt = getNow()
+            if actualAdded < reward.amount then
+                entry.reason = "currency-capped"
+            else
+                entry.reason = nil
+            end
         end
 
         local persisted, persistReason = persistRewardState(achievementRef, state)
