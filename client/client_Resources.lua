@@ -338,6 +338,34 @@ local function getEventUnitHealthValue(unit, eventState)
     return nil
 end
 
+local function getEventUnitHealthMaxValue(unit, eventState)
+    if type(unit) ~= "table" then
+        return nil
+    end
+
+    local combat = getCombat()
+    if combat and type(combat.GetUnitHealthEntry) == "function" then
+        local entry = combat:GetUnitHealthEntry(unit, { eventState = eventState })
+        if type(entry) == "table" then
+            return tonumber(entry.maxValue)
+        end
+    end
+
+    local healthResourceRef = eventState and eventState.healthResourceRef or nil
+    if type(healthResourceRef) ~= "string" or healthResourceRef == "" then
+        return nil
+    end
+
+    for index = 1, #(unit.resources or {}) do
+        local resource = unit.resources[index]
+        if resource and resource.resourceRef == healthResourceRef then
+            return tonumber(resource.maxValue)
+        end
+    end
+
+    return nil
+end
+
 local function resolveKillIsEnemy(targetClient, eventState, targetUnit)
     if type(targetUnit) ~= "table" then
         return false
@@ -477,7 +505,47 @@ local function queueRPEKillAchievement(targetClient, eventState, actionOwnerName
     return true
 end
 
-local function queueRPEHealthAchievement(targetClient, eventState, actionOwnerName, result, options)
+local function resolveQueuedRPEHealthResult(queued)
+    local result = queued and queued.result
+    if type(result) ~= "table" then
+        return nil
+    end
+
+    local healthBefore = tonumber(queued.healthBefore)
+    local healthAfter = healthBefore
+    local eventState = queued.eventState
+    local healthResourceRef = eventState and eventState.healthResourceRef or nil
+    if healthBefore ~= nil
+        and type(healthResourceRef) == "string"
+        and healthResourceRef ~= ""
+        and ResourceSync.ApplyResourceDeltasToResources
+    then
+        local healthMaxValue = tonumber(queued.healthMaxBefore)
+            or tonumber(result.healthMaxValue)
+            or healthBefore
+        local simulatedResources = {
+            {
+                resourceRef = healthResourceRef,
+                currentValue = healthBefore,
+                maxValue = healthMaxValue,
+            },
+        }
+        ResourceSync.ApplyResourceDeltasToResources(
+            simulatedResources,
+            queued.resourceDeltas,
+            { healthResourceRef = healthResourceRef }
+        )
+        healthAfter = tonumber(simulatedResources[1].currentValue) or healthBefore
+    end
+
+    result.healthBefore = healthBefore
+    result.healthAfter = healthAfter
+    result.actualDamage = healthBefore ~= nil and math.max(0, healthBefore - healthAfter) or 0
+    result.actualHealing = healthBefore ~= nil and math.max(0, healthAfter - healthBefore) or 0
+    return result
+end
+
+local function queueRPEHealthAchievement(targetClient, eventState, actionOwnerName, result, resourceDeltas, options)
     if type(targetClient) ~= "table"
         or type(result) ~= "table"
         or type(result.targetUnit) ~= "table"
@@ -487,20 +555,66 @@ local function queueRPEHealthAchievement(targetClient, eventState, actionOwnerNa
         return false
     end
 
-    local actualDamage = math.max(0, tonumber(result.actualDamage) or 0)
-    local actualHealing = math.max(0, tonumber(result.actualHealing) or 0)
+    local healthBefore = tonumber(result.healthBefore)
+    local targetEventId = tonumber(result.targetEventId) or 0
+    if healthBefore == nil or targetEventId <= 0 then
+        return false
+    end
+
+    local scope = normalizePendingScope(options.scope)
+    local coalescedResourceDeltas = ResourceSync.CoalesceResourceDeltas
+        and ResourceSync.CoalesceResourceDeltas(resourceDeltas)
+        or resourceDeltas
+    if type(coalescedResourceDeltas) ~= "table" then
+        coalescedResourceDeltas = {}
+    end
+    targetClient.PendingRPEHealthAchievements = targetClient.PendingRPEHealthAchievements or {}
+    local pending = targetClient.PendingRPEHealthAchievements
+    for index = #pending, 1, -1 do
+        local queued = pending[index]
+        if queued
+            and queued.eventState == eventState
+            and queued.targetEventId == targetEventId
+            and queued.allowLocalEchoApply == true
+            and queued.scope == scope
+        then
+            queued.resourceDeltas = ResourceSync.CoalesceResourceDeltas
+                and ResourceSync.CoalesceResourceDeltas(queued.resourceDeltas, coalescedResourceDeltas)
+                or queued.resourceDeltas
+            queued.actionOwnerName = actionOwnerName
+            queued.result = result
+            resolveQueuedRPEHealthResult(queued)
+            return true
+        end
+    end
+
+    local healthAfter = tonumber(result.healthAfter)
+    if healthAfter == nil then
+        return false
+    end
+    local actualDamage = math.max(0, healthBefore - healthAfter)
+    local actualHealing = math.max(0, healthAfter - healthBefore)
     if actualDamage <= 0 and actualHealing <= 0 then
         return false
     end
 
-    targetClient.PendingRPEHealthAchievements = targetClient.PendingRPEHealthAchievements or {}
-    targetClient.PendingRPEHealthAchievements[#targetClient.PendingRPEHealthAchievements + 1] = {
+    result.healthBefore = healthBefore
+    result.healthAfter = healthAfter
+    result.actualDamage = actualDamage
+    result.actualHealing = actualHealing
+    local queued = {
         eventState = eventState,
         actionOwnerName = actionOwnerName,
+        healthBefore = healthBefore,
+        healthMaxBefore = tonumber(result.healthMaxValue),
+        resourceDeltas = coalescedResourceDeltas,
         result = result,
+        targetEventId = targetEventId,
         allowLocalEchoApply = true,
-        scope = normalizePendingScope(options.scope),
+        scope = scope,
     }
+    pending[#pending + 1] = queued
+    resolveQueuedRPEHealthResult(queued)
     return true
 end
 
@@ -564,6 +678,12 @@ local function settleQueuedRPEHealthAchievements(targetClient, expectedState, ag
     end
 
     local targetEventIds = {}
+    for targetEventId in pairs(aggregate.targetEventIds or {}) do
+        targetEventId = tonumber(targetEventId) or 0
+        if targetEventId > 0 then
+            targetEventIds[targetEventId] = true
+        end
+    end
     for index = 1, #(aggregate.targetedResourceDeltas or {}) do
         local targetEventId = tonumber(aggregate.targetedResourceDeltas[index].targetEventId) or 0
         if targetEventId > 0 then
@@ -583,8 +703,12 @@ local function settleQueuedRPEHealthAchievements(targetClient, expectedState, ag
             and queued.scope == normalizePendingScope(aggregate.scope)
             and targetEventIds[targetEventId]
         then
-            if committed == true then
-                notifyRPEHealthAchievement(targetClient, queued.eventState, queued.actionOwnerName, queued.result)
+            local settledResult = committed == true and resolveQueuedRPEHealthResult(queued) or nil
+            if settledResult
+                and ((tonumber(settledResult.actualDamage) or 0) > 0
+                    or (tonumber(settledResult.actualHealing) or 0) > 0)
+            then
+                notifyRPEHealthAchievement(targetClient, queued.eventState, queued.actionOwnerName, settledResult)
             end
             table.remove(pending, index)
             processed = processed + 1
@@ -954,6 +1078,7 @@ local function applyInboundResourceDeltasForTarget(targetClient, state, eventSta
     end
 
     local healthAfter = getEventUnitHealthValue(targetUnit, eventState)
+    local healthMaxValue = getEventUnitHealthMaxValue(targetUnit, eventState)
     local isDead = healthAfter ~= nil and healthAfter <= 0
     local actualDamage = 0
     local actualHealing = 0
@@ -970,6 +1095,9 @@ local function applyInboundResourceDeltasForTarget(targetClient, state, eventSta
         resourceOwnerName = resourceOwnerName,
         sender = sender,
         targetEventId = tonumber(targetEventId) or 0,
+        healthBefore = healthBefore,
+        healthAfter = healthAfter,
+        healthMaxValue = healthMaxValue,
         actualDamage = actualDamage,
         actualHealing = actualHealing,
         kill = wasAlive and isDead and {
@@ -1013,7 +1141,7 @@ local function applyQueuedLocalResourceDeltas(targetClient, state, targetEventId
         resourceDeltas
     )
     queueRPEKillAchievement(targetClient, eventState, playerName, result, options)
-    queueRPEHealthAchievement(targetClient, eventState, playerName, result, options)
+    queueRPEHealthAchievement(targetClient, eventState, playerName, result, resourceDeltas, options)
     local suppressLocalVisualRefresh = type(options) == "table" and options.suppressLocalVisualRefresh == true
     if result.eventUpdated and type(targetClient.QueueEventWidgetRefresh) == "function" and not suppressLocalVisualRefresh then
         queueScopedEventPortraitRefresh(targetClient, "resource-delta-local", targetEventId)
@@ -1064,7 +1192,6 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
             and batch.channelName == expectedState.channelName
             and normalizePendingScope(batch.scope) == scope
             and type(batch.resourceDeltas) == "table"
-            and #batch.resourceDeltas > 0
         then
             pendingBatches[batchKey] = nil
             local batchIndex = batch.allowLocalEchoApply == true and 1 or 0
@@ -1074,12 +1201,17 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
                     reason = "",
                     allowLocalEchoApply = batch.allowLocalEchoApply == true,
                     targetedResourceDeltas = {},
+                    targetEventIds = {},
                     threatUpdates = {},
                 }
                 batchedPayloads[batchIndex] = aggregate
             end
 
             aggregate.reason = mergeReasons(aggregate.reason, batch.reason)
+            local batchTargetEventId = tonumber(batch.targetEventId) or 0
+            if batchTargetEventId > 0 then
+                aggregate.targetEventIds[batchTargetEventId] = true
+            end
             for deltaIndex = 1, #batch.resourceDeltas do
                 local deltaEntry = batch.resourceDeltas[deltaIndex]
                 aggregate.targetedResourceDeltas[#aggregate.targetedResourceDeltas + 1] = {
@@ -1095,17 +1227,20 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
     end
 
     for _, aggregate in pairs(batchedPayloads) do
-        if type(aggregate) == "table" and type(aggregate.targetedResourceDeltas) == "table" and #aggregate.targetedResourceDeltas > 0 then
-            local sent = targetClient:SendClientResourceDeltaBatch(
-                expectedState,
-                aggregate.reason,
-                nil,
-                aggregate.targetedResourceDeltas,
-                {
-                    allowLocalEchoApply = aggregate.allowLocalEchoApply == true,
-                    threatUpdates = aggregate.threatUpdates,
-                }
-            )
+        if type(aggregate) == "table" and type(aggregate.targetedResourceDeltas) == "table" then
+            local sent = false
+            if #aggregate.targetedResourceDeltas > 0 then
+                sent = targetClient:SendClientResourceDeltaBatch(
+                    expectedState,
+                    aggregate.reason,
+                    nil,
+                    aggregate.targetedResourceDeltas,
+                    {
+                        allowLocalEchoApply = aggregate.allowLocalEchoApply == true,
+                        threatUpdates = aggregate.threatUpdates,
+                    }
+                )
+            end
             settleQueuedRPEKillAchievements(targetClient, expectedState, {
                 allowLocalEchoApply = aggregate.allowLocalEchoApply == true,
                 scope = scope,
@@ -1115,6 +1250,7 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
                 allowLocalEchoApply = aggregate.allowLocalEchoApply == true,
                 scope = scope,
                 targetedResourceDeltas = aggregate.targetedResourceDeltas,
+                targetEventIds = aggregate.targetEventIds,
             }, sent == true)
             flushed = sent or flushed
         end
@@ -1151,6 +1287,7 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
     end
 
     local targetedResourceDeltas = {}
+    local targetEventIds = {}
     local reason = ""
     for batchKey, batch in pairs(pendingBatches) do
         if type(batch) == "table"
@@ -1158,10 +1295,13 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
             and batch.channelName == state.channelName
             and normalizePendingScope(batch.scope) == "turn"
             and type(batch.resourceDeltas) == "table"
-            and #batch.resourceDeltas > 0
         then
             pendingBatches[batchKey] = nil
             reason = mergeReasons(reason, batch.reason)
+            local batchTargetEventId = tonumber(batch.targetEventId) or 0
+            if batchTargetEventId > 0 then
+                targetEventIds[batchTargetEventId] = true
+            end
             for deltaIndex = 1, #batch.resourceDeltas do
                 local deltaEntry = batch.resourceDeltas[deltaIndex]
                 targetedResourceDeltas[#targetedResourceDeltas + 1] = {
@@ -1179,6 +1319,12 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
         and ResourceSync.CoalesceTargetedResourceDeltas(targetedResourceDeltas)
         or targetedResourceDeltas
     if type(targetedResourceDeltas) ~= "table" or #targetedResourceDeltas == 0 then
+        settleQueuedRPEHealthAchievements(self, state, {
+            allowLocalEchoApply = true,
+            scope = "turn",
+            targetedResourceDeltas = {},
+            targetEventIds = targetEventIds,
+        }, false)
         return true
     end
 
@@ -1200,6 +1346,7 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
         allowLocalEchoApply = true,
         scope = "turn",
         targetedResourceDeltas = targetedResourceDeltas,
+        targetEventIds = targetEventIds,
     }, sent == true)
     return sent
 end
