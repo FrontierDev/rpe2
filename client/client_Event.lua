@@ -127,6 +127,7 @@ local function getEventStartupRuntime(client, eventId, createIfMissing)
         eventAurasSynced = false,
         resolvedStateRefreshed = false,
         consumablesQueued = false,
+        achievementStartIdentity = nil,
     }
     client.EventStartupRuntimeByEventId[normalizedEventId] = runtime
     return runtime
@@ -1391,6 +1392,12 @@ function Client:HandleEventStart(arguments, sender)
         startupRuntime.queued = false
     end
     setEventStartupPhase(nextState, startupRuntime, "starting")
+
+    local achievements = Client.Achievements
+    if achievements and type(achievements.HandleRPEEventStart) == "function" then
+        pcall(achievements.HandleRPEEventStart, achievements, nextState, startupRuntime)
+    end
+
     local wasLocalTurn = false
     self.EventUnitInteractionMarkers = {}
     self.LastLocalInteractionMarker = nil

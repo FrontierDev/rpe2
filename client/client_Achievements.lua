@@ -598,6 +598,59 @@ function Achievements:HandleRPEKill(context)
     return self:ProcessTrigger("rpe_kill", event)
 end
 
+local function getEventStartIdentity(eventState)
+    if type(eventState) ~= "table" then
+        return ""
+    end
+
+    local channelName = trimText(eventState.channelName)
+    local eventId = trimText(eventState.id)
+    local startedAt = trimText(eventState.startedAt)
+    if channelName == "" and eventId == "" and startedAt == "" then
+        return ""
+    end
+
+    return table.concat({ channelName, eventId, startedAt }, "\31")
+end
+
+function Achievements:HandleRPEEventStart(eventState, startupRuntime)
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return {
+            trigger = "rpe_event_started",
+            updated = 0,
+            completed = 0,
+        }
+    end
+
+    local marker = type(startupRuntime) == "table" and startupRuntime or eventState
+    local identity = getEventStartIdentity(eventState)
+    if identity ~= "" then
+        if marker.achievementStartIdentity == identity then
+            return {
+                trigger = "rpe_event_started",
+                updated = 0,
+                completed = 0,
+            }
+        end
+        marker.achievementStartIdentity = identity
+    elseif marker.achievementStartProcessed == true then
+        return {
+            trigger = "rpe_event_started",
+            updated = 0,
+            completed = 0,
+        }
+    end
+    marker.achievementStartProcessed = true
+
+    return self:ProcessTrigger("rpe_event_started", {
+        eventState = eventState,
+        eventId = eventState.id,
+        eventName = eventState.name,
+        source = "rpe-event-start",
+        authoritative = true,
+    })
+end
+
 function Achievements:HandleRPEEventComplete(eventState, reason)
     if type(eventState) ~= "table" then
         return {

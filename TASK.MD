@@ -1,79 +1,62 @@
 ## Goal
-Advance `skill_gain` criteria from actual positive persisted Skill increases.
+Advance `rpe_event_started` criteria exactly once from the accepted authoritative RPE Event-start path.
 
 Depends on: #23, #24
 
 ## Primary files
-- `core/internal/profile/Profile.lua`
-- `core/internal/database/Database.lua` only if the canonical setter must expose final applied level more clearly
+- `client/client_Event.lua`
 - `client/client_Achievements.lua`
-- existing direct Skill mutation call sites found by repository search
 
-## Canonical change boundary
-Prefer a small Profile-level Skill change listener/callback rather than making Profile persistence directly depend on `Client.Achievements`.
-
-Emit only after a successful canonical:
+## Authoritative integration point
+Use the existing accepted:
 
 ```lua
-Profile.SetSkillLevel(skillRef, value)
+Client:HandleEventStart(...)
 ```
 
-Calculate:
+path only after the incoming Event-start message/session has passed current validation and a real active Event state has been established.
 
-```text
-previousLevel
-updatedLevel
-actualGain = updatedLevel - previousLevel
-```
+Do not emit Achievement progress from:
+- Event Manager preview/opening;
+- local Event construction;
+- Event widget refresh;
+- repeated presentation/startup refresh.
 
-Dispatch only when:
+## Idempotency
+The same Event instance must not advance `rpe_event_started` more than once even if the Event-start path is replayed/reprocessed.
 
-```text
-actualGain > 0
-```
+Use a transient marker associated with the current active Event instance or existing Event startup runtime. Do not persist this delivery marker into Dataset or character Profile state.
 
-Use the actual persisted result, not the requested delta/value when normalization or bounds change it.
-
-## Runtime call-site audit
-Search for gameplay/Admin code that bypasses the Profile API with direct `Database.SetProfileSkillLevel(...)` calls. Runtime mutation should converge on the canonical Profile API so one Skill-gain boundary exists.
-
-Database normalization/loading must not emit gain events.
+Inspect the current Event identity/session fields before choosing the marker key; do not assume `eventState.id` alone uniquely identifies repeated runs if the runtime already has a stronger event-instance/session identity.
 
 ## Trigger context
 Conceptually:
 
 ```lua
 {
-    skillRef = "dataset:skill",
-    previousLevel = 4,
-    updatedLevel = 6,
-    amount = 2,
-    source = "profile-skill-change",
+    eventId = eventState.id,
+    eventName = eventState.name,
+    source = "rpe-event-start",
+    authoritative = true,
 }
 ```
 
-## Filter semantics
-If `filters.skillRef` exists, require exact qualified-reference match.
-
-## Expected Guild Admin behavior
-An officer `adjust_skill` increase should count naturally because the member's canonical Profile Skill state increased. A decrease remains a valid Admin mutation but must not count as `skill_gain`.
+If `filters.eventId` is configured, require exact match.
 
 ## Constraints
-- Do not emit from Profile load/normalization.
-- Do not count decreases or same-value writes.
-- Do not bypass existing Skill bounds/normalization.
-- Do not implement Item/Event/Combat triggers here.
+- Do not change Event startup/synchronization semantics.
+- Do not change `rpe_event_complete` behavior.
+- Do not add another Event frame or message path.
+- Do not trigger from UI/previews.
+- Do not implement Damage/Healing/Boss Kill here.
 
 ## Acceptance criteria
-- [ ] Positive actual Skill increase advances matching criteria.
-- [ ] Decrease does not progress.
-- [ ] Same-value set does not progress.
-- [ ] Progress amount equals actual persisted positive difference.
-- [ ] `skillRef` filter requires exact match.
-- [ ] Profile load/normalization does not emit gain.
-- [ ] Guild Admin increase counts through the canonical path.
-- [ ] Guild Admin decrease remains valid but does not count.
-- [ ] Existing Skill bounds/normalization remain authoritative.
+- [ ] One accepted authoritative Event start advances matching criteria once.
+- [ ] Duplicate/replayed handling of the same Event instance does not double-count.
+- [ ] Event Manager/UI preview/open does not count.
+- [ ] `eventId` filter is respected.
+- [ ] Existing Event startup/readiness synchronization remains unchanged.
+- [ ] Existing `rpe_event_complete` progression remains unchanged.
 
 ## Coding-agent instructions
-Read the PDD and issues #23–#24, then inspect `Profile.GetSkillLevel`, `Profile.SetSkillLevel`, Database persistence/normalization, and every runtime Skill mutation call site before editing. Implement Task 4 only. Create one canonical post-persist Skill-gain boundary, use the actual applied positive delta, and keep persistence layers decoupled from client runtime where possible. Review every acceptance criterion and report changed files, validation performed, and deviations.
+Read the PDD and issues #23–#24, then inspect `Client:HandleEventStart`, Event startup runtime/idempotency state, message/session validation, and the current Achievement dispatch API before editing. Implement Task 5 only. Attach the trigger only after authoritative Event acceptance and reuse existing Event-instance state for idempotency; do not infer authority from UI or local construction. Review every acceptance criterion and report changed files, validation performed, and deviations.
