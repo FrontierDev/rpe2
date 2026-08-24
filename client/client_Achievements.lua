@@ -598,6 +598,41 @@ function Achievements:HandleRPEKill(context)
     return self:ProcessTrigger("rpe_kill", event)
 end
 
+local function emptyTriggerResult(trigger)
+    return {
+        trigger = trigger,
+        updated = 0,
+        completed = 0,
+    }
+end
+
+local function processAuthoritativeHealthAchievement(achievements, trigger, context)
+    local event = type(context) == "table" and context or {}
+    local actionOwnerName = normalizeName(event.actionOwnerName)
+    local localPlayerName = getLocalPlayerName()
+    local amount = normalizeInteger(event.amount, 0)
+    if event.authoritative ~= true
+        or actionOwnerName == ""
+        or localPlayerName == ""
+        or actionOwnerName ~= localPlayerName
+        or amount <= 0
+    then
+        return emptyTriggerResult(trigger)
+    end
+
+    event.actionOwnerName = actionOwnerName
+    event.amount = amount
+    return achievements:ProcessTrigger(trigger, event)
+end
+
+function Achievements:HandleRPEDamage(context)
+    return processAuthoritativeHealthAchievement(self, "rpe_damage", context)
+end
+
+function Achievements:HandleRPEHealing(context)
+    return processAuthoritativeHealthAchievement(self, "rpe_healing", context)
+end
+
 local function getEventStartIdentity(eventState)
     if type(eventState) ~= "table" then
         return ""

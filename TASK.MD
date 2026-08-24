@@ -1,62 +1,85 @@
 ## Goal
-Advance `rpe_event_started` criteria exactly once from the accepted authoritative RPE Event-start path.
+Advance `rpe_damage` and `rpe_healing` criteria from actual committed health changes attributed to the authoritative local action owner.
 
 Depends on: #23, #24
 
 ## Primary files
-- `client/client_Event.lua`
+- `client/client_Resources.lua`
 - `client/client_Achievements.lua`
+- existing Resource/EventUnit helpers already used by authoritative kill detection
 
-## Authoritative integration point
-Use the existing accepted:
+## Authoritative source
+Use the same committed inbound Resource processing boundary already used for `rpe_kill`:
 
-```lua
-Client:HandleEventStart(...)
+```text
+RESOURCE_DELTA
+RESOURCE_DELTA_BATCH
 ```
 
-path only after the incoming Event-start message/session has passed current validation and a real active Event state has been established.
+Do not trigger from:
+- spell tooltip estimates;
+- spell-component preview;
+- locally predicted effect amounts;
+- outbound/requested values before committed state arrives.
 
-Do not emit Achievement progress from:
-- Event Manager preview/opening;
-- local Event construction;
-- Event widget refresh;
-- repeated presentation/startup refresh.
+## Health identification
+Inspect the current Resource/death helpers and reuse the repository's canonical health Resource semantics. Do not hard-code a parallel health identifier if a resolver/helper already exists.
 
-## Idempotency
-The same Event instance must not advance `rpe_event_started` more than once even if the Event-start path is replayed/reprocessed.
+For the committed health value:
 
-Use a transient marker associated with the current active Event instance or existing Event startup runtime. Do not persist this delivery marker into Dataset or character Profile state.
+```text
+actualDamage  = max(0, previousHealth - updatedHealth)
+actualHealing = max(0, updatedHealth - previousHealth)
+```
 
-Inspect the current Event identity/session fields before choosing the marker key; do not assume `eventState.id` alone uniquely identifies repeated runs if the runtime already has a stronger event-instance/session identity.
+This must naturally limit progress to the amount actually applied, excluding overkill/overheal beyond the committed state transition.
+
+## Ownership/security
+Reuse the transport-bound action-owner rule already established for `rpe_kill`.
+
+Do not trust a payload actor field unless it matches the authoritative transport/action context used by the current resource protocol.
+
+Only credit the local player's own Achievement Profile for actions authoritatively attributed to that player.
 
 ## Trigger context
 Conceptually:
 
 ```lua
 {
-    eventId = eventState.id,
-    eventName = eventState.name,
-    source = "rpe-event-start",
+    unitRef = "dataset:unit",
+    amount = actualAppliedAmount,
+    isEnemy = true,
+    actionOwnerName = trustedActor,
     authoritative = true,
 }
 ```
 
-If `filters.eventId` is configured, require exact match.
+## Filters
+Apply optional:
+- exact `unitRef`;
+- `enemyOnly` where configured.
+
+Determine enemy/friendly status from the same Event/team semantics already used by `rpe_kill`; do not invent name-based allegiance logic.
+
+## Single/batch parity
+Single and batched Resource Delta handlers must produce equivalent Achievement semantics and must not both count the same committed state change.
 
 ## Constraints
-- Do not change Event startup/synchronization semantics.
-- Do not change `rpe_event_complete` behavior.
-- Do not add another Event frame or message path.
-- Do not trigger from UI/previews.
-- Do not implement Damage/Healing/Boss Kill here.
+- Preserve existing Resource synchronization behavior.
+- Preserve exactly-once `rpe_kill` alive->dead behavior.
+- Do not change server combat calculation merely to expose an Achievement hook.
+- Do not implement boss-specific semantics in this task.
 
 ## Acceptance criteria
-- [ ] One accepted authoritative Event start advances matching criteria once.
-- [ ] Duplicate/replayed handling of the same Event instance does not double-count.
-- [ ] Event Manager/UI preview/open does not count.
-- [ ] `eventId` filter is respected.
-- [ ] Existing Event startup/readiness synchronization remains unchanged.
-- [ ] Existing `rpe_event_complete` progression remains unchanged.
+- [ ] Committed health loss advances `rpe_damage` by actual loss.
+- [ ] Committed health gain advances `rpe_healing` by actual restoration.
+- [ ] Overkill/overheal cannot inflate progress beyond committed health change.
+- [ ] Non-health Resource changes do not count.
+- [ ] Preview/uncommitted effects do not count.
+- [ ] Another player's action cannot credit the local Profile.
+- [ ] `unitRef` and `enemyOnly` filters work.
+- [ ] Single/batch paths do not double-count one committed delta.
+- [ ] Existing `rpe_kill` remains exactly once per authoritative alive->dead transition.
 
 ## Coding-agent instructions
-Read the PDD and issues #23–#24, then inspect `Client:HandleEventStart`, Event startup runtime/idempotency state, message/session validation, and the current Achievement dispatch API before editing. Implement Task 5 only. Attach the trigger only after authoritative Event acceptance and reuse existing Event-instance state for idempotency; do not infer authority from UI or local construction. Review every acceptance criterion and report changed files, validation performed, and deviations.
+Read the PDD and completed issues #23–#24, then inspect the current authoritative Resource Delta single/batch handlers, health/death detection, EventUnit/team resolution, and transport-bound kill ownership before editing. Implement Task 6 only. Derive progress from before/after committed health state, not requested or preview values. Preserve Resource protocol behavior and kill semantics. Review every acceptance criterion and report changed files, validation performed, and deviations.

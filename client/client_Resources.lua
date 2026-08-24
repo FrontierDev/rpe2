@@ -399,6 +399,53 @@ local function notifyRPEKillAchievement(targetClient, eventState, actionOwnerNam
     )
 end
 
+local function notifyRPEHealthAchievement(targetClient, eventState, actionOwnerName, result)
+    if type(result) ~= "table" or type(result.targetUnit) ~= "table" then
+        return
+    end
+
+    local localPlayerName = resolveLocalPlayerName()
+    local normalizedActionOwnerName = Common.NormalizeName
+        and Common.NormalizeName(actionOwnerName)
+        or tostring(actionOwnerName or "")
+    if normalizedActionOwnerName == ""
+        or localPlayerName == ""
+        or normalizedActionOwnerName ~= localPlayerName
+    then
+        return
+    end
+
+    local achievements = Addon.Client and Addon.Client.Achievements or nil
+    if not achievements then
+        return
+    end
+
+    local targetUnit = result.targetUnit
+    local context = {
+        authoritative = true,
+        actionOwnerName = normalizedActionOwnerName,
+        actorName = normalizedActionOwnerName,
+        eventState = eventState,
+        targetEventId = result.targetEventId,
+        targetUnit = targetUnit,
+        unitRef = targetUnit.registryID or targetUnit.unitRef or targetUnit.ref,
+        isEnemy = resolveKillIsEnemy(targetClient, eventState, targetUnit),
+        source = "resource-delta",
+    }
+
+    local actualDamage = math.max(0, tonumber(result.actualDamage) or 0)
+    if actualDamage > 0 and type(achievements.HandleRPEDamage) == "function" then
+        context.amount = actualDamage
+        pcall(achievements.HandleRPEDamage, achievements, context)
+    end
+
+    local actualHealing = math.max(0, tonumber(result.actualHealing) or 0)
+    if actualHealing > 0 and type(achievements.HandleRPEHealing) == "function" then
+        context.amount = actualHealing
+        pcall(achievements.HandleRPEHealing, achievements, context)
+    end
+end
+
 local function getTrustedTransportActionOwner(arguments, sender)
     local claimedPlayerName = Common.NormalizeName(arguments and arguments[2])
     local transportSenderName = Common.NormalizeName(sender)
@@ -836,6 +883,12 @@ local function applyInboundResourceDeltasForTarget(targetClient, state, eventSta
 
     local healthAfter = getEventUnitHealthValue(targetUnit, eventState)
     local isDead = healthAfter ~= nil and healthAfter <= 0
+    local actualDamage = 0
+    local actualHealing = 0
+    if healthBefore ~= nil and healthAfter ~= nil then
+        actualDamage = math.max(0, healthBefore - healthAfter)
+        actualHealing = math.max(0, healthAfter - healthBefore)
+    end
 
     return {
         changed = cachedChanged or eventUpdated,
@@ -844,6 +897,9 @@ local function applyInboundResourceDeltasForTarget(targetClient, state, eventSta
         appliedDeltas = appliedDeltas or resourceDeltas,
         resourceOwnerName = resourceOwnerName,
         sender = sender,
+        targetEventId = tonumber(targetEventId) or 0,
+        actualDamage = actualDamage,
+        actualHealing = actualHealing,
         kill = wasAlive and isDead and {
             targetEventId = tonumber(targetEventId) or 0,
             targetUnit = targetUnit,
@@ -1830,6 +1886,7 @@ function Client:HandleResourceDelta(arguments, sender)
     local result = applyInboundResourceDeltasForTarget(self, state, eventState, playerName, sender, targetEventId, resourceDeltas)
     if transportActionOwner then
         notifyRPEKillAchievement(self, eventState, transportActionOwner, result)
+        notifyRPEHealthAchievement(self, eventState, transportActionOwner, result)
     end
 
     if eventState and ResourceSync.UpdateEventReadiness then
@@ -1955,6 +2012,7 @@ function Client:HandleResourceDeltaBatch(arguments, sender)
         )
         if transportActionOwner then
             notifyRPEKillAchievement(self, eventState, transportActionOwner, result)
+            notifyRPEHealthAchievement(self, eventState, transportActionOwner, result)
         end
         if result.changed then
             changed = true
