@@ -388,6 +388,23 @@ local function resolveKillIsEnemy(targetClient, eventState, targetUnit)
     return targetUnit.isPlayer ~= true
 end
 
+local function isBossEventUnit(unit)
+    if type(unit) ~= "table" then
+        return false
+    end
+
+    local eventUnitClass = Addon.Internal
+        and Addon.Internal.Database
+        and Addon.Internal.Database.Classes
+        and Addon.Internal.Database.Classes.EventUnit
+        or nil
+    if eventUnitClass and type(eventUnitClass.IsBoss) == "function" then
+        return eventUnitClass.IsBoss(unit) == true
+    end
+
+    return unit.boss == true
+end
+
 local function notifyRPEKillAchievement(targetClient, eventState, actionOwnerName, result)
     local kill = result and result.kill
     if type(kill) ~= "table" then
@@ -420,6 +437,8 @@ local function notifyRPEKillAchievement(targetClient, eventState, actionOwnerNam
             targetUnit = targetUnit,
             unitRef = targetUnit and (targetUnit.registryID or targetUnit.unitRef or targetUnit.ref) or nil,
             isEnemy = resolveKillIsEnemy(targetClient, eventState, targetUnit),
+            isBoss = kill.isBoss == true
+                or (kill.isBoss == nil and isBossEventUnit(targetUnit)),
             wasAlive = true,
             isDead = true,
             source = "resource-delta",
@@ -1103,6 +1122,7 @@ local function applyInboundResourceDeltasForTarget(targetClient, state, eventSta
         kill = wasAlive and isDead and {
             targetEventId = tonumber(targetEventId) or 0,
             targetUnit = targetUnit,
+            isBoss = isBossEventUnit(targetUnit),
         } or nil,
     }
 end

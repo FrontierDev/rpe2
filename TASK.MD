@@ -1,85 +1,66 @@
 ## Goal
-Advance `rpe_damage` and `rpe_healing` criteria from actual committed health changes attributed to the authoritative local action owner.
+Emit a boss-specific Achievement kill trigger while preserving the existing ordinary `rpe_kill` behavior and authority model.
 
-Depends on: #23, #24
+Depends on: #23, #24, #28
 
 ## Primary files
 - `client/client_Resources.lua`
 - `client/client_Achievements.lua`
-- existing Resource/EventUnit helpers already used by authoritative kill detection
+- `core/classes/EventUnit.lua` only if a narrow boss-state accessor is useful
 
-## Authoritative source
-Use the same committed inbound Resource processing boundary already used for `rpe_kill`:
+## Boss authority
+The current EventUnit model already normalizes a `boss` boolean. Use that authoritative EventUnit state.
 
-```text
-RESOURCE_DELTA
-RESOURCE_DELTA_BATCH
-```
+Do not infer boss status from:
+- unit name;
+- raid marker;
+- health quantity;
+- Achievement filters;
+- arbitrary client-side naming conventions.
 
-Do not trigger from:
-- spell tooltip estimates;
-- spell-component preview;
-- locally predicted effect amounts;
-- outbound/requested values before committed state arrives.
+## Kill semantics
+Reuse the existing authoritative alive->dead transition and transport-bound local action-owner validation.
 
-## Health identification
-Inspect the current Resource/death helpers and reuse the repository's canonical health Resource semantics. Do not hard-code a parallel health identifier if a resolver/helper already exists.
-
-For the committed health value:
+For an authoritative boss kill credited to the local player, emit both semantic triggers:
 
 ```text
-actualDamage  = max(0, previousHealth - updatedHealth)
-actualHealing = max(0, updatedHealth - previousHealth)
+rpe_kill
+rpe_boss_kill
 ```
 
-This must naturally limit progress to the amount actually applied, excluding overkill/overheal beyond the committed state transition.
+For an ordinary non-boss kill, emit only:
 
-## Ownership/security
-Reuse the transport-bound action-owner rule already established for `rpe_kill`.
+```text
+rpe_kill
+```
 
-Do not trust a payload actor field unless it matches the authoritative transport/action context used by the current resource protocol.
-
-Only credit the local player's own Achievement Profile for actions authoritatively attributed to that player.
+Do not replace or weaken generic kill progression.
 
 ## Trigger context
-Conceptually:
-
-```lua
-{
-    unitRef = "dataset:unit",
-    amount = actualAppliedAmount,
-    isEnemy = true,
-    actionOwnerName = trustedActor,
-    authoritative = true,
-}
-```
+Reuse the existing trusted kill context rather than constructing a second independent death-analysis path. Add confirmed boss state only as needed for matching/debugging.
 
 ## Filters
-Apply optional:
-- exact `unitRef`;
-- `enemyOnly` where configured.
+`rpe_boss_kill` must respect the Task 1 filter contract:
+- optional exact `unitRef`;
+- optional `enemyOnly`.
 
-Determine enemy/friendly status from the same Event/team semantics already used by `rpe_kill`; do not invent name-based allegiance logic.
-
-## Single/batch parity
-Single and batched Resource Delta handlers must produce equivalent Achievement semantics and must not both count the same committed state change.
+Use existing Event/team semantics for enemy status.
 
 ## Constraints
-- Preserve existing Resource synchronization behavior.
-- Preserve exactly-once `rpe_kill` alive->dead behavior.
-- Do not change server combat calculation merely to expose an Achievement hook.
-- Do not implement boss-specific semantics in this task.
+- Do not duplicate alive/dead transition tracking.
+- Do not alter generic `rpe_kill` filters/semantics.
+- Do not infer boss status from presentation data.
+- Preserve transport-bound action ownership.
+- Do not implement reward logic here.
 
 ## Acceptance criteria
-- [ ] Committed health loss advances `rpe_damage` by actual loss.
-- [ ] Committed health gain advances `rpe_healing` by actual restoration.
-- [ ] Overkill/overheal cannot inflate progress beyond committed health change.
-- [ ] Non-health Resource changes do not count.
-- [ ] Preview/uncommitted effects do not count.
-- [ ] Another player's action cannot credit the local Profile.
+- [ ] Boss alive->dead triggers `rpe_boss_kill` exactly once.
+- [ ] Boss kill continues to trigger ordinary `rpe_kill`.
+- [ ] Non-boss kill never triggers `rpe_boss_kill`.
+- [ ] Already-dead updates cannot repeat either trigger.
+- [ ] Boss status comes from authoritative EventUnit state.
 - [ ] `unitRef` and `enemyOnly` filters work.
-- [ ] Single/batch paths do not double-count one committed delta.
-- [ ] Existing `rpe_kill` remains exactly once per authoritative alive->dead transition.
+- [ ] Existing transport-bound kill ownership remains intact.
 
 ## Coding-agent instructions
-Read the PDD and completed issues #23–#24, then inspect the current authoritative Resource Delta single/batch handlers, health/death detection, EventUnit/team resolution, and transport-bound kill ownership before editing. Implement Task 6 only. Derive progress from before/after committed health state, not requested or preview values. Preserve Resource protocol behavior and kill semantics. Review every acceptance criterion and report changed files, validation performed, and deviations.
+Read the PDD and completed issues #23, #24 and #28, then inspect the current `rpe_kill` alive->dead path, trusted action-owner helper, EventUnit boss normalization and team/enemy determination before editing. Implement Task 7 only. Extend the existing authoritative kill event rather than building a parallel death detector. Review every acceptance criterion and report changed files, validation performed, and deviations.

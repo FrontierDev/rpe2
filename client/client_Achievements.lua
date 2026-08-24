@@ -159,6 +159,23 @@ local function getLocalPlayerName()
     return ""
 end
 
+local function isBossEventUnit(unit)
+    if type(unit) ~= "table" then
+        return false
+    end
+
+    local eventUnitClass = Addon.Internal
+        and Addon.Internal.Database
+        and Addon.Internal.Database.Classes
+        and Addon.Internal.Database.Classes.EventUnit
+        or nil
+    if eventUnitClass and type(eventUnitClass.IsBoss) == "function" then
+        return eventUnitClass.IsBoss(unit) == true
+    end
+
+    return unit.boss == true
+end
+
 local function matchesUnitFilters(filters, event)
     local configuredUnit = trimText(filters.unitRef)
     if configuredUnit ~= "" and configuredUnit ~= trimText(event.unitRef) then
@@ -595,7 +612,19 @@ function Achievements:HandleRPEKill(context)
         }
     end
 
-    return self:ProcessTrigger("rpe_kill", event)
+    local result = self:ProcessTrigger("rpe_kill", event)
+    local isBoss = event.isBoss
+    if isBoss == nil then
+        isBoss = isBossEventUnit(event.targetUnit)
+    end
+    if isBoss ~= true then
+        return result
+    end
+
+    local bossResult = self:ProcessTrigger("rpe_boss_kill", event)
+    result.updated = (tonumber(result.updated) or 0) + (tonumber(bossResult.updated) or 0)
+    result.completed = (tonumber(result.completed) or 0) + (tonumber(bossResult.completed) or 0)
+    return result
 end
 
 local function emptyTriggerResult(trigger)
