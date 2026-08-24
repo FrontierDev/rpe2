@@ -1,81 +1,210 @@
-## Goal
-Execute supported Item/Currency Achievement rewards exactly once after a newly completed Achievement, using canonical mutation APIs and persistent transaction state.
+# Fix Issue #33 rev 1 — multiple rewards for the same Item reference
 
-Depends on: #25, #30, #31, #32
+The current `client/client_AchievementRewards.lua` implementation still has one transaction-state bug.
 
-## Primary files
-- `client/client_Achievements.lua`
-- optionally a focused new `client/client_AchievementRewards.lua` if that fits current organization better
-- `core/internal/profile/Achievements.lua`
-- existing `core/internal/profile/Currencies.lua`
-- existing `client/character/inventory/Inventory.lua`
-- `RPEngine_Dev.toc` if a new runtime file is introduced
+## Problem
 
-## Completion ordering
-Do not rewrite existing Achievement completion semantics.
+Multiple Item rewards that reference the same `datasetId:itemId` fail incorrectly.
 
-Required ordering is conceptually:
+Example:
 
-```text
-criterion progress persisted
-        ↓
-completedAt persisted
-        ↓
-existing completion/meta/UI/announcement processing
-        ↓
-reward transaction state persisted
-        ↓
-reward mutation
+```lua
+rewards = {
+    {
+        id = "reward_1",
+        type = "item",
+        ref = "dataset:item",
+        amount = 1,
+    },
+    {
+        id = "reward_2",
+        type = "item",
+        ref = "dataset:item",
+        amount = 1,
+    },
+}
 ```
 
-Reward failure does **not** un-complete the Achievement.
+The current implementation captures the correct immutable pre-transaction snapshot.
 
-Reward retry/recovery must not re-announce or re-complete the Achievement.
+However, before every Item reward it compares the current inventory against that original snapshot:
 
-## Prevalidation
-Before the first gameplay mutation:
-- validate every supported reward record;
-- resolve every Item reference;
-- resolve every Currency reference;
-- validate positive amounts;
-- ensure required canonical APIs exist.
+```lua
+compareInventoryVariants(itemSnapshot.variants, beforeVariants)
+```
 
-Unsupported/legacy reward records preserved by #30 must never be executed accidentally. If supported and unsupported records coexist, expose/report that coherently rather than pretending unsupported records were granted.
+After `reward_1` succeeds, the inventory has legitimately changed.
 
-## Canonical mutation paths
-Item reward:
+Therefore `reward_2` sees a mismatch against the original pre-transaction state, reports:
+
+```text
+item-snapshot-drift
+```
+
+and rolls the transaction back.
+
+This makes valid multiple-reward definitions fail.
+
+## Required fix
+
+Maintain **two distinct Item-state concepts** during a reward transaction.
+
+### 1. Original snapshots
+
+Keep the existing pre-transaction Item snapshots immutable.
+
+These must represent the exact inventory state before any reward mutation occurred.
+
+They are used only for:
+
+- rollback;
+- final rollback verification;
+- deciding whether `failed` is safe versus `recovery-required`.
+
+Do **not** update these snapshots after successful rewards.
+
+Conceptually:
+
+```lua
+transaction.itemSnapshots
+```
+
+remains the immutable rollback baseline.
+
+### 2. Expected current Item state
+
+Add transaction-local expected Item state.
+
+Conceptually:
+
+```lua
+transaction.expectedItemStates
+```
+
+This should initially be a deep copy of the corresponding original Item snapshot state.
+
+For example:
+
+```lua
+transaction = {
+    itemAwards = {},
+    itemSnapshots = ...,        -- immutable original state
+    expectedItemStates = {},    -- mutable expected live state
+    currencySnapshots = ...,
+}
+```
+
+Use a stable key such as the canonical Item ref or another unambiguous `datasetId:itemId` key.
+
+## Before each Item mutation
+
+Currently the code effectively does:
+
+```lua
+local itemSnapshot = findItemSnapshot(
+    transaction.itemSnapshots,
+    reward.datasetId,
+    reward.itemId
+)
+
+local beforeVariants = getInventoryItemVariants(
+    inventory,
+    reward.datasetId,
+    reward.itemId
+)
+
+if not itemSnapshot
+    or beforeVariants == nil
+    or not compareInventoryVariants(itemSnapshot.variants, beforeVariants)
+then
+    return finishFailedTransaction(
+        achievementRef,
+        state,
+        transaction,
+        reward.id,
+        "item-snapshot-drift"
+    )
+end
+```
+
+Change this so drift detection compares the live state against the **expected current transaction state**, not the immutable original snapshot.
+
+Conceptually:
+
+```lua
+local expectedVariants = transaction.expectedItemStates[reward.ref]
+
+local beforeVariants = getInventoryItemVariants(
+    inventory,
+    reward.datasetId,
+    reward.itemId
+)
+
+if expectedVariants == nil
+    or beforeVariants == nil
+    or not compareInventoryVariants(expectedVariants, beforeVariants)
+then
+    return finishFailedTransaction(
+        achievementRef,
+        state,
+        transaction,
+        reward.id,
+        "item-snapshot-drift"
+    )
+end
+```
+
+The exact storage structure may follow existing code conventions.
+
+## After a successful Item mutation
+
+After:
 
 ```lua
 Client.Inventory.AddItem(...)
 ```
 
-Currency reward:
+has succeeded and the post-add state has been verified, update the expected transaction-local state to the actual verified post-add state.
+
+Conceptually:
 
 ```lua
-Profile.AddCurrencyAmount(...)
+transaction.expectedItemStates[reward.ref] = deepCopy(afterVariants)
 ```
 
-Do not write underlying Inventory/Profile currency tables directly.
+This allows a subsequent reward for the same Item reference to see the state produced by the previous reward as the expected state.
 
-Respect existing currency caps and actual applied changes.
-
-## Transaction marker and snapshots
-Before applying any supported reward, persist:
+Example:
 
 ```text
-rewardState.status = in-progress
+Original:
+foo:bar = 3
+
+reward_1 +1:
+expected state becomes 4
+
+reward_2 checks against 4
+reward_2 +1:
+expected state becomes 5
 ```
 
-Snapshot enough pre-transaction Item/Currency state to verify mutations and roll back this transaction only.
+This must not modify the original rollback snapshot of `3`.
 
-Track enough per-reward state for diagnostics/recovery without introducing another persistence root.
+## Rollback behaviour
 
-## Failure/rollback policy
-If a mutation fails after the transaction begins:
-1. remove Item quantity awarded by this transaction where possible;
-2. restore affected Currency balances through canonical APIs;
-3. verify restored state;
-4. persist final transaction state.
+Keep the existing variant-aware rollback introduced in `Issue #33 rev 1`.
+
+Rollback must still:
+
+1. remove Item quantities awarded by this transaction, in reverse order;
+2. distinguish Item variants using:
+   - dataset;
+   - item ID;
+   - modifications;
+   - soulbound state;
+3. restore affected Currency snapshots through canonical APIs;
+4. compare the resulting Item inventory against the **immutable original `itemSnapshots`**;
+5. compare Currency balances against their original snapshots.
 
 Use:
 
@@ -83,7 +212,7 @@ Use:
 failed
 ```
 
-only when the pre-transaction state has been coherently restored and explicit retry is safe.
+only when the exact pre-transaction state has been verified as restored.
 
 Use:
 
@@ -91,65 +220,125 @@ Use:
 recovery-required
 ```
 
-when rollback cannot be proven complete/coherent.
+if that cannot be proven.
 
-If a later addon load finds:
+Do not use `expectedItemStates` for final rollback verification.
 
-```text
-in-progress
-```
+## Important constraints
 
-never blindly replay it. Treat as recovery-required unless the implementation can prove no mutation occurred.
+Do not:
 
-## Explicit retry
-Provide an explicit runtime operation such as:
+- remove the Item drift check;
+- weaken rollback verification;
+- overwrite the original Item snapshots after successful rewards;
+- introduce another Inventory store;
+- introduce another reward transaction persistence root;
+- change Achievement completion semantics;
+- re-complete or re-announce Achievements during retry;
+- change the corrected currency-cap behaviour from `Issue #33 rev 1`.
+
+The fix should be limited to the transaction-local Item state tracking needed for repeated Item reward references.
+
+## Required validation
+
+### Same Item twice
 
 ```lua
-Achievements:RetryRewards(achievementRef)
+item A x1
+item A x1
 ```
 
-Allow retry only when:
-- Achievement is complete;
-- state is safely `failed`;
-- it is not `in-progress` or `recovery-required`;
-- current reward definitions still prevalidate.
-
-## Trigger cascades
-Because rewards use canonical APIs, these cascades are intentional:
+Expected:
 
 ```text
-Achievement Item reward -> item_gain
-Achievement Currency reward -> currency_gain
+both apply
+transaction -> complete
+total Item gain = 2
 ```
 
-The source Achievement must already be durably complete, so those gains cannot re-complete it.
+### Same Item with different amounts
 
-Guild Admin `Achievements:Grant()` must use the same normal completion/reward path rather than bypassing reward delivery.
+```lua
+item A x2
+item A x3
+```
 
-## Legacy completion behavior
-Achievements completed before this reward system, represented by `completedAt` with no original reward-delivery state, must not receive automatic retroactive rewards on login/index rebuild.
+Expected:
 
-## Constraints
-- Do not create another Inventory/Currency store.
-- Do not create another Achievement completion path.
-- Do not automatically retry unsafe transactions.
-- Do not re-announce completed Achievements during retry/recovery.
-- Do not implement additional reward types.
+```text
+both apply
+transaction -> complete
+total Item gain = 5
+```
 
-## Acceptance criteria
-- [ ] Newly completed Achievement executes supported rewards exactly once.
-- [ ] Item reward uses `Client.Inventory.AddItem()`.
-- [ ] Currency reward uses canonical Profile Currency APIs.
-- [ ] All supported rewards prevalidate before mutation begins.
-- [ ] `/reload`, relog, repeated trigger dispatch and index rebuild cannot duplicate completed delivery.
-- [ ] Full verified rollback produces safe `failed` state.
-- [ ] Incomplete/unverifiable rollback produces `recovery-required`.
-- [ ] `in-progress` found after restart is never blindly replayed.
-- [ ] Safe retry does not re-complete or re-announce the Achievement.
-- [ ] Guild Admin Grant follows normal reward behavior.
-- [ ] Legacy completed Achievements are not automatically rewarded.
-- [ ] Unsupported reward types are never executed accidentally.
-- [ ] Reward-generated Item/Currency gains may progress other Achievements without duplicate source completion.
+### Interleaved duplicate Item
 
-## Coding-agent instructions
-Read issues #25 and #30–#32, then inspect the current Achievement completion/Grant path, Profile reward-state APIs, Currency transaction semantics, Inventory AddItem/RemoveItem behavior, and the rollback patterns already used by Guild Requisitions/Daily Rewards before editing. Implement Task 11 only. Persist completion before rewards, persist an in-progress marker before mutation, verify rollback, and prefer a blocked recovery state over any unsafe automatic retry. Do not create parallel storage or completion systems. Review every acceptance criterion and report changed files, validation performed, and deviations.
+```lua
+item A x1
+currency X x10
+item A x2
+```
+
+Expected:
+
+```text
+all rewards apply
+transaction -> complete
+```
+
+### Multiple different Items
+
+```lua
+item A x1
+item B x1
+```
+
+Expected:
+
+```text
+existing behaviour remains correct
+```
+
+### Failure after repeated Item rewards
+
+```lua
+item A x1
+item A x2
+later reward fails
+```
+
+Expected:
+
+```text
+all 3 transaction-awarded copies of Item A are rolled back
+the exact original Item variants/quantities are restored
+transaction -> failed only if restoration is verified
+otherwise -> recovery-required
+```
+
+### External inventory drift
+
+If Item A changes externally between reward mutations in a way not caused by the current reward transaction:
+
+```text
+expected current state != actual current state
+```
+
+Expected:
+
+```text
+item-snapshot-drift
+rollback attempted
+failed only after exact original state is verified
+otherwise recovery-required
+```
+
+## Definition of done
+
+- Multiple supported Item reward records may reference the same Item.
+- Earlier rewards in the same transaction do not trigger false `item-snapshot-drift`.
+- Genuine external drift is still detected.
+- Original pre-transaction snapshots remain immutable.
+- Rollback remains variant-aware and verifies the exact original state.
+- Existing currency-cap handling remains unchanged.
+- All Issue #33 acceptance criteria remain satisfied.

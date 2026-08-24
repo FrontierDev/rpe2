@@ -226,17 +226,6 @@ local function removeInventoryVariantQuantity(inventory, variant, quantity)
     return false
 end
 
-local function findItemSnapshot(snapshots, datasetId, itemId)
-    for index = 1, #(snapshots or {}) do
-        local snapshot = snapshots[index]
-        if snapshot.datasetId == datasetId and snapshot.itemId == itemId then
-            return snapshot
-        end
-    end
-
-    return nil
-end
-
 local function restoreCurrencySnapshots(snapshots)
     if type(Profile.SetCurrencyAmount) ~= "function"
         or type(Profile.GetCurrencyAmount) ~= "function"
@@ -667,9 +656,19 @@ end
 
 local function executeRewardPlan(achievementRef, state, plan)
     local inventory = getInventoryService()
+    local itemSnapshots = state.snapshots and state.snapshots.items or {}
+    local expectedItemStates = {}
+    for index = 1, #itemSnapshots do
+        local snapshot = itemSnapshots[index]
+        if snapshot.itemRef ~= nil then
+            expectedItemStates[snapshot.itemRef] = deepCopy(snapshot.variants)
+        end
+    end
+
     local transaction = {
         itemAwards = {},
-        itemSnapshots = state.snapshots and state.snapshots.items or {},
+        itemSnapshots = itemSnapshots,
+        expectedItemStates = expectedItemStates,
         currencySnapshots = state.snapshots and state.snapshots.currencies or {},
     }
 
@@ -677,19 +676,15 @@ local function executeRewardPlan(achievementRef, state, plan)
         local reward = plan.supported[index]
         local entry = state.entries[reward.id]
         if reward.type == "item" then
-            local itemSnapshot = findItemSnapshot(
-                transaction.itemSnapshots,
-                reward.datasetId,
-                reward.itemId
-            )
+            local expectedVariants = transaction.expectedItemStates[reward.ref]
             local beforeVariants = getInventoryItemVariants(
                 inventory,
                 reward.datasetId,
                 reward.itemId
             )
-            if not itemSnapshot
+            if expectedVariants == nil
                 or beforeVariants == nil
-                or not compareInventoryVariants(itemSnapshot.variants, beforeVariants)
+                or not compareInventoryVariants(expectedVariants, beforeVariants)
             then
                 return finishFailedTransaction(
                     achievementRef,
@@ -747,6 +742,7 @@ local function executeRewardPlan(achievementRef, state, plan)
             entry.status = "applied"
             entry.appliedAmount = actualAdded
             entry.appliedAt = getNow()
+            transaction.expectedItemStates[reward.ref] = deepCopy(afterVariants)
         else
             local beforeCallOk, before = pcall(Profile.GetCurrencyAmount, reward.currencyRef)
             before = beforeCallOk and tonumber(before) or nil
