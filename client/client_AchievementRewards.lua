@@ -818,6 +818,84 @@ local function markRecoveryRequired(achievementRef, rewardState, reason)
     return persisted, state
 end
 
+local function getRewardDeliveryQueue(achievements)
+    local queue = achievements._rewardDeliveryQueue
+    if type(queue) ~= "table" then
+        queue = {
+            items = {},
+            queued = {},
+        }
+        achievements._rewardDeliveryQueue = queue
+    end
+
+    queue.items = type(queue.items) == "table" and queue.items or {}
+    queue.queued = type(queue.queued) == "table" and queue.queued or {}
+    return queue
+end
+
+local function enqueueRewardDelivery(achievements, achievementRef, achievement, options)
+    local activeRefs = achievements._rewardDeliveryActiveRefs or {}
+    if activeRefs[achievementRef] then
+        return false, "reward-delivery-active"
+    end
+
+    local queue = getRewardDeliveryQueue(achievements)
+    if queue.queued[achievementRef] then
+        return true, "already-queued"
+    end
+
+    local deliveryOptions = type(options) == "table" and options or {}
+    queue.queued[achievementRef] = true
+    queue.items[#queue.items + 1] = {
+        achievementRef = achievementRef,
+        achievement = achievement,
+        options = {
+            newlyCompleted = deliveryOptions.newlyCompleted == true,
+            retry = deliveryOptions.retry == true,
+        },
+    }
+    return true, "queued"
+end
+
+local function drainRewardDeliveryQueue(achievements)
+    if achievements._rewardDeliveryDraining == true
+        or (tonumber(achievements._rewardDeliveryDepth) or 0) > 0
+    then
+        return
+    end
+
+    local queue = getRewardDeliveryQueue(achievements)
+    if #queue.items == 0 then
+        return
+    end
+
+    achievements._rewardDeliveryDraining = true
+    while #queue.items > 0 do
+        local request = table.remove(queue.items, 1)
+        queue.queued[request.achievementRef] = nil
+
+        local callOk = pcall(
+            achievements.DeliverRewards,
+            achievements,
+            request.achievementRef,
+            request.achievement,
+            request.options
+        )
+        if not callOk then
+            local rewardState = readRewardState(request.achievementRef)
+            if type(rewardState) == "table" and rewardState.status == "in-progress" then
+                markRecoveryRequired(
+                    request.achievementRef,
+                    rewardState,
+                    "queued-reward-delivery-error"
+                )
+            end
+        end
+    end
+
+    achievements._rewardDeliveryDraining = nil
+end
+
 function Achievements:RecoverInProgressRewards()
     if self._rewardRecoveryChecked == true then
         return 0
@@ -860,6 +938,16 @@ function Achievements:DeliverRewards(achievementRef, achievement, options)
     local normalizedRef = trimText(achievementRef)
     if normalizedRef == "" or type(achievement) ~= "table" then
         return false, "achievement-unavailable"
+    end
+
+    if (tonumber(self._rewardDeliveryDepth) or 0) > 0 then
+        local queued, queueReason = enqueueRewardDelivery(
+            self,
+            normalizedRef,
+            achievement,
+            options
+        )
+        return queued, queueReason
     end
 
     local isRetry = type(options) == "table" and options.retry == true
@@ -947,7 +1035,37 @@ function Achievements:DeliverRewards(achievementRef, achievement, options)
         return false, persistedReason, state
     end
 
-    return executeRewardPlan(normalizedRef, state, plan)
+    self._rewardDeliveryDepth = (tonumber(self._rewardDeliveryDepth) or 0) + 1
+    self._rewardDeliveryActiveRefs = self._rewardDeliveryActiveRefs or {}
+    self._rewardDeliveryActiveRefs[normalizedRef] = true
+
+    local callOk, success, reason, result = pcall(
+        executeRewardPlan,
+        normalizedRef,
+        state,
+        plan
+    )
+
+    self._rewardDeliveryActiveRefs[normalizedRef] = nil
+    self._rewardDeliveryDepth = math.max(0, (tonumber(self._rewardDeliveryDepth) or 1) - 1)
+
+    if not callOk then
+        local persistedRecovery, recoveryState = markRecoveryRequired(
+            normalizedRef,
+            state,
+            "reward-delivery-error"
+        )
+        success = false
+        reason = persistedRecovery and "recovery-required"
+            or "reward-state-persistence-failed"
+        result = recoveryState
+    end
+
+    if (tonumber(self._rewardDeliveryDepth) or 0) == 0 then
+        drainRewardDeliveryQueue(self)
+    end
+
+    return success, reason, result
 end
 
 function Achievements:RetryRewards(achievementRef)
