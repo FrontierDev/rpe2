@@ -81,6 +81,7 @@ local function getGuildIdentity()
     local guildRankName = ""
     local guildRankIndex = nil
     local realmName = ""
+    local legacyRealmName = ""
     local guildClubId = ""
 
     local club = _G and _G.C_Club or nil
@@ -101,12 +102,23 @@ local function getGuildIdentity()
         end
     end
 
+    -- Keep the local realm only as migration context. It must not become the
+    -- current fallback key when the guild realm is unavailable: same-realm
+    -- guilds intentionally use the name-only fallback until a Club ID exists.
+    if type(GetRealmName) == "function" then
+        local ok, currentRealm = pcall(GetRealmName)
+        if ok then
+            legacyRealmName = trimText(currentRealm)
+        end
+    end
+
     return {
         inGuild = inGuild,
         guildName = guildName,
         guildRankName = guildRankName,
         guildRankIndex = guildRankIndex,
         realmName = realmName,
+        legacyRealmName = legacyRealmName,
         guildClubId = guildClubId,
     }
 end

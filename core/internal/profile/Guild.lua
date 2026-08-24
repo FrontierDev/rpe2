@@ -67,6 +67,21 @@ local function appendUniqueGuildKey(keys, value)
     keys[#keys + 1] = normalizedKey
 end
 
+local function appendUniqueGuildRealm(realms, value)
+    local normalizedRealm = normalizeGuildKey(value)
+    if normalizedRealm == "" then
+        return
+    end
+
+    for index = 1, #realms do
+        if realms[index] == normalizedRealm then
+            return
+        end
+    end
+
+    realms[#realms + 1] = normalizedRealm
+end
+
 local function getLegacyGuildKeys(identity)
     local keys = {}
     local guildName = normalizeGuildKey(identity and identity.guildName)
@@ -82,10 +97,22 @@ local function getLegacyGuildKeys(identity)
         realmName = normalizeGuildKey(identity and identity.realm)
     end
 
+    local realms = {}
+    if realmName ~= "" then
+        appendUniqueGuildRealm(realms, realmName)
+    else
+        -- GetRealmName() is migration-only context. The pre-#35 client used
+        -- it when GetGuildInfo() did not provide a same-realm guild realm, so
+        -- probe that old qualified bucket without changing the current
+        -- fallback key.
+        appendUniqueGuildRealm(realms, identity and identity.legacyRealmName)
+        appendUniqueGuildRealm(realms, identity and identity.localRealmName)
+    end
+
     -- The realm-qualified form is newer than the original name-only form,
     -- so it wins when both legacy buckets contain conflicting fields.
-    if realmName ~= "" then
-        appendUniqueGuildKey(keys, guildName .. "-" .. realmName)
+    for index = 1, #realms do
+        appendUniqueGuildKey(keys, guildName .. "-" .. realms[index])
     end
     appendUniqueGuildKey(keys, guildName)
     return keys
