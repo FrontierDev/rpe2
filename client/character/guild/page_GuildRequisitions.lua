@@ -481,29 +481,45 @@ function RequisitionsPage:RefreshShopEntryMetrics()
     end
 end
 
-function RequisitionsPage:GetShopRequisitions(assignment)
+function RequisitionsPage:PartitionRequisitions(assignment)
+    local shopRows = {}
+    local limitedRows = {}
+
     if type(assignment) ~= "table"
         or assignment.status ~= "valid"
         or type(assignment.rank) ~= "table"
         or trimText(assignment.assignedRankRef) == ""
     then
-        return {}
+        return shopRows, limitedRows
     end
 
-    local rows = {}
     local requisitions = assignment.rank.requisitions
     if type(requisitions) ~= "table" then
-        return rows
+        return shopRows, limitedRows
     end
 
     for index = 1, #requisitions do
         local requisition = requisitions[index]
-        if type(requisition) == "table" and normalizeCharacterLimit(requisition.characterLimit) == 0 then
-            rows[#rows + 1] = requisition
+        if type(requisition) == "table" then
+            if normalizeCharacterLimit(requisition.characterLimit) == 0 then
+                shopRows[#shopRows + 1] = requisition
+            else
+                limitedRows[#limitedRows + 1] = requisition
+            end
         end
     end
 
-    return rows
+    return shopRows, limitedRows
+end
+
+function RequisitionsPage:GetShopRequisitions(assignment)
+    local shopRows = self:PartitionRequisitions(assignment)
+    return shopRows
+end
+
+function RequisitionsPage:GetLimitedRequisitions(assignment)
+    local _, limitedRows = self:PartitionRequisitions(assignment)
+    return limitedRows
 end
 
 function RequisitionsPage:GetShopEligibility(requisition)
@@ -535,6 +551,7 @@ function RequisitionsPage:BindShopEntry(entry, requisition)
     local costText = self:FormatCompactCost(requisition and requisition.costs)
     local eligible, reason, detail = self:GetShopEligibility(requisition)
 
+    entry:SetOption("keepMouseEnabled", true)
     entry.resolvedRequisition = requisition
     entry.resolvedItem = itemDisplay.item
     entry.resolvedItemRef = itemDisplay.itemRef
@@ -567,6 +584,39 @@ function RequisitionsPage:BindShopEntry(entry, requisition)
         }
     end)
     entry:Show()
+end
+
+function RequisitionsPage:EnsureRequisitionClickHandler(entry)
+    if not entry or entry._guildRequisitionClickBound == true then
+        return
+    end
+
+    local entryFrame = entry.GetFrame and entry:GetFrame() or nil
+    if not entryFrame or not entryFrame.HookScript then
+        return
+    end
+
+    entryFrame:HookScript("OnMouseUp", function(_, button)
+        if button == "LeftButton" then
+            self:TryShopRequisition(entry)
+        end
+    end)
+    entry._guildRequisitionClickBound = true
+end
+
+function RequisitionsPage:BindLimitedRequisitionEntry(entry, requisition)
+    self:BindShopEntry(entry, requisition)
+    self:EnsureRequisitionClickHandler(entry)
+
+    local entryFrame = entry and entry.GetFrame and entry:GetFrame() or nil
+    local width = entryFrame and tonumber(entryFrame:GetWidth()) or 0
+    if width <= 0 and self.LimitedRequisitionList then
+        local listFrame = self.LimitedRequisitionList:GetFrame()
+        width = listFrame and tonumber(listFrame:GetWidth()) or 0
+    end
+    if width > 0 then
+        entry:SetLayoutMetrics(width, SHOP_ENTRY_HEIGHT)
+    end
 end
 
 function RequisitionsPage:HideShopEntry(entry)
@@ -678,6 +728,7 @@ function RequisitionsPage:Build(parent, owner)
     self.CurrentShopPage = 1
     self.ShopItems = {}
     self.ShopEntries = {}
+    self.LimitedRequisitions = {}
 
     self.frame = CreateFrame("Frame", "RPEGuildRequisitionsPage", parent)
     self.frame:SetAllPoints(parent)
@@ -870,11 +921,7 @@ function RequisitionsPage:Build(parent, owner)
         })
         entry:SetParent(self.ShopGrid:GetFrame())
         entry:Create()
-        entry:GetFrame():HookScript("OnMouseUp", function(_, button)
-            if button == "LeftButton" then
-                self:TryShopRequisition(entry)
-            end
-        end)
+        self:EnsureRequisitionClickHandler(entry)
         self.ShopGrid:AddChild(entry)
         self.ShopEntries[index] = entry
     end
@@ -891,6 +938,26 @@ function RequisitionsPage:Build(parent, owner)
         fitChildrenHeight = true,
     })
     self.MainContentLayout:AddChild(self.LimitedRequisitionHost)
+
+    self.LimitedRequisitionList = UI.ScrollLayout:New({
+        name = "RPEGuildLimitedRequisitionList",
+        rowElementClass = UI.ShopEntry,
+        rowWidth = 160,
+        rowHeight = SHOP_ENTRY_HEIGHT,
+        rowSpacing = SHOP_GRID_SPACING_Y,
+        autoFitRows = true,
+        minVisibleRows = 1,
+        expandWidth = true,
+        expandHeight = true,
+        weight = 1,
+        border = false,
+    })
+    self.LimitedRequisitionList:SetParent(self.LimitedRequisitionHost:GetFrame())
+    self.LimitedRequisitionList:SetRowRenderer(function(row, requisition)
+        self:BindLimitedRequisitionEntry(row, requisition)
+    end)
+    self.LimitedRequisitionList:Create()
+    self.LimitedRequisitionHost:AddChild(self.LimitedRequisitionList)
 
     self.TabPageFrame = parent
     local contentFrame = parent and parent.GetParent and parent:GetParent() or nil
@@ -952,12 +1019,13 @@ function RequisitionsPage:Refresh()
 
     self.AssignedRankStatus = assignment
     self.DailyRewardStatus = dailyStatus
-    self.ShopItems = self:GetShopRequisitions(assignment)
     self.DailyRewardButton:SetTooltip(self.DailyRewardTooltip)
     self.GuildRankText:SetText("Guild Rank: " .. resolveRankName(assignment))
     self:UpdateResetText(dailyStatus.resetState and dailyStatus.resetState.secondsRemaining or 0)
     self:UpdateDailyRewardVisualState()
+    self.ShopItems, self.LimitedRequisitions = self:PartitionRequisitions(assignment)
     self:RefreshShopEntries()
+    self.LimitedRequisitionList:SetItems(self.LimitedRequisitions)
 
     self.LastResetCycleKey = dailyStatus.resetState and dailyStatus.resetState.cycleKey or nil
     self.ResetCycleKeyInitialized = true

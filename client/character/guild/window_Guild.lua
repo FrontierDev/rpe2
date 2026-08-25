@@ -209,9 +209,8 @@ function GuildWindow:BuildWindow()
 end
 
 function GuildWindow:Refresh()
-    local _, assignmentText = self:GetAssignedGuildRankDisplay()
     if self.window and self.window.SetTitle then
-        self.window:SetTitle("Guild | " .. assignmentText)
+        self.window:SetTitle("Guild")
     end
     self:RefreshTab(self:GetActiveTabKey())
     return self.window
