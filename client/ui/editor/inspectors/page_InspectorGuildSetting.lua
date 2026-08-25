@@ -7,6 +7,7 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
 local Client = Addon.Client or {}
+local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local InspectorShared = DataEditor.ItemInspectorShared
 local GuildSettingClass = Addon.Internal
     and Addon.Internal.Database
@@ -79,6 +80,93 @@ local function buildGuildSettingReferenceItems(self, collectionKey, datasetId, r
         noneLabel = "None",
     })
     return appendMissingDropdownValue(items, reference, ("Missing reference: %s"):format(trim(reference)))
+end
+
+local function buildGuildSettingCurrencyItems(self, reference)
+    local items = {
+        { label = "None", value = "" },
+    }
+    local knownValues = {}
+
+    local builtinChildren = {}
+    if type(Profile.GetBuiltinCurrencyDefinitions) == "function" then
+        for _, definition in ipairs(Profile.GetBuiltinCurrencyDefinitions() or {}) do
+            local value = trim(definition and (definition.key or definition.id))
+            if value ~= "" and not knownValues[value] then
+                knownValues[value] = true
+                local definitionName = trim(definition and definition.name)
+                builtinChildren[#builtinChildren + 1] = {
+                    label = definitionName ~= "" and definitionName or value,
+                    value = value,
+                    icon = definition.icon,
+                }
+            end
+        end
+    end
+    if #builtinChildren > 0 then
+        items[#items + 1] = {
+            label = "Built-in",
+            value = "guildsetting-currency-group:builtin",
+            enabled = true,
+            keepShownOnClick = true,
+            notCheckable = true,
+            children = builtinChildren,
+        }
+    end
+
+    local datasets = self:GetDatasets() or {}
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local datasetId = trim(dataset and dataset.id)
+        local currencyChildren = {}
+        for currencyIndex = 1, #(dataset and dataset.currencies or {}) do
+            local currency = dataset.currencies[currencyIndex]
+            local currencyId = trim(currency and currency.id)
+            if datasetId ~= "" and currencyId ~= "" then
+                local value = ("%s:%s"):format(datasetId, currencyId)
+                if not knownValues[value] then
+                    knownValues[value] = true
+                    currencyChildren[#currencyChildren + 1] = {
+                        label = self.GetEntryDisplayName and self:GetEntryDisplayName("currencies", currency) or currencyId,
+                        value = value,
+                        icon = currency.icon,
+                    }
+                end
+            end
+        end
+
+        if #currencyChildren > 0 then
+            items[#items + 1] = {
+                label = self.GetDatasetDisplayName and self:GetDatasetDisplayName(dataset) or datasetId,
+                value = ("guildsetting-currency-group:%s"):format(datasetId),
+                enabled = true,
+                keepShownOnClick = true,
+                notCheckable = true,
+                children = currencyChildren,
+            }
+        end
+    end
+
+    local currentReference = trim(reference)
+    appendMissingDropdownValue(items, currentReference, ("Missing currency: %s"):format(currentReference))
+    return items
+end
+
+local function getGuildSettingCurrencySelectionValue(items, reference)
+    local rawReference = trim(reference)
+    if rawReference == "" or dropdownItemsContainValue(items, rawReference) then
+        return rawReference
+    end
+
+    local normalizedReference = rawReference
+    if type(Profile.NormalizeCurrencyKey) == "function" then
+        normalizedReference = trim(Profile.NormalizeCurrencyKey(rawReference))
+    end
+    if normalizedReference ~= "" and dropdownItemsContainValue(items, normalizedReference) then
+        return normalizedReference
+    end
+
+    return rawReference
 end
 
 local function applyTable(target, source)
@@ -857,7 +945,7 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     local _, costSection = InspectorShared.createInspectorSection(
         root,
         "RPEDataEditorGuildSettingInspectorCostPanel",
-        "Costs (Currency Ref / Amount)",
+        "Costs (Currency / Amount)",
         70
     )
     self.GuildSettingInspectorCostScroll = UI.ScrollLayout:New({
@@ -921,10 +1009,27 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     local costInputs = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorCostInputs", {
         spacing = 2, height = 18, fitChildrenWidth = true, fitChildrenHeight = false,
     })
-    self.GuildSettingInspectorCostCurrencyRefInput = UI.CreateTextInput(costInputs:GetFrame(), "RPEDataEditorGuildSettingInspectorCostCurrencyRefInput", {
-        width = 174, height = 18, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
+    self.GuildSettingInspectorCostCurrencyDropdown = UI.CreateDropdown(costInputs:GetFrame(), "RPEDataEditorGuildSettingInspectorCostCurrencyDropdown", {
+        width = 174, height = 18,
+        items = buildGuildSettingCurrencyItems(self, ""),
+        onValueChanged = function(value)
+            if self._refreshingGuildSettingInspector then
+                return
+            end
+
+            local _, _, requisitionIndex = getSelectedRequisition(self)
+            local costIndex = tonumber(self.SelectedGuildSettingCostIndex)
+            self:CommitSelectedGuildSetting(function(guildSetting)
+                local requisition = guildSetting.requisitions and guildSetting.requisitions[requisitionIndex]
+                local cost = requisition and requisition.costs and requisition.costs[costIndex]
+                if cost then
+                    cost.currencyRef = trim(value)
+                end
+            end)
+            self:RefreshGuildSettingRequisitionsPage()
+        end,
     })
-    costInputs:AddChild(self.GuildSettingInspectorCostCurrencyRefInput)
+    costInputs:AddChild(self.GuildSettingInspectorCostCurrencyDropdown)
     self.GuildSettingInspectorCostAmountInput = UI.CreateTextInput(costInputs:GetFrame(), "RPEDataEditorGuildSettingInspectorCostAmountInput", {
         width = 60, height = 18, text = "0", borderColor = UI.ResolveColor(nil, "panel.border"),
     })
@@ -936,13 +1041,10 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
             local requisition = guildSetting.requisitions and guildSetting.requisitions[requisitionIndex]
             local cost = requisition and requisition.costs and requisition.costs[costIndex]
             if cost then
-                cost.currencyRef = self.GuildSettingInspectorCostCurrencyRefInput:GetText()
                 cost.amount = normalizeInteger(self.GuildSettingInspectorCostAmountInput:GetText(), 0, 0)
             end
         end)
     end
-    self.GuildSettingInspectorCostCurrencyRefInput:SetScript("OnEnterPressed", commitCost)
-    self.GuildSettingInspectorCostCurrencyRefInput:SetScript("OnEditFocusLost", commitCost)
     self.GuildSettingInspectorCostAmountInput:SetScript("OnEnterPressed", commitCost)
     self.GuildSettingInspectorCostAmountInput:SetScript("OnEditFocusLost", commitCost)
     root:AddChild(costInputs)
@@ -1095,29 +1197,10 @@ function DataEditor:BuildGuildSettingInspectorDailyRewardsPage(parent)
     })
     dailyRewardItemGroup:AddChild(self.GuildSettingInspectorDailyRewardItemDropdown)
 
-    local dailyRewardCurrencyDatasetGroup = createFieldGroup(root, "RPEDataEditorGuildSettingInspectorDailyRewardCurrencyDatasetGroup", "Currency Dataset")
-    self.GuildSettingInspectorDailyRewardCurrencyDatasetDropdown = UI.CreateDropdown(dailyRewardCurrencyDatasetGroup:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardCurrencyDatasetDropdown", {
-        width = FIELD_WIDTH, height = CONTROL_HEIGHT,
-        items = self:BuildItemInspectorDatasetItems(),
-        onValueChanged = function(value)
-            if self._refreshingGuildSettingInspector then
-                return
-            end
-
-            if self.GuildSettingInspectorDailyRewardCurrencyDropdown then
-                self.GuildSettingInspectorDailyRewardCurrencyDropdown:SetItems(buildGuildSettingReferenceItems(self, "currencies", value, ""))
-                self.GuildSettingInspectorDailyRewardCurrencyDropdown:SetSelectedValue("", true)
-                local _, _, _, reward = getSelectedDailyReward(self)
-                setDropdownEnabled(self.GuildSettingInspectorDailyRewardCurrencyDropdown, trim(value) ~= "" and reward ~= nil and trim(reward.type or "") == "currency")
-            end
-        end,
-    })
-    dailyRewardCurrencyDatasetGroup:AddChild(self.GuildSettingInspectorDailyRewardCurrencyDatasetDropdown)
-
     local dailyRewardCurrencyGroup = createFieldGroup(root, "RPEDataEditorGuildSettingInspectorDailyRewardCurrencyGroup", "Currency")
     self.GuildSettingInspectorDailyRewardCurrencyDropdown = UI.CreateDropdown(dailyRewardCurrencyGroup:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardCurrencyDropdown", {
         width = FIELD_WIDTH, height = CONTROL_HEIGHT,
-        items = { { label = "None", value = "" } },
+        items = buildGuildSettingCurrencyItems(self, ""),
         onValueChanged = function(value)
             if self._refreshingGuildSettingInspector then
                 return
@@ -1137,7 +1220,6 @@ function DataEditor:BuildGuildSettingInspectorDailyRewardsPage(parent)
 
     self.GuildSettingInspectorDailyRewardItemDatasetGroup = dailyRewardItemDatasetGroup
     self.GuildSettingInspectorDailyRewardItemGroup = dailyRewardItemGroup
-    self.GuildSettingInspectorDailyRewardCurrencyDatasetGroup = dailyRewardCurrencyDatasetGroup
     self.GuildSettingInspectorDailyRewardCurrencyGroup = dailyRewardCurrencyGroup
 
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardAmountLabel", "Amount"))
@@ -1534,9 +1616,12 @@ function DataEditor:RefreshGuildSettingRequisitionsPage()
     if self.GuildSettingInspectorDeleteCostButton then
         self.GuildSettingInspectorDeleteCostButton:SetEnabled(cost ~= nil)
     end
-    if self.GuildSettingInspectorCostCurrencyRefInput then
-        self.GuildSettingInspectorCostCurrencyRefInput:SetText(cost and (cost.currencyRef or "") or "")
-        setTextElementEnabled(self.GuildSettingInspectorCostCurrencyRefInput, cost ~= nil)
+    if self.GuildSettingInspectorCostCurrencyDropdown then
+        local currencyRef = cost and tostring(cost.currencyRef or "") or ""
+        local currencyItems = buildGuildSettingCurrencyItems(self, currencyRef)
+        self.GuildSettingInspectorCostCurrencyDropdown:SetItems(currencyItems)
+        self.GuildSettingInspectorCostCurrencyDropdown:SetSelectedValue(getGuildSettingCurrencySelectionValue(currencyItems, currencyRef), true)
+        setDropdownEnabled(self.GuildSettingInspectorCostCurrencyDropdown, cost ~= nil)
     end
     if self.GuildSettingInspectorCostAmountInput then
         self.GuildSettingInspectorCostAmountInput:SetText(tostring(normalizeInteger(cost and cost.amount, 0, 0)))
@@ -1584,7 +1669,6 @@ function DataEditor:RefreshGuildSettingDailyRewardsPage()
     local itemRef = rewardType == "item" and rewardRef or ""
     local itemDatasetId = rewardType == "item" and rewardDatasetId or ""
     local currencyRef = rewardType == "currency" and rewardRef or ""
-    local currencyDatasetId = rewardType == "currency" and rewardDatasetId or ""
 
     if self.GuildSettingInspectorDailyRewardItemDatasetDropdown then
         self.GuildSettingInspectorDailyRewardItemDatasetDropdown:SetItems(buildGuildSettingDatasetItems(self, itemDatasetId))
@@ -1596,19 +1680,14 @@ function DataEditor:RefreshGuildSettingDailyRewardsPage()
         self.GuildSettingInspectorDailyRewardItemDropdown:SetSelectedValue(itemRef, true)
         setDropdownEnabled(self.GuildSettingInspectorDailyRewardItemDropdown, reward ~= nil and rewardType == "item" and itemDatasetId ~= "")
     end
-    if self.GuildSettingInspectorDailyRewardCurrencyDatasetDropdown then
-        self.GuildSettingInspectorDailyRewardCurrencyDatasetDropdown:SetItems(buildGuildSettingDatasetItems(self, currencyDatasetId))
-        self.GuildSettingInspectorDailyRewardCurrencyDatasetDropdown:SetSelectedValue(currencyDatasetId, true)
-        setDropdownEnabled(self.GuildSettingInspectorDailyRewardCurrencyDatasetDropdown, reward ~= nil and rewardType == "currency")
-    end
     if self.GuildSettingInspectorDailyRewardCurrencyDropdown then
-        self.GuildSettingInspectorDailyRewardCurrencyDropdown:SetItems(buildGuildSettingReferenceItems(self, "currencies", currencyDatasetId, currencyRef))
-        self.GuildSettingInspectorDailyRewardCurrencyDropdown:SetSelectedValue(currencyRef, true)
-        setDropdownEnabled(self.GuildSettingInspectorDailyRewardCurrencyDropdown, reward ~= nil and rewardType == "currency" and currencyDatasetId ~= "")
+        local currencyItems = buildGuildSettingCurrencyItems(self, currencyRef)
+        self.GuildSettingInspectorDailyRewardCurrencyDropdown:SetItems(currencyItems)
+        self.GuildSettingInspectorDailyRewardCurrencyDropdown:SetSelectedValue(getGuildSettingCurrencySelectionValue(currencyItems, currencyRef), true)
+        setDropdownEnabled(self.GuildSettingInspectorDailyRewardCurrencyDropdown, reward ~= nil and rewardType == "currency")
     end
     setElementGroupVisible(self.GuildSettingInspectorDailyRewardItemDatasetGroup, reward ~= nil and rewardType == "item")
     setElementGroupVisible(self.GuildSettingInspectorDailyRewardItemGroup, reward ~= nil and rewardType == "item")
-    setElementGroupVisible(self.GuildSettingInspectorDailyRewardCurrencyDatasetGroup, reward ~= nil and rewardType == "currency")
     setElementGroupVisible(self.GuildSettingInspectorDailyRewardCurrencyGroup, reward ~= nil and rewardType == "currency")
     if self.GuildSettingInspectorDailyRewardsRoot and self.GuildSettingInspectorDailyRewardsRoot.RefreshLayout then
         self.GuildSettingInspectorDailyRewardsRoot:RefreshLayout()
