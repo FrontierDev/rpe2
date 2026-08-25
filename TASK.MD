@@ -1,272 +1,150 @@
 ## Goal
-Address four remaining UI/presentation issues found after runtime validation of the Guild Requisitions feature:
+Fix three remaining runtime presentation issues on the Guild Requisitions page:
 
-1. the Guild Ranks / GuildSetting inspector still does not visually match the established Spell/Item inspector conventions;
-2. `ShopEntry` hover currently shows a simplified requisition tooltip instead of the actual RPE item tooltip;
-3. `ShopEntry` costs show currency names instead of currency icons;
-4. the Requisitions page needs explicit `Guild Shop` / `Requisitions` panel headers and slightly darker panel backgrounds, matching the visual treatment used by the Profile stats sheet.
+1. requisition costs using the built-in `copper` currency must use the existing copper/money formatter in `Addon.Utils.Common`;
+2. Daily Reward entries granting `copper` must use the same copper formatter;
+3. the Guild Shop paginator must be centered at the bottom of the left panel, and unaffordable requisition cost text must clearly show the amount in red.
 
-This issue is UI/editor polish only. Preserve the existing requisition, Daily Reward, Guild Rank, reset, transaction, pagination, and persistence semantics.
+This is a presentation-only task. Preserve all requisition, eligibility, Daily Reward, reset-cycle, transaction, pagination-count, Profile persistence, and Guild Rank semantics.
 
-## Important superseding design change
-Previous Guild Requisitions tasks deliberately removed section headings from the page. This issue **supersedes that requirement only for the two main content panels**.
+## Current source observations
 
-The final page should now include:
+The current Requisitions page formats every cost as a generic currency icon plus integer amount. The repository already has:
 
-```text
-Guild Shop                       Requisitions
-[shop entries...]                [limited entries...]
+```lua
+Common:FormatCopper(amount)
 ```
 
-Do not reintroduce instructional text, status paragraphs, empty-state prose, selection text, or a separate purchase button.
+in `utils/Common.lua`, and `Profile.FormatCurrencyAmount(...)` already delegates built-in `copper` to that formatter. Do not duplicate WoW money formatting.
+
+`Guild:GetRequisitionEligibility()` already distinguishes `insufficient-currency` and returns detail containing `currencyRef`, `balance`, and required `amount` for the first failing cost. Reuse the authoritative eligibility result; do not reimplement purchasing rules in the UI.
 
 ## Primary files
 
-- `client/ui/editor/inspectors/page_InspectorGuildSetting.lua`
 - `client/character/guild/page_GuildRequisitions.lua`
-- `core/ui/prefabs/ShopEntry.lua` only if a reusable presentation API is required
+- `core/ui/prefabs/ShopEntry.lua` only if a small reusable cost-text color API is required
+- `utils/Common.lua` should normally remain unchanged
 
-Inspect/reuse established patterns from:
+## 1. Copper requisition costs
 
-- `client/ui/editor/inspectors/page_InspectorSpell.lua`
-- `client/ui/editor/inspectors/page_InspectorItem.lua`
-- `client/ui/editor/inspectors/item/page_InspectorItemShared.lua`
-- `client/ui/tooltips/tooltip_Item.lua`
-- `client/character/profile/page_ProfileEquipmentStats.lua`
-- existing Profile currency resolution APIs
-- existing `UI.Panel`, layout-group, text, tooltip, and colour-token implementations
+When a requisition cost resolves to the built-in currency key `copper`, render the amount with `Addon.Utils.Common.FormatCopper` rather than the generic currency-icon formatter.
 
-Do not create parallel inspector, tooltip, currency, or panel-style systems if the existing ones can be reused.
-
----
-
-## 1. Make the Guild Ranks inspector visually consistent with Spell/Item inspectors
-
-### Current problem
-Issue #44 replaced raw requisition/reward references with dropdown selectors, but the overall GuildSetting/Guild Rank inspector still looks and behaves like a bespoke inspector rather than the standard Data Editor inspector family.
-
-The Spell and Item inspectors establish the expected visual language: consistent selector bar, page spacing, field grouping, labels, control heights/widths, section/panel treatment, list/action rows, and page navigation.
-
-### Required behavior
-Refactor the GuildSetting inspector presentation so it follows the same conventions as the Spell/Item inspectors.
-
-At minimum:
-
-- use the same inspector-page shell/selector-bar proportions and spacing;
-- use the same side padding and vertical spacing conventions;
-- use the same label/control sizing conventions;
-- use the same field-group / section-panel visual treatment where comparable;
-- align Add/Delete/list controls with the same patterns used by existing inspectors;
-- keep dataset/item/currency selector behavior from #44, but present those selectors consistently with other reference selectors;
-- avoid one-off hard-coded visual rules where an existing shared inspector helper/component already exists;
-- preserve the existing `General`, `Requisitions`, `Daily Rewards`, and `Progression` page split unless a small presentational reorganization is necessary for consistency.
-
-This is **not** a request to change the GuildSetting schema or underlying editor behavior.
-
-### Preserve
-
-- current requisition IDs, quantities, character limits and costs;
-- current Daily Reward type/ref/amount semantics;
-- current progression configuration;
-- #44 dataset/item/currency selector behavior and legacy-reference handling;
-- existing pending dataset-change/coalescing behavior.
-
----
-
-## 2. ShopEntry tooltip must use the actual Item tooltip
-
-### Current problem
-`RequisitionsPage:BindShopEntry(...)` currently supplies a simplified custom tooltip containing essentially the item name and cost.
-
-That is not sufficient. A requisition/shop entry represents a real RPE item and should expose the same full item tooltip used elsewhere in the client.
-
-### Required behavior
-For a resolved requisition item, hovering either a Guild Shop entry or a limited Requisition entry must show the canonical RPE item tooltip produced by the existing item tooltip builder in:
+Examples:
 
 ```text
-client/ui/tooltips/tooltip_Item.lua
+50 copper     -> 50[copper icon]
+125 copper    -> 1[silver icon] 25[copper icon]
+12345 copper  -> 1[gold icon] 23[silver icon] 45[copper icon]
 ```
 
-Follow the same integration pattern used for equipped items in `page_ProfileEquipmentStats.lua` or another canonical caller.
+Use the exact existing `Common` implementation and inline texture output. Do not create a second gold/silver/copper formatter.
 
-The tooltip should therefore include whatever the Item tooltip builder normally provides for that item, such as applicable quality/category/item-level/stats/effects/description/etc., instead of replacing it with requisition-specific summary text.
+For non-copper currencies, retain the compact currency-icon + amount behavior introduced by #45.
 
-### Resolution/context
-When resolving the requisition `itemRef`, retain enough context to call the Item tooltip builder correctly:
+For mixed multi-currency costs, each component should use the appropriate formatter independently.
 
-- resolved item;
-- dataset / dataset ID where available;
-- dataset display name where applicable;
-- item ID/ref;
-- any other normal builder context that is available without inventing state.
+## 2. Copper Daily Rewards
 
-If the item cannot be resolved, retain a safe fallback tooltip identifying the missing item/reference rather than erroring.
+In the Daily Reward tooltip, a reward whose normalized currency key is `copper` must display its amount through `Common:FormatCopper(...)`.
 
-### Constraints
+Do not show `x12345` for copper. The tooltip may retain the currency label/row structure, but the displayed amount must be the formatted gold/silver/copper string.
 
-- tooltip hover must not purchase the item;
-- tooltip generation must not mutate Profile state;
-- exhausted/unaffordable entries must remain hoverable so the item tooltip still works;
-- both left Guild Shop entries and right limited Requisition entries must use the same behavior.
+Other currencies retain the existing icon/name + integer amount presentation.
 
----
+Missing/unresolved reward definitions must continue to fail safely.
 
-## 3. ShopEntry costs must use currency icons instead of currency names
+## 3. Unaffordable requisition cost amount is red
 
-### Current problem
-The current compact cost formatter produces text such as:
+If a requisition is disabled specifically because `GetRequisitionEligibility()` returned:
 
 ```text
-25 Marks of Valor
+insufficient-currency
 ```
 
-This consumes too much horizontal space and does not match the intended compact visual design.
-
-### Required behavior
-Render each cost using the configured RPE currency icon and amount, not the currency name.
-
-Conceptually:
-
-```text
-[currency icon] 25
-```
-
-For multiple currencies:
-
-```text
-[icon A] 25   [icon B] 3
-```
-
-Use the existing Profile currency resolver/definition as the source of the currency icon. Do not create a second currency registry.
-
-### Fallbacks
-
-- resolved currency with icon -> use its icon;
-- resolved currency with missing/empty icon -> use the standard question-mark fallback icon;
-- unresolved currency -> safe question-mark fallback plus amount;
-- do not fall back to displaying the full currency name in the normal ShopEntry cost line.
-
-The cost remains a single compact line underneath the item name and must continue to fit/truncate safely within both shop columns and the narrow limited-requisition panel.
-
-If WoW inline texture markup is used, use the existing UI-supported format and a size appropriate to the ShopEntry cost font.
-
----
-
-## 4. Add panel headers and darker panel backgrounds
-
-### Required page structure
-The main content region should now visually distinguish its two sections:
-
-```text
-[Daily Reward]  Guild Rank: ...
-                Daily Reset in ...
-
-┌ Guild Shop ───────────────────┐  ┌ Requisitions ─────────────┐
-│ two-column paginated grid     │  │ one-column scroll list    │
-│                               │  │                           │
-└───────────────────────────────┘  └───────────────────────────┘
-```
-
-The exact border treatment need not literally match the ASCII example; the important requirements are header labels and distinct darker panel surfaces.
-
-### Headers
-Add visible section headers:
-
-- `Guild Shop`
-- `Requisitions`
+then the numeric text in the ShopEntry cost line must render red.
 
 Requirements:
 
-- headers are part of their respective panels, not floating globally over the page;
-- use the established Profile/UI header typography rather than ad-hoc font styling;
-- left aligned;
-- compact enough that the existing 2x7 shop layout remains practical;
-- do not add a `Daily Rewards` heading.
+- the currency icon(s) should remain visually normal;
+- the amount text is red for an unaffordable row;
+- this applies to both unlimited Guild Shop entries and limited Requisition entries;
+- affordability color must reset correctly when a recycled `ShopEntry` is rebound to an affordable item;
+- rows disabled for a non-affordability reason (for example exhausted character limit) should use the normal disabled/subdued presentation rather than being incorrectly marked as insufficient funds;
+- hover/item tooltip behavior remains available on disabled rows.
 
-### Darker panel treatment
-The left Guild Shop region and right Requisitions region should both be slightly darker than the surrounding Guild window/page background.
+A narrow `ShopEntry:SetCostColor(...)` / `SetCostTextColor(...)` API is acceptable if needed. Prefer a reusable prefab API over directly reaching into internal font-string fields from the page.
 
-Use the visual treatment already established by the Profile stats sheet (`client/character/profile/page_ProfileEquipmentStats.lua`) as the reference. Inspect and reuse the relevant panel/background colour token/component/treatment instead of guessing a new unrelated colour.
+## 4. Center the Guild Shop paginator
 
-The two panels should use the same background treatment so they read as a coordinated pair.
+The existing previous/page/next paginator belongs at the bottom center of the Guild Shop panel.
 
-### Preserve layout behavior
+Required visual result:
 
-- left panel remains approximately 70% width;
-- right panel remains approximately 30% width;
-- Guild Shop remains exactly two columns;
-- Guild Shop remains fixed-pool + manual pagination, not scrolling;
-- limited Requisitions remain one-column `UI.ScrollLayout`;
-- pagination controls remain associated with the Guild Shop panel;
-- headers/backgrounds must not overlap entries, scrollbar, or pagination controls.
+```text
+                <   Page 1 / 2   >
+```
 
----
+Requirements:
+
+- horizontally centered relative to the usable Guild Shop panel content width;
+- remains at the bottom of the panel beneath the grid;
+- remains centered when the window/layout recalculates width;
+- does not depend on the number of visible shop entries;
+- does not overlap the grid or panel border;
+- Previous/Next enabled-state behavior and page calculations are unchanged.
+
+Use the existing layout system where practical; a fixed-width centered paginator host is preferable to fragile hard-coded offsets.
 
 ## Acceptance criteria
 
-### GuildSetting inspector
-- [ ] Guild Rank/GuildSetting inspector visually follows the same shell, spacing, sizing and section conventions as Spell/Item inspectors.
-- [ ] Existing #44 dataset/item/currency dropdown behavior remains intact.
-- [ ] No raw requisition/reward reference editing is reintroduced.
-- [ ] No GuildSetting schema/business-logic change is introduced.
-
-### Item tooltip
-- [ ] Hovering a Guild Shop `ShopEntry` shows the canonical RPE item tooltip.
-- [ ] Hovering a limited Requisition `ShopEntry` shows the same canonical RPE item tooltip.
-- [ ] Item tooltip is built through the existing Item tooltip builder rather than a duplicate implementation.
-- [ ] Missing/unresolved item references fail safely.
-- [ ] Disabled/exhausted/unaffordable rows remain hoverable for tooltip purposes.
-
-### Currency display
-- [ ] Cost line displays currency icon + amount rather than currency name.
-- [ ] Multiple cost currencies render as multiple compact icon/amount pairs.
-- [ ] Missing currency icons use the standard fallback icon.
-- [ ] Unresolved currencies fail safely.
-- [ ] Cost text remains one line and does not bleed into adjacent entries/panels.
-
-### Requisitions page panels
-- [ ] Left panel has a visible `Guild Shop` header.
-- [ ] Right panel has a visible `Requisitions` header.
-- [ ] Both main panels use a slightly darker surface matching/reusing the Profile stats-sheet treatment.
-- [ ] Headers are left aligned and visually consistent with existing Profile/UI headers.
-- [ ] No extra help/status/empty-state prose is added.
-- [ ] Existing 70/30 split, 2-column shop, pagination, and limited scroll behavior remain intact.
+- [ ] Built-in `copper` requisition costs use `Common:FormatCopper` output.
+- [ ] Non-copper requisition costs still use compact currency icon + amount.
+- [ ] Mixed costs format copper and non-copper components correctly.
+- [ ] Copper Daily Reward amounts use `Common:FormatCopper` rather than `xN`.
+- [ ] Other Daily Reward currencies retain their existing presentation.
+- [ ] `insufficient-currency` entries render cost amount text red.
+- [ ] Affordable/recycled entries restore the normal cost color.
+- [ ] Non-affordability disable reasons do not incorrectly use red cost text.
+- [ ] Both Guild Shop and limited Requisition rows behave identically.
+- [ ] Paginator is horizontally centered at the bottom of the Guild Shop panel.
+- [ ] Page count, navigation boundaries, and click transaction behavior are unchanged.
 
 ## Validation matrix
 
 ```text
-GuildSetting inspector
--> compare side-by-side with Spell inspector
--> compare side-by-side with Item inspector
--> selector bar / page padding / fields / lists / actions read as same UI family
+cost = 50 copper
+-> 50c via Common formatter
 
-Guild Shop item hover
--> canonical Item tooltip appears
+cost = 125 copper
+-> 1s 25c via Common formatter
 
-Limited Requisition item hover
--> same canonical Item tooltip appears
+cost = 12345 copper
+-> 1g 23s 45c via Common formatter
 
-unresolved item
--> safe fallback, no Lua error
+cost = valor
+-> existing valor icon + integer amount
 
-single currency cost
--> icon + amount; no currency name
+cost = copper + valor
+-> Common copper format + compact valor format
 
-multiple currency costs
--> each currency shown as compact icon + amount
+Daily Reward = 12345 copper
+-> formatted 1g 23s 45c amount, not x12345
 
-missing/unresolved currency icon
--> question-mark fallback + amount
+affordable item
+-> normal cost text color
+
+insufficient-currency item
+-> amount text red; item tooltip still hoverable
+
+limited item exhausted by characterLimit
+-> disabled/subdued, but not falsely red for affordability
+
+recycled row unaffordable -> affordable
+-> red state is cleared
 
 0 / 1 / 14 / 15 shop entries
--> panel header/background does not disturb pagination/grid behavior
-
-limited list requiring scrollbar
--> header/background does not overlap scrollbar or rows
-
-exhausted limited entry
--> disabled/subdued but item tooltip still works
+-> paginator remains centered at panel bottom and navigation remains correct
 ```
 
 ## Coding-agent instructions
-Treat current `FrontierDev/rpe2` as authoritative. Inspect the Spell and Item inspectors before changing `page_InspectorGuildSetting.lua`, and reuse their established visual/layout conventions rather than merely tweaking individual margins. For ShopEntry tooltips, use the existing `Addon.Client.UI.Tooltips.Item` builder and follow an existing canonical caller. For costs, resolve icons from the existing Profile currency definition. For the two panel surfaces, inspect the Profile stats-sheet implementation and reuse its established background/header treatment. Keep all gameplay/business logic unchanged and report exact files changed plus validation performed.
+Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Inspect `utils/Common.lua`, `core/internal/profile/Currencies.lua`, `client/client_Guild.lua`, `client/character/guild/page_GuildRequisitions.lua`, and `core/ui/prefabs/ShopEntry.lua` before editing. Reuse the existing copper formatter and authoritative eligibility result; do not duplicate transaction or currency logic. Report exact files changed and validation performed.

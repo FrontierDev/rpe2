@@ -10,6 +10,7 @@ local UI = Addon.UI or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
+local Common = Addon.Utils and Addon.Utils.Common or {}
 local TooltipBuilders = Addon.Client.UI and Addon.Client.UI.Tooltips or {}
 
 local RequisitionsPage = GuildUI.RequisitionsPage or {}
@@ -17,7 +18,7 @@ GuildUI.RequisitionsPage = RequisitionsPage
 RequisitionsPage.__index = RequisitionsPage
 
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
-local DAILY_REWARD_ICON = "Interface\\Icons\\INV_Misc_Gift_01"
+local DAILY_REWARD_ICON = "Interface\\Icons\\spell_nature_timestop"
 local HEADER_HEIGHT = 42
 local DAILY_REWARD_BUTTON_SIZE = HEADER_HEIGHT
 local SHOP_COLUMNS = 2
@@ -27,6 +28,10 @@ local SHOP_ENTRY_HEIGHT = 34
 local SHOP_GRID_SPACING_X = 6
 local SHOP_GRID_SPACING_Y = 4
 local SHOP_PAGE_NAV_HEIGHT = 18
+local SHOP_PAGE_BUTTON_WIDTH = 22
+local SHOP_PAGE_TEXT_WIDTH = 96
+local SHOP_PAGE_NAV_SPACING = 4
+local SHOP_PAGINATION_WIDTH = (SHOP_PAGE_BUTTON_WIDTH * 2) + SHOP_PAGE_TEXT_WIDTH + (SHOP_PAGE_NAV_SPACING * 2)
 local PANEL_HEADER_HEIGHT = 16
 local PANEL_CONTENT_INSET = 6
 
@@ -76,14 +81,20 @@ local function normalizeCharacterLimit(value)
     return math.max(1, math.floor(numeric))
 end
 
-local function resolveCurrencyIcon(currencyRef)
-    local normalizedRef = trimText(currencyRef)
+local function normalizeCurrencyRef(currencyRef)
+    local normalizedRef = trimText(currencyRef):lower()
     if type(Profile.NormalizeCurrencyKey) == "function" then
         local normalizeCallOk, resolvedRef = pcall(Profile.NormalizeCurrencyKey, currencyRef)
         if normalizeCallOk and trimText(resolvedRef) ~= "" then
-            normalizedRef = trimText(resolvedRef)
+            normalizedRef = trimText(resolvedRef):lower()
         end
     end
+
+    return normalizedRef
+end
+
+local function resolveCurrencyIcon(currencyRef)
+    local normalizedRef = normalizeCurrencyRef(currencyRef)
 
     if type(Profile.ResolveCurrencyDefinition) == "function" then
         local resolveCallOk, definition = pcall(Profile.ResolveCurrencyDefinition, normalizedRef)
@@ -114,6 +125,15 @@ local function formatInlineIcon(icon, size)
     return ("|T%s:%d:%d|t"):format(DEFAULT_ICON, iconSize, iconSize)
 end
 
+local function formatCostComponent(currencyRef, amount)
+    local normalizedRef = normalizeCurrencyRef(currencyRef)
+    if normalizedRef == "copper" then
+        return Common:FormatCopper(amount)
+    end
+
+    return ("%s %d"):format(formatInlineIcon(resolveCurrencyIcon(normalizedRef), 12), amount)
+end
+
 local function formatCompactCost(costs)
     if type(costs) ~= "table" then
         return ""
@@ -123,7 +143,7 @@ local function formatCompactCost(costs)
     for index = 1, #costs do
         local cost = type(costs[index]) == "table" and costs[index] or {}
         local amount = normalizeNonNegativeInteger(cost.amount, 0)
-        labels[#labels + 1] = ("%s %d"):format(formatInlineIcon(resolveCurrencyIcon(cost.currencyRef), 12), amount)
+        labels[#labels + 1] = formatCostComponent(cost.currencyRef, amount)
     end
 
     return table.concat(labels, "  ")
@@ -285,18 +305,14 @@ local function resolveRewardDisplay(reward)
     local ref = trimText(reward and reward.ref)
     local name = rewardType == "currency" and "Unknown currency" or "Unknown item"
     local icon = DEFAULT_ICON
+    local currencyKey = nil
 
     if rewardType == "currency" then
         local currencyRef = reward and reward.ref or ref
-        if type(Profile.NormalizeCurrencyKey) == "function" then
-            local normalizeOk, normalizedRef = pcall(Profile.NormalizeCurrencyKey, currencyRef)
-            if normalizeOk and trimText(normalizedRef) ~= "" then
-                currencyRef = normalizedRef
-            end
-        end
+        currencyKey = normalizeCurrencyRef(currencyRef)
 
         if type(Profile.ResolveCurrencyDefinition) == "function" then
-            local resolveOk, definition = pcall(Profile.ResolveCurrencyDefinition, currencyRef)
+            local resolveOk, definition = pcall(Profile.ResolveCurrencyDefinition, currencyKey)
             if resolveOk and type(definition) == "table" and definition.isMissing ~= true then
                 name = trimText(definition.name) ~= "" and trimText(definition.name) or name
                 icon = trimText(definition.icon) ~= "" and definition.icon or icon
@@ -336,6 +352,7 @@ local function resolveRewardDisplay(reward)
         name = name,
         icon = icon,
         amount = normalizeRewardAmount(reward and reward.amount),
+        currencyKey = currencyKey,
     }
 end
 
@@ -355,9 +372,13 @@ function RequisitionsPage:BuildDailyRewardTooltip()
     if type(rewards) == "table" then
         for index = 1, #rewards do
             local display = resolveRewardDisplay(rewards[index])
+            local rightText = ("x%d"):format(display.amount)
+            if display.currencyKey == "copper" then
+                rightText = Common:FormatCopper(display.amount)
+            end
             local line = {
                 left = display.name,
-                right = ("x%d"):format(display.amount),
+                right = rightText,
                 colorToken = "text.secondary",
                 rightColorToken = "text.primary",
             }
@@ -631,8 +652,9 @@ end
 
 function RequisitionsPage:BindShopEntry(entry, requisition)
     local itemDisplay = resolveShopItemDisplay(requisition)
-    local costText = self:FormatCompactCost(requisition and requisition.costs)
     local eligible, reason, detail = self:GetShopEligibility(requisition)
+    local insufficientCurrency = reason == "insufficient-currency"
+    local costText = self:FormatCompactCost(requisition and requisition.costs)
 
     entry:SetOption("keepMouseEnabled", true)
     entry.resolvedRequisition = requisition
@@ -648,6 +670,7 @@ function RequisitionsPage:BindShopEntry(entry, requisition)
     entry:SetIcon(itemDisplay.icon)
     entry:SetItemName(itemDisplay.name)
     entry:SetCostText(costText)
+    entry:SetCostColor(insufficientCurrency and "danger" or "text.secondary")
     entry:SetEnabled(eligible)
     entry:SetTooltip(function()
         return buildShopItemTooltip(entry.resolvedItemDisplay)
@@ -706,6 +729,7 @@ function RequisitionsPage:HideShopEntry(entry)
     entry:SetIcon(DEFAULT_ICON)
     entry:SetItemName("")
     entry:SetCostText("")
+    entry:SetCostColor("text.secondary")
     entry:SetEnabled(false)
     entry:Hide()
 end
@@ -919,7 +943,7 @@ function RequisitionsPage:Build(parent, owner)
     })
     UI.Utils.AnchorFill(self.GuildShopHost, self.GuildShopPanel:GetContentFrame(), 0, 0, 0, 0)
 
-    self.GuildShopHeader = UI.CreateText(self.GuildShopHost:GetFrame(), "RPEGuildShopHeader", "Guild Shop", {
+    self.GuildShopHeader = UI.CreateText(self.GuildShopHost:GetFrame(), "RPEGuildShopHeader", "Requisitions", {
         fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
         fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Heading2) or 10,
         textColor = UI.ResolveColor(nil, "text.primary"),
@@ -952,23 +976,38 @@ function RequisitionsPage:Build(parent, owner)
     })
     self.ShopLayout:AddChild(self.ShopGrid)
 
+    self.ShopPaginationHost = UI.CreatePanel(self.ShopLayout:GetFrame(), "RPEGuildShopPaginationHost", {
+        height = SHOP_PAGE_NAV_HEIGHT,
+        expandWidth = true,
+        contentInset = 0,
+        showBorder = false,
+        panelBackgroundColor = { r = 0, g = 0, b = 0, a = 0 },
+    })
+    self.ShopLayout:AddChild(self.ShopPaginationHost)
+
     self.ShopPaginationLayout = UI.CreateLayout(
         UI.HorizontalLayoutGroup,
-        self.ShopLayout:GetFrame(),
+        self.ShopPaginationHost:GetContentFrame(),
         "RPEGuildShopPaginationLayout",
         {
+            width = SHOP_PAGINATION_WIDTH,
             height = SHOP_PAGE_NAV_HEIGHT,
-            expandWidth = true,
-            fitChildrenWidth = false,
+            fitChildrenWidth = true,
             fitChildrenHeight = false,
-            spacing = 4,
+            spacing = SHOP_PAGE_NAV_SPACING,
         }
     )
-    self.ShopLayout:AddChild(self.ShopPaginationLayout)
+    self.ShopPaginationLayout:GetFrame():SetPoint(
+        "CENTER",
+        self.ShopPaginationHost:GetContentFrame(),
+        "CENTER",
+        0,
+        0
+    )
 
     self.ShopPreviousButton = UI.TextButton:New({
         name = "RPEGuildShopPreviousButton",
-        width = 22,
+        width = SHOP_PAGE_BUTTON_WIDTH,
         height = SHOP_PAGE_NAV_HEIGHT,
         text = "<",
         fontSize = 11,
@@ -983,7 +1022,7 @@ function RequisitionsPage:Build(parent, owner)
     self.ShopPaginationLayout:AddChild(self.ShopPreviousButton)
 
     self.ShopPageText = UI.CreateText(self.ShopPaginationLayout:GetFrame(), "RPEGuildShopPageText", "Page 0 / 0", {
-        width = 96,
+        width = SHOP_PAGE_TEXT_WIDTH,
         height = SHOP_PAGE_NAV_HEIGHT,
         justifyH = "CENTER",
         expandWidth = false,
@@ -993,7 +1032,7 @@ function RequisitionsPage:Build(parent, owner)
 
     self.ShopNextButton = UI.TextButton:New({
         name = "RPEGuildShopNextButton",
-        width = 22,
+        width = SHOP_PAGE_BUTTON_WIDTH,
         height = SHOP_PAGE_NAV_HEIGHT,
         text = ">",
         fontSize = 11,
@@ -1047,7 +1086,7 @@ function RequisitionsPage:Build(parent, owner)
     })
     UI.Utils.AnchorFill(self.LimitedRequisitionHost, self.LimitedRequisitionPanel:GetContentFrame(), 0, 0, 0, 0)
 
-    self.LimitedRequisitionHeader = UI.CreateText(self.LimitedRequisitionHost:GetFrame(), "RPEGuildLimitedRequisitionHeader", "Requisitions", {
+    self.LimitedRequisitionHeader = UI.CreateText(self.LimitedRequisitionHost:GetFrame(), "RPEGuildLimitedRequisitionHeader", "Special Requisitions", {
         fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
         fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Heading2) or 10,
         textColor = UI.ResolveColor(nil, "text.primary"),

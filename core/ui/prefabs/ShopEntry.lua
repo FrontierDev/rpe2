@@ -137,6 +137,7 @@ function ShopEntry:New(options)
     instance.enabled = options == nil or options.enabled ~= false
     instance.fullItemName = tostring(options and options.itemName or "")
     instance.costText = tostring(options and options.costText or "")
+    instance.costColor = options and options.costColor or nil
     instance.itemNameDisplay = ""
     instance.costTextDisplay = ""
     instance.textWidth = 0
@@ -179,6 +180,18 @@ function ShopEntry:SetCostText(costText)
     self:SetOption("costText", self.costText)
     self:RefreshText()
     return self.costText
+end
+
+function ShopEntry:SetCostColor(color)
+    local resolvedColor = UI.ResolveColor(color, "text.secondary")
+    self.costColor = resolvedColor
+    self:SetOption("costColor", resolvedColor)
+
+    if self.costRegion and self.costRegion.SetTextColor then
+        self.costRegion:SetTextColor(resolvedColor.r, resolvedColor.g, resolvedColor.b, resolvedColor.a)
+    end
+
+    return resolvedColor
 end
 
 function ShopEntry:SetBorderColor(r, g, b, a)
@@ -447,6 +460,7 @@ function ShopEntry:Create()
     self:SetBorderColor(borderColor.r, borderColor.g, borderColor.b, borderColor.a)
     self:SetItemName(self.fullItemName or self.options.itemName or "")
     self:SetCostText(self.costText or self.options.costText or "")
+    self:SetCostColor(self.options.costColor)
     self:SetLayoutMetrics(width, height)
     self:SetEnabled(self.enabled)
 
