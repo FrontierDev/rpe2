@@ -172,6 +172,7 @@ core/ui/Popup.lua
 core/ui/prefabs/UnitPortrait.lua
 core/ui/prefabs/ObjectSlot.lua
 core/ui/prefabs/SpellbookEntry.lua
+core/ui/prefabs/ShopEntry.lua
 core/ui/prefabs/TrainerEntry.lua
 core/ui/prefabs/SkillEntry.lua
 core/ui/prefabs/ResourceBar.lua

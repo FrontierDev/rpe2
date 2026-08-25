@@ -1,99 +1,159 @@
-## Validation result: revision required
+## Goal
+Create the reusable `ShopEntry` UI prefab used by both the paginated Guild Shop and the limited Requisitions scroll panel.
 
-The core Task 1 implementation is structurally correct, but there is one blocking backward-compatibility defect in the reset-cycle key transition. Do not close #38 yet.
+Authoritative plan: `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md`.
 
-### What passes
+Depends on: #38
 
-Static inspection of commit `04101931299bda2b0c7c6b53343491b316993a0f` confirms:
+`ShopEntry` must visually follow `core/ui/prefabs/SpellbookEntry.lua`: icon on the left, compact text region on the right, hover treatment, disabled/desaturated state and responsive layout metrics. The text region differs by containing **item name on the first line and item cost directly underneath**.
 
-- `PLAYER_ENTERING_WORLD`, `PLAYER_GUILD_UPDATE`, and `GUILD_ROSTER_UPDATE` no longer call `ProcessDailyRewards()` automatically;
-- those runtime events still re-evaluate assigned Guild Rank state and refresh the Guild window;
-- `Guild:TryClaimDailyReward()` delegates to the existing `ProcessDailyRewards()` transaction instead of duplicating award logic;
-- existing transaction markers, award verification, rollback, claim persistence, duplicate protection, and refresh behavior remain in the central transaction path;
-- `Guild:GetDailyRewardResetState()` is the single new source of `secondsRemaining` and `cycleKey`;
-- missing/invalid `C_DateAndTime.GetSecondsUntilDailyReset()` cleanly returns `calendar-unavailable` rather than falling back to local midnight;
-- no Profile schema/root change was introduced;
-- #36's configuration-refresh coalescing code was not modified by this task.
+## Primary files
+- new `core/ui/prefabs/ShopEntry.lua`
+- `RPEngine_Dev.toc`
+- `core/ui/Constants.lua` only if a narrow prefab constants block is consistent with the current prefab pattern after inspection
 
-### Blocking defect: existing claims can become claimable again after upgrading
-
-Before #38, a successful Daily Reward stored:
+## Visual contract
+Required layout:
 
 ```text
-dailyRewardDate = date("%Y-%m-%d", claimTime)
+┌──────┬────────────────────────┐
+│ ICON │ Item Name              │
+│      │ Item Cost              │
+└──────┴────────────────────────┘
 ```
 
-The new code stores/compares:
+Retain the relevant `SpellbookEntry` behavior/style:
+
+- Button-backed outer frame;
+- left-side icon frame;
+- cropped icon texture;
+- thin icon border;
+- hover highlight;
+- enabled/disabled visual treatment;
+- `SetBorderColor(...)`;
+- responsive `SetLayoutMetrics(width, height)`;
+- normal `BaseElement` tooltip support.
+
+Do not copy unrelated Spellbook behavior such as action-bar binding or spell-specific fields.
+
+## Internal layout
+Use RPE layout abstractions where practical.
+
+The icon remains the fixed left region. The text area to its right should contain a small `VerticalLayoutGroup` with:
+
+1. one-line item-name text;
+2. one-line cost text.
+
+Avoid independently hand-anchoring two arbitrary text rows if the existing Vertical Layout Group can express the same structure.
+
+The overall entry should remain compact and comparable in height to `SpellbookEntry` so a two-column grid can display multiple rows within the current Guild window.
+
+## Public API
+Provide at minimum:
+
+```lua
+ShopEntry:SetIcon(texturePath)
+ShopEntry:SetItemName(itemName)
+ShopEntry:SetCostText(costText)
+ShopEntry:SetBorderColor(r, g, b, a)
+ShopEntry:SetLayoutMetrics(width, height)
+ShopEntry:SetEnabled(enabled)
+```
+
+`SetTooltip(...)` should work through inherited `BaseElement` behavior without introducing a second tooltip system.
+
+Store the full item name separately from the rendered/truncated string.
+
+## Item-name truncation
+The item name must:
+
+- remain on one line;
+- never wrap;
+- never bleed into the adjacent Guild Shop column;
+- render `...` when the full text does not fit.
+
+Example:
 
 ```text
-cycleKey = date("%Y-%m-%d", nextResetTimestamp)
+Reinforced Arcanite Longs...
 ```
 
-Those two `YYYY-MM-DD` strings have the same storage shape but **different semantics**.
+Implement a focused fitting helper inside `ShopEntry.lua`, conceptually:
 
-Example with a 10:00 local daily reset:
+```lua
+local function fitTextWithEllipsis(fontString, fullText, maxWidth)
+    -- full text if it fits
+    -- otherwise longest fitting prefix .. "..."
+end
+```
+
+Prefer binary search over candidate string length rather than removing one character repeatedly.
+
+Recompute truncation whenever:
+
+- `SetItemName()` changes the full name;
+- `SetLayoutMetrics()` changes the available text width;
+- any relevant font/layout metric is reapplied during creation.
+
+The displayed text must never become the source of truth for tooltips or data binding; preserve the full name internally.
+
+## Cost line
+The cost appears directly underneath the name.
+
+Requirements:
+
+- single line;
+- slightly smaller than the item-name text;
+- secondary/muted text color;
+- no visible `Cost:` prefix added by the prefab;
+- does not overflow outside the entry.
+
+It may use the same fitting helper if necessary. The explicit required truncation behavior is for the item name, but cost overflow must still remain visually contained.
+
+The page will supply already-formatted cost text; `ShopEntry` should not resolve Currency definitions itself.
+
+## Enabled/disabled state
+Mirror `SpellbookEntry` semantics:
+
+- disabled icon desaturates/dims;
+- name and cost become subdued;
+- outer frame visual alpha updates coherently;
+- the prefab should remain safe for tooltip use where the caller deliberately keeps hover enabled.
+
+Do not encode requisition eligibility rules inside the prefab.
+
+## Load order
+Add:
 
 ```text
-Old client claims at 11:00 on Aug 25
--> stored dailyRewardDate = 2026-08-25
-
-Upgrade to #38 at 11:05 on Aug 25
--> next reset is Aug 26 10:00
--> new cycleKey = 2026-08-26
-
-2026-08-25 ~= 2026-08-26
--> GetDailyRewardStatus() reports available-today
--> the same reset-cycle reward can be claimed a second time
+core/ui/prefabs/ShopEntry.lua
 ```
 
-This violates the requirement to preserve duplicate-claim protection and means the existing `YYYY-MM-DD` claim persistence is not semantically backward-compatible even though it still passes the Profile date validator.
+to `RPEngine_Dev.toc` after `SpellbookEntry.lua` and before Guild UI pages that consume it.
 
-### Required revision
+Do not reorder unrelated files.
 
-Add an explicit one-time compatibility path for pre-#38 Daily Reward claims so an already-claimed **current reset cycle** cannot become claimable simply because the meaning of `dailyRewardDate` changed.
+## Constraints
+- Do not implement Guild Shop pagination here.
+- Do not implement Requisition transaction calls here.
+- Do not resolve Items/Currencies here.
+- Do not create a Shop-specific tooltip framework.
+- Do not modify `SpellbookEntry.lua` merely to share small implementation details unless a tiny genuinely reusable helper already belongs elsewhere.
+- Do not add visible labels/help text.
 
-The implementation should:
+## Acceptance criteria
+- [ ] `UI.ShopEntry` loads before Guild UI consumers.
+- [ ] The prefab matches the Spellbook visual language.
+- [ ] Item icon is on the left.
+- [ ] Item name is above cost in the right-hand text region.
+- [ ] Item name is strictly one line.
+- [ ] Overlong item names are truncated with `...` rather than wrapped or clipped into another column.
+- [ ] Truncation recalculates after width changes.
+- [ ] Full item name is preserved internally.
+- [ ] Cost is directly below the name, smaller/subdued, and visually contained.
+- [ ] `SetIcon`, `SetItemName`, `SetCostText`, `SetBorderColor`, `SetLayoutMetrics` and `SetEnabled` work after creation.
+- [ ] Existing BaseElement tooltip support works on ShopEntry.
+- [ ] Disabled-state visuals remain coherent.
 
-1. distinguish legacy calendar-day claim semantics from the new reset-cycle semantics;
-2. on first use after upgrade, determine conservatively whether the legacy claim belongs to the current reset cycle;
-3. if it does, migrate/translate it to the current reset `cycleKey` before returning `available-today`;
-4. persist enough state to know that this claim/bucket now uses reset-cycle semantics, so later cycles are compared only against the new key and are not accidentally blocked by legacy compatibility logic;
-5. keep the existing `YYYY-MM-DD` claim value format if practical and avoid a Profile schema bump/new SavedVariable root unless repository inspection shows that is genuinely necessary.
-
-A narrow version/semantics marker inside the existing per-guild Profile bucket is acceptable if the current Profile normalization/preservation rules support it. Do not solve this by permanently accepting both `current calendar date` and `cycleKey` on every future comparison: after a new-format claim, that can block the next reset cycle because yesterday's `cycleKey` may equal today's calendar date.
-
-### Re-validation matrix
-
-After revision, verify at minimum:
-
-```text
-legacy claim after previous reset, upgrade before next reset
--> remains claimed; no duplicate
-
-legacy claim before today's reset, upgrade before that reset
--> remains claimed for the current cycle
-
-legacy claim from an older cycle
--> current cycle remains available
-
-new-format claim
--> remains claimed through reload/relog until reset
-
-next reset
--> becomes available exactly once
-
-subsequent new-format cycles
--> legacy compatibility path no longer causes false blocking
-```
-
-Also test the reset boundary around:
-
-```text
-secondsRemaining = 1
-secondsRemaining = 0 (if the Blizzard API can expose it)
-first value after reset
-```
-
-and confirm `cycleKey` changes coherently with the timer boundary.
-
-Everything else in #38 is consistent with the issue from static source inspection. The legacy-claim transition is the remaining blocker.
+## Coding-agent instructions
+Read `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md`, then inspect `core/ui/prefabs/SpellbookEntry.lua`, `TrainerEntry.lua`, `VerticalLayoutGroup.lua`, `Text.lua`, `BaseElement.lua`, and the prefab load-order section of `RPEngine_Dev.toc` before editing. Implement Task 2 only. Clone the established visual behavior rather than inventing a new row style, and validate truncation at multiple widths. Review every acceptance criterion and report changed files, validation performed, and any deviation.
