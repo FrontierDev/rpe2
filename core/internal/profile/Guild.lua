@@ -321,6 +321,17 @@ local function normalizeDailyRewardDate(value)
     return ""
 end
 
+local DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE = "reset-cycle"
+Profile.DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE = DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE
+
+local function normalizeDailyRewardClaimSemantics(value)
+    if value == DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE then
+        return DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE
+    end
+
+    return nil
+end
+
 local function normalizeDailyRewardTransaction(value)
     if type(value) ~= "table" then
         return nil
@@ -571,14 +582,17 @@ function Profile.GetDailyRewardClaim(guildKey)
     local bucket = Profile.GetGuildBucket(normalizedGuildKey)
     local dateKey = normalizeDailyRewardDate(bucket and bucket.dailyRewardDate)
     local rankRef = normalizeGuildRankRef(bucket and bucket.dailyRewardRankRef)
+    local claimSemantics = normalizeDailyRewardClaimSemantics(
+        bucket and bucket.dailyRewardClaimSemantics
+    )
     if dateKey == "" then
-        return nil, rankRef ~= "" and rankRef or nil
+        return nil, rankRef ~= "" and rankRef or nil, claimSemantics
     end
 
-    return dateKey, rankRef ~= "" and rankRef or nil
+    return dateKey, rankRef ~= "" and rankRef or nil, claimSemantics
 end
 
-function Profile.SetDailyRewardClaim(guildKey, dateKey, guildRankRef)
+function Profile.SetDailyRewardClaim(guildKey, dateKey, guildRankRef, claimSemantics)
     local normalizedGuildKey = normalizeGuildKey(guildKey)
     local normalizedDateKey = normalizeDailyRewardDate(dateKey)
     local normalizedRankRef = normalizeGuildRankRef(guildRankRef)
@@ -591,8 +605,12 @@ function Profile.SetDailyRewardClaim(guildKey, dateKey, guildRankRef)
     local bucket = type(state.byGuild[normalizedGuildKey]) == "table"
         and state.byGuild[normalizedGuildKey]
         or {}
+    local normalizedClaimSemantics = claimSemantics == nil
+        and normalizeDailyRewardClaimSemantics(bucket.dailyRewardClaimSemantics)
+        or normalizeDailyRewardClaimSemantics(claimSemantics)
     bucket.dailyRewardDate = normalizedDateKey
     bucket.dailyRewardRankRef = normalizedRankRef
+    bucket.dailyRewardClaimSemantics = normalizedClaimSemantics
     state.byGuild[normalizedGuildKey] = bucket
 
     local persistedState = Profile.SetGuildState(state)

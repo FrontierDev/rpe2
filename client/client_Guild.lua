@@ -17,6 +17,7 @@ local GUILD_ADMIN_QUERY_OPCODE = Operations.GetOpcode and Operations:GetOpcode("
 local GUILD_ADMIN_QUERY_RESPONSE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("GUILD_ADMIN_QUERY_RESPONSE") or nil
 local GUILD_ADMIN_MUTATION_OPCODE = Operations.GetOpcode and Operations:GetOpcode("GUILD_ADMIN_MUTATION") or nil
 local GUILD_ADMIN_MUTATION_RESPONSE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("GUILD_ADMIN_MUTATION_RESPONSE") or nil
+local DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE = "reset-cycle"
 
 Guild._guildAdminPending = Guild._guildAdminPending or {}
 Guild._guildAdminRequestSequence = tonumber(Guild._guildAdminRequestSequence) or 0
@@ -1765,10 +1766,82 @@ function Guild:GetDailyRewardResetState()
         return nil, "calendar-unavailable"
     end
 
+    local currentDateCallOk, currentDayKey = pcall(date, "%Y-%m-%d", now)
+    local previousResetDateCallOk, previousCycleKey = pcall(
+        date,
+        "%Y-%m-%d",
+        nextResetTimestamp - (24 * 60 * 60)
+    )
+    if not currentDateCallOk
+        or type(currentDayKey) ~= "string"
+        or not currentDayKey:match("^%d%d%d%d%-%d%d%-%d%d$")
+        or not previousResetDateCallOk
+        or type(previousCycleKey) ~= "string"
+        or not previousCycleKey:match("^%d%d%d%d%-%d%d%-%d%d$") then
+        return nil, "calendar-unavailable"
+    end
+
     return {
         secondsRemaining = secondsRemaining,
         cycleKey = cycleKey,
+        currentDayKey = currentDayKey,
+        previousCycleKey = previousCycleKey,
     }
+end
+
+local function legacyDailyRewardClaimBelongsToCurrentResetCycle(claimDate, resetState)
+    if type(claimDate) ~= "string" or type(resetState) ~= "table" then
+        return false
+    end
+
+    if claimDate == resetState.currentDayKey then
+        return true
+    end
+
+    -- Before the reset, the current reset cycle can include the previous
+    -- calendar day. Legacy storage has no claim timestamp, so retain that
+    -- claim conservatively rather than risking a duplicate award.
+    return resetState.cycleKey == resetState.currentDayKey
+        and claimDate == resetState.previousCycleKey
+end
+
+local function migrateLegacyDailyRewardClaim(guildKey, claimDate, claimRankRef, assignedRankRef, resetState)
+    if type(Profile.SetDailyRewardClaim) ~= "function"
+        or type(Profile.GetDailyRewardClaim) ~= "function" then
+        return nil, nil, nil, "profile-api-unavailable"
+    end
+
+    local normalizedRankRef = claimRankRef or assignedRankRef
+    if type(normalizedRankRef) ~= "string" or normalizedRankRef == "" then
+        return nil, nil, nil, "profile-api-unavailable"
+    end
+
+    local migratedDate = legacyDailyRewardClaimBelongsToCurrentResetCycle(claimDate, resetState)
+        and resetState.cycleKey
+        or claimDate
+    local setCallOk = pcall(
+        Profile.SetDailyRewardClaim,
+        guildKey,
+        migratedDate,
+        normalizedRankRef,
+        DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE
+    )
+    if not setCallOk then
+        return nil, nil, nil, "profile-api-unavailable"
+    end
+
+    local storedCallOk, storedDate, storedRankRef, storedSemantics = pcall(
+        Profile.GetDailyRewardClaim,
+        guildKey
+    )
+    if not storedCallOk
+        or storedDate ~= migratedDate
+        or storedRankRef ~= normalizedRankRef
+        or storedSemantics ~= DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE then
+        return nil, nil, nil, "profile-api-unavailable"
+    end
+
+    return storedDate, storedRankRef, storedSemantics
 end
 
 local function getDailyRewardStatus(self)
@@ -1855,14 +1928,37 @@ local function getDailyRewardStatus(self)
         return result
     end
 
-    local claimCallOk, claimDate, claimRankRef = pcall(Profile.GetDailyRewardClaim, result.guildKey)
+    local claimCallOk, claimDate, claimRankRef, claimSemantics = pcall(
+        Profile.GetDailyRewardClaim,
+        result.guildKey
+    )
     if not claimCallOk then
         result.status = "profile-api-unavailable"
         result.reason = result.status
         return result
     end
+
+    if claimDate and claimSemantics ~= DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE then
+        local migratedDate, migratedRankRef, migratedSemantics, migrationReason = migrateLegacyDailyRewardClaim(
+            result.guildKey,
+            claimDate,
+            claimRankRef,
+            result.assignedRankRef,
+            resetState
+        )
+        if not migratedDate then
+            result.status = migrationReason or "profile-api-unavailable"
+            result.reason = result.status
+            return result
+        end
+
+        claimDate = migratedDate
+        claimRankRef = migratedRankRef
+        claimSemantics = migratedSemantics
+    end
     result.claimDate = claimDate
     result.claimRankRef = claimRankRef
+    result.claimSemantics = claimSemantics
     if claimDate == result.dayKey then
         result.status = "received-today"
         result.reason = result.status
@@ -2098,14 +2194,19 @@ function Guild:ProcessDailyRewards()
             Profile.SetDailyRewardClaim,
             status.guildKey,
             status.dayKey,
-            status.assignedRankRef
+            status.assignedRankRef,
+            DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE
         )
-        local storedCallOk, storedDate, storedRankRef = pcall(Profile.GetDailyRewardClaim, status.guildKey)
+        local storedCallOk, storedDate, storedRankRef, storedSemantics = pcall(
+            Profile.GetDailyRewardClaim,
+            status.guildKey
+        )
         if not claimCallOk
             or type(persistedBucket) ~= "table"
             or not storedCallOk
             or storedDate ~= status.dayKey
-            or storedRankRef ~= status.assignedRankRef then
+            or storedRankRef ~= status.assignedRankRef
+            or storedSemantics ~= DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE then
             pcall(transaction.Rollback, transaction)
             if not persistDailyRewardTransactionState(
                 transactionContext,
