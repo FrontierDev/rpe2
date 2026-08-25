@@ -1,205 +1,291 @@
 ## Goal
-Populate the final page's right-hand region with limited/one-time requisitions as a scrolling one-column list of `ShopEntry` rows, then remove the remaining provisional selection/action UI and duplicate Guild Rank window-title text.
+Audit Tasks 0–5 as one coherent implementation of the final Guild Requisitions page, execute the required behavior matrix, and fix **concrete defects only**.
 
 Authoritative plan: `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md`.
 
-Depends on: #37, #39, #40, #41
+Depends on: #37, #38, #39, #40, #41, #42
+
+Do not start until all preceding Guild Requisitions tasks are implemented and pushed/available in the working tree.
 
 ## Primary files
+Audit all files changed by #37–#42, especially:
+
+- `core/classes/GuildSetting.lua`
+- `client/ui/editor/inspectors/page_InspectorGuildSetting.lua`
+- `client/client_Guild.lua`
+- `core/ui/prefabs/ShopEntry.lua`
+- `RPEngine_Dev.toc`
 - `client/character/guild/page_GuildRequisitions.lua`
 - `client/character/guild/window_Guild.lua`
+- `core/internal/profile/Guild.lua` only if a preceding task required a narrow compatibility edit
 
-## Source data
-Use the same assigned RPE Guild Rank and the same existing:
+Inspect adjacent layout/tooltip/profile APIs where needed, but do not redesign them.
 
-```lua
-rank.requisitions
-```
-
-collection as the Guild Shop.
-
-The right-hand panel contains only:
+## Unlimited/limited semantics audit
+Verify the canonical partition:
 
 ```text
-characterLimit > 0
+characterLimit == 0 -> Guild Shop
+characterLimit > 0  -> limited Requisitions
 ```
 
-requisitions.
-
-`characterLimit == 0` belongs exclusively to the left-hand Guild Shop implemented by #41.
-
-Do not create a second definition collection.
-
-## ScrollLayout implementation
-Use:
-
-```lua
-UI.ScrollLayout
-```
-
-with:
-
-```lua
-rowElementClass = UI.ShopEntry
-```
-
-and a single full-width column.
-
-Configure row height/spacing to match the compact `ShopEntry` visual language. Prefer `autoFitRows = true` if that integrates cleanly with the available right-hand host height; otherwise derive a stable visible-row count from the final layout without manual per-row anchoring.
-
-The scrollbar should appear only when required through existing `ScrollLayout` behavior.
-
-Do not paginate the limited Requisitions panel.
-
-## ShopEntry row binding
-For each visible limited requisition:
-
-1. resolve the Item definition/reference through the existing Registry API;
-2. resolve item display name/icon with safe question-mark fallback;
-3. reuse the compact cost formatter introduced by #41;
-4. set `ShopEntry` icon/name/cost;
-5. evaluate eligibility through `Guild:GetRequisitionEligibility(...)`;
-6. keep exhausted/unaffordable/unavailable entries visible but disabled/subdued;
-7. bind left click directly to `Guild:TryRequisition(...)`;
-8. refresh the page/list after a transaction attempt.
-
-There is no selection state and no separate action button.
-
-For finite limits greater than `1`, the entry remains enabled while usage is below the limit and becomes disabled only when the existing eligibility API reports it exhausted or otherwise unavailable.
-
-Do not make row display logic the authority for usage; the existing Guild/Profile transaction layer remains authoritative.
-
-## Truncation and cost layout
-Each right-hand row uses the same `ShopEntry` contract as the Guild Shop:
+Test at minimum:
 
 ```text
-[icon] Item Name
-       Item Cost
+omitted characterLimit -> normalizes to 1
+characterLimit = 0 -> survives definition/editor round-trip
+characterLimit = 1 -> limited
+characterLimit = 3 -> limited
 ```
 
-The item name remains one line and truncates with `...` through `ShopEntry` when the narrow panel width requires it.
-
-Cost appears directly underneath the name and uses the same formatter as #41. Do not add a `Cost:` prefix.
-
-## Empty/invalid state
-When there are no limited requisitions, hide/recycle the rows normally and leave the panel visually empty.
-
-Do not render:
-
-- `No requisitions configured`;
-- invalid-rank explanation;
-- eligibility help;
-- status paragraphs;
-- a section heading.
-
-## Remove provisional selection/action UI
-Delete the remaining old-page state/controls associated with selecting a requisition and pressing a separate action button.
-
-Remove obsolete concepts equivalent to:
+### Unlimited transaction matrix
+Verify:
 
 ```text
-SelectedRequisitionIndex
-SelectedRequisitionItems (if no longer needed as page partition data)
-setSelectedRow(...)
-RequisitionButton
-RequisitionActionStatus
-RequisitionActionMessage
-RequisitionPending (unless a new narrow per-click guard is genuinely required)
-RequisitionTitle
-RequisitionEmptyText
-old ScrollListEntry requisition rendering
+affordable unlimited purchase -> succeeds
+same unlimited purchase again -> succeeds while affordable
+unlimited purchase -> no requisition usage ledger increment/write
+unlimited insufficient currency -> rejected, item not awarded
+unlimited invalid item/currency -> rejected without partial mutation
 ```
 
-Also remove obsolete helper functions whose only consumer was the provisional selection/action/status UI.
-
-Do not remove reusable item/currency resolution or failure-safe logic that the final binding still uses.
-
-## Final Refresh flow
-After this task, `RequisitionsPage:Refresh()` should conceptually:
+### Limited transaction matrix
+Verify existing behavior remains intact:
 
 ```text
-resolve assigned RPE Guild Rank status
-        ↓
-resolve Daily Reward status/reset state
-        ↓
+limit 1 first purchase -> succeeds + usage 1
+limit 1 second purchase -> character-limit-reached
+limit 3 purchases 1..3 -> succeed + ledger increments
+limit 3 purchase 4 -> rejected
+transaction failure -> existing rollback semantics preserved
+```
+
+Do not weaken the transaction layer to make UI testing pass.
+
+## Daily Reward runtime audit
+Verify automatic claiming is gone:
+
+```text
+PLAYER_ENTERING_WORLD with available reward -> no award
+PLAYER_GUILD_UPDATE with available reward -> no award
+GUILD_ROSTER_UPDATE with available reward -> no award
+```
+
+Verify explicit claim:
+
+```text
+available icon click -> one claim transaction
+repeated click while pending -> no duplicate
+second click after claim -> no duplicate
+/reload after claim -> still claimed for current reset cycle
+next daily reset -> becomes available again
+```
+
+Exercise both Item and Currency Daily Rewards where practical.
+
+Confirm existing transaction markers/rollback/claim persistence remain authoritative.
+
+## Reset-boundary audit
+Verify one reset helper drives both runtime eligibility and UI timer.
+
+Test/inspect:
+
+```text
+secondsRemaining comes from Blizzard daily reset API
+visible HH:MM:SS follows same helper
+claim cycle key derives from same reset boundary
+cycle key changes when reset passes
+page detects changed cycle and performs one full refresh
+missing reset API -> clean unavailable state, no mixed local-midnight fallback
+```
+
+Confirm Profile claim persistence remains backward compatible and no unnecessary schema/root was introduced.
+
+## ShopEntry audit
+Verify `core/ui/prefabs/ShopEntry.lua` against `SpellbookEntry` visual behavior.
+
+Test at multiple widths, especially the narrow limited panel and each Guild Shop column:
+
+```text
+short name -> full name shown
+exact-fit name -> no unnecessary ellipsis
+long name -> longest fitting prefix + "..."
+resize narrower -> truncation recomputes
+resize wider -> more/full text restored
+very narrow width -> safe output/no bleed
+```
+
+Confirm:
+
+- name is one line;
+- cost is directly underneath;
+- cost is one line and visually contained;
+- full item name is preserved separately from rendered text;
+- icon border/crop/hover match established prefab style;
+- disabled state desaturates/subdues coherently;
+- tooltip support remains functional.
+
+## Guild Shop layout/pagination audit
+Verify the left region is a Spellbook-style shop, not a list.
+
+Required matrix:
+
+```text
+0 shop entries -> no visible entry rows, controls safe
+1 shop entry -> first slot only
+14 shop entries -> one full 2x7 page
+15 shop entries -> two pages
+28 shop entries -> two full pages
+29 shop entries -> three pages
+```
+
+Confirm:
+
+- exactly two columns;
+- `GridLayoutGroup` owns entry placement;
+- fixed `ShopEntry` pool is reused;
+- no `ScrollLayout` is used for the Guild Shop;
+- page clamping works after dataset/rank changes;
+- Previous/Next disabled correctly at boundaries;
+- page indicator is correct;
+- long names never overlap the adjacent column;
+- clicking an entry reaches `Guild:TryRequisition(...)` directly;
+- unlimited entries remain visible after purchase;
+- affordability/eligibility refreshes after purchase.
+
+## Limited Requisitions panel audit
+Verify the right region:
+
+```text
+uses UI.ScrollLayout
+uses UI.ShopEntry rows
+contains only characterLimit > 0
+is one column/full panel width
+shows scrollbar only when required
+does not paginate
+```
+
+Test exhausted and unaffordable limited entries remain visible but disabled/subdued rather than disappearing.
+
+Confirm `characterLimit > 1` stays enabled until the authoritative usage limit is reached.
+
+## Header/tooltip/ticker audit
+Verify final header exactly represents the agreed design:
+
+```text
+[Daily Reward ImageButton]  Guild Rank: <rank>
+                            Daily Reset in HH:MM:SS
+```
+
+Confirm:
+
+- Daily Reward control is `UI.ImageButton`;
+- tooltip lists configured Item/Currency rewards with icons/names/amounts;
+- unresolved definitions use safe fallback;
+- tooltip remains available after claim;
+- ordinary tooltip/page refresh performs no gameplay mutation;
+- one ticker runs only while the page is visible;
+- repeated show/hide does not accumulate tickers;
+- ordinary ticker tick updates timer only;
+- reset-cycle change triggers one full page refresh.
+
+## No-extra-text audit
+Search the final Requisitions page for visible legacy/provisional labels/messages.
+
+The page must **not** render:
+
+```text
+Daily Rewards heading
+Guild Shop heading
+Requisitions heading
+instruction/help text
+status paragraph
+empty-state prose
+Selected/Select row status
+Requisition button
+action-result/status message
+```
+
+Allowed on-page functional text includes only:
+
+```text
+Guild Rank: <name>
+Daily Reset in HH:MM:SS
+ShopEntry item names
+ShopEntry costs
+Previous / Next / page indicator
+```
+
+Tooltip text is allowed.
+
+## Refresh/state audit
+Inspect `RequisitionsPage:Refresh()` and event/page callbacks for accidental mutation or redundant rebuilds.
+
+Verify conceptually:
+
+```text
+resolve assigned rank/status once
+resolve Daily Reward/reset state
 update header
-        ↓
-partition rank.requisitions:
-  characterLimit == 0 -> Guild Shop rows
-  characterLimit > 0  -> limited rows
-        ↓
-refresh paginated Guild Shop
-        ↓
-refresh limited ScrollLayout
+partition requisitions
+refresh shop page
+refresh limited list
 ```
 
-Do not perform requisition mutation during ordinary `Refresh()`.
+Ordinary `Refresh()` must not:
 
-Do not rebuild/reattach scripts unnecessarily on every refresh if existing row/entry objects can retain stable handlers using bound row data.
+- claim Daily Rewards;
+- purchase requisitions;
+- write Profile state;
+- duplicate row click handlers indefinitely;
+- rebuild the entire page tree unnecessarily.
 
-## Guild window title cleanup
-`client/character/guild/window_Guild.lua` currently appends assigned-RPE-Guild-Rank display text to the window title during refresh.
+## Window/load-order audit
+Verify:
 
-The final page already shows the rank in its header. Keep the window title simply:
+- `ShopEntry.lua` loads before `page_GuildRequisitions.lua`;
+- no unrelated TOC ordering was changed;
+- Guild window title remains exactly `Guild` after refresh;
+- Requisitions/Progression/Admin tab builders still work;
+- Guild window dimensions/show/hide/refresh routing remain intact.
+
+## Existing hotfix/regression audit
+Issue #36 must remain effective.
+
+Exercise a manual Daily Reward claim containing multiple Profile writes and confirm it does not restore the previous synchronous full-config-refresh-per-write watchdog behavior.
+
+Also verify no new second systems were introduced for:
 
 ```text
-Guild
+Guild Shop definitions
+Requisition transaction/persistence
+Daily Reward transaction
+Daily reset timing
+Tooltip handling
+Ticker/task scheduling
+Guild Rank assignment
 ```
 
-Do not append:
-
-```text
-| Guild Rank: ...
-```
-
-This cleanup must not change tab construction, page refresh routing, Admin/Progression pages, window dimensions or show/hide behavior.
-
-## Final no-extra-text rule
-After this task the Requisitions tab must contain no visible:
-
-- `Guild Shop` heading;
-- `Requisitions` heading;
-- `Daily Rewards` heading;
-- instructions/help text;
-- status paragraph;
-- empty-state prose;
-- purchase/requisition action-result text;
-- separate purchase button.
-
-The allowed functional text is limited to things such as:
-
-- `Guild Rank: <name>`;
-- `Daily Reset in HH:MM:SS`;
-- `ShopEntry` item names/costs;
-- shop pagination controls/page indicator.
-
-Tooltip text is not considered an extra on-page label.
-
-## Constraints
-- Do not change unlimited Guild Shop pagination from #41.
-- Do not change `characterLimit` business semantics from #37.
-- Do not implement a separate limited-requisition transaction path.
-- Do not add usage counters/labels unless already part of the agreed design (they are not currently required).
-- Do not add empty-state/status labels.
-- Do not alter Progression/Admin page behavior.
-- Do not change Daily Reward business logic.
-
-## Acceptance criteria
-- [ ] Only `characterLimit > 0` requisitions appear in the right-hand panel.
-- [ ] Right-hand panel uses `UI.ScrollLayout` with `UI.ShopEntry` rows.
-- [ ] Right-hand entries are one column/full panel width.
-- [ ] Each row shows icon, item name and cost directly underneath.
-- [ ] Narrow/long item names truncate with `...` and do not overflow.
-- [ ] Cost formatting matches the Guild Shop and has no `Cost:` prefix.
-- [ ] Clicking an eligible row calls the existing `TryRequisition()` transaction directly.
-- [ ] Limited usage/character-limit behavior remains authoritative and unchanged from #37.
-- [ ] Exhausted/unaffordable entries remain visible but disabled/subdued.
-- [ ] No pagination is used for the right-hand panel.
-- [ ] Old selected-row/separate Requisition button/action-status UI is removed.
-- [ ] No visible section headings/help/status/empty-state prose remain on the Requisitions page.
-- [ ] `RequisitionsPage:Refresh()` cleanly refreshes header, shop and limited rows without gameplay mutation.
-- [ ] Guild window title remains exactly `Guild` during refresh.
-- [ ] Progression/Admin tabs and Guild window lifecycle remain unchanged.
+## Final definition of done
+- [ ] `characterLimit = 0` is authorable and means unlimited Guild Shop entry.
+- [ ] Unlimited purchases bypass the usage ledger and remain repeatable while eligible/affordable.
+- [ ] Positive limits preserve finite usage behavior and rollback semantics.
+- [ ] Daily Rewards are manual click-to-claim only.
+- [ ] Daily Reward claim and countdown use one Blizzard reset boundary.
+- [ ] `ShopEntry` matches Spellbook styling with name above cost.
+- [ ] Long item names truncate with `...` and never bleed across columns.
+- [ ] Guild Shop is a paginated fixed two-column grid.
+- [ ] Limited Requisitions are a one-column scroll view.
+- [ ] Both regions use the same `ShopEntry` prefab and cost formatting.
+- [ ] No separate purchase/selection UI remains.
+- [ ] No extra headings/help/status/empty-state prose remain.
+- [ ] Daily Reward tooltip remains available after claim.
+- [ ] Visible-page ticker is lifecycle-safe and reset-aware.
+- [ ] Guild window title remains `Guild`.
+- [ ] Load order is coherent.
+- [ ] Progression/Admin pages remain functional.
+- [ ] Issue #36 configuration-refresh coalescing remains intact.
+- [ ] No duplicate Guild Shop/Requisition/Daily Reward/reset subsystem was introduced.
 
 ## Coding-agent instructions
-Read `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md` and completed Tasks #37, #39–#41. Inspect current `ScrollLayout.lua` custom row-class behavior, `ShopEntry.lua`, the page's shared cost/item helpers, `Guild:GetRequisitionEligibility(...)`, `Guild:TryRequisition(...)`, and `window_Guild.lua` refresh/title logic before editing. Implement Task 5 only. Reuse the same ShopEntry and transaction semantics as the left Guild Shop; the only presentation distinction is scrolling one-column limited entries versus paginated two-column unlimited entries. Review every acceptance criterion and report changed files, validation performed, and any deviation.
+Treat current `FrontierDev/rpe2`, `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md`, issue #36, and completed issues #37–#42 as authoritative. Inspect the actual final working tree rather than assuming task reports are correct. Execute every matrix above, fix concrete defects in this feature only, and do not redesign working adjacent systems or expand scope. Before marking complete, report the audit performed, files changed, validation results, and any unresolved deviation.

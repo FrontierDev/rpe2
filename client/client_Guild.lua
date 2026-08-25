@@ -1805,12 +1805,7 @@ local function legacyDailyRewardClaimBelongsToCurrentResetCycle(claimDate, reset
         and claimDate == resetState.previousCycleKey
 end
 
-local function migrateLegacyDailyRewardClaim(guildKey, claimDate, claimRankRef, assignedRankRef, resetState)
-    if type(Profile.SetDailyRewardClaim) ~= "function"
-        or type(Profile.GetDailyRewardClaim) ~= "function" then
-        return nil, nil, nil, "profile-api-unavailable"
-    end
-
+local function normalizeLegacyDailyRewardClaim(claimDate, claimRankRef, assignedRankRef, resetState)
     local normalizedRankRef = claimRankRef or assignedRankRef
     if type(normalizedRankRef) ~= "string" or normalizedRankRef == "" then
         return nil, nil, nil, "profile-api-unavailable"
@@ -1819,29 +1814,9 @@ local function migrateLegacyDailyRewardClaim(guildKey, claimDate, claimRankRef, 
     local migratedDate = legacyDailyRewardClaimBelongsToCurrentResetCycle(claimDate, resetState)
         and resetState.cycleKey
         or claimDate
-    local setCallOk = pcall(
-        Profile.SetDailyRewardClaim,
-        guildKey,
-        migratedDate,
-        normalizedRankRef,
-        DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE
-    )
-    if not setCallOk then
-        return nil, nil, nil, "profile-api-unavailable"
-    end
-
-    local storedCallOk, storedDate, storedRankRef, storedSemantics = pcall(
-        Profile.GetDailyRewardClaim,
-        guildKey
-    )
-    if not storedCallOk
-        or storedDate ~= migratedDate
-        or storedRankRef ~= normalizedRankRef
-        or storedSemantics ~= DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE then
-        return nil, nil, nil, "profile-api-unavailable"
-    end
-
-    return storedDate, storedRankRef, storedSemantics
+    -- Keep the read path side-effect free. The reset-cycle form is persisted
+    -- only by the explicit claim transaction.
+    return migratedDate, normalizedRankRef, DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE
 end
 
 local function getDailyRewardStatus(self)
@@ -1939,8 +1914,7 @@ local function getDailyRewardStatus(self)
     end
 
     if claimDate and claimSemantics ~= DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE then
-        local migratedDate, migratedRankRef, migratedSemantics, migrationReason = migrateLegacyDailyRewardClaim(
-            result.guildKey,
+        local migratedDate, migratedRankRef, migratedSemantics, migrationReason = normalizeLegacyDailyRewardClaim(
             claimDate,
             claimRankRef,
             result.assignedRankRef,

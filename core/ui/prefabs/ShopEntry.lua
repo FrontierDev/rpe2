@@ -75,8 +75,8 @@ local function fitTextWithEllipsis(fontString, fullText, maxWidth)
     end
 
     local ellipsis = "..."
-    if width <= 0 then
-        return ellipsis
+    if width <= 0 or measureText(fontString, ellipsis) > width then
+        return ""
     end
 
     local low = 0
