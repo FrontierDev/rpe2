@@ -1,97 +1,188 @@
-## Validation result: revision required
+## Goal
+Populate the final page's left-hand Guild Shop region with unlimited requisitions as a **Spellbook-style, paginated two-column grid of `ShopEntry` objects**.
 
-Static validation of commit `fc7984f8e24d3f17efbde4fdc7850688f51b6edd` found the core Task 3 structure is in place, but there are three implementation defects that should be corrected before #40 is closed.
+Authoritative plan: `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md`.
 
-### What passes
+Depends on: #37, #39, #40
 
-- The provisional `StatusText` / Daily Rewards list presentation has been removed.
-- The page now uses the required `VerticalLayoutGroup -> Header + MainContent` hierarchy.
-- The Header uses `HorizontalLayoutGroup` with an `ImageButton` and a nested `VerticalLayoutGroup` for rank/reset text.
-- The lower host regions are stable weighted layout groups with weights `7` and `3`.
-- Daily Reward clicking is gated by cached status and `DailyRewardPending`, and delegates to `Client.Guild:TryClaimDailyReward()` rather than duplicating the transaction.
-- Tooltip construction is read-only and resolves item/currency display data with question-mark fallback behavior.
-- Rank text is concise and reset text uses the #38 reset-state API.
-- Ordinary ticker ticks only update the reset text; a cycle-key change calls one full `Refresh()`.
-- No Shop grid or limited-requisition row population was introduced early.
+This task implements the Guild Shop only. The right-hand limited Requisitions scroll panel is Task 5.
 
-### Blocking defect 1: the reset ticker can run while the Guild window/page is not actually visible
+## Primary files
+- `client/character/guild/page_GuildRequisitions.lua`
 
-`Refresh()` and `StartResetTicker()` use `self.frame:IsShown()` as the visibility gate:
+## Source data
+Use the assigned RPE Guild Rank's existing:
 
 ```lua
-if not self.frame or self.ResetTicker or not self.frame:IsShown() then
-    return
-end
+rank.requisitions
 ```
 
-and:
-
-```lua
-if self.frame:IsShown() then
-    self:StartResetTicker()
-end
-```
-
-The Guild window is initially created with `hidden = true`, while the Requisitions child frame itself is still in its shown state. In WoW, `IsShown()` reports the frame's own shown flag and does not account for a hidden ancestor; `IsVisible()` is the effective-visibility check. This means page construction/refresh can install the one-second `OnUpdate` loop while the Guild window is hidden, violating the requirement that the ticker exist only while the Requisitions page is visible.
-
-The same distinction matters across window/tab visibility transitions.
-
-#### Required revision
-
-Gate ticker creation/execution on effective visibility, not only the child frame's shown flag. Use `IsVisible()` where available and/or explicitly tie ticker lifecycle to the actual active tab/window visibility. Ensure:
+Partition entries by the Task 0 contract:
 
 ```text
-window hidden -> no active ticker
-other Guild tab active -> no active Requisitions ticker
-Requisitions tab shown -> exactly one ticker
-hide/show repeatedly -> no duplicate ticker state
+characterLimit == 0 -> Guild Shop
+characterLimit > 0  -> limited Requisitions panel
 ```
 
-`StopResetTicker()` should leave no live `OnUpdate` handler or stale state that prevents a clean restart.
+Do not add or consume a second `shop` collection.
 
-### Defect 2: claimed/unavailable button visual state is lost after hover
+If the assigned rank is invalid/unavailable, the Guild Shop should simply have no visible entries. Do not display explanatory empty-state prose.
 
-`UpdateDailyRewardVisualState()` correctly applies baseline alpha (`0.5`, `0.7`, or `1`) while leaving the button mouse-enabled for tooltips. However, `UI.ImageButton` inherits the default `ButtonBase` mouse scripts. `ButtonBase` sets alpha to `1` on `OnEnter`, `OnLeave`, and `OnMouseUp`.
+## Spellbook-style fixed grid
+Follow the existing Profile Spellbook's fixed-entry-pool/pagination pattern rather than using `ScrollLayout`.
 
-Therefore a claimed/invalid reward is initially subdued, but after the first hover/leave its alpha becomes `1` and stays there until another full refresh. That defeats the required persistent subdued/claimed visual state while preserving hoverability.
-
-#### Required revision
-
-Keep the button hoverable, but make its mouse visual handlers restore the status-dependent baseline alpha instead of unconditional `1`, or apply the unavailable visual through a property not overwritten by `ButtonBase` hover scripts (for example texture vertex/desaturation state). Verify claimed and invalid states remain visibly subdued before, during and after tooltip hover.
-
-### Defect 3: the Daily Reward control is not actually square after layout
-
-The button is created as `36 x 36`, but `HeaderLayout` has:
+Define page/grid constants near the top of the page, conceptually:
 
 ```lua
-height = 42,
-fitChildrenHeight = true,
+local SHOP_COLUMNS = 2
+local SHOP_ROWS = 7
+local SHOP_ENTRIES_PER_PAGE = SHOP_COLUMNS * SHOP_ROWS
 ```
 
-`HorizontalLayoutGroup` forces every child to the full inner height when `fitChildrenHeight = true`, so the Daily Reward button becomes approximately `36 x 42`, not square as required.
+Use:
 
-#### Required revision
+```lua
+UI.GridLayoutGroup
+```
 
-Preserve a square Daily Reward button after layout. For example, make the header/button dimensions agree, or place the fixed square button in a wrapper whose height can stretch without resizing the button itself. Re-check the final frame dimensions after the layout group has run.
+with exactly two columns.
 
-### Re-validation
+Create a fixed pool of `UI.ShopEntry` objects for `SHOP_ENTRIES_PER_PAGE` slots. Do not create/destroy an arbitrary number of entry frames every refresh.
 
-After revision, validate at minimum:
+The layout must remain driven by the available Guild Shop host width from Task 3 so both columns size consistently.
+
+## Pagination model
+Maintain page state conceptually equivalent to:
+
+```lua
+self.CurrentShopPage = 1
+```
+
+Implement focused helpers following the Spellbook pattern:
 
 ```text
-Guild window constructed but hidden -> no ticker
-Guild window shown on Requisitions -> one ticker
-switch to Progression/Admin -> ticker stopped
-switch back -> one ticker only
-close/reopen repeatedly -> no ticker accumulation
-
-available reward -> normal visual, one central claim call
-pending -> repeated clicks ignored
-claimed/invalid -> subdued visual survives hover/leave, tooltip still works
-
-Daily Reward button -> square after layout
-rank/reset text -> unchanged concise format
-reset cycle change -> one full Refresh()
+get page count
+slice current page rows
+clamp current page
+populate fixed entry pool
+hide unused slots
+update pagination controls
 ```
 
-No configured CI/status checks are attached to this commit, so this validation is based on static source inspection. Issue #40 should remain open pending these revisions.
+When the shop data set changes and the current page is now out of range, clamp it to the last valid page. With no shop rows, keep internal page state safe and hide all entries.
+
+## Pagination controls
+At the bottom of the Guild Shop region, use a `HorizontalLayoutGroup` containing:
+
+- Previous button;
+- page indicator;
+- Next button.
+
+Use the existing RPE button/text style and the Spellbook's concise interaction pattern.
+
+A suitable indicator is:
+
+```text
+Page 1 / 3
+```
+
+This is functional pagination UI, not a section heading/help label.
+
+Requirements:
+
+- Previous disabled on first/no page;
+- Next disabled on last/no page;
+- changing page refreshes only the shop entry binding where practical;
+- page controls do not trigger requisition purchases.
+
+Do **not** use `UI.PaginatedPanel` if doing so would produce a different visual layout/control structure than the current Spellbook; mirror the actual Spellbook pattern after inspection.
+
+## ShopEntry binding
+For each visible unlimited requisition:
+
+1. resolve the Item definition/reference through the existing Registry API;
+2. resolve item display name;
+3. resolve item icon with question-mark fallback;
+4. format compact cost text;
+5. set `ShopEntry` icon/name/cost;
+6. evaluate current eligibility through `Guild:GetRequisitionEligibility(...)`;
+7. apply available/disabled visual state;
+8. bind left click directly to the central `Guild:TryRequisition(...)` transaction;
+9. refresh page/shop state after the transaction attempt.
+
+There is no selected-row state and no separate Requisition/Purchase button.
+
+The transaction layer is authoritative. UI disabling is presentation only; the click handler should still rely on `TryRequisition()` rather than duplicating eligibility business rules.
+
+## Compact cost formatting
+Create/reuse one page-level helper that can also be consumed by Task 5.
+
+For each requisition cost:
+
+- resolve Currency display name through existing Profile definition APIs;
+- include the configured amount;
+- combine multiple costs in deterministic authored order;
+- do not prepend `Cost:`;
+- use a concise one-line format suitable for `ShopEntry:SetCostText(...)`.
+
+Example shapes:
+
+```text
+12 Guild Marks
+2 Marks, 50 Silver
+```
+
+If a Currency definition is unresolved, render a safe compact fallback rather than throw.
+
+`ShopEntry` owns visual truncation/containment; this helper owns semantic cost-string construction.
+
+## Item/requisition tooltip
+Use existing tooltip support where useful to expose the full item name/cost details that may be visually truncated. Do not add visible help text to the page.
+
+At minimum, ensure the full item name remains available to any tooltip builder rather than reading the ellipsized display string back from the prefab.
+
+Do not invent a second tooltip system.
+
+## Entry state after purchase
+Unlimited entries remain present after a successful purchase.
+
+After refresh:
+
+- if the player can still afford/is otherwise eligible, the entry remains enabled;
+- if no longer affordable/eligible, the entry remains visible but becomes disabled/subdued;
+- no usage counter should hide/remove it because Task 0 makes unlimited entries ledger-free.
+
+## Layout requirements
+- exactly two Guild Shop columns;
+- rows laid out by `GridLayoutGroup`, not manual per-entry coordinates;
+- item name is top text row and cost is directly underneath via `ShopEntry`;
+- long item names rely on Task 2 ellipsis behavior and must never overlap the adjacent column;
+- shop region uses approximately the 70% lower-content width established by Task 3.
+
+## Constraints
+- Do not use `ScrollLayout` for the Guild Shop.
+- Do not implement the right-hand limited Requisition list here.
+- Do not reintroduce selection/action/status controls from the provisional UI.
+- Do not add `Guild Shop` heading/help/empty-state text.
+- Do not duplicate Item/Currency transaction logic.
+- Do not modify `ShopEntry` unless a concrete bug against Task 2's contract is found; keep any fix narrow and report it.
+- Do not change Daily Reward behavior.
+
+## Acceptance criteria
+- [ ] Only `characterLimit == 0` requisitions appear in the Guild Shop.
+- [ ] Guild Shop uses a `GridLayoutGroup` with exactly two columns.
+- [ ] Shop uses a fixed `ShopEntry` pool rather than a scrolling/dynamically recreated list.
+- [ ] Default page capacity is `2 x 7 = 14` entries with constants easy to tune.
+- [ ] Pagination slices the unlimited requisition collection deterministically.
+- [ ] Previous/Next/page indicator behave correctly at boundaries and with zero rows.
+- [ ] Every visible entry shows item icon, name, and cost underneath the name.
+- [ ] Long names do not overlap the adjacent column.
+- [ ] Compact cost formatting is shared/reusable for Task 5 and has no `Cost:` prefix.
+- [ ] Clicking an eligible entry calls the existing `TryRequisition()` path directly.
+- [ ] Successful purchase refreshes current affordability/state.
+- [ ] Unlimited entries remain visible and repeatedly purchasable while eligible/affordable.
+- [ ] Disabled/unaffordable entries remain visible rather than disappearing.
+- [ ] No selection state, separate purchase button, section heading or help/empty-state text exists.
+
+## Coding-agent instructions
+Read `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md` and completed Tasks #37, #39 and #40. Inspect `client/character/profile/page_ProfileSpellbook.lua` carefully for fixed-entry pool, grid sizing and pagination behavior; also inspect `GridLayoutGroup.lua`, `ShopEntry.lua`, current Registry Item resolution, Profile Currency resolution and Guild requisition eligibility/transaction APIs. Implement Task 4 only. Make the left panel look and behave like a two-column Spellbook of purchasable ShopEntries, not a generic paginated list. Review every acceptance criterion and report changed files, validation performed, and any deviation.
