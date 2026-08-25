@@ -123,6 +123,19 @@ local function normalizeInteger(value, fallback, minimum)
     return math.max(minimum, math.floor(numeric))
 end
 
+local function normalizeCharacterLimit(value)
+    local numeric = tonumber(value)
+    if not numeric or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        return 1
+    end
+
+    if numeric == 0 then
+        return 0
+    end
+
+    return math.max(1, math.floor(numeric))
+end
+
 local function buildUniqueStableId(entries, ignoredIndex, requestedId, prefix)
     local baseId = trim(requestedId)
     if baseId == "" then
@@ -583,7 +596,7 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
             local requisition = guildSetting.requisitions and guildSetting.requisitions[selectedIndex]
             if requisition then
                 requisition.quantity = normalizeInteger(self.GuildSettingInspectorRequisitionQuantityInput:GetText(), 1, 1)
-                requisition.characterLimit = normalizeInteger(self.GuildSettingInspectorRequisitionLimitInput:GetText(), 1, 0)
+                requisition.characterLimit = normalizeCharacterLimit(self.GuildSettingInspectorRequisitionLimitInput:GetText())
             end
         end)
     end
@@ -1182,7 +1195,7 @@ function DataEditor:RefreshGuildSettingRequisitionsPage()
         setTextElementEnabled(self.GuildSettingInspectorRequisitionQuantityInput, requisition ~= nil)
     end
     if self.GuildSettingInspectorRequisitionLimitInput then
-        self.GuildSettingInspectorRequisitionLimitInput:SetText(tostring(normalizeInteger(requisition and requisition.characterLimit, 1, 0)))
+        self.GuildSettingInspectorRequisitionLimitInput:SetText(tostring(normalizeCharacterLimit(requisition and requisition.characterLimit)))
         setTextElementEnabled(self.GuildSettingInspectorRequisitionLimitInput, requisition ~= nil)
     end
     if self.GuildSettingInspectorCostScroll then

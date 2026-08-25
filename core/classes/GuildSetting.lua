@@ -38,6 +38,19 @@ local function normalizeInteger(value, fallback, minimum)
     return math.max(minimum, math.floor(numeric))
 end
 
+local function normalizeCharacterLimit(value)
+    local numeric = tonumber(value)
+    if not isFiniteNumber(numeric) then
+        return 1
+    end
+
+    if numeric == 0 then
+        return 0
+    end
+
+    return math.max(1, math.floor(numeric))
+end
+
 local function normalizeOptionalRankIndex(value)
     local numeric = tonumber(value)
     if not isFiniteNumber(numeric) or numeric < 0 then
@@ -151,7 +164,7 @@ local function normalizeRequisition(value, index, usedIds)
         costs = normalizeCosts(source.costs),
         -- Legacy compatibility field; the new Guild Rank mapping is not inferred from it.
         requiredGuildRankIndex = normalizeOptionalRankIndex(source.requiredGuildRankIndex),
-        characterLimit = normalizeInteger(source.characterLimit, 1, 0),
+        characterLimit = normalizeCharacterLimit(source.characterLimit),
     }
 end
 

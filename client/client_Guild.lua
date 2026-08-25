@@ -558,6 +558,19 @@ local function normalizeIntegerArgument(value, minimum, maximum)
     return integer
 end
 
+local function normalizeCharacterLimit(value)
+    local numeric = tonumber(value)
+    if not numeric or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        return 1
+    end
+
+    if numeric == 0 then
+        return 0
+    end
+
+    return math.max(1, math.floor(numeric))
+end
+
 local function resolveAchievementReference(achievementRef)
     if type(Registry.ResolveAchievementReference) ~= "function" then
         return nil, nil
@@ -1428,11 +1441,7 @@ function Guild:GetRequisitionEligibility(guildRankRef, requisitionId)
         })
     end
 
-    local characterLimit = tonumber(requisition.characterLimit)
-    if not characterLimit or characterLimit ~= characterLimit or characterLimit == math.huge or characterLimit == -math.huge then
-        characterLimit = 1
-    end
-    characterLimit = math.max(0, math.floor(characterLimit))
+    local characterLimit = normalizeCharacterLimit(requisition.characterLimit)
     local isUnlimited = characterLimit == 0
     local usage = 0
     if not isUnlimited then

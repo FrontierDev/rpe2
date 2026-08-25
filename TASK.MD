@@ -1,86 +1,78 @@
-## Goal
-Allow existing Guild Requisition definitions to represent unlimited Guild Shop purchases without introducing a second shop dataset or persistence system.
+## Validation result: revision required
 
-Authoritative plan: `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md`.
+The core unlimited-requisition implementation is mostly correct, but there is one backward-compatibility defect that should be fixed before closing #37.
 
-This task defines the business/data distinction used by the final page:
+### Blocking defect: malformed/sub-1 limits can become unlimited
+
+Before #37, `characterLimit` was normalized with a minimum of `1`, so values such as `-1` or `0.5` became `1`.
+
+The current implementation changes normalization to a minimum of `0`, which means:
 
 ```text
-characterLimit = 0  -> unlimited Guild Shop entry
-characterLimit > 0  -> limited/one-time Requisition entry
+-1   -> 0 -> unlimited
+-50  -> 0 -> unlimited
+0.5  -> 0 -> unlimited
 ```
 
-Keep the existing default at `1` so all existing requisitions retain their current limited behavior unless explicitly authored as unlimited.
+That violates this issue's backward-compatibility requirement that absent/invalid existing values continue to behave as `1`, and it can accidentally turn malformed legacy data into an infinitely repeatable Guild Shop purchase.
 
-## Primary files
+### Required revision
+
+Make **only an explicitly authored numeric `0`** mean unlimited.
+
+Apply the same semantic rule consistently in:
+
 - `core/classes/GuildSetting.lua`
 - `client/ui/editor/inspectors/page_InspectorGuildSetting.lua`
-- `client/client_Guild.lua`
+- defensive runtime normalization in `client/client_Guild.lua`
 
-## GuildSetting normalization
-In `core/classes/GuildSetting.lua`, change requisition normalization so `characterLimit` accepts `0` as the minimum valid value.
-
-Conceptually:
+A suitable contract is:
 
 ```lua
-characterLimit = normalizeInteger(source.characterLimit, 1, 0)
+local function normalizeCharacterLimit(value)
+    local numeric = tonumber(value)
+
+    if not numeric
+        or numeric ~= numeric
+        or numeric == math.huge
+        or numeric == -math.huge then
+        return 1
+    end
+
+    if numeric == 0 then
+        return 0
+    end
+
+    return math.max(1, math.floor(numeric))
+end
 ```
 
-Do not add a separate `shop` array/field. `rank.requisitions` remains the sole definition collection.
+The inspector must use equivalent semantics before committing, otherwise e.g. `-1` could be coerced to `0` by the editor and then become indistinguishable from an intentionally authored unlimited value.
 
-## Authoring
-Update the existing GuildSetting inspector Character Limit field so `0` can be entered, persisted, normalized, exported and reloaded without being coerced back to `1`.
+### Re-validation required
 
-Do not add explanatory/help text to the inspector. Preserve the existing field and surrounding editor structure.
+After revision, verify at minimum:
 
-## Eligibility behavior
-In `Guild:GetRequisitionEligibility(...)`:
+```text
+nil/absent -> 1
+invalid text -> 1
+NaN/inf -> 1
+-1 -> 1
+0.5 -> 1
+0 -> 0
+1 -> 1
+3 -> 3
+```
 
-- normalize the effective limit with a minimum of `0`;
-- preserve all existing Guild Rank, item, currency, affordability and inventory checks;
-- when `characterLimit > 0`, preserve the existing usage-ledger lookup and `character-limit-reached` rejection;
-- when `characterLimit == 0`, skip the usage-limit rejection entirely;
-- return enough normalized detail for `TryRequisition(...)` to know whether the requisition is unlimited.
+Then verify:
 
-Do not make UI state authoritative for eligibility.
+- `characterLimit = 0` bypasses `GetGuildRequisitionUsage()`;
+- unlimited purchases do not call `IncrementGuildRequisitionUsage()` or write the ledger;
+- repeated unlimited purchases still succeed while otherwise eligible/affordable;
+- positive limits retain existing usage-limit and rollback behavior.
 
-## Transaction behavior
-In `Guild:TryRequisition(...)`:
+### Scope note
 
-- preserve the existing currency-spend transaction;
-- preserve item award verification and rollback;
-- preserve the usage-ledger increment/rollback path for `characterLimit > 0`;
-- for `characterLimit == 0`, do **not** increment, set or otherwise write the requisition usage ledger;
-- unlimited entries must remain repeatedly purchasable while the player remains otherwise eligible and can afford the cost.
+The #37 commit also removed `RPE2-Phase-5-Remaining-Achievement-Features-Implementation-Plan.md` and moved the PDD into `.docs`. Those changes are outside this task's stated scope. They are not a gameplay blocker, but they should be confirmed as intentional rather than incidental Codex changes.
 
-Do not weaken transaction rollback behavior for limited requisitions.
-
-## Backward compatibility
-Existing definitions with absent/invalid `characterLimit` must continue to normalize to `1`.
-
-Existing persisted usage for limited requisitions must remain authoritative and unchanged.
-
-No Profile schema migration should be required: unlimited entries simply bypass the existing requisition usage ledger.
-
-## Constraints
-- Do not add a second Guild Shop definition collection.
-- Do not add a second purchase API.
-- Do not change currency transaction semantics.
-- Do not change item award semantics.
-- Do not change assigned Guild Rank resolution.
-- Do not implement the final Requisitions page UI in this task.
-- Do not change Daily Reward behavior in this task.
-
-## Acceptance criteria
-- [ ] `characterLimit = 0` survives GuildSetting normalization and round-trip.
-- [ ] Existing/omitted limits still default to `1`.
-- [ ] The GuildSetting inspector accepts and preserves `0`.
-- [ ] `characterLimit = 0` bypasses the usage-limit eligibility check.
-- [ ] Unlimited purchases do not write or increment the requisition usage ledger.
-- [ ] Unlimited entries can be purchased repeatedly while affordable/eligible.
-- [ ] `characterLimit > 0` retains the existing usage-limit and rollback behavior.
-- [ ] Existing currency, item, Guild Rank and inventory validation remains unchanged.
-- [ ] No new Profile schema or shop persistence root is introduced.
-
-## Coding-agent instructions
-Read `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md`, then inspect the current `GuildSetting.lua` requisition normalizer, GuildSetting inspector Character Limit control, `Guild:GetRequisitionEligibility(...)`, `Guild:TryRequisition(...)`, and Profile requisition-ledger APIs before editing. Implement Task 0 only. Treat `rank.requisitions` and the existing transaction path as authoritative. Review every acceptance criterion and report changed files, validation performed, and any deviation.
+Everything else in the #37 gameplay change is consistent with the issue: unlimited eligibility bypasses the ledger, unlimited transactions skip ledger writes, limited requisitions retain the existing transaction path, and no new Profile/shop persistence system was introduced.
