@@ -1627,24 +1627,6 @@ function Guild:TryRequisition(guildRankRef, requisitionId)
     }
 end
 
-local function getDailyRewardDayKey()
-    if type(Common.GetNow) ~= "function" or type(date) ~= "function" then
-        return nil
-    end
-
-    local timestamp = tonumber(Common.GetNow())
-    if not timestamp then
-        return nil
-    end
-
-    local ok, dayKey = pcall(date, "%Y-%m-%d", timestamp)
-    if not ok or type(dayKey) ~= "string" or dayKey == "" then
-        return nil
-    end
-
-    return dayKey
-end
-
 local function buildDailyRewardPlan(rank)
     local rewards = type(rank and rank.dailyRewards) == "table" and rank.dailyRewards or {}
     local plan = {}
@@ -1740,6 +1722,55 @@ local function buildDailyRewardPlan(rank)
     }
 end
 
+local function isFiniteNumber(value)
+    return value ~= nil
+        and value == value
+        and value ~= math.huge
+        and value ~= -math.huge
+end
+
+function Guild:GetDailyRewardResetState()
+    if type(Common.GetNow) ~= "function" or type(date) ~= "function" then
+        return nil, "calendar-unavailable"
+    end
+
+    local dateAndTime = _G and _G.C_DateAndTime or nil
+    local getSecondsUntilDailyReset = dateAndTime and dateAndTime.GetSecondsUntilDailyReset or nil
+    if type(getSecondsUntilDailyReset) ~= "function" then
+        return nil, "calendar-unavailable"
+    end
+
+    local nowCallOk, now = pcall(Common.GetNow)
+    now = tonumber(now)
+    local resetCallOk, secondsRemaining = pcall(getSecondsUntilDailyReset)
+    secondsRemaining = tonumber(secondsRemaining)
+    if not nowCallOk
+        or not isFiniteNumber(now)
+        or not resetCallOk
+        or not isFiniteNumber(secondsRemaining)
+        or secondsRemaining < 0 then
+        return nil, "calendar-unavailable"
+    end
+
+    secondsRemaining = math.floor(secondsRemaining)
+    local nextResetTimestamp = now + secondsRemaining
+    if not isFiniteNumber(nextResetTimestamp) then
+        return nil, "calendar-unavailable"
+    end
+
+    local dateCallOk, cycleKey = pcall(date, "%Y-%m-%d", nextResetTimestamp)
+    if not dateCallOk
+        or type(cycleKey) ~= "string"
+        or not cycleKey:match("^%d%d%d%d%-%d%d%-%d%d$") then
+        return nil, "calendar-unavailable"
+    end
+
+    return {
+        secondsRemaining = secondsRemaining,
+        cycleKey = cycleKey,
+    }
+end
+
 local function getDailyRewardStatus(self)
     local identity = getGuildIdentity()
     local result = {
@@ -1753,6 +1784,7 @@ local function getDailyRewardStatus(self)
         assignedRankRef = nil,
         rank = nil,
         rewards = {},
+        resetState = nil,
         dayKey = nil,
         claimDate = nil,
         claimRankRef = nil,
@@ -1808,13 +1840,14 @@ local function getDailyRewardStatus(self)
         return result
     end
 
-    local dayKey = getDailyRewardDayKey()
-    if not dayKey then
-        result.status = "calendar-unavailable"
+    local resetState, resetReason = self:GetDailyRewardResetState()
+    if type(resetState) ~= "table" then
+        result.status = resetReason or "calendar-unavailable"
         result.reason = result.status
         return result
     end
-    result.dayKey = dayKey
+    result.resetState = resetState
+    result.dayKey = resetState.cycleKey
 
     if type(Profile.GetDailyRewardClaim) ~= "function" then
         result.status = "profile-api-unavailable"
@@ -1830,7 +1863,7 @@ local function getDailyRewardStatus(self)
     end
     result.claimDate = claimDate
     result.claimRankRef = claimRankRef
-    if claimDate == dayKey then
+    if claimDate == result.dayKey then
         result.status = "received-today"
         result.reason = result.status
         return result
@@ -2108,6 +2141,10 @@ function Guild:ProcessDailyRewards()
     end
 
     return success, reason, result
+end
+
+function Guild:TryClaimDailyReward()
+    return self:ProcessDailyRewards()
 end
 
 function Guild:IsGuildAdminTargetAvailable(targetName)
@@ -3047,9 +3084,16 @@ function Guild:HandleRuntimeEvent(event)
         return nil
     end
 
-    local dailyResult = self:ProcessDailyRewards()
+    local status = nil
+    if type(self.GetAssignedGuildRankStatus) == "function" then
+        local statusCallOk, assignedStatus = pcall(self.GetAssignedGuildRankStatus, self)
+        if statusCallOk then
+            status = assignedStatus
+        end
+    end
+
     self:RefreshWindow()
-    return dailyResult
+    return status
 end
 
 return Guild
