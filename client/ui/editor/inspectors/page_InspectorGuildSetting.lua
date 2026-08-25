@@ -33,6 +33,49 @@ local function trim(value)
     return tostring(value or ""):match("^%s*(.-)%s*$")
 end
 
+local function parseDatasetQualifiedRef(value)
+    local datasetId, entryId = trim(value):match("^([^:]+):(.+)$")
+    return datasetId, entryId
+end
+
+local function dropdownItemsContainValue(items, value)
+    for index = 1, #(items or {}) do
+        local item = items[index]
+        if item and item.value == value then
+            return true
+        end
+        if item and dropdownItemsContainValue(item.children, value) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function appendMissingDropdownValue(items, value, label)
+    local reference = trim(value)
+    if reference ~= "" and not dropdownItemsContainValue(items, value) then
+        items[#items + 1] = {
+            label = label or ("Missing: %s"):format(reference),
+            value = value,
+        }
+    end
+
+    return items
+end
+
+local function buildGuildSettingDatasetItems(self, datasetId)
+    local items = self:BuildItemInspectorDatasetItems()
+    return appendMissingDropdownValue(items, datasetId, ("Missing dataset: %s"):format(trim(datasetId)))
+end
+
+local function buildGuildSettingReferenceItems(self, collectionKey, datasetId, reference)
+    local items = self:BuildItemInspectorDatasetCollectionItems(collectionKey, datasetId, {
+        noneLabel = "None",
+    })
+    return appendMissingDropdownValue(items, reference, ("Missing reference: %s"):format(trim(reference)))
+end
+
 local function applyTable(target, source)
     if type(target) ~= "table" or type(source) ~= "table" then
         return
@@ -85,6 +128,48 @@ local function setDropdownEnabled(dropdown, enabled)
     if frame.SetAlpha then
         frame:SetAlpha(enabled == true and 1 or 0.5)
     end
+end
+
+local function setElementGroupVisible(group, visible)
+    if not group then
+        return
+    end
+
+    local frame = group.GetFrame and group:GetFrame() or nil
+    local targetHeight = visible and group._visibleHeight or 0
+
+    if group.SetHeight then
+        group:SetHeight(targetHeight or 0)
+    elseif group.options then
+        group.options.height = targetHeight or 0
+    end
+
+    if frame then
+        if frame.SetHeight then
+            frame:SetHeight(targetHeight or 0)
+        end
+
+        if visible then
+            frame:Show()
+        else
+            frame:Hide()
+        end
+    end
+end
+
+local function createFieldGroup(parent, name, labelText, height)
+    local groupHeight = 14 + 2 + (height or CONTROL_HEIGHT)
+    local group = UI.CreateLayout(UI.VerticalLayoutGroup, parent:GetFrame(), name, {
+        width = FIELD_WIDTH,
+        height = groupHeight,
+        spacing = 2,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    group._visibleHeight = groupHeight
+    parent:AddChild(group)
+    group:AddChild(createLabel(group:GetFrame(), name .. "Label", labelText))
+    return group
 end
 
 local function setRowSelection(row, selected)
@@ -555,22 +640,44 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     self.GuildSettingInspectorRequisitionIdInput:SetScript("OnEditFocusLost", commitRequisitionId)
     root:AddChild(self.GuildSettingInspectorRequisitionIdInput)
 
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionItemRefLabel", "Item Ref"))
-    self.GuildSettingInspectorRequisitionItemRefInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionItemRefInput", {
-        width = FIELD_WIDTH, height = 18, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    local commitRequisitionItemRef = function()
-        local _, _, selectedIndex = getSelectedRequisition(self)
-        self:CommitSelectedGuildSetting(function(guildSetting)
-            local requisition = guildSetting.requisitions and guildSetting.requisitions[selectedIndex]
-            if requisition then
-                requisition.itemRef = self.GuildSettingInspectorRequisitionItemRefInput:GetText()
+    local requisitionItemDatasetGroup = createFieldGroup(root, "RPEDataEditorGuildSettingInspectorRequisitionItemDatasetGroup", "Item Dataset")
+    self.GuildSettingInspectorRequisitionItemDatasetDropdown = UI.CreateDropdown(requisitionItemDatasetGroup:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionItemDatasetDropdown", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT,
+        items = self:BuildItemInspectorDatasetItems(),
+        onValueChanged = function(value)
+            if self._refreshingGuildSettingInspector then
+                return
             end
-        end)
-    end
-    self.GuildSettingInspectorRequisitionItemRefInput:SetScript("OnEnterPressed", commitRequisitionItemRef)
-    self.GuildSettingInspectorRequisitionItemRefInput:SetScript("OnEditFocusLost", commitRequisitionItemRef)
-    root:AddChild(self.GuildSettingInspectorRequisitionItemRefInput)
+
+            if self.GuildSettingInspectorRequisitionItemDropdown then
+                self.GuildSettingInspectorRequisitionItemDropdown:SetItems(buildGuildSettingReferenceItems(self, "items", value, ""))
+                self.GuildSettingInspectorRequisitionItemDropdown:SetSelectedValue("", true)
+                setDropdownEnabled(self.GuildSettingInspectorRequisitionItemDropdown, trim(value) ~= "" and select(4, getSelectedRequisition(self)) ~= nil)
+            end
+        end,
+    })
+    requisitionItemDatasetGroup:AddChild(self.GuildSettingInspectorRequisitionItemDatasetDropdown)
+
+    local requisitionItemGroup = createFieldGroup(root, "RPEDataEditorGuildSettingInspectorRequisitionItemGroup", "Item")
+    self.GuildSettingInspectorRequisitionItemDropdown = UI.CreateDropdown(requisitionItemGroup:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionItemDropdown", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT,
+        items = { { label = "None", value = "" } },
+        onValueChanged = function(value)
+            if self._refreshingGuildSettingInspector then
+                return
+            end
+
+            local _, _, selectedIndex = getSelectedRequisition(self)
+            self:CommitSelectedGuildSetting(function(guildSetting)
+                local requisition = guildSetting.requisitions and guildSetting.requisitions[selectedIndex]
+                if requisition then
+                    requisition.itemRef = value or ""
+                end
+            end)
+            self:RefreshGuildSettingRequisitionsPage()
+        end,
+    })
+    requisitionItemGroup:AddChild(self.GuildSettingInspectorRequisitionItemDropdown)
 
     local numberLabels = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionNumberLabels", {
         spacing = 2, height = 12, fitChildrenWidth = true, fitChildrenHeight = false,
@@ -704,6 +811,7 @@ function DataEditor:BuildGuildSettingInspectorDailyRewardsPage(parent)
         spacing = 2, fitChildrenWidth = true, fitChildrenHeight = false,
     })
     UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
+    self.GuildSettingInspectorDailyRewardsRoot = root
 
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardsLabel", "Daily Rewards"))
     local panel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardPanel", {
@@ -806,22 +914,90 @@ function DataEditor:BuildGuildSettingInspectorDailyRewardsPage(parent)
     })
     root:AddChild(self.GuildSettingInspectorDailyRewardTypeDropdown)
 
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardRefLabel", "Ref"))
-    self.GuildSettingInspectorDailyRewardRefInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardRefInput", {
-        width = FIELD_WIDTH, height = 18, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    local commitDailyRewardRef = function()
-        local selectedIndex = tonumber(self.SelectedGuildSettingDailyRewardIndex)
-        self:CommitSelectedGuildSetting(function(guildSetting)
-            local reward = guildSetting.dailyRewards and guildSetting.dailyRewards[selectedIndex]
-            if reward then
-                reward.ref = self.GuildSettingInspectorDailyRewardRefInput:GetText()
+    local dailyRewardItemDatasetGroup = createFieldGroup(root, "RPEDataEditorGuildSettingInspectorDailyRewardItemDatasetGroup", "Item Dataset")
+    self.GuildSettingInspectorDailyRewardItemDatasetDropdown = UI.CreateDropdown(dailyRewardItemDatasetGroup:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardItemDatasetDropdown", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT,
+        items = self:BuildItemInspectorDatasetItems(),
+        onValueChanged = function(value)
+            if self._refreshingGuildSettingInspector then
+                return
             end
-        end)
-    end
-    self.GuildSettingInspectorDailyRewardRefInput:SetScript("OnEnterPressed", commitDailyRewardRef)
-    self.GuildSettingInspectorDailyRewardRefInput:SetScript("OnEditFocusLost", commitDailyRewardRef)
-    root:AddChild(self.GuildSettingInspectorDailyRewardRefInput)
+
+            if self.GuildSettingInspectorDailyRewardItemDropdown then
+                self.GuildSettingInspectorDailyRewardItemDropdown:SetItems(buildGuildSettingReferenceItems(self, "items", value, ""))
+                self.GuildSettingInspectorDailyRewardItemDropdown:SetSelectedValue("", true)
+                local _, _, _, reward = getSelectedDailyReward(self)
+                setDropdownEnabled(self.GuildSettingInspectorDailyRewardItemDropdown, trim(value) ~= "" and reward ~= nil and trim(reward.type or "item") == "item")
+            end
+        end,
+    })
+    dailyRewardItemDatasetGroup:AddChild(self.GuildSettingInspectorDailyRewardItemDatasetDropdown)
+
+    local dailyRewardItemGroup = createFieldGroup(root, "RPEDataEditorGuildSettingInspectorDailyRewardItemGroup", "Item")
+    self.GuildSettingInspectorDailyRewardItemDropdown = UI.CreateDropdown(dailyRewardItemGroup:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardItemDropdown", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT,
+        items = { { label = "None", value = "" } },
+        onValueChanged = function(value)
+            if self._refreshingGuildSettingInspector then
+                return
+            end
+
+            local _, _, selectedIndex = getSelectedDailyReward(self)
+            self:CommitSelectedGuildSetting(function(guildSetting)
+                local reward = guildSetting.dailyRewards and guildSetting.dailyRewards[selectedIndex]
+                if reward then
+                    reward.ref = value or ""
+                end
+            end)
+            self:RefreshGuildSettingDailyRewardsPage()
+        end,
+    })
+    dailyRewardItemGroup:AddChild(self.GuildSettingInspectorDailyRewardItemDropdown)
+
+    local dailyRewardCurrencyDatasetGroup = createFieldGroup(root, "RPEDataEditorGuildSettingInspectorDailyRewardCurrencyDatasetGroup", "Currency Dataset")
+    self.GuildSettingInspectorDailyRewardCurrencyDatasetDropdown = UI.CreateDropdown(dailyRewardCurrencyDatasetGroup:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardCurrencyDatasetDropdown", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT,
+        items = self:BuildItemInspectorDatasetItems(),
+        onValueChanged = function(value)
+            if self._refreshingGuildSettingInspector then
+                return
+            end
+
+            if self.GuildSettingInspectorDailyRewardCurrencyDropdown then
+                self.GuildSettingInspectorDailyRewardCurrencyDropdown:SetItems(buildGuildSettingReferenceItems(self, "currencies", value, ""))
+                self.GuildSettingInspectorDailyRewardCurrencyDropdown:SetSelectedValue("", true)
+                local _, _, _, reward = getSelectedDailyReward(self)
+                setDropdownEnabled(self.GuildSettingInspectorDailyRewardCurrencyDropdown, trim(value) ~= "" and reward ~= nil and trim(reward.type or "") == "currency")
+            end
+        end,
+    })
+    dailyRewardCurrencyDatasetGroup:AddChild(self.GuildSettingInspectorDailyRewardCurrencyDatasetDropdown)
+
+    local dailyRewardCurrencyGroup = createFieldGroup(root, "RPEDataEditorGuildSettingInspectorDailyRewardCurrencyGroup", "Currency")
+    self.GuildSettingInspectorDailyRewardCurrencyDropdown = UI.CreateDropdown(dailyRewardCurrencyGroup:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardCurrencyDropdown", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT,
+        items = { { label = "None", value = "" } },
+        onValueChanged = function(value)
+            if self._refreshingGuildSettingInspector then
+                return
+            end
+
+            local _, _, selectedIndex = getSelectedDailyReward(self)
+            self:CommitSelectedGuildSetting(function(guildSetting)
+                local reward = guildSetting.dailyRewards and guildSetting.dailyRewards[selectedIndex]
+                if reward then
+                    reward.ref = value or ""
+                end
+            end)
+            self:RefreshGuildSettingDailyRewardsPage()
+        end,
+    })
+    dailyRewardCurrencyGroup:AddChild(self.GuildSettingInspectorDailyRewardCurrencyDropdown)
+
+    self.GuildSettingInspectorDailyRewardItemDatasetGroup = dailyRewardItemDatasetGroup
+    self.GuildSettingInspectorDailyRewardItemGroup = dailyRewardItemGroup
+    self.GuildSettingInspectorDailyRewardCurrencyDatasetGroup = dailyRewardCurrencyDatasetGroup
+    self.GuildSettingInspectorDailyRewardCurrencyGroup = dailyRewardCurrencyGroup
 
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardAmountLabel", "Amount"))
     self.GuildSettingInspectorDailyRewardAmountInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardAmountInput", {
@@ -1186,9 +1362,17 @@ function DataEditor:RefreshGuildSettingRequisitionsPage()
         self.GuildSettingInspectorRequisitionIdInput:SetText(requisition and (requisition.id or "") or "")
         setTextElementEnabled(self.GuildSettingInspectorRequisitionIdInput, requisition ~= nil)
     end
-    if self.GuildSettingInspectorRequisitionItemRefInput then
-        self.GuildSettingInspectorRequisitionItemRefInput:SetText(requisition and (requisition.itemRef or "") or "")
-        setTextElementEnabled(self.GuildSettingInspectorRequisitionItemRefInput, requisition ~= nil)
+    local requisitionItemRef = requisition and tostring(requisition.itemRef or "") or ""
+    local requisitionItemDatasetId = select(1, parseDatasetQualifiedRef(requisitionItemRef)) or ""
+    if self.GuildSettingInspectorRequisitionItemDatasetDropdown then
+        self.GuildSettingInspectorRequisitionItemDatasetDropdown:SetItems(buildGuildSettingDatasetItems(self, requisitionItemDatasetId))
+        self.GuildSettingInspectorRequisitionItemDatasetDropdown:SetSelectedValue(requisitionItemDatasetId, true)
+        setDropdownEnabled(self.GuildSettingInspectorRequisitionItemDatasetDropdown, requisition ~= nil)
+    end
+    if self.GuildSettingInspectorRequisitionItemDropdown then
+        self.GuildSettingInspectorRequisitionItemDropdown:SetItems(buildGuildSettingReferenceItems(self, "items", requisitionItemDatasetId, requisitionItemRef))
+        self.GuildSettingInspectorRequisitionItemDropdown:SetSelectedValue(requisitionItemRef, true)
+        setDropdownEnabled(self.GuildSettingInspectorRequisitionItemDropdown, requisition ~= nil and requisitionItemDatasetId ~= "")
     end
     if self.GuildSettingInspectorRequisitionQuantityInput then
         self.GuildSettingInspectorRequisitionQuantityInput:SetText(tostring(normalizeInteger(requisition and requisition.quantity, 1, 1)))
@@ -1246,9 +1430,43 @@ function DataEditor:RefreshGuildSettingDailyRewardsPage()
         self._refreshingGuildSettingInspector = false
         setDropdownEnabled(self.GuildSettingInspectorDailyRewardTypeDropdown, reward ~= nil)
     end
-    if self.GuildSettingInspectorDailyRewardRefInput then
-        self.GuildSettingInspectorDailyRewardRefInput:SetText(reward and (reward.ref or "") or "")
-        setTextElementEnabled(self.GuildSettingInspectorDailyRewardRefInput, reward ~= nil)
+    local rewardType = trim(reward and reward.type or "item")
+    if rewardType ~= "currency" then
+        rewardType = "item"
+    end
+    local rewardRef = reward and tostring(reward.ref or "") or ""
+    local rewardDatasetId = select(1, parseDatasetQualifiedRef(rewardRef)) or ""
+    local itemRef = rewardType == "item" and rewardRef or ""
+    local itemDatasetId = rewardType == "item" and rewardDatasetId or ""
+    local currencyRef = rewardType == "currency" and rewardRef or ""
+    local currencyDatasetId = rewardType == "currency" and rewardDatasetId or ""
+
+    if self.GuildSettingInspectorDailyRewardItemDatasetDropdown then
+        self.GuildSettingInspectorDailyRewardItemDatasetDropdown:SetItems(buildGuildSettingDatasetItems(self, itemDatasetId))
+        self.GuildSettingInspectorDailyRewardItemDatasetDropdown:SetSelectedValue(itemDatasetId, true)
+        setDropdownEnabled(self.GuildSettingInspectorDailyRewardItemDatasetDropdown, reward ~= nil and rewardType == "item")
+    end
+    if self.GuildSettingInspectorDailyRewardItemDropdown then
+        self.GuildSettingInspectorDailyRewardItemDropdown:SetItems(buildGuildSettingReferenceItems(self, "items", itemDatasetId, itemRef))
+        self.GuildSettingInspectorDailyRewardItemDropdown:SetSelectedValue(itemRef, true)
+        setDropdownEnabled(self.GuildSettingInspectorDailyRewardItemDropdown, reward ~= nil and rewardType == "item" and itemDatasetId ~= "")
+    end
+    if self.GuildSettingInspectorDailyRewardCurrencyDatasetDropdown then
+        self.GuildSettingInspectorDailyRewardCurrencyDatasetDropdown:SetItems(buildGuildSettingDatasetItems(self, currencyDatasetId))
+        self.GuildSettingInspectorDailyRewardCurrencyDatasetDropdown:SetSelectedValue(currencyDatasetId, true)
+        setDropdownEnabled(self.GuildSettingInspectorDailyRewardCurrencyDatasetDropdown, reward ~= nil and rewardType == "currency")
+    end
+    if self.GuildSettingInspectorDailyRewardCurrencyDropdown then
+        self.GuildSettingInspectorDailyRewardCurrencyDropdown:SetItems(buildGuildSettingReferenceItems(self, "currencies", currencyDatasetId, currencyRef))
+        self.GuildSettingInspectorDailyRewardCurrencyDropdown:SetSelectedValue(currencyRef, true)
+        setDropdownEnabled(self.GuildSettingInspectorDailyRewardCurrencyDropdown, reward ~= nil and rewardType == "currency" and currencyDatasetId ~= "")
+    end
+    setElementGroupVisible(self.GuildSettingInspectorDailyRewardItemDatasetGroup, reward ~= nil and rewardType == "item")
+    setElementGroupVisible(self.GuildSettingInspectorDailyRewardItemGroup, reward ~= nil and rewardType == "item")
+    setElementGroupVisible(self.GuildSettingInspectorDailyRewardCurrencyDatasetGroup, reward ~= nil and rewardType == "currency")
+    setElementGroupVisible(self.GuildSettingInspectorDailyRewardCurrencyGroup, reward ~= nil and rewardType == "currency")
+    if self.GuildSettingInspectorDailyRewardsRoot and self.GuildSettingInspectorDailyRewardsRoot.RefreshLayout then
+        self.GuildSettingInspectorDailyRewardsRoot:RefreshLayout()
     end
     if self.GuildSettingInspectorDailyRewardAmountInput then
         self.GuildSettingInspectorDailyRewardAmountInput:SetText(tostring(normalizeInteger(reward and reward.amount, 1, 1)))

@@ -768,8 +768,10 @@ function RequisitionsPage:Build(parent, owner)
         if button and button.SetAlpha then
             button:SetAlpha(self:GetDailyRewardVisualAlpha())
         end
+        self.DailyRewardButton:ShowTooltip()
     end)
     self.DailyRewardButton:SetScript("OnLeave", function(button)
+        self.DailyRewardButton:HideTooltip()
         if button and button.SetAlpha then
             button:SetAlpha(self:GetDailyRewardVisualAlpha())
         end
@@ -803,6 +805,7 @@ function RequisitionsPage:Build(parent, owner)
     self.GuildRankText = UI.CreateText(self.RankResetLayout:GetFrame(), "RPEGuildRankText", "", {
         height = 20,
         expandWidth = true,
+        justifyH = "LEFT",
         textColor = UI.ResolveColor(nil, "text.primary"),
     })
     self.RankResetLayout:AddChild(self.GuildRankText)
@@ -810,6 +813,7 @@ function RequisitionsPage:Build(parent, owner)
     self.DailyResetText = UI.CreateText(self.RankResetLayout:GetFrame(), "RPEGuildDailyResetText", "", {
         height = 20,
         expandWidth = true,
+        justifyH = "LEFT",
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
     self.RankResetLayout:AddChild(self.DailyResetText)
