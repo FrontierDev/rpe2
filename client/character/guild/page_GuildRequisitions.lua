@@ -17,7 +17,19 @@ RequisitionsPage.__index = RequisitionsPage
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local DAILY_REWARD_ICON = "Interface\\Icons\\INV_Misc_Gift_01"
 local HEADER_HEIGHT = 42
-local DAILY_REWARD_BUTTON_SIZE = 36
+local DAILY_REWARD_BUTTON_SIZE = HEADER_HEIGHT
+
+local function isEffectivelyVisible(frame)
+    if not frame then
+        return false
+    end
+
+    if type(frame.IsVisible) == "function" then
+        return frame:IsVisible() == true
+    end
+
+    return type(frame.IsShown) == "function" and frame:IsShown() == true
+end
 
 local function text(value)
     if value == nil then
@@ -167,13 +179,7 @@ function RequisitionsPage:UpdateDailyRewardVisualState()
         return
     end
 
-    local status = self.DailyRewardStatus and self.DailyRewardStatus.status or "unavailable"
-    local alpha = 0.5
-    if self.DailyRewardPending == true then
-        alpha = 0.7
-    elseif status == "available-today" then
-        alpha = 1
-    end
+    local alpha = self:GetDailyRewardVisualAlpha()
 
     local buttonFrame = self.DailyRewardButton:GetFrame()
     if buttonFrame then
@@ -188,6 +194,17 @@ function RequisitionsPage:UpdateDailyRewardVisualState()
     end
 end
 
+function RequisitionsPage:GetDailyRewardVisualAlpha()
+    local status = self.DailyRewardStatus and self.DailyRewardStatus.status or "unavailable"
+    if self.DailyRewardPending == true then
+        return 0.7
+    elseif status == "available-today" then
+        return 1
+    end
+
+    return 0.5
+end
+
 function RequisitionsPage:UpdateResetText(secondsRemaining)
     if self.DailyResetText then
         self.DailyResetText:SetText(formatDailyReset(secondsRemaining))
@@ -195,10 +212,6 @@ function RequisitionsPage:UpdateResetText(secondsRemaining)
 end
 
 function RequisitionsPage:StopResetTicker()
-    if not self.ResetTicker then
-        return
-    end
-
     self.ResetTicker = nil
     if self.frame and self.frame.SetScript then
         self.frame:SetScript("OnUpdate", nil)
@@ -206,7 +219,8 @@ function RequisitionsPage:StopResetTicker()
 end
 
 function RequisitionsPage:StartResetTicker()
-    if not self.frame or self.ResetTicker or not self.frame:IsShown() then
+    local visibilityFrame = self.TabPageFrame or self.frame
+    if not self.frame or self.ResetTicker or not isEffectivelyVisible(visibilityFrame) then
         return
     end
 
@@ -225,7 +239,7 @@ function RequisitionsPage:StartResetTicker()
         end
         ticker.elapsed = ticker.elapsed - 1
 
-        if not self.frame:IsShown() then
+        if not isEffectivelyVisible(self.TabPageFrame or self.frame) then
             self:StopResetTicker()
             return
         end
@@ -325,6 +339,26 @@ function RequisitionsPage:Build(parent, owner)
         return self:BuildDailyRewardTooltip()
     end
     self.DailyRewardButton:SetTooltip(self.DailyRewardTooltip)
+    self.DailyRewardButton:SetScript("OnEnter", function(button)
+        if button and button.SetAlpha then
+            button:SetAlpha(self:GetDailyRewardVisualAlpha())
+        end
+    end)
+    self.DailyRewardButton:SetScript("OnLeave", function(button)
+        if button and button.SetAlpha then
+            button:SetAlpha(self:GetDailyRewardVisualAlpha())
+        end
+    end)
+    self.DailyRewardButton:SetScript("OnMouseDown", function(button)
+        if button and button.SetAlpha then
+            button:SetAlpha(self:GetDailyRewardVisualAlpha())
+        end
+    end)
+    self.DailyRewardButton:SetScript("OnMouseUp", function(button)
+        if button and button.SetAlpha then
+            button:SetAlpha(self:GetDailyRewardVisualAlpha())
+        end
+    end)
     self.DailyRewardButton:Create()
     self.DailyRewardButton:SetScript("OnClick", function()
         self:TryClaimDailyReward()
@@ -383,6 +417,26 @@ function RequisitionsPage:Build(parent, owner)
     })
     self.MainContentLayout:AddChild(self.LimitedRequisitionHost)
 
+    self.TabPageFrame = parent
+    local contentFrame = parent and parent.GetParent and parent:GetParent() or nil
+    self.WindowFrame = contentFrame and contentFrame.GetParent and contentFrame:GetParent() or nil
+
+    if self.TabPageFrame and self.TabPageFrame.HookScript then
+        self.TabPageFrame:HookScript("OnShow", function()
+            self:StartResetTicker()
+        end)
+        self.TabPageFrame:HookScript("OnHide", function()
+            self:StopResetTicker()
+        end)
+    end
+    if self.WindowFrame and self.WindowFrame.HookScript then
+        self.WindowFrame:HookScript("OnShow", function()
+            self:StartResetTicker()
+        end)
+        self.WindowFrame:HookScript("OnHide", function()
+            self:StopResetTicker()
+        end)
+    end
     self.frame:HookScript("OnShow", function()
         self:StartResetTicker()
     end)
@@ -431,7 +485,7 @@ function RequisitionsPage:Refresh()
     self.LastResetCycleKey = dailyStatus.resetState and dailyStatus.resetState.cycleKey or nil
     self.ResetCycleKeyInitialized = true
 
-    if self.frame:IsShown() then
+    if isEffectivelyVisible(self.TabPageFrame or self.frame) then
         self:StartResetTicker()
     end
 

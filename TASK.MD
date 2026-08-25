@@ -1,190 +1,97 @@
-## Goal
-Replace the provisional top-level Guild Requisitions page structure with the final layout shell and implement the complete Daily Reward / Guild Rank / reset-timer header.
+## Validation result: revision required
 
-Authoritative plan: `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md`.
+Static validation of commit `fc7984f8e24d3f17efbde4fdc7850688f51b6edd` found the core Task 3 structure is in place, but there are three implementation defects that should be corrected before #40 is closed.
 
-Depends on: #39
+### What passes
 
-This task establishes the final page hierarchy and header only. The Guild Shop grid and limited Requisitions entry population are implemented in later tasks.
+- The provisional `StatusText` / Daily Rewards list presentation has been removed.
+- The page now uses the required `VerticalLayoutGroup -> Header + MainContent` hierarchy.
+- The Header uses `HorizontalLayoutGroup` with an `ImageButton` and a nested `VerticalLayoutGroup` for rank/reset text.
+- The lower host regions are stable weighted layout groups with weights `7` and `3`.
+- Daily Reward clicking is gated by cached status and `DailyRewardPending`, and delegates to `Client.Guild:TryClaimDailyReward()` rather than duplicating the transaction.
+- Tooltip construction is read-only and resolves item/currency display data with question-mark fallback behavior.
+- Rank text is concise and reset text uses the #38 reset-state API.
+- Ordinary ticker ticks only update the reset text; a cycle-key change calls one full `Refresh()`.
+- No Shop grid or limited-requisition row population was introduced early.
 
-## Primary files
-- `client/character/guild/page_GuildRequisitions.lua`
+### Blocking defect 1: the reset ticker can run while the Guild window/page is not actually visible
 
-## Final page shell
-Use layout groups rather than a manually anchored collection of unrelated controls.
+`Refresh()` and `StartResetTicker()` use `self.frame:IsShown()` as the visibility gate:
 
-Required hierarchy:
-
-```text
-VerticalLayoutGroup — Root
-│
-├─ HorizontalLayoutGroup — Header
-│  ├─ ImageButton — Daily Reward
-│  └─ VerticalLayoutGroup — Rank/Reset
-│     ├─ Text — Guild Rank
-│     └─ Text — Daily Reset countdown
-│
-└─ HorizontalLayoutGroup — Main Content
-   ├─ Guild Shop host region       weight ~7
-   └─ Limited Requisition region  weight ~3
+```lua
+if not self.frame or self.ResetTicker or not self.frame:IsShown() then
+    return
+end
 ```
 
-Create stable host frames/layouts for the two lower regions so Tasks 4 and 5 can populate them without replacing the page architecture again.
+and:
 
-Use `HorizontalLayoutGroup`, `VerticalLayoutGroup` and layout weights wherever practical. Manual anchoring should be limited to cases the existing layout abstractions cannot express cleanly.
-
-## Remove provisional top/status presentation
-The final page must not retain the current visible status paragraph / Daily Rewards list presentation.
-
-Remove or stop rendering the current concepts equivalent to:
-
-```text
-StatusText
-DailyPanel
-DailyTitle
-DailyList
-DailyEmptyText
+```lua
+if self.frame:IsShown() then
+    self:StartResetTicker()
+end
 ```
 
-Do not replace them with explanatory prose or headings.
+The Guild window is initially created with `hidden = true`, while the Requisitions child frame itself is still in its shown state. In WoW, `IsShown()` reports the frame's own shown flag and does not account for a hidden ancestor; `IsVisible()` is the effective-visibility check. This means page construction/refresh can install the one-second `OnUpdate` loop while the Guild window is hidden, violating the requirement that the ticker exist only while the Requisitions page is visible.
 
-The lower provisional requisition selection/action UI may be removed now if the page remains structurally safe for Tasks 4/5; otherwise isolate it clearly for removal in Task 5. Do not add new visible placeholders/headings.
+The same distinction matters across window/tab visibility transitions.
 
-## Daily Reward ImageButton
-The upper-left control must be `UI.ImageButton` from `core/ui/elements/ImageButton.lua`.
+#### Required revision
 
-Use an appropriate square gift/reward icon texture and existing ImageButton highlight/pushed behavior.
-
-Click behavior:
+Gate ticker creation/execution on effective visibility, not only the child frame's shown flag. Use `IsVisible()` where available and/or explicitly tie ticker lifecycle to the actual active tab/window visibility. Ensure:
 
 ```text
-available -> call Client.Guild manual claim API from #38 -> refresh page
-claimed   -> do not award again
-invalid   -> do not award
-pending   -> ignore repeated click while the claim is in progress
+window hidden -> no active ticker
+other Guild tab active -> no active Requisitions ticker
+Requisitions tab shown -> exactly one ticker
+hide/show repeatedly -> no duplicate ticker state
 ```
 
-Do not implement or duplicate reward transactions in the page.
+`StopResetTicker()` should leave no live `OnUpdate` handler or stale state that prevents a clean restart.
 
-Keep the button hoverable after a claim so the configured reward tooltip remains available. If `SetEnabled(false)` disables mouse hover in the target client, gate claimability in the click handler and apply subdued/claimed visual state without disabling tooltip interaction.
+### Defect 2: claimed/unavailable button visual state is lost after hover
 
-## Daily Reward tooltip
-Build the tooltip dynamically from the active assigned Guild Rank / current Daily Reward status.
+`UpdateDailyRewardVisualState()` correctly applies baseline alpha (`0.5`, `0.7`, or `1`) while leaving the button mouse-enabled for tooltips. However, `UI.ImageButton` inherits the default `ButtonBase` mouse scripts. `ButtonBase` sets alpha to `1` on `OnEnter`, `OnLeave`, and `OnMouseUp`.
 
-Required content shape:
+Therefore a claimed/invalid reward is initially subdued, but after the first hover/leave its alpha becomes `1` and stays there until another full refresh. That defeats the required persistent subdued/claimed visual state while preserving hoverability.
+
+#### Required revision
+
+Keep the button hoverable, but make its mouse visual handlers restore the status-dependent baseline alpha instead of unconditional `1`, or apply the unavailable visual through a property not overwritten by `ButtonBase` hover scripts (for example texture vertex/desaturation state). Verify claimed and invalid states remain visibly subdued before, during and after tooltip hover.
+
+### Defect 3: the Daily Reward control is not actually square after layout
+
+The button is created as `36 x 36`, but `HeaderLayout` has:
+
+```lua
+height = 42,
+fitChildrenHeight = true,
+```
+
+`HorizontalLayoutGroup` forces every child to the full inner height when `fitChildrenHeight = true`, so the Daily Reward button becomes approximately `36 x 42`, not square as required.
+
+#### Required revision
+
+Preserve a square Daily Reward button after layout. For example, make the header/button dimensions agree, or place the fixed square button in a wrapper whose height can stretch without resizing the button itself. Re-check the final frame dimensions after the layout group has run.
+
+### Re-validation
+
+After revision, validate at minimum:
 
 ```text
-Daily Rewards
-[icon] Field Ration            x2
-[icon] Guild Commendation      x1
+Guild window constructed but hidden -> no ticker
+Guild window shown on Requisitions -> one ticker
+switch to Progression/Admin -> ticker stopped
+switch back -> one ticker only
+close/reopen repeatedly -> no ticker accumulation
+
+available reward -> normal visual, one central claim call
+pending -> repeated clicks ignored
+claimed/invalid -> subdued visual survives hover/leave, tooltip still works
+
+Daily Reward button -> square after layout
+rank/reset text -> unchanged concise format
+reset cycle change -> one full Refresh()
 ```
 
-Use the existing RPE tooltip system (`BaseElement:SetTooltip` / `UI.Tooltip`) and its icon-bearing line support.
-
-For each configured reward:
-
-### Item
-Resolve through the existing Registry Item reference API:
-- item display name;
-- item icon;
-- amount.
-
-### Currency
-Resolve through existing Profile Currency definition APIs:
-- currency display name;
-- currency icon;
-- amount.
-
-Use the standard question-mark icon fallback when a definition/icon cannot be resolved. Missing definitions must not throw.
-
-The tooltip must remain read-only and must not claim rewards.
-
-## Guild Rank text
-To the right of the ImageButton show only:
-
-```text
-Guild Rank: <assigned rank name>
-```
-
-Resolve through the existing assigned-RPE-Guild-Rank status API.
-
-Do not append daily status prose, eligibility explanations, help text or extra labels.
-
-For invalid/unassigned states, use a concise existing rank fallback only; do not restore the old explanatory status paragraph.
-
-## Reset timer
-Directly underneath the rank show:
-
-```text
-Daily Reset in HH:MM:SS
-```
-
-Consume the centralized reset-state helper from #38. Do not independently calculate a different reset boundary in the page.
-
-Format remaining seconds robustly as hours/minutes/seconds, clamped at zero.
-
-## Visible-page ticker
-Start a lightweight one-second ticker while this Requisitions page is visible.
-
-Requirements:
-
-- ticker updates only the timer text during an ordinary tick;
-- ticker stops/cancels when the page is hidden;
-- reopening the page creates/resumes only one ticker;
-- no duplicate ticker accumulation after repeated tab/window show/hide;
-- retain the last observed reset-cycle key;
-- if the cycle key changes, perform one full `Refresh()` so the Daily Reward claim state updates for the new cycle.
-
-Use existing WoW/RPE ticker patterns if present rather than inventing another task scheduler.
-
-## Refresh contract for header
-`RequisitionsPage:Refresh()` should resolve assigned rank and Daily Reward status once per full refresh, then:
-
-1. update rank text;
-2. update Daily Reward button claim/visual state;
-3. update tooltip source data;
-4. update timer text/reset-cycle marker;
-5. leave lower host-region population to the later shop/requisition refresh helpers.
-
-Do not perform reward mutation from `Refresh()`.
-
-## No extra visible text
-Do not add:
-
-- `Daily Rewards` page heading;
-- `Guild Shop` heading;
-- `Requisitions` heading;
-- instructions;
-- empty-state prose;
-- eligibility/status paragraphs;
-- action-result messages.
-
-`Daily Rewards` is allowed as the **tooltip title**, not as an on-page label.
-
-## Constraints
-- Do not implement the two-column Guild Shop entry grid in this task.
-- Do not implement limited Requisition `ShopEntry` rows in this task.
-- Do not duplicate Daily Reward reset calculations from #38.
-- Do not mutate Daily Reward/Profile state during ordinary refresh or tooltip building.
-- Do not add a separate tooltip/ticker framework.
-- Do not change requisition business rules.
-
-## Acceptance criteria
-- [ ] Root page uses a Vertical Layout Group with Header + Main Content.
-- [ ] Header uses Horizontal + Vertical layout groups as specified.
-- [ ] Lower content has stable approximately 70/30 weighted host regions.
-- [ ] Upper-left control is `UI.ImageButton`.
-- [ ] Clicking an available reward calls the central manual-claim API exactly once per click/transaction.
-- [ ] Claimed/invalid/pending states cannot duplicate a claim.
-- [ ] Daily Reward tooltip lists configured Item/Currency rewards with resolved names/icons/amounts and safe fallbacks.
-- [ ] Tooltip remains available after claim.
-- [ ] Rank renders as `Guild Rank: <name>` without status prose.
-- [ ] Reset text renders as `Daily Reset in HH:MM:SS` using #38's reset helper.
-- [ ] One-second ticker exists only while visible and does not accumulate duplicates.
-- [ ] Reset-cycle change causes one full page refresh.
-- [ ] Ordinary header refresh/tooltip build is read-only.
-- [ ] Old Daily Rewards list/status paragraph is no longer visible.
-- [ ] No new headings/help/empty-state text are added.
-
-## Coding-agent instructions
-Read `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md` and completed Tasks #38–#39. Inspect the current `page_GuildRequisitions.lua`, `ImageButton.lua`, `BaseElement.lua`, `Tooltip.lua`, existing ticker lifecycle patterns, assigned Guild Rank display helpers, Registry Item resolution and Profile Currency resolution before editing. Implement Task 3 only. Establish the final page shell/header without prematurely inventing shop/list logic. Review every acceptance criterion and report changed files, validation performed, and any deviation.
+No configured CI/status checks are attached to this commit, so this validation is based on static source inspection. Issue #40 should remain open pending these revisions.
