@@ -1,150 +1,121 @@
-## Goal
-Fix three remaining runtime presentation issues on the Guild Requisitions page:
+## Validation result: revision required
 
-1. requisition costs using the built-in `copper` currency must use the existing copper/money formatter in `Addon.Utils.Common`;
-2. Daily Reward entries granting `copper` must use the same copper formatter;
-3. the Guild Shop paginator must be centered at the bottom of the left panel, and unaffordable requisition cost text must clearly show the amount in red.
+Static validation of commit `9d609578788b931d7f14d839aed8833762c532a6` shows that the core #46 implementation is largely correct, but the commit also introduces unrelated visual regressions from the previously accepted Requisitions page. Do **not** close #46 yet.
 
-This is a presentation-only task. Preserve all requisition, eligibility, Daily Reward, reset-cycle, transaction, pagination-count, Profile persistence, and Guild Rank semantics.
+### What passes
 
-## Current source observations
+The requested #46 behavior is implemented coherently:
 
-The current Requisitions page formats every cost as a generic currency icon plus integer amount. The repository already has:
+- built-in `copper` requisition costs are normalized through the existing Profile currency API and formatted through `Common:FormatCopper(...)` rather than a duplicate money formatter;
+- non-copper currencies retain compact currency-icon + amount rendering;
+- mixed cost lists format each component independently;
+- copper Daily Reward tooltip amounts use `Common:FormatCopper(...)` instead of `xN`;
+- `GetRequisitionEligibility()` remains authoritative for affordability; the page only keys the warning state from the returned `insufficient-currency` reason;
+- `ShopEntry:SetCostColor(...)` provides a narrow reusable presentation API;
+- the red cost state is reset to `text.secondary` when an entry is rebound or hidden, so recycled rows do not retain stale affordability coloring;
+- both Guild Shop and limited Requisition rows pass through the same `BindShopEntry(...)` path;
+- disabled rows remain mouse-enabled for item tooltips;
+- the paginator now uses a full-width host with a fixed-width pagination layout anchored at the host center, while the grid retains the expandable area above it;
+- page-count/navigation and requisition transaction logic were not changed;
+- `utils/Common.lua` and `client/client_Guild.lua` were not modified by the implementation.
+
+There are no configured commit status checks on this commit, so this validation is static source inspection rather than an in-game runtime test.
+
+### Blocking regression 1: Daily Reward icon was changed outside scope
+
+This commit changes:
 
 ```lua
-Common:FormatCopper(amount)
+local DAILY_REWARD_ICON = "Interface\\Icons\\INV_Misc_Gift_01"
 ```
 
-in `utils/Common.lua`, and `Profile.FormatCurrencyAmount(...)` already delegates built-in `copper` to that formatter. Do not duplicate WoW money formatting.
+to:
 
-`Guild:GetRequisitionEligibility()` already distinguishes `insufficient-currency` and returns detail containing `currencyRef`, `balance`, and required `amount` for the first failing cost. Reuse the authoritative eligibility result; do not reimplement purchasing rules in the UI.
-
-## Primary files
-
-- `client/character/guild/page_GuildRequisitions.lua`
-- `core/ui/prefabs/ShopEntry.lua` only if a small reusable cost-text color API is required
-- `utils/Common.lua` should normally remain unchanged
-
-## 1. Copper requisition costs
-
-When a requisition cost resolves to the built-in currency key `copper`, render the amount with `Addon.Utils.Common.FormatCopper` rather than the generic currency-icon formatter.
-
-Examples:
-
-```text
-50 copper     -> 50[copper icon]
-125 copper    -> 1[silver icon] 25[copper icon]
-12345 copper  -> 1[gold icon] 23[silver icon] 45[copper icon]
+```lua
+local DAILY_REWARD_ICON = "Interface\\Icons\\spell_nature_timestop"
 ```
 
-Use the exact existing `Common` implementation and inline texture output. Do not create a second gold/silver/copper formatter.
+#46 does not request a Daily Reward button icon change. This is unrelated scope drift and changes a previously accepted UI element.
 
-For non-copper currencies, retain the compact currency-icon + amount behavior introduced by #45.
+**Required revision:** restore the pre-#46 Daily Reward icon:
 
-For mixed multi-currency costs, each component should use the appropriate formatter independently.
-
-## 2. Copper Daily Rewards
-
-In the Daily Reward tooltip, a reward whose normalized currency key is `copper` must display its amount through `Common:FormatCopper(...)`.
-
-Do not show `x12345` for copper. The tooltip may retain the currency label/row structure, but the displayed amount must be the formatted gold/silver/copper string.
-
-Other currencies retain the existing icon/name + integer amount presentation.
-
-Missing/unresolved reward definitions must continue to fail safely.
-
-## 3. Unaffordable requisition cost amount is red
-
-If a requisition is disabled specifically because `GetRequisitionEligibility()` returned:
-
-```text
-insufficient-currency
+```lua
+local DAILY_REWARD_ICON = "Interface\\Icons\\INV_Misc_Gift_01"
 ```
 
-then the numeric text in the ShopEntry cost line must render red.
+unless a separate explicit issue is created/approved to change that icon.
 
-Requirements:
+### Blocking regression 2: Both panel headers were renamed
 
-- the currency icon(s) should remain visually normal;
-- the amount text is red for an unaffordable row;
-- this applies to both unlimited Guild Shop entries and limited Requisition entries;
-- affordability color must reset correctly when a recycled `ShopEntry` is rebound to an affordable item;
-- rows disabled for a non-affordability reason (for example exhausted character limit) should use the normal disabled/subdued presentation rather than being incorrectly marked as insufficient funds;
-- hover/item tooltip behavior remains available on disabled rows.
-
-A narrow `ShopEntry:SetCostColor(...)` / `SetCostTextColor(...)` API is acceptable if needed. Prefer a reusable prefab API over directly reaching into internal font-string fields from the page.
-
-## 4. Center the Guild Shop paginator
-
-The existing previous/page/next paginator belongs at the bottom center of the Guild Shop panel.
-
-Required visual result:
+#45 explicitly established the accepted panel headers as:
 
 ```text
-                <   Page 1 / 2   >
+Guild Shop
+Requisitions
 ```
 
-Requirements:
-
-- horizontally centered relative to the usable Guild Shop panel content width;
-- remains at the bottom of the panel beneath the grid;
-- remains centered when the window/layout recalculates width;
-- does not depend on the number of visible shop entries;
-- does not overlap the grid or panel border;
-- Previous/Next enabled-state behavior and page calculations are unchanged.
-
-Use the existing layout system where practical; a fixed-width centered paginator host is preferable to fragile hard-coded offsets.
-
-## Acceptance criteria
-
-- [ ] Built-in `copper` requisition costs use `Common:FormatCopper` output.
-- [ ] Non-copper requisition costs still use compact currency icon + amount.
-- [ ] Mixed costs format copper and non-copper components correctly.
-- [ ] Copper Daily Reward amounts use `Common:FormatCopper` rather than `xN`.
-- [ ] Other Daily Reward currencies retain their existing presentation.
-- [ ] `insufficient-currency` entries render cost amount text red.
-- [ ] Affordable/recycled entries restore the normal cost color.
-- [ ] Non-affordability disable reasons do not incorrectly use red cost text.
-- [ ] Both Guild Shop and limited Requisition rows behave identically.
-- [ ] Paginator is horizontally centered at the bottom of the Guild Shop panel.
-- [ ] Page count, navigation boundaries, and click transaction behavior are unchanged.
-
-## Validation matrix
+Commit `9d609578...` changes them to:
 
 ```text
-cost = 50 copper
--> 50c via Common formatter
+Requisitions
+Special Requisitions
+```
 
-cost = 125 copper
--> 1s 25c via Common formatter
+Specifically:
 
-cost = 12345 copper
--> 1g 23s 45c via Common formatter
+```lua
+"Guild Shop" -> "Requisitions"
+"Requisitions" -> "Special Requisitions"
+```
 
-cost = valor
--> existing valor icon + integer amount
+That rename is unrelated to copper formatting, affordability coloring, or paginator alignment, and regresses the layout accepted in #45.
 
-cost = copper + valor
--> Common copper format + compact valor format
+**Required revision:** restore the exact previous header text:
 
-Daily Reward = 12345 copper
--> formatted 1g 23s 45c amount, not x12345
+```lua
+self.GuildShopHeader ... "Guild Shop"
+self.LimitedRequisitionHeader ... "Requisitions"
+```
 
-affordable item
--> normal cost text color
+Do not rename these sections as part of #46.
 
-insufficient-currency item
--> amount text red; item tooltip still hoverable
+### Re-validation matrix for rev 1
 
-limited item exhausted by characterLimit
--> disabled/subdued, but not falsely red for affordability
+After the revision, verify at minimum:
 
-recycled row unaffordable -> affordable
+```text
+Daily Reward button
+-> uses the pre-#46 gift icon
+
+left panel header
+-> "Guild Shop"
+
+right panel header
+-> "Requisitions"
+
+50 / 125 / 12345 copper cost
+-> Common money formatting
+
+copper + non-copper mixed cost
+-> copper uses Common formatter; other currency uses compact icon + amount
+
+copper Daily Reward
+-> formatted money amount, not xN
+
+affordable row
+-> normal cost color
+
+insufficient-currency row
+-> numeric cost text red; currency textures remain normal; tooltip remains available
+
+character-limit-reached row
+-> disabled/subdued but not affordability-red
+
+recycled insufficient -> affordable row
 -> red state is cleared
 
 0 / 1 / 14 / 15 shop entries
--> paginator remains centered at panel bottom and navigation remains correct
+-> paginator remains centered at the bottom and navigation behavior is unchanged
 ```
 
-## Coding-agent instructions
-Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Inspect `utils/Common.lua`, `core/internal/profile/Currencies.lua`, `client/client_Guild.lua`, `client/character/guild/page_GuildRequisitions.lua`, and `core/ui/prefabs/ShopEntry.lua` before editing. Reuse the existing copper formatter and authoritative eligibility result; do not duplicate transaction or currency logic. Report exact files changed and validation performed.
+The requested #46 implementation otherwise looks consistent from static source inspection. The two unrelated visual regressions above are the remaining blockers.

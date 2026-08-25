@@ -18,7 +18,7 @@ GuildUI.RequisitionsPage = RequisitionsPage
 RequisitionsPage.__index = RequisitionsPage
 
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
-local DAILY_REWARD_ICON = "Interface\\Icons\\spell_nature_timestop"
+local DAILY_REWARD_ICON = "Interface\\Icons\\INV_Misc_Gift_01"
 local HEADER_HEIGHT = 42
 local DAILY_REWARD_BUTTON_SIZE = HEADER_HEIGHT
 local SHOP_COLUMNS = 2
@@ -943,7 +943,7 @@ function RequisitionsPage:Build(parent, owner)
     })
     UI.Utils.AnchorFill(self.GuildShopHost, self.GuildShopPanel:GetContentFrame(), 0, 0, 0, 0)
 
-    self.GuildShopHeader = UI.CreateText(self.GuildShopHost:GetFrame(), "RPEGuildShopHeader", "Requisitions", {
+    self.GuildShopHeader = UI.CreateText(self.GuildShopHost:GetFrame(), "RPEGuildShopHeader", "Guild Shop", {
         fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
         fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Heading2) or 10,
         textColor = UI.ResolveColor(nil, "text.primary"),
@@ -1086,7 +1086,7 @@ function RequisitionsPage:Build(parent, owner)
     })
     UI.Utils.AnchorFill(self.LimitedRequisitionHost, self.LimitedRequisitionPanel:GetContentFrame(), 0, 0, 0, 0)
 
-    self.LimitedRequisitionHeader = UI.CreateText(self.LimitedRequisitionHost:GetFrame(), "RPEGuildLimitedRequisitionHeader", "Special Requisitions", {
+    self.LimitedRequisitionHeader = UI.CreateText(self.LimitedRequisitionHost:GetFrame(), "RPEGuildLimitedRequisitionHeader", "Requisitions", {
         fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
         fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Heading2) or 10,
         textColor = UI.ResolveColor(nil, "text.primary"),
