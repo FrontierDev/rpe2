@@ -583,7 +583,7 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
             local requisition = guildSetting.requisitions and guildSetting.requisitions[selectedIndex]
             if requisition then
                 requisition.quantity = normalizeInteger(self.GuildSettingInspectorRequisitionQuantityInput:GetText(), 1, 1)
-                requisition.characterLimit = normalizeInteger(self.GuildSettingInspectorRequisitionLimitInput:GetText(), 1, 1)
+                requisition.characterLimit = normalizeInteger(self.GuildSettingInspectorRequisitionLimitInput:GetText(), 1, 0)
             end
         end)
     end
@@ -1182,7 +1182,7 @@ function DataEditor:RefreshGuildSettingRequisitionsPage()
         setTextElementEnabled(self.GuildSettingInspectorRequisitionQuantityInput, requisition ~= nil)
     end
     if self.GuildSettingInspectorRequisitionLimitInput then
-        self.GuildSettingInspectorRequisitionLimitInput:SetText(tostring(normalizeInteger(requisition and requisition.characterLimit, 1, 1)))
+        self.GuildSettingInspectorRequisitionLimitInput:SetText(tostring(normalizeInteger(requisition and requisition.characterLimit, 1, 0)))
         setTextElementEnabled(self.GuildSettingInspectorRequisitionLimitInput, requisition ~= nil)
     end
     if self.GuildSettingInspectorCostScroll then

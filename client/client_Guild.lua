@@ -1428,22 +1428,27 @@ function Guild:GetRequisitionEligibility(guildRankRef, requisitionId)
         })
     end
 
-    if type(Profile.GetGuildRequisitionUsage) ~= "function" then
-        return buildRequisitionFailure("ledger-unavailable")
-    end
-    local usage = Profile.GetGuildRequisitionUsage(guildKey, assignedRankRef, normalizedRequisitionId)
-    usage = math.max(0, math.floor(tonumber(usage) or 0))
     local characterLimit = tonumber(requisition.characterLimit)
     if not characterLimit or characterLimit ~= characterLimit or characterLimit == math.huge or characterLimit == -math.huge then
         characterLimit = 1
     end
-    characterLimit = math.max(1, math.floor(characterLimit))
-    if usage >= characterLimit then
-        return buildRequisitionFailure("character-limit-reached", {
-            usage = usage,
-            characterLimit = characterLimit,
-            requisitionId = normalizedRequisitionId,
-        })
+    characterLimit = math.max(0, math.floor(characterLimit))
+    local isUnlimited = characterLimit == 0
+    local usage = 0
+    if not isUnlimited then
+        if type(Profile.GetGuildRequisitionUsage) ~= "function" then
+            return buildRequisitionFailure("ledger-unavailable")
+        end
+
+        usage = Profile.GetGuildRequisitionUsage(guildKey, assignedRankRef, normalizedRequisitionId)
+        usage = math.max(0, math.floor(tonumber(usage) or 0))
+        if usage >= characterLimit then
+            return buildRequisitionFailure("character-limit-reached", {
+                usage = usage,
+                characterLimit = characterLimit,
+                requisitionId = normalizedRequisitionId,
+            })
+        end
     end
 
     local normalizedCosts, costReason, costDetail = getCurrencyCosts(requisition.costs)
@@ -1487,6 +1492,7 @@ function Guild:GetRequisitionEligibility(guildRankRef, requisitionId)
         costs = normalizedCosts,
         usage = usage,
         characterLimit = characterLimit,
+        isUnlimited = isUnlimited,
     }
 end
 
@@ -1561,8 +1567,8 @@ function Guild:TryRequisition(guildRankRef, requisitionId)
     end
 
     local expectedUsage = detail.usage + 1
-    local updatedUsage = nil
-    if type(Profile.IncrementGuildRequisitionUsage) == "function" then
+    local updatedUsage = detail.usage
+    if detail.characterLimit > 0 and type(Profile.IncrementGuildRequisitionUsage) == "function" then
         local incremented
         incremented, updatedUsage = pcall(Profile.IncrementGuildRequisitionUsage,
             detail.guildKey,
@@ -1574,7 +1580,7 @@ function Guild:TryRequisition(guildRankRef, requisitionId)
         end
     end
 
-    if updatedUsage ~= expectedUsage then
+    if detail.characterLimit > 0 and updatedUsage ~= expectedUsage then
         local itemRestored = removeInventoryItemQuantity(
             inventory,
             detail.datasetId,

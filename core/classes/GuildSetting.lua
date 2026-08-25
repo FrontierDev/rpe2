@@ -151,7 +151,7 @@ local function normalizeRequisition(value, index, usedIds)
         costs = normalizeCosts(source.costs),
         -- Legacy compatibility field; the new Guild Rank mapping is not inferred from it.
         requiredGuildRankIndex = normalizeOptionalRankIndex(source.requiredGuildRankIndex),
-        characterLimit = normalizeInteger(source.characterLimit, 1, 1),
+        characterLimit = normalizeInteger(source.characterLimit, 1, 0),
     }
 end
 

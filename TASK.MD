@@ -1,69 +1,86 @@
-Validation of current `main` (`74bfa9b`, Issue #35): **FAIL — leave open**.
+## Goal
+Allow existing Guild Requisition definitions to represent unlimited Guild Shop purchases without introducing a second shop dataset or persistence system.
 
-The broad Phase 5 integration is coherent at source level, and the new `Achievements:RefreshIndex()` hook is read-only and correctly keeps the trigger index synchronized after local configuration changes. The previously completed Achievement reward/runtime/UI work also remains intact. However, the Guild identity fix in this revision introduces a backward-compatibility hole that violates Task 13's stable-Guild-state requirements.
+Authoritative plan: `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md`.
 
-### Blocking defect: previous `guildName-realm` buckets can become unreachable
-
-Before Issue #35, `client/client_Guild.lua:getGuildIdentity()` filled an empty guild realm with `GetRealmName()`. Therefore, whenever `C_Club.GetGuildClubId()` was unavailable/empty, `Profile.GetGuildKey()` selected:
-
-```text
-GuildName-RealmName
-```
-
-and Phase 5 Guild state could legitimately be written there.
-
-Issue #35 removes that `GetRealmName()` fallback. On the target API, `GetGuildInfo("player")` returns the guild realm as `nil` for a same-realm guild. With Club ID unavailable, the current code therefore selects:
+This task defines the business/data distinction used by the final page:
 
 ```text
-GuildName
+characterLimit = 0  -> unlimited Guild Shop entry
+characterLimit > 0  -> limited/one-time Requisition entry
 ```
 
-instead.
+Keep the existing default at `1` so all existing requisitions retain their current limited behavior unless explicitly authored as unlimited.
 
-The migration helper does not recover the previous realm-qualified bucket in this case. `getLegacyGuildKeys(identity)` only adds `GuildName-RealmName` when `identity.realmName` / `guildRealm` / `realm` is non-empty. After this revision, a same-realm identity has none of those values, so the helper only probes `GuildName`.
+## Primary files
+- `core/classes/GuildSetting.lua`
+- `client/ui/editor/inspectors/page_InspectorGuildSetting.lua`
+- `client/client_Guild.lua`
 
-Concrete regression:
+## GuildSetting normalization
+In `core/classes/GuildSetting.lua`, change requisition normalization so `characterLimit` accepts `0` as the minimum valid value.
 
-1. Run the pre-#35 build while `C_Club.GetGuildClubId()` is temporarily unavailable.
-2. Same-realm guild `Example Guild` resolves via the old fallback to `Example Guild-MyRealm`.
-3. Store any current Guild state there, e.g. `assignedRankRef`, requisition usage, daily reward transaction, or progression slots.
-4. Update to Issue #35.
-5. `GetGuildInfo("player")` supplies no realm for this same-realm guild and Club ID is still unavailable.
-6. New key resolves to `Example Guild`.
-7. `migrateLegacyGuildBucket()` never looks at `Example Guild-MyRealm` because the identity no longer carries `MyRealm`.
-8. The previously persisted Guild state appears lost/inaccessible.
-9. If Club ID later becomes available, migration to `guild:<clubId>` still only considers `Example Guild`, so the orphaned realm-qualified bucket remains skipped.
+Conceptually:
 
-This directly violates:
-- existing Guild Profile state remains accessible/migrates safely;
-- the key transition must not split the current guild's Profile state;
-- assignment/Requisition/Daily Reward/Progression nested data survives.
+```lua
+characterLimit = normalizeInteger(source.characterLimit, 1, 0)
+```
 
-### Required fix
+Do not add a separate `shop` array/field. `rank.requisitions` remains the sole definition collection.
 
-It is reasonable to keep the new **current fallback key** name-only for same-realm guilds, but migration still needs to know the legacy local realm so it can recover the key format used by the prior build.
+## Authoring
+Update the existing GuildSetting inspector Character Limit field so `0` can be entered, persisted, normalized, exported and reloaded without being coerced back to `1`.
 
-For example:
-- retain `GetRealmName()` as a separate migration-only identity field such as `legacyRealmName` / `localRealmName`; and
-- have `getLegacyGuildKeys()` consider `GuildName-<local realm>` in addition to `GuildName`, without making that realm-qualified form the selected current fallback key.
+Do not add explanatory/help text to the inspector. Preserve the existing field and surrounding editor structure.
 
-When Club ID is available, migration should likewise consider both prior forms before returning `guild:<clubId>`. Preserve the current non-destructive merge precedence and do not alter `assignedRankRef` semantics.
+## Eligibility behavior
+In `Guild:GetRequisitionEligibility(...)`:
 
-### Other integration checks
+- normalize the effective limit with a minimum of `0`;
+- preserve all existing Guild Rank, item, currency, affordability and inventory checks;
+- when `characterLimit > 0`, preserve the existing usage-ledger lookup and `character-limit-reached` rejection;
+- when `characterLimit == 0`, skip the usage-limit rejection entirely;
+- return enough normalized detail for `TryRequisition(...)` to know whether the requisition is unlimited.
 
-Source review confirms the final tree still has:
-- all 11 supported Achievement triggers indexed and authorable;
-- index rebuild itself read-only;
-- canonical Inventory add notifications and positive Skill deltas feeding Achievement progress;
-- committed/transport-bound damage, healing, kill and boss-kill hooks;
-- event-start dispatch from accepted client Event start with per-instance idempotency;
-- schema 17/7 monotonic markers;
-- structured Item/Currency reward normalization, dependency/runtime/UI paths from Tasks 8–12;
-- reward persistence, rollback/recovery blocking and explicit safe retry semantics;
-- Profile Achievement reward display/retry restrictions;
-- one runtime event frame and no new SavedVariable root;
-- load order where Profile APIs exist before Achievement runtime/UI consumers and Achievement listeners initialize only on `ADDON_LOADED`, after Inventory has loaded.
+Do not make UI state authoritative for eligibility.
 
-No combined CI statuses or GitHub Actions workflow runs are configured for `74bfa9b`.
+## Transaction behavior
+In `Guild:TryRequisition(...)`:
 
-Issue #35 should remain open until the realm-qualified legacy Guild bucket is recoverable under the revised identity fallback.
+- preserve the existing currency-spend transaction;
+- preserve item award verification and rollback;
+- preserve the usage-ledger increment/rollback path for `characterLimit > 0`;
+- for `characterLimit == 0`, do **not** increment, set or otherwise write the requisition usage ledger;
+- unlimited entries must remain repeatedly purchasable while the player remains otherwise eligible and can afford the cost.
+
+Do not weaken transaction rollback behavior for limited requisitions.
+
+## Backward compatibility
+Existing definitions with absent/invalid `characterLimit` must continue to normalize to `1`.
+
+Existing persisted usage for limited requisitions must remain authoritative and unchanged.
+
+No Profile schema migration should be required: unlimited entries simply bypass the existing requisition usage ledger.
+
+## Constraints
+- Do not add a second Guild Shop definition collection.
+- Do not add a second purchase API.
+- Do not change currency transaction semantics.
+- Do not change item award semantics.
+- Do not change assigned Guild Rank resolution.
+- Do not implement the final Requisitions page UI in this task.
+- Do not change Daily Reward behavior in this task.
+
+## Acceptance criteria
+- [ ] `characterLimit = 0` survives GuildSetting normalization and round-trip.
+- [ ] Existing/omitted limits still default to `1`.
+- [ ] The GuildSetting inspector accepts and preserves `0`.
+- [ ] `characterLimit = 0` bypasses the usage-limit eligibility check.
+- [ ] Unlimited purchases do not write or increment the requisition usage ledger.
+- [ ] Unlimited entries can be purchased repeatedly while affordable/eligible.
+- [ ] `characterLimit > 0` retains the existing usage-limit and rollback behavior.
+- [ ] Existing currency, item, Guild Rank and inventory validation remains unchanged.
+- [ ] No new Profile schema or shop persistence root is introduced.
+
+## Coding-agent instructions
+Read `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md`, then inspect the current `GuildSetting.lua` requisition normalizer, GuildSetting inspector Character Limit control, `Guild:GetRequisitionEligibility(...)`, `Guild:TryRequisition(...)`, and Profile requisition-ledger APIs before editing. Implement Task 0 only. Treat `rank.requisitions` and the existing transaction path as authoritative. Review every acceptance criterion and report changed files, validation performed, and any deviation.
