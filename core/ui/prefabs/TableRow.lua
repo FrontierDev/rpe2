@@ -233,6 +233,17 @@ function TableRow:Refresh()
 
             cell.text:SetText(displayValue)
 
+            local textColor = nil
+            if column.cellTextColor then
+                textColor = column.cellTextColor(value, rowData, rowIndex, column, self)
+            elseif column.textColor then
+                textColor = column.textColor
+            else
+                textColor = self.options.textColor
+            end
+            textColor = UI.ResolveColor(textColor, "text.primary")
+            cell.text:SetTextColor(textColor.r or 1, textColor.g or 1, textColor.b or 1, textColor.a or 1)
+
             local tooltip = nil
             if column.cellTooltip then
                 tooltip = column.cellTooltip(value, rowData, rowIndex, column, self)

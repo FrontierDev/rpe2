@@ -9,18 +9,19 @@ local GuildUI = Addon.Client.UI.Guild
 local UI = Addon.UI or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
+local Database = Addon.Internal and Addon.Internal.Database or {}
 
 local AdminPage = GuildUI.AdminPage or {}
 GuildUI.AdminPage = AdminPage
 AdminPage.__index = AdminPage
 
-local function setSelectedRow(row, selected)
-    if not row or not row.entryBackground or not row.entryBackground.SetColorTexture then
+local function setSelectedTableRow(row, selected)
+    if not row or not row.background or not row.background.SetColorTexture then
         return
     end
 
     local color = UI.ResolveColor(nil, selected and "list.rowHover" or "list.rowBackground")
-    row.entryBackground:SetColorTexture(color.r or 0, color.g or 0, color.b or 0, color.a or 1)
+    row.background:SetColorTexture(color.r or 0, color.g or 0, color.b or 0, color.a or 1)
 end
 
 local function normalizeMemberName(name)
@@ -32,18 +33,34 @@ local function normalizeMemberName(name)
     return value
 end
 
+local function buildSortedRoster(roster)
+    local sorted = {}
+    for index = 1, #(roster or {}) do
+        sorted[index] = roster[index]
+    end
+
+    table.sort(sorted, function(left, right)
+        local leftRank = tonumber(left and left.rankIndex) or math.huge
+        local rightRank = tonumber(right and right.rankIndex) or math.huge
+        if leftRank ~= rightRank then
+            return leftRank < rightRank
+        end
+
+        local leftName = normalizeMemberName(left and left.name):lower()
+        local rightName = normalizeMemberName(right and right.name):lower()
+        return leftName < rightName
+    end)
+
+    return sorted
+end
+
 local function getRankLabel(match)
     local settingName = tostring(match and match.settingName or "")
-    local datasetName = tostring(match and match.datasetName or "")
     local ref = tostring(match and match.ref or "")
 
     if settingName == "" then
         settingName = ref
     end
-    if datasetName ~= "" and settingName ~= "" then
-        return ("%s (%s)"):format(settingName, datasetName)
-    end
-
     return settingName
 end
 
@@ -56,26 +73,57 @@ local function getAdminReason(response)
     return reason
 end
 
+local function getDatasetLabel(dataset)
+    local datasetId = tostring(dataset and dataset.id or "")
+    local datasetName = tostring(dataset and (dataset.name or dataset.displayName) or "")
+    if datasetName ~= "" then
+        return datasetName
+    end
+
+    if type(Database.GetDatasetDisplayName) == "function" then
+        local ok, displayName = pcall(Database.GetDatasetDisplayName, dataset)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return datasetId
+end
+
 local function getDatasetEntryLabel(dataset, entry, reference)
     local entryName = tostring(entry and entry.name or "")
     local entryId = tostring(entry and entry.id or "")
-    local datasetName = tostring(dataset and dataset.name or dataset and dataset.id or "")
     local label = entryName ~= "" and entryName or entryId
     if label == "" then
         label = tostring(reference or "")
-    end
-    if datasetName ~= "" and label ~= "" then
-        return ("%s (%s)"):format(label, datasetName)
     end
 
     return label
 end
 
+local function makeDatasetGroup(label, key, children)
+    return {
+        label = label,
+        value = key,
+        notCheckable = true,
+        keepShownOnClick = true,
+        children = children,
+    }
+end
+
 local function buildReferenceItems(collectionKey)
+    local collectionLabels = {
+        achievements = "Achievement",
+        skills = "Skill",
+        items = "Item",
+    }
+    local collectionLabel = collectionLabels[collectionKey] or tostring(collectionKey or "reference")
     local items = {
-        { label = "Select a " .. collectionKey .. " reference", value = "" },
+        { label = "Select a " .. collectionLabel, value = "" },
     }
     local seen = {}
+    local groups = {}
+    local orderedGroups = {}
     local datasets = type(Registry.GetActivatedDatasets) == "function"
         and Registry:GetActivatedDatasets()
         or {}
@@ -89,12 +137,96 @@ local function buildReferenceItems(collectionKey)
             local reference = datasetId ~= "" and entryId ~= "" and (datasetId .. ":" .. entryId) or ""
             if reference ~= "" and not seen[reference] then
                 seen[reference] = true
-                items[#items + 1] = {
+                local groupKey = datasetId ~= "" and datasetId or getDatasetLabel(dataset)
+                local group = groups[groupKey]
+                if not group then
+                    group = {
+                        label = getDatasetLabel(dataset),
+                        value = "guild-admin-" .. collectionKey .. "-dataset:" .. groupKey,
+                        children = {},
+                    }
+                    groups[groupKey] = group
+                    orderedGroups[#orderedGroups + 1] = group
+                end
+                group.children[#group.children + 1] = {
                     label = getDatasetEntryLabel(dataset, entry, reference),
                     value = reference,
                 }
             end
         end
+    end
+
+    for index = 1, #orderedGroups do
+        local group = orderedGroups[index]
+        items[#items + 1] = makeDatasetGroup(group.label, group.value, group.children)
+    end
+
+    return items
+end
+
+local function dropdownItemsContainValue(items, value)
+    local normalizedValue = tostring(value or "")
+    if normalizedValue == "" then
+        return false
+    end
+
+    for index = 1, #(items or {}) do
+        local item = items[index]
+        if tostring(item and item.value or "") == normalizedValue then
+            return true
+        end
+        if item and dropdownItemsContainValue(item.children, normalizedValue) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function buildGuildRankItems(eligibleRanks)
+    local items = {
+        { label = "Select an eligible RPE Guild Rank", value = "" },
+    }
+    local groups = {}
+    local orderedGroups = {}
+    local seen = {}
+
+    for index = 1, #(eligibleRanks or {}) do
+        local match = eligibleRanks[index]
+        local reference = tostring(match and match.ref or "")
+        if reference ~= "" and not seen[reference] then
+            seen[reference] = true
+            local datasetId = tostring(match and match.datasetId or "")
+            local groupKey = datasetId ~= "" and datasetId or tostring(match and match.datasetName or "")
+            if groupKey == "" then
+                groupKey = reference:match("^([^:]+):") or reference
+            end
+            local datasetLabel = tostring(match and match.datasetName or "")
+            if datasetLabel == "" then
+                datasetLabel = getDatasetLabel(match and match.dataset)
+            end
+
+            local group = groups[groupKey]
+            if not group then
+                group = {
+                    label = datasetLabel ~= "" and datasetLabel or groupKey,
+                    value = "guild-admin-ranks-dataset:" .. groupKey,
+                    children = {},
+                }
+                groups[groupKey] = group
+                orderedGroups[#orderedGroups + 1] = group
+            end
+
+            group.children[#group.children + 1] = {
+                label = getRankLabel(match),
+                value = reference,
+            }
+        end
+    end
+
+    for index = 1, #orderedGroups do
+        local group = orderedGroups[index]
+        items[#items + 1] = makeDatasetGroup(group.label, group.value, group.children)
     end
 
     return items
@@ -219,68 +351,120 @@ function AdminPage:Build(parent, owner)
     })
     self.RootLayout:AddChild(self.RosterPanel)
 
-    self.RosterTitle = UI.CreateText(self.RosterPanel:GetContentFrame(), "RPEGuildRosterTitle", "Guild Roster (select a member for Guild Admin)", {
+    self.RosterContentLayout = UI.CreateLayout(UI.VerticalLayoutGroup, self.RosterPanel:GetContentFrame(), "RPEGuildRosterContentLayout", {
+        spacing = 2,
+        padding = 0,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    UI.Utils.AnchorFill(self.RosterContentLayout, self.RosterPanel:GetContentFrame(), 0, 0, 0, 0)
+
+    self.RosterTitle = UI.CreateText(self.RosterContentLayout:GetFrame(), "RPEGuildRosterTitle", "Guild Roster (select a member for Guild Admin)", {
         width = 512,
         height = 18,
+        expandWidth = true,
         textColor = UI.ResolveColor(nil, "text.primary"),
     })
-    self.RosterList = UI.ScrollLayout:New({
-        name = "RPEGuildRosterList",
+    self.RosterContentLayout:AddChild(self.RosterTitle)
+
+    self.RosterTable = UI.Table:New({
+        name = "RPEGuildRosterTable",
         width = 512,
         height = 216,
+        expandWidth = true,
+        expandHeight = true,
+        weight = 1,
         visibleRows = 9,
         rowHeight = 22,
         rowSpacing = 1,
         border = false,
-        rowElementClass = UI.ScrollListEntry,
-        categoryWidth = 120,
-        statusWidth = 94,
-        categoryInsetLeft = 4,
-        statusInsetRight = 4,
+        headerHeight = 20,
+        columns = {
+            {
+                key = "name",
+                label = "Character",
+                width = 104,
+                sortable = true,
+                sortValue = function(member)
+                    return tostring(member and member.name or "")
+                end,
+            },
+            {
+                key = "rankName",
+                label = "Guild Rank",
+                width = 110,
+                sortable = true,
+                sortValue = function(member)
+                    return tonumber(member and member.rankIndex) or math.huge
+                end,
+            },
+            {
+                key = "level",
+                label = "Level",
+                width = 44,
+                justifyH = "RIGHT",
+                sortable = true,
+                sortValue = function(member)
+                    return tonumber(member and member.level) or 0
+                end,
+            },
+            {
+                key = "className",
+                label = "Class",
+                width = 78,
+                sortable = true,
+            },
+            {
+                key = "zone",
+                label = "Zone",
+                width = 100,
+                sortable = true,
+            },
+            {
+                key = "online",
+                label = "Status",
+                width = 64,
+                sortable = true,
+                value = function(member)
+                    return member and member.online == true and "Online" or "Offline"
+                end,
+                cellTextColor = function(_, member)
+                    return member and member.online == true and "success" or "text.muted"
+                end,
+            },
+        },
     })
-    self.RosterList:SetParent(self.RosterPanel:GetContentFrame())
-    self.RosterList:SetRowRenderer(function(row, member, memberIndex)
-        local name = tostring(member and member.name or ("Member " .. tostring(memberIndex)))
-        local details = tostring(member and member.rankName or "")
-        if member and member.zone ~= "" then
-            details = details ~= "" and (details .. " - " .. member.zone) or member.zone
-        end
-        row:SetCategory(name)
-        row:SetTestName(details)
-        row:SetStatus(member and member.online and "Online" or "Offline")
-        row:SetDetail(("Level %d\nClass: %s"):format(
-            tonumber(member and member.level) or 0,
-            tostring(member and member.className or "Unknown")
-        ))
-
-        local frame = row.GetFrame and row:GetFrame() or nil
-        if frame then
-            frame:EnableMouse(true)
-            frame:SetScript("OnMouseUp", function(_, button)
-                if button == "LeftButton" then
-                    self.SelectedMemberIndex = memberIndex
-                    self.SelectedMemberKey = nil
-                    self.SelectedMemberAdminState = nil
-                    self.SelectedMemberProfileState = { achievements = {}, skills = {}, progression = nil }
-                    self.SelectedMemberQueryPending = false
-                    self.PendingAdminAction = nil
-                    self.SelectedGuildRankRef = ""
-                    self.SelectedAchievementRef = ""
-                    self.SelectedSkillRef = ""
-                    self.SelectedItemRef = ""
-                    self.SelectedProgressionEntryId = ""
-                    self.SelectedProgressionSlot = 1
-                    self.SelectedProgressionSpellRef = ""
-                    self.EligibleGuildRanks = {}
-                    self.AdminActionMessage = nil
-                    self:Refresh()
-                end
-            end)
-            setSelectedRow(row, tonumber(self.SelectedMemberIndex) == tonumber(memberIndex))
-        end
+    self.RosterTable:SetParent(self.RosterContentLayout:GetFrame())
+    self.RosterTable:Create()
+    self.RosterTable:SetSort("rankName", "ascending")
+    self.RosterTable.bodyScroll:SetRowRenderer(function(row, item, absoluteIndex)
+        local member = item and item.rowData or {}
+        local memberIndex = item and item.sourceIndex or absoluteIndex
+        row:SetColumns(self.RosterTable:GetResolvedColumns())
+        row:SetRowData(member, memberIndex)
+        row:SetRowMouseUpHandler(function(_, button, rowData, rowIndex)
+            if button == "LeftButton" then
+                self.SelectedMemberIndex = rowIndex
+                self.SelectedMemberKey = nil
+                self.SelectedMemberAdminState = nil
+                self.SelectedMemberProfileState = { achievements = {}, skills = {}, progression = nil }
+                self.SelectedMemberQueryPending = false
+                self.PendingAdminAction = nil
+                self.SelectedGuildRankRef = ""
+                self.SelectedAchievementRef = ""
+                self.SelectedSkillRef = ""
+                self.SelectedItemRef = ""
+                self.SelectedProgressionEntryId = ""
+                self.SelectedProgressionSlot = 1
+                self.SelectedProgressionSpellRef = ""
+                self.EligibleGuildRanks = {}
+                self.AdminActionMessage = nil
+                self:Refresh()
+            end
+        end)
+        setSelectedTableRow(row, tonumber(self.SelectedMemberIndex) == tonumber(memberIndex))
     end)
-    self.RosterList:Create()
-    UI.Utils.AnchorFill(self.RosterList, self.RosterPanel:GetContentFrame(), 0, 20, 0, 0)
+    self.RosterContentLayout:AddChild(self.RosterTable)
     self.RosterEmptyText = UI.CreateText(self.RosterPanel:GetContentFrame(), "RPEGuildRosterEmptyText", "", {
         width = 320,
         height = 30,
@@ -297,58 +481,38 @@ function AdminPage:Build(parent, owner)
         showBorder = false,
     })
     self.RootLayout:AddChild(self.AdminSectionsPanel)
-    self.AdminSectionsLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminSectionsLayout", {
-        width = 512,
+    self.AdminControlsLayout = UI.CreateLayout(UI.VerticalLayoutGroup, self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminControlsLayout", {
         spacing = 4,
+        padding = 0,
         fitChildrenWidth = true,
         fitChildrenHeight = false,
-        height = 22,
     })
-    self.AdminSectionsLayout:GetFrame():SetPoint("BOTTOMLEFT", self.AdminSectionsPanel:GetContentFrame(), "BOTTOMLEFT", 2, 2)
-    local plannedSections = { "Achievements", "Skills", "Items" }
-    self.AdminSectionButtons = {}
-    for index = 1, #plannedSections do
-        local section = plannedSections[index]
-        local button = UI.CreateButton(self.AdminSectionsLayout:GetFrame(), "RPEGuildAdminPlanned" .. section .. "Button", section, 104, function()
-            self.AdminSection = section
-            self.AdminActionMessage = nil
-            self:Refresh()
-        end, {
-            height = 20,
-            fontSize = 8,
-        })
-        self.AdminSectionsLayout:AddChild(button)
-        self.AdminSectionButtons[#self.AdminSectionButtons + 1] = button
-    end
+    UI.Utils.AnchorFill(self.AdminControlsLayout, self.AdminSectionsPanel:GetContentFrame(), 0, 0, 0, 0)
 
-    self.SetGuildRankButton = UI.CreateButton(self.AdminSectionsLayout:GetFrame(), "RPEGuildAdminSetGuildRankButton", "Set Rank", 86, function()
-        self:SetSelectedGuildRank()
-    end, {
-        height = 20,
-        fontSize = 8,
-    })
-    self.AdminSectionsLayout:AddChild(self.SetGuildRankButton)
-
-    self.ClearGuildRankButton = UI.CreateButton(self.AdminSectionsLayout:GetFrame(), "RPEGuildAdminClearGuildRankButton", "Clear Rank", 86, function()
-        self:ClearSelectedGuildRank()
-    end, {
-        height = 20,
-        fontSize = 8,
-    })
-
-    self.AdminSectionsLayout:AddChild(self.ClearGuildRankButton)
-    self.AdminSectionsText = UI.CreateText(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminSectionsText", "", {
+    self.AdminSectionsText = UI.CreateText(self.AdminControlsLayout:GetFrame(), "RPEGuildAdminSectionsText", "", {
         width = 512,
         height = 30,
+        expandWidth = true,
         justifyH = "LEFT",
         wordWrap = true,
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
-    self.AdminSectionsText:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 2, -2)
+    self.AdminControlsLayout:AddChild(self.AdminSectionsText)
 
-    self.GuildRankDropdown = UI.CreateDropdown(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminGuildRankDropdown", {
-        width = 300,
+    self.GuildRankControlsLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, self.AdminControlsLayout:GetFrame(), "RPEGuildAdminGuildRankControlsLayout", {
+        width = 512,
         height = 20,
+        expandWidth = true,
+        spacing = 4,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    self.AdminControlsLayout:AddChild(self.GuildRankControlsLayout)
+    self.GuildRankDropdown = UI.CreateDropdown(self.GuildRankControlsLayout:GetFrame(), "RPEGuildAdminGuildRankDropdown", {
+        width = 0,
+        height = 20,
+        expandWidth = true,
+        weight = 1,
         placeholder = "Select an eligible RPE Guild Rank",
         items = {
             { label = "Select an eligible RPE Guild Rank", value = "" },
@@ -359,11 +523,45 @@ function AdminPage:Build(parent, owner)
             self:RefreshActionControls()
         end,
     })
-    self.GuildRankDropdown:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 2, -35)
+    self.GuildRankControlsLayout:AddChild(self.GuildRankDropdown)
+    self.SetGuildRankButton = UI.CreateButton(self.GuildRankControlsLayout:GetFrame(), "RPEGuildAdminSetGuildRankButton", "Set Rank", 86, function()
+        self:SetSelectedGuildRank()
+    end, {
+        height = 20,
+        fontSize = 8,
+    })
+    self.GuildRankControlsLayout:AddChild(self.SetGuildRankButton)
+    self.ClearGuildRankButton = UI.CreateButton(self.GuildRankControlsLayout:GetFrame(), "RPEGuildAdminClearGuildRankButton", "Clear Rank", 86, function()
+        self:ClearSelectedGuildRank()
+    end, {
+        height = 20,
+        fontSize = 8,
+    })
+    self.GuildRankControlsLayout:AddChild(self.ClearGuildRankButton)
 
-    self.AchievementDropdown = UI.CreateDropdown(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminAchievementDropdown", {
-        width = 250,
+    self.AdminSectionLayouts = {}
+    self.AdminSectionVisibleHeights = {
+        Achievements = 18,
+        Skills = 18,
+        Items = 18,
+        Progression = 40,
+    }
+
+    self.AchievementActionLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, self.AdminControlsLayout:GetFrame(), "RPEGuildAdminAchievementActionLayout", {
+        width = 512,
+        height = self.AdminSectionVisibleHeights.Achievements,
+        expandWidth = true,
+        spacing = 4,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    self.AdminSectionLayouts.Achievements = self.AchievementActionLayout
+    self.AdminControlsLayout:AddChild(self.AchievementActionLayout)
+    self.AchievementDropdown = UI.CreateDropdown(self.AchievementActionLayout:GetFrame(), "RPEGuildAdminAchievementDropdown", {
+        width = 0,
         height = 18,
+        expandWidth = true,
+        weight = 1,
         placeholder = "Select an Achievement",
         items = {
             { label = "Select an Achievement", value = "" },
@@ -374,26 +572,36 @@ function AdminPage:Build(parent, owner)
             self:RefreshActionControls()
         end,
     })
-    self.AchievementDropdown:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 2, -58)
-
-    self.AchievementStateText = UI.CreateText(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminAchievementStateText", "", {
-        width = 150,
+    self.AchievementActionLayout:AddChild(self.AchievementDropdown)
+    self.AchievementStateText = UI.CreateText(self.AchievementActionLayout:GetFrame(), "RPEGuildAdminAchievementStateText", "", {
+        width = 76,
         height = 18,
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
-    self.AchievementStateText:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 258, -58)
-
-    self.GrantAchievementButton = UI.CreateButton(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminGrantAchievementButton", "Grant", 70, function()
+    self.AchievementActionLayout:AddChild(self.AchievementStateText)
+    self.GrantAchievementButton = UI.CreateButton(self.AchievementActionLayout:GetFrame(), "RPEGuildAdminGrantAchievementButton", "Grant", 70, function()
         self:GrantSelectedAchievement()
     end, {
         height = 18,
         fontSize = 8,
     })
-    self.GrantAchievementButton:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 412, -58)
+    self.AchievementActionLayout:AddChild(self.GrantAchievementButton)
 
-    self.SkillDropdown = UI.CreateDropdown(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminSkillDropdown", {
-        width = 250,
+    self.SkillActionLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, self.AdminControlsLayout:GetFrame(), "RPEGuildAdminSkillActionLayout", {
+        width = 512,
+        height = self.AdminSectionVisibleHeights.Skills,
+        expandWidth = true,
+        spacing = 4,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    self.AdminSectionLayouts.Skills = self.SkillActionLayout
+    self.AdminControlsLayout:AddChild(self.SkillActionLayout)
+    self.SkillDropdown = UI.CreateDropdown(self.SkillActionLayout:GetFrame(), "RPEGuildAdminSkillDropdown", {
+        width = 0,
         height = 18,
+        expandWidth = true,
+        weight = 1,
         placeholder = "Select a Skill",
         items = {
             { label = "Select a Skill", value = "" },
@@ -404,34 +612,43 @@ function AdminPage:Build(parent, owner)
             self:RefreshActionControls()
         end,
     })
-    self.SkillDropdown:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 2, -80)
-
-    self.SkillLevelText = UI.CreateText(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminSkillLevelText", "Level: --", {
+    self.SkillActionLayout:AddChild(self.SkillDropdown)
+    self.SkillLevelText = UI.CreateText(self.SkillActionLayout:GetFrame(), "RPEGuildAdminSkillLevelText", "Level: --", {
         width = 74,
         height = 18,
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
-    self.SkillLevelText:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 258, -80)
-
-    self.DecreaseSkillButton = UI.CreateButton(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminDecreaseSkillButton", "-1", 42, function()
+    self.SkillActionLayout:AddChild(self.SkillLevelText)
+    self.DecreaseSkillButton = UI.CreateButton(self.SkillActionLayout:GetFrame(), "RPEGuildAdminDecreaseSkillButton", "-1", 42, function()
         self:AdjustSelectedSkill(-1)
     end, {
         height = 18,
         fontSize = 8,
     })
-    self.DecreaseSkillButton:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 334, -80)
-
-    self.IncreaseSkillButton = UI.CreateButton(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminIncreaseSkillButton", "+1", 42, function()
+    self.SkillActionLayout:AddChild(self.DecreaseSkillButton)
+    self.IncreaseSkillButton = UI.CreateButton(self.SkillActionLayout:GetFrame(), "RPEGuildAdminIncreaseSkillButton", "+1", 42, function()
         self:AdjustSelectedSkill(1)
     end, {
         height = 18,
         fontSize = 8,
     })
-    self.IncreaseSkillButton:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 380, -80)
+    self.SkillActionLayout:AddChild(self.IncreaseSkillButton)
 
-    self.ItemDropdown = UI.CreateDropdown(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminItemDropdown", {
-        width = 250,
+    self.ItemActionLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, self.AdminControlsLayout:GetFrame(), "RPEGuildAdminItemActionLayout", {
+        width = 512,
+        height = self.AdminSectionVisibleHeights.Items,
+        expandWidth = true,
+        spacing = 4,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    self.AdminSectionLayouts.Items = self.ItemActionLayout
+    self.AdminControlsLayout:AddChild(self.ItemActionLayout)
+    self.ItemDropdown = UI.CreateDropdown(self.ItemActionLayout:GetFrame(), "RPEGuildAdminItemDropdown", {
+        width = 0,
         height = 18,
+        expandWidth = true,
+        weight = 1,
         placeholder = "Select an Item",
         items = {
             { label = "Select an Item", value = "" },
@@ -442,9 +659,8 @@ function AdminPage:Build(parent, owner)
             self:RefreshActionControls()
         end,
     })
-    self.ItemDropdown:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 2, -102)
-
-    self.ItemQuantityInput = UI.CreateTextInput(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminItemQuantityInput", {
+    self.ItemActionLayout:AddChild(self.ItemDropdown)
+    self.ItemQuantityInput = UI.CreateTextInput(self.ItemActionLayout:GetFrame(), "RPEGuildAdminItemQuantityInput", {
         width = 62,
         height = 18,
         text = "1",
@@ -454,19 +670,39 @@ function AdminPage:Build(parent, owner)
     self.ItemQuantityInput:SetScript("OnTextChanged", function()
         self:RefreshActionControls()
     end)
-    self.ItemQuantityInput:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 258, -102)
-
-    self.GiveItemButton = UI.CreateButton(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminGiveItemButton", "Give", 70, function()
+    self.ItemActionLayout:AddChild(self.ItemQuantityInput)
+    self.GiveItemButton = UI.CreateButton(self.ItemActionLayout:GetFrame(), "RPEGuildAdminGiveItemButton", "Give", 70, function()
         self:GiveSelectedItem()
     end, {
         height = 18,
         fontSize = 8,
     })
-    self.GiveItemButton:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 326, -102)
+    self.ItemActionLayout:AddChild(self.GiveItemButton)
 
-    self.ProgressionEntryDropdown = UI.CreateDropdown(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminProgressionEntryDropdown", {
-        width = 220,
+    self.ProgressionActionLayout = UI.CreateLayout(UI.VerticalLayoutGroup, self.AdminControlsLayout:GetFrame(), "RPEGuildAdminProgressionActionLayout", {
+        width = 512,
+        height = self.AdminSectionVisibleHeights.Progression,
+        expandWidth = true,
+        spacing = 4,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    self.AdminSectionLayouts.Progression = self.ProgressionActionLayout
+    self.AdminControlsLayout:AddChild(self.ProgressionActionLayout)
+    self.ProgressionEntryActionLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, self.ProgressionActionLayout:GetFrame(), "RPEGuildAdminProgressionEntryActionLayout", {
+        width = 512,
         height = 18,
+        expandWidth = true,
+        spacing = 4,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    self.ProgressionActionLayout:AddChild(self.ProgressionEntryActionLayout)
+    self.ProgressionEntryDropdown = UI.CreateDropdown(self.ProgressionEntryActionLayout:GetFrame(), "RPEGuildAdminProgressionEntryDropdown", {
+        width = 0,
+        height = 18,
+        expandWidth = true,
+        weight = 1,
         placeholder = "Select a Progression entry",
         items = {
             { label = "Select a Progression entry", value = "" },
@@ -478,9 +714,8 @@ function AdminPage:Build(parent, owner)
             self:RefreshActionControls()
         end,
     })
-    self.ProgressionEntryDropdown:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 2, -124)
-
-    self.ProgressionSlotDropdown = UI.CreateDropdown(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminProgressionSlotDropdown", {
+    self.ProgressionEntryActionLayout:AddChild(self.ProgressionEntryDropdown)
+    self.ProgressionSlotDropdown = UI.CreateDropdown(self.ProgressionEntryActionLayout:GetFrame(), "RPEGuildAdminProgressionSlotDropdown", {
         width = 66,
         height = 18,
         placeholder = "Slot",
@@ -492,27 +727,36 @@ function AdminPage:Build(parent, owner)
             self:RefreshActionControls()
         end,
     })
-    self.ProgressionSlotDropdown:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 228, -124)
-
-    self.AssignProgressionButton = UI.CreateButton(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminAssignProgressionButton", "Assign", 68, function()
+    self.ProgressionEntryActionLayout:AddChild(self.ProgressionSlotDropdown)
+    self.AssignProgressionButton = UI.CreateButton(self.ProgressionEntryActionLayout:GetFrame(), "RPEGuildAdminAssignProgressionButton", "Assign", 68, function()
         self:AssignSelectedProgressionEntry()
     end, {
         height = 18,
         fontSize = 8,
     })
-    self.AssignProgressionButton:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 300, -124)
-
-    self.LockProgressionButton = UI.CreateButton(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminLockProgressionButton", "Unlock", 80, function()
+    self.ProgressionEntryActionLayout:AddChild(self.AssignProgressionButton)
+    self.LockProgressionButton = UI.CreateButton(self.ProgressionEntryActionLayout:GetFrame(), "RPEGuildAdminLockProgressionButton", "Unlock", 80, function()
         self:ToggleSelectedProgressionEntryLock()
     end, {
         height = 18,
         fontSize = 8,
     })
-    self.LockProgressionButton:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 372, -124)
+    self.ProgressionEntryActionLayout:AddChild(self.LockProgressionButton)
 
-    self.ProgressionSpellDropdown = UI.CreateDropdown(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminProgressionSpellDropdown", {
-        width = 220,
+    self.ProgressionSpellActionLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, self.ProgressionActionLayout:GetFrame(), "RPEGuildAdminProgressionSpellActionLayout", {
+        width = 512,
         height = 18,
+        expandWidth = true,
+        spacing = 4,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    self.ProgressionActionLayout:AddChild(self.ProgressionSpellActionLayout)
+    self.ProgressionSpellDropdown = UI.CreateDropdown(self.ProgressionSpellActionLayout:GetFrame(), "RPEGuildAdminProgressionSpellDropdown", {
+        width = 0,
+        height = 18,
+        expandWidth = true,
+        weight = 1,
         placeholder = "Selected spell",
         items = {
             { label = "Selected spell", value = "" },
@@ -522,21 +766,62 @@ function AdminPage:Build(parent, owner)
             self:RefreshActionControls()
         end,
     })
-    self.ProgressionSpellDropdown:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 2, -146)
-
-    self.ClearProgressionSpellButton = UI.CreateButton(self.AdminSectionsPanel:GetContentFrame(), "RPEGuildAdminClearProgressionSpellButton", "Clear", 68, function()
+    self.ProgressionSpellActionLayout:AddChild(self.ProgressionSpellDropdown)
+    self.ClearProgressionSpellButton = UI.CreateButton(self.ProgressionSpellActionLayout:GetFrame(), "RPEGuildAdminClearProgressionSpellButton", "Clear", 68, function()
         self:ClearSelectedProgressionSpell()
     end, {
         height = 18,
         fontSize = 8,
     })
-    self.ClearProgressionSpellButton:GetFrame():SetPoint("TOPLEFT", self.AdminSectionsPanel:GetContentFrame(), "TOPLEFT", 228, -146)
+    self.ProgressionSpellActionLayout:AddChild(self.ClearProgressionSpellButton)
+
+    self.AdminSectionsLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, self.AdminControlsLayout:GetFrame(), "RPEGuildAdminSectionsLayout", {
+        width = 512,
+        height = 20,
+        expandWidth = true,
+        spacing = 4,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    self.AdminControlsLayout:AddChild(self.AdminSectionsLayout)
+    local plannedSections = { "Achievements", "Skills", "Items", "Progression" }
+    self.AdminSectionButtons = {}
+    for index = 1, #plannedSections do
+        local section = plannedSections[index]
+        local button = UI.CreateButton(self.AdminSectionsLayout:GetFrame(), "RPEGuildAdminPlanned" .. section .. "Button", section, 100, function()
+            self.AdminSection = section
+            self.AdminActionMessage = nil
+            self:Refresh()
+        end, {
+            height = 20,
+            fontSize = 8,
+        })
+        self.AdminSectionsLayout:AddChild(button)
+        self.AdminSectionButtons[#self.AdminSectionButtons + 1] = button
+    end
 
     self:Refresh()
     return self.frame
 end
 
 function AdminPage:RefreshActionControls()
+    if self.AdminControlsLayout and self.AdminSectionLayouts then
+        for section, layout in pairs(self.AdminSectionLayouts) do
+            local visible = section == self.AdminSection
+            local height = visible and self.AdminSectionVisibleHeights[section] or 0
+            layout.options.height = height
+            if layout:GetFrame() then
+                layout:GetFrame():SetHeight(height)
+                if visible then
+                    layout:Show()
+                else
+                    layout:Hide()
+                end
+            end
+        end
+        self.AdminControlsLayout:RefreshLayout()
+    end
+
     local selectedMember = self.SelectedMember
     local canAdminister = self.IsOfficer == true
         and selectedMember ~= nil
@@ -1069,9 +1354,25 @@ function AdminPage:Refresh()
     local Guild = Client.Guild
     local identity = Guild and Guild:GetLocalGuildIdentity() or { inGuild = false }
     local isOfficer = Guild and Guild:IsLocalPlayerOfficer() == true or false
-    local roster = Guild and Guild:GetRoster() or {}
-    local selectedMember = roster[self.SelectedMemberIndex]
+    local roster = buildSortedRoster(Guild and Guild:GetRoster() or {})
+    local selectedMember = nil
+    local selectedMemberIndex = nil
+    if self.SelectedMemberKey then
+        for index = 1, #roster do
+            local candidate = roster[index]
+            if normalizeMemberName(candidate and candidate.name) == self.SelectedMemberKey then
+                selectedMember = candidate
+                selectedMemberIndex = index
+                break
+            end
+        end
+    end
+    if not selectedMember then
+        selectedMemberIndex = tonumber(self.SelectedMemberIndex)
+        selectedMember = roster[selectedMemberIndex]
+    end
     local selectedMemberKey = normalizeMemberName(selectedMember and selectedMember.name)
+    selectedMemberKey = selectedMemberKey ~= "" and selectedMemberKey or nil
     local wowRankIndex = tonumber(selectedMember and selectedMember.rankIndex)
 
     if selectedMemberKey ~= self.SelectedMemberKey then
@@ -1105,6 +1406,7 @@ function AdminPage:Refresh()
         self.AdminActionMessage = nil
     end
     self.SelectedMemberWowRankIndex = wowRankIndex
+    self.SelectedMemberIndex = selectedMemberIndex
     self.SelectedMember = selectedMember
     self.IsOfficer = isOfficer
 
@@ -1115,16 +1417,7 @@ function AdminPage:Refresh()
     end
     self.EligibleGuildRanks = eligibleRanks
 
-    local rankItems = {
-        { label = "Select an eligible RPE Guild Rank", value = "" },
-    }
-    for index = 1, #eligibleRanks do
-        local match = eligibleRanks[index]
-        rankItems[#rankItems + 1] = {
-            label = getRankLabel(match),
-            value = tostring(match and match.ref or ""),
-        }
-    end
+    local rankItems = buildGuildRankItems(eligibleRanks)
     if self.GuildRankDropdown then
         self.GuildRankDropdown:SetItems(rankItems)
         if not containsRankRef(eligibleRanks, self.SelectedGuildRankRef) then
@@ -1138,13 +1431,7 @@ function AdminPage:Refresh()
     local itemItems = buildReferenceItems("items")
     if self.AchievementDropdown then
         self.AchievementDropdown:SetItems(achievementItems)
-        local achievementFound = false
-        for index = 1, #achievementItems do
-            if tostring(achievementItems[index].value or "") == tostring(self.SelectedAchievementRef or "") then
-                achievementFound = true
-                break
-            end
-        end
+        local achievementFound = dropdownItemsContainValue(achievementItems, self.SelectedAchievementRef)
         if not achievementFound then
             self.SelectedAchievementRef = ""
         end
@@ -1152,13 +1439,7 @@ function AdminPage:Refresh()
     end
     if self.SkillDropdown then
         self.SkillDropdown:SetItems(skillItems)
-        local skillFound = false
-        for index = 1, #skillItems do
-            if tostring(skillItems[index].value or "") == tostring(self.SelectedSkillRef or "") then
-                skillFound = true
-                break
-            end
-        end
+        local skillFound = dropdownItemsContainValue(skillItems, self.SelectedSkillRef)
         if not skillFound then
             self.SelectedSkillRef = ""
         end
@@ -1166,13 +1447,7 @@ function AdminPage:Refresh()
     end
     if self.ItemDropdown then
         self.ItemDropdown:SetItems(itemItems)
-        local itemFound = false
-        for index = 1, #itemItems do
-            if tostring(itemItems[index].value or "") == tostring(self.SelectedItemRef or "") then
-                itemFound = true
-                break
-            end
-        end
+        local itemFound = dropdownItemsContainValue(itemItems, self.SelectedItemRef)
         if not itemFound then
             self.SelectedItemRef = ""
         end
@@ -1301,7 +1576,7 @@ function AdminPage:Refresh()
     else
         self.RosterTitle:SetText("Guild Roster (select a member for Guild Admin)")
     end
-    self.RosterList:SetItems(roster)
+    self.RosterTable:SetRows(roster)
     self.RosterEmptyText:SetText(identity.inGuild and #roster == 0 and "No guild roster data is available yet." or "")
 
     local adminText
