@@ -7,14 +7,15 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
 local Client = Addon.Client or {}
+local InspectorShared = DataEditor.ItemInspectorShared
 local GuildSettingClass = Addon.Internal
     and Addon.Internal.Database
     and Addon.Internal.Database.Classes
     and Addon.Internal.Database.Classes.GuildSetting
 
-local INSPECTOR_SIDE_PADDING = 8
-local CONTROL_HEIGHT = 20
-local FIELD_WIDTH = 236
+local INSPECTOR_SIDE_PADDING = InspectorShared.INSPECTOR_SIDE_PADDING
+local CONTROL_HEIGHT = InspectorShared.CONTROL_HEIGHT
+local FIELD_WIDTH = InspectorShared.FIELD_WIDTH
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local INSPECTOR_PAGE_DEFINITIONS = {
@@ -93,14 +94,7 @@ local function applyTable(target, source)
 end
 
 local function createLabel(parent, name, text, width)
-    return UI.CreateText(parent, name, text, {
-        fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
-        fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Body) or 8,
-        textColor = UI.ResolveColor(nil, "text.secondary"),
-        width = width or FIELD_WIDTH,
-        height = 12,
-        justifyH = "LEFT",
-    })
+    return InspectorShared.buildLabel(parent, name, text, width)
 end
 
 local function setTextElementEnabled(element, enabled)
@@ -158,18 +152,7 @@ local function setElementGroupVisible(group, visible)
 end
 
 local function createFieldGroup(parent, name, labelText, height)
-    local groupHeight = 14 + 2 + (height or CONTROL_HEIGHT)
-    local group = UI.CreateLayout(UI.VerticalLayoutGroup, parent:GetFrame(), name, {
-        width = FIELD_WIDTH,
-        height = groupHeight,
-        spacing = 2,
-        fitChildrenWidth = true,
-        fitChildrenHeight = false,
-    })
-    group._visibleHeight = groupHeight
-    parent:AddChild(group)
-    group:AddChild(createLabel(group:GetFrame(), name .. "Label", labelText))
-    return group
+    return InspectorShared.createEquipmentFieldGroup(parent, name, labelText, height)
 end
 
 local function setRowSelection(row, selected)
@@ -432,7 +415,7 @@ end
 
 function DataEditor:BuildGuildSettingInspectorGeneralPage(parent)
     local root = UI.CreateLayout(UI.VerticalLayoutGroup, parent, "RPEDataEditorGuildSettingInspectorGeneralLayout", {
-        spacing = 3,
+        spacing = 6,
         fitChildrenWidth = true,
         fitChildrenHeight = false,
     })
@@ -548,24 +531,25 @@ end
 
 function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     local root = UI.CreateLayout(UI.VerticalLayoutGroup, parent, "RPEDataEditorGuildSettingInspectorRequisitionsLayout", {
-        spacing = 2,
+        spacing = 6,
         fitChildrenWidth = true,
         fitChildrenHeight = false,
     })
     UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
 
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionsLabel", "Requisitions"))
-    local requisitionPanel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionPanel", {
-        width = FIELD_WIDTH, height = 64, contentInset = 2, showBorder = false,
-    })
-    root:AddChild(requisitionPanel)
+    local _, requisitionSection = InspectorShared.createInspectorSection(
+        root,
+        "RPEDataEditorGuildSettingInspectorRequisitionPanel",
+        "Requisitions",
+        82
+    )
     self.GuildSettingInspectorRequisitionScroll = UI.ScrollLayout:New({
         name = "RPEDataEditorGuildSettingInspectorRequisitionScroll",
-        width = FIELD_WIDTH - 4, height = 60, visibleRows = 3, autoFitRows = true,
+        width = FIELD_WIDTH - 12, height = 54, visibleRows = 3, autoFitRows = true,
         rowHeight = 18, rowSpacing = 0, border = false, rowElementClass = UI.ScrollListEntry,
-        categoryWidth = 112, statusWidth = 54, categoryInsetLeft = 4, statusInsetRight = 4,
+        categoryWidth = 108, statusWidth = 50, categoryInsetLeft = 4, statusInsetRight = 4,
     })
-    self.GuildSettingInspectorRequisitionScroll:SetParent(requisitionPanel:GetContentFrame())
+    self.GuildSettingInspectorRequisitionScroll:SetParent(requisitionSection:GetFrame())
     self.GuildSettingInspectorRequisitionScroll:SetRowRenderer(function(row, requisition, itemIndex)
         row:SetCategory(tostring(requisition and requisition.id or "-"))
         row:SetTestName("")
@@ -585,7 +569,7 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
         end
     end)
     self.GuildSettingInspectorRequisitionScroll:Create()
-    UI.Utils.AnchorFill(self.GuildSettingInspectorRequisitionScroll, requisitionPanel:GetContentFrame(), 0, 0, 0, 0)
+    requisitionSection:AddChild(self.GuildSettingInspectorRequisitionScroll)
 
     local requisitionActions = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionActions", {
         spacing = 2, height = 18, fitChildrenWidth = true, fitChildrenHeight = false,
@@ -713,18 +697,19 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     end
     root:AddChild(numberInputs)
 
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorCostsLabel", "Costs (Currency Ref / Amount)"))
-    local costPanel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorCostPanel", {
-        width = FIELD_WIDTH, height = 46, contentInset = 2, showBorder = false,
-    })
-    root:AddChild(costPanel)
+    local _, costSection = InspectorShared.createInspectorSection(
+        root,
+        "RPEDataEditorGuildSettingInspectorCostPanel",
+        "Costs (Currency Ref / Amount)",
+        70
+    )
     self.GuildSettingInspectorCostScroll = UI.ScrollLayout:New({
         name = "RPEDataEditorGuildSettingInspectorCostScroll",
-        width = FIELD_WIDTH - 4, height = 42, visibleRows = 2, autoFitRows = true,
+        width = FIELD_WIDTH - 12, height = 42, visibleRows = 2, autoFitRows = true,
         rowHeight = 18, rowSpacing = 0, border = false, rowElementClass = UI.ScrollListEntry,
-        categoryWidth = 172, statusWidth = 48, categoryInsetLeft = 4, statusInsetRight = 4,
+        categoryWidth = 166, statusWidth = 42, categoryInsetLeft = 4, statusInsetRight = 4,
     })
-    self.GuildSettingInspectorCostScroll:SetParent(costPanel:GetContentFrame())
+    self.GuildSettingInspectorCostScroll:SetParent(costSection:GetFrame())
     self.GuildSettingInspectorCostScroll:SetRowRenderer(function(row, cost, itemIndex)
         row:SetCategory(tostring(cost and cost.currencyRef or ""))
         row:SetTestName("")
@@ -743,7 +728,7 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
         end
     end)
     self.GuildSettingInspectorCostScroll:Create()
-    UI.Utils.AnchorFill(self.GuildSettingInspectorCostScroll, costPanel:GetContentFrame(), 0, 0, 0, 0)
+    costSection:AddChild(self.GuildSettingInspectorCostScroll)
 
     local costActions = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorCostActions", {
         spacing = 2, height = 18, fitChildrenWidth = true, fitChildrenHeight = false,
@@ -808,23 +793,24 @@ end
 
 function DataEditor:BuildGuildSettingInspectorDailyRewardsPage(parent)
     local root = UI.CreateLayout(UI.VerticalLayoutGroup, parent, "RPEDataEditorGuildSettingInspectorDailyRewardsLayout", {
-        spacing = 2, fitChildrenWidth = true, fitChildrenHeight = false,
+        spacing = 6, fitChildrenWidth = true, fitChildrenHeight = false,
     })
     UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
     self.GuildSettingInspectorDailyRewardsRoot = root
 
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardsLabel", "Daily Rewards"))
-    local panel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardPanel", {
-        width = FIELD_WIDTH, height = 72, contentInset = 2, showBorder = false,
-    })
-    root:AddChild(panel)
+    local _, dailyRewardSection = InspectorShared.createInspectorSection(
+        root,
+        "RPEDataEditorGuildSettingInspectorDailyRewardPanel",
+        "Daily Rewards",
+        96
+    )
     self.GuildSettingInspectorDailyRewardScroll = UI.ScrollLayout:New({
         name = "RPEDataEditorGuildSettingInspectorDailyRewardScroll",
-        width = FIELD_WIDTH - 4, height = 68, visibleRows = 4, autoFitRows = true,
+        width = FIELD_WIDTH - 12, height = 68, visibleRows = 4, autoFitRows = true,
         rowHeight = 18, rowSpacing = 0, border = false, rowElementClass = UI.ScrollListEntry,
-        categoryWidth = 112, statusWidth = 54, categoryInsetLeft = 4, statusInsetRight = 4,
+        categoryWidth = 108, statusWidth = 50, categoryInsetLeft = 4, statusInsetRight = 4,
     })
-    self.GuildSettingInspectorDailyRewardScroll:SetParent(panel:GetContentFrame())
+    self.GuildSettingInspectorDailyRewardScroll:SetParent(dailyRewardSection:GetFrame())
     self.GuildSettingInspectorDailyRewardScroll:SetRowRenderer(function(row, reward, itemIndex)
         row:SetCategory(tostring(reward and reward.id or "-"))
         row:SetTestName("")
@@ -843,7 +829,7 @@ function DataEditor:BuildGuildSettingInspectorDailyRewardsPage(parent)
         end
     end)
     self.GuildSettingInspectorDailyRewardScroll:Create()
-    UI.Utils.AnchorFill(self.GuildSettingInspectorDailyRewardScroll, panel:GetContentFrame(), 0, 0, 0, 0)
+    dailyRewardSection:AddChild(self.GuildSettingInspectorDailyRewardScroll)
 
     local actions = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardActions", {
         spacing = 2, height = 18, fitChildrenWidth = true, fitChildrenHeight = false,
@@ -1019,7 +1005,7 @@ end
 
 function DataEditor:BuildGuildSettingInspectorProgressionPage(parent)
     local root = UI.CreateLayout(UI.VerticalLayoutGroup, parent, "RPEDataEditorGuildSettingInspectorProgressionLayout", {
-        spacing = 2, fitChildrenWidth = true, fitChildrenHeight = false,
+        spacing = 6, fitChildrenWidth = true, fitChildrenHeight = false,
     })
     UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
 
@@ -1046,18 +1032,19 @@ function DataEditor:BuildGuildSettingInspectorProgressionPage(parent)
     end)
     root:AddChild(slotRow)
 
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionEntriesLabel", "Progression Entries"))
-    local entryPanel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionEntryPanel", {
-        width = FIELD_WIDTH, height = 58, contentInset = 2, showBorder = false,
-    })
-    root:AddChild(entryPanel)
+    local _, entrySection = InspectorShared.createInspectorSection(
+        root,
+        "RPEDataEditorGuildSettingInspectorProgressionEntryPanel",
+        "Progression Entries",
+        82
+    )
     self.GuildSettingInspectorProgressionEntryScroll = UI.ScrollLayout:New({
         name = "RPEDataEditorGuildSettingInspectorProgressionEntryScroll",
-        width = FIELD_WIDTH - 4, height = 54, visibleRows = 3, autoFitRows = true,
+        width = FIELD_WIDTH - 12, height = 54, visibleRows = 3, autoFitRows = true,
         rowHeight = 18, rowSpacing = 0, border = false, rowElementClass = UI.ScrollListEntry,
-        categoryWidth = 112, statusWidth = 54, categoryInsetLeft = 4, statusInsetRight = 4,
+        categoryWidth = 108, statusWidth = 50, categoryInsetLeft = 4, statusInsetRight = 4,
     })
-    self.GuildSettingInspectorProgressionEntryScroll:SetParent(entryPanel:GetContentFrame())
+    self.GuildSettingInspectorProgressionEntryScroll:SetParent(entrySection:GetFrame())
     self.GuildSettingInspectorProgressionEntryScroll:SetRowRenderer(function(row, entry, itemIndex)
         row:SetCategory(tostring(entry and entry.id or "-"))
         row:SetTestName("")
@@ -1077,7 +1064,7 @@ function DataEditor:BuildGuildSettingInspectorProgressionPage(parent)
         end
     end)
     self.GuildSettingInspectorProgressionEntryScroll:Create()
-    UI.Utils.AnchorFill(self.GuildSettingInspectorProgressionEntryScroll, entryPanel:GetContentFrame(), 0, 0, 0, 0)
+    entrySection:AddChild(self.GuildSettingInspectorProgressionEntryScroll)
 
     local entryActions = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionEntryActions", {
         spacing = 2, height = 18, fitChildrenWidth = true, fitChildrenHeight = false,

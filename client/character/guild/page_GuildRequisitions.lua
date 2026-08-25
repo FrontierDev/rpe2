@@ -9,6 +9,8 @@ local Client = Addon.Client
 local UI = Addon.UI or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
+local Database = Addon.Internal and Addon.Internal.Database or {}
+local TooltipBuilders = Addon.Client.UI and Addon.Client.UI.Tooltips or {}
 
 local RequisitionsPage = GuildUI.RequisitionsPage or {}
 GuildUI.RequisitionsPage = RequisitionsPage
@@ -25,6 +27,8 @@ local SHOP_ENTRY_HEIGHT = 34
 local SHOP_GRID_SPACING_X = 6
 local SHOP_GRID_SPACING_Y = 4
 local SHOP_PAGE_NAV_HEIGHT = 18
+local PANEL_HEADER_HEIGHT = 16
+local PANEL_CONTENT_INSET = 6
 
 local function isEffectivelyVisible(frame)
     if not frame then
@@ -72,7 +76,7 @@ local function normalizeCharacterLimit(value)
     return math.max(1, math.floor(numeric))
 end
 
-local function resolveCurrencyDisplayName(currencyRef)
+local function resolveCurrencyIcon(currencyRef)
     local normalizedRef = trimText(currencyRef)
     if type(Profile.NormalizeCurrencyKey) == "function" then
         local normalizeCallOk, resolvedRef = pcall(Profile.NormalizeCurrencyKey, currencyRef)
@@ -84,14 +88,30 @@ local function resolveCurrencyDisplayName(currencyRef)
     if type(Profile.ResolveCurrencyDefinition) == "function" then
         local resolveCallOk, definition = pcall(Profile.ResolveCurrencyDefinition, normalizedRef)
         if resolveCallOk and type(definition) == "table" and definition.isMissing ~= true then
-            local name = trimText(definition.name)
-            if name ~= "" then
-                return name
+            local icon = definition.icon
+            if type(icon) == "number" and icon > 0 then
+                return icon
+            elseif type(icon) == "string" and trimText(icon) ~= "" then
+                return trimText(icon)
             end
         end
     end
 
-    return normalizedRef ~= "" and normalizedRef or "Unknown currency"
+    return DEFAULT_ICON
+end
+
+local function formatInlineIcon(icon, size)
+    local iconSize = tonumber(size) or 12
+    if type(icon) == "number" then
+        return ("|T%d:%d:%d|t"):format(icon, iconSize, iconSize)
+    end
+
+    local texture = trimText(icon)
+    if texture ~= "" then
+        return ("|T%s:%d:%d|t"):format(texture, iconSize, iconSize)
+    end
+
+    return ("|T%s:%d:%d|t"):format(DEFAULT_ICON, iconSize, iconSize)
 end
 
 local function formatCompactCost(costs)
@@ -103,26 +123,49 @@ local function formatCompactCost(costs)
     for index = 1, #costs do
         local cost = type(costs[index]) == "table" and costs[index] or {}
         local amount = normalizeNonNegativeInteger(cost.amount, 0)
-        labels[#labels + 1] = ("%d %s"):format(amount, resolveCurrencyDisplayName(cost.currencyRef))
+        labels[#labels + 1] = ("%s %d"):format(formatInlineIcon(resolveCurrencyIcon(cost.currencyRef), 12), amount)
     end
 
-    return table.concat(labels, ", ")
+    return table.concat(labels, "  ")
+end
+
+local function parseDatasetQualifiedRef(value)
+    local datasetId, itemId = trimText(value):match("^([^:]+):(.+)$")
+    return datasetId, itemId
+end
+
+local function resolveDatasetDisplayName(dataset)
+    if dataset and type(Database.GetDatasetDisplayName) == "function" then
+        local callOk, name = pcall(Database.GetDatasetDisplayName, dataset)
+        if callOk and trimText(name) ~= "" then
+            return trimText(name)
+        end
+    end
+
+    return "Unknown Dataset"
 end
 
 local function resolveShopItemDisplay(requisition)
     local itemRef = trimText(requisition and requisition.itemRef)
+    local datasetId, itemId = parseDatasetQualifiedRef(itemRef)
     local itemName = "Unknown item"
     local itemIcon = DEFAULT_ICON
+    local resolvedDataset = nil
     local resolvedItem = nil
 
     if type(Registry.ResolveItemReference) == "function" then
-        local resolveCallOk, _, item = pcall(
+        local resolveCallOk, dataset, item = pcall(
             Registry.ResolveItemReference,
             Registry,
             requisition and requisition.itemRef or itemRef
         )
+        if resolveCallOk and type(dataset) == "table" then
+            resolvedDataset = dataset
+            datasetId = dataset.id or datasetId
+        end
         if resolveCallOk and type(item) == "table" then
             resolvedItem = item
+            itemId = item.id or itemId
             local resolvedName = trimText(item.name)
             if resolvedName ~= "" then
                 itemName = resolvedName
@@ -154,8 +197,48 @@ local function resolveShopItemDisplay(requisition)
     return {
         item = resolvedItem,
         itemRef = itemRef,
+        itemId = itemId,
+        dataset = resolvedDataset,
+        datasetId = datasetId,
+        datasetName = resolveDatasetDisplayName(resolvedDataset),
         name = itemName,
         icon = itemIcon,
+    }
+end
+
+local function buildShopItemTooltip(itemDisplay)
+    if not itemDisplay or not itemDisplay.item then
+        local missingRef = itemDisplay and itemDisplay.itemRef or ""
+        return {
+            type = "custom",
+            title = "Missing item",
+            lines = {
+                ("Missing item reference: %s"):format(missingRef ~= "" and missingRef or "-")
+            },
+        }
+    end
+
+    local builder = TooltipBuilders and TooltipBuilders.Item
+    if builder and type(builder.Build) == "function" then
+        local tooltip = builder:Build(itemDisplay.item, {
+            dataset = itemDisplay.dataset,
+            datasetId = itemDisplay.datasetId,
+            datasetName = itemDisplay.datasetName,
+            itemId = itemDisplay.itemId,
+            itemRef = itemDisplay.itemRef,
+        })
+        if tooltip then
+            return tooltip
+        end
+    end
+
+    return {
+        type = "custom",
+        title = trimText(itemDisplay.item.name) ~= "" and itemDisplay.item.name or "Unknown item",
+        lines = {
+            ("Dataset: %s"):format(itemDisplay.datasetName or "Unknown Dataset"),
+            ("Item reference: %s"):format(itemDisplay.itemRef ~= "" and itemDisplay.itemRef or "-"),
+        },
     }
 end
 
@@ -555,6 +638,7 @@ function RequisitionsPage:BindShopEntry(entry, requisition)
     entry.resolvedRequisition = requisition
     entry.resolvedItem = itemDisplay.item
     entry.resolvedItemRef = itemDisplay.itemRef
+    entry.resolvedItemDisplay = itemDisplay
     entry.resolvedItemName = itemDisplay.name
     entry.resolvedCostText = costText
     entry.resolvedEligibility = eligible
@@ -566,22 +650,7 @@ function RequisitionsPage:BindShopEntry(entry, requisition)
     entry:SetCostText(costText)
     entry:SetEnabled(eligible)
     entry:SetTooltip(function()
-        local currentName = entry.resolvedItemName or "Unknown item"
-        local currentCost = entry.resolvedCostText
-        return {
-            type = "custom",
-            title = currentName,
-            lines = {
-                {
-                    left = currentName,
-                    colorToken = "text.primary",
-                },
-                {
-                    left = currentCost ~= "" and currentCost or "No cost",
-                    colorToken = "text.secondary",
-                },
-            },
-        }
+        return buildShopItemTooltip(entry.resolvedItemDisplay)
     end)
     entry:Show()
 end
@@ -627,6 +696,7 @@ function RequisitionsPage:HideShopEntry(entry)
     entry.resolvedRequisition = nil
     entry.resolvedItem = nil
     entry.resolvedItemRef = nil
+    entry.resolvedItemDisplay = nil
     entry.resolvedItemName = nil
     entry.resolvedCostText = nil
     entry.resolvedEligibility = false
@@ -828,14 +898,36 @@ function RequisitionsPage:Build(parent, owner)
     })
     self.RootLayout:AddChild(self.MainContentLayout)
 
-    self.GuildShopHost = UI.CreateLayout(UI.VerticalLayoutGroup, self.MainContentLayout:GetFrame(), "RPEGuildShopHost", {
+    self.GuildShopPanel = UI.CreatePanel(self.MainContentLayout:GetFrame(), "RPEGuildShopPanel", {
         expandWidth = true,
         expandHeight = true,
         weight = 7,
+        contentInset = PANEL_CONTENT_INSET,
+        showBorder = true,
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+        panelBackgroundColor = UI.ResolveColor(nil, "panel.background"),
+    })
+    self.MainContentLayout:AddChild(self.GuildShopPanel)
+
+    self.GuildShopHost = UI.CreateLayout(UI.VerticalLayoutGroup, self.GuildShopPanel:GetContentFrame(), "RPEGuildShopHost", {
+        expandWidth = true,
+        expandHeight = true,
+        weight = 1,
+        spacing = 2,
         fitChildrenWidth = true,
         fitChildrenHeight = true,
     })
-    self.MainContentLayout:AddChild(self.GuildShopHost)
+    UI.Utils.AnchorFill(self.GuildShopHost, self.GuildShopPanel:GetContentFrame(), 0, 0, 0, 0)
+
+    self.GuildShopHeader = UI.CreateText(self.GuildShopHost:GetFrame(), "RPEGuildShopHeader", "Guild Shop", {
+        fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
+        fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Heading2) or 10,
+        textColor = UI.ResolveColor(nil, "text.primary"),
+        height = PANEL_HEADER_HEIGHT,
+        expandWidth = true,
+        justifyH = "LEFT",
+    })
+    self.GuildShopHost:AddChild(self.GuildShopHeader)
 
     self.ShopLayout = UI.CreateLayout(UI.VerticalLayoutGroup, self.GuildShopHost:GetFrame(), "RPEGuildShopLayout", {
         expandWidth = true,
@@ -934,14 +1026,36 @@ function RequisitionsPage:Build(parent, owner)
         self:RefreshShopEntryMetrics()
     end)
 
-    self.LimitedRequisitionHost = UI.CreateLayout(UI.VerticalLayoutGroup, self.MainContentLayout:GetFrame(), "RPEGuildLimitedRequisitionHost", {
+    self.LimitedRequisitionPanel = UI.CreatePanel(self.MainContentLayout:GetFrame(), "RPEGuildLimitedRequisitionPanel", {
         expandWidth = true,
         expandHeight = true,
         weight = 3,
+        contentInset = PANEL_CONTENT_INSET,
+        showBorder = true,
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+        panelBackgroundColor = UI.ResolveColor(nil, "panel.background"),
+    })
+    self.MainContentLayout:AddChild(self.LimitedRequisitionPanel)
+
+    self.LimitedRequisitionHost = UI.CreateLayout(UI.VerticalLayoutGroup, self.LimitedRequisitionPanel:GetContentFrame(), "RPEGuildLimitedRequisitionHost", {
+        expandWidth = true,
+        expandHeight = true,
+        weight = 1,
+        spacing = 2,
         fitChildrenWidth = true,
         fitChildrenHeight = true,
     })
-    self.MainContentLayout:AddChild(self.LimitedRequisitionHost)
+    UI.Utils.AnchorFill(self.LimitedRequisitionHost, self.LimitedRequisitionPanel:GetContentFrame(), 0, 0, 0, 0)
+
+    self.LimitedRequisitionHeader = UI.CreateText(self.LimitedRequisitionHost:GetFrame(), "RPEGuildLimitedRequisitionHeader", "Requisitions", {
+        fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
+        fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Heading2) or 10,
+        textColor = UI.ResolveColor(nil, "text.primary"),
+        height = PANEL_HEADER_HEIGHT,
+        expandWidth = true,
+        justifyH = "LEFT",
+    })
+    self.LimitedRequisitionHost:AddChild(self.LimitedRequisitionHeader)
 
     self.LimitedRequisitionList = UI.ScrollLayout:New({
         name = "RPEGuildLimitedRequisitionList",

@@ -63,6 +63,28 @@ local function measureText(fontString, text)
     return 0
 end
 
+local function tokenizeDisplayText(text)
+    local tokens = {}
+    local value = tostring(text or "")
+    local cursor = 1
+
+    while cursor <= #value do
+        local textureStart, textureEnd = value:find("|T.-|t", cursor)
+        if textureStart == cursor then
+            tokens[#tokens + 1] = value:sub(textureStart, textureEnd)
+            cursor = textureEnd + 1
+        else
+            local nextCursor = textureStart or (#value + 1)
+            for index = cursor, nextCursor - 1 do
+                tokens[#tokens + 1] = value:sub(index, index)
+            end
+            cursor = nextCursor
+        end
+    end
+
+    return tokens
+end
+
 local function fitTextWithEllipsis(fontString, fullText, maxWidth)
     local text = tostring(fullText or "")
     local width = math.max(0, tonumber(maxWidth) or 0)
@@ -79,13 +101,14 @@ local function fitTextWithEllipsis(fontString, fullText, maxWidth)
         return ""
     end
 
+    local tokens = tokenizeDisplayText(text)
     local low = 0
-    local high = #text
+    local high = #tokens
     local best = ellipsis
 
     while low <= high do
         local middle = math.floor((low + high) / 2)
-        local candidate = text:sub(1, middle) .. ellipsis
+        local candidate = table.concat(tokens, "", 1, middle) .. ellipsis
         if measureText(fontString, candidate) <= width then
             best = candidate
             low = middle + 1

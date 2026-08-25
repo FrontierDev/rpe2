@@ -1,227 +1,272 @@
 ## Goal
-Fix three UI problems found during runtime validation of the completed Guild Requisitions feature:
+Address four remaining UI/presentation issues found after runtime validation of the Guild Requisitions feature:
 
-1. Guild Rank editor requisition/daily-reward references are currently entered as raw text references instead of using the existing dataset/entry selector patterns used elsewhere in the Data Editor.
-2. The Daily Reward image button does not display its tooltip at runtime.
-3. The Guild Rank and Daily Reset text are horizontally centered instead of left-aligned immediately beside the Daily Reward button.
+1. the Guild Ranks / GuildSetting inspector still does not visually match the established Spell/Item inspector conventions;
+2. `ShopEntry` hover currently shows a simplified requisition tooltip instead of the actual RPE item tooltip;
+3. `ShopEntry` costs show currency names instead of currency icons;
+4. the Requisitions page needs explicit `Guild Shop` / `Requisitions` panel headers and slightly darker panel backgrounds, matching the visual treatment used by the Profile stats sheet.
 
-These are UI/editor integration fixes only. Do not redesign requisition, Daily Reward, Guild Rank, reset, or transaction semantics.
+This issue is UI/editor polish only. Preserve the existing requisition, Daily Reward, Guild Rank, reset, transaction, pagination, and persistence semantics.
 
-## Observed runtime state
-The final Requisitions page renders the Daily Reward image in the upper-left, but the rank/reset block is centered across the remaining header width rather than aligned next to the image. Hovering the Daily Reward image produces no tooltip.
+## Important superseding design change
+Previous Guild Requisitions tasks deliberately removed section headings from the page. This issue **supersedes that requirement only for the two main content panels**.
 
-The Guild Rank editor currently asks the author to type raw references for:
+The final page should now include:
 
-- requisition item references;
-- Daily Reward item references;
-- Daily Reward currency references.
+```text
+Guild Shop                       Requisitions
+[shop entries...]                [limited entries...]
+```
 
-This is inconsistent with the rest of the Data Editor and is error-prone.
+Do not reintroduce instructional text, status paragraphs, empty-state prose, selection text, or a separate purchase button.
 
 ## Primary files
 
 - `client/ui/editor/inspectors/page_InspectorGuildSetting.lua`
 - `client/character/guild/page_GuildRequisitions.lua`
+- `core/ui/prefabs/ShopEntry.lua` only if a reusable presentation API is required
 
-Inspect for reusable patterns/components in:
+Inspect/reuse established patterns from:
 
-- `client/ui/editor/inspectors/page_InspectorRecipe.lua`
-- item/currency inspector helpers already exposed by the Data Editor
-- `core/ui/Tooltip.lua`
-- `core/ui/abstract/BaseElement.lua`
-- `core/ui/abstract/ButtonBase.lua`
-- `core/ui/elements/ImageButton.lua`
-- layout group implementations as needed
+- `client/ui/editor/inspectors/page_InspectorSpell.lua`
+- `client/ui/editor/inspectors/page_InspectorItem.lua`
+- `client/ui/editor/inspectors/item/page_InspectorItemShared.lua`
+- `client/ui/tooltips/tooltip_Item.lua`
+- `client/character/profile/page_ProfileEquipmentStats.lua`
+- existing Profile currency resolution APIs
+- existing `UI.Panel`, layout-group, text, tooltip, and colour-token implementations
 
-## 1. Replace raw Guild Rank references with editor selectors
+Do not create parallel inspector, tooltip, currency, or panel-style systems if the existing ones can be reused.
+
+---
+
+## 1. Make the Guild Ranks inspector visually consistent with Spell/Item inspectors
 
 ### Current problem
-The Guild Rank inspector requires manually typed dataset-qualified references for requisition items and Daily Reward item/currency rewards.
+Issue #44 replaced raw requisition/reward references with dropdown selectors, but the overall GuildSetting/Guild Rank inspector still looks and behaves like a bespoke inspector rather than the standard Data Editor inspector family.
 
-Authors should not have to know or type values such as:
-
-```text
-my_dataset:item_id
-my_dataset:currency_id
-```
+The Spell and Item inspectors establish the expected visual language: consistent selector bar, page spacing, field grouping, labels, control heights/widths, section/panel treatment, list/action rows, and page navigation.
 
 ### Required behavior
-Use the same general selector approach already used by the Recipes editor for referenced objects.
+Refactor the GuildSetting inspector presentation so it follows the same conventions as the Spell/Item inspectors.
 
-For **requisition items**:
+At minimum:
 
-- expose dataset selection and item selection via dropdowns or the closest existing reusable editor selector;
-- populate the item selector from the selected dataset's `items` collection;
-- store the same existing dataset-qualified `itemRef` value in the GuildSetting definition;
-- preserve existing references when refreshing the inspector;
-- gracefully represent a missing/unresolved legacy reference without silently replacing it.
+- use the same inspector-page shell/selector-bar proportions and spacing;
+- use the same side padding and vertical spacing conventions;
+- use the same label/control sizing conventions;
+- use the same field-group / section-panel visual treatment where comparable;
+- align Add/Delete/list controls with the same patterns used by existing inspectors;
+- keep dataset/item/currency selector behavior from #44, but present those selectors consistently with other reference selectors;
+- avoid one-off hard-coded visual rules where an existing shared inspector helper/component already exists;
+- preserve the existing `General`, `Requisitions`, `Daily Rewards`, and `Progression` page split unless a small presentational reorganization is necessary for consistency.
 
-For **Daily Reward `type = item`**:
+This is **not** a request to change the GuildSetting schema or underlying editor behavior.
 
-- expose dataset + item selection using the same item-selector pattern;
-- persist the same existing `reward.ref` schema value;
-- only show/enable item selection while the reward type is `item`.
+### Preserve
 
-For **Daily Reward `type = currency`**:
+- current requisition IDs, quantities, character limits and costs;
+- current Daily Reward type/ref/amount semantics;
+- current progression configuration;
+- #44 dataset/item/currency selector behavior and legacy-reference handling;
+- existing pending dataset-change/coalescing behavior.
 
-- expose dataset + currency selection using the equivalent dataset/entry dropdown pattern;
-- populate from the selected dataset's `currencies` collection;
-- persist the same existing dataset-qualified `reward.ref` schema value;
-- only show/enable currency selection while the reward type is `currency`.
+---
 
-Do not introduce a new reference format or schema. This is an authoring UI change only.
-
-### Reuse existing editor patterns
-`page_InspectorRecipe.lua` already contains dataset/entry selector behavior such as:
-
-```lua
-BuildRecipeInspectorDatasetItems(...)
-BuildRecipeInspectorDatasetItemItems(...)
-```
-
-and uses dropdowns rather than requiring authors to type references. Follow/reuse that pattern where practical instead of creating a second reference-picker system.
-
-If generic item/currency dataset selector helpers already exist in the Data Editor, prefer them over duplicating Recipe-specific code.
-
-## 2. Fix Daily Reward button tooltip
+## 2. ShopEntry tooltip must use the actual Item tooltip
 
 ### Current problem
-`RequisitionsPage` assigns a tooltip to the Daily Reward `UI.ImageButton`, but no tooltip appears on hover at runtime.
+`RequisitionsPage:BindShopEntry(...)` currently supplies a simplified custom tooltip containing essentially the item name and cost.
 
-The current page sets:
+That is not sufficient. A requisition/shop entry represents a real RPE item and should expose the same full item tooltip used elsewhere in the client.
 
-```lua
-self.DailyRewardButton:SetTooltip(self.DailyRewardTooltip)
+### Required behavior
+For a resolved requisition item, hovering either a Guild Shop entry or a limited Requisition entry must show the canonical RPE item tooltip produced by the existing item tooltip builder in:
+
+```text
+client/ui/tooltips/tooltip_Item.lua
 ```
 
-where `self.DailyRewardTooltip` is a function returning the current tooltip specification.
+Follow the same integration pattern used for equipped items in `page_ProfileEquipmentStats.lua` or another canonical caller.
 
-Inspect the actual `BaseElement`/tooltip contract and determine why this does not render. Fix the integration at the narrowest appropriate point.
+The tooltip should therefore include whatever the Item tooltip builder normally provides for that item, such as applicable quality/category/item-level/stats/effects/description/etc., instead of replacing it with requisition-specific summary text.
 
-### Required tooltip behavior
-Hovering the Daily Reward button must display the existing configured Daily Reward tooltip, including:
+### Resolution/context
+When resolving the requisition `itemRef`, retain enough context to call the Item tooltip builder correctly:
 
-- `Daily Rewards` title;
-- Item reward names/icons/amounts;
-- Currency reward names/icons/amounts;
-- safe fallback for unresolved definitions;
-- tooltip still available after the reward has been claimed.
+- resolved item;
+- dataset / dataset ID where available;
+- dataset display name where applicable;
+- item ID/ref;
+- any other normal builder context that is available without inventing state.
 
-Do not make tooltip hover trigger reward claiming, Profile writes, or any gameplay mutation.
+If the item cannot be resolved, retain a safe fallback tooltip identifying the missing item/reference rather than erroring.
 
-Do not remove the existing post-claim hoverability requirement merely to make tooltip handling simpler.
+### Constraints
 
-If the root issue is that `BaseElement:SetTooltip`/`ShowTooltip` does not support a function-valued tooltip spec, either:
+- tooltip hover must not purchase the item;
+- tooltip generation must not mutate Profile state;
+- exhausted/unaffordable entries must remain hoverable so the item tooltip still works;
+- both left Guild Shop entries and right limited Requisition entries must use the same behavior.
 
-- update the page to provide a supported dynamic tooltip mechanism; or
-- add narrow function-spec support to the shared tooltip plumbing if that is already consistent with other callers.
+---
 
-Avoid broad tooltip-system redesign.
-
-## 3. Left-align Guild Rank / Daily Reset beside the reward button
+## 3. ShopEntry costs must use currency icons instead of currency names
 
 ### Current problem
-The current header visually appears approximately as:
+The current compact cost formatter produces text such as:
 
 ```text
-[Reward]                 Guild Rank: Marshal
-                         Daily Reset in 08:35:35
+25 Marks of Valor
 ```
 
-The text block is centered across the remaining width.
+This consumes too much horizontal space and does not match the intended compact visual design.
 
-### Required layout
-It should render as:
+### Required behavior
+Render each cost using the configured RPE currency icon and amount, not the currency name.
+
+Conceptually:
 
 ```text
-[Reward]  Guild Rank: Marshal
-          Daily Reset in 08:35:35
+[currency icon] 25
 ```
 
-Specifically:
+For multiple currencies:
 
-- Daily Reward button remains upper-left;
-- Guild Rank text begins immediately to the right of the button with the existing header spacing;
-- Daily Reset text is directly below Guild Rank and shares the same left edge;
-- both text elements use left horizontal justification;
-- the rank/reset block should not be centered in the remaining header area;
-- keep the existing overall header height and button size unless a concrete layout constraint requires a small adjustment.
+```text
+[icon A] 25   [icon B] 3
+```
 
-Prefer fixing the existing `HorizontalLayoutGroup` + `VerticalLayoutGroup` options/child text justification rather than manual frame anchoring.
+Use the existing Profile currency resolver/definition as the source of the currency icon. Do not create a second currency registry.
 
-## Constraints
+### Fallbacks
 
-Do not change:
+- resolved currency with icon -> use its icon;
+- resolved currency with missing/empty icon -> use the standard question-mark fallback icon;
+- unresolved currency -> safe question-mark fallback plus amount;
+- do not fall back to displaying the full currency name in the normal ShopEntry cost line.
 
-- `characterLimit` semantics;
-- requisition partitioning or pagination;
-- requisition transaction logic;
-- Daily Reward manual-claim semantics;
-- Daily Reward reset-cycle semantics;
-- Profile persistence/schema;
-- Guild window dimensions or tab structure;
-- Progression/Admin behavior;
-- Issue #36 configuration-refresh coalescing.
+The cost remains a single compact line underneath the item name and must continue to fit/truncate safely within both shop columns and the narrow limited-requisition panel.
 
-Do not add new visible headings/help/status text to the Requisitions page.
+If WoW inline texture markup is used, use the existing UI-supported format and a size appropriate to the ShopEntry cost font.
+
+---
+
+## 4. Add panel headers and darker panel backgrounds
+
+### Required page structure
+The main content region should now visually distinguish its two sections:
+
+```text
+[Daily Reward]  Guild Rank: ...
+                Daily Reset in ...
+
+┌ Guild Shop ───────────────────┐  ┌ Requisitions ─────────────┐
+│ two-column paginated grid     │  │ one-column scroll list    │
+│                               │  │                           │
+└───────────────────────────────┘  └───────────────────────────┘
+```
+
+The exact border treatment need not literally match the ASCII example; the important requirements are header labels and distinct darker panel surfaces.
+
+### Headers
+Add visible section headers:
+
+- `Guild Shop`
+- `Requisitions`
+
+Requirements:
+
+- headers are part of their respective panels, not floating globally over the page;
+- use the established Profile/UI header typography rather than ad-hoc font styling;
+- left aligned;
+- compact enough that the existing 2x7 shop layout remains practical;
+- do not add a `Daily Rewards` heading.
+
+### Darker panel treatment
+The left Guild Shop region and right Requisitions region should both be slightly darker than the surrounding Guild window/page background.
+
+Use the visual treatment already established by the Profile stats sheet (`client/character/profile/page_ProfileEquipmentStats.lua`) as the reference. Inspect and reuse the relevant panel/background colour token/component/treatment instead of guessing a new unrelated colour.
+
+The two panels should use the same background treatment so they read as a coordinated pair.
+
+### Preserve layout behavior
+
+- left panel remains approximately 70% width;
+- right panel remains approximately 30% width;
+- Guild Shop remains exactly two columns;
+- Guild Shop remains fixed-pool + manual pagination, not scrolling;
+- limited Requisitions remain one-column `UI.ScrollLayout`;
+- pagination controls remain associated with the Guild Shop panel;
+- headers/backgrounds must not overlap entries, scrollbar, or pagination controls.
+
+---
 
 ## Acceptance criteria
 
-- [ ] Requisition item authoring no longer requires manual reference entry.
-- [ ] Requisition item selection uses dataset/entry dropdowns or the existing equivalent reusable selector.
-- [ ] Daily Reward Item authoring no longer requires manual reference entry.
-- [ ] Daily Reward Currency authoring no longer requires manual reference entry.
-- [ ] Item/Currency reward controls switch appropriately with `reward.type`.
-- [ ] Existing `itemRef` / `reward.ref` persisted formats remain unchanged.
-- [ ] Existing valid references round-trip through editor refresh without being lost.
-- [ ] Missing legacy references remain representable and are not silently overwritten.
-- [ ] Hovering the Daily Reward button displays the configured tooltip.
-- [ ] Tooltip remains available after claim.
-- [ ] Tooltip hover performs no gameplay mutation.
-- [ ] Guild Rank text is left-aligned immediately to the right of the Daily Reward button.
-- [ ] Daily Reset text is left-aligned directly below Guild Rank.
-- [ ] Header remains stable through refresh, claim, tab switching, and window show/hide.
-- [ ] No unrelated gameplay/business logic changes are introduced.
+### GuildSetting inspector
+- [ ] Guild Rank/GuildSetting inspector visually follows the same shell, spacing, sizing and section conventions as Spell/Item inspectors.
+- [ ] Existing #44 dataset/item/currency dropdown behavior remains intact.
+- [ ] No raw requisition/reward reference editing is reintroduced.
+- [ ] No GuildSetting schema/business-logic change is introduced.
+
+### Item tooltip
+- [ ] Hovering a Guild Shop `ShopEntry` shows the canonical RPE item tooltip.
+- [ ] Hovering a limited Requisition `ShopEntry` shows the same canonical RPE item tooltip.
+- [ ] Item tooltip is built through the existing Item tooltip builder rather than a duplicate implementation.
+- [ ] Missing/unresolved item references fail safely.
+- [ ] Disabled/exhausted/unaffordable rows remain hoverable for tooltip purposes.
+
+### Currency display
+- [ ] Cost line displays currency icon + amount rather than currency name.
+- [ ] Multiple cost currencies render as multiple compact icon/amount pairs.
+- [ ] Missing currency icons use the standard fallback icon.
+- [ ] Unresolved currencies fail safely.
+- [ ] Cost text remains one line and does not bleed into adjacent entries/panels.
+
+### Requisitions page panels
+- [ ] Left panel has a visible `Guild Shop` header.
+- [ ] Right panel has a visible `Requisitions` header.
+- [ ] Both main panels use a slightly darker surface matching/reusing the Profile stats-sheet treatment.
+- [ ] Headers are left aligned and visually consistent with existing Profile/UI headers.
+- [ ] No extra help/status/empty-state prose is added.
+- [ ] Existing 70/30 split, 2-column shop, pagination, and limited scroll behavior remain intact.
 
 ## Validation matrix
 
-Editor:
-
 ```text
-requisition -> choose dataset -> choose item -> saved ref is dataset:item
-reopen inspector -> same item selected
+GuildSetting inspector
+-> compare side-by-side with Spell inspector
+-> compare side-by-side with Item inspector
+-> selector bar / page padding / fields / lists / actions read as same UI family
 
-Daily Reward item -> choose type Item -> dataset/item controls active
-reopen inspector -> same item selected
+Guild Shop item hover
+-> canonical Item tooltip appears
 
-Daily Reward currency -> choose type Currency -> dataset/currency controls active
-reopen inspector -> same currency selected
+Limited Requisition item hover
+-> same canonical Item tooltip appears
 
-change type Item <-> Currency
--> irrelevant selector is hidden/disabled
--> selected ref updates only through the active selector
+unresolved item
+-> safe fallback, no Lua error
 
-legacy/missing ref
--> inspector does not crash
--> unresolved value is not silently replaced
-```
+single currency cost
+-> icon + amount; no currency name
 
-Runtime header:
+multiple currency costs
+-> each currency shown as compact icon + amount
 
-```text
-open Guild -> rank/reset left aligned beside image
-resize/show/hide/tab switch -> alignment remains correct
-```
+missing/unresolved currency icon
+-> question-mark fallback + amount
 
-Tooltip:
+0 / 1 / 14 / 15 shop entries
+-> panel header/background does not disturb pagination/grid behavior
 
-```text
-available reward -> hover shows tooltip
-claimed reward -> hover still shows tooltip
-item + currency rewards -> names/icons/amounts shown
-missing definition -> safe fallback
-hover only -> no claim / no Profile mutation
+limited list requiring scrollbar
+-> header/background does not overlap scrollbar or rows
+
+exhausted limited entry
+-> disabled/subdued but item tooltip still works
 ```
 
 ## Coding-agent instructions
-Treat current `FrontierDev/rpe2` as authoritative. Inspect the Recipes editor reference-picker implementation before changing the Guild Rank inspector. Reuse existing Data Editor selector helpers wherever practical. Inspect the shared tooltip contract before changing `page_GuildRequisitions.lua`; fix the narrow integration defect rather than adding a parallel tooltip implementation. Keep the header layout group-based and make only the alignment changes required above. Report exact files changed and validation performed.
+Treat current `FrontierDev/rpe2` as authoritative. Inspect the Spell and Item inspectors before changing `page_InspectorGuildSetting.lua`, and reuse their established visual/layout conventions rather than merely tweaking individual margins. For ShopEntry tooltips, use the existing `Addon.Client.UI.Tooltips.Item` builder and follow an existing canonical caller. For costs, resolve icons from the existing Profile currency definition. For the two panel surfaces, inspect the Profile stats-sheet implementation and reuse its established background/header treatment. Keep all gameplay/business logic unchanged and report exact files changed plus validation performed.
