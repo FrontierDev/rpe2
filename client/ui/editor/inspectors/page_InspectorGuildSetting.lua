@@ -17,6 +17,10 @@ local INSPECTOR_SIDE_PADDING = InspectorShared.INSPECTOR_SIDE_PADDING
 local CONTROL_HEIGHT = InspectorShared.CONTROL_HEIGHT
 local FIELD_WIDTH = InspectorShared.FIELD_WIDTH
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+local GUILD_SETTING_PAGE_SCROLLBAR_WIDTH = 12
+local GUILD_SETTING_PAGE_SCROLLBAR_GAP = 4
+local GUILD_SETTING_PAGE_SCROLLBAR_RIGHT_INSET = 4
+local GUILD_SETTING_PAGE_SCROLL_STEP = 24
 
 local INSPECTOR_PAGE_DEFINITIONS = {
     { key = "general", label = "General" },
@@ -183,6 +187,167 @@ local function createCheckbox(parent, name, text, onValueChanged)
     return checkbox
 end
 
+local function createGuildSettingPageScrollShell(page, rootName)
+    local shell = {}
+    local refreshing = false
+    local root = nil
+
+    local function handleMouseWheel(_, delta)
+        if not shell.scrollBar then
+            return
+        end
+
+        local _, maxValue = shell.scrollBar:GetMinMaxValues()
+        local current = shell.scrollBar:GetValue() or 0
+        local nextValue = math.max(0, math.min(maxValue or 0, current - ((delta or 0) * GUILD_SETTING_PAGE_SCROLL_STEP)))
+        shell.scrollBar:SetValue(nextValue)
+    end
+
+    local function attachMouseWheel(target)
+        local frame = target and target.GetFrame and target:GetFrame() or target
+        if not frame then
+            return
+        end
+
+        if frame.EnableMouseWheel then
+            frame:EnableMouseWheel(true)
+        end
+
+        if frame.HookScript then
+            frame:HookScript("OnMouseWheel", handleMouseWheel)
+        elseif frame.SetScript then
+            frame:SetScript("OnMouseWheel", handleMouseWheel)
+        end
+    end
+
+    shell.scrollFrame = CreateFrame("ScrollFrame", rootName .. "ScrollFrame", page)
+    shell.scrollFrame:SetPoint("TOPLEFT", page, "TOPLEFT", 0, 0)
+    shell.scrollFrame:SetPoint(
+        "BOTTOMRIGHT",
+        page,
+        "BOTTOMRIGHT",
+        -(GUILD_SETTING_PAGE_SCROLLBAR_WIDTH + GUILD_SETTING_PAGE_SCROLLBAR_GAP + GUILD_SETTING_PAGE_SCROLLBAR_RIGHT_INSET),
+        0
+    )
+    shell.scrollFrame:EnableMouseWheel(true)
+    if shell.scrollFrame.SetClipsChildren then
+        shell.scrollFrame:SetClipsChildren(true)
+    end
+    attachMouseWheel(page)
+    attachMouseWheel(shell.scrollFrame)
+
+    shell.scrollBar = CreateFrame("Slider", rootName .. "ScrollBar", page)
+    shell.scrollBar:SetPoint("TOPRIGHT", page, "TOPRIGHT", -GUILD_SETTING_PAGE_SCROLLBAR_RIGHT_INSET, -2)
+    shell.scrollBar:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -GUILD_SETTING_PAGE_SCROLLBAR_RIGHT_INSET, 2)
+    shell.scrollBar:SetOrientation("VERTICAL")
+    shell.scrollBar:SetMinMaxValues(0, 0)
+    shell.scrollBar:SetValueStep(GUILD_SETTING_PAGE_SCROLL_STEP)
+    if shell.scrollBar.SetObeyStepOnDrag then
+        shell.scrollBar:SetObeyStepOnDrag(true)
+    end
+    shell.scrollBar:SetWidth(GUILD_SETTING_PAGE_SCROLLBAR_WIDTH)
+    shell.scrollBar:Hide()
+
+    local track = shell.scrollBar:CreateTexture(nil, "BACKGROUND")
+    track:SetAllPoints(shell.scrollBar)
+    local trackColor = UI.ResolveColor(nil, "scrollbar.track")
+    track:SetColorTexture(trackColor.r or 0.08, trackColor.g or 0.09, trackColor.b or 0.11, trackColor.a or 0.95)
+
+    shell.scrollBar:SetThumbTexture("Interface\\Buttons\\WHITE8x8")
+    local thumb = shell.scrollBar.GetThumbTexture and shell.scrollBar:GetThumbTexture() or nil
+    if thumb and thumb.SetVertexColor then
+        local thumbColor = UI.ResolveColor(nil, "scrollbar.thumb")
+        thumb:SetVertexColor(thumbColor.r or 0.42, thumbColor.g or 0.46, thumbColor.b or 0.52, thumbColor.a or 1)
+    end
+
+    local function refreshScrollBounds()
+        if not root or not root.GetFrame or not shell.scrollFrame then
+            return
+        end
+
+        local rootFrame = root:GetFrame()
+        local contentHeight = rootFrame and rootFrame.GetHeight and rootFrame:GetHeight() or 0
+        local viewportHeight = shell.scrollFrame.GetHeight and shell.scrollFrame:GetHeight() or 0
+        local maxScroll = math.max(0, math.ceil(contentHeight - viewportHeight))
+
+        shell.scrollBar:SetMinMaxValues(0, maxScroll)
+        if shell.scrollBar.SetShown then
+            shell.scrollBar:SetShown(maxScroll > 0)
+        elseif maxScroll > 0 and shell.scrollBar.Show then
+            shell.scrollBar:Show()
+        elseif shell.scrollBar.Hide then
+            shell.scrollBar:Hide()
+        end
+        if shell.scrollBar.EnableMouse then
+            shell.scrollBar:EnableMouse(maxScroll > 0)
+        end
+
+        local current = shell.scrollBar:GetValue() or 0
+        if current > maxScroll then
+            shell.scrollBar:SetValue(maxScroll)
+        elseif maxScroll == 0 and current ~= 0 then
+            shell.scrollBar:SetValue(0)
+        else
+            shell.scrollFrame:SetVerticalScroll(math.max(0, math.min(current, maxScroll)))
+        end
+    end
+
+    local function refreshLayout()
+        if refreshing or not root or not root.GetFrame then
+            return
+        end
+
+        refreshing = true
+        local rootFrame = root:GetFrame()
+        local width = math.max(1, (shell.scrollFrame:GetWidth() or FIELD_WIDTH))
+        rootFrame:SetWidth(width)
+        if root.RefreshLayout then
+            root:RefreshLayout()
+        end
+        refreshing = false
+        refreshScrollBounds()
+    end
+
+    root = UI.CreateLayout(UI.VerticalLayoutGroup, shell.scrollFrame, rootName, {
+        spacing = 6,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+        autoSize = true,
+    })
+    root:GetFrame():SetPoint("TOPLEFT", shell.scrollFrame, "TOPLEFT", 0, 0)
+    root:GetFrame():SetPoint("TOPRIGHT", shell.scrollFrame, "TOPRIGHT", 0, 0)
+    shell.root = root
+    page._guildSettingPageScrollShell = shell
+    shell.scrollFrame:SetScrollChild(root:GetFrame())
+    shell.scrollBar:SetScript("OnValueChanged", function(_, value)
+        shell.scrollFrame:SetVerticalScroll(value or 0)
+    end)
+    shell.scrollFrame:SetScript("OnMouseWheel", handleMouseWheel)
+    shell.scrollFrame:SetScript("OnSizeChanged", function()
+        refreshLayout()
+    end)
+    if root:GetFrame().HookScript then
+        root:GetFrame():HookScript("OnSizeChanged", refreshScrollBounds)
+    end
+    if shell.scrollFrame.HookScript then
+        shell.scrollFrame:HookScript("OnShow", refreshLayout)
+    end
+    if page.HookScript then
+        page:HookScript("OnShow", refreshLayout)
+    end
+    shell.refreshScrollBounds = refreshScrollBounds
+    shell.refreshLayout = refreshLayout
+
+    return root
+end
+
+local function refreshGuildSettingPageScroll(page)
+    local shell = page and page._guildSettingPageScrollShell or nil
+    if shell and shell.refreshLayout then
+        shell.refreshLayout()
+    end
+end
+
 local function normalizeInteger(value, fallback, minimum)
     local numeric = tonumber(value)
     if not numeric or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
@@ -342,6 +507,7 @@ function DataEditor:SetGuildSettingInspectorTab(tabKey)
             end
         end
     end
+    refreshGuildSettingPageScroll(pages[self.ActiveGuildSettingInspectorTabKey])
     self:RefreshGuildSettingInspectorPageSelector()
 end
 
@@ -414,12 +580,7 @@ function DataEditor:BuildGuildSettingInspectorPage(parent)
 end
 
 function DataEditor:BuildGuildSettingInspectorGeneralPage(parent)
-    local root = UI.CreateLayout(UI.VerticalLayoutGroup, parent, "RPEDataEditorGuildSettingInspectorGeneralLayout", {
-        spacing = 6,
-        fitChildrenWidth = true,
-        fitChildrenHeight = false,
-    })
-    UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
+    local root = createGuildSettingPageScrollShell(parent, "RPEDataEditorGuildSettingInspectorGeneralLayout")
 
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorNameLabel", "Name"))
     self.GuildSettingInspectorNameInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorGuildSettingInspectorNameInput", {
@@ -527,15 +688,11 @@ function DataEditor:BuildGuildSettingInspectorGeneralPage(parent)
     self.GuildSettingInspectorTagsInput:SetScript("OnEnterPressed", commitTags)
     self.GuildSettingInspectorTagsInput:SetScript("OnEditFocusLost", commitTags)
     root:AddChild(self.GuildSettingInspectorTagsInput)
+    refreshGuildSettingPageScroll(self.GuildSettingInspectorGeneralPage)
 end
 
 function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
-    local root = UI.CreateLayout(UI.VerticalLayoutGroup, parent, "RPEDataEditorGuildSettingInspectorRequisitionsLayout", {
-        spacing = 6,
-        fitChildrenWidth = true,
-        fitChildrenHeight = false,
-    })
-    UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
+    local root = createGuildSettingPageScrollShell(parent, "RPEDataEditorGuildSettingInspectorRequisitionsLayout")
 
     local _, requisitionSection = InspectorShared.createInspectorSection(
         root,
@@ -789,13 +946,11 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     self.GuildSettingInspectorCostAmountInput:SetScript("OnEnterPressed", commitCost)
     self.GuildSettingInspectorCostAmountInput:SetScript("OnEditFocusLost", commitCost)
     root:AddChild(costInputs)
+    refreshGuildSettingPageScroll(self.GuildSettingInspectorRequisitionsPage)
 end
 
 function DataEditor:BuildGuildSettingInspectorDailyRewardsPage(parent)
-    local root = UI.CreateLayout(UI.VerticalLayoutGroup, parent, "RPEDataEditorGuildSettingInspectorDailyRewardsLayout", {
-        spacing = 6, fitChildrenWidth = true, fitChildrenHeight = false,
-    })
-    UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
+    local root = createGuildSettingPageScrollShell(parent, "RPEDataEditorGuildSettingInspectorDailyRewardsLayout")
     self.GuildSettingInspectorDailyRewardsRoot = root
 
     local _, dailyRewardSection = InspectorShared.createInspectorSection(
@@ -1001,13 +1156,11 @@ function DataEditor:BuildGuildSettingInspectorDailyRewardsPage(parent)
     self.GuildSettingInspectorDailyRewardAmountInput:SetScript("OnEnterPressed", commitDailyRewardAmount)
     self.GuildSettingInspectorDailyRewardAmountInput:SetScript("OnEditFocusLost", commitDailyRewardAmount)
     root:AddChild(self.GuildSettingInspectorDailyRewardAmountInput)
+    refreshGuildSettingPageScroll(self.GuildSettingInspectorDailyRewardsPage)
 end
 
 function DataEditor:BuildGuildSettingInspectorProgressionPage(parent)
-    local root = UI.CreateLayout(UI.VerticalLayoutGroup, parent, "RPEDataEditorGuildSettingInspectorProgressionLayout", {
-        spacing = 6, fitChildrenWidth = true, fitChildrenHeight = false,
-    })
-    UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
+    local root = createGuildSettingPageScrollShell(parent, "RPEDataEditorGuildSettingInspectorProgressionLayout")
 
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionLabel", "Progression (structural configuration)"))
     local slotRow = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorSlotRow", {
@@ -1276,6 +1429,7 @@ function DataEditor:BuildGuildSettingInspectorProgressionPage(parent)
     end, { height = 18, fontSize = 7 })
     spellActions:AddChild(self.GuildSettingInspectorDeleteSpellRefButton)
     root:AddChild(spellActions)
+    refreshGuildSettingPageScroll(self.GuildSettingInspectorProgressionPage)
 end
 
 function DataEditor:RefreshGuildSettingInspectorGeneralPage(guildSetting)
@@ -1317,6 +1471,8 @@ function DataEditor:RefreshGuildSettingInspectorGeneralPage(guildSetting)
         self.GuildSettingInspectorTagsInput:SetText(guildSetting and UI.Utils.JoinCommaSeparatedList(guildSetting.tags or {}) or "")
         setTextElementEnabled(self.GuildSettingInspectorTagsInput, hasGuildSetting)
     end
+
+    refreshGuildSettingPageScroll(self.GuildSettingInspectorGeneralPage)
 end
 
 function DataEditor:RefreshGuildSettingRequisitionsPage()
@@ -1386,6 +1542,8 @@ function DataEditor:RefreshGuildSettingRequisitionsPage()
         self.GuildSettingInspectorCostAmountInput:SetText(tostring(normalizeInteger(cost and cost.amount, 0, 0)))
         setTextElementEnabled(self.GuildSettingInspectorCostAmountInput, cost ~= nil)
     end
+
+    refreshGuildSettingPageScroll(self.GuildSettingInspectorRequisitionsPage)
 end
 
 function DataEditor:RefreshGuildSettingDailyRewardsPage()
@@ -1459,6 +1617,8 @@ function DataEditor:RefreshGuildSettingDailyRewardsPage()
         self.GuildSettingInspectorDailyRewardAmountInput:SetText(tostring(normalizeInteger(reward and reward.amount, 1, 1)))
         setTextElementEnabled(self.GuildSettingInspectorDailyRewardAmountInput, reward ~= nil)
     end
+
+    refreshGuildSettingPageScroll(self.GuildSettingInspectorDailyRewardsPage)
 end
 
 function DataEditor:RefreshGuildSettingProgressionPage()
@@ -1526,6 +1686,8 @@ function DataEditor:RefreshGuildSettingProgressionPage()
     if self.GuildSettingInspectorDeleteSpellRefButton then
         self.GuildSettingInspectorDeleteSpellRefButton:SetEnabled(spellRefIndex ~= nil)
     end
+
+    refreshGuildSettingPageScroll(self.GuildSettingInspectorProgressionPage)
 end
 
 function DataEditor:RefreshGuildSettingInspectorPage()

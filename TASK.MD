@@ -1,121 +1,152 @@
-## Validation result: revision required
+## Goal
+Fix the Guild Ranks / GuildSetting Data Editor inspector so none of its four pages overflow the inspector viewport.
 
-Static validation of commit `9d609578788b931d7f14d839aed8833762c532a6` shows that the core #46 implementation is largely correct, but the commit also introduces unrelated visual regressions from the previously accepted Requisitions page. Do **not** close #46 yet.
+The following pages must each have a proper vertical scroll view:
 
-### What passes
+- General
+- Requisitions
+- Daily Rewards
+- Progression
 
-The requested #46 behavior is implemented coherently:
+The selector bar (`Prev` / page dropdown / `Next`) remains fixed at the top. Only the active page body scrolls.
 
-- built-in `copper` requisition costs are normalized through the existing Profile currency API and formatted through `Common:FormatCopper(...)` rather than a duplicate money formatter;
-- non-copper currencies retain compact currency-icon + amount rendering;
-- mixed cost lists format each component independently;
-- copper Daily Reward tooltip amounts use `Common:FormatCopper(...)` instead of `xN`;
-- `GetRequisitionEligibility()` remains authoritative for affordability; the page only keys the warning state from the returned `insufficient-currency` reason;
-- `ShopEntry:SetCostColor(...)` provides a narrow reusable presentation API;
-- the red cost state is reset to `text.secondary` when an entry is rebound or hidden, so recycled rows do not retain stale affordability coloring;
-- both Guild Shop and limited Requisition rows pass through the same `BindShopEntry(...)` path;
-- disabled rows remain mouse-enabled for item tooltips;
-- the paginator now uses a full-width host with a fixed-width pagination layout anchored at the host center, while the grid retains the expandable area above it;
-- page-count/navigation and requisition transaction logic were not changed;
-- `utils/Common.lua` and `client/client_Guild.lua` were not modified by the implementation.
+This is a layout task only. Preserve all GuildSetting schema, authoring behavior, reference selection, normalization, pending dataset-change coalescing, and business semantics.
 
-There are no configured commit status checks on this commit, so this validation is static source inspection rather than an in-game runtime test.
+## Dependency / ordering
+Implement this **after #46 or independently of #46**; there is no runtime dependency. However, complete this issue **before the currency-selector follow-up issue** because both tasks edit `client/ui/editor/inspectors/page_InspectorGuildSetting.lua` and this ordering minimizes conflicting rewrites.
 
-### Blocking regression 1: Daily Reward icon was changed outside scope
+## Current source observations
 
-This commit changes:
+`page_InspectorGuildSetting.lua` currently creates each page as a fixed frame and anchors a `VerticalLayoutGroup` directly to it. Long pages therefore continue growing beyond the visible inspector region.
 
-```lua
-local DAILY_REWARD_ICON = "Interface\\Icons\\INV_Misc_Gift_01"
-```
-
-to:
-
-```lua
-local DAILY_REWARD_ICON = "Interface\\Icons\\spell_nature_timestop"
-```
-
-#46 does not request a Daily Reward button icon change. This is unrelated scope drift and changes a previously accepted UI element.
-
-**Required revision:** restore the pre-#46 Daily Reward icon:
-
-```lua
-local DAILY_REWARD_ICON = "Interface\\Icons\\INV_Misc_Gift_01"
-```
-
-unless a separate explicit issue is created/approved to change that icon.
-
-### Blocking regression 2: Both panel headers were renamed
-
-#45 explicitly established the accepted panel headers as:
+The repository already has the required scroll-view pattern in inspector implementations such as:
 
 ```text
-Guild Shop
-Requisitions
+client/ui/editor/inspectors/item/page_InspectorItemEquipment.lua
 ```
 
-Commit `9d609578...` changes them to:
+That pattern uses:
+
+- a `ScrollFrame` clipped to the page;
+- a vertical scrollbar using existing `scrollbar.track` / `scrollbar.thumb` color tokens;
+- an auto-sized vertical layout as the scroll child;
+- mouse-wheel support;
+- dynamic scroll-range recalculation from content height vs viewport height.
+
+Reuse this established pattern rather than introducing a second visual style.
+
+## Primary file
+
+- `client/ui/editor/inspectors/page_InspectorGuildSetting.lua`
+
+A small reusable local helper inside this file is preferred because all four pages need the same shell. Do not create a new global UI abstraction unless repository inspection shows an existing shared helper already intended for this purpose.
+
+## Required implementation
+
+### 1. Shared GuildSetting page scroll shell
+Create or reuse a helper that provides, per GuildSetting inspector page:
 
 ```text
-Requisitions
-Special Requisitions
+Page frame
+├─ ScrollFrame
+│  └─ auto-sized VerticalLayoutGroup scroll child
+└─ vertical scrollbar
 ```
 
-Specifically:
+The helper should handle:
 
-```lua
-"Guild Shop" -> "Requisitions"
-"Requisitions" -> "Special Requisitions"
-```
+- clipping;
+- mouse wheel;
+- scrollbar value -> vertical scroll;
+- viewport resize -> scroll-child width refresh;
+- content/layout refresh -> scroll-range refresh;
+- scrollbar visibility/enabled state when content fits without scrolling;
+- existing UI color tokens for scrollbar track/thumb.
 
-That rename is unrelated to copper formatting, affordability coloring, or paginator alignment, and regresses the layout accepted in #45.
+Avoid duplicating the complete scroll plumbing four times if a local helper can express it cleanly.
 
-**Required revision:** restore the exact previous header text:
+### 2. Convert all four pages
+Move the existing page contents into the corresponding scroll-child root for:
 
-```lua
-self.GuildShopHeader ... "Guild Shop"
-self.LimitedRequisitionHeader ... "Requisitions"
-```
+- `BuildGuildSettingInspectorGeneralPage`
+- `BuildGuildSettingInspectorRequisitionsPage`
+- `BuildGuildSettingInspectorDailyRewardsPage`
+- `BuildGuildSettingInspectorProgressionPage`
 
-Do not rename these sections as part of #46.
+The visual field order and existing page selector structure should remain unchanged unless a tiny spacing adjustment is required to avoid clipping against the scrollbar.
 
-### Re-validation matrix for rev 1
+### 3. Dynamic content must update scroll range
+The Requisitions and Daily Rewards pages contain dynamic/conditional content and nested list sections. Whenever their root layout changes height, the page scroll range must remain correct.
 
-After the revision, verify at minimum:
+Examples include:
+
+- selecting/deleting requisitions;
+- showing/hiding item vs currency Daily Reward fields;
+- adding/deleting costs;
+- adding/deleting progression entries;
+- section panels changing calculated height.
+
+Do not rely only on the initial build-time height.
+
+### 4. Nested scrollable lists
+Several GuildSetting pages already contain `UI.ScrollLayout` list controls inside the page.
+
+The outer page scroll view must not break those lists. In particular:
+
+- list rows remain clickable;
+- list scrollbar/selection behavior remains functional;
+- wheel behavior should be sensible when the cursor is over an inner scrolling list;
+- the outer page must still be scrollable when the cursor is over ordinary fields/background.
+
+Follow existing editor behavior where nested scroll regions already exist.
+
+### 5. Page switching
+Switching General/Requisitions/Daily Rewards/Progression must continue to show exactly one page.
+
+It is acceptable either to preserve each page's previous scroll position or reset it when changing pages, but behavior must be deterministic and must never leave a newly selected page outside its valid scroll range.
+
+## Acceptance criteria
+
+- [ ] General page is vertically scrollable when its content exceeds the viewport.
+- [ ] Requisitions page is vertically scrollable when its content exceeds the viewport.
+- [ ] Daily Rewards page is vertically scrollable when its content exceeds the viewport.
+- [ ] Progression page is vertically scrollable when its content exceeds the viewport.
+- [ ] No GuildSetting page content renders outside the inspector page bounds.
+- [ ] Selector bar remains fixed and does not scroll with page contents.
+- [ ] Scrollbars use the established editor/UI visual treatment.
+- [ ] Content that fits the viewport does not leave a misleading active scrollbar.
+- [ ] Dynamic field visibility and section-height changes update the scroll range correctly.
+- [ ] Existing nested `UI.ScrollLayout` lists remain usable.
+- [ ] All existing field values and editor mutations behave as before.
+- [ ] No GuildSetting schema or runtime Guild logic changes are introduced.
+
+## Validation matrix
 
 ```text
-Daily Reward button
--> uses the pre-#46 gift icon
+General page at normal Data Editor size
+-> bottom fields reachable by scrolling; nothing overflows page bounds
 
-left panel header
--> "Guild Shop"
+Requisitions with several entries/costs
+-> all controls reachable; inner requisition/cost lists still usable
 
-right panel header
--> "Requisitions"
+Daily Rewards item type
+-> item fields visible/reachable
 
-50 / 125 / 12345 copper cost
--> Common money formatting
+Daily Rewards currency type
+-> currency fields visible/reachable; scroll range updates after type switch
 
-copper + non-copper mixed cost
--> copper uses Common formatter; other currency uses compact icon + amount
+Progression with entries
+-> all progression controls reachable
 
-copper Daily Reward
--> formatted money amount, not xN
+resize Data Editor shorter/taller
+-> scrollbar range updates; content width remains correct
 
-affordable row
--> normal cost color
+page with content shorter than viewport
+-> no unnecessary active scrollbar
 
-insufficient-currency row
--> numeric cost text red; currency textures remain normal; tooltip remains available
-
-character-limit-reached row
--> disabled/subdued but not affordability-red
-
-recycled insufficient -> affordable row
--> red state is cleared
-
-0 / 1 / 14 / 15 shop entries
--> paginator remains centered at the bottom and navigation behavior is unchanged
+switch page after scrolling previous page
+-> selected page starts/preserves a valid scroll position, never outside range
 ```
 
-The requested #46 implementation otherwise looks consistent from static source inspection. The two unrelated visual regressions above are the remaining blockers.
+## Coding-agent instructions
+Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Before editing, inspect the scroll implementation in `client/ui/editor/inspectors/item/page_InspectorItemEquipment.lua` and any newer reusable inspector-scroll helper in the current branch. Prefer a compact local helper in `page_InspectorGuildSetting.lua` rather than four copy-pasted scroll implementations. Preserve all existing GuildSetting authoring behavior and report exact files changed plus validation performed.
