@@ -1,280 +1,136 @@
 ## Goal
-Rework the Guild **Admin** page so the roster and administration controls use the current RPE UI system cleanly and consistently.
+Fix the Guild **Admin** page layout regression visible after #49 while preserving the new table/scroll implementation.
 
-Runtime issues visible in the current Admin page:
+Runtime screenshot shows two concrete problems:
 
-1. the guild roster is a `ScrollLayout`/`ScrollListEntry` list rather than a proper table;
-2. the lower administration controls are laid out with many independent absolute `SetPoint` offsets and are visually cramped/misaligned;
-3. Guild Rank / Achievement / Skill / Item reference dropdowns are flat lists rather than hierarchical dataset-based selectors;
-4. Online/Offline state is not visually distinct enough;
-5. members are not presented in Guild Rank order.
+1. the instruction/status line at the top (`Officer access detected for ... Select an online member...`) wastes vertical space and should be removed from the normal Admin layout;
+2. the roster table visually overlaps the lower administration controls instead of remaining contained inside the roster panel.
 
-This is primarily a UI/layout refactor. Preserve all existing Guild Admin authority checks, member querying, mutation semantics, comms, pending-action gating, selected-member state, achievement/skill/item/rank operations, and any existing progression administration behavior.
+The `UI.Table` roster itself, its columns, row scrolling, rank sorting, selection, and Online/Offline colors are otherwise correct and should be retained.
 
-## Current source observations
-
-Primary page:
+## Primary file
 
 - `client/character/guild/page_GuildAdmin.lua`
 
-The current roster is implemented using:
-
-```lua
-UI.ScrollLayout
-rowElementClass = UI.ScrollListEntry
-```
-
-and manually combines fields such as Guild Rank + zone into row text.
-
-The repository already has a proper table implementation at:
-
-- `core/ui/prefabs/Table.lua`
-- `core/ui/prefabs/TableRow.lua`
-
-`UI.Table` already supports named columns, headers, scrolling, sort state, `sortValue`, filtering, and reusable `TableRow` cells. `TableRow` already supports a row mouse-up handler, so preserve selectable roster rows rather than making the new table display-only.
-
-The dropdown system already supports nested `children` through `UI.Dropdown` / `UI.ContextMenu`. The Recipe inspector demonstrates the desired multi-level pattern in:
-
-- `client/ui/editor/inspectors/page_InspectorRecipe.lua`
-
-For example, Recipe output selectors construct non-selectable parent groups using:
-
-```lua
-{
-    label = "...",
-    value = "...group...",
-    enabled = true,
-    keepShownOnClick = true,
-    notCheckable = true,
-    children = { ... },
-}
-```
-
-Use that established mechanism rather than implementing a second dropdown/menu system.
-
-## 1. Replace the guild roster with `UI.Table`
-
-Replace `RPEGuildRosterList` with a `UI.Table`.
-
-Recommended columns, using the data already available on roster members:
+Current #49 implementation uses a root `VerticalLayoutGroup` with:
 
 ```text
-Character | Guild Rank | Level | Class | Zone | Status
+StatusText
+RosterPanel (expandHeight)
+AdminSectionsPanel
+```
+
+Inside `RosterPanel`, `RPEGuildRosterContentLayout` contains the title plus an expanding `UI.Table`, but its sizing must be made strictly follow the actual panel viewport so table rows cannot render into `AdminSectionsPanel`.
+
+## 1. Remove the top instruction/status row
+
+Remove the routine top instruction text from the visible Admin page.
+
+In particular, the normal officer state must no longer render:
+
+```text
+Officer access detected for <guild>. Select an online member to administer RPE Guild Rank.
+```
+
+Do not replace it with another persistent instructional sentence elsewhere.
+
+Preserve meaningful exceptional states such as:
+
+- not in a guild;
+- no officer/admin access;
+
+but surface them compactly within the existing Admin summary/control region rather than reserving a dedicated top row. The normal officer/member-selection workflow should begin directly with the roster panel.
+
+## 2. Fix roster/admin vertical containment
+
+The roster table must never overlap the lower Admin controls.
+
+Required layout:
+
+```text
+Vertical Root
+├─ Roster Panel (takes remaining height)
+│  ├─ Roster title
+│  └─ UI.Table (fills only remaining roster-panel height)
+└─ Admin Controls Panel (fixed/bounded lower region)
+   ├─ selected-member summary
+   ├─ rank controls
+   ├─ active section controls
+   └─ section selector
 ```
 
 Requirements:
 
-- use `UI.Table`, not a custom collection of FontStrings and not another `ScrollLayout` pretending to be a table;
-- retain a scrollable body and compact row height appropriate to the Guild window;
-- retain member selection by clicking a row;
-- selected-member highlighting must remain visible;
-- selection must continue to drive the existing Admin query/mutation state exactly as before;
-- do not lose currently available roster data (`name`, `rankName`, `rankIndex`, `level`, `className`, `zone`, `online`);
-- table headers should be visible and aligned with their columns;
-- remove the old concatenated `rankName .. " - " .. zone` presentation once those values have dedicated columns.
+- `RosterPanel` should consume the remaining available height above the lower Admin panel;
+- `AdminSectionsPanel` must remain fully below it;
+- the table viewport/body must size from the **actual current height** of `RosterPanel`, not continue using a preferred height that can extend beyond the panel;
+- keep `RPEGuildRosterTitle` above the table;
+- table body continues to scroll normally when there are more rows than fit;
+- no table row, scrollbar, header, or row background may render over the Admin controls;
+- no Admin control may render over the roster;
+- resize/layout refresh should recompute the table viewport correctly.
 
-If `UI.Table` needs a **small reusable hook** to expose its existing `TableRow:SetRowMouseUpHandler(...)` capability through table options/row rendering, add that narrowly in `Table.lua`; do not special-case Guild Admin inside the core prefab.
+Prefer correcting the existing layout-group sizing/anchoring rather than adding masks, arbitrary offsets, or manually hiding overflowing rows.
 
-## 2. Default roster ordering: Guild Rank
+Likely approaches include making the roster content layout actually distribute its available height (`fitChildrenHeight`/expanding table semantics) or anchoring the table between the title and the bottom of the roster content frame. Use whichever is most consistent with the existing RPE UI system.
 
-The roster must default to WoW Guild Rank order using the numeric roster `rankIndex`, not an alphabetical comparison of the displayed rank name.
+## 3. Preserve #49 behavior
 
-Expected order:
+Do not regress the parts of #49 that are working:
 
-```text
-rankIndex 0
-rankIndex 1
-rankIndex 2
-...
-```
+- roster remains `UI.Table`;
+- columns remain Character / Guild Rank / Level / Class / Zone / Status;
+- default sort remains numeric WoW `rankIndex` ascending with name tie-break;
+- Online remains green and Offline grey;
+- clicking a row still selects/querys that member;
+- selected-row highlighting remains visible;
+- Guild Rank / Achievement / Skill / Item selectors remain hierarchical;
+- lower controls continue using layout groups;
+- Progression controls and mutations remain intact;
+- officer checks, online-target requirement, pending/query state, comms, rank assignment, achievement grant, skill adjustment, item grant, and progression mutations remain unchanged.
 
-where lower `rankIndex` means the higher WoW Guild Rank.
-
-For members with the same rank, use character name alphabetically as the deterministic tie-breaker.
-
-Do **not** group online users ahead of higher-ranked offline users: Guild Rank is the primary ordering requested here.
-
-If interactive table sorting is retained, opening/refreshing the Admin page must still restore or default to Guild Rank ascending unless the existing table conventions clearly preserve an intentional user-selected sort.
-
-## 3. Online status colors
-
-The `Status` table cell must show:
-
-- **Online** in green;
-- **Offline** in grey/muted text.
-
-Use existing RPE UI color tokens where an appropriate success/positive and muted color already exists. Avoid hard-coding a new visual palette unnecessarily.
-
-The color must be applied to the status cell/text only; do not tint the entire roster row green/grey.
-
-If dynamic per-row cell color is not currently supported by `TableRow`, prefer a small reusable table-cell color callback/API over page code reaching directly into private FontStrings. Keep any core UI change generic.
-
-## 4. Clean up the lower Admin-control layout
-
-The lower Admin panel currently relies on many independent absolute offsets such as:
-
-```lua
-control:GetFrame():SetPoint("TOPLEFT", ..., x, y)
-```
-
-Rebuild this area primarily with `VerticalLayoutGroup` / `HorizontalLayoutGroup` and existing panel helpers so controls align predictably.
-
-Suggested hierarchy:
-
-```text
-Vertical Admin Controls
-├─ Selected-member summary
-├─ Horizontal Rank Controls
-│  ├─ Guild Rank dropdown
-│  ├─ Set Rank
-│  └─ Clear Rank
-├─ Section-specific action area
-│  ├─ Achievements controls OR
-│  ├─ Skills controls OR
-│  ├─ Items controls OR
-│  └─ existing progression controls, if present
-└─ Horizontal section selector
-```
-
-Requirements:
-
-- consistent field heights;
-- consistent gaps/padding;
-- dropdowns should use available horizontal width instead of arbitrary mismatched widths;
-- labels/state text and action buttons should align vertically with their related selector;
-- avoid overlapping controls at the current Guild window size;
-- preserve the current Admin section switching and button enable/disable logic;
-- preserve selected-member summary/status messaging, but fit it into the cleaned-up layout rather than allowing it to collide with controls.
-
-Do not redesign the whole Guild window or the Requisitions/Progression tabs in this task.
-
-## 5. Convert reference dropdowns to multi-level selectors
-
-The current helper `buildReferenceItems(collectionKey)` flattens entries from all activated datasets into labels like:
-
-```text
-Entry Name (Dataset Name)
-```
-
-Replace the flat reference menus with hierarchical dropdown items following the Recipe inspector pattern.
-
-At minimum convert these Admin selectors:
-
-- Guild Rank;
-- Achievement;
-- Skill;
-- Item.
-
-Expected structure for dataset-backed references:
-
-```text
-Dataset A
-  Achievement A
-  Achievement B
-
-Dataset B
-  Achievement C
-```
-
-and analogously for Skills and Items.
-
-For Guild Rank, group the **eligible** `GuildSetting` matches by dataset:
-
-```text
-Dataset A
-  Marshal
-  Crusader
-
-Dataset B
-  ...
-```
-
-Requirements:
-
-- parent dataset entries are non-selectable category nodes (`notCheckable = true`) with `children`;
-- leaf values continue to be the exact existing dataset-qualified references expected by Guild Admin operations;
-- do not change reference persistence or comms payload format;
-- continue to restrict Guild Rank choices to `EligibleGuildRanks` for the selected member;
-- Achievement / Skill / Item choices continue to come from the currently appropriate activated datasets used by runtime Guild Admin;
-- preserve empty/unavailable states safely;
-- leaf labels should be the human-readable entry names, falling back to IDs where required;
-- dataset labels should use the human-readable dataset name where available;
-- no duplicate reference leaf should be emitted.
-
-If an existing selector on this page is not dataset-backed (for example a progression slot number or an entry derived only from the selected rank), do not force it into an artificial dataset hierarchy.
-
-## 6. Preserve Admin behavior
-
-This UI rework must not change the security/transaction layer.
-
-Preserve:
-
-- officer capability detection;
-- requirement that remote admin targets are online where currently required;
-- query/pending state behavior;
-- rank assignment eligibility checks;
-- Set Rank / Clear Rank behavior;
-- Achievement grant behavior;
-- Skill adjustment behavior;
-- Item grant behavior;
-- existing progression mutation behavior;
-- current comms protocol and opcodes;
-- refresh behavior after mutations;
-- selected member identity handling / normalized names.
-
-No schema changes should be required.
+No schema or protocol changes are expected.
 
 ## Acceptance criteria
 
-- [ ] Guild roster uses `UI.Table`.
-- [ ] Table has clear columns instead of concatenated row text.
-- [ ] Clicking a table row still selects the member and drives the existing Admin workflow.
-- [ ] Members default-sort by numeric WoW Guild Rank (`rankIndex`, lowest first), then name.
-- [ ] Online members show green `Online` status text.
-- [ ] Offline members show grey/muted `Offline` status text.
-- [ ] Lower Admin controls are rebuilt with layout groups and no longer look cramped/misaligned.
-- [ ] Guild Rank selector is hierarchical by dataset and contains only eligible ranks.
-- [ ] Achievement selector is hierarchical by dataset.
-- [ ] Skill selector is hierarchical by dataset.
-- [ ] Item selector is hierarchical by dataset.
-- [ ] Parent dropdown nodes are categories only; leaf values retain existing dataset-qualified refs.
-- [ ] No Guild Admin authority, comms, transaction, persistence, or progression behavior is changed.
-- [ ] Requisitions and Progression Guild tabs are unaffected.
+- [ ] Routine officer instruction text is no longer shown at the top.
+- [ ] Roster starts at the top of the Admin content area.
+- [ ] Roster panel and Admin controls panel occupy non-overlapping vertical regions.
+- [ ] Table header/body/scrollbar are fully contained inside the roster panel.
+- [ ] With a long guild roster, excess members are reached by scrolling rather than by rows extending into the controls area.
+- [ ] Admin summary, rank controls, section-specific controls, and section selector remain fully visible and aligned.
+- [ ] No overlap occurs at the current Guild window size shown in the runtime screenshot.
+- [ ] No #49 roster/table/dropdown/admin behavior regresses.
 
 ## Validation matrix
 
 ```text
-roster with ranks 0, 1, 1, 3
--> order is rank 0, rank 1 members alphabetically, then rank 3
+normal officer state
+-> no top instruction sentence
+-> roster begins at top of Admin page
 
-online member
--> Status cell says Online in green
+roster with more rows than viewport
+-> table scrolls
+-> last visible row ends above Admin controls
+-> scrollbar ends above Admin controls
 
-offline member
--> Status cell says Offline in grey
+select online member
+-> row highlight updates
+-> selected-member summary and query work
+-> table does not move/overlap controls
 
-click table row
--> selected-member summary changes to that member
--> online member query behavior still runs as before
+switch Achievements / Skills / Items / Progression
+-> lower panel layout remains contained
+-> roster region remains unchanged
 
-Guild Rank dropdown
--> Dataset -> eligible rank leaf
--> ineligible ranks are absent
+non-officer / not-in-guild
+-> meaningful access state still visible in the lower summary/control region
+-> no dedicated instruction row is reintroduced
 
-Achievement / Skill / Item dropdown
--> Dataset -> entry leaf
--> selecting leaf stores/uses the same existing reference value
-
-switch Achievements / Skills / Items sections
--> only relevant controls are shown
--> alignment remains stable
-
-Admin action pending / target offline / no officer access
--> same controls disabled and same security behavior as before
-
-refresh roster
--> rank ordering and selected-member handling remain valid
+window/layout refresh
+-> roster table recalculates available height
+-> no overflow into lower panel
 ```
 
 ## Coding-agent instructions
-Use current `FrontierDev/rpe2` as authoritative. Before editing, inspect `client/character/guild/page_GuildAdmin.lua`, `core/ui/prefabs/Table.lua`, `core/ui/prefabs/TableRow.lua`, `core/ui/elements/Dropdown.lua`, `core/ui/elements/ContextMenu.lua`, and the hierarchical selector builders in `client/ui/editor/inspectors/page_InspectorRecipe.lua`. Reuse those systems rather than duplicating them. Keep any core Table/TableRow enhancements generic and minimal. Report exact files changed and runtime/static validation performed.
+Use current `FrontierDev/rpe2` as authoritative. Inspect `client/character/guild/page_GuildAdmin.lua` and the sizing behavior of `VerticalLayoutGroup`, `UI.Panel`, and `UI.Table`/`ScrollLayout` before editing. This is a narrow layout correction to #49: preserve the table and scroll view, remove the top routine instruction row, and make the two main vertical regions strictly non-overlapping. Report exact files changed and runtime/static validation performed.

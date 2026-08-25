@@ -331,15 +331,6 @@ function AdminPage:Build(parent, owner)
     })
     UI.Utils.AnchorFill(self.RootLayout, self.frame, 0, 0, 0, 0)
 
-    self.StatusText = UI.CreateText(self.RootLayout:GetFrame(), "RPEGuildAdminStatusText", "", {
-        width = 520,
-        height = 30,
-        justifyH = "LEFT",
-        wordWrap = true,
-        textColor = UI.ResolveColor(nil, "text.secondary"),
-    })
-    self.RootLayout:AddChild(self.StatusText)
-
     self.RosterPanel = UI.CreatePanel(self.RootLayout:GetFrame(), "RPEGuildRosterPanel", {
         width = 520,
         height = 250,
@@ -355,11 +346,11 @@ function AdminPage:Build(parent, owner)
         spacing = 2,
         padding = 0,
         fitChildrenWidth = true,
-        fitChildrenHeight = false,
+        fitChildrenHeight = true,
     })
     UI.Utils.AnchorFill(self.RosterContentLayout, self.RosterPanel:GetContentFrame(), 0, 0, 0, 0)
 
-    self.RosterTitle = UI.CreateText(self.RosterContentLayout:GetFrame(), "RPEGuildRosterTitle", "Guild Roster (select a member for Guild Admin)", {
+    self.RosterTitle = UI.CreateText(self.RosterContentLayout:GetFrame(), "RPEGuildRosterTitle", "Guild Roster", {
         width = 512,
         height = 18,
         expandWidth = true,
@@ -377,6 +368,9 @@ function AdminPage:Build(parent, owner)
         visibleRows = 9,
         rowHeight = 22,
         rowSpacing = 1,
+        autoFitRows = true,
+        minVisibleRows = 1,
+        maxVisibleRows = 9,
         border = false,
         headerHeight = 20,
         columns = {
@@ -1563,25 +1557,26 @@ function AdminPage:Refresh()
         self.AchievementDropdown:SetEnabled(self.IsOfficer == true and selectedMember ~= nil and selectedMember.online == true)
     end
 
-    if not identity.inGuild then
-        self.StatusText:SetText("Admin access requires membership in a guild.")
-    elseif isOfficer then
-        self.StatusText:SetText(("Officer access detected for %s. Select an online member to administer RPE Guild Rank."):format(identity.guildName))
-    else
-        self.StatusText:SetText("Access denied: an officer rank is required for Guild administration.")
-    end
-
     if selectedMember then
         self.RosterTitle:SetText(("Guild Roster | Selected: %s"):format(selectedMember.name))
     else
-        self.RosterTitle:SetText("Guild Roster (select a member for Guild Admin)")
+        self.RosterTitle:SetText("Guild Roster")
     end
     self.RosterTable:SetRows(roster)
     self.RosterEmptyText:SetText(identity.inGuild and #roster == 0 and "No guild roster data is available yet." or "")
 
     local adminText
-    if not selectedMember then
-        adminText = "Select a guild member to query their RPE Guild Rank."
+    if not identity.inGuild then
+        adminText = "Admin access requires membership in a guild."
+    elseif not isOfficer then
+        if selectedMember then
+            local wowRankName = tostring(selectedMember.rankName or "Unknown")
+            adminText = ("Selected: %s | WoW Guild Rank: %s | Officer access required."):format(selectedMember.name, wowRankName)
+        else
+            adminText = "Access denied: an officer rank is required for Guild administration."
+        end
+    elseif not selectedMember then
+        adminText = ""
     else
         local wowRankName = tostring(selectedMember.rankName or "Unknown")
         local selectedLine = ("Selected: %s | WoW Guild Rank: %s"):format(selectedMember.name, wowRankName)
