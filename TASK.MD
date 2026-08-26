@@ -1,332 +1,190 @@
 ## Goal
-Audit Tasks #51–#56 as one coherent removal of **Guild Progression**, execute the required validation matrix, and fix **concrete defects only**.
+Establish the **measurement and diagnostic baseline** required for the Runtime Performance and Hitch Elimination project before changing runtime behavior.
 
-Authoritative plan: `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md`.
+Authoritative documents:
 
-Depends on: #51, #52, #53, #54, #55, #56
+- `.docs/RPE2-Runtime-Performance-Hitch-Elimination-PDD.md`
+- `.docs/RPE2-Runtime-Performance-Hitch-Elimination-Implementation-Plan.md`
 
-Do not start until all preceding Guild Progression Removal tasks are implemented and available in the working tree.
+This task is instrumentation-only. Do not optimize or reorder gameplay logic here except where a tiny non-semantic hook is required to measure it.
 
-## Primary files to audit
+## Primary files
 
-Inspect every file changed by #51–#56, especially:
+- `core/debug/Timings.lua`
+- `Commands.lua`
+- `core/internal/tasks/TaskQueue.lua`
+- `core/internal/database/Database.lua`
+- `client/character/inventory/Inventory.lua`
+- `client/character/inventory/page_Inventory.lua`
+- `client/character/inventory/window_Inventory.lua`
+- `client/character/profile/window_Profile.lua`
+- `client/character/profile/page_ProfileEquipmentStats.lua`
+- `client/client_Achievements.lua`
+- `client/client_Session.lua`
+- `client/client_Event.lua`
+- `client/spellcasting/Core.lua`
+- `client/spellcasting/Lifecycle.lua`
+- `client/spellcasting/Cooldowns.lua`
+- `client/spellcasting/AuraManager.lua`
 
-- `core/classes/GuildSetting.lua`
-- `core/internal/profile/Guild.lua`
-- `core/internal/database/Dependecies.lua`
-- `client/client_Guild.lua`
-- `client/character/guild/page_GuildAdmin.lua`
-- `client/character/guild/window_Guild.lua`
-- `client/ui/editor/inspectors/page_InspectorGuildSetting.lua`
-- `RPEngine_Dev.toc`
-- `.docs/RPE2-Achievements-Guild-Systems-PDD.md`
-- `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md`
-- `TASK.MD`
+Inspect current timing hooks before adding new ones. Extend `Addon.Debug.Timings`; do not introduce a second profiling framework.
 
-Confirm that:
+## 1. Add required timing scopes
 
-```text
-client/character/guild/page_GuildProgression.lua
-```
-
-has been deleted.
-
-Inspect adjacent code only where necessary to validate references or regressions. Do not redesign working systems.
-
-## 1. Repository-wide Guild Progression search audit
-
-Search the repository for at least:
+Add timings for at least:
 
 ```text
-enableProgression
-GuildProgression
-ProgressionPage
-GetActiveGuildProgression
-GetGuildProgression
-SetGuildProgression
-SetGuildProgressionSlot
-SetGuildProgressionEntryUnlocked
-SetGuildProgressionSelectedSpell
-ClearGuildProgressionSelectedSpell
-SelectedProgression
-RPEGuildProgression
-GuildSetting.progression
-assign_progression_entry
-lock_progression_entry
-unlock_progression_entry
-clear_progression_spell
-page_GuildProgression
+Inventory.AddItem
+Inventory bulk commit / SetItems
+Inventory.GetDisplayItems or display snapshot build path
+InventoryGridPage:Refresh
+InventoryWindow:Show
+ProfileWindow:Show
+EquipmentStatsPage refresh/view-model work
+Achievements:ProcessTrigger
+Achievement reward-chain execution
+Client:HandleLocalConfigurationChanged
+event start total + startup phases
+event end total + teardown phases
+event-state immediate handler
+spellcast advancement
+cooldown advancement
+aura advancement
+spell start
+spell completion
+spell component execution
+visual refresh flush where an existing flush exists
+network/resource flush where an existing flush exists
 ```
 
-Inspect **every remaining match**.
-
-Allowed remaining matches are limited to:
-
-- clearly historical/changelog text that cannot be interpreted as an active requirement;
-- unrelated generic class/race/stat/resource progression code.
-
-No active Guild runtime, UI, editor, Profile, dataset, dependency, protocol or TOC implementation may retain Guild Progression behavior.
-
-Do not delete generic progression code merely to make a text search empty.
-
-## 2. GuildSetting model/serialization audit
-
-Verify:
+Use thresholds consistent with the PDD:
 
 ```text
-new GuildSetting
--> no general.enableProgression
--> no progression table
-
-legacy GuildSetting input containing both fields
--> loads/merges without error
--> normalized live object does not expose active Guild Progression state
--> ToTable() does not serialize either field
+normally-cheap mutation: >4ms slow
+user-action immediate path: >8ms slow
+cooperative slice later: >2ms slow
+single-frame hard concern: >16ms
 ```
 
-Confirm the removal did not alter:
+Do not force timing output when debug timings are disabled.
+
+## 2. Include cardinality/context with slow operations
+
+Where available, slow logs must include the scale of the operation rather than only elapsed time.
+
+Examples:
 
 ```text
-Guild Rank metadata
-wowGuildRankIndices
-Requisitions
-Daily Rewards
-existing tags/other GuildSetting fields
+inventoryStacks
+resolvedItems
+achievementCriteria
+changedAchievements
+eventUnits
+activeAuras
+dueAuras
+activeCooldowns
+activeCasts
+spellComponents
+targetCount
+queuedTasks
 ```
 
-## 3. Profile persistence audit
+Use concise context strings or structured helper arguments consistent with the existing `Timings` API.
 
-Verify `core/internal/profile/Guild.lua` exposes no Guild Progression APIs.
+## 3. Add recent slow-operation diagnostics
 
-Exercise/inspect an existing profile that still contains stale:
+Extend the existing timing/debug system with a bounded in-memory record of recent slow operations suitable for development diagnosis.
 
-```lua
-profile.guild.byGuild[...].progression
-```
+Requirements:
 
-Expected behavior:
+- bounded size; do not grow indefinitely;
+- records contain label, elapsed time, threshold, context/cardinality where supplied, and timestamp/order information;
+- disabled timing mode should have negligible overhead;
+- expose a small read/print API rather than making callers inspect private tables.
+
+Add a `/rpe` debug command to print recent slow operations and TaskQueue summary state. Keep the existing `/rpe debug timings on|off` command intact.
+
+A command shape such as:
 
 ```text
-profile loads normally
-stale progression data is ignored
-no code reads it
-no code mutates it
-no migration is required solely to erase it
+/rpe debug perf
 ```
 
-Verify unrelated Guild Profile state remains intact:
+is acceptable if it matches the current command router cleanly.
+
+## 4. Add TaskQueue diagnostics only
+
+Expose diagnostic state for the existing queue without changing queue scheduling semantics yet.
+
+At minimum report:
 
 ```text
-assigned Guild Rank
-requisition usage
-Daily Reward claims/transactions
-guild identity migration
+pending jobs
+jobs executed in last flush if readily available
+last/max flush elapsed time if readily available
+current configured job/time budgets
 ```
 
-## 4. Dependency-system audit
+Do **not** implement cooperative slicing in this issue; that is a later task.
 
-Confirm GuildSetting dependency extraction/rewrite no longer traverses progression spell refs.
+## 5. Instrument configuration invalidation entry points
 
-Then explicitly validate unrelated generic progression dependency behavior remains intact for structures such as:
+Add timing/context around the global configuration refresh path so later tasks can prove runtime state no longer reaches it.
+
+At minimum make it possible to identify:
 
 ```text
-statProgressions
-resourceProgressions
-traitRefs
-skillBonuses
+notifyConfigurationChanged(reason)
+QueueLocalConfigurationRefresh(reason)
+HandleLocalConfigurationChanged(reason)
 ```
 
-Also confirm GuildSetting Requisition/Daily Reward item/currency dependencies still work.
+and see the `reason` in timing/debug output.
 
-## 5. `client_Guild.lua` runtime/protocol audit
+Do not change which reasons currently enter the path in this task.
 
-Verify there is no active runtime progression resolver or mutation API.
+## Acceptance criteria
 
-Confirm Guild Admin query responses contain only still-supported member state and do not serialize/parse progression.
+- [ ] Every reported hitch category has a timing scope or timed sub-phases sufficient to locate the cost.
+- [ ] Slow logs include useful cardinality/context where the code already knows it.
+- [ ] Existing spellcast timing output remains functional.
+- [ ] `HandleLocalConfigurationChanged` is timed with its reason.
+- [ ] Recent slow operations are kept in a bounded debug buffer.
+- [ ] A `/rpe` debug command prints recent slow operations and TaskQueue diagnostics.
+- [ ] Existing `/rpe debug timings on|off` behavior remains intact.
+- [ ] TaskQueue execution behavior is unchanged.
+- [ ] No gameplay, persistence, UI refresh, or networking semantics are intentionally changed.
 
-Confirm progression Admin operation strings/dispatch branches are gone.
-
-### Preserve generic Admin protocol
-Verify the generic opcodes remain available:
+## Validation matrix
 
 ```text
-GUILD_ADMIN_QUERY
-GUILD_ADMIN_QUERY_RESPONSE
-GUILD_ADMIN_MUTATION
-GUILD_ADMIN_MUTATION_RESPONSE
+/rpe debug timings off
+-> normal gameplay produces no timing spam
+
+/rpe debug timings on
+-> add item -> Inventory timing appears
+-> add currency -> profile/config-related timings appear
+-> open Inventory -> Show/Refresh timings appear
+-> open Profile -> Show/page timings appear
+-> start/end/advance event -> event phase timings appear
+-> cast/complete spell -> lifecycle/component timings appear
+
+/rpe debug perf
+-> prints bounded recent slow operations
+-> prints TaskQueue diagnostic summary
+
+repeat many slow operations
+-> diagnostic buffer remains bounded
 ```
-
-Exercise/inspect:
-
-```text
-Set/Clear Guild Rank
-Grant Achievement
-Adjust Skill
-Give Item
-```
-
-and confirm request, validation, acknowledgement and refresh paths still work.
-
-### Protocol-version validation
-Review the protocol-version decision made in #52 against the final serializer/parser.
-
-If no version bump was made, confirm mixed-version parsing cannot silently reinterpret fields.
-
-If a bump was made, confirm incompatible clients fail through the intended compatibility path rather than corrupting member state.
-
-Fix only a concrete compatibility defect found during this audit.
-
-## 6. Guild window audit
-
-Required final structure:
-
-```text
-Guild
-├─ Requisitions
-└─ Admin
-```
-
-Validate:
-
-```text
-open window -> Requisitions selected by default
-switch Requisitions -> Admin -> Requisitions
-refresh each active tab
-hide/show/reopen window
-```
-
-Confirm:
-
-- no Progression tab appears;
-- no `ProgressionPage` is constructed;
-- Admin works as the second tab;
-- no stale tab-index assumption exists;
-- window title remains exactly `Guild`;
-- dimensions/lifecycle remain unchanged.
-
-## 7. Guild Admin audit
-
-Verify the Admin section selector contains exactly:
-
-```text
-Achievements
-Skills
-Items
-```
-
-Guild Rank controls remain outside/alongside those sections as currently designed.
-
-Exercise:
-
-```text
-roster loading
-rank sorting
-Online/Offline colors
-row selection
-online member query
-Guild Rank mutation
-Achievement grant
-Skill adjustment
-Item grant
-Achievements / Skills / Items switching
-long roster scrolling
-```
-
-Confirm the #49/#50 table/layout behavior remains intact:
-
-- no top routine instruction row is reintroduced;
-- roster remains contained above lower Admin controls;
-- no overlap occurs;
-- hierarchical selectors remain functional.
-
-No Progression state/control/callback may remain.
-
-## 8. GuildSetting inspector audit
-
-Validate all surviving pages:
-
-```text
-General
-Requisitions
-Daily Rewards
-```
-
-Confirm:
-
-- no fourth Progression page;
-- no Enable Progression checkbox;
-- no Progression entry/spell controls;
-- all three pages retain #47 scrolling behavior;
-- Requisition authoring remains functional;
-- Daily Reward item/currency authoring remains functional;
-- built-in/custom currency behavior from #48 remains intact;
-- legacy definitions do not cause nil-index errors or recreate progression state.
-
-## 9. Requisitions/Daily Reward regression audit
-
-Guild Progression removal must not affect the final Requisitions feature.
-
-At minimum verify:
-
-```text
-Guild Shop displays unlimited requisitions
-limited Requisitions remain in the right-hand list
-Daily Reward button/tooltip works
-Daily Reset timer works
-Guild Rank display works
-requisition affordability/eligibility still works
-purchase transaction still works
-manual Daily Reward claim still works
-```
-
-Preserve the post-#45/#46/#48 UI and currency behavior.
-
-## 10. Documentation consistency audit
-
-Read the active Guild sections of:
-
-```text
-.docs/RPE2-Achievements-Guild-Systems-PDD.md
-.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md
-TASK.MD
-```
-
-Confirm none still instruct future coding work to preserve or restore Guild Progression.
-
-The documentation should agree on the final Guild structure:
-
-```text
-Requisitions
-Admin
-```
-
-with Admin supporting Guild Rank, Achievements, Skills and Items but no Progression.
-
-## Final definition of done
-
-- [ ] `page_GuildProgression.lua` is deleted.
-- [ ] Guild window has exactly Requisitions and Admin tabs.
-- [ ] Guild Admin contains no Progression section/state/actions.
-- [ ] `client_Guild.lua` contains no Guild Progression runtime/protocol behavior.
-- [ ] Guild Admin generic opcodes and non-progression mutations remain functional.
-- [ ] `GuildSetting` contains no `enableProgression` or `progression` model.
-- [ ] Guild Profile exposes no progression APIs and safely ignores stale saved progression data.
-- [ ] GuildSetting dependencies no longer include progression spell refs.
-- [ ] Generic non-Guild progression systems remain intact.
-- [ ] GuildSetting inspector contains only General/Requisitions/Daily Rewards and preserves current editor behavior.
-- [ ] Requisitions/Daily Rewards continue to function normally.
-- [ ] Active documentation no longer specifies Guild Progression.
-- [ ] Repository-wide search finds no active Guild Progression implementation.
-- [ ] Any protocol-version choice is validated against the final serializer/parser.
-- [ ] No duplicate/replacement progression subsystem was introduced.
 
 ## Constraints
 
-- Fix concrete defects only; do not redesign adjacent systems during the audit.
-- Do not remove unrelated generic progression code to satisfy text search.
-- Do not add a migration solely to purge stale Guild Progression SavedVariables.
-- Do not change Requisition/Daily Reward/Guild Rank/Achievement/Skill/Item semantics unless a regression caused by this removal is identified.
-- Do not renumber generic Guild Admin opcodes.
+- Do not optimize code paths yet.
+- Do not add a second profiler/debug framework.
+- Do not enable profiling permanently for normal users.
+- Do not materially increase allocations on hot paths when timings are disabled.
+- Do not change TaskQueue scheduling behavior.
+- Do not change spell/event ordering.
 
 ## Coding-agent instructions
-Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md` and completed issues #51–#56. Inspect the actual final working tree rather than trusting task summaries. Execute every matrix above, inspect every remaining Guild Progression search hit, and fix only concrete defects in this removal. Before marking complete, report the audit performed, exact files changed, protocol compatibility result, validation results, and any remaining intentional progression references.
+Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read both runtime-performance documents first, then inspect existing `core/debug/Timings.lua`, spellcast timing helpers, and `/rpe` command routing before editing. Keep this task instrumentation-only. Report exact timing scopes added, the debug command added, cardinality fields captured, files changed, and baseline observations obtainable from the new instrumentation.

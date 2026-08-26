@@ -9,6 +9,31 @@ local UI = Addon.UI or {}
 local Inventory = Addon.Client.Inventory or {}
 local InventoryUI = Addon.Client.UI.Inventory
 
+local function startTiming(label, thresholdMs, context)
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer, cardinality)
+    if not timer then
+        return
+    end
+
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer, { cardinality = cardinality })
+    end
+end
+
 local InventoryWindow = InventoryUI.Window or {}
 InventoryUI.Window = InventoryWindow
 InventoryWindow.__index = InventoryWindow
@@ -196,11 +221,18 @@ function InventoryWindow:Refresh()
 end
 
 function InventoryWindow:Show()
+    local timer = startTiming("InventoryWindow:Show", 8, self.activeTabKey or "inventory")
     local window = self:BuildWindow()
     self:Refresh()
     self:RefreshWindowLayout()
     if window and window.Show then
         window:Show()
+    end
+    if timer then
+        stopTiming(timer, {
+            activeTab = self.activeTabKey or "inventory",
+            builtPages = 3,
+        })
     end
     return window
 end

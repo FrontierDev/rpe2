@@ -14,6 +14,31 @@ local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Ruleset = Addon.Internal and Addon.Internal.Ruleset or {}
 local ItemClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Item or nil
 
+local function startTiming(label, thresholdMs, context)
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer, cardinality)
+    if not timer then
+        return
+    end
+
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer, { cardinality = cardinality })
+    end
+end
+
 local EquipmentStatsPage = ProfileUI.EquipmentStatsPage or {}
 ProfileUI.EquipmentStatsPage = EquipmentStatsPage
 
@@ -1840,14 +1865,23 @@ function EquipmentStatsPage:Refresh()
         return nil
     end
 
+    local timer = startTiming("EquipmentStatsPage:Refresh", 8, "equipment")
     self:ApplyMetrics()
     local owner = self.owner
     local scope = self:GetActiveEquipmentScope()
+    local viewModelTimer = startTiming("EquipmentStatsPage:ViewModel", 4, scope)
     local layout = self:GetActiveEquipmentLayout() or { left = {}, right = {}, bottom = {}, ordered = {} }
     local statRows = Profile.ListProfileStatRows and Profile.ListProfileStatRows() or {}
     local resourceRows = Profile.ListResolvedResources and Profile.ListResolvedResources() or {}
     local healthResourceRef = getHealthResourceRef()
     local layoutSignature = buildLayoutSignature(layout)
+    if viewModelTimer then
+        stopTiming(viewModelTimer, {
+            equipmentSlots = #(layout.ordered or {}),
+            statRows = #statRows,
+            resourceRows = #resourceRows,
+        })
+    end
     self:RefreshScopeButtons()
     self:RefreshEquipmentHeader()
     if self.LastLayoutSignature ~= layoutSignature then
@@ -1880,6 +1914,14 @@ function EquipmentStatsPage:Refresh()
     refreshItemLevelSummary(self, layout)
     refreshResourceSelectors(self, resourceRows, healthResourceRef)
     refreshProfileSelectors(self)
+    if timer then
+        stopTiming(timer, {
+            equipmentSlots = #(layout.ordered or {}),
+            statRows = #statRows,
+            resourceRows = #resourceRows,
+            scope = scope,
+        })
+    end
     return self.frame
 end
 

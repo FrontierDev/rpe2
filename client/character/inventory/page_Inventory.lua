@@ -11,6 +11,31 @@ local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local UI = Addon.UI or {}
 local TooltipBuilders = Addon.Client.UI and Addon.Client.UI.Tooltips or {}
 
+local function startTiming(label, thresholdMs, context)
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer, cardinality)
+    if not timer then
+        return
+    end
+
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer, { cardinality = cardinality })
+    end
+end
+
 local InventoryGridPage = {}
 InventoryGridPage.__index = InventoryGridPage
 
@@ -779,6 +804,8 @@ function InventoryGridPage:Refresh()
         return nil
     end
 
+    local timer = startTiming("InventoryGridPage:Refresh", 8, self.categoryKey or self.pageLabel or "inventory")
+
     if self.FilterDropdown and self.FilterDropdown.SetItems then
         local selectedValues = self:GetSelectedFilterValues()
         self.FilterDropdown:SetItems(self:BuildFilterItems())
@@ -832,6 +859,14 @@ function InventoryGridPage:Refresh()
         end
     end
 
+    if timer then
+        stopTiming(timer, {
+            categoryItems = #categoryItems,
+            filteredItems = #displayItems,
+            resolvedItems = #displayItems,
+            visibleSlots = TOTAL_SLOTS,
+        })
+    end
     return self.frame
 end
 

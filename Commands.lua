@@ -11,6 +11,95 @@ local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
 end
 
+local function getTimings()
+    return Addon.Debug and Addon.Debug.Timings or nil
+end
+
+local function formatCardinality(cardinality)
+    if type(cardinality) ~= "table" then
+        return cardinality ~= nil and tostring(cardinality) or ""
+    end
+
+    local keys = {}
+    for key in pairs(cardinality) do
+        keys[#keys + 1] = key
+    end
+    table.sort(keys, function(left, right)
+        return tostring(left) < tostring(right)
+    end)
+
+    local parts = {}
+    for index = 1, #keys do
+        local key = keys[index]
+        parts[#parts + 1] = ("%s=%s"):format(tostring(key), tostring(cardinality[key]))
+    end
+    return table.concat(parts, ",")
+end
+
+local function printTaskStats(router, prefix)
+    local tasks = getTasks()
+    local stats = tasks and type(tasks.GetStats) == "function" and tasks:GetStats() or nil
+    if type(stats) ~= "table" then
+        router:Print("%sTaskQueue diagnostics unavailable.", nil, prefix or "")
+        return false
+    end
+
+    router:Print(
+        "%sTaskQueue pending=%d lastFlushJobs=%d lastFlush=%.2fms maxFlush=%.2fms budget=%d timeBudget=%.2fms interval=%.3fs paused=%s totalExecuted=%d.",
+        nil,
+        prefix or "",
+        tonumber(stats.queueLength) or 0,
+        tonumber(stats.jobsExecutedLastFlush) or 0,
+        tonumber(stats.lastFlushElapsedMs) or 0,
+        tonumber(stats.maxFlushElapsedMs) or 0,
+        tonumber(stats.budget) or 0,
+        tonumber(stats.timeBudget) or 0,
+        tonumber(stats.flushInterval) or 0,
+        stats.paused and "yes" or "no",
+        tonumber(stats.totalExecuted) or 0
+    )
+    return true
+end
+
+local function printRecentSlowRecords(router)
+    local timings = getTimings()
+    local records = timings and type(timings.GetRecentRecords) == "function"
+        and timings:GetRecentRecords({ slowOnly = true }) or {}
+
+    router:Print("Recent slow operations (%d):", nil, #records)
+    if #records == 0 then
+        router:Print("  none recorded.")
+        return 0
+    end
+
+    for index = 1, #records do
+        local record = records[index]
+        local context = record.context and (" context=" .. tostring(record.context)) or ""
+        local cardinality = formatCardinality(record.cardinality)
+        if cardinality ~= "" then
+            cardinality = " cardinality=" .. cardinality
+        end
+        router:Print(
+            "  #%d %s %.2fms (threshold %.2fms)%s%s",
+            nil,
+            tonumber(record.order) or index,
+            tostring(record.label or "operation"),
+            tonumber(record.elapsedMs) or 0,
+            tonumber(record.thresholdMs) or 0,
+            context,
+            cardinality
+        )
+    end
+
+    return #records
+end
+
+local function printPerformanceDiagnostics(router)
+    printRecentSlowRecords(router)
+    printTaskStats(router, "")
+    return true
+end
+
 local function copyPathTokens(path)
     local tokens = {}
 
@@ -196,6 +285,24 @@ Commands:RegisterCommand({ "debug", "timings" }, function(context)
     return true
 end, {
     description = "Toggle internal timing debug output. Use /rpe debug timings on or off.",
+})
+
+Commands:RegisterCommand({ "debug", "perf" }, function(context)
+    return printPerformanceDiagnostics(context.router)
+end, {
+    description = "Print recent slow timing records and TaskQueue diagnostics.",
+})
+
+Commands:RegisterCommand({ "debug", "tasks" }, function(context)
+    return printTaskStats(context.router, "")
+end, {
+    description = "Print TaskQueue diagnostics.",
+})
+
+Commands:RegisterCommand({ "debug" }, function(context)
+    return printPerformanceDiagnostics(context.router)
+end, {
+    description = "Print recent slow timing records and TaskQueue diagnostics.",
 })
 
 function Commands:Run(message)

@@ -8,6 +8,31 @@ local Client = Addon.Client
 local ProfileUI = Addon.Client.UI.Profile
 local UI = Addon.UI or {}
 
+local function startTiming(label, thresholdMs, context)
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer, cardinality)
+    if not timer then
+        return
+    end
+
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer, { cardinality = cardinality })
+    end
+end
+
 local ProfileWindow = ProfileUI.Window or {}
 ProfileUI.Window = ProfileWindow
 ProfileWindow.__index = ProfileWindow
@@ -215,7 +240,14 @@ function ProfileWindow:BuildWindow()
 end
 
 function ProfileWindow:Refresh()
+    local timer = startTiming("ProfileWindow:Refresh", 8, "profile")
     self:RefreshTab(self:GetActiveTabKey())
+    if timer then
+        stopTiming(timer, {
+            activeTab = self:GetActiveTabKey() or "profile",
+            activePage = 1,
+        })
+    end
 
     return self.window
 end
@@ -234,10 +266,18 @@ function ProfileWindow:ShowTab(tabKey)
 end
 
 function ProfileWindow:Show()
+    local timer = startTiming("ProfileWindow:Show", 8, "profile")
     local window = self:BuildWindow()
     self:Refresh()
     if window and window.Show then
         window:Show()
+    end
+    if timer then
+        local activeTab = self:GetActiveTabKey() or "profile"
+        stopTiming(timer, {
+            activeTab = activeTab,
+            profilePages = 4,
+        })
     end
     return window
 end

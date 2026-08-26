@@ -72,6 +72,47 @@ local function isSpellcastTimingEnabled()
     return type(Addon.Debug) == "table" and Addon.Debug.SpellcastTiming == true
 end
 
+local function startTiming(label, thresholdMs, context)
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer, cardinality)
+    if not timer then
+        return
+    end
+
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer, { cardinality = cardinality })
+    end
+end
+
+local function countCooldownEntries(bucket)
+    local units = 0
+    local spells = 0
+    if type(bucket) == "table" then
+        for _, unitState in pairs(bucket) do
+            if type(unitState) == "table" then
+                units = units + 1
+                for _ in pairs(unitState.spells or {}) do
+                    spells = spells + 1
+                end
+            end
+        end
+    end
+    return units, spells
+end
+
 local function logSpellcastTiming(phase, context, detail)
     local Debug = Addon.Debug or {}
     if not isSpellcastTimingEnabled() or type(Debug.Internal) ~= "function" then
@@ -936,17 +977,25 @@ function Spellcasting.AdvanceCooldownState(self, previousTurnNumber, previousTic
         return false
     end
 
+    local timer = startTiming("Cooldown advancement", 8, eventId)
+
     local currentTurnNumber = math.max(1, math.floor(tonumber(eventState.turnNumber) or 1))
     local currentTickNumber = math.max(1, math.floor(tonumber(eventState.tickNumber) or 1))
     local previousTurn = math.max(0, math.floor(tonumber(previousTurnNumber) or 0))
     local previousTick = math.max(0, math.floor(tonumber(previousTickNumber) or 0))
     if previousTurn == currentTurnNumber and previousTick == currentTickNumber then
+        if timer then
+            stopTiming(timer, { activeCooldowns = 0, activeCooldownUnits = 0, eventUnits = type(eventState.units) == "table" and #eventState.units or 0 })
+        end
         return false
     end
 
     local bucket = Spellcasting.GetEventCooldownBucket(self, eventId, false)
     local changed = Spellcasting.PruneCooldownState(self, eventState)
     if type(bucket) ~= "table" then
+        if timer then
+            stopTiming(timer, { activeCooldowns = 0, activeCooldownUnits = 0, eventUnits = type(eventState.units) == "table" and #eventState.units or 0 })
+        end
         return changed
     end
 
@@ -1003,6 +1052,14 @@ function Spellcasting.AdvanceCooldownState(self, previousTurnNumber, previousTic
         self:QueueActionBarRefresh("cooldown-advance")
     end
 
+    if timer then
+        local activeCooldownUnits, activeCooldowns = countCooldownEntries(bucket)
+        stopTiming(timer, {
+            activeCooldowns = activeCooldowns,
+            activeCooldownUnits = activeCooldownUnits,
+            eventUnits = type(eventState.units) == "table" and #eventState.units or 0,
+        })
+    end
     return changed
 end
 

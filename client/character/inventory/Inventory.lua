@@ -8,6 +8,31 @@ local Database = Addon.Internal and Addon.Internal.Database or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local ModificationService = Profile and Profile.Modifications or {}
 
+local function startTiming(label, thresholdMs, context)
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer, cardinality)
+    if not timer then
+        return
+    end
+
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer, { cardinality = cardinality })
+    end
+end
+
 local function getItemClass()
     return Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Item or nil
 end
@@ -328,6 +353,7 @@ function Inventory.GetItems()
 end
 
 function Inventory.SetItems(items, changeType, detail, notificationToken)
+    local timer = startTiming("Inventory.SetItems", 4, changeType or "set")
     local inventory = Inventory.GetCharacterInventory()
     local normalizedItems = {}
 
@@ -340,6 +366,13 @@ function Inventory.SetItems(items, changeType, detail, notificationToken)
 
     inventory.items = normalizedItems
     notifyChangeListeners(changeType or "set", detail, notificationToken)
+    if timer then
+        stopTiming(timer, {
+            inventoryStacks = #normalizedItems,
+            resolvedItems = #normalizedItems,
+            mutationCount = 1,
+        })
+    end
     return inventory.items
 end
 
@@ -355,6 +388,7 @@ function Inventory.AddItem(itemRecord)
         normalized.soulbound = true
     end
 
+    local timer = startTiming("Inventory.AddItem", 4, "inventory-add")
     local items = Inventory.GetItems()
     local canStack, maxStackSize = canStackRecord(normalized)
     local remaining = math.max(1, math.floor(tonumber(normalized.quantity) or 1))
@@ -392,6 +426,13 @@ function Inventory.AddItem(itemRecord)
         actualAddedQuantity = actualAddedQuantity,
         source = "inventory-add",
     }, CANONICAL_ADD_NOTIFICATION)
+    if timer then
+        stopTiming(timer, {
+            inventoryStacks = #items,
+            addedStacks = #items,
+            actualAddedQuantity = actualAddedQuantity,
+        })
+    end
     return normalized, #items
 end
 
@@ -641,6 +682,7 @@ function Inventory.ResolveItem(itemRecord)
 end
 
 function Inventory.GetDisplayItems(maxItems)
+    local timer = startTiming("Inventory.GetDisplayItems", 4, "display-snapshot")
     local items = Inventory.GetItems()
     local active = {}
     local inactive = {}
@@ -665,15 +707,25 @@ function Inventory.GetDisplayItems(maxItems)
         ordered[#ordered + 1] = inactive[index]
     end
 
+    local result = ordered
     if maxItems and maxItems > 0 and #ordered > maxItems then
         local limited = {}
         for index = 1, maxItems do
             limited[index] = ordered[index]
         end
-        return limited
+        result = limited
     end
 
-    return ordered
+    if timer then
+        stopTiming(timer, {
+            inventoryStacks = #items,
+            resolvedItems = #ordered,
+            displayItems = #result,
+            activeItems = #active,
+            inactiveItems = #inactive,
+        })
+    end
+    return result
 end
 
 function Inventory.Initialize()

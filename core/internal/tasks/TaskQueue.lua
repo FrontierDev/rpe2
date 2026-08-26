@@ -7,6 +7,10 @@ Addon.Internal.Tasks = Tasks
 
 local Debug = Addon.Debug or {}
 
+local function getTimings()
+    return Addon.Debug and Addon.Debug.Timings or nil
+end
+
 Tasks.DefaultBudget = Tasks.DefaultBudget or 2
 Tasks.DefaultMaxMilliseconds = Tasks.DefaultMaxMilliseconds or 2
 Tasks.DefaultFlushInterval = Tasks.DefaultFlushInterval or 0.05
@@ -21,6 +25,11 @@ Tasks.Tail = Tasks.Tail or #Tasks.Queue
 Tasks.Paused = Tasks.Paused == nil and false or Tasks.Paused
 Tasks.IsFlushing = Tasks.IsFlushing or false
 Tasks.TotalExecuted = Tasks.TotalExecuted or 0
+Tasks.TotalFlushes = Tasks.TotalFlushes or 0
+Tasks.LastFlushElapsedMs = tonumber(Tasks.LastFlushElapsedMs) or 0
+Tasks.MaxFlushElapsedMs = tonumber(Tasks.MaxFlushElapsedMs) or 0
+Tasks.JobsExecutedLastFlush = tonumber(Tasks.JobsExecutedLastFlush) or 0
+Tasks.LastFlushQueuedJobs = tonumber(Tasks.LastFlushQueuedJobs) or 0
 
 local function captureArgs(...)
     local count = select("#", ...)
@@ -215,6 +224,16 @@ function Tasks:Flush(maxTasks)
 
     local executed = 0
     self.IsFlushing = true
+    local timings = getTimings()
+    local flushTimer = nil
+    if timings and type(timings.Start) == "function"
+        and (type(timings.IsEnabled) ~= "function" or timings:IsEnabled())
+    then
+        flushTimer = timings:Start("TaskQueue.Flush", {
+            thresholdMs = 2,
+        })
+    end
+    local queuedJobs = activeQueueLength() + #self.DeferredQueue
     local startedAt = getNowMilliseconds()
     local maxMilliseconds = tonumber(self.MaxMilliseconds) or tonumber(self.DefaultMaxMilliseconds) or 0
 
@@ -238,6 +257,27 @@ function Tasks:Flush(maxTasks)
 
     appendDeferredQueue()
 
+    local elapsedMs = nil
+    if startedAt then
+        elapsedMs = math.max(0, getNowMilliseconds() - startedAt)
+        self.LastFlushElapsedMs = elapsedMs
+        self.MaxFlushElapsedMs = math.max(tonumber(self.MaxFlushElapsedMs) or 0, elapsedMs)
+    end
+    self.TotalFlushes = (tonumber(self.TotalFlushes) or 0) + 1
+    self.JobsExecutedLastFlush = executed
+    self.LastFlushQueuedJobs = queuedJobs
+
+    if flushTimer and timings and type(timings.Stop) == "function" then
+        timings:Stop(flushTimer, {
+            cardinality = {
+                queuedTasks = queuedJobs,
+                jobsExecuted = executed,
+                deferredTasks = #self.DeferredQueue,
+                sliceableTasks = 0,
+            },
+        })
+    end
+
     return executed
 end
 
@@ -259,5 +299,12 @@ function Tasks:GetStats()
         flushInterval = self.FlushInterval or self.DefaultFlushInterval,
         paused = self.Paused and true or false,
         totalExecuted = self.TotalExecuted or 0,
+        totalFlushes = self.TotalFlushes or 0,
+        jobsExecutedLastFlush = self.JobsExecutedLastFlush or 0,
+        lastFlushQueuedJobs = self.LastFlushQueuedJobs or 0,
+        lastFlushElapsedMs = self.LastFlushElapsedMs or 0,
+        maxFlushElapsedMs = self.MaxFlushElapsedMs or 0,
+        normalQueuedJobs = activeQueueLength(),
+        sliceableQueuedJobs = 0,
     }
 end

@@ -36,6 +36,41 @@ local function getTimings()
     return Addon.Debug and Addon.Debug.Timings or nil
 end
 
+local function startTiming(label, thresholdMs, context)
+    local timings = getTimings()
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer, cardinality)
+    if not timer then
+        return
+    end
+
+    local timings = getTimings()
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer, { cardinality = cardinality })
+    end
+end
+
+local function countMap(value)
+    local count = 0
+    if type(value) == "table" then
+        for _ in pairs(value) do
+            count = count + 1
+        end
+    end
+    return count
+end
+
 local function logEventTimingParts(label, parts, totalElapsed, threshold)
     local timings = getTimings()
     if type(timings) == "table" and type(timings.LogParts) == "function" then
@@ -555,7 +590,16 @@ local function queueNextVisualPhase(targetClient)
                 nextClient.VisualRefreshFlushQueued = false
                 local currentPhase = tonumber(nextClient.PendingVisualRefreshPhase) or 1
                 nextClient.PendingVisualRefreshPhase = nil
+                local timer = startTiming("Visual refresh flush", 8, currentPhase)
                 consumeVisualPhase(nextClient, currentPhase)
+                if timer then
+                    local dirtyState = ensureDirtyUiRefreshState(nextClient)
+                    stopTiming(timer, {
+                        phase = currentPhase,
+                        pendingEventTargets = countMap(nextClient.PendingEventWidgetRefreshTargetEventIds),
+                        actionBarSlots = countMap(dirtyState and dirtyState.actionBarSlots),
+                    })
+                end
                 queueNextVisualPhase(nextClient)
             end, targetClient)
         end
@@ -2305,6 +2349,7 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
         return false, {}
     end
 
+    local timer = startTiming("Spellcast component execution", 8, spellRef)
     local timingEnabled = isSpellcastTimingEnabled()
     local totalStartTime = timingEnabled and getNowMilliseconds() or nil
     local targetPhase = combat.NormalizeCastPhase and combat.NormalizeCastPhase(phase) or tostring(phase or "on_cast_end")
@@ -2312,6 +2357,7 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
     local results = {}
     local executed = false
     local executedComponentCount = 0
+    local executedComponentTotal = 0
     local combatEventState = type(combat.GetOrCreateActionCombatEventState) == "function"
         and combat:GetOrCreateActionCombatEventState(castEntry, spell)
         or nil
@@ -2322,6 +2368,7 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
         local normalizedComponent = combat.NormalizeComponent and combat.NormalizeComponent(component) or component
         local componentPhase = normalizedComponent and normalizedComponent.castPhase or nil
         if normalizedComponent and componentPhase == targetPhase and normalizedComponent.effect then
+            executedComponentTotal = executedComponentTotal + 1
             local componentStartTime = timingEnabled and getNowMilliseconds() or nil
             local targetResolveStartTime = timingEnabled and getNowMilliseconds() or nil
             local targets = Spellcasting.ResolveComponentTargets(eventState, casterUnit, normalizedComponent, castEntry)
@@ -2520,6 +2567,14 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
             getNowMilliseconds() - totalStartTime,
             SPELLCAST_SLOW_TOTAL_MS
         )
+    end
+
+    if timer then
+        stopTiming(timer, {
+            spellComponents = executedComponentTotal,
+            targetCount = #results,
+            resolvedComponents = executedComponentTotal,
+        })
     end
 
     return executed, results

@@ -20,6 +20,35 @@ local SPELLCAST_INTERRUPT_OPCODE = Operations:GetOpcode("SPELLCAST_INTERRUPT")
 local SPELLCAST_SLOW_TOTAL_MS = 100
 local SPELLCAST_SLOW_HELPER_MS = 25
 
+local function startTiming(label, thresholdMs, context)
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer, cardinality)
+    if not timer then
+        return
+    end
+
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer, { cardinality = cardinality })
+    end
+end
+
+local function countList(value)
+    return type(value) == "table" and #value or 0
+end
+
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
 end
@@ -521,6 +550,8 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
         appendTimingPhase(timingPhases, "aura", getNowMilliseconds() - auraStartTime, SPELLCAST_SLOW_HELPER_MS)
     end
 
+    local timer = startTiming("Spellcast start", 8, spellRef)
+
     local numericCastTime = Spellcasting.NormalizeTurnCount(castTime)
     if numericCastTime == nil then
         numericCastTime = Spellcasting.NormalizeTurnCount(spell.totalTicks) or Spellcasting.NormalizeTurnCount(spell.castTime)
@@ -540,6 +571,9 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
             appendTimingPhase(timingPhases, "resource-apply", getNowMilliseconds() - resourceApplyStartTime, SPELLCAST_SLOW_HELPER_MS)
         end
         if not applied then
+            if timer then
+                stopTiming(timer, { spellComponents = countList(spell.components), targetCount = queuedTargetUnit and 1 or 0 })
+            end
             return false
         end
 
@@ -568,7 +602,15 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
             appendTimingPhase(timingPhases, "instant-dispatch", getNowMilliseconds() - instantDispatchStartTime, SPELLCAST_SLOW_HELPER_MS)
             logSpellcastTiming("start", spellRef, timingPhases, getNowMilliseconds() - (totalStartTime or 0), SPELLCAST_SLOW_TOTAL_MS)
         end
-        return queueLocalInstantSpellcastCompletion(self, spellRef, instantCastEntry)
+        local sent = queueLocalInstantSpellcastCompletion(self, spellRef, instantCastEntry)
+        if timer then
+            stopTiming(timer, {
+                spellComponents = countList(spell.components),
+                targetCount = queuedTargetUnit and 1 or 0,
+                instant = 1,
+            })
+        end
+        return sent
     end
 
     local stateStartTime = timingEnabled and getNowMilliseconds() or nil
@@ -582,6 +624,9 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
         activeEventState and activeEventState.turnNumber or eventState.turnNumber
     )
     if not entry then
+        if timer then
+            stopTiming(timer, { spellComponents = countList(spell.components), targetCount = queuedTargetUnit and 1 or 0 })
+        end
         return false
     end
 
@@ -616,6 +661,13 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
         logSpellcastTiming("start", spellRef, timingPhases, getNowMilliseconds() - (totalStartTime or 0), SPELLCAST_SLOW_TOTAL_MS)
     end
 
+    if timer then
+        stopTiming(timer, {
+            spellComponents = countList(spell.components),
+            targetCount = queuedTargetUnit and 1 or 0,
+            activeCasts = 1,
+        })
+    end
     return sent
 end
 
@@ -680,6 +732,8 @@ function Client:OnSpellcastComplete(spellRef, castEntryOverride)
         return false
     end
 
+    local timer = startTiming("Spellcast completion", 8, spellRef)
+
     local endCosts = Spellcasting.GetSpellResourceCostsForPhase(spell, "on_cast_end")
     if #endCosts > 0 then
         local resourceApplyStartTime = timingEnabled and getNowMilliseconds() or nil
@@ -734,6 +788,13 @@ function Client:OnSpellcastComplete(spellRef, castEntryOverride)
         logSpellcastTiming("finish", spellRef, timingPhases, getNowMilliseconds() - (totalStartTime or 0), SPELLCAST_SLOW_TOTAL_MS)
     end
 
+    if timer then
+        stopTiming(timer, {
+            spellComponents = countList(spell.components),
+            targetCount = targetUnit and 1 or 0,
+            activeCasts = 0,
+        })
+    end
     return sent
 end
 

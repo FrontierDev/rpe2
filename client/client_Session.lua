@@ -39,6 +39,35 @@ local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
 end
 
+local function getTimings()
+    return Addon.Debug and Addon.Debug.Timings or nil
+end
+
+local function startTiming(label, thresholdMs, context)
+    local timings = getTimings()
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer, cardinality)
+    if not timer then
+        return
+    end
+
+    local timings = getTimings()
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer, { cardinality = cardinality })
+    end
+end
+
 local function getTimingMilliseconds()
     if type(debugprofilestop) == "function" then
         return tonumber(debugprofilestop()) or 0
@@ -56,6 +85,10 @@ end
 
 local function logSessionInternal(message, ...)
     if SESSION_INTERNAL_TRACE ~= true then
+        return
+    end
+    local timings = getTimings()
+    if not timings or type(timings.IsEnabled) ~= "function" or not timings:IsEnabled() then
         return
     end
     if Debug and type(Debug.SetLevelEnabled) == "function" and type(Debug.IsLevelEnabled) == "function" and not Debug.IsLevelEnabled("internal") then
@@ -154,8 +187,12 @@ function Client:QueueLocalConfigurationRefresh(reason)
         return false
     end
 
+    local timer = startTiming("Client:QueueLocalConfigurationRefresh", 4, reason or "configuration-changed")
     self.PendingLocalConfigurationRefreshReason = reason or self.PendingLocalConfigurationRefreshReason or "configuration-changed"
     if self.LocalConfigurationRefreshQueued then
+        if timer then
+            stopTiming(timer, { queuedTasks = 1, alreadyQueued = 1 })
+        end
         return true
     end
 
@@ -171,6 +208,14 @@ function Client:QueueLocalConfigurationRefresh(reason)
         targetClient:HandleLocalConfigurationChanged(refreshReason)
     end, self)
 
+    local queuedTasks = 1
+    local tasks = timer and getTasks() or nil
+    if tasks and type(tasks.GetStats) == "function" then
+        queuedTasks = tonumber(tasks:GetStats().queueLength) or queuedTasks
+    end
+    if timer then
+        stopTiming(timer, { queuedTasks = queuedTasks })
+    end
     return true
 end
 
@@ -417,6 +462,7 @@ function Client:HandleLocalConfigurationChanged(reason)
     self.LocalConfigurationRefreshInProgress = true
     local startedAt = getTimingMilliseconds()
     local normalizedReason = normalizeConfigurationChangeReason(reason)
+    local timer = startTiming("Client:HandleLocalConfigurationChanged", 8, normalizedReason)
     local profileLogic = Addon.Internal and Addon.Internal.Profile or nil
     local resolvedBootstrapReady = true
     if self.Crafting and type(self.Crafting.GetRecipeSkillIndex) == "function" then
@@ -500,6 +546,13 @@ function Client:HandleLocalConfigurationChanged(reason)
 
     if not ConfigurationChangeQueuesClientConnectRefresh(normalizedReason) then
         self.LocalConfigurationRefreshInProgress = false
+        if timer then
+            stopTiming(timer, {
+                eventUnits = type(eventState) == "table" and type(eventState.units) == "table" and #eventState.units or 0,
+                activeEvent = type(eventState) == "table" and eventState.active == true and 1 or 0,
+                resourceSync = 0,
+            })
+        end
         logSessionInternal(
             "Session: HandleLocalConfigurationChanged reason=%s took=%.2fms",
             tostring(normalizedReason or ""),
@@ -509,6 +562,13 @@ function Client:HandleLocalConfigurationChanged(reason)
     end
 
     self.LocalConfigurationRefreshInProgress = false
+    if timer then
+        stopTiming(timer, {
+            eventUnits = type(eventState) == "table" and type(eventState.units) == "table" and #eventState.units or 0,
+            activeEvent = type(eventState) == "table" and eventState.active == true and 1 or 0,
+            resourceSync = ConfigurationChangeQueuesResourceSync(normalizedReason) and 1 or 0,
+        })
+    end
     logSessionInternal(
         "Session: HandleLocalConfigurationChanged reason=%s took=%.2fms",
         tostring(normalizedReason or ""),

@@ -7,6 +7,31 @@ local Common = Addon.Utils and Addon.Utils.Common or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 
+local function startTiming(label, thresholdMs, context)
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer, cardinality)
+    if not timer then
+        return
+    end
+
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer, { cardinality = cardinality })
+    end
+end
+
 local Achievements = Client.Achievements or {}
 Client.Achievements = Achievements
 
@@ -500,6 +525,7 @@ function Achievements:_CommitState(achievementRef, achievement, state, options)
 
     refreshProfileUI()
     if newlyCompleted then
+        local rewardTimer = startTiming("Achievement reward-chain", 8, achievementRef)
         local dependentContext = {
             achievementRef = achievementRef,
             source = "achievement-complete",
@@ -517,6 +543,12 @@ function Achievements:_CommitState(achievementRef, achievement, state, options)
                 newlyCompleted = true,
             })
         end
+        if rewardTimer then
+            stopTiming(rewardTimer, {
+                achievementCriteria = #(achievement.criteria or {}),
+                changedAchievements = 1,
+            })
+        end
     end
 
     return true, newlyCompleted
@@ -532,6 +564,7 @@ function Achievements:ProcessTrigger(trigger, context)
         }
     end
 
+    local timer = startTiming("Achievements:ProcessTrigger", 4, normalizedTrigger)
     local index = self:EnsureIndex() or {}
     local entries = index[normalizedTrigger] or {}
     local statesByAchievement = {}
@@ -539,6 +572,13 @@ function Achievements:ProcessTrigger(trigger, context)
     local achievementOrder = {}
     local amount = normalizeInteger(type(context) == "table" and context.amount or 1, 0)
     if amount <= 0 then
+        if timer then
+            stopTiming(timer, {
+                achievementCriteria = #entries,
+                changedAchievements = 0,
+                completedAchievements = 0,
+            })
+        end
         return {
             trigger = normalizedTrigger,
             updated = 0,
@@ -593,6 +633,13 @@ function Achievements:ProcessTrigger(trigger, context)
         end
     end
 
+    if timer then
+        stopTiming(timer, {
+            achievementCriteria = #entries,
+            changedAchievements = updated,
+            completedAchievements = completed,
+        })
+    end
     return {
         trigger = normalizedTrigger,
         updated = updated,

@@ -18,6 +18,41 @@ local Dependencies = Database.Dependecies or {}
 local Comms = Addon.Internal.Comms or {}
 local Operations = Comms.Operations or {}
 
+local function startTiming(label, thresholdMs, context)
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer, cardinality)
+    if not timer then
+        return
+    end
+
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer, { cardinality = cardinality })
+    end
+end
+
+local function countAuraEntries(bucket)
+    local count = 0
+    if type(bucket) == "table" and type(bucket.byKey) == "table" then
+        for _ in pairs(bucket.byKey) do
+            count = count + 1
+        end
+    end
+    return count
+end
+
 local AURA_APPLY_OPCODE = Operations.GetOpcode and Operations:GetOpcode("AURA_APPLY") or nil
 local AURA_DISPEL_OPCODE = Operations.GetOpcode and Operations:GetOpcode("AURA_DISPEL") or nil
 local AURA_APPLY_BATCH_OPCODE = Operations.GetOpcode and Operations:GetOpcode("AURA_APPLY_BATCH") or nil
@@ -3397,6 +3432,8 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
         return false
     end
 
+    local timer = startTiming("Aura advancement entry", 8, eventId)
+
     local currentTurnNumber = math.max(1, math.floor(tonumber(targetTurnNumber) or tonumber(eventState.turnNumber) or 1))
     local currentTickNumber = math.max(1, math.floor(tonumber(targetTickNumber) or tonumber(eventState.tickNumber) or 1))
     local currentStepNumber = math.max(1, math.floor(tonumber(targetStepNumber) or resolveEventProgressStep(currentTurnNumber, currentTickNumber, eventState.totalTicks)))
@@ -3410,6 +3447,9 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
     if currentStepNumber <= lastAdvancedStep then
         if math.floor(tonumber(entry.pendingAdvancedStep) or 0) <= currentStepNumber then
             entry.pendingAdvancedStep = nil
+        end
+        if timer then
+            stopTiming(timer, { activeAuras = countAuraEntries(bucket), dueAuras = 0, targetCount = 1 })
         end
         return false
     end
@@ -3475,6 +3515,13 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
         refreshAuraDisplays("aura-advance", eventState, localPlayerEventId, localPlayerDerivedStateImpact)
     end
 
+    if timer then
+        stopTiming(timer, {
+            activeAuras = countAuraEntries(bucket),
+            dueAuras = 1,
+            targetCount = 1,
+        })
+    end
     return changed
 end
 
@@ -3489,21 +3536,30 @@ function AuraManager:AdvanceAuraState(client, previousTurnNumber, previousTickNu
         return false
     end
 
+    local timer = startTiming("Aura advancement", 8, eventId)
+
     local currentTurnNumber = math.max(1, math.floor(tonumber(eventState.turnNumber) or 1))
     local currentTickNumber = math.max(1, math.floor(tonumber(eventState.tickNumber) or 1))
     local currentStepNumber = resolveEventProgressStep(currentTurnNumber, currentTickNumber, eventState.totalTicks)
     local previousTurn = math.max(0, math.floor(tonumber(previousTurnNumber) or 0))
     local previousTick = math.max(0, math.floor(tonumber(previousTickNumber) or 0))
     if previousTurn == currentTurnNumber and previousTick == currentTickNumber then
+        if timer then
+            stopTiming(timer, { activeAuras = 0, dueAuras = 0, queuedAuras = 0, eventUnits = type(eventState.units) == "table" and #eventState.units or 0 })
+        end
         return false
     end
 
     local bucket = self:GetEventAuraBucket(client, eventId, false)
     if not bucket then
+        if timer then
+            stopTiming(timer, { activeAuras = 0, dueAuras = 0, queuedAuras = 0, eventUnits = type(eventState.units) == "table" and #eventState.units or 0 })
+        end
         return false
     end
 
     local queued = false
+    local dueAuras = 0
 
     for auraKey, entry in pairs(bucket.byKey or {}) do
         if type(entry) == "table" then
@@ -3515,6 +3571,7 @@ function AuraManager:AdvanceAuraState(client, previousTurnNumber, previousTickNu
                 )
             )
             if currentStepNumber > lastAdvancedStep then
+                dueAuras = dueAuras + 1
                 local pendingAdvancedStep = math.floor(tonumber(entry.pendingAdvancedStep) or 0)
                 if pendingAdvancedStep < currentStepNumber then
                     entry.pendingAdvancedStep = currentStepNumber
@@ -3531,6 +3588,14 @@ function AuraManager:AdvanceAuraState(client, previousTurnNumber, previousTickNu
         end
     end
 
+    if timer then
+        stopTiming(timer, {
+            activeAuras = countAuraEntries(bucket),
+            dueAuras = dueAuras,
+            queuedAuras = queued and dueAuras or 0,
+            eventUnits = type(eventState.units) == "table" and #eventState.units or 0,
+        })
+    end
     return queued
 end
 

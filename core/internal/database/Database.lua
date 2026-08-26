@@ -6,6 +6,31 @@ local Database = Addon.Internal.Database or {}
 Addon.Internal.Database = Database
 local Dependecies = Database.Dependecies or {}
 
+local function startTiming(label, thresholdMs, context)
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer)
+    if not timer then
+        return
+    end
+
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer)
+    end
+end
+
 local SCHEMA = {
     profiles = 7,
     rulesets = 1,
@@ -95,9 +120,11 @@ local function markConfigurationChanged()
 end
 
 local function notifyConfigurationChanged(reason)
+    local timer = startTiming("Database:notifyConfigurationChanged", 4, reason or "configuration-changed")
     markConfigurationChanged()
     local client = Addon.Client or nil
     if client and type(client.TryDeferLocalConfigurationChanged) == "function" and client:TryDeferLocalConfigurationChanged(reason) then
+        stopTiming(timer)
         return
     end
     if startsWith(reason, "profile-")
@@ -105,11 +132,13 @@ local function notifyConfigurationChanged(reason)
         and type(client.QueueLocalConfigurationRefresh) == "function"
     then
         client:QueueLocalConfigurationRefresh(reason)
+        stopTiming(timer)
         return
     end
     if client and type(client.HandleLocalConfigurationChanged) == "function" then
         client:HandleLocalConfigurationChanged(reason)
     end
+    stopTiming(timer)
 end
 
 local function applyTable(target, source)

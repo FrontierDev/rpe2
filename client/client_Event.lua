@@ -18,7 +18,74 @@ local function getTimings()
     return Addon.Debug and Addon.Debug.Timings or nil
 end
 
+local function startTiming(label, thresholdMs, context)
+    local timings = getTimings()
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer, cardinality)
+    if not timer then
+        return
+    end
+
+    local timings = getTimings()
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer, { cardinality = cardinality })
+    end
+end
+
+local function isTimingsEnabled()
+    local timings = getTimings()
+    return timings
+        and type(timings.IsEnabled) == "function"
+        and timings:IsEnabled() == true
+end
+
+local function countList(value)
+    return type(value) == "table" and #value or 0
+end
+
+local function countMap(value)
+    local count = 0
+    if type(value) == "table" then
+        for _ in pairs(value) do
+            count = count + 1
+        end
+    end
+    return count
+end
+
+local function getActiveEventCardinality(client, eventState)
+    if type(client) ~= "table" or type(eventState) ~= "table" then
+        return 0, 0
+    end
+
+    local eventId = tostring(eventState.id or "")
+    local spellcasting = client.Spellcasting
+    local castBuckets = spellcasting and spellcasting.ActiveSpellcastsByEventId or client.ActiveSpellcastsByEventId
+    local auraBuckets = spellcasting and spellcasting.ActiveAurasByEventId or client.ActiveAurasByEventId
+    local castBucket = type(castBuckets) == "table" and castBuckets[eventId] or nil
+    local auraBucket = type(auraBuckets) == "table" and auraBuckets[eventId] or nil
+    if type(auraBucket) == "table" and type(auraBucket.byKey) == "table" then
+        auraBucket = auraBucket.byKey
+    end
+    return countMap(castBucket), countMap(auraBucket)
+end
+
 local function getTimingNowMilliseconds()
+    if not isTimingsEnabled() then
+        return 0
+    end
+
     local timings = getTimings()
     return type(timings) == "table" and type(timings.GetNowMilliseconds) == "function"
         and timings.GetNowMilliseconds()
@@ -44,6 +111,16 @@ local function appendTimingPart(parts, label, startedAtMs, thresholdMs)
         elapsedMs = getTimingNowMilliseconds() - startedAtMs,
         thresholdMs = thresholdMs,
     }
+end
+
+local function stopEventTiming(timer, eventState, cardinality)
+    if not timer then
+        return
+    end
+
+    cardinality = cardinality or {}
+    cardinality.eventUnits = type(eventState) == "table" and countList(eventState.units) or 0
+    stopTiming(timer, cardinality)
 end
 
 local function getInline()
@@ -565,47 +642,71 @@ local function runEventStartupStep(targetClient, queuedEventId)
     if runtime.actionBarPrimed ~= true and runtime.visualGate ~= "syncing-local" then
         runtime.visualGate = "syncing-local"
         runtime.actionBarPrimed = true
+        local phaseTimer = startTiming("Event startup phase: action-bar", 8, queuedEventId)
         queueSharedEventVisualRefresh(targetClient, "startup-action-bar", {
             eventWidget = false,
             targeting = false,
             actionBar = true,
         })
+        if phaseTimer then
+            stopEventTiming(phaseTimer, eventState, { startupPhase = "action-bar" })
+        end
         setEventStartupPhase(eventState, runtime, "syncing-local")
         return true
     end
 
     if runtime.traitRuntimeRefreshed ~= true and type(targetClient.RefreshTraitRuntimeEntries) == "function" then
+        local phaseTimer = startTiming("Event startup phase: trait-runtime", 8, queuedEventId)
         targetClient:RefreshTraitRuntimeEntries(eventState)
+        if phaseTimer then
+            stopEventTiming(phaseTimer, eventState, { startupPhase = "trait-runtime" })
+        end
         runtime.traitRuntimeRefreshed = true
         setEventStartupPhase(eventState, runtime, "syncing-local")
         return true
     end
 
     if runtime.automaticAurasSynced ~= true and type(targetClient.SyncAutomaticTraitAuras) == "function" then
+        local phaseTimer = startTiming("Event startup phase: automatic-auras", 8, queuedEventId)
         targetClient:SyncAutomaticTraitAuras(eventState, { suppressResolvedRefresh = true })
+        if phaseTimer then
+            stopEventTiming(phaseTimer, eventState, { startupPhase = "automatic-auras" })
+        end
         runtime.automaticAurasSynced = true
         setEventStartupPhase(eventState, runtime, "syncing-local")
         return true
     end
 
     if runtime.eventAurasSynced ~= true and type(targetClient.SyncEventAuras) == "function" then
+        local phaseTimer = startTiming("Event startup phase: event-auras", 8, queuedEventId)
         targetClient:SyncEventAuras(eventState, { suppressResolvedRefresh = true })
+        if phaseTimer then
+            stopEventTiming(phaseTimer, eventState, { startupPhase = "event-auras" })
+        end
         runtime.eventAurasSynced = true
         setEventStartupPhase(eventState, runtime, "syncing-local")
         return true
     end
 
     if runtime.resolvedStateRefreshed ~= true and type(targetClient.RefreshTraitResolvedState) == "function" then
+        local phaseTimer = startTiming("Event startup phase: resolved-state", 8, queuedEventId)
         targetClient:RefreshTraitResolvedState(eventState, "startup")
         runtime.resolvedStateRefreshed = true
         local sessionState = targetClient.GetState and targetClient:GetState() or targetClient.State
         tryQueueInitialLocalResourceSync(targetClient, sessionState, eventState, "startup-resolved-state")
+        if phaseTimer then
+            stopEventTiming(phaseTimer, eventState, { startupPhase = "resolved-state" })
+        end
         setEventStartupPhase(eventState, runtime, "syncing-local")
         return true
     end
 
     if runtime.consumablesQueued ~= true and type(targetClient.QueueDeferredConsumablePrompt) == "function" then
+        local phaseTimer = startTiming("Event startup phase: consumables", 8, queuedEventId)
         targetClient:QueueDeferredConsumablePrompt(eventState, "event_start")
+        if phaseTimer then
+            stopEventTiming(phaseTimer, eventState, { startupPhase = "consumables" })
+        end
         runtime.consumablesQueued = true
         setEventStartupPhase(eventState, runtime, "syncing-local")
         return true
@@ -613,6 +714,7 @@ local function runEventStartupStep(targetClient, queuedEventId)
 
     setEventStartupPhase(eventState, runtime, "ready")
     runtime.visualGate = "ready"
+    local readyTimer = startTiming("Event startup phase: ready", 8, queuedEventId)
     if type(targetClient.QueueEventWidgetRefresh) == "function" then
         targetClient:QueueEventWidgetRefresh("startup-ready")
     end
@@ -623,6 +725,9 @@ local function runEventStartupStep(targetClient, queuedEventId)
         targetClient:QueueActionBarCompanionBarsRefresh("startup-ready", { immediate = true })
     elseif type(targetClient.RefreshActionBarCompanionBars) == "function" then
         targetClient:RefreshActionBarCompanionBars("startup-ready")
+    end
+    if readyTimer then
+        stopEventTiming(readyTimer, eventState, { startupPhase = "ready" })
     end
     return false
 end
@@ -1192,6 +1297,7 @@ function Client:FlushPendingTurnChanges(sessionStateOverride, eventStateOverride
         return false
     end
 
+    local timer = startTiming("Network/resource flush", 8, eventState.id or "turn-flush")
     local flushed = false
 
     if type(self.FlushDeferredTurnResourceDeltas) == "function" then
@@ -1210,6 +1316,13 @@ function Client:FlushPendingTurnChanges(sessionStateOverride, eventStateOverride
     end
     if self.RefreshPendingTurnChangesTooltip then
         self:RefreshPendingTurnChangesTooltip()
+    end
+    if timer then
+        stopEventTiming(timer, eventState, {
+            resourceFlush = flushed and 1 or 0,
+            queuedTasks = Addon.Internal and Addon.Internal.Tasks and Addon.Internal.Tasks.GetStats
+                and (tonumber(Addon.Internal.Tasks:GetStats().queueLength) or 0) or 0,
+        })
     end
     return flushed
 end
@@ -1290,6 +1403,11 @@ end
 function Client:ResetEventState(reason)
     local state = self.EventState
     local sessionState = self:GetState()
+    local timer = startTiming("Event end teardown", 16, reason or "ended")
+    local activeCasts, activeAuras = 0, 0
+    if timer then
+        activeCasts, activeAuras = getActiveEventCardinality(self, state)
+    end
     local tracker = getMovementTracker()
     if tracker and type(tracker.OnPlayerTurnEnd) == "function" then
         tracker:OnPlayerTurnEnd()
@@ -1312,16 +1430,29 @@ function Client:ResetEventState(reason)
     self.PendingStartupActionBarRefreshReason = nil
     self.EventUnitInteractionMarkers = {}
     self.LastLocalInteractionMarker = nil
+    local combatLogTimer = startTiming("Event end teardown: combat-log", 8, reason or "ended")
     if self.ClearEventWidgetCombatLog then
         self:ClearEventWidgetCombatLog(reason or "ended")
     end
+    if combatLogTimer then
+        stopEventTiming(combatLogTimer, state, { teardownPhase = "combat-log" })
+    end
+    local spellcastingTimer = startTiming("Event end teardown: spellcasting", 8, reason or "ended")
     if self.ResetSpellcastingState then
         self:ResetSpellcastingState(state and state.id or nil)
     end
+    if spellcastingTimer then
+        stopEventTiming(spellcastingTimer, state, { teardownPhase = "spellcasting" })
+    end
+    local traitTimer = startTiming("Event end teardown: traits", 8, reason or "ended")
     if self.ResetTraitRuntime then
         self:ResetTraitRuntime(state and state.id or nil)
     end
+    if traitTimer then
+        stopEventTiming(traitTimer, state, { teardownPhase = "traits" })
+    end
     resetEventStartupRuntime(self, state and state.id or nil)
+    local targetingTimer = startTiming("Event end teardown: targeting", 8, reason or "ended")
     if self.CancelSpellTargeting then
         self:CancelSpellTargeting("")
     end
@@ -1331,11 +1462,25 @@ function Client:ResetEventState(reason)
     if self.InvalidatePendingSpellTargetingDisplayState then
         self:InvalidatePendingSpellTargetingDisplayState()
     end
+    if targetingTimer then
+        stopEventTiming(targetingTimer, state, { teardownPhase = "targeting" })
+    end
+    local visualTimer = startTiming("Event end teardown: visual-queue", 8, reason or "ended")
     queueSharedEventVisualRefresh(self, reason or "ended", {
         eventWidget = true,
         targeting = false,
         actionBar = true,
     })
+    if visualTimer then
+        stopEventTiming(visualTimer, state, { teardownPhase = "visual-queue" })
+    end
+    if timer then
+        stopEventTiming(timer, state, {
+            teardownReason = reason or "ended",
+            activeCasts = activeCasts,
+            activeAuras = activeAuras,
+        })
+    end
     return state
 end
 
@@ -1351,6 +1496,8 @@ function Client:HandleEventStart(arguments, sender)
     if type(channelName) ~= "string" or channelName == "" or sessionState.channelName ~= channelName then
         return false
     end
+
+    local timer = startTiming("Event start total", 16, "event-start")
 
     local parseStartTime = timingParts and getTimingNowMilliseconds() or nil
     local nextState = Event.FromStartArguments(arguments)
@@ -1441,6 +1588,12 @@ function Client:HandleEventStart(arguments, sender)
     if timingParts then
         logTimingParts("HandleEventStart", "event-start-handler", timingParts, getTimingNowMilliseconds() - totalStartTime, 25)
     end
+    if timer then
+        stopEventTiming(timer, nextState, {
+            eventId = nextState.id,
+            startupQueued = 1,
+        })
+    end
     return true
 end
 
@@ -1461,6 +1614,7 @@ function Client:HandleEventEnd(arguments)
     end
 
     local reason = arguments and arguments[3] or "ended"
+    local timer = startTiming("Event end total", 16, reason)
     local achievements = Client.Achievements
     if achievements and type(achievements.HandleRPEEventComplete) == "function" then
         pcall(achievements.HandleRPEEventComplete, achievements, state, reason)
@@ -1470,11 +1624,18 @@ function Client:HandleEventEnd(arguments)
             Client:ResetEventState(reason)
         end)
         if prompted then
+            if timer then
+                stopEventTiming(timer, state, { prompted = 1 })
+            end
             return true
         end
     end
 
-    return self:ResetEventState(reason) ~= nil
+    local resetState = self:ResetEventState(reason)
+    if timer then
+        stopEventTiming(timer, resetState, { prompted = 0 })
+    end
+    return resetState ~= nil
 end
 
 function Client:HandleEventUnits(arguments)
@@ -1705,6 +1866,8 @@ function Client:HandleEventState(arguments)
         return false
     end
 
+    local timer = startTiming("Event-state immediate handler", 8, eventState.id or "event-state")
+
     local previousTurnNumber = tonumber(eventState.turnNumber) or 0
     local previousTickNumber = tonumber(eventState.tickNumber) or 0
     local wasLocalTurn = self.IsLocalTurnActive and self:IsLocalTurnActive(eventState) or false
@@ -1814,6 +1977,15 @@ function Client:HandleEventState(arguments)
 
     if timingParts then
         logTimingParts("HandleEventState", "event-state-handler", timingParts, getTimingNowMilliseconds() - totalStartTime, 25)
+    end
+    if timer then
+        local activeCasts, activeAuras = getActiveEventCardinality(self, eventState)
+        stopEventTiming(timer, eventState, {
+            activeCasts = activeCasts,
+            activeAuras = activeAuras,
+            turnNumber = tonumber(eventState.turnNumber) or 0,
+            tickNumber = tonumber(eventState.tickNumber) or 0,
+        })
     end
     return true
 end
