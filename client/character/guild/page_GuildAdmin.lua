@@ -258,47 +258,6 @@ local function getSelectedSkillLevel(page)
     return tonumber(skills[tostring(page.SelectedSkillRef or "")]) or 0
 end
 
-local function getSelectedProgressionState(page)
-    local profileState = page.SelectedMemberProfileState or {}
-    local progression = type(profileState.progression) == "table" and profileState.progression or nil
-    return progression
-end
-
-local function getSelectedProgressionRank(page)
-    local rankRef = page.SelectedMemberAdminState
-        and page.SelectedMemberAdminState.success == true
-        and tostring(page.SelectedMemberAdminState.assignedRankRef or "")
-        or ""
-    if rankRef == "" or type(Registry.ResolveGuildSettingReference) ~= "function" then
-        return nil
-    end
-
-    local ok, _, rank = pcall(Registry.ResolveGuildSettingReference, Registry, rankRef)
-    return ok and type(rank) == "table" and rank or nil
-end
-
-local function getSelectedProgressionEntry(page)
-    local rank = getSelectedProgressionRank(page)
-    local progression = rank and rank.progression or nil
-    local entryId = tostring(page.SelectedProgressionEntryId or "")
-    local entries = type(progression and progression.entries) == "table" and progression.entries or {}
-    for index = 1, #entries do
-        if tostring(entries[index] and entries[index].id or "") == entryId then
-            return entries[index], progression
-        end
-    end
-
-    return nil, progression
-end
-
-local function getSelectedProgressionSpell(page, entryId)
-    local progression = getSelectedProgressionState(page)
-    local selectedSpells = type(progression and progression.selectedSpells) == "table"
-        and progression.selectedSpells
-        or {}
-    return tostring(selectedSpells[tostring(entryId or "")] or "")
-end
-
 function AdminPage:Build(parent, owner)
     self.owner = owner
     if self.frame then
@@ -307,7 +266,7 @@ function AdminPage:Build(parent, owner)
 
     self.SelectedMemberKey = nil
     self.SelectedMemberAdminState = nil
-    self.SelectedMemberProfileState = { achievements = {}, skills = {}, progression = nil }
+    self.SelectedMemberProfileState = { achievements = {}, skills = {} }
     self.SelectedMemberQueryPending = false
     self.PendingAdminAction = nil
     self.SelectedGuildRankRef = ""
@@ -317,10 +276,6 @@ function AdminPage:Build(parent, owner)
     self.SelectedAchievementRef = ""
     self.SelectedSkillRef = ""
     self.SelectedItemRef = ""
-    self.SelectedProgressionEntryId = ""
-    self.SelectedProgressionSlot = 1
-    self.SelectedProgressionSpellRef = ""
-
     self.frame = CreateFrame("Frame", "RPEGuildAdminPage", parent)
     self.frame:SetAllPoints(parent)
 
@@ -441,16 +396,13 @@ function AdminPage:Build(parent, owner)
                 self.SelectedMemberIndex = rowIndex
                 self.SelectedMemberKey = nil
                 self.SelectedMemberAdminState = nil
-                self.SelectedMemberProfileState = { achievements = {}, skills = {}, progression = nil }
+                self.SelectedMemberProfileState = { achievements = {}, skills = {} }
                 self.SelectedMemberQueryPending = false
                 self.PendingAdminAction = nil
                 self.SelectedGuildRankRef = ""
                 self.SelectedAchievementRef = ""
                 self.SelectedSkillRef = ""
                 self.SelectedItemRef = ""
-                self.SelectedProgressionEntryId = ""
-                self.SelectedProgressionSlot = 1
-                self.SelectedProgressionSpellRef = ""
                 self.EligibleGuildRanks = {}
                 self.AdminActionMessage = nil
                 self:Refresh()
@@ -538,7 +490,6 @@ function AdminPage:Build(parent, owner)
         Achievements = 18,
         Skills = 18,
         Items = 18,
-        Progression = 40,
     }
 
     self.AchievementActionLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, self.AdminControlsLayout:GetFrame(), "RPEGuildAdminAchievementActionLayout", {
@@ -673,102 +624,6 @@ function AdminPage:Build(parent, owner)
     })
     self.ItemActionLayout:AddChild(self.GiveItemButton)
 
-    self.ProgressionActionLayout = UI.CreateLayout(UI.VerticalLayoutGroup, self.AdminControlsLayout:GetFrame(), "RPEGuildAdminProgressionActionLayout", {
-        width = 512,
-        height = self.AdminSectionVisibleHeights.Progression,
-        expandWidth = true,
-        spacing = 4,
-        fitChildrenWidth = true,
-        fitChildrenHeight = false,
-    })
-    self.AdminSectionLayouts.Progression = self.ProgressionActionLayout
-    self.AdminControlsLayout:AddChild(self.ProgressionActionLayout)
-    self.ProgressionEntryActionLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, self.ProgressionActionLayout:GetFrame(), "RPEGuildAdminProgressionEntryActionLayout", {
-        width = 512,
-        height = 18,
-        expandWidth = true,
-        spacing = 4,
-        fitChildrenWidth = true,
-        fitChildrenHeight = false,
-    })
-    self.ProgressionActionLayout:AddChild(self.ProgressionEntryActionLayout)
-    self.ProgressionEntryDropdown = UI.CreateDropdown(self.ProgressionEntryActionLayout:GetFrame(), "RPEGuildAdminProgressionEntryDropdown", {
-        width = 0,
-        height = 18,
-        expandWidth = true,
-        weight = 1,
-        placeholder = "Select a Progression entry",
-        items = {
-            { label = "Select a Progression entry", value = "" },
-        },
-        onValueChanged = function(value)
-            self.SelectedProgressionEntryId = tostring(value or "")
-            self.SelectedProgressionSpellRef = getSelectedProgressionSpell(self, self.SelectedProgressionEntryId)
-            self.AdminActionMessage = nil
-            self:RefreshActionControls()
-        end,
-    })
-    self.ProgressionEntryActionLayout:AddChild(self.ProgressionEntryDropdown)
-    self.ProgressionSlotDropdown = UI.CreateDropdown(self.ProgressionEntryActionLayout:GetFrame(), "RPEGuildAdminProgressionSlotDropdown", {
-        width = 66,
-        height = 18,
-        placeholder = "Slot",
-        items = {
-            { label = "Slot", value = "1" },
-        },
-        onValueChanged = function(value)
-            self.SelectedProgressionSlot = tonumber(value) or 1
-            self:RefreshActionControls()
-        end,
-    })
-    self.ProgressionEntryActionLayout:AddChild(self.ProgressionSlotDropdown)
-    self.AssignProgressionButton = UI.CreateButton(self.ProgressionEntryActionLayout:GetFrame(), "RPEGuildAdminAssignProgressionButton", "Assign", 68, function()
-        self:AssignSelectedProgressionEntry()
-    end, {
-        height = 18,
-        fontSize = 8,
-    })
-    self.ProgressionEntryActionLayout:AddChild(self.AssignProgressionButton)
-    self.LockProgressionButton = UI.CreateButton(self.ProgressionEntryActionLayout:GetFrame(), "RPEGuildAdminLockProgressionButton", "Unlock", 80, function()
-        self:ToggleSelectedProgressionEntryLock()
-    end, {
-        height = 18,
-        fontSize = 8,
-    })
-    self.ProgressionEntryActionLayout:AddChild(self.LockProgressionButton)
-
-    self.ProgressionSpellActionLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, self.ProgressionActionLayout:GetFrame(), "RPEGuildAdminProgressionSpellActionLayout", {
-        width = 512,
-        height = 18,
-        expandWidth = true,
-        spacing = 4,
-        fitChildrenWidth = true,
-        fitChildrenHeight = false,
-    })
-    self.ProgressionActionLayout:AddChild(self.ProgressionSpellActionLayout)
-    self.ProgressionSpellDropdown = UI.CreateDropdown(self.ProgressionSpellActionLayout:GetFrame(), "RPEGuildAdminProgressionSpellDropdown", {
-        width = 0,
-        height = 18,
-        expandWidth = true,
-        weight = 1,
-        placeholder = "Selected spell",
-        items = {
-            { label = "Selected spell", value = "" },
-        },
-        onValueChanged = function(value)
-            self.SelectedProgressionSpellRef = tostring(value or "")
-            self:RefreshActionControls()
-        end,
-    })
-    self.ProgressionSpellActionLayout:AddChild(self.ProgressionSpellDropdown)
-    self.ClearProgressionSpellButton = UI.CreateButton(self.ProgressionSpellActionLayout:GetFrame(), "RPEGuildAdminClearProgressionSpellButton", "Clear", 68, function()
-        self:ClearSelectedProgressionSpell()
-    end, {
-        height = 18,
-        fontSize = 8,
-    })
-    self.ProgressionSpellActionLayout:AddChild(self.ClearProgressionSpellButton)
-
     self.AdminSectionsLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, self.AdminControlsLayout:GetFrame(), "RPEGuildAdminSectionsLayout", {
         width = 512,
         height = 20,
@@ -778,7 +633,7 @@ function AdminPage:Build(parent, owner)
         fitChildrenHeight = false,
     })
     self.AdminControlsLayout:AddChild(self.AdminSectionsLayout)
-    local plannedSections = { "Achievements", "Skills", "Items", "Progression" }
+    local plannedSections = { "Achievements", "Skills", "Items" }
     self.AdminSectionButtons = {}
     for index = 1, #plannedSections do
         local section = plannedSections[index]
@@ -829,16 +684,6 @@ function AdminPage:RefreshActionControls()
     local selectedSkillRef = tostring(self.SelectedSkillRef or "")
     local selectedItemRef = tostring(self.SelectedItemRef or "")
     local itemQuantity = self.ItemQuantityInput and normalizeInteger(self.ItemQuantityInput:GetText(), 1) or nil
-    local selectedProgressionEntry, progressionDefinition = getSelectedProgressionEntry(self)
-    local progressionState = getSelectedProgressionState(self) or {}
-    local selectedProgressionEntryId = tostring(self.SelectedProgressionEntryId or "")
-    local progressionUnlocked = selectedProgressionEntry ~= nil
-        and progressionState.unlocked
-        and progressionState.unlocked[selectedProgressionEntryId] == true
-    local selectedProgressionSpell = selectedProgressionEntry ~= nil
-        and getSelectedProgressionSpell(self, selectedProgressionEntryId)
-        or ""
-    local progressionSlotCount = tonumber(progressionDefinition and progressionDefinition.slotCount) or 0
     local canUseAdminControls = canAdminister
     local selectedRankIsEligible = false
     for index = 1, #eligibleRanks do
@@ -860,8 +705,6 @@ function AdminPage:RefreshActionControls()
         and self.SelectedMemberAdminState.success == true
         and tostring(self.SelectedMemberAdminState.assignedRankRef or "")
         or ""
-    local progressionStateMatchesRank = assignedRankRef ~= ""
-        and tostring(progressionState.rankRef or "") == assignedRankRef
     if self.ClearGuildRankButton then
         self.ClearGuildRankButton:SetEnabled(canAdminister and assignedRankRef ~= "")
     end
@@ -902,38 +745,6 @@ function AdminPage:RefreshActionControls()
         self.GiveItemButton:SetEnabled(canUseAdminControls and selectedItemRef ~= "" and itemQuantity ~= nil)
     end
 
-    local canUseProgression = canUseAdminControls
-        and progressionStateMatchesRank
-        and selectedProgressionEntry ~= nil
-    if self.ProgressionEntryDropdown then
-        self.ProgressionEntryDropdown:SetEnabled(
-            canUseAdminControls and progressionStateMatchesRank and progressionDefinition ~= nil
-        )
-    end
-    if self.ProgressionSlotDropdown then
-        self.ProgressionSlotDropdown:SetEnabled(
-            canUseAdminControls and progressionStateMatchesRank and progressionDefinition ~= nil and progressionSlotCount > 0
-        )
-    end
-    if self.AssignProgressionButton then
-        self.AssignProgressionButton:SetEnabled(
-            canUseProgression
-                and progressionUnlocked
-                and tonumber(self.SelectedProgressionSlot) ~= nil
-                and tonumber(self.SelectedProgressionSlot) >= 1
-                and tonumber(self.SelectedProgressionSlot) <= progressionSlotCount
-        )
-    end
-    if self.LockProgressionButton then
-        self.LockProgressionButton:SetEnabled(canUseProgression)
-        self.LockProgressionButton:SetText(progressionUnlocked and "Lock" or "Unlock")
-    end
-    if self.ProgressionSpellDropdown then
-        self.ProgressionSpellDropdown:SetEnabled(canUseProgression and selectedProgressionSpell ~= "")
-    end
-    if self.ClearProgressionSpellButton then
-        self.ClearProgressionSpellButton:SetEnabled(canUseProgression and selectedProgressionSpell ~= "")
-    end
 end
 
 local function containsRankRef(ranks, rankRef)
@@ -972,153 +783,6 @@ local function preserveSelectedRankState(page, response)
     end
     page.SelectedMemberAdminState = normalizedResponse
     return normalizedResponse
-end
-
-local function ensureSelectedProgressionState(page)
-    page.SelectedMemberProfileState = page.SelectedMemberProfileState or { achievements = {}, skills = {} }
-    page.SelectedMemberProfileState.progression = page.SelectedMemberProfileState.progression or {
-        rankRef = tostring(page.SelectedMemberAdminState and page.SelectedMemberAdminState.assignedRankRef or ""),
-        slotCount = 0,
-        slots = {},
-        unlocked = {},
-        selectedSpells = {},
-    }
-    local progression = page.SelectedMemberProfileState.progression
-    progression.slots = progression.slots or {}
-    progression.unlocked = progression.unlocked or {}
-    progression.selectedSpells = progression.selectedSpells or {}
-    return progression
-end
-
-function AdminPage:AssignSelectedProgressionEntry()
-    local Guild = Client.Guild
-    local selectedMember, selectionGeneration = getSelectedMutationContext(self)
-    local entryId = tostring(self.SelectedProgressionEntryId or "")
-    local slotIndex = tonumber(self.SelectedProgressionSlot)
-    if not Guild or not selectedMember or entryId == "" or not slotIndex then
-        return false
-    end
-
-    local selectedKey = self.SelectedMemberKey
-    self.PendingAdminAction = "assign_progression_entry"
-    self.AdminActionMessage = "Progression slot assignment pending..."
-    self:Refresh()
-
-    local function finish(response)
-        if self.SelectedMemberKey ~= selectedKey or self.SelectionGeneration ~= selectionGeneration then
-            return
-        end
-
-        self.PendingAdminAction = nil
-        local normalizedResponse = preserveSelectedRankState(self, response)
-        if normalizedResponse.success == true then
-            local progression = ensureSelectedProgressionState(self)
-            progression.slots[slotIndex] = entryId
-            self.AdminActionMessage = "Progression slot assignment acknowledged by target client."
-        else
-            self.AdminActionMessage = ("Progression assignment failed: %s"):format(getAdminReason(normalizedResponse))
-        end
-        self:Refresh()
-    end
-
-    if type(Guild.AssignProgressionEntryForMember) ~= "function" then
-        finish({ success = false, reason = "incompatible-protocol" })
-        return false
-    end
-
-    return Guild:AssignProgressionEntryForMember(selectedMember.name, slotIndex, entryId, finish) == true
-end
-
-function AdminPage:ToggleSelectedProgressionEntryLock()
-    local Guild = Client.Guild
-    local selectedMember, selectionGeneration = getSelectedMutationContext(self)
-    local entryId = tostring(self.SelectedProgressionEntryId or "")
-    local progression = getSelectedProgressionState(self) or {}
-    local unlocked = progression.unlocked and progression.unlocked[entryId] == true
-    if not Guild or not selectedMember or entryId == "" then
-        return false
-    end
-
-    local selectedKey = self.SelectedMemberKey
-    self.PendingAdminAction = unlocked and "lock_progression_entry" or "unlock_progression_entry"
-    self.AdminActionMessage = unlocked and "Progression lock pending..." or "Progression unlock pending..."
-    self:Refresh()
-
-    local function finish(response)
-        if self.SelectedMemberKey ~= selectedKey or self.SelectionGeneration ~= selectionGeneration then
-            return
-        end
-
-        self.PendingAdminAction = nil
-        local normalizedResponse = preserveSelectedRankState(self, response)
-        if normalizedResponse.success == true then
-            local stored = ensureSelectedProgressionState(self)
-            if unlocked then
-                stored.unlocked[entryId] = nil
-                for slot, assignedEntryId in pairs(stored.slots) do
-                    if tostring(assignedEntryId or "") == entryId then
-                        stored.slots[slot] = nil
-                    end
-                end
-                stored.selectedSpells[entryId] = nil
-            else
-                stored.unlocked[entryId] = true
-            end
-            self.AdminActionMessage = unlocked
-                and "Progression lock acknowledged by target client."
-                or "Progression unlock acknowledged by target client."
-        else
-            self.AdminActionMessage = ("Progression lock change failed: %s"):format(getAdminReason(normalizedResponse))
-        end
-        self:Refresh()
-    end
-
-    if type(Guild.SetProgressionEntryLockForMember) ~= "function" then
-        finish({ success = false, reason = "incompatible-protocol" })
-        return false
-    end
-
-    return Guild:SetProgressionEntryLockForMember(selectedMember.name, entryId, not unlocked, finish) == true
-end
-
-function AdminPage:ClearSelectedProgressionSpell()
-    local Guild = Client.Guild
-    local selectedMember, selectionGeneration = getSelectedMutationContext(self)
-    local entryId = tostring(self.SelectedProgressionEntryId or "")
-    local spellRef = tostring(self.SelectedProgressionSpellRef or "")
-    if not Guild or not selectedMember or entryId == "" then
-        return false
-    end
-
-    local selectedKey = self.SelectedMemberKey
-    self.PendingAdminAction = "clear_progression_spell"
-    self.AdminActionMessage = "Progression spell clear pending..."
-    self:Refresh()
-
-    local function finish(response)
-        if self.SelectedMemberKey ~= selectedKey or self.SelectionGeneration ~= selectionGeneration then
-            return
-        end
-
-        self.PendingAdminAction = nil
-        local normalizedResponse = preserveSelectedRankState(self, response)
-        if normalizedResponse.success == true then
-            local stored = ensureSelectedProgressionState(self)
-            stored.selectedSpells[entryId] = nil
-            self.SelectedProgressionSpellRef = ""
-            self.AdminActionMessage = "Progression spell clear acknowledged by target client."
-        else
-            self.AdminActionMessage = ("Progression spell clear failed: %s"):format(getAdminReason(normalizedResponse))
-        end
-        self:Refresh()
-    end
-
-    if type(Guild.ClearProgressionSpellForMember) ~= "function" then
-        finish({ success = false, reason = "incompatible-protocol" })
-        return false
-    end
-
-    return Guild:ClearProgressionSpellForMember(selectedMember.name, entryId, spellRef, finish) == true
 end
 
 function AdminPage:GrantSelectedAchievement()
@@ -1269,11 +933,8 @@ function AdminPage:SetSelectedGuildRank()
         local normalizedResponse = response or { success = false, reason = "unknown-error" }
         if normalizedResponse.success == true then
             self.SelectedGuildRankRef = tostring(normalizedResponse.assignedRankRef or selectedRankRef)
-            -- The rank mutation changes which rank-scoped Progression bucket
-            -- is authoritative. Drop the old snapshot and force a fresh query
-            -- before any Progression control can be enabled.
             self.SelectedMemberAdminState = nil
-            self.SelectedMemberProfileState = { achievements = {}, skills = {}, progression = nil }
+            self.SelectedMemberProfileState = { achievements = {}, skills = {} }
             self.SelectedMemberQueryPending = false
             self.AdminActionMessage = "Set succeeded; target client acknowledged the assignment."
         else
@@ -1373,30 +1034,24 @@ function AdminPage:Refresh()
         self.SelectionGeneration = (tonumber(self.SelectionGeneration) or 0) + 1
         self.SelectedMemberKey = selectedMemberKey ~= "" and selectedMemberKey or nil
         self.SelectedMemberAdminState = nil
-        self.SelectedMemberProfileState = { achievements = {}, skills = {}, progression = nil }
+        self.SelectedMemberProfileState = { achievements = {}, skills = {} }
         self.SelectedMemberQueryPending = false
         self.PendingAdminAction = nil
         self.SelectedGuildRankRef = ""
         self.SelectedAchievementRef = ""
         self.SelectedSkillRef = ""
         self.SelectedItemRef = ""
-        self.SelectedProgressionEntryId = ""
-        self.SelectedProgressionSlot = 1
-        self.SelectedProgressionSpellRef = ""
         self.AdminActionMessage = nil
     elseif selectedMember and self.SelectedMemberWowRankIndex ~= nil and self.SelectedMemberWowRankIndex ~= wowRankIndex then
         self.SelectionGeneration = (tonumber(self.SelectionGeneration) or 0) + 1
         self.SelectedMemberAdminState = nil
-        self.SelectedMemberProfileState = { achievements = {}, skills = {}, progression = nil }
+        self.SelectedMemberProfileState = { achievements = {}, skills = {} }
         self.SelectedMemberQueryPending = false
         self.PendingAdminAction = nil
         self.SelectedGuildRankRef = ""
         self.SelectedAchievementRef = ""
         self.SelectedSkillRef = ""
         self.SelectedItemRef = ""
-        self.SelectedProgressionEntryId = ""
-        self.SelectedProgressionSlot = 1
-        self.SelectedProgressionSpellRef = ""
         self.AdminActionMessage = nil
     end
     self.SelectedMemberWowRankIndex = wowRankIndex
@@ -1446,97 +1101,6 @@ function AdminPage:Refresh()
             self.SelectedItemRef = ""
         end
         self.ItemDropdown:SetSelectedValue(self.SelectedItemRef, true)
-    end
-
-    local selectedProgressionRank = getSelectedProgressionRank(self)
-    local progressionDefinition = selectedProgressionRank and selectedProgressionRank.progression or nil
-    local progressionEntries = type(progressionDefinition and progressionDefinition.entries) == "table"
-        and progressionDefinition.entries
-        or {}
-    local progressionItems = {
-        { label = "Select a Progression entry", value = "" },
-    }
-    for index = 1, #progressionEntries do
-        local entry = progressionEntries[index]
-        local entryId = tostring(entry and entry.id or "")
-        local entryName = tostring(entry and entry.name or entryId)
-        if entryId ~= "" then
-            progressionItems[#progressionItems + 1] = {
-                label = entryName ~= "" and entryName or entryId,
-                value = entryId,
-            }
-        end
-    end
-    local progressionEntryFound = false
-    for index = 1, #progressionItems do
-        if tostring(progressionItems[index].value or "") == tostring(self.SelectedProgressionEntryId or "") then
-            progressionEntryFound = true
-            break
-        end
-    end
-    if not progressionEntryFound then
-        self.SelectedProgressionEntryId = ""
-        self.SelectedProgressionSpellRef = ""
-    end
-    if self.ProgressionEntryDropdown then
-        self.ProgressionEntryDropdown:SetItems(progressionItems)
-        self.ProgressionEntryDropdown:SetSelectedValue(self.SelectedProgressionEntryId, true)
-    end
-
-    local progressionSlotItems = {}
-    local progressionSlotCount = tonumber(progressionDefinition and progressionDefinition.slotCount) or 0
-    for slot = 1, progressionSlotCount do
-        progressionSlotItems[#progressionSlotItems + 1] = {
-            label = "Slot " .. tostring(slot),
-            value = tostring(slot),
-        }
-    end
-    if #progressionSlotItems == 0 then
-        progressionSlotItems[1] = { label = "Slot", value = "1" }
-    end
-    if self.ProgressionSlotDropdown then
-        self.ProgressionSlotDropdown:SetItems(progressionSlotItems)
-        self.ProgressionSlotDropdown:SetSelectedValue(tostring(self.SelectedProgressionSlot or 1), true)
-    end
-
-    local selectedProgressionEntry = getSelectedProgressionEntry(self)
-    local progressionSpellItems = { { label = "Selected spell", value = "" } }
-    if selectedProgressionEntry then
-        local spellRefs = selectedProgressionEntry.spellRefs or {}
-        for index = 1, #spellRefs do
-            local spellRef = tostring(spellRefs[index] or "")
-            if spellRef ~= "" then
-                progressionSpellItems[#progressionSpellItems + 1] = {
-                    label = spellRef,
-                    value = spellRef,
-                }
-            end
-        end
-        local storedSpell = getSelectedProgressionSpell(self, self.SelectedProgressionEntryId)
-        if storedSpell ~= "" then
-            local storedFound = false
-            for index = 1, #progressionSpellItems do
-                if tostring(progressionSpellItems[index].value or "") == storedSpell then
-                    storedFound = true
-                    break
-                end
-            end
-            if not storedFound then
-                progressionSpellItems[#progressionSpellItems + 1] = {
-                    label = "Current: " .. storedSpell,
-                    value = storedSpell,
-                }
-            end
-            if self.SelectedProgressionSpellRef == "" then
-                self.SelectedProgressionSpellRef = storedSpell
-            end
-        end
-    else
-        self.SelectedProgressionSpellRef = ""
-    end
-    if self.ProgressionSpellDropdown then
-        self.ProgressionSpellDropdown:SetItems(progressionSpellItems)
-        self.ProgressionSpellDropdown:SetSelectedValue(self.SelectedProgressionSpellRef, true)
     end
 
     if self.AchievementStateText then
@@ -1626,7 +1190,7 @@ function AdminPage:Refresh()
                 self.SelectedMemberQueryPending = false
                 self.SelectedMemberAdminState = response or { success = false, reason = "no-response" }
                 self.SelectedMemberProfileState = self.SelectedMemberAdminState.profileState
-                    or { achievements = {}, skills = {}, progression = nil }
+                    or { achievements = {}, skills = {} }
                 if self.SelectedMemberAdminState.success == true then
                     self.SelectedGuildRankRef = tostring(self.SelectedMemberAdminState.assignedRankRef or "")
                 else
@@ -1637,7 +1201,7 @@ function AdminPage:Refresh()
         else
             self.SelectedMemberQueryPending = false
             self.SelectedMemberAdminState = { success = false, reason = "incompatible-protocol" }
-            self.SelectedMemberProfileState = { achievements = {}, skills = {}, progression = nil }
+            self.SelectedMemberProfileState = { achievements = {}, skills = {} }
             self:Refresh()
         end
     end

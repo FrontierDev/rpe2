@@ -1,222 +1,237 @@
 ## Goal
-Remove the **runtime Guild Progression subsystem** from `client/client_Guild.lua`, including active progression resolution, local/remote progression mutations, and Guild Admin query payload progression state.
+Remove the **Progression administration surface** from the Guild Admin page after the runtime/query support has been removed.
 
 Authoritative plan: `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md`.
 
-Depends on: #51
+Depends on: #52
 
-This task is intentionally limited to the Guild client/runtime layer. Guild Admin visual controls, the Progression tab/page, and the GuildSetting editor are removed by later tasks.
+This task is a focused cleanup of `page_GuildAdmin.lua`. Preserve the roster/table/layout work from #49/#50 and all remaining Guild Admin operations.
 
 ## Primary file
 
-- `client/client_Guild.lua`
-
-Reference files to inspect before editing:
-
-- `core/internal/profile/Guild.lua` after #51
-- `core/internal/comms/Operations.lua`
 - `client/character/guild/page_GuildAdmin.lua`
-- `client/character/guild/page_GuildProgression.lua`
 
-## 1. Remove active Guild Progression resolution
+Reference before editing:
 
-Delete Guild Progression-only helpers and APIs, including current equivalents of:
+- completed #52 `client/client_Guild.lua`
+- issue #49 for intended roster/table/hierarchical-selector behavior
+- issue #50 for current roster/Admin panel containment behavior
 
-```text
-normalizeProgressionSlotCount
-getProgressionEntryMap
-isConfiguredSpell
-buildActiveGuildProgression
-Guild:GetActiveGuildProgression
-getProgressionMutationContext
-persistProgressionMutation
-```
+## 1. Remove progression-specific member state
 
-Remove progression-only state/status handling such as:
+The Admin page currently tracks Progression state alongside Achievements and Skills.
 
-```text
-progression-disabled
-progression-unavailable
-no-active-progression
-```
-
-where those values have no remaining non-progression caller.
-
-Do not remove generic Guild Rank resolution, requisition, Daily Reward, Achievement, Skill or Item logic.
-
-## 2. Remove local Guild Progression mutation APIs
-
-Delete current progression mutation APIs and aliases such as:
-
-```text
-Guild:AssignProgressionEntryToSlot
-Guild:SetProgressionEntryUnlocked
-Guild:SelectProgressionSpell
-Guild:ClearProgressionSpell
-SetProgressionSlot
-UnlockProgressionEntry
-LockProgressionEntry
-SelectGuildProgressionSpell
-ClearGuildProgressionSpell
-```
-
-Remove helpers whose only consumer was one of those APIs.
-
-## 3. Remove progression state from Guild Admin query responses
-
-Guild Admin member query responses currently serialize Achievements, Skills, and Progression.
-
-Change the payload to carry only the still-supported Admin state:
-
-```text
-Achievements
-Skills
-```
-
-Remove progression query helpers such as:
-
-```text
-appendQueryProgressionStateArguments
-getProgressionQuerySnapshot
-```
-
-Update the response builder and parser so result/profile state no longer contains:
+Change all selected-member profile-state defaults/resets from the conceptual shape:
 
 ```lua
-progression = ...
+{
+    achievements = {},
+    skills = {},
+    progression = nil,
+}
 ```
 
-and no longer parses progression fields such as:
+to:
 
-```text
-active
-rankRef
-slotCount
-slots
-unlocked entries
-selected spells
+```lua
+{
+    achievements = {},
+    skills = {},
+}
 ```
 
-Do not leave placeholder progression fields merely to make the transport look unchanged.
-
-## 4. Remove remote Guild Progression Admin mutation APIs
-
-Delete request-side APIs such as current equivalents of:
+Delete Progression-only selection state such as:
 
 ```text
-AssignProgressionEntryForMember
-SetProgressionEntryLockForMember
-ClearProgressionSpellForMember
+SelectedProgressionEntryId
+SelectedProgressionSlot
+SelectedProgressionSpellRef
 ```
 
-Remove mutation operation strings and receiver-side dispatch branches for:
+Remove stale progression reset logic from member selection, query refresh, rank mutation and page refresh paths.
+
+## 2. Remove progression helpers
+
+Delete helpers whose only purpose is interpreting or selecting Guild Progression state, including current equivalents of:
 
 ```text
-assign_progression_entry
-lock_progression_entry
-unlock_progression_entry
-clear_progression_spell
+getSelectedProgressionState
+getSelectedProgressionRank
+getSelectedProgressionEntry
+getSelectedProgressionSpell
+ensureSelectedProgressionState
 ```
 
-Remove progression-only validation/result codes if no longer referenced, including equivalents of:
+Trace callers before deletion so no generic Guild Rank helper is accidentally removed.
 
-```text
-invalid-progression-slot
-unknown-progression-entry
-progression-entry-locked
-invalid-progression-spell
-no-active-progression
+## 3. Remove Progression section UI
+
+Delete the Progression section from the Admin section selector.
+
+Change the conceptual section list from:
+
+```lua
+{
+    "Achievements",
+    "Skills",
+    "Items",
+    "Progression",
+}
 ```
 
-## 5. Preserve generic Guild Admin protocol/opcodes
+to:
 
-Do **not** delete or renumber:
-
-```text
-GUILD_ADMIN_QUERY
-GUILD_ADMIN_QUERY_RESPONSE
-GUILD_ADMIN_MUTATION
-GUILD_ADMIN_MUTATION_RESPONSE
+```lua
+{
+    "Achievements",
+    "Skills",
+    "Items",
+}
 ```
 
-These generic opcodes are still required for non-progression Guild Admin operations such as:
+Remove `Progression` from section-height tables such as `AdminSectionVisibleHeights`.
+
+Delete Progression-specific layouts and controls, including current equivalents of:
 
 ```text
-Guild Rank assignment
+ProgressionActionLayout
+ProgressionEntryActionLayout
+ProgressionSpellActionLayout
+ProgressionEntryDropdown
+ProgressionSlotDropdown
+AssignProgressionButton
+LockProgressionButton
+ProgressionSpellDropdown
+ClearProgressionSpellButton
+```
+
+Do not replace them with empty placeholders.
+
+## 4. Remove Progression actions/callbacks
+
+Delete Admin page methods and event callbacks for progression mutation, including current equivalents of:
+
+```text
+AssignSelectedProgressionEntry
+ToggleSelectedProgressionEntryLock
+ClearSelectedProgressionSpell
+```
+
+Remove button enable/disable logic and pending-state branches that exist only for those operations.
+
+## 5. Remove Progression refresh/population logic
+
+Delete refresh code that:
+
+- resolves the selected member's Progression rank/state;
+- populates Progression entry dropdowns;
+- populates Progression slot dropdowns;
+- populates selected Progression spell options;
+- matches progression state against the selected Guild Rank;
+- enables/disables Progression mutation controls.
+
+After cleanup, Admin refresh should only account for still-supported areas such as:
+
+```text
+Guild Rank
+Achievements
+Skills
+Items
+```
+
+## 6. Preserve #49/#50 UI behavior
+
+Do not regress the current Admin layout and roster behavior:
+
+- roster remains `UI.Table`;
+- columns remain Character / Guild Rank / Level / Class / Zone / Status;
+- default rank sorting remains numeric WoW `rankIndex` ascending with name tie-break;
+- Online/Offline colors remain;
+- selected-row highlighting remains;
+- roster/table remains vertically contained above Admin controls;
+- no routine top instruction row is reintroduced;
+- Guild Rank / Achievement / Skill / Item selectors remain hierarchical;
+- lower controls remain layout-group based.
+
+## 7. Preserve Admin security and mutations
+
+Keep unchanged:
+
+```text
+officer capability detection
+online-target requirement
+member query/pending state
+rank assignment eligibility
+Set/Clear Guild Rank
 Achievement grant
 Skill adjustment
 Item grant
+mutation acknowledgements
+refresh after mutation
+normalized member identity handling
 ```
 
-Preserve all remaining mutation operation strings and transaction/acknowledgement behavior.
-
-## 6. Decide protocol version deliberately
-
-Inspect the current `GUILD_ADMIN_PROTOCOL_VERSION` and parser contract before changing it.
-
-Because progression fields are being removed from the query response payload:
-
-- if old/new clients could silently misparse positional fields, increment the protocol version and preserve the existing explicit incompatibility behavior;
-- if the parser already treats the removed trailing fields as optional and mixed-version operation is demonstrably safe, a version bump is not required.
-
-Do not guess. Base the decision on the actual current serializer/parser.
-
-Report the decision and rationale in the task result.
+No schema change belongs in this task.
 
 ## Acceptance criteria
 
-- [ ] `client_Guild.lua` exposes no active Guild Progression resolution API.
-- [ ] Local Guild Progression mutation APIs and aliases are removed.
-- [ ] Guild Admin query responses contain no progression snapshot/state.
-- [ ] Guild Admin query parsing contains no progression parser/state field.
-- [ ] Remote Guild Progression Admin mutation request APIs are removed.
-- [ ] Progression mutation operation strings/dispatch branches are removed.
-- [ ] Unused progression-only error/result codes are removed.
-- [ ] Generic Guild Admin query/mutation opcodes remain unchanged unless a documented protocol-version change requires otherwise.
-- [ ] Guild Rank, Achievement, Skill and Item Admin operations remain intact.
-- [ ] Requisition and Daily Reward runtime behavior remains unchanged.
-- [ ] Protocol-version decision is explicitly validated and reported.
+- [ ] Admin section selector contains only Achievements, Skills and Items.
+- [ ] No Progression controls, layouts, dropdowns or buttons are created.
+- [ ] No Progression-specific selected-member state remains.
+- [ ] No Admin page helper/callback calls removed #52 progression runtime APIs.
+- [ ] Member query state contains only still-supported Achievement/Skill data.
+- [ ] Guild Rank controls still work.
+- [ ] Achievement controls still work.
+- [ ] Skill controls still work.
+- [ ] Item controls still work.
+- [ ] Roster `UI.Table`, sorting, selection, status colors and scrolling remain intact.
+- [ ] Roster/Admin panel containment from #50 remains intact.
+- [ ] No empty visual gap/section remains where Progression used to be.
 
 ## Validation matrix
 
 ```text
-Guild Admin query response
--> serializes Achievement state
--> serializes Skill state
--> does not serialize Progression state
+open Guild -> Admin as officer
+-> roster begins at top
+-> lower Admin controls visible
+-> section selector shows Achievements / Skills / Items only
 
-Guild Admin response parser
--> reconstructs Achievement/Skill state
--> does not expect/store progression
+select online member
+-> query completes
+-> selected-member summary updates
+-> no progression state access/error
 
-set Guild Rank remotely
--> request/validation/ack still works
+switch Achievements / Skills / Items repeatedly
+-> relevant controls shown
+-> layout remains contained
 
-grant Achievement remotely
--> still works
+Set Rank / Clear Rank
+-> existing behavior unchanged
 
-adjust Skill remotely
--> still works
+Grant Achievement
+-> existing behavior unchanged
 
-give Item remotely
--> still works
+Adjust Skill
+-> existing behavior unchanged
 
-old progression mutation operation string received
--> no active progression mutation path remains
--> fails safely through existing unknown/unsupported-operation behavior
+Give Item
+-> existing behavior unchanged
 
-Requisitions / Daily Rewards
--> unaffected
+long roster
+-> table scrolls
+-> no overlap with lower controls
+
+non-officer / not in guild
+-> existing compact access-state behavior remains
 ```
 
 ## Constraints
 
-- Do not delete the generic Guild Admin opcodes.
-- Do not edit the Admin page UI in this task except for an unavoidable compile/load compatibility adjustment; #53 owns that cleanup.
-- Do not delete `page_GuildProgression.lua` or the Guild tab here; #54 owns that cleanup.
-- Do not edit the GuildSetting inspector here.
-- Do not reintroduce Profile progression persistence removed by #51.
-- Do not change non-progression Guild transaction semantics.
+- Do not redesign the Admin page.
+- Do not change `UI.Table`, dropdown infrastructure or layout prefabs unless a concrete regression requires a tiny generic fix.
+- Do not modify Guild Admin protocol/runtime semantics beyond adapting to completed #52.
+- Do not remove the Guild Progression tab/page here; #54 owns that.
+- Do not edit the GuildSetting inspector here; #55 owns that.
 
 ## Coding-agent instructions
-Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md` and completed #51 before editing. Trace each serializer/parser and mutation dispatch path end-to-end rather than deleting by name only. Preserve the four generic Guild Admin opcodes and all non-progression operations. Inspect mixed-version behavior before deciding whether to bump `GUILD_ADMIN_PROTOCOL_VERSION`. Report exact functions removed, protocol decision, files changed, and validation performed.
+Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md`, completed #52, and the current implementations resulting from #49/#50. Remove Progression-specific UI/state surgically while preserving the working roster and non-progression administration flow. Search the file after editing for `Progression`, `SelectedProgression`, progression mutation names, and stale profile-state fields. Report exact sections removed and validation performed.
