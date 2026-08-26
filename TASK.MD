@@ -1,146 +1,332 @@
 ## Goal
-Remove stale **Guild Progression requirements and documentation** after the code feature has been removed, so future implementation work does not accidentally restore it.
+Audit Tasks #51–#56 as one coherent removal of **Guild Progression**, execute the required validation matrix, and fix **concrete defects only**.
 
 Authoritative plan: `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md`.
 
-Depends on: #51, #52, #53, #54, #55
+Depends on: #51, #52, #53, #54, #55, #56
 
-This is a documentation/task-definition cleanup. Do not redesign the implemented Guild systems.
+Do not start until all preceding Guild Progression Removal tasks are implemented and available in the working tree.
 
-## Primary files
+## Primary files to audit
 
+Inspect every file changed by #51–#56, especially:
+
+- `core/classes/GuildSetting.lua`
+- `core/internal/profile/Guild.lua`
+- `core/internal/database/Dependecies.lua`
+- `client/client_Guild.lua`
+- `client/character/guild/page_GuildAdmin.lua`
+- `client/character/guild/window_Guild.lua`
+- `client/ui/editor/inspectors/page_InspectorGuildSetting.lua`
+- `RPEngine_Dev.toc`
 - `.docs/RPE2-Achievements-Guild-Systems-PDD.md`
-- `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md` only where it assumes Guild Progression still exists
+- `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md`
 - `TASK.MD`
 
-Also search `.docs/` and root Markdown files for active Guild Progression requirements that conflict with the completed removal.
-
-## 1. Update the Achievements/Guild Systems PDD
-
-Remove Guild Progression as an intended RPE 2 feature.
-
-At minimum inspect and remove/update sections that describe:
+Confirm that:
 
 ```text
-Guild-specific character progression
-GuildSetting.general.enableProgression
-GuildSetting.progression
-Progression entry definitions / spellRefs
-Guild Profile progression state
-Guild Progression runtime/page behavior
-Guild Admin progression management
-GuildSetting editor Progression page
-Progression dependency extraction
-Progression implementation phases/acceptance criteria
+client/character/guild/page_GuildProgression.lua
 ```
 
-Preserve the PDD's unrelated content for:
+has been deleted.
+
+Inspect adjacent code only where necessary to validate references or regressions. Do not redesign working systems.
+
+## 1. Repository-wide Guild Progression search audit
+
+Search the repository for at least:
 
 ```text
-Achievements
-Guild Ranks
-Requisitions / Guild Shop
-Daily Rewards
-Guild Admin
-Skills
-Items
-Achievement broadcasting
-```
-
-After editing, the document should describe the actual intended Guild system rather than a historical design that still promises Progression.
-
-## 2. Update the final Requisitions implementation plan narrowly
-
-Inspect:
-
-```text
-.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md
-```
-
-Only remove or adjust statements that now incorrectly assume:
-
-- a three-tab Guild window;
-- a surviving Progression page;
-- Progression must remain unaffected/intact;
-- TOC/load ordering involving `page_GuildProgression.lua`.
-
-Do **not** rewrite the Requisitions design itself. Preserve its authoritative Guild Shop, limited requisition, Daily Reward, ShopEntry, pagination and transaction requirements.
-
-## 3. Remove stale `TASK.MD` requirements
-
-Remove or replace inherited wording that treats deleted Guild Progression controls, mutations or tabs as active requirements.
-
-`TASK.MD` must no longer instruct a coding agent to restore or preserve the deleted feature.
-
-Keep any still-relevant current-task conventions if the file is otherwise used as an active Codex handoff, but do not preserve obsolete Issue #50 wording merely for history.
-
-## 4. Search for contradictory active docs
-
-Search Markdown documentation for at least:
-
-```text
-Guild Progression
-Progression tab
 enableProgression
+GuildProgression
+ProgressionPage
+GetActiveGuildProgression
+GetGuildProgression
+SetGuildProgression
+SetGuildProgressionSlot
+SetGuildProgressionEntryUnlocked
+SetGuildProgressionSelectedSpell
+ClearGuildProgressionSelectedSpell
+SelectedProgression
+RPEGuildProgression
 GuildSetting.progression
-page_GuildProgression
 assign_progression_entry
 lock_progression_entry
 unlock_progression_entry
 clear_progression_spell
+page_GuildProgression
 ```
 
-Inspect every match.
+Inspect **every remaining match**.
 
-Historical references may remain only where they are clearly historical/changelog context and cannot be mistaken for active product requirements.
+Allowed remaining matches are limited to:
 
-## 5. Preserve generic progression terminology
+- clearly historical/changelog text that cannot be interpreted as an active requirement;
+- unrelated generic class/race/stat/resource progression code.
 
-Do not globally replace/delete the word `progression` from documentation.
+No active Guild runtime, UI, editor, Profile, dataset, dependency, protocol or TOC implementation may retain Guild Progression behavior.
 
-Unrelated concepts such as class/race/stat/resource progression remain valid and must not be rewritten as part of this task.
+Do not delete generic progression code merely to make a text search empty.
 
-## Acceptance criteria
+## 2. GuildSetting model/serialization audit
 
-- [ ] Achievements/Guild Systems PDD no longer specifies Guild Progression as an active feature.
-- [ ] PDD no longer defines `enableProgression` or `GuildSetting.progression`.
-- [ ] PDD no longer describes Guild Profile progression state or Progression Admin controls.
-- [ ] Requisitions implementation plan contains no requirement that a Progression tab/page remain functional.
-- [ ] Requisitions design/business requirements remain otherwise unchanged.
-- [ ] `TASK.MD` contains no instruction to preserve Progression controls/mutations.
-- [ ] Active project documentation contains no contradictory requirement to restore Guild Progression.
-- [ ] Generic non-Guild progression documentation remains intact.
-
-## Validation matrix
+Verify:
 
 ```text
-search docs for "Guild Progression"
--> no active product requirement remains
+new GuildSetting
+-> no general.enableProgression
+-> no progression table
 
-search docs for "enableProgression"
--> no active GuildSetting requirement remains
-
-search docs for "GuildSetting.progression"
--> no active schema requirement remains
-
-read PDD Guild section end-to-end
--> Guild system now describes ranks/requisitions/admin/achievements without a missing Progression phase
-
-read final Requisitions plan
--> two surviving Guild tabs are not contradicted
--> Guild Shop/Requisitions/Daily Reward design remains unchanged
-
-read TASK.MD
--> no coding-agent instruction asks to preserve/rebuild Progression
+legacy GuildSetting input containing both fields
+-> loads/merges without error
+-> normalized live object does not expose active Guild Progression state
+-> ToTable() does not serialize either field
 ```
+
+Confirm the removal did not alter:
+
+```text
+Guild Rank metadata
+wowGuildRankIndices
+Requisitions
+Daily Rewards
+existing tags/other GuildSetting fields
+```
+
+## 3. Profile persistence audit
+
+Verify `core/internal/profile/Guild.lua` exposes no Guild Progression APIs.
+
+Exercise/inspect an existing profile that still contains stale:
+
+```lua
+profile.guild.byGuild[...].progression
+```
+
+Expected behavior:
+
+```text
+profile loads normally
+stale progression data is ignored
+no code reads it
+no code mutates it
+no migration is required solely to erase it
+```
+
+Verify unrelated Guild Profile state remains intact:
+
+```text
+assigned Guild Rank
+requisition usage
+Daily Reward claims/transactions
+guild identity migration
+```
+
+## 4. Dependency-system audit
+
+Confirm GuildSetting dependency extraction/rewrite no longer traverses progression spell refs.
+
+Then explicitly validate unrelated generic progression dependency behavior remains intact for structures such as:
+
+```text
+statProgressions
+resourceProgressions
+traitRefs
+skillBonuses
+```
+
+Also confirm GuildSetting Requisition/Daily Reward item/currency dependencies still work.
+
+## 5. `client_Guild.lua` runtime/protocol audit
+
+Verify there is no active runtime progression resolver or mutation API.
+
+Confirm Guild Admin query responses contain only still-supported member state and do not serialize/parse progression.
+
+Confirm progression Admin operation strings/dispatch branches are gone.
+
+### Preserve generic Admin protocol
+Verify the generic opcodes remain available:
+
+```text
+GUILD_ADMIN_QUERY
+GUILD_ADMIN_QUERY_RESPONSE
+GUILD_ADMIN_MUTATION
+GUILD_ADMIN_MUTATION_RESPONSE
+```
+
+Exercise/inspect:
+
+```text
+Set/Clear Guild Rank
+Grant Achievement
+Adjust Skill
+Give Item
+```
+
+and confirm request, validation, acknowledgement and refresh paths still work.
+
+### Protocol-version validation
+Review the protocol-version decision made in #52 against the final serializer/parser.
+
+If no version bump was made, confirm mixed-version parsing cannot silently reinterpret fields.
+
+If a bump was made, confirm incompatible clients fail through the intended compatibility path rather than corrupting member state.
+
+Fix only a concrete compatibility defect found during this audit.
+
+## 6. Guild window audit
+
+Required final structure:
+
+```text
+Guild
+├─ Requisitions
+└─ Admin
+```
+
+Validate:
+
+```text
+open window -> Requisitions selected by default
+switch Requisitions -> Admin -> Requisitions
+refresh each active tab
+hide/show/reopen window
+```
+
+Confirm:
+
+- no Progression tab appears;
+- no `ProgressionPage` is constructed;
+- Admin works as the second tab;
+- no stale tab-index assumption exists;
+- window title remains exactly `Guild`;
+- dimensions/lifecycle remain unchanged.
+
+## 7. Guild Admin audit
+
+Verify the Admin section selector contains exactly:
+
+```text
+Achievements
+Skills
+Items
+```
+
+Guild Rank controls remain outside/alongside those sections as currently designed.
+
+Exercise:
+
+```text
+roster loading
+rank sorting
+Online/Offline colors
+row selection
+online member query
+Guild Rank mutation
+Achievement grant
+Skill adjustment
+Item grant
+Achievements / Skills / Items switching
+long roster scrolling
+```
+
+Confirm the #49/#50 table/layout behavior remains intact:
+
+- no top routine instruction row is reintroduced;
+- roster remains contained above lower Admin controls;
+- no overlap occurs;
+- hierarchical selectors remain functional.
+
+No Progression state/control/callback may remain.
+
+## 8. GuildSetting inspector audit
+
+Validate all surviving pages:
+
+```text
+General
+Requisitions
+Daily Rewards
+```
+
+Confirm:
+
+- no fourth Progression page;
+- no Enable Progression checkbox;
+- no Progression entry/spell controls;
+- all three pages retain #47 scrolling behavior;
+- Requisition authoring remains functional;
+- Daily Reward item/currency authoring remains functional;
+- built-in/custom currency behavior from #48 remains intact;
+- legacy definitions do not cause nil-index errors or recreate progression state.
+
+## 9. Requisitions/Daily Reward regression audit
+
+Guild Progression removal must not affect the final Requisitions feature.
+
+At minimum verify:
+
+```text
+Guild Shop displays unlimited requisitions
+limited Requisitions remain in the right-hand list
+Daily Reward button/tooltip works
+Daily Reset timer works
+Guild Rank display works
+requisition affordability/eligibility still works
+purchase transaction still works
+manual Daily Reward claim still works
+```
+
+Preserve the post-#45/#46/#48 UI and currency behavior.
+
+## 10. Documentation consistency audit
+
+Read the active Guild sections of:
+
+```text
+.docs/RPE2-Achievements-Guild-Systems-PDD.md
+.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md
+TASK.MD
+```
+
+Confirm none still instruct future coding work to preserve or restore Guild Progression.
+
+The documentation should agree on the final Guild structure:
+
+```text
+Requisitions
+Admin
+```
+
+with Admin supporting Guild Rank, Achievements, Skills and Items but no Progression.
+
+## Final definition of done
+
+- [ ] `page_GuildProgression.lua` is deleted.
+- [ ] Guild window has exactly Requisitions and Admin tabs.
+- [ ] Guild Admin contains no Progression section/state/actions.
+- [ ] `client_Guild.lua` contains no Guild Progression runtime/protocol behavior.
+- [ ] Guild Admin generic opcodes and non-progression mutations remain functional.
+- [ ] `GuildSetting` contains no `enableProgression` or `progression` model.
+- [ ] Guild Profile exposes no progression APIs and safely ignores stale saved progression data.
+- [ ] GuildSetting dependencies no longer include progression spell refs.
+- [ ] Generic non-Guild progression systems remain intact.
+- [ ] GuildSetting inspector contains only General/Requisitions/Daily Rewards and preserves current editor behavior.
+- [ ] Requisitions/Daily Rewards continue to function normally.
+- [ ] Active documentation no longer specifies Guild Progression.
+- [ ] Repository-wide search finds no active Guild Progression implementation.
+- [ ] Any protocol-version choice is validated against the final serializer/parser.
+- [ ] No duplicate/replacement progression subsystem was introduced.
 
 ## Constraints
 
-- Do not modify Lua/runtime code in this task unless a documentation search reveals a filename typo only in generated metadata; implementation should already be complete.
-- Do not rewrite unrelated PDD sections.
-- Do not remove generic character progression documentation.
-- Do not change Requisitions business/design decisions.
-- Do not turn historical changelog text into current requirements.
+- Fix concrete defects only; do not redesign adjacent systems during the audit.
+- Do not remove unrelated generic progression code to satisfy text search.
+- Do not add a migration solely to purge stale Guild Progression SavedVariables.
+- Do not change Requisition/Daily Reward/Guild Rank/Achievement/Skill/Item semantics unless a regression caused by this removal is identified.
+- Do not renumber generic Guild Admin opcodes.
 
 ## Coding-agent instructions
-Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md` and inspect the completed code from #51–#55 before editing documentation, so the docs describe the actual resulting system. Make narrow, internally consistent Markdown edits. Search all active Markdown for contradictory Guild Progression requirements and report exact documents/sections changed plus any historical references intentionally retained.
+Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md` and completed issues #51–#56. Inspect the actual final working tree rather than trusting task summaries. Execute every matrix above, inspect every remaining Guild Progression search hit, and fix only concrete defects in this removal. Before marking complete, report the audit performed, exact files changed, protocol compatibility result, validation results, and any remaining intentional progression references.
