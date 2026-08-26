@@ -35,6 +35,12 @@ local LOCAL_ONLY_CONFIGURATION_REASONS = {
     ["profile-widgets-unlocked"] = true,
 }
 
+local RUNTIME_ONLY_CONFIGURATION_REASONS = {
+    ["profile-currency"] = true,
+    ["profile-achievements"] = true,
+    ["profile-achievement-rewards"] = true,
+}
+
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
 end
@@ -107,12 +113,20 @@ local function normalizeConfigurationChangeReason(reason)
     return "configuration-changed"
 end
 
+local function isRuntimeOnlyConfigurationReason(reason)
+    return RUNTIME_ONLY_CONFIGURATION_REASONS[normalizeConfigurationChangeReason(reason)] == true
+end
+
 local function ConfigurationChangeQueuesResourceSync(reason)
-    return LOCAL_ONLY_CONFIGURATION_REASONS[normalizeConfigurationChangeReason(reason)] ~= true
+    local normalizedReason = normalizeConfigurationChangeReason(reason)
+    return RUNTIME_ONLY_CONFIGURATION_REASONS[normalizedReason] ~= true
+        and LOCAL_ONLY_CONFIGURATION_REASONS[normalizedReason] ~= true
 end
 
 local function ConfigurationChangeQueuesClientConnectRefresh(reason)
-    return LOCAL_ONLY_CONFIGURATION_REASONS[normalizeConfigurationChangeReason(reason)] ~= true
+    local normalizedReason = normalizeConfigurationChangeReason(reason)
+    return RUNTIME_ONLY_CONFIGURATION_REASONS[normalizedReason] ~= true
+        and LOCAL_ONLY_CONFIGURATION_REASONS[normalizedReason] ~= true
 end
 
 local function captureDeferredInvoker()
@@ -183,6 +197,14 @@ local function queueLocalConfigurationRefresh(reason)
 end
 
 function Client:QueueLocalConfigurationRefresh(reason)
+    if isRuntimeOnlyConfigurationReason(reason) then
+        logSessionInternal(
+            "Runtime-only Profile reason %s attempted to queue a configuration refresh.",
+            tostring(reason or "")
+        )
+        return false
+    end
+
     if type(self.HandleLocalConfigurationChanged) ~= "function" then
         return false
     end
@@ -438,6 +460,14 @@ function Client:QueueClientConnectRefresh(reason)
 end
 
 function Client:TryDeferLocalConfigurationChanged(reason)
+    if isRuntimeOnlyConfigurationReason(reason) then
+        logSessionInternal(
+            "Runtime-only Profile reason %s attempted to defer a configuration refresh.",
+            tostring(reason or "")
+        )
+        return false
+    end
+
     local editor = Addon.Client and Addon.Client.UI and Addon.Client.UI.Editor or nil
     if type(editor) ~= "table" or type(editor.ShouldDeferConfigurationRefresh) ~= "function" then
         return false
@@ -455,13 +485,21 @@ function Client:TryDeferLocalConfigurationChanged(reason)
 end
 
 function Client:HandleLocalConfigurationChanged(reason)
+    local normalizedReason = normalizeConfigurationChangeReason(reason)
+    if isRuntimeOnlyConfigurationReason(normalizedReason) then
+        logSessionInternal(
+            "Runtime-only Profile reason %s reached HandleLocalConfigurationChanged.",
+            tostring(normalizedReason or "")
+        )
+        return false
+    end
+
     if self.LocalConfigurationRefreshInProgress then
         return false
     end
 
     self.LocalConfigurationRefreshInProgress = true
     local startedAt = getTimingMilliseconds()
-    local normalizedReason = normalizeConfigurationChangeReason(reason)
     local timer = startTiming("Client:HandleLocalConfigurationChanged", 8, normalizedReason)
     local profileLogic = Addon.Internal and Addon.Internal.Profile or nil
     local resolvedBootstrapReady = true

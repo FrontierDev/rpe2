@@ -5,6 +5,7 @@ Addon.Internal = Addon.Internal or {}
 local Database = Addon.Internal.Database or {}
 Addon.Internal.Database = Database
 local Dependecies = Database.Dependecies or {}
+local Runtime = Addon.Internal.Runtime
 
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
@@ -100,6 +101,84 @@ local function startsWith(text, prefix)
         and string.sub(text, 1, #prefix) == prefix
 end
 
+-- Keep this classification next to the configuration boundary. It documents
+-- why each current notifier reason remains global or moves to runtime state,
+-- and gives development builds a cheap regression guard for the known
+-- runtime-only reasons.
+local CONFIGURATION_CHANGE_CLASSIFICATION = {
+    ["profile-currency"] = "runtime/profile state",
+    ["profile-achievements"] = "runtime/profile state",
+    ["profile-achievement-rewards"] = "runtime/profile state",
+
+    ["profile-equipment"] = "structural profile change",
+    ["profile-%s-equipment"] = "structural profile change",
+    ["profile-traits"] = "structural profile change",
+    ["profile-active-traits"] = "structural profile change",
+    ["profile-inactive-traits"] = "structural profile change",
+    ["profile-preferred-consumables"] = "authored configuration",
+    ["profile-spellbook"] = "authored configuration",
+    ["profile-recipebook"] = "authored configuration",
+    ["profile-mount"] = "structural profile change",
+    ["profile-pet"] = "structural profile change",
+    ["profile-mounted"] = "structural profile change",
+    ["profile-widgets-unlocked"] = "authored configuration",
+    ["profile-action-bar-mode"] = "authored configuration",
+    ["profile-level"] = "structural profile change",
+    ["profile-race"] = "structural profile change",
+    ["profile-class"] = "structural profile change",
+    ["profile-primary-resource"] = "structural profile change",
+    ["profile-special-resource"] = "structural profile change",
+    ["profile-setup-wizard"] = "authored configuration",
+    ["profile-action-bar-anchor"] = "authored configuration",
+    ["profile-action-bar"] = "authored configuration",
+    ["profile-skill-action-bar"] = "authored configuration",
+    ["profile-mounted-action-bar"] = "authored configuration",
+    ["profile-guild"] = "authored configuration",
+    ["profile-skills"] = "authored configuration",
+
+    ["active-ruleset"] = "authored configuration",
+    ["ruleset-import"] = "authored configuration",
+    ["ruleset-delete"] = "authored configuration",
+    ["ruleset-rename"] = "authored configuration",
+    ["ruleset-update"] = "authored configuration",
+    ["dataset-activation"] = "authored configuration",
+    ["dataset-import"] = "authored configuration",
+    ["dataset-delete"] = "authored configuration",
+    ["dataset-rename"] = "authored configuration",
+    ["dataset-update"] = "authored configuration",
+    ["dataset-entry"] = "authored configuration",
+}
+
+Database.ConfigurationChangeClassification = CONFIGURATION_CHANGE_CLASSIFICATION
+
+local function getConfigurationChangeClassification(reason)
+    local normalizedReason = ensureString(reason, "configuration-changed")
+    local classification = CONFIGURATION_CHANGE_CLASSIFICATION[normalizedReason]
+    if classification then
+        return classification
+    end
+
+    if string.match(normalizedReason, "^profile%-.+%-equipment$") then
+        return CONFIGURATION_CHANGE_CLASSIFICATION["profile-%s-equipment"]
+    end
+
+    return "unclassified"
+end
+
+local function logRuntimeConfigurationBoundaryViolation(reason)
+    local debug = Addon.Debug or nil
+    if debug and type(debug.Internal) == "function" then
+        debug.Internal(
+            "Runtime-only Profile reason '%s' entered the configuration invalidation path.",
+            tostring(reason or "")
+        )
+    end
+end
+
+local function isRuntimeOnlyConfigurationReason(reason)
+    return getConfigurationChangeClassification(reason) == "runtime/profile state"
+end
+
 local function deepCopy(value)
     if type(value) ~= "table" then
         return value
@@ -120,6 +199,10 @@ local function markConfigurationChanged()
 end
 
 local function notifyConfigurationChanged(reason)
+    if isRuntimeOnlyConfigurationReason(reason) then
+        logRuntimeConfigurationBoundaryViolation(reason)
+    end
+
     local timer = startTiming("Database:notifyConfigurationChanged", 4, reason or "configuration-changed")
     markConfigurationChanged()
     local client = Addon.Client or nil
@@ -139,6 +222,21 @@ local function notifyConfigurationChanged(reason)
         client:HandleLocalConfigurationChanged(reason)
     end
     stopTiming(timer)
+end
+
+local function runProfileRuntimeMutation(reason, scope, detail, mutation)
+    if type(Runtime) ~= "table"
+        or type(Runtime.RunTransaction) ~= "function"
+        or type(Runtime.MarkChanged) ~= "function"
+    then
+        error("Database profile runtime mutation requires the Runtime transaction module.", 2)
+    end
+
+    return Runtime:RunTransaction(reason, function()
+        local result = mutation()
+        Runtime:MarkChanged(scope, detail)
+        return result
+    end)
 end
 
 local function applyTable(target, source)
@@ -1162,12 +1260,15 @@ local function isDefaultProfileRecord(record)
         and isEmptyProfileGuildState(profile.guild)
 end
 
-local function migrateUnknownPlayerProfile(root)
+local function migrateUnknownPlayerProfile(root, normalizedProfiles)
     if type(root) ~= "table" then
         return false, false
     end
 
-    local profiles = normalizeProfilesCollection(root)
+    local profiles = normalizedProfiles
+    if type(profiles) ~= "table" then
+        profiles = normalizeProfilesCollection(root)
+    end
     local unknownProfile = profiles["unknown-player"]
     if type(unknownProfile) ~= "table" then
         return false, false
@@ -1606,8 +1707,12 @@ function Database.EnsureProfiles()
 
     profiles.lastLFRPChannel = nil
     profiles.currentByChar = nil
-    normalizeProfilesCollection(profiles, previousSchema < SCHEMA.profiles)
-    migrateUnknownPlayerProfile(profiles)
+    -- SavedVariables are canonicalized when the root is first loaded (or
+    -- replaced), rather than rebuilding every profile on every normal read.
+    if Database.Profiles ~= profiles then
+        normalizeProfilesCollection(profiles, previousSchema < SCHEMA.profiles)
+    end
+    migrateUnknownPlayerProfile(profiles, profiles.profiles)
 
     Database.Profiles = profiles
     return profiles
@@ -2792,11 +2897,14 @@ end
 
 function Database.ListProfileCurrencies()
     local profile = Database.GetOrCreateActiveProfile()
-    profile.currencies = normalizeProfileCurrencies(profile.currencies)
+    local currencies = ensureTable(profile.currencies)
 
     local copy = {}
-    for currencyKey, amount in pairs(profile.currencies) do
-        copy[currencyKey] = amount
+    for currencyKey, amount in pairs(currencies) do
+        local normalizedCurrencyKey = ensureString(currencyKey, "")
+        if normalizedCurrencyKey ~= "" then
+            copy[normalizedCurrencyKey] = math.max(0, math.floor(tonumber(amount) or 0))
+        end
     end
 
     return copy
@@ -2809,8 +2917,8 @@ function Database.GetProfileCurrencyAmount(currencyKey)
     end
 
     local profile = Database.GetOrCreateActiveProfile()
-    profile.currencies = normalizeProfileCurrencies(profile.currencies)
-    return math.max(0, math.floor(tonumber(profile.currencies[normalizedCurrencyKey]) or 0))
+    local currencies = ensureTable(profile.currencies)
+    return math.max(0, math.floor(tonumber(currencies[normalizedCurrencyKey]) or 0))
 end
 
 function Database.SetProfileCurrencyAmount(currencyKey, amount)
@@ -2820,11 +2928,17 @@ function Database.SetProfileCurrencyAmount(currencyKey, amount)
     end
 
     local profile = Database.GetOrCreateActiveProfile()
-    profile.currencies = normalizeProfileCurrencies(profile.currencies)
     local normalizedAmount = math.max(0, math.floor(tonumber(amount) or 0))
-    profile.currencies[normalizedCurrencyKey] = normalizedAmount
-    notifyConfigurationChanged("profile-currency")
-    return normalizedAmount
+    return runProfileRuntimeMutation(
+        "profile-currency",
+        "currencies",
+        { key = normalizedCurrencyKey },
+        function()
+            profile.currencies = ensureTable(profile.currencies)
+            profile.currencies[normalizedCurrencyKey] = normalizedAmount
+            return normalizedAmount
+        end
+    )
 end
 
 function Database.ClearProfileCurrencyAmount(currencyKey)
@@ -2834,19 +2948,33 @@ function Database.ClearProfileCurrencyAmount(currencyKey)
     end
 
     local profile = Database.GetOrCreateActiveProfile()
-    profile.currencies = normalizeProfileCurrencies(profile.currencies)
-    local existed = profile.currencies[normalizedCurrencyKey] ~= nil
-    profile.currencies[normalizedCurrencyKey] = nil
-    if existed then
-        notifyConfigurationChanged("profile-currency")
+    local currencies = ensureTable(profile.currencies)
+    if currencies[normalizedCurrencyKey] == nil then
+        return false
     end
-    return existed
+
+    return runProfileRuntimeMutation(
+        "profile-currency",
+        "currencies",
+        { key = normalizedCurrencyKey },
+        function()
+            currencies[normalizedCurrencyKey] = nil
+            return true
+        end
+    )
 end
 
 function Database.ListProfileAchievementStates()
     local profile = Database.GetOrCreateActiveProfile()
-    profile.achievements = normalizeProfileAchievements(profile.achievements)
-    return deepCopy(profile.achievements)
+    local achievements = ensureTable(profile.achievements)
+    local copy = {}
+    for achievementRef, state in pairs(achievements) do
+        local normalizedAchievementRef = ensureString(achievementRef, "")
+        if normalizedAchievementRef ~= "" then
+            copy[normalizedAchievementRef] = normalizeProfileAchievementState(state)
+        end
+    end
+    return copy
 end
 
 function Database.GetProfileAchievementState(achievementRef)
@@ -2856,8 +2984,12 @@ function Database.GetProfileAchievementState(achievementRef)
     end
 
     local profile = Database.GetOrCreateActiveProfile()
-    profile.achievements = normalizeProfileAchievements(profile.achievements)
-    return deepCopy(profile.achievements[normalizedAchievementRef])
+    local achievements = ensureTable(profile.achievements)
+    local state = achievements[normalizedAchievementRef]
+    if state == nil then
+        return nil
+    end
+    return deepCopy(normalizeProfileAchievementState(state))
 end
 
 function Database.SetProfileAchievementState(achievementRef, state)
@@ -2867,10 +2999,16 @@ function Database.SetProfileAchievementState(achievementRef, state)
     end
 
     local profile = Database.GetOrCreateActiveProfile()
-    profile.achievements = normalizeProfileAchievements(profile.achievements)
-    profile.achievements[normalizedAchievementRef] = normalizeProfileAchievementState(state)
-    notifyConfigurationChanged("profile-achievements")
-    return deepCopy(profile.achievements[normalizedAchievementRef])
+    return runProfileRuntimeMutation(
+        "profile-achievements",
+        "achievements",
+        { ref = normalizedAchievementRef },
+        function()
+            profile.achievements = ensureTable(profile.achievements)
+            profile.achievements[normalizedAchievementRef] = normalizeProfileAchievementState(state)
+            return deepCopy(profile.achievements[normalizedAchievementRef])
+        end
+    )
 end
 
 function Database.GetProfileAchievementRewardState(achievementRef)
@@ -2889,19 +3027,27 @@ function Database.SetProfileAchievementRewardState(achievementRef, rewardState)
     end
 
     local profile = Database.GetOrCreateActiveProfile()
-    profile.achievements = normalizeProfileAchievements(profile.achievements)
-    local state = profile.achievements[normalizedAchievementRef]
-    if type(state) ~= "table" then
-        state = {
-            criteria = {},
-            completedAt = nil,
-        }
-        profile.achievements[normalizedAchievementRef] = state
-    end
+    return runProfileRuntimeMutation(
+        "profile-achievement-rewards",
+        "achievements",
+        { ref = normalizedAchievementRef },
+        function()
+            profile.achievements = ensureTable(profile.achievements)
+            local state = profile.achievements[normalizedAchievementRef]
+            if type(state) ~= "table" then
+                state = {
+                    criteria = {},
+                    completedAt = nil,
+                }
+            else
+                state = normalizeProfileAchievementState(state)
+            end
 
-    state.rewardState = normalizeProfileAchievementRewardState(rewardState, state.completedAt)
-    notifyConfigurationChanged("profile-achievement-rewards")
-    return deepCopy(state.rewardState)
+            state.rewardState = normalizeProfileAchievementRewardState(rewardState, state.completedAt)
+            profile.achievements[normalizedAchievementRef] = state
+            return deepCopy(state.rewardState)
+        end
+    )
 end
 
 function Database.ClearProfileAchievementRewardState(achievementRef)
@@ -2911,15 +3057,21 @@ function Database.ClearProfileAchievementRewardState(achievementRef)
     end
 
     local profile = Database.GetOrCreateActiveProfile()
-    profile.achievements = normalizeProfileAchievements(profile.achievements)
-    local state = profile.achievements[normalizedAchievementRef]
+    local achievements = ensureTable(profile.achievements)
+    local state = achievements[normalizedAchievementRef]
     if type(state) ~= "table" or state.rewardState == nil then
         return false
     end
 
-    state.rewardState = nil
-    notifyConfigurationChanged("profile-achievement-rewards")
-    return true
+    return runProfileRuntimeMutation(
+        "profile-achievement-rewards",
+        "achievements",
+        { ref = normalizedAchievementRef },
+        function()
+            state.rewardState = nil
+            return true
+        end
+    )
 end
 
 function Database.ClearProfileAchievementState(achievementRef)
@@ -2929,13 +3081,20 @@ function Database.ClearProfileAchievementState(achievementRef)
     end
 
     local profile = Database.GetOrCreateActiveProfile()
-    profile.achievements = normalizeProfileAchievements(profile.achievements)
-    local existed = profile.achievements[normalizedAchievementRef] ~= nil
-    profile.achievements[normalizedAchievementRef] = nil
-    if existed then
-        notifyConfigurationChanged("profile-achievements")
+    local achievements = ensureTable(profile.achievements)
+    if achievements[normalizedAchievementRef] == nil then
+        return false
     end
-    return existed
+
+    return runProfileRuntimeMutation(
+        "profile-achievements",
+        "achievements",
+        { ref = normalizedAchievementRef },
+        function()
+            achievements[normalizedAchievementRef] = nil
+            return true
+        end
+    )
 end
 
 function Database.GetProfileGuildState()
