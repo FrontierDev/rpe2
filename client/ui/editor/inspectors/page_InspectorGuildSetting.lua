@@ -6,7 +6,6 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
-local Client = Addon.Client or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local InspectorShared = DataEditor.ItemInspectorShared
 local GuildSettingClass = Addon.Internal
@@ -17,7 +16,6 @@ local GuildSettingClass = Addon.Internal
 local INSPECTOR_SIDE_PADDING = InspectorShared.INSPECTOR_SIDE_PADDING
 local CONTROL_HEIGHT = InspectorShared.CONTROL_HEIGHT
 local FIELD_WIDTH = InspectorShared.FIELD_WIDTH
-local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local GUILD_SETTING_PAGE_SCROLLBAR_WIDTH = 12
 local GUILD_SETTING_PAGE_SCROLLBAR_GAP = 4
 local GUILD_SETTING_PAGE_SCROLLBAR_RIGHT_INSET = 4
@@ -27,7 +25,6 @@ local INSPECTOR_PAGE_DEFINITIONS = {
     { key = "general", label = "General" },
     { key = "requisitions", label = "Requisitions" },
     { key = "dailyRewards", label = "Daily Rewards" },
-    { key = "progression", label = "Progression" },
 }
 
 local DAILY_REWARD_TYPE_ITEMS = {
@@ -497,14 +494,6 @@ local function getSelectedDailyReward(self)
     return guildSetting, rewards, index, index and rewards[index] or nil
 end
 
-local function getSelectedProgressionEntry(self)
-    local guildSetting = self:GetSelectedGuildSetting()
-    local progression = guildSetting and guildSetting.progression or {}
-    local entries = progression and progression.entries or {}
-    local index = tonumber(self.SelectedGuildSettingProgressionEntryIndex)
-    return guildSetting, entries, index, index and entries[index] or nil
-end
-
 function DataEditor:NormalizeGuildSettingDefinition(guildSetting)
     if GuildSettingClass and GuildSettingClass.New and GuildSettingClass.ToTable then
         return GuildSettingClass:New(guildSetting):ToTable()
@@ -584,7 +573,6 @@ function DataEditor:SetGuildSettingInspectorTab(tabKey)
         general = self.GuildSettingInspectorGeneralPage,
         requisitions = self.GuildSettingInspectorRequisitionsPage,
         dailyRewards = self.GuildSettingInspectorDailyRewardsPage,
-        progression = self.GuildSettingInspectorProgressionPage,
     }
     for key, page in pairs(pages) do
         if page then
@@ -637,7 +625,7 @@ function DataEditor:BuildGuildSettingInspectorPage(parent)
 
     self.GuildSettingInspectorNextButton = UI.CreateButton(self.GuildSettingInspectorSelectorBar:GetFrame(), "RPEDataEditorGuildSettingInspectorNextButton", "Next", 40, function()
         local definition = INSPECTOR_PAGE_DEFINITIONS[(self.ActiveGuildSettingInspectorPageIndex or 1) + 1]
-        self:SetGuildSettingInspectorTab(definition and definition.key or "progression")
+        self:SetGuildSettingInspectorTab(definition and definition.key or "dailyRewards")
     end, { height = 20, fontSize = 7 })
     self.GuildSettingInspectorSelectorBar:AddChild(self.GuildSettingInspectorNextButton)
 
@@ -656,8 +644,6 @@ function DataEditor:BuildGuildSettingInspectorPage(parent)
     self:BuildGuildSettingInspectorRequisitionsPage(self.GuildSettingInspectorRequisitionsPage)
     self.GuildSettingInspectorDailyRewardsPage = createPage("RPEDataEditorGuildSettingInspectorDailyRewardsPage")
     self:BuildGuildSettingInspectorDailyRewardsPage(self.GuildSettingInspectorDailyRewardsPage)
-    self.GuildSettingInspectorProgressionPage = createPage("RPEDataEditorGuildSettingInspectorProgressionPage")
-    self:BuildGuildSettingInspectorProgressionPage(self.GuildSettingInspectorProgressionPage)
 
     self.GuildSettingInspectorEmptyText = createLabel(self.GuildSettingInspectorPage, "RPEDataEditorGuildSettingInspectorEmptyText", "")
     self.GuildSettingInspectorEmptyText:GetFrame():SetPoint("BOTTOMLEFT", self.GuildSettingInspectorPage, "BOTTOMLEFT", 0, 0)
@@ -752,17 +738,6 @@ function DataEditor:BuildGuildSettingInspectorGeneralPage(parent)
         end)
     end)
     root:AddChild(self.GuildSettingInspectorEnableDailyRewardsCheckbox)
-
-    self.GuildSettingInspectorEnableProgressionCheckbox = createCheckbox(root:GetFrame(), "RPEDataEditorGuildSettingInspectorEnableProgressionCheckbox", "Enable Progression", function(value)
-        if self._refreshingGuildSettingInspector then
-            return
-        end
-        self:CommitSelectedGuildSetting(function(guildSetting)
-            guildSetting.general = guildSetting.general or {}
-            guildSetting.general.enableProgression = value == true
-        end)
-    end)
-    root:AddChild(self.GuildSettingInspectorEnableProgressionCheckbox)
 
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorTagsLabel", "Tags"))
     self.GuildSettingInspectorTagsInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorGuildSettingInspectorTagsInput", {
@@ -1241,279 +1216,6 @@ function DataEditor:BuildGuildSettingInspectorDailyRewardsPage(parent)
     refreshGuildSettingPageScroll(self.GuildSettingInspectorDailyRewardsPage)
 end
 
-function DataEditor:BuildGuildSettingInspectorProgressionPage(parent)
-    local root = createGuildSettingPageScrollShell(parent, "RPEDataEditorGuildSettingInspectorProgressionLayout")
-
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionLabel", "Progression (structural configuration)"))
-    local slotRow = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorSlotRow", {
-        spacing = 2, height = 18, fitChildrenWidth = true, fitChildrenHeight = false,
-    })
-    slotRow:AddChild(createLabel(slotRow:GetFrame(), "RPEDataEditorGuildSettingInspectorSlotCountLabel", "Slot Count", 76))
-    self.GuildSettingInspectorSlotCountInput = UI.CreateTextInput(slotRow:GetFrame(), "RPEDataEditorGuildSettingInspectorSlotCountInput", {
-        width = 76, height = 18, text = "3", borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    slotRow:AddChild(self.GuildSettingInspectorSlotCountInput)
-    self.GuildSettingInspectorSlotCountInput:SetScript("OnEnterPressed", function()
-        self:CommitSelectedGuildSetting(function(guildSetting)
-            guildSetting.progression = guildSetting.progression or {}
-            guildSetting.progression.slotCount = normalizeInteger(self.GuildSettingInspectorSlotCountInput:GetText(), 3, 1)
-        end)
-    end)
-    self.GuildSettingInspectorSlotCountInput:SetScript("OnEditFocusLost", function()
-        self:CommitSelectedGuildSetting(function(guildSetting)
-            guildSetting.progression = guildSetting.progression or {}
-            guildSetting.progression.slotCount = normalizeInteger(self.GuildSettingInspectorSlotCountInput:GetText(), 3, 1)
-        end)
-    end)
-    root:AddChild(slotRow)
-
-    local _, entrySection = InspectorShared.createInspectorSection(
-        root,
-        "RPEDataEditorGuildSettingInspectorProgressionEntryPanel",
-        "Progression Entries",
-        82
-    )
-    self.GuildSettingInspectorProgressionEntryScroll = UI.ScrollLayout:New({
-        name = "RPEDataEditorGuildSettingInspectorProgressionEntryScroll",
-        width = FIELD_WIDTH - 12, height = 54, visibleRows = 3, autoFitRows = true,
-        rowHeight = 18, rowSpacing = 0, border = false, rowElementClass = UI.ScrollListEntry,
-        categoryWidth = 108, statusWidth = 50, categoryInsetLeft = 4, statusInsetRight = 4,
-    })
-    self.GuildSettingInspectorProgressionEntryScroll:SetParent(entrySection:GetFrame())
-    self.GuildSettingInspectorProgressionEntryScroll:SetRowRenderer(function(row, entry, itemIndex)
-        row:SetCategory(tostring(entry and entry.id or "-"))
-        row:SetTestName("")
-        row:SetStatus(tostring(entry and entry.name or ""))
-        row:SetDetail(tostring(entry and entry.description or ""))
-        local frame = row.GetFrame and row:GetFrame() or nil
-        if frame then
-            frame:EnableMouse(true)
-            frame:SetScript("OnMouseUp", function(_, button)
-                if button == "LeftButton" then
-                    self.SelectedGuildSettingProgressionEntryIndex = itemIndex
-                    self.SelectedGuildSettingSpellRefIndex = nil
-                    self:RefreshGuildSettingProgressionPage()
-                end
-            end)
-            setRowSelection(row, tonumber(self.SelectedGuildSettingProgressionEntryIndex) == tonumber(itemIndex))
-        end
-    end)
-    self.GuildSettingInspectorProgressionEntryScroll:Create()
-    entrySection:AddChild(self.GuildSettingInspectorProgressionEntryScroll)
-
-    local entryActions = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionEntryActions", {
-        spacing = 2, height = 18, fitChildrenWidth = true, fitChildrenHeight = false,
-    })
-    self.GuildSettingInspectorAddProgressionEntryButton = UI.CreateButton(entryActions:GetFrame(), "RPEDataEditorGuildSettingInspectorAddProgressionEntryButton", "Add", 42, function()
-        local guildSetting = self:CommitSelectedGuildSetting(function(selected)
-            selected.progression = selected.progression or {}
-            selected.progression.entries = selected.progression.entries or {}
-            selected.progression.entries[#selected.progression.entries + 1] = {
-                id = buildUniqueStableId(selected.progression.entries, nil, "", "progression_entry"),
-                name = "",
-                description = "",
-                icon = "",
-                lockedText = "",
-                spellRefs = {},
-            }
-        end)
-        local entries = guildSetting and guildSetting.progression and guildSetting.progression.entries or {}
-        self.SelectedGuildSettingProgressionEntryIndex = #entries
-        self.SelectedGuildSettingSpellRefIndex = nil
-        self:RefreshGuildSettingProgressionPage()
-    end, { height = 18, fontSize = 7 })
-    entryActions:AddChild(self.GuildSettingInspectorAddProgressionEntryButton)
-    self.GuildSettingInspectorDeleteProgressionEntryButton = UI.CreateButton(entryActions:GetFrame(), "RPEDataEditorGuildSettingInspectorDeleteProgressionEntryButton", "Delete", 48, function()
-        local selectedIndex = tonumber(self.SelectedGuildSettingProgressionEntryIndex)
-        local guildSetting = self:CommitSelectedGuildSetting(function(selected)
-            local entries = selected.progression and selected.progression.entries or {}
-            if selectedIndex and entries[selectedIndex] then
-                table.remove(entries, selectedIndex)
-            end
-        end)
-        local entries = guildSetting and guildSetting.progression and guildSetting.progression.entries or {}
-        self.SelectedGuildSettingProgressionEntryIndex = #entries > 0 and math.min(selectedIndex or 1, #entries) or nil
-        self.SelectedGuildSettingSpellRefIndex = nil
-        self:RefreshGuildSettingProgressionPage()
-    end, { height = 18, fontSize = 7 })
-    entryActions:AddChild(self.GuildSettingInspectorDeleteProgressionEntryButton)
-    root:AddChild(entryActions)
-
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionEntryIdLabel", "Entry ID"))
-    self.GuildSettingInspectorProgressionEntryIdInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionEntryIdInput", {
-        width = FIELD_WIDTH, height = 18, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    local commitProgressionEntryId = function()
-        local selectedIndex = tonumber(self.SelectedGuildSettingProgressionEntryIndex)
-        self:CommitSelectedGuildSetting(function(guildSetting)
-            local entries = guildSetting.progression and guildSetting.progression.entries or {}
-            local entry = entries[selectedIndex]
-            if entry then
-                entry.id = buildUniqueStableId(entries, selectedIndex, self.GuildSettingInspectorProgressionEntryIdInput:GetText(), "progression_entry")
-            end
-        end)
-        self:RefreshGuildSettingProgressionPage()
-    end
-    self.GuildSettingInspectorProgressionEntryIdInput:SetScript("OnEnterPressed", commitProgressionEntryId)
-    self.GuildSettingInspectorProgressionEntryIdInput:SetScript("OnEditFocusLost", commitProgressionEntryId)
-    root:AddChild(self.GuildSettingInspectorProgressionEntryIdInput)
-
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionEntryNameLabel", "Entry Name"))
-    self.GuildSettingInspectorProgressionEntryNameInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionEntryNameInput", {
-        width = FIELD_WIDTH, height = 18, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    local commitProgressionEntryName = function()
-        local selectedIndex = tonumber(self.SelectedGuildSettingProgressionEntryIndex)
-        self:CommitSelectedGuildSetting(function(guildSetting)
-            local entries = guildSetting.progression and guildSetting.progression.entries or {}
-            if entries[selectedIndex] then
-                entries[selectedIndex].name = self.GuildSettingInspectorProgressionEntryNameInput:GetText()
-            end
-        end)
-    end
-    self.GuildSettingInspectorProgressionEntryNameInput:SetScript("OnEnterPressed", commitProgressionEntryName)
-    self.GuildSettingInspectorProgressionEntryNameInput:SetScript("OnEditFocusLost", commitProgressionEntryName)
-    root:AddChild(self.GuildSettingInspectorProgressionEntryNameInput)
-
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionEntryDescriptionLabel", "Description"))
-    self.GuildSettingInspectorProgressionEntryDescriptionInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionEntryDescriptionInput", {
-        width = FIELD_WIDTH, height = 18, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    local commitProgressionEntryDescription = function()
-        local selectedIndex = tonumber(self.SelectedGuildSettingProgressionEntryIndex)
-        self:CommitSelectedGuildSetting(function(guildSetting)
-            local entries = guildSetting.progression and guildSetting.progression.entries or {}
-            if entries[selectedIndex] then
-                entries[selectedIndex].description = self.GuildSettingInspectorProgressionEntryDescriptionInput:GetText()
-            end
-        end)
-    end
-    self.GuildSettingInspectorProgressionEntryDescriptionInput:SetScript("OnEnterPressed", commitProgressionEntryDescription)
-    self.GuildSettingInspectorProgressionEntryDescriptionInput:SetScript("OnEditFocusLost", commitProgressionEntryDescription)
-    root:AddChild(self.GuildSettingInspectorProgressionEntryDescriptionInput)
-
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionEntryIconLabel", "Icon"))
-    self.GuildSettingInspectorProgressionEntryIconField = UI.EditorIconField:New({
-        name = "RPEDataEditorGuildSettingInspectorProgressionEntryIconField",
-        width = FIELD_WIDTH, height = 18, buttonText = "Select Icon", labelText = "-", iconTexture = DEFAULT_ICON, border = false,
-    })
-    self.GuildSettingInspectorProgressionEntryIconField:SetParent(root:GetFrame())
-    self.GuildSettingInspectorProgressionEntryIconField:Create()
-    local iconButton = self.GuildSettingInspectorProgressionEntryIconField:GetButton()
-    if iconButton and iconButton.SetScript then
-        iconButton:SetScript("OnClick", function()
-            local _, _, _, entry = getSelectedProgressionEntry(self)
-            if not entry or not Client.OpenIconFinder then
-                return
-            end
-            Client:OpenIconFinder(function(_, filePath)
-                self:CommitSelectedGuildSetting(function(guildSetting)
-                    local entries = guildSetting.progression and guildSetting.progression.entries or {}
-                    local selected = entries[self.SelectedGuildSettingProgressionEntryIndex]
-                    if selected then
-                        selected.icon = filePath or ""
-                    end
-                end)
-                self:RefreshGuildSettingProgressionPage()
-            end, { filter = entry.icon or "" })
-        end)
-    end
-    root:AddChild(self.GuildSettingInspectorProgressionEntryIconField)
-
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionEntryLockedTextLabel", "Locked Text"))
-    self.GuildSettingInspectorProgressionEntryLockedTextInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorGuildSettingInspectorProgressionEntryLockedTextInput", {
-        width = FIELD_WIDTH, height = 18, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    local commitProgressionEntryLockedText = function()
-        local selectedIndex = tonumber(self.SelectedGuildSettingProgressionEntryIndex)
-        self:CommitSelectedGuildSetting(function(guildSetting)
-            local entries = guildSetting.progression and guildSetting.progression.entries or {}
-            if entries[selectedIndex] then
-                entries[selectedIndex].lockedText = self.GuildSettingInspectorProgressionEntryLockedTextInput:GetText()
-            end
-        end)
-    end
-    self.GuildSettingInspectorProgressionEntryLockedTextInput:SetScript("OnEnterPressed", commitProgressionEntryLockedText)
-    self.GuildSettingInspectorProgressionEntryLockedTextInput:SetScript("OnEditFocusLost", commitProgressionEntryLockedText)
-    root:AddChild(self.GuildSettingInspectorProgressionEntryLockedTextInput)
-
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorSpellRefsLabel", "Spell Refs"))
-    local spellPanel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorSpellPanel", {
-        width = FIELD_WIDTH, height = 40, contentInset = 2, showBorder = false,
-    })
-    root:AddChild(spellPanel)
-    self.GuildSettingInspectorSpellRefScroll = UI.ScrollLayout:New({
-        name = "RPEDataEditorGuildSettingInspectorSpellRefScroll",
-        width = FIELD_WIDTH - 4, height = 36, visibleRows = 2, autoFitRows = true,
-        rowHeight = 18, rowSpacing = 0, border = false, rowElementClass = UI.ScrollListEntry,
-        categoryWidth = 228, statusWidth = 0, categoryInsetLeft = 4, statusInsetRight = 0,
-    })
-    self.GuildSettingInspectorSpellRefScroll:SetParent(spellPanel:GetContentFrame())
-    self.GuildSettingInspectorSpellRefScroll:SetRowRenderer(function(row, spellRef, itemIndex)
-        row:SetCategory(tostring(spellRef or ""))
-        row:SetTestName("")
-        row:SetStatus("")
-        row:SetDetail("")
-        local frame = row.GetFrame and row:GetFrame() or nil
-        if frame then
-            frame:EnableMouse(true)
-            frame:SetScript("OnMouseUp", function(_, button)
-                if button == "LeftButton" then
-                    self.SelectedGuildSettingSpellRefIndex = itemIndex
-                    self:RefreshGuildSettingProgressionPage()
-                end
-            end)
-            setRowSelection(row, tonumber(self.SelectedGuildSettingSpellRefIndex) == tonumber(itemIndex))
-        end
-    end)
-    self.GuildSettingInspectorSpellRefScroll:Create()
-    UI.Utils.AnchorFill(self.GuildSettingInspectorSpellRefScroll, spellPanel:GetContentFrame(), 0, 0, 0, 0)
-
-    local spellActions = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorSpellActions", {
-        spacing = 2, height = 18, fitChildrenWidth = true, fitChildrenHeight = false,
-    })
-    self.GuildSettingInspectorSpellRefInput = UI.CreateTextInput(spellActions:GetFrame(), "RPEDataEditorGuildSettingInspectorSpellRefInput", {
-        width = 168, height = 18, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    spellActions:AddChild(self.GuildSettingInspectorSpellRefInput)
-    self.GuildSettingInspectorSaveSpellRefButton = UI.CreateButton(spellActions:GetFrame(), "RPEDataEditorGuildSettingInspectorSaveSpellRefButton", "Add/Update", 64, function()
-        local value = trim(self.GuildSettingInspectorSpellRefInput:GetText())
-        if value == "" then
-            return
-        end
-        local selectedSpellIndex = tonumber(self.SelectedGuildSettingSpellRefIndex)
-        local guildSetting = self:CommitSelectedGuildSetting(function(selected)
-            local entry = selected.progression and selected.progression.entries and selected.progression.entries[self.SelectedGuildSettingProgressionEntryIndex]
-            if entry then
-                entry.spellRefs = entry.spellRefs or {}
-                if selectedSpellIndex and entry.spellRefs[selectedSpellIndex] then
-                    entry.spellRefs[selectedSpellIndex] = value
-                else
-                    entry.spellRefs[#entry.spellRefs + 1] = value
-                    selectedSpellIndex = #entry.spellRefs
-                end
-            end
-        end)
-        self.SelectedGuildSettingSpellRefIndex = selectedSpellIndex
-        self:RefreshGuildSettingProgressionPage()
-    end, { height = 18, fontSize = 7 })
-    spellActions:AddChild(self.GuildSettingInspectorSaveSpellRefButton)
-    self.GuildSettingInspectorDeleteSpellRefButton = UI.CreateButton(spellActions:GetFrame(), "RPEDataEditorGuildSettingInspectorDeleteSpellRefButton", "Delete", 48, function()
-        local selectedSpellIndex = tonumber(self.SelectedGuildSettingSpellRefIndex)
-        self:CommitSelectedGuildSetting(function(selected)
-            local entry = selected.progression and selected.progression.entries and selected.progression.entries[self.SelectedGuildSettingProgressionEntryIndex]
-            if entry and selectedSpellIndex and entry.spellRefs and entry.spellRefs[selectedSpellIndex] then
-                table.remove(entry.spellRefs, selectedSpellIndex)
-            end
-        end)
-        self.SelectedGuildSettingSpellRefIndex = nil
-        self:RefreshGuildSettingProgressionPage()
-    end, { height = 18, fontSize = 7 })
-    spellActions:AddChild(self.GuildSettingInspectorDeleteSpellRefButton)
-    root:AddChild(spellActions)
-    refreshGuildSettingPageScroll(self.GuildSettingInspectorProgressionPage)
-end
-
 function DataEditor:RefreshGuildSettingInspectorGeneralPage(guildSetting)
     local hasGuildSetting = guildSetting ~= nil
     local general = guildSetting and guildSetting.general or {}
@@ -1544,10 +1246,6 @@ function DataEditor:RefreshGuildSettingInspectorGeneralPage(guildSetting)
     if self.GuildSettingInspectorEnableDailyRewardsCheckbox then
         self.GuildSettingInspectorEnableDailyRewardsCheckbox:SetChecked(general.enableDailyRewards == true, true)
         self.GuildSettingInspectorEnableDailyRewardsCheckbox:SetEnabled(hasGuildSetting)
-    end
-    if self.GuildSettingInspectorEnableProgressionCheckbox then
-        self.GuildSettingInspectorEnableProgressionCheckbox:SetChecked(general.enableProgression == true, true)
-        self.GuildSettingInspectorEnableProgressionCheckbox:SetEnabled(hasGuildSetting)
     end
     if self.GuildSettingInspectorTagsInput then
         self.GuildSettingInspectorTagsInput:SetText(guildSetting and UI.Utils.JoinCommaSeparatedList(guildSetting.tags or {}) or "")
@@ -1700,75 +1398,6 @@ function DataEditor:RefreshGuildSettingDailyRewardsPage()
     refreshGuildSettingPageScroll(self.GuildSettingInspectorDailyRewardsPage)
 end
 
-function DataEditor:RefreshGuildSettingProgressionPage()
-    local guildSetting = self:GetSelectedGuildSetting()
-    local progression = guildSetting and guildSetting.progression or {}
-    local entries = progression and progression.entries or {}
-    local entryIndex = tonumber(self.SelectedGuildSettingProgressionEntryIndex)
-    if entryIndex and not entries[entryIndex] then
-        entryIndex = #entries > 0 and math.min(entryIndex, #entries) or nil
-        self.SelectedGuildSettingProgressionEntryIndex = entryIndex
-    end
-    local entry = entryIndex and entries[entryIndex] or nil
-    local spellRefs = entry and entry.spellRefs or {}
-    local spellRefIndex = tonumber(self.SelectedGuildSettingSpellRefIndex)
-    if spellRefIndex and not spellRefs[spellRefIndex] then
-        spellRefIndex = #spellRefs > 0 and math.min(spellRefIndex, #spellRefs) or nil
-        self.SelectedGuildSettingSpellRefIndex = spellRefIndex
-    end
-
-    if self.GuildSettingInspectorSlotCountInput then
-        self.GuildSettingInspectorSlotCountInput:SetText(tostring(normalizeInteger(progression and progression.slotCount, 3, 1)))
-        setTextElementEnabled(self.GuildSettingInspectorSlotCountInput, guildSetting ~= nil)
-    end
-    if self.GuildSettingInspectorProgressionEntryScroll then
-        self.GuildSettingInspectorProgressionEntryScroll:SetItems(entries)
-    end
-    if self.GuildSettingInspectorAddProgressionEntryButton then
-        self.GuildSettingInspectorAddProgressionEntryButton:SetEnabled(guildSetting ~= nil)
-    end
-    if self.GuildSettingInspectorDeleteProgressionEntryButton then
-        self.GuildSettingInspectorDeleteProgressionEntryButton:SetEnabled(entry ~= nil)
-    end
-    if self.GuildSettingInspectorProgressionEntryIdInput then
-        self.GuildSettingInspectorProgressionEntryIdInput:SetText(entry and (entry.id or "") or "")
-        setTextElementEnabled(self.GuildSettingInspectorProgressionEntryIdInput, entry ~= nil)
-    end
-    if self.GuildSettingInspectorProgressionEntryNameInput then
-        self.GuildSettingInspectorProgressionEntryNameInput:SetText(entry and (entry.name or "") or "")
-        setTextElementEnabled(self.GuildSettingInspectorProgressionEntryNameInput, entry ~= nil)
-    end
-    if self.GuildSettingInspectorProgressionEntryDescriptionInput then
-        self.GuildSettingInspectorProgressionEntryDescriptionInput:SetText(entry and (entry.description or "") or "")
-        setTextElementEnabled(self.GuildSettingInspectorProgressionEntryDescriptionInput, entry ~= nil)
-    end
-    if self.GuildSettingInspectorProgressionEntryIconField then
-        local icon = entry and entry.icon or ""
-        self.GuildSettingInspectorProgressionEntryIconField:SetIcon(icon ~= "" and icon or DEFAULT_ICON)
-        self.GuildSettingInspectorProgressionEntryIconField:SetLabelText(icon ~= "" and icon or "-")
-        self.GuildSettingInspectorProgressionEntryIconField:SetEnabled(entry ~= nil)
-    end
-    if self.GuildSettingInspectorProgressionEntryLockedTextInput then
-        self.GuildSettingInspectorProgressionEntryLockedTextInput:SetText(entry and (entry.lockedText or "") or "")
-        setTextElementEnabled(self.GuildSettingInspectorProgressionEntryLockedTextInput, entry ~= nil)
-    end
-    if self.GuildSettingInspectorSpellRefScroll then
-        self.GuildSettingInspectorSpellRefScroll:SetItems(spellRefs)
-    end
-    if self.GuildSettingInspectorSpellRefInput then
-        self.GuildSettingInspectorSpellRefInput:SetText(spellRefIndex and (spellRefs[spellRefIndex] or "") or "")
-        setTextElementEnabled(self.GuildSettingInspectorSpellRefInput, entry ~= nil)
-    end
-    if self.GuildSettingInspectorSaveSpellRefButton then
-        self.GuildSettingInspectorSaveSpellRefButton:SetEnabled(entry ~= nil)
-    end
-    if self.GuildSettingInspectorDeleteSpellRefButton then
-        self.GuildSettingInspectorDeleteSpellRefButton:SetEnabled(spellRefIndex ~= nil)
-    end
-
-    refreshGuildSettingPageScroll(self.GuildSettingInspectorProgressionPage)
-end
-
 function DataEditor:RefreshGuildSettingInspectorPage()
     local guildSetting = self:GetSelectedGuildSetting()
     local hasGuildSetting = guildSetting ~= nil
@@ -1780,14 +1409,11 @@ function DataEditor:RefreshGuildSettingInspectorPage()
         self.SelectedGuildSettingRequisitionIndex = guildSetting and #(guildSetting.requisitions or {}) > 0 and 1 or nil
         self.SelectedGuildSettingCostIndex = nil
         self.SelectedGuildSettingDailyRewardIndex = guildSetting and #(guildSetting.dailyRewards or {}) > 0 and 1 or nil
-        self.SelectedGuildSettingProgressionEntryIndex = guildSetting and guildSetting.progression and #(guildSetting.progression.entries or {}) > 0 and 1 or nil
-        self.SelectedGuildSettingSpellRefIndex = nil
     end
 
     self:RefreshGuildSettingInspectorGeneralPage(guildSetting)
     self:RefreshGuildSettingRequisitionsPage()
     self:RefreshGuildSettingDailyRewardsPage()
-    self:RefreshGuildSettingProgressionPage()
     if self.GuildSettingInspectorEmptyText then
         self.GuildSettingInspectorEmptyText:SetText(hasGuildSetting and "" or "Select a Guild Rank to inspect it.")
     end
