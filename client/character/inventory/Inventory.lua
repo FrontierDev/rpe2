@@ -795,6 +795,14 @@ local function markInventoryMutation(changeType, detail, notificationToken)
     local mutation = buildInventoryMutationDetail(changeType, detail, notificationToken)
     if type(Runtime) == "table" and type(Runtime.MarkChanged) == "function" then
         Runtime:MarkChanged("inventory", mutation)
+        if mutation.isCanonicalAdd == true
+            and type(Runtime.EmitMutationEvent) == "function"
+        then
+            -- Achievement item gains are authoritative dependent work. Queue
+            -- the typed event in the current transaction so the before-commit
+            -- processor can join reward chains without a second transaction.
+            Runtime:EmitMutationEvent("item_gain", mutation)
+        end
         return mutation
     end
 

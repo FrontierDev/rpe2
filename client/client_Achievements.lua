@@ -568,6 +568,42 @@ function Achievements:HandleInventoryChange(payload)
     return processAdditions()
 end
 
+local function registerInventoryMutationProcessor()
+    if Achievements._inventoryMutationProcessorId ~= nil then
+        return true
+    end
+
+    if type(Runtime) ~= "table"
+        or type(Runtime.RegisterBeforeCommitProcessor) ~= "function"
+    then
+        return false
+    end
+
+    Achievements._inventoryMutationProcessorId = Runtime:RegisterBeforeCommitProcessor(
+        "item_gain",
+        function(mutation)
+            if type(mutation) ~= "table"
+                or mutation.changeType ~= "add"
+                or mutation.isCanonicalAdd ~= true
+            then
+                return
+            end
+
+            -- The processor receives one exact AddItem mutation. Reuse the
+            -- established handler shape so direct/listener compatibility and
+            -- transaction-aware processing share the same quantity logic.
+            Achievements:HandleInventoryChange({
+                changeType = "add",
+                isCanonicalAdd = true,
+                detail = mutation,
+                changes = { mutation },
+                addedItems = { mutation },
+            })
+        end
+    )
+    return Achievements._inventoryMutationProcessorId ~= nil
+end
+
 function Achievements:HandleSkillChange(payload)
     if type(payload) ~= "table" then
         return {
@@ -599,7 +635,18 @@ function Achievements:HandleSkillChange(payload)
 end
 
 function Achievements:Initialize()
-    if self._inventoryListenerId == nil then
+    local hasInventoryMutationProcessor = registerInventoryMutationProcessor()
+    if hasInventoryMutationProcessor and self._inventoryListenerId ~= nil then
+        local inventory = Client.Inventory
+        if type(inventory) == "table"
+            and type(inventory.UnregisterChangeListener) == "function"
+        then
+            inventory.UnregisterChangeListener(self._inventoryListenerId)
+        end
+        self._inventoryListenerId = nil
+    end
+
+    if not hasInventoryMutationProcessor and self._inventoryListenerId == nil then
         local inventory = Client.Inventory
         if type(inventory) == "table" and type(inventory.RegisterChangeListener) == "function" then
             self._inventoryListenerId = inventory.RegisterChangeListener(function(payload)
@@ -621,7 +668,9 @@ function Achievements:Initialize()
         self:RecoverInProgressRewards()
     end
 
-    return self._inventoryListenerId ~= nil or self._skillListenerId ~= nil
+    return hasInventoryMutationProcessor
+        or self._inventoryListenerId ~= nil
+        or self._skillListenerId ~= nil
 end
 
 function Achievements:RefreshProfileUI()
