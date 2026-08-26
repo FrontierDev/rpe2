@@ -3,7 +3,7 @@
 
 **Status:** Revised after Phase 1  
 **Target:** RPEngine 2.0 (`FrontierDev/rpe2`)  
-**Scope:** Achievements, RPE Guild Ranks, Guild Requisitions, Daily Rewards, Guild Administration, Guild Progression  
+**Scope:** Achievements, RPE Guild Ranks, Guild Requisitions, Daily Rewards, Guild Administration
 **Reference addons:** `old_crusadetoolkit`, `gns_mekkatorque`  
 **Explicitly out of scope:** Bestiary, Quest Log
 
@@ -21,7 +21,7 @@ From this revision onward:
 - the RPE Guild Rank is assigned manually by a guild officer;
 - RPE never automatically derives, changes or clears a character's assigned RPE Guild Rank from their WoW guild rank;
 - the WoW guild rank mapping constrains which RPE Guild Ranks an officer may assign;
-- each RPE Guild Rank owns the Requisitions, Daily Rewards and Progression available while that rank is assigned;
+- each RPE Guild Rank owns the Requisitions and Daily Rewards available while that rank is assigned;
 - multiple RPE Guild Ranks applying to the same WoW guild rank are intentional and are not a configuration conflict;
 - there is no implicit RPE Guild Rank hierarchy or inheritance. If content should be shared between ranks, the dataset must define it for each relevant rank unless a future inheritance feature is deliberately added.
 
@@ -47,7 +47,6 @@ This project extends RPE 2 with two related systems:
    - Manual officer assignment of an RPE Guild Rank to an online member.
    - Rank-scoped Requisitions.
    - Rank-scoped Daily Rewards.
-   - Rank-scoped Guild Progression.
    - Officer administration of online members' RPE characters.
 
 The implementation must build on RPE 2's existing Database, Profile, Registry, Inventory, Runtime, UI and Comms systems rather than importing the architecture of either reference addon.
@@ -257,14 +256,13 @@ Achievement definition         ->    Achievement progress
 RPE Guild Rank (GuildSetting)  ->    Assigned Guild Rank ref
                                      Requisition usage
                                      Daily reward claim
-                                     Progression state
 ```
 
 A Dataset describes **what exists and what is available at a rank**.
 
 A Profile describes **what this character has done and which RPE Guild Rank an officer has assigned**.
 
-No player-specific assignment, completion, claim or progression state is serialized into an Achievement or Guild Rank dataset object.
+No player-specific assignment, completion or claim state is serialized into an Achievement or Guild Rank dataset object.
 
 The player's WoW guild rank is live Blizzard state. It is used to validate which RPE Guild Ranks may be assigned, but it is not the stored RPE Guild Rank.
 
@@ -642,16 +640,10 @@ GuildSetting {
     general = {
         enableRequisitions = false,
         enableDailyRewards = false,
-        enableProgression = false,
     },
 
     requisitions = {},
     dailyRewards = {},
-
-    progression = {
-        slotCount = 3,
-        entries = {},
-    },
 
     tags = {},
 }
@@ -808,7 +800,7 @@ RPE must never automatically assign a rank because:
 
 If an existing assignment becomes invalid because the member's WoW guild rank changed or the referenced RPE Guild Rank is no longer applicable, RPE should treat it as an **invalid assignment** for feature eligibility and show an explanatory UI state. It must not silently remap or clear the Profile value.
 
-No assigned RPE Guild Rank means no rank-scoped Requisitions, Daily Rewards or Progression are available.
+No assigned RPE Guild Rank means no rank-scoped Requisitions or Daily Rewards are available.
 
 WoW officer permission remains the authority for Guild Admin access. Being assigned a particular RPE Guild Rank does not itself make a user an officer.
 
@@ -980,11 +972,6 @@ profile.guild = {
                 },
             },
 
-            progression = {
-                ["campaign:medic"] = {
-                    ...
-                },
-            },
         },
     },
 }
@@ -992,7 +979,7 @@ profile.guild = {
 
 The guild key is produced by one Guild helper from the best stable Blizzard guild identity available, with guild name/realm fallback.
 
-Requisition and progression state remain keyed by RPE Guild Rank reference so changing ranks does not erase previous rank-specific state. Returning to a prior rank restores its previous persisted state.
+Requisition state remains keyed by RPE Guild Rank reference so changing ranks does not erase previous rank-specific state. Returning to a prior rank restores its previous persisted state.
 
 ---
 
@@ -1002,7 +989,6 @@ The top-level Guild window remains:
 
 ```text
 Requisitions
-Progression
 Admin
 ```
 
@@ -1024,7 +1010,7 @@ or:
 Guild Rank: Medic (assignment no longer valid for current WoW rank)
 ```
 
-Requisitions and Progression render from the assigned RPE Guild Rank only.
+Requisitions render from the assigned RPE Guild Rank only.
 
 ---
 
@@ -1258,7 +1244,7 @@ Profile.ClearAssignedGuildRank(guildKey)
 
 Only the validated receiver-side Guild Admin operation should call this on behalf of another player.
 
-Setting an RPE Guild Rank does not automatically award its Daily Reward, consume a Requisition or mutate Progression. Normal runtime/UI refresh follows the assignment change.
+Setting an RPE Guild Rank does not automatically award its Daily Reward or consume a Requisition. Normal runtime/UI refresh follows the assignment change.
 
 ## Grant Achievement
 
@@ -1323,102 +1309,7 @@ The officer UI must not display success before acknowledgement.
 
 ---
 
-# 34. Guild Progression
-
-CrusadeToolkit's progression concept remains useful as a generalized RPE system containing:
-
-- a named progression identity;
-- descriptive text;
-- locked text;
-- an unlocked state;
-- configured ability choices;
-- a player's selected ability.
-
-The revised design scopes that progression to the assigned RPE Guild Rank.
-
----
-
-# 35. RPE Guild Rank Progression Definition
-
-Each RPE Guild Rank owns its own progression definition:
-
-```lua
-progression = {
-    slotCount = 3,
-
-    entries = {
-        {
-            id = "field_medicine",
-            name = "Field Medicine",
-            description = "...",
-            icon = "...",
-            lockedText = "You have not yet unlocked this progression.",
-            spellRefs = {
-                "campaign:ability_one",
-                "campaign:ability_two",
-            },
-        },
-    },
-}
-```
-
-The progression entry is not itself the character's RPE Guild Rank. It is progression content available **inside** that Guild Rank.
-
-There are no hard-coded campaign-specific rank/oath terms in RPE core.
-
----
-
-# 36. Character Progression State
-
-Example:
-
-```lua
-profile.guild.byGuild[guildKey].progression[guildRankRef] = {
-    slots = {
-        [1] = "field_medicine",
-    },
-
-    unlocked = {
-        ["field_medicine"] = true,
-    },
-
-    selectedSpells = {
-        ["field_medicine"] = "campaign:ability_one",
-    },
-}
-```
-
-Changing the assigned RPE Guild Rank does not delete progression state associated with the previous rank.
-
-Only the currently assigned valid rank's progression is active/displayed.
-
----
-
-# 37. Progression UI
-
-The Progression tab renders the assigned rank's configured progression entries.
-
-Where more slots exist than fit horizontally, the page paginates or scrolls rather than assuming exactly three definitions.
-
-No progression from a different RPE Guild Rank is displayed as active.
-
----
-
-# 38. Progression Administration
-
-Guild Admin may later expose Progression controls for the selected member:
-
-- assign an entry to a progression slot;
-- lock/unlock an entry;
-- clear a selected spell.
-
-Every remote mutation is validated against the member's currently assigned RPE Guild Rank and its progression definition.
-
-A rank assignment change does not destroy previous rank-scoped progression state.
-
----
-
-# 39. Dataset Dependency Integration
+# 34. Dataset Dependency Integration
 
 Dependency extraction remains required for Achievement and internal `GuildSetting` definitions.
 
@@ -1437,8 +1328,6 @@ other defined criterion references
 Requisition itemRef
 Requisition currencyRefs
 Daily Reward item/currency refs
-Progression spellRefs
-future Achievement refs used by progression requirements
 ```
 
 `wowGuildRankIndices` contains Blizzard numeric rank indexes and creates no dataset dependency.
@@ -1447,7 +1336,7 @@ future Achievement refs used by progression requirements
 
 ---
 
-# 40. Registry Additions
+# 35. Registry Additions
 
 Existing internal resolvers remain valid:
 
@@ -1467,7 +1356,7 @@ but existing datasets and APIs must not be broken solely to rename the internal 
 
 ---
 
-# 41. Data Editor Integration
+# 36. Data Editor Integration
 
 The internal collection remains:
 
@@ -1493,12 +1382,10 @@ General
   Eligible WoW Guild Ranks
   Enable Requisitions
   Enable Daily Rewards
-  Enable Progression
   Tags
 
 Requisitions
 Daily Rewards
-Progression
 ```
 
 `Eligible WoW Guild Ranks` edits `wowGuildRankIndices` and permits multiple RPE Guild Rank entries to contain the same WoW rank index.
@@ -1509,7 +1396,7 @@ Existing datasets containing `requiredGuildRankIndex` must continue to import wi
 
 ---
 
-# 42. Schema and Migration Changes
+# 37. Schema and Migration Changes
 
 Phase 1 currently uses:
 
@@ -1528,7 +1415,7 @@ Dataset schema
 15 → 16
 ```
 
-Profile normalization adds/normalizes rank assignment fields inside each guild bucket without destroying existing requisition/progression/future nested fields.
+Profile normalization adds/normalizes rank assignment fields inside each guild bucket without destroying existing requisition/future nested fields.
 
 Dataset normalization adds:
 
@@ -1546,7 +1433,7 @@ No automatic character rank assignment is performed during migration.
 
 ---
 
-# 43. Runtime Event Integration
+# 38. Runtime Event Integration
 
 RPE continues to centralize WoW runtime events in:
 
@@ -1565,7 +1452,7 @@ They must **not** assign, remap or clear `assignedRankRef` automatically.
 
 ---
 
-# 44. Proposed Module Layout
+# 39. Proposed Module Layout
 
 Existing Phase 1 files remain the starting point:
 
@@ -1604,7 +1491,6 @@ client/
 
     guild/
       page_GuildRequisitions.lua
-      page_GuildProgression.lua
       page_GuildAdmin.lua
       window_Guild.lua
 
@@ -1629,7 +1515,7 @@ RPEngine_Dev.toc
 
 ---
 
-# 45. Phase 1 — UI and Data Layer — Complete Baseline
+# 40. Phase 1 — UI and Data Layer — Complete Baseline
 
 Phase 1 established:
 
@@ -1641,7 +1527,7 @@ Phase 1 established:
 - Achievement Data Editor authoring;
 - GuildSetting Data Editor authoring;
 - read-only Profile Achievements;
-- read-only Guild Requisitions/Progression/Admin shell;
+- read-only Guild Requisitions/Admin shell;
 - guild roster display and WoW officer gating;
 - Launcher and `/rpe guild` integration.
 
@@ -1649,7 +1535,7 @@ The Guild Rank revision builds on this baseline rather than restarting it.
 
 ---
 
-# 46. Phase 2 — Guild Rank Revision, Requisitions and Daily Rewards
+# 41. Phase 2 — Guild Rank Revision, Requisitions and Daily Rewards
 
 Before transactional Guild features are activated, refactor the Phase 1 Guild model to the revised RPE Guild Rank semantics.
 
@@ -1696,7 +1582,7 @@ Requisition transactions remain atomic and use existing Currency/Inventory APIs.
 
 ---
 
-# 47. Phase 3 — Achievements and General Guild Administration
+# 42. Phase 3 — Achievements and General Guild Administration
 
 Implement the Achievement runtime with initial triggers:
 
@@ -1732,38 +1618,7 @@ All Guild Admin operations use the same targeted, receiver-validated protocol es
 
 ---
 
-# 48. Phase 4 — Rank-Scoped Guild Progression
-
-Implement:
-
-- progression slots and entries defined per RPE Guild Rank;
-- unlocked/locked state;
-- narrative/locked text;
-- spell selections;
-- persisted progression state keyed by RPE Guild Rank ref;
-- Progression UI for the assigned rank;
-- officer Progression administration;
-- remote progression mutations through Guild Admin.
-
-Acceptance includes:
-
-```text
-Only the assigned valid RPE Guild Rank's progression is active/displayed.
-
-Changing RPE Guild Rank does not delete previous rank-scoped progression state.
-
-Dataset content controls names, descriptions and choices.
-
-Locked entries cannot be selected.
-
-Selected spells must exist in the configured progression entry.
-
-Officer changes are validated by the target client.
-```
-
----
-
-# 49. Explicit Non-Goals
+# 43. Explicit Non-Goals
 
 This project does not implement:
 
@@ -1787,7 +1642,7 @@ RPE SavedVariables remain fundamentally player-controlled.
 
 ---
 
-# 50. Principal Architectural Decisions
+# 44. Principal Architectural Decisions
 
 **Achievement definitions remain Dataset data; progress remains Profile data.**
 
@@ -1809,7 +1664,7 @@ RPE SavedVariables remain fundamentally player-controlled.
 
 **Multiple RPE Guild Ranks matching the same WoW guild rank are expected and are not a conflict.**
 
-**Each RPE Guild Rank independently owns its Requisitions, Daily Rewards and Progression.**
+**Each RPE Guild Rank independently owns its Requisitions and Daily Rewards.**
 
 **There is no implicit cross-rank inheritance.**
 
@@ -1829,6 +1684,6 @@ RPE SavedVariables remain fundamentally player-controlled.
 
 **Requisition validation exists in the transaction layer, not merely the UI.**
 
-**Rank changes preserve previous rank-scoped requisition/progression history rather than deleting it.**
+**Rank changes preserve previous rank-scoped requisition history rather than deleting it.**
 
 This revision preserves the completed Phase 1 architecture while changing the Guild model from a single guild-wide setting into a manually assigned, dataset-driven RPE Guild Rank system.

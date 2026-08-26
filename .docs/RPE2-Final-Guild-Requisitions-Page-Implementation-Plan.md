@@ -658,11 +658,10 @@ Guild
 
 Do not duplicate the rank in the title while this page is active.
 
-The existing tab structure remains unchanged:
+The Guild window exposes the two surviving tabs:
 
 ```text
 Requisitions
-Progression
 Admin
 ```
 
@@ -859,7 +858,7 @@ client/character/guild/window_Guild.lua
 
 ## Regression
 
-- [ ] Progression and Admin tabs are unaffected.
+- [ ] The Admin tab is unaffected.
 - [ ] Existing guild-rank assignment logic is unaffected.
 - [ ] Existing built-in and dataset currency costs continue to work.
 - [ ] Existing inventory rollback and currency rollback behaviour remains intact.
@@ -874,7 +873,6 @@ This task does not add:
 - a separate Guild Shop dataset collection;
 - new requisition currencies;
 - new guild-rank assignment rules;
-- new progression behaviour;
 - new Guild Admin behaviour;
 - separate purchase confirmation dialogs;
 - extra explanatory labels/help text;

@@ -1,202 +1,146 @@
 ## Goal
-Remove all **Guild Progression authoring UI** from the GuildSetting/Guild Rank Data Editor inspector while preserving the three surviving pages and the recent inspector improvements.
+Remove stale **Guild Progression requirements and documentation** after the code feature has been removed, so future implementation work does not accidentally restore it.
 
 Authoritative plan: `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md`.
 
-Depends on: #51
+Depends on: #51, #52, #53, #54, #55
 
-This task is intentionally isolated to the editor surface so it does not overlap with the runtime Guild window/Admin cleanup.
+This is a documentation/task-definition cleanup. Do not redesign the implemented Guild systems.
 
-## Primary file
+## Primary files
 
-- `client/ui/editor/inspectors/page_InspectorGuildSetting.lua`
+- `.docs/RPE2-Achievements-Guild-Systems-PDD.md`
+- `.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md` only where it assumes Guild Progression still exists
+- `TASK.MD`
 
-Reference before editing:
+Also search `.docs/` and root Markdown files for active Guild Progression requirements that conflict with the completed removal.
 
-- completed #51 `core/classes/GuildSetting.lua`
-- issue #47 for the current per-page scroll-view architecture
-- issue #48 for current GuildSetting currency selector behavior
-- issue #45 for current inspector visual conventions
+## 1. Update the Achievements/Guild Systems PDD
 
-## 1. Remove the Progression inspector page
+Remove Guild Progression as an intended RPE 2 feature.
 
-Change the GuildSetting inspector page list from the conceptual structure:
+At minimum inspect and remove/update sections that describe:
 
 ```text
-General
-Requisitions
+Guild-specific character progression
+GuildSetting.general.enableProgression
+GuildSetting.progression
+Progression entry definitions / spellRefs
+Guild Profile progression state
+Guild Progression runtime/page behavior
+Guild Admin progression management
+GuildSetting editor Progression page
+Progression dependency extraction
+Progression implementation phases/acceptance criteria
+```
+
+Preserve the PDD's unrelated content for:
+
+```text
+Achievements
+Guild Ranks
+Requisitions / Guild Shop
 Daily Rewards
-Progression
+Guild Admin
+Skills
+Items
+Achievement broadcasting
 ```
 
-to:
+After editing, the document should describe the actual intended Guild system rather than a historical design that still promises Progression.
+
+## 2. Update the final Requisitions implementation plan narrowly
+
+Inspect:
 
 ```text
-General
-Requisitions
-Daily Rewards
+.docs/RPE2-Final-Guild-Requisitions-Page-Implementation-Plan.md
 ```
 
-Remove the Progression page definition, builder invocation, page frame/scroll shell, and page-selection routing.
+Only remove or adjust statements that now incorrectly assume:
 
-Do not leave an empty fourth page.
+- a three-tab Guild window;
+- a surviving Progression page;
+- Progression must remain unaffected/intact;
+- TOC/load ordering involving `page_GuildProgression.lua`.
 
-## 2. Remove `Enable Progression`
+Do **not** rewrite the Requisitions design itself. Preserve its authoritative Guild Shop, limited requisition, Daily Reward, ShopEntry, pagination and transaction requirements.
 
-Delete the General-page control that edits:
+## 3. Remove stale `TASK.MD` requirements
 
-```lua
-general.enableProgression
-```
+Remove or replace inherited wording that treats deleted Guild Progression controls, mutations or tabs as active requirements.
 
-Remove any refresh/binding/validation code that reads or writes that field.
+`TASK.MD` must no longer instruct a coding agent to restore or preserve the deleted feature.
 
-Do not replace it with another toggle.
+Keep any still-relevant current-task conventions if the file is otherwise used as an active Codex handoff, but do not preserve obsolete Issue #50 wording merely for history.
 
-## 3. Remove Progression authoring controls
+## 4. Search for contradictory active docs
 
-Delete controls and editor state for Guild Progression definition fields, including current equivalents of:
+Search Markdown documentation for at least:
 
 ```text
-slotCount
-progression entry list
-entry id
-entry name
-entry description
-entry icon
-lockedText
-spellRefs
-add progression entry
-delete progression entry
-selected progression entry
-selected progression spell/reference
+Guild Progression
+Progression tab
+enableProgression
+GuildSetting.progression
+page_GuildProgression
+assign_progression_entry
+lock_progression_entry
+unlock_progression_entry
+clear_progression_spell
 ```
 
-Remove related helpers used only to:
+Inspect every match.
 
-- build Progression entry/spell dropdowns;
-- normalize selected progression indexes/refs;
-- update progression entry fields;
-- add/delete progression entries;
-- refresh progression controls;
-- calculate Progression page dynamic height/scroll range.
+Historical references may remain only where they are clearly historical/changelog context and cannot be mistaken for active product requirements.
 
-Trace helper callers before deletion so generic dataset/reference-selector utilities are preserved.
+## 5. Preserve generic progression terminology
 
-## 4. Preserve the #47 scroll-view architecture
+Do not globally replace/delete the word `progression` from documentation.
 
-Issue #47 converted all GuildSetting pages to the shared scroll shell.
-
-After this task:
-
-```text
-General        -> remains a scrollable inspector page
-Requisitions   -> remains a scrollable inspector page
-Daily Rewards  -> remains a scrollable inspector page
-```
-
-Remove only the Progression page's shell/registration.
-
-Preserve:
-
-- fixed page selector bar;
-- mouse-wheel behavior;
-- dynamic scroll-range updates;
-- nested `UI.ScrollLayout` behavior;
-- resize handling;
-- existing visual scrollbar treatment.
-
-Do not revert the remaining pages to fixed non-scroll frames.
-
-## 5. Preserve #48 currency authoring
-
-Do not regress current GuildSetting currency selector behavior:
-
-- built-in currencies remain selectable;
-- custom dataset currencies remain selectable;
-- requisition costs remain dropdown-based rather than raw reference text;
-- Daily Reward currency authoring remains dropdown-based;
-- missing/legacy currency references remain safely representable.
-
-Progression removal must not disturb the shared currency/reference helpers still used by Requisitions or Daily Rewards.
-
-## 6. Preserve inspector visual conventions
-
-Keep the existing Spell/Item-style GuildSetting inspector conventions introduced by recent issues:
-
-- selector bar proportions;
-- page padding/spacing;
-- label/control sizing;
-- list/action-row conventions;
-- section/panel styling.
-
-Removing Progression should simplify the inspector, not redesign it.
-
-## 7. Handle legacy GuildSetting input safely
-
-After #51, the underlying GuildSetting model no longer exposes active Progression configuration.
-
-The inspector must therefore:
-
-- not attempt to read `definition.progression`;
-- not attempt to read/write `general.enableProgression`;
-- not recreate missing progression tables as part of refresh;
-- open legacy definitions without errors even if their raw source once contained those fields.
-
-The model/normalizer is authoritative for discarding legacy fields; the inspector should simply ignore them.
+Unrelated concepts such as class/race/stat/resource progression remain valid and must not be rewritten as part of this task.
 
 ## Acceptance criteria
 
-- [ ] GuildSetting inspector has exactly General, Requisitions and Daily Rewards pages.
-- [ ] No Progression page/frame/scroll shell is created.
-- [ ] No `Enable Progression` control exists.
-- [ ] No Progression entry list or Progression-specific input/dropdown/button exists.
-- [ ] No inspector refresh path reads/writes `GuildSetting.progression`.
-- [ ] No inspector refresh path reads/writes `general.enableProgression`.
-- [ ] General/Requisitions/Daily Rewards pages remain scrollable and properly clipped.
-- [ ] Requisition editor behavior remains intact.
-- [ ] Daily Reward editor behavior remains intact.
-- [ ] Built-in/custom currency selector behavior from #48 remains intact.
-- [ ] Existing visual conventions remain intact.
-- [ ] Opening a legacy GuildSetting does not error or recreate progression state.
+- [ ] Achievements/Guild Systems PDD no longer specifies Guild Progression as an active feature.
+- [ ] PDD no longer defines `enableProgression` or `GuildSetting.progression`.
+- [ ] PDD no longer describes Guild Profile progression state or Progression Admin controls.
+- [ ] Requisitions implementation plan contains no requirement that a Progression tab/page remain functional.
+- [ ] Requisitions design/business requirements remain otherwise unchanged.
+- [ ] `TASK.MD` contains no instruction to preserve Progression controls/mutations.
+- [ ] Active project documentation contains no contradictory requirement to restore Guild Progression.
+- [ ] Generic non-Guild progression documentation remains intact.
 
 ## Validation matrix
 
 ```text
-open GuildSetting inspector
--> selector shows General / Requisitions / Daily Rewards only
+search docs for "Guild Progression"
+-> no active product requirement remains
 
-General page
--> Guild metadata/rank mapping/toggles still editable
--> no Enable Progression control
--> scroll behavior unchanged
+search docs for "enableProgression"
+-> no active GuildSetting requirement remains
 
-Requisitions page
--> lists/selectors/cost editing still work
--> page scroll still works
+search docs for "GuildSetting.progression"
+-> no active schema requirement remains
 
-Daily Rewards page
--> item/currency switching still works
--> built-in currency selection still works
--> page scroll range updates normally
+read PDD Guild section end-to-end
+-> Guild system now describes ranks/requisitions/admin/achievements without a missing Progression phase
 
-legacy GuildSetting once containing progression fields
--> inspector opens
--> no Progression controls appear
--> no nil-index errors
--> editing unrelated fields does not recreate progression
+read final Requisitions plan
+-> two surviving Guild tabs are not contradicted
+-> Guild Shop/Requisitions/Daily Reward design remains unchanged
 
-resize Data Editor
--> three remaining page scroll shells remain valid
+read TASK.MD
+-> no coding-agent instruction asks to preserve/rebuild Progression
 ```
 
 ## Constraints
 
-- Do not edit runtime Guild UI here.
-- Do not reintroduce fields removed by #51 to make the inspector easier to compile.
-- Do not remove generic dataset/reference/currency helpers still used by Requisitions or Daily Rewards.
-- Do not redesign the inspector or page selector.
-- Do not change Requisition/Daily Reward schema or business semantics.
+- Do not modify Lua/runtime code in this task unless a documentation search reveals a filename typo only in generated metadata; implementation should already be complete.
+- Do not rewrite unrelated PDD sections.
+- Do not remove generic character progression documentation.
+- Do not change Requisitions business/design decisions.
+- Do not turn historical changelog text into current requirements.
 
 ## Coding-agent instructions
-Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md`, completed #51, and the current post-#47/#48 inspector before editing. This file is large: trace helper usage before deletion and keep the patch progression-specific. Search the file after editing for `enableProgression`, `Progression`, `progression.entries`, `slotCount`, `lockedText`, and stale Progression page identifiers. Report exact helpers/controls removed and validation performed on all three surviving pages.
+Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md` and inspect the completed code from #51–#55 before editing documentation, so the docs describe the actual resulting system. Make narrow, internally consistent Markdown edits. Search all active Markdown for contradictory Guild Progression requirements and report exact documents/sections changed plus any historical references intentionally retained.
