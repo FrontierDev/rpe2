@@ -230,6 +230,8 @@ local function buildTooltipText(resolved)
             isMissing = resolved.isMissing,
             soulbound = resolved.soulbound == true,
             modifications = resolved.modifications,
+            quantity = resolved.quantity,
+            stackIdentity = resolved.stackIdentity,
         })
     end
 
@@ -991,8 +993,11 @@ function InventoryGridPage:Refresh()
                 slot:SetIcon(icon)
                 slot:SetCount((tonumber(resolved.quantity) or 1) > 1 and tostring(math.floor(tonumber(resolved.quantity) or 1)) or "")
                 slot:SetEnabled((resolved.isActive and not resolved.isMissing) and (searchQuery == "" or searchMatches[resolved] == true))
-                slot:SetTooltip(buildTooltipText(resolved))
                 slot.resolvedItem = resolved
+                slot:SetTooltip(function()
+                    local currentResolvedItem = slot.resolvedItem
+                    return currentResolvedItem and buildTooltipText(currentResolvedItem) or nil
+                end)
             else
                 slot:SetIcon(DEFAULT_ICON)
                 slot:SetCount("")

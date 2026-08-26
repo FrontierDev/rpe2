@@ -118,6 +118,11 @@ local function resolveItemDefinition(itemRef)
         return nil, nil
     end
 
+    if type(Registry.ResolveItemReference) == "function" then
+        local dataset, item = Registry:ResolveItemReference(itemRef)
+        return item, dataset
+    end
+
     local dataset = Database.GetDatasetByID and Database.GetDatasetByID(datasetId) or nil
     if not dataset then
         return nil, nil

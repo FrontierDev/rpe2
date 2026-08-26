@@ -10,6 +10,7 @@ local Traits = Addon.Client.Traits or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Dependencies = Database and Database.Dependecies or {}
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 local Ruleset = Addon.Internal and Addon.Internal.Ruleset or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local ItemClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Item or nil
@@ -17,9 +18,305 @@ local ModificationService = Profile and Profile.Modifications or {}
 local Common = Addon.Utils and Addon.Utils.Common or nil
 local TraitClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Trait or nil
 local Conditions = Addon.Client and Addon.Client.Conditions or {}
+local DescriptionBuilder = Addon.Client
+    and Addon.Client.Spellcasting
+    and Addon.Client.Spellcasting.DescriptionBuilder
+    or {}
 
 local ItemTooltip = Tooltips.Item or {}
 Tooltips.Item = ItemTooltip
+local ensureString
+
+ensureString = function(value, fallback)
+    if value == nil or value == "" then
+        return fallback or ""
+    end
+
+    return tostring(value)
+end
+
+local TOOLTIP_CACHE_VERSION = "item-tooltip-v2"
+ItemTooltip.BuildCache = ItemTooltip.BuildCache or {}
+ItemTooltip.StaticBuildCache = ItemTooltip.StaticBuildCache or {}
+ItemTooltip.DatasetIndexCache = ItemTooltip.DatasetIndexCache or {}
+ItemTooltip.BuildCacheHits = math.max(0, math.floor(tonumber(ItemTooltip.BuildCacheHits) or 0))
+ItemTooltip.BuildCacheMisses = math.max(0, math.floor(tonumber(ItemTooltip.BuildCacheMisses) or 0))
+ItemTooltip.DatasetIndexBuilds = math.max(0, math.floor(tonumber(ItemTooltip.DatasetIndexBuilds) or 0))
+
+local function startTiming(label, thresholdMs, context)
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopTiming(timer, cardinality)
+    if not timer then
+        return 0
+    end
+
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Stop) == "function" then
+        local elapsedMs = timings:Stop(timer, { cardinality = cardinality })
+        return math.max(0, tonumber(elapsedMs) or 0)
+    end
+
+    return 0
+end
+
+local function logTooltipBuildHardFailure(elapsedMs, item, cacheHit)
+    if tonumber(elapsedMs) == nil or elapsedMs <= 16 then
+        return
+    end
+
+    local debug = Addon.Debug
+    if type(debug) ~= "table" or type(debug.Internal) ~= "function" then
+        return
+    end
+
+    if type(debug.EnsureInternalLevelEnabled) == "function" then
+        debug.EnsureInternalLevelEnabled()
+    end
+
+    debug.Internal(
+        "HARD FAILURE ItemTooltip:Build took %.2fms [cacheHit=%s,item=%s]",
+        elapsedMs,
+        cacheHit == true and "true" or "false",
+        tostring(item and item.id or "unknown")
+    )
+end
+
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
+local function getRuntimeRevision(domain, key)
+    if type(Runtime) == "table" and type(Runtime.GetRevision) == "function" then
+        return math.max(0, math.floor(tonumber(Runtime:GetRevision(domain, key)) or 0))
+    end
+
+    return 0
+end
+
+local function sortedTableKeys(value)
+    local keys = {}
+    for key in pairs(value or {}) do
+        keys[#keys + 1] = key
+    end
+
+    table.sort(keys, function(left, right)
+        return tostring(left) < tostring(right)
+    end)
+    return keys
+end
+
+local function stableSerialize(value, seen, nextId)
+    local valueType = type(value)
+    if valueType == "nil" then
+        return "nil"
+    end
+    if valueType == "boolean" then
+        return value and "boolean:true" or "boolean:false"
+    end
+    if valueType == "number" then
+        if value ~= value then
+            return "number:nan"
+        end
+        if value == math.huge then
+            return "number:infinity"
+        end
+        if value == -math.huge then
+            return "number:-infinity"
+        end
+        return "number:" .. tostring(value)
+    end
+    if valueType == "string" then
+        return "string:" .. string.format("%q", value)
+    end
+    if valueType ~= "table" then
+        return valueType .. ":" .. tostring(value)
+    end
+
+    seen = seen or {}
+    nextId = nextId or { value = 0 }
+    if seen[value] then
+        return "table-ref:" .. tostring(seen[value])
+    end
+
+    nextId.value = nextId.value + 1
+    seen[value] = nextId.value
+    local parts = {}
+    local keys = sortedTableKeys(value)
+    for index = 1, #keys do
+        local key = keys[index]
+        parts[#parts + 1] = stableSerialize(key, seen, nextId)
+            .. "="
+            .. stableSerialize(value[key], seen, nextId)
+    end
+
+    return "table:{" .. table.concat(parts, ";") .. "}"
+end
+
+local function getDatasetIndex(datasetId)
+    local normalizedDatasetId = ensureString(datasetId)
+    if normalizedDatasetId == "" or type(Database.GetDatasetByID) ~= "function" then
+        return nil
+    end
+
+    local revision = getConfigurationRevision()
+    local cached = ItemTooltip.DatasetIndexCache[normalizedDatasetId]
+    if type(cached) == "table" and cached.revision == revision then
+        return cached
+    end
+
+    local dataset = Database.GetDatasetByID(normalizedDatasetId)
+    if type(dataset) ~= "table" then
+        ItemTooltip.DatasetIndexCache[normalizedDatasetId] = {
+            revision = revision,
+            dataset = nil,
+            itemSlotsById = {},
+            statsById = {},
+        }
+        return ItemTooltip.DatasetIndexCache[normalizedDatasetId]
+    end
+
+    local itemSlotsById = {}
+    for index = 1, #(dataset.itemSlots or {}) do
+        local slot = dataset.itemSlots[index]
+        local slotId = ensureString(slot and slot.id)
+        if slotId ~= "" then
+            itemSlotsById[slotId] = slot
+        end
+    end
+
+    local statsById = {}
+    for index = 1, #(dataset.stats or {}) do
+        local stat = dataset.stats[index]
+        local statId = ensureString(stat and stat.id)
+        if statId ~= "" then
+            statsById[statId] = stat
+        end
+    end
+
+    local index = {
+        revision = revision,
+        dataset = dataset,
+        itemSlotsById = itemSlotsById,
+        statsById = statsById,
+    }
+    ItemTooltip.DatasetIndexCache[normalizedDatasetId] = index
+    ItemTooltip.DatasetIndexBuilds = ItemTooltip.DatasetIndexBuilds + 1
+    return index
+end
+
+local function getDatasetByIdCached(datasetId)
+    local datasetIndex = getDatasetIndex(datasetId)
+    return datasetIndex and datasetIndex.dataset or nil
+end
+
+local function getEventTooltipRevision()
+    local client = Addon.Client or {}
+    local eventState = type(client.GetEventState) == "function" and client:GetEventState() or nil
+    local eventId = math.max(0, math.floor(tonumber(eventState and eventState.id) or 0))
+    if eventId <= 0 then
+        return "0:0:0"
+    end
+
+    local descriptionBucket = type(DescriptionBuilder.EventTooltipContextRevisions) == "table"
+        and DescriptionBuilder.EventTooltipContextRevisions[eventId]
+        or nil
+    local descriptionRevision = math.max(1, math.floor(tonumber(descriptionBucket and descriptionBucket.global) or 1))
+    local auraRevision = getRuntimeRevision("AuraRevisionByEventId", eventId)
+    local cooldownRevision = getRuntimeRevision("CooldownRevisionByEventId", eventId)
+    local spellcastRevision = getRuntimeRevision("SpellcastRevisionByEventId", eventId)
+
+    return table.concat({
+        tostring(eventId),
+        tostring(descriptionRevision),
+        tostring(auraRevision),
+        tostring(cooldownRevision),
+        tostring(spellcastRevision),
+    }, ":")
+end
+
+local function getTooltipRuntimeRevisionKey()
+    return table.concat({
+        tostring(getConfigurationRevision()),
+        tostring(getRuntimeRevision("InventoryRevision")),
+        tostring(getRuntimeRevision("ProfileStateRevision")),
+        tostring(getRuntimeRevision("EquipmentRevision")),
+        tostring(getRuntimeRevision("SkillRevision")),
+        tostring(getRuntimeRevision("ResolvedProfileRevision")),
+        tostring(getRuntimeRevision("EventRuntimeRevision")),
+        tostring(math.max(1, math.floor(tonumber(DescriptionBuilder.ProfileTooltipContextRevision) or 1))),
+        getEventTooltipRevision(),
+    }, "\31")
+end
+
+local function getTooltipVariantKey(item, values, runtimeRevisionKey)
+    local modifications = values.modifications
+    if modifications == nil then
+        modifications = item.modifications
+    end
+
+    return table.concat({
+        TOOLTIP_CACHE_VERSION,
+        runtimeRevisionKey or getTooltipRuntimeRevisionKey(),
+        tostring(values.datasetId or values.dataset and values.dataset.id or item.datasetId or ""),
+        tostring(values.itemId or item.id or ""),
+        tostring(values.datasetName or ""),
+        tostring(values.itemRef or ""),
+        tostring(values.equipmentScope or ""),
+        tostring(values.isActive == false),
+        tostring(values.isMissing == true),
+        tostring(values.soulbound == true),
+        tostring(values.quantity or values.stackCount or item.quantity or item.stackCount or ""),
+        tostring(values.stackIdentity or item.stackIdentity or ""),
+        tostring(item),
+        stableSerialize(modifications or {}),
+    }, "\31")
+end
+
+local function getStaticTooltipVariantKey(item, values)
+    local modifications = values.modifications
+    if modifications == nil then
+        modifications = item.modifications
+    end
+
+    return table.concat({
+        TOOLTIP_CACHE_VERSION,
+        "static",
+        tostring(getConfigurationRevision()),
+        tostring(values.datasetId or values.dataset and values.dataset.id or item.datasetId or ""),
+        tostring(values.itemId or item.id or ""),
+        tostring(values.datasetName or ""),
+        tostring(values.itemRef or ""),
+        tostring(values.equipmentScope or ""),
+        tostring(values.isActive == false),
+        tostring(values.isMissing == true),
+        tostring(values.soulbound == true),
+        tostring(values.quantity or values.stackCount or item.quantity or item.stackCount or ""),
+        tostring(values.stackIdentity or item.stackIdentity or ""),
+        tostring(item),
+        stableSerialize(modifications or {}),
+    }, "\31")
+end
+
+local function finishTooltipBuild(timer, result, item, cacheHit)
+    local elapsedMs = stopTiming(timer, {
+        cacheHit = cacheHit == true,
+        lineCount = math.max(0, math.floor(tonumber(result and result.lines and #result.lines) or 0)),
+    })
+    logTooltipBuildHardFailure(elapsedMs, item, cacheHit)
+    return result
+end
 
 local QUALITY_COLORS = {
     poor = { r = 0.62, g = 0.62, b = 0.62 },
@@ -109,14 +406,6 @@ local QUEST_ITEM_TEXT = "Quest Item"
 
 local function getWhiteLineColor()
     return 1, 1, 1
-end
-
-local function ensureString(value, fallback)
-    if value == nil or value == "" then
-        return fallback or ""
-    end
-
-    return tostring(value)
 end
 
 local function getQualityColor(quality)
@@ -243,17 +532,14 @@ local function resolveSlotName(slotRef)
         datasetId, slotId = Dependencies.ParseSourceStatRef(slotRef)
     end
 
-    local dataset = datasetId and Database.GetDatasetByID and Database.GetDatasetByID(datasetId) or nil
-    local itemSlots = dataset and dataset.itemSlots or nil
-    if type(itemSlots) ~= "table" then
+    local datasetIndex = getDatasetIndex(datasetId)
+    if type(datasetIndex) ~= "table" then
         return nil
     end
 
-    for index = 1, #itemSlots do
-        local slot = itemSlots[index]
-        if slot and slot.id == slotId then
-            return ensureString(slot.name, slot.id)
-        end
+    local slot = datasetIndex.itemSlotsById and datasetIndex.itemSlotsById[tostring(slotId)] or nil
+    if slot then
+        return ensureString(slot.name, slot.id)
     end
 
     return nil
@@ -420,50 +706,6 @@ local function appendItemLevelLine(lines, item)
     }
 end
 
-local function resolveStatLabel(sourceStatRef)
-    if type(sourceStatRef) ~= "string" or sourceStatRef == "" then
-        return nil
-    end
-
-    local datasetId, statId = nil, nil
-    if Dependencies and Dependencies.ParseSourceStatRef then
-        datasetId, statId = Dependencies.ParseSourceStatRef(sourceStatRef)
-    end
-
-    if not datasetId or not statId or not Database.GetDatasetByID then
-        return statId or sourceStatRef
-    end
-
-    local dataset = Database.GetDatasetByID(datasetId)
-    local stats = dataset and dataset.stats or nil
-    if type(stats) ~= "table" then
-        return statId
-    end
-
-    for index = 1, #stats do
-        local stat = stats[index]
-        if stat and stat.id == statId then
-            local name = stat.name
-            if name == nil or name == "" then
-                return "Unnamed Stat"
-            end
-
-            return tostring(name)
-        end
-    end
-
-    return statId
-end
-
-local function resolveEquipStatLabel(sourceStatRef)
-    local label = resolveStatLabel(sourceStatRef)
-    if type(label) ~= "string" then
-        return label
-    end
-
-    return string.lower(label)
-end
-
 local function resolveStatDefinition(sourceStatRef)
     if type(sourceStatRef) ~= "string" or sourceStatRef == "" then
         return nil, nil
@@ -474,24 +716,34 @@ local function resolveStatDefinition(sourceStatRef)
         datasetId, statId = Dependencies.ParseSourceStatRef(sourceStatRef)
     end
 
-    if not datasetId or not statId or not Database.GetDatasetByID then
+    if not datasetId or not statId then
         return nil, statId or sourceStatRef
     end
 
-    local dataset = Database.GetDatasetByID(datasetId)
-    local stats = dataset and dataset.stats or nil
-    if type(stats) ~= "table" then
+    local datasetIndex = getDatasetIndex(datasetId)
+    if type(datasetIndex) ~= "table" then
         return nil, statId
     end
 
-    for index = 1, #stats do
-        local stat = stats[index]
-        if stat and stat.id == statId then
-            return stat, statId
-        end
+    return datasetIndex.statsById and datasetIndex.statsById[tostring(statId)] or nil, statId
+end
+
+local function resolveStatLabel(sourceStatRef)
+    local stat, fallback = resolveStatDefinition(sourceStatRef)
+    if stat then
+        return ensureString(stat.name, "Unnamed Stat")
     end
 
-    return nil, statId
+    return fallback
+end
+
+local function resolveEquipStatLabel(sourceStatRef)
+    local label = resolveStatLabel(sourceStatRef)
+    if type(label) ~= "string" then
+        return label
+    end
+
+    return string.lower(label)
 end
 
 local function resolveSkillLabel(skillRef)
@@ -603,8 +855,8 @@ local function getEquipmentTraitDescription(item, payload, options)
         if detailName == "" then
             detailName = ensureString(item and item.name) ~= "" and ensureString(item and item.name) or "Equipment Trait"
         end
-        if not dataset and type(Database.GetDatasetByID) == "function" and ensureString(tooltipOptions.datasetId) ~= "" then
-            dataset = Database.GetDatasetByID(tooltipOptions.datasetId)
+        if not dataset and ensureString(tooltipOptions.datasetId) ~= "" then
+            dataset = getDatasetByIdCached(tooltipOptions.datasetId)
         end
 
         local descriptionText = descriptionBuilder:BuildDescription({
@@ -683,8 +935,8 @@ local function getConsumableTraitDescription(item, payload, options)
     if type(descriptionBuilder) == "table" and type(descriptionBuilder.BuildDescription) == "function" then
         local tooltipOptions = options or {}
         local dataset = tooltipOptions.dataset
-        if not dataset and type(Database.GetDatasetByID) == "function" and ensureString(tooltipOptions.datasetId) ~= "" then
-            dataset = Database.GetDatasetByID(tooltipOptions.datasetId)
+        if not dataset and ensureString(tooltipOptions.datasetId) ~= "" then
+            dataset = getDatasetByIdCached(tooltipOptions.datasetId)
         end
 
         local descriptionText = descriptionBuilder:BuildDescription({
@@ -1449,14 +1701,84 @@ local function buildInactiveTooltip(item, options)
     }
 end
 
+local function hasDynamicTooltipContent(item)
+    if type(item) ~= "table" then
+        return false
+    end
+
+    if type(item.conditions) == "table" and #item.conditions > 0 then
+        return true
+    end
+
+    local itemType = tostring(item.itemType or "none")
+    if itemType == "weapon" or itemType == "armor" or itemType == "modification" then
+        local equipmentTrait = normalizeEquipmentTrait(item.equipmentTrait)
+        if equipmentTrait and ensureString(equipmentTrait.description) == "" then
+            return true
+        end
+    end
+
+    if itemType == "consumable" then
+        local consumableTrait = normalizeConsumableTrait(item.consumableTrait)
+        if consumableTrait and ensureString(consumableTrait.description) == "" then
+            return true
+        end
+    end
+
+    return false
+end
+
 function ItemTooltip:Build(item, options)
     if type(item) ~= "table" then
         return nil
     end
 
     local values = options or {}
+    local timer = startTiming(
+        "ItemTooltip:Build",
+        4,
+        tostring(values.itemId or item.id or item.name or "unknown")
+    )
+    local runtimeRevisionKey = getTooltipRuntimeRevisionKey()
+    local cacheRevision = TOOLTIP_CACHE_VERSION .. "\31" .. runtimeRevisionKey
+    if ItemTooltip.BuildCacheRevision ~= cacheRevision then
+        ItemTooltip.BuildCache = {}
+        ItemTooltip.BuildCacheRevision = cacheRevision
+    elseif type(ItemTooltip.BuildCache) ~= "table" then
+        ItemTooltip.BuildCache = {}
+    end
+
+    local configurationRevision = getConfigurationRevision()
+    if ItemTooltip.StaticBuildCacheRevision ~= configurationRevision then
+        ItemTooltip.StaticBuildCache = {}
+        ItemTooltip.StaticBuildCacheRevision = configurationRevision
+    elseif type(ItemTooltip.StaticBuildCache) ~= "table" then
+        ItemTooltip.StaticBuildCache = {}
+    end
+
+    local cacheKey = getTooltipVariantKey(item, values, runtimeRevisionKey)
+    local cached = ItemTooltip.BuildCache[cacheKey]
+    if cached then
+        ItemTooltip.BuildCacheHits = ItemTooltip.BuildCacheHits + 1
+        return finishTooltipBuild(timer, cached, item, true)
+    end
+
+    ItemTooltip.BuildCacheMisses = ItemTooltip.BuildCacheMisses + 1
     if values.isMissing or values.isActive == false then
-        return buildInactiveTooltip(item, values)
+        local inactiveTooltip = buildInactiveTooltip(item, values)
+        ItemTooltip.BuildCache[cacheKey] = inactiveTooltip
+        return finishTooltipBuild(timer, inactiveTooltip, item, false)
+    end
+
+    local isDynamic = hasDynamicTooltipContent(item)
+    local staticCacheKey = not isDynamic and getStaticTooltipVariantKey(item, values) or nil
+    if staticCacheKey then
+        local staticCached = ItemTooltip.StaticBuildCache[staticCacheKey]
+        if staticCached then
+            ItemTooltip.BuildCache[cacheKey] = staticCached
+            ItemTooltip.BuildCacheHits = ItemTooltip.BuildCacheHits + 1
+            return finishTooltipBuild(timer, staticCached, item, true)
+        end
     end
 
     local lines = {}
@@ -1516,12 +1838,17 @@ function ItemTooltip:Build(item, options)
     appendDescriptionLine(lines, item)
     appendEconomyLine(lines, item)
 
-    return {
+    local tooltip = {
         type = "game",
         title = ensureString(item.name, values.itemId or "Unnamed Item"),
         titleColor = getQualityColor(item.quality),
         lines = lines,
     }
+    ItemTooltip.BuildCache[cacheKey] = tooltip
+    if staticCacheKey then
+        ItemTooltip.StaticBuildCache[staticCacheKey] = tooltip
+    end
+    return finishTooltipBuild(timer, tooltip, item, false)
 end
 
 return ItemTooltip
