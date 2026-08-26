@@ -32,7 +32,75 @@ local function register(path, handler, description)
     end
 end
 
+local function parseDebugCurrencyAmount(value)
+    local numericAmount = tonumber(value)
+    if not numericAmount
+        or numericAmount ~= numericAmount
+        or numericAmount == math.huge
+        or numericAmount == -math.huge
+    then
+        return nil
+    end
+
+    local amount = math.floor(numericAmount)
+    if amount <= 0 then
+        return nil
+    end
+
+    return amount
+end
+
 function ClientCommands:RegisterSlashCommands()
+    register({ "debug", "currency", "add" }, function(context)
+        local args = context and context.args or {}
+        local currencyRef = tostring(args[1] or "")
+        local amount = parseDebugCurrencyAmount(args[2])
+        local internalProfile = Addon.Internal and Addon.Internal.Profile or nil
+
+        if currencyRef == "" or not amount then
+            context.router:Print(
+                "Usage: /rpe debug currency add <currency> <amount> (amount must be a positive whole number).",
+                "warn"
+            )
+            return false
+        end
+
+        if type(internalProfile) ~= "table"
+            or type(internalProfile.AddCurrencyAmount) ~= "function"
+            or type(internalProfile.GetCurrencyAmount) ~= "function"
+        then
+            context.router:Print("Currency debug command is not available.", "warn")
+            return false
+        end
+
+        local normalizedCurrencyRef = currencyRef
+        if type(internalProfile.NormalizeCurrencyKey) == "function" then
+            normalizedCurrencyRef = internalProfile.NormalizeCurrencyKey(currencyRef)
+        end
+        if normalizedCurrencyRef == "" then
+            context.router:Print("A currency key or reference is required.", "warn")
+            return false
+        end
+
+        local previousBalance = internalProfile.GetCurrencyAmount(normalizedCurrencyRef)
+        local persistedAmount = internalProfile.AddCurrencyAmount(normalizedCurrencyRef, amount)
+        if persistedAmount == nil then
+            context.router:Print("Currency grant failed for %s.", "warn", normalizedCurrencyRef)
+            return false
+        end
+
+        local resultingBalance = internalProfile.GetCurrencyAmount(normalizedCurrencyRef)
+        context.router:Print(
+            "Debug currency grant: %s +%d; balance %d (was %d).",
+            nil,
+            normalizedCurrencyRef,
+            amount,
+            tonumber(resultingBalance) or 0,
+            tonumber(previousBalance) or 0
+        )
+        return true
+    end, "Development test utility: grant currency through Profile.AddCurrencyAmount.")
+
     register({ "data" }, function(context)
         if not Client.OpenDataEditorLauncherDestination then
             context.router:Print("Data editor UI is not available.", "warn")
