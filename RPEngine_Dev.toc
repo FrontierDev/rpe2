@@ -214,7 +214,6 @@ client/character/profile/page_ProfileSkills.lua
 client/character/profile/page_ProfileAchievements.lua
 client/character/profile/window_Profile.lua
 client/character/guild/page_GuildRequisitions.lua
-client/character/guild/page_GuildProgression.lua
 client/character/guild/page_GuildAdmin.lua
 client/character/guild/window_Guild.lua
 core/debug/Clipboard.lua

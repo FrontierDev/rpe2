@@ -70,7 +70,6 @@ local function createInstance()
     return setmetatable({
         window = nil,
         requisitionsPage = GuildUI.RequisitionsPage,
-        progressionPage = GuildUI.ProgressionPage,
         adminPage = GuildUI.AdminPage,
     }, GuildWindow)
 end
@@ -124,10 +123,6 @@ function GuildWindow:RefreshTab(tabKey)
         if self.requisitionsPage and self.requisitionsPage.Refresh then
             self.requisitionsPage:Refresh()
         end
-    elseif normalizedKey == "progression" then
-        if self.progressionPage and self.progressionPage.Refresh then
-            self.progressionPage:Refresh()
-        end
     elseif normalizedKey == "admin" then
         if self.adminPage and self.adminPage.Refresh then
             self.adminPage:Refresh()
@@ -171,17 +166,6 @@ function GuildWindow:BuildWindow()
                     self.requisitionsPage:Build(page, self)
                     refreshPageOnShow(page, function()
                         self:RefreshTab("requisitions")
-                    end)
-                end,
-            },
-            {
-                name = "progression",
-                label = "Progression",
-                width = 82,
-                builder = function(page)
-                    self.progressionPage:Build(page, self)
-                    refreshPageOnShow(page, function()
-                        self:RefreshTab("progression")
                     end)
                 end,
             },
