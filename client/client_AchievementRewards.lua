@@ -128,6 +128,13 @@ local function sameInventoryVariant(left, right)
 end
 
 local function getInventoryItemVariants(inventory, datasetId, itemId)
+    if type(inventory.GetItemVariants) == "function" then
+        local callOk, variants = pcall(inventory.GetItemVariants, datasetId, itemId)
+        if callOk and type(variants) == "table" then
+            return variants
+        end
+    end
+
     if type(inventory.GetItems) ~= "function" then
         return nil
     end
@@ -196,6 +203,13 @@ local function removeInventoryVariantQuantity(inventory, variant, quantity)
     local remaining = math.max(0, math.floor(tonumber(quantity) or 0))
     if remaining == 0 then
         return true
+    end
+
+    if type(inventory.RemoveVariantQuantity) == "function" then
+        local callOk, removed = pcall(inventory.RemoveVariantQuantity, variant, remaining)
+        if callOk then
+            return removed == true
+        end
     end
 
     if type(inventory.GetItems) ~= "function" or type(inventory.RemoveItem) ~= "function" then

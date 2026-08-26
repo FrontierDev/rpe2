@@ -1,183 +1,243 @@
 ## Goal
-Refactor Achievement runtime processing so one trigger/reward chain produces **one deterministic transaction and one consolidated notification**, rather than per-Achievement persistence/UI/configuration fan-out.
+Remove the Inventory runtime’s repeated whole-list normalization/resolution work and make normal item mutations **incremental, revisioned, and transaction-aware**.
 
 Authoritative documents:
 
 - `.docs/RPE2-Runtime-Performance-Hitch-Elimination-PDD.md`
 - `.docs/RPE2-Runtime-Performance-Hitch-Elimination-Implementation-Plan.md`
 
-Depends on: #60
+Depends on: #61
 
-This task owns Achievement trigger/reward batching. Inventory runtime internals are optimized separately; use their existing public APIs inside the outer transaction until that work lands.
+This task owns Inventory storage/runtime behavior only. Inventory window/page refresh behavior is handled by the next task.
 
 ## Primary files
 
-- `client/client_Achievements.lua`
-- `client/client_AchievementRewards.lua`
-- `core/internal/profile/Achievements.lua`
-- `core/internal/profile/Currencies.lua`
+- `client/character/inventory/Inventory.lua`
 - runtime transaction/revision module added by #59
+- `client/client_Achievements.lua` only for adapting Inventory change-listener integration where required
+- `client/client_Crafting.lua` / `client/character/inventory/window_ItemModification.lua` only where their registered listeners require payload compatibility updates
 
-Inspect current trigger indexing, `_CommitState`, recursive `achievement_earned` handling, and reward rollback/verification behavior before editing.
+Inspect every current `Inventory.RegisterChangeListener(...)` caller before changing listener semantics.
 
-## 1. Keep Achievement definition indexing configuration-derived
+## 1. Make stored Inventory records canonical
 
-Preserve the existing criteria-by-trigger indexing concept.
+`Inventory.GetItems()` must become a read operation.
 
-`Achievements:RebuildIndex()` / `EnsureIndex()` may rebuild when activated Achievement definitions genuinely change, but must not rebuild merely because:
-
-```text
-criterion progress changed
-reward state changed
-item gained
-currency gained
-event started/ended
-Achievement completed
-```
-
-Use `ConfigurationRevision` or the existing dataset signature only for definition invalidation.
-
-## 2. Batch one trigger evaluation
-
-Refactor `Achievements:ProcessTrigger(...)` so one trigger does conceptually:
+Normalize/canonicalize Inventory records only at ownership boundaries such as:
 
 ```text
-read CriteriaByTrigger bucket
--> evaluate matching criteria
--> accumulate changed Achievement states
--> resolve newly completed Achievements
--> resolve achievement_earned dependencies
--> accumulate reward actions
--> persist changed states
--> execute rewards in the same outer Runtime transaction
--> mark AchievementRevision once per logical transaction
--> publish one consolidated Achievement ChangeSet
--> queue presentation/announcements after commit
+SavedVariable initialization/load normalization
+SetItems bulk replacement
+AddItem input
+Remove/split/merge/bind/modification mutation functions
 ```
-
-Do not call a broad Profile/UI refresh from `_CommitState()` for every changed Achievement.
-
-It is acceptable to replace `_CommitState()` with narrower helpers if that makes transaction ownership clearer.
-
-## 3. Preserve deterministic recursive Achievement behavior
-
-`achievement_earned` criteria can cause dependent Achievements to progress/complete.
 
 Requirements:
 
-- preserve the current logical order of completion and rewards;
-- process dependent Achievement triggers within the same outer transaction;
-- avoid re-evaluating already finalized state unnecessarily;
-- add a cycle/re-entry guard so malformed definitions cannot recurse indefinitely;
-- report/skip cycles through existing debug behavior rather than freezing the client.
+- do not normalize/rewrite the entire persistent list on every `GetItems()`;
+- preserve dataset ID, item ID, quantity/count semantics, soulbound state and modifications;
+- preserve legacy/corrupt-record safety currently provided by normalizers;
+- use one load/migration normalization pass rather than repeated read-side repair.
 
-Do not change criteria semantics.
+Do not introduce a user-visible migration step.
 
-## 4. Batch state persistence
+## 2. Add `InventoryRevision`
 
-Persist all changed Achievement states/reward states through the narrow runtime persistence path introduced by #60.
+Integrate Inventory mutations with the runtime revision system from #59.
 
 Requirements:
 
-- no `notifyConfigurationChanged("profile-achievements")` path;
-- no per-Achievement Profile-window refresh;
-- no definition-index rebuild because progress changed;
-- one logical trigger/reward chain should produce one `AchievementRevision` commit even if several Achievement refs changed;
-- ChangeSet must contain the affected/completed refs for downstream UI.
+- increment/publish once per logical Inventory transaction;
+- append affected stack/index/item references to the ChangeSet where known;
+- bulk replacement marks Inventory structural/full-refresh state;
+- read-only calls do not change the revision;
+- nested Achievement reward transactions participate in the existing outer transaction.
 
-If the lower-level persistence API currently bumps a revision on every setter call, adapt transaction-aware revision bumping so the published revision represents the logical transaction rather than N separate visible invalidations.
+## 3. Add deterministic stack identity/indexing
 
-## 5. Execute rewards inside the outer transaction
-
-Achievement rewards may grant multiple items/currencies.
-
-Keep the existing validation, rollback, verification and unsupported-reward behavior, but ensure supported rewards participate in the current Runtime transaction.
-
-Required outcome:
+Replace repeated full scans + recursive `deepEqual(modifications)` comparisons with an in-memory stack index keyed by a stable identity equivalent to:
 
 ```text
-Achievement completes
--> reward item(s)
--> reward currency(s)
--> downstream item_gain/currency_gain Achievement effects
--> all authoritative changes settle
--> one outer commit
+dataset:id | soulbound | modificationSignature
 ```
 
-Nested calls must not flush UI/listeners/configuration between each reward.
+Requirements:
 
-Preserve existing reward-delivery idempotence so a reload/retry does not duplicate already-completed rewards.
+- modification signature is deterministic for equivalent normalized modifications;
+- do not rely on Lua table iteration order when constructing it;
+- build/rebuild the index once after load/bulk replacement;
+- update incrementally on add/remove/split/merge/bind/modification operations;
+- invalidate/rebuild safely if an external/bulk replacement makes the index stale;
+- do not persist the index.
 
-## 6. Queue announcements after commit
+If two records are semantically non-stackable by existing rules, the new index must not merge them merely because the string key matches a subset of their state.
 
-Guild/Raid achievement broadcasting remains supported.
+## 4. Rewrite normal `Inventory.AddItem()` incrementally
 
-Do not send an announcement until the Achievement state has successfully committed. Multiple announcements from multiple legitimate completions may still be sent, but their dispatch must not sit inside low-level persistence setters or force UI refresh between rewards.
+For a normal add:
 
-## 7. Narrow UI invalidation
+```text
+normalize incoming record once
+resolve item definition once
+calculate stack behavior/signature once
+query matching stack candidates
+mutate only affected stacks
+append new stack(s) if required
+mark Inventory change
+return existing public result
+```
 
-Mark only the Achievement/Profile surfaces that need updating.
+Do not perform the current complete:
 
-At this stage it is sufficient to emit the proper ChangeSet/revision data; later Profile UI work will consume it efficiently.
+```text
+GetItems -> whole normalization -> full scan/deepEqual -> SetItems -> whole normalization
+```
 
-Do not call `ProfileWindow:Refresh()` broadly from Achievement internals.
+round trip.
+
+Preserve:
+
+- stack-size limits;
+- bind-on-pickup behavior;
+- soulbound semantics;
+- modifications;
+- overflow behavior;
+- public return values;
+- existing item-gain Achievement semantics.
+
+## 5. Add revision-cached display snapshot
+
+Create one resolved Inventory display snapshot keyed by:
+
+```text
+InventoryRevision + ConfigurationRevision
+```
+
+The snapshot should resolve each stored record to its dataset/item definition once per key and expose presentation/filter fields currently recomputed by page code.
+
+Include fields equivalent to:
+
+```text
+sourceIndex/stack identity
+record
+datasetId
+itemId
+dataset
+item
+isActive
+isMissing
+quantity
+soulbound
+modifications
+quality
+itemType
+tags
+normalized search text
+```
+
+Requirements:
+
+- do not deep-copy immutable dataset definitions merely for the snapshot;
+- build normalized search text once per snapshot entry;
+- publish a completed immutable/current snapshot atomically; never expose a half-built one;
+- invalidate on InventoryRevision or relevant ConfigurationRevision change;
+- repeated reads for the same revision tuple return/reuse the cached snapshot.
+
+The actual public API may remain `Inventory.GetDisplayItems()` if changing callers is unnecessary.
+
+## 6. Coalesce Inventory listeners around transaction commit
+
+Current listeners are invoked synchronously by mutation functions.
+
+Refactor listener dispatch so one outer Runtime transaction produces one consolidated Inventory notification payload.
+
+Requirements:
+
+- Achievement item-gain handling still receives exact added quantities/references required for criteria;
+- Crafting/item-modification consumers remain correct;
+- listeners should not force unrelated UI refresh before the outer transaction commits;
+- listener errors remain isolated;
+- keep compatibility for direct Inventory calls outside an explicit outer transaction via an implicit transaction.
+
+Do not silently drop existing listener behavior; adapt all current registered consumers deliberately.
+
+## 7. Reduce hot-path allocation
+
+Remove avoidable transient allocations associated with:
+
+```text
+repeated full normalization arrays
+repeated modification deep copies
+repeated search-string construction
+repeated resolved display arrays for the same revision
+```
+
+Do not use manual `collectgarbage()` calls as a fix.
 
 ## Acceptance criteria
 
-- [ ] `ProcessTrigger` batches all state changes for one trigger in one outer transaction.
-- [ ] Multiple changed Achievements do not cause multiple global/Profile refreshes.
-- [ ] `achievement_earned` dependencies resolve deterministically inside the same transaction.
-- [ ] A cycle/re-entry guard prevents infinite recursive Achievement chains.
-- [ ] Reward items/currencies execute inside the outer Achievement transaction.
-- [ ] Achievement reward idempotence/rollback behavior remains intact.
-- [ ] Achievement progress/reward persistence never reaches global configuration refresh.
-- [ ] `AchievementRevision` is published once per logical trigger/reward chain.
-- [ ] ChangeSet identifies affected and newly completed Achievement refs.
-- [ ] Achievement broadcasts happen only after successful commit.
+- [ ] `Inventory.GetItems()` no longer rewrites/normalizes the entire inventory on a normal read.
+- [ ] Inventory load/bulk replacement canonicalizes records safely.
+- [ ] Normal `AddItem()` does not perform a complete GetItems + SetItems round trip.
+- [ ] Stack matching uses an incremental deterministic index/signature.
+- [ ] Existing stack/bind/modification semantics remain unchanged.
+- [ ] InventoryRevision changes once per logical Inventory transaction.
+- [ ] Display resolution is cached by `InventoryRevision + ConfigurationRevision`.
+- [ ] Search/filter presentation fields are precomputed once per snapshot entry.
+- [ ] Repeated `GetDisplayItems()` calls for an unchanged revision reuse the snapshot.
+- [ ] Inventory listeners receive one consolidated post-commit payload per outer transaction.
+- [ ] Achievement item-gain processing still receives correct quantities.
+- [ ] Existing Inventory SavedVariables load without user intervention.
 
 ## Validation matrix
 
+Use inventories of roughly 10, 50 and 150+ stacks.
+
 ```text
-currency gain advances no Achievement
--> no Achievement state write
+call GetItems repeatedly without mutation
+-> InventoryRevision unchanged
+-> no whole-list normalization/rewrite
 
-currency gain advances one criterion
--> one Achievement state transaction
--> one Achievement revision publish
+add to existing stack
+-> only matching stack changes
+-> one InventoryRevision commit
 
-one trigger advances 3 Achievements
--> all three persisted correctly
--> one outer commit
--> no per-Achievement Profile refresh
+add stackable quantity beyond max stack
+-> existing stack fills
+-> overflow stack(s) created correctly
 
-Achievement A completes -> achievement_earned progresses B
--> A then B resolve deterministically
--> both state changes in same transaction
+add non-stackable item
+-> new record created; no unrelated stack mutation
 
-Achievement reward = 2 items + 2 currencies
--> all rewards delivered exactly once
--> no global configuration refresh between rewards
+same item with different modifications
+-> variants do not merge
 
-reward currency completes dependent Achievement
--> dependent completion is processed in the same outer chain
+same item soulbound vs unbound
+-> variants do not merge when current semantics forbid it
 
-malformed A -> B -> A dependency
--> cycle is detected/guarded
--> client does not freeze
--> debug output identifies the cycle
+bulk SetItems
+-> canonicalizes once
+-> rebuilds stack index
+-> invalidates display snapshot
 
-announcement enabled
--> message is sent only after successful completion commit
+GetDisplayItems twice unchanged
+-> one snapshot build
+
+Achievement reward grants several items
+-> one outer transaction
+-> one consolidated Inventory listener payload
+-> exact quantities delivered
 ```
 
 ## Constraints
 
-- Do not change Achievement criteria definitions or completion semantics.
-- Do not redesign Inventory storage here.
-- Do not remove existing reward verification/rollback safeguards merely for speed.
-- Do not make broadcasts part of low-level persistence.
-- Do not rebuild Achievement indexes after progress changes.
-- Do not introduce asynchronous ordering that changes authoritative results.
+- Do not redesign Inventory UI in this task.
+- Do not change item stacking/gameplay rules.
+- Do not persist cache/index structures.
+- Do not expose half-built snapshots.
+- Do not remove listener consumers without adapting their required behavior.
+- Do not deep-copy immutable dataset definitions on hot reads.
+- Do not manually force garbage collection.
 
 ## Coding-agent instructions
-Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read both runtime-performance documents and completed #60. Trace `ProcessTrigger`, `_CommitState`, `achievement_earned`, reward delivery, and item/currency trigger recursion end-to-end before editing. Preserve exact criteria/reward semantics while changing notification/commit ownership. Report the new trigger transaction flow, cycle guard, reward-chain behavior, files changed, and validation results.
+Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read both runtime-performance documents and completed #61. Trace every Inventory mutation function and every registered change listener before editing. Preserve public API/stacking semantics while changing internal ownership and notification timing. Report canonicalization boundaries, stack-key/signature design, revision/snapshot keys, listener payload changes, files changed, and timing results for 10/50/150+ stack cases.

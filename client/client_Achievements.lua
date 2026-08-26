@@ -501,40 +501,71 @@ function Achievements:RefreshIndex()
 end
 
 function Achievements:HandleInventoryChange(payload)
-    if type(payload) ~= "table"
-        or payload.changeType ~= "add"
-        or payload.isCanonicalAdd ~= true
-    then
-        return {
-            trigger = "item_gain",
-            updated = 0,
-            completed = 0,
-        }
+    if type(payload) ~= "table" then
+        return emptyTriggerResult("item_gain")
     end
 
-    local detail = type(payload.detail) == "table" and payload.detail or {}
-    local datasetId = trimText(detail.dataset or detail.datasetId)
-    local itemId = trimText(detail.itemId or detail.id)
-    local amount = normalizeInteger(detail.actualAddedQuantity, 0)
-    if amount <= 0 then
-        amount = normalizeInteger(detail.quantity, 0)
+    local additions = {}
+    local function appendAddition(entry)
+        if type(entry) ~= "table" then
+            return
+        end
+
+        local datasetId = trimText(entry.dataset or entry.datasetId)
+        local itemId = trimText(entry.itemId or entry.id)
+        local amount = normalizeInteger(entry.actualAddedQuantity, 0)
+        if amount <= 0 then
+            amount = normalizeInteger(entry.quantity, 0)
+        end
+        if datasetId ~= "" and itemId ~= "" and amount > 0 then
+            additions[#additions + 1] = {
+                itemRef = entry.itemRef or ("%s:%s"):format(datasetId, itemId),
+                datasetId = datasetId,
+                itemId = itemId,
+                amount = amount,
+            }
+        end
     end
 
-    if datasetId == "" or itemId == "" or amount <= 0 then
-        return {
-            trigger = "item_gain",
-            updated = 0,
-            completed = 0,
-        }
+    -- Inventory emits one addedItems entry per logical AddItem mutation. This
+    -- keeps exact quantities intact even when a reward grants several items
+    -- inside one outer Runtime transaction.
+    for index = 1, #(payload.addedItems or {}) do
+        appendAddition(payload.addedItems[index])
     end
 
-    return self:ProcessTrigger("item_gain", {
-        itemRef = ("%s:%s"):format(datasetId, itemId),
-        datasetId = datasetId,
-        itemId = itemId,
-        amount = amount,
-        source = "inventory-add",
-    })
+    -- Retain compatibility with a direct/synthetic listener payload from an
+    -- older producer, while requiring the original canonical-add marker.
+    if #additions == 0 and payload.isCanonicalAdd == true then
+        appendAddition(payload.detail)
+    end
+
+    if #additions == 0 then
+        return emptyTriggerResult("item_gain")
+    end
+
+    local function processAdditions()
+        local result = emptyTriggerResult("item_gain")
+        for index = 1, #additions do
+            local addition = additions[index]
+            local triggerResult = self:ProcessTrigger("item_gain", {
+                itemRef = addition.itemRef,
+                datasetId = addition.datasetId,
+                itemId = addition.itemId,
+                amount = addition.amount,
+                source = "inventory-add",
+            })
+            result.updated = (tonumber(result.updated) or 0) + (tonumber(triggerResult and triggerResult.updated) or 0)
+            result.completed = (tonumber(result.completed) or 0) + (tonumber(triggerResult and triggerResult.completed) or 0)
+        end
+        return result
+    end
+
+    if type(Runtime) == "table" and type(Runtime.RunTransaction) == "function" then
+        return Runtime:RunTransaction("achievement-item-gains", processAdditions)
+    end
+
+    return processAdditions()
 end
 
 function Achievements:HandleSkillChange(payload)

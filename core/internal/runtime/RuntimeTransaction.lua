@@ -179,6 +179,30 @@ local function markInventory(result, detail)
         return
     end
 
+    -- Keep the mutation-level metadata alongside the aggregated ChangeSet.
+    -- Inventory uses this to preserve exact item-gain quantities when several
+    -- mutations share one outer transaction.  The aggregate fields below are
+    -- still maintained for consumers which only need affected references.
+    result.mutations = result.mutations or {}
+    result.mutations[#result.mutations + 1] = copy(detail)
+
+    if detail.changeType ~= nil then
+        result.changeTypes = result.changeTypes or {}
+        put(result.changeTypes, detail.changeType)
+    end
+    if detail.characterKey ~= nil and result.characterKey == nil then
+        result.characterKey = detail.characterKey
+    end
+    if detail.structural == true or detail.fullRefresh == true or detail.bulk == true then
+        result.structural = true
+    end
+    if detail.fullRefresh == true or detail.bulk == true then
+        result.fullRefresh = true
+    end
+    if detail.isCanonicalAdd == true then
+        result.hasCanonicalAdd = true
+    end
+
     if detail.mutationCount ~= nil then
         result.mutationCount = (tonumber(result.mutationCount) or 0)
             + math.max(0, tonumber(detail.mutationCount) or 0) - 1
