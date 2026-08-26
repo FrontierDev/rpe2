@@ -513,9 +513,14 @@ function Achievements:HandleInventoryChange(payload)
 
         local datasetId = trimText(entry.dataset or entry.datasetId)
         local itemId = trimText(entry.itemId or entry.id)
-        local amount = normalizeInteger(entry.actualAddedQuantity, 0)
-        if amount <= 0 then
-            amount = normalizeInteger(entry.quantity, 0)
+        local amount
+        if entry.settledQuantity ~= nil then
+            amount = normalizeInteger(entry.settledQuantity, 0)
+        else
+            amount = normalizeInteger(entry.actualAddedQuantity, 0)
+            if amount <= 0 then
+                amount = normalizeInteger(entry.quantity, 0)
+            end
         end
         if datasetId ~= "" and itemId ~= "" and amount > 0 then
             additions[#additions + 1] = {
@@ -530,13 +535,14 @@ function Achievements:HandleInventoryChange(payload)
     -- Inventory emits one addedItems entry per logical AddItem mutation. This
     -- keeps exact quantities intact even when a reward grants several items
     -- inside one outer Runtime transaction.
+    local hasAddedItems = type(payload.addedItems) == "table" and #payload.addedItems > 0
     for index = 1, #(payload.addedItems or {}) do
         appendAddition(payload.addedItems[index])
     end
 
     -- Retain compatibility with a direct/synthetic listener payload from an
     -- older producer, while requiring the original canonical-add marker.
-    if #additions == 0 and payload.isCanonicalAdd == true then
+    if #additions == 0 and not hasAddedItems and payload.isCanonicalAdd == true then
         appendAddition(payload.detail)
     end
 
@@ -585,6 +591,7 @@ local function registerInventoryMutationProcessor()
             if type(mutation) ~= "table"
                 or mutation.changeType ~= "add"
                 or mutation.isCanonicalAdd ~= true
+                or normalizeInteger(mutation.settledQuantity, 0) <= 0
             then
                 return
             end

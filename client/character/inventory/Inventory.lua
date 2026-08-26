@@ -572,6 +572,79 @@ local function getCurrentTransaction()
     return nil
 end
 
+local function getPendingGainBucket(stackKey, create)
+    local transaction = getCurrentTransaction()
+    if type(transaction) ~= "table" or type(stackKey) ~= "string" or stackKey == "" then
+        return nil
+    end
+
+    transaction.inventoryPendingGains = transaction.inventoryPendingGains or {}
+    local bucket = transaction.inventoryPendingGains[stackKey]
+    if not bucket and create then
+        bucket = {}
+        transaction.inventoryPendingGains[stackKey] = bucket
+    end
+    return bucket
+end
+
+local function settlePendingGains(mutation)
+    if type(mutation) ~= "table" then
+        return
+    end
+
+    local stackKey = mutation.stackKey
+    local bucket = getPendingGainBucket(stackKey, false)
+    if type(bucket) ~= "table" then
+        return
+    end
+
+    local remaining = math.max(0, math.floor(tonumber(mutation.removedQuantity) or 0))
+    if remaining <= 0 then
+        return
+    end
+
+    -- Removal/rollback walks the newest matching stacks first. Mirror that
+    -- ownership order when netting multiple pending gains for one variant.
+    for index = #bucket, 1, -1 do
+        if remaining <= 0 then
+            break
+        end
+
+        local pending = bucket[index]
+        local available = math.max(0, math.floor(tonumber(pending.remaining) or 0))
+        local settled = math.min(available, remaining)
+        if settled > 0 then
+            pending.remaining = available - settled
+            pending.payload.settledQuantity = pending.remaining
+            remaining = remaining - settled
+        end
+
+        if pending.remaining <= 0 then
+            table.remove(bucket, index)
+        end
+    end
+end
+
+local function queuePendingGain(mutation)
+    local requestedQuantity = mutation.actualAddedQuantity or mutation.quantity
+    local quantity = math.max(0, math.floor(tonumber(requestedQuantity) or 0))
+    if quantity <= 0 then
+        return
+    end
+
+    local payload = mutation
+    payload.settledQuantity = quantity
+    local bucket = getPendingGainBucket(payload.stackKey, true)
+    if bucket then
+        bucket[#bucket + 1] = {
+            payload = payload,
+            remaining = quantity,
+        }
+    end
+
+    Runtime:EmitMutationEvent("item_gain", payload)
+end
+
 local function appendSearchValue(buffer, value)
     local text = ensureString(value):gsub("^%s+", ""):gsub("%s+$", "")
     if text ~= "" then
@@ -794,14 +867,19 @@ end
 local function markInventoryMutation(changeType, detail, notificationToken)
     local mutation = buildInventoryMutationDetail(changeType, detail, notificationToken)
     if type(Runtime) == "table" and type(Runtime.MarkChanged) == "function" then
+        if mutation.changeType == "remove" or mutation.changeType == "remove-variant"
+            or mutation.changeType == "modify-apply"
+        then
+            settlePendingGains(mutation)
+        end
         Runtime:MarkChanged("inventory", mutation)
         if mutation.isCanonicalAdd == true
             and type(Runtime.EmitMutationEvent) == "function"
         then
             -- Achievement item gains are authoritative dependent work. Queue
-            -- the typed event in the current transaction so the before-commit
-            -- processor can join reward chains without a second transaction.
-            Runtime:EmitMutationEvent("item_gain", mutation)
+            -- a transaction-local pending payload so same-transaction rollback
+            -- can settle it before the before-commit processor runs.
+            queuePendingGain(mutation)
         end
         return mutation
     end
@@ -953,6 +1031,7 @@ local function addItemInternal(normalized, itemDefinition)
         dataset = normalized.dataset,
         itemId = normalized.id,
         itemRef = getItemRef(normalized.dataset, normalized.id),
+        stackKey = stackKey,
         quantity = actualAddedQuantity,
         actualAddedQuantity = actualAddedQuantity,
         addedRefs = { getItemRef(normalized.dataset, normalized.id) },
@@ -1071,6 +1150,8 @@ local function removeItemInternal(slotIndex, quantity)
 
     local requestedQuantity = math.max(1, math.floor(tonumber(quantity) or 1))
     local record = items[index]
+    local recordIndexEntry = state.indexByRecord[record]
+    local stackKey = recordIndexEntry and recordIndexEntry.stackKey or getStackIdentity(record)
     local existingQuantity = math.max(1, math.floor(tonumber(record.quantity) or 1))
     local removed = copyCanonicalRecord(record)
     local actualRemovedQuantity = math.min(existingQuantity, requestedQuantity)
@@ -1085,6 +1166,7 @@ local function removeItemInternal(slotIndex, quantity)
     state.itemCount = #items
     markInventoryMutation("remove", {
         slotIndex = index,
+        stackKey = stackKey,
         quantity = requestedQuantity,
         removedQuantity = actualRemovedQuantity,
         removedRefs = { getItemRef(record.dataset, record.id) },
@@ -1164,6 +1246,8 @@ local function applyModificationInternal(targetSlotIndex, modificationSlotIndex)
 
     local targetRecord = items[originalTargetIndex]
     local sourceRecord = items[originalSourceIndex]
+    local sourceIndexEntry = state.indexByRecord[sourceRecord]
+    local sourceStackKey = sourceIndexEntry and sourceIndexEntry.stackKey or getStackIdentity(sourceRecord)
     local targetWorking = copyCanonicalRecord(targetRecord)
     local sourceWorking = copyCanonicalRecord(sourceRecord)
     local targetWasSplit = targetWorking.quantity > 1
@@ -1225,6 +1309,8 @@ local function applyModificationInternal(targetSlotIndex, modificationSlotIndex)
         itemRef = type(ModificationService.GetRecordItemRef) == "function"
             and ModificationService.GetRecordItemRef(sourceRecord)
             or getItemRef(sourceRecord.dataset, sourceRecord.id),
+        stackKey = sourceStackKey,
+        removedQuantity = 1,
         slots = { originalTargetIndex, originalSourceIndex, targetIndex },
         structural = targetWasSplit or sourceRemoved,
     })
@@ -1449,6 +1535,7 @@ local function removeVariantQuantityInternal(recordOrKey, quantity)
         state.itemCount = #items
         markInventoryMutation("remove-variant", {
             itemRef = itemRef,
+            stackKey = stackKey,
             quantity = requestedQuantity,
             removedQuantity = removedQuantity,
             removedRefs = { itemRef },
