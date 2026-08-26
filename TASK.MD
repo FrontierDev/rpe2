@@ -1,136 +1,184 @@
 ## Goal
-Fix the Guild **Admin** page layout regression visible after #49 while preserving the new table/scroll implementation.
+Remove the **data-layer foundation** of Guild Progression while preserving every unrelated Guild and character-progression system.
 
-Runtime screenshot shows two concrete problems:
+Authoritative plan: `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md`.
 
-1. the instruction/status line at the top (`Officer access detected for ... Select an online member...`) wastes vertical space and should be removed from the normal Admin layout;
-2. the roster table visually overlaps the lower administration controls instead of remaining contained inside the roster panel.
+This task covers only:
 
-The `UI.Table` roster itself, its columns, row scrolling, rank sorting, selection, and Online/Offline colors are otherwise correct and should be retained.
+- `GuildSetting` schema/normalization/serialization;
+- Guild-specific Profile progression APIs/state access;
+- GuildSetting progression dependency discovery/pruning.
 
-## Primary file
+Do **not** remove runtime/UI callers in this task; those are handled by follow-up issues.
 
-- `client/character/guild/page_GuildAdmin.lua`
+## Primary files
 
-Current #49 implementation uses a root `VerticalLayoutGroup` with:
+- `core/classes/GuildSetting.lua`
+- `core/internal/profile/Guild.lua`
+- `core/internal/database/Dependecies.lua`
 
-```text
-StatusText
-RosterPanel (expandHeight)
-AdminSectionsPanel
-```
-
-Inside `RosterPanel`, `RPEGuildRosterContentLayout` contains the title plus an expanding `UI.Table`, but its sizing must be made strictly follow the actual panel viewport so table rows cannot render into `AdminSectionsPanel`.
-
-## 1. Remove the top instruction/status row
-
-Remove the routine top instruction text from the visible Admin page.
-
-In particular, the normal officer state must no longer render:
+## Critical scope boundary
+RPE 2 contains unrelated progression systems. Preserve generic character progression code including concepts such as:
 
 ```text
-Officer access detected for <guild>. Select an online member to administer RPE Guild Rank.
+statProgressions
+resourceProgressions
 ```
 
-Do not replace it with another persistent instructional sentence elsewhere.
+and generic helpers used by class/race/stat/resource progression.
 
-Preserve meaningful exceptional states such as:
-
-- not in a guild;
-- no officer/admin access;
-
-but surface them compactly within the existing Admin summary/control region rather than reserving a dedicated top row. The normal officer/member-selection workflow should begin directly with the roster panel.
-
-## 2. Fix roster/admin vertical containment
-
-The roster table must never overlap the lower Admin controls.
-
-Required layout:
+Only remove **Guild-specific** progression concepts such as:
 
 ```text
-Vertical Root
-├─ Roster Panel (takes remaining height)
-│  ├─ Roster title
-│  └─ UI.Table (fills only remaining roster-panel height)
-└─ Admin Controls Panel (fixed/bounded lower region)
-   ├─ selected-member summary
-   ├─ rank controls
-   ├─ active section controls
-   └─ section selector
+GuildSetting.progression
+general.enableProgression
+profile.guild.byGuild[...].progression
+Guild Progression spellRefs
 ```
 
-Requirements:
+Before deleting any helper named `progression`, inspect its callers and prove it belongs only to Guild Progression.
 
-- `RosterPanel` should consume the remaining available height above the lower Admin panel;
-- `AdminSectionsPanel` must remain fully below it;
-- the table viewport/body must size from the **actual current height** of `RosterPanel`, not continue using a preferred height that can extend beyond the panel;
-- keep `RPEGuildRosterTitle` above the table;
-- table body continues to scroll normally when there are more rows than fit;
-- no table row, scrollbar, header, or row background may render over the Admin controls;
-- no Admin control may render over the roster;
-- resize/layout refresh should recompute the table viewport correctly.
+## 1. Remove Guild Progression from `GuildSetting`
 
-Prefer correcting the existing layout-group sizing/anchoring rather than adding masks, arbitrary offsets, or manually hiding overflowing rows.
+In `core/classes/GuildSetting.lua`:
 
-Likely approaches include making the roster content layout actually distribute its available height (`fitChildrenHeight`/expanding table semantics) or anchoring the table between the title and the bottom of the roster content frame. Use whichever is most consistent with the existing RPE UI system.
+- remove `general.enableProgression` from defaults and normalization;
+- remove the `progression = { slotCount = ..., entries = ... }` definition;
+- remove Guild Progression-only normalization helpers such as the current progression-entry/spell-ref normalization chain;
+- remove progression normalization from `Merge()`;
+- remove progression from `ToTable()` serialization.
 
-## 3. Preserve #49 behavior
+### Legacy definition handling
+`GuildSetting:Merge()` currently accepts incoming table keys before normalization. Do not leave legacy input able to reintroduce active `self.progression` state simply because the normalizer was deleted.
 
-Do not regress the parts of #49 that are working:
+After merge/normalization, a live GuildSetting object must not expose active Guild Progression data. Explicitly discard legacy:
 
-- roster remains `UI.Table`;
-- columns remain Character / Guild Rank / Level / Class / Zone / Status;
-- default sort remains numeric WoW `rankIndex` ascending with name tie-break;
-- Online remains green and Offline grey;
-- clicking a row still selects/querys that member;
-- selected-row highlighting remains visible;
-- Guild Rank / Achievement / Skill / Item selectors remain hierarchical;
-- lower controls continue using layout groups;
-- Progression controls and mutations remain intact;
-- officer checks, online-target requirement, pending/query state, comms, rank assignment, achievement grant, skill adjustment, item grant, and progression mutations remain unchanged.
+```text
+progression
+general.enableProgression
+```
 
-No schema or protocol changes are expected.
+where necessary in the existing normalization path.
+
+Do not introduce a new schema migration framework for this removal.
+
+Newly serialized GuildSettings must contain neither field.
+
+## 2. Remove Guild Profile progression APIs
+
+In `core/internal/profile/Guild.lua`, remove Guild Progression-only helpers and public APIs, including the current equivalents of:
+
+```text
+normalizeProgressionEntryId
+normalizeProgressionState
+getGuildProgressionState
+updateGuildProgressionState
+
+Profile.GetGuildProgression
+Profile.SetGuildProgression
+Profile.SetGuildProgressionSlot
+Profile.SetGuildProgressionEntryUnlocked
+Profile.SetGuildProgressionSelectedSpell
+Profile.ClearGuildProgressionSelectedSpell
+```
+
+Remove aliases/wrappers whose only purpose is Guild Progression.
+
+Preserve all remaining Guild profile behavior, especially:
+
+```text
+assignedRankRef
+assignedRankAt
+assignedRankBy
+requisition usage
+daily reward claim state
+daily reward transaction state
+guild identity migration
+```
+
+### Legacy SavedVariables
+Do **not** add permanent migration code solely to erase an already-saved:
+
+```lua
+profile.guild.byGuild[guildKey].progression
+```
+
+Legacy progression state may remain physically present in SavedVariables as inert data. The requirement is that no active Profile API reads or writes it after the full removal.
+
+## 3. Remove GuildSetting progression dependency handling
+
+In `core/internal/database/Dependecies.lua`, remove only the dependency logic that traverses:
+
+```text
+GuildSetting.progression.entries[*].spellRefs
+```
+
+This includes both:
+
+- source-reference discovery;
+- reference rewrite/pruning for GuildSetting progression spell refs.
+
+### Do not remove the generic progression dependency helper
+The file also contains progression-reference logic used by unrelated class/race/stat/resource definitions. Inspect callers carefully and preserve generic logic such as the helper that handles:
+
+```text
+statProgressions
+resourceProgressions
+traitRefs
+skillBonuses
+```
+
+Do not delete that generic helper wholesale merely because its name contains `Progression`.
 
 ## Acceptance criteria
 
-- [ ] Routine officer instruction text is no longer shown at the top.
-- [ ] Roster starts at the top of the Admin content area.
-- [ ] Roster panel and Admin controls panel occupy non-overlapping vertical regions.
-- [ ] Table header/body/scrollbar are fully contained inside the roster panel.
-- [ ] With a long guild roster, excess members are reached by scrolling rather than by rows extending into the controls area.
-- [ ] Admin summary, rank controls, section-specific controls, and section selector remain fully visible and aligned.
-- [ ] No overlap occurs at the current Guild window size shown in the runtime screenshot.
-- [ ] No #49 roster/table/dropdown/admin behavior regresses.
+- [ ] `GuildSetting.general` no longer contains `enableProgression`.
+- [ ] `GuildSetting` no longer defines or serializes `progression`.
+- [ ] Legacy GuildSetting input cannot leave active `self.progression` or `general.enableProgression` state after normalization/merge.
+- [ ] Newly serialized GuildSettings contain no Guild Progression fields.
+- [ ] Guild Profile exposes no Guild Progression get/set/mutation APIs.
+- [ ] Existing legacy profile progression SavedVariables can remain inert without causing load errors.
+- [ ] GuildSetting dependency discovery no longer adds progression `spellRefs`.
+- [ ] GuildSetting dependency rewrite/pruning no longer traverses progression entries.
+- [ ] Requisition, Daily Reward, Guild Rank and guild-identity Profile state remain unchanged.
+- [ ] Generic class/race/stat/resource progression dependency logic remains intact.
 
 ## Validation matrix
 
 ```text
-normal officer state
--> no top instruction sentence
--> roster begins at top of Admin page
+new GuildSetting
+-> no enableProgression
+-> no progression table
 
-roster with more rows than viewport
--> table scrolls
--> last visible row ends above Admin controls
--> scrollbar ends above Admin controls
+legacy GuildSetting table containing progression + enableProgression
+-> merge/load succeeds
+-> live normalized object does not expose active Guild Progression state
+-> ToTable() omits both legacy fields
 
-select online member
--> row highlight updates
--> selected-member summary and query work
--> table does not move/overlap controls
+existing character profile containing guild.progression SavedVariables
+-> profile loads without error
+-> unrelated Guild state remains readable
 
-switch Achievements / Skills / Items / Progression
--> lower panel layout remains contained
--> roster region remains unchanged
+GuildSetting requisition/item/currency dependencies
+-> still discovered normally
 
-non-officer / not-in-guild
--> meaningful access state still visible in the lower summary/control region
--> no dedicated instruction row is reintroduced
+GuildSetting Daily Reward dependencies
+-> still discovered normally
 
-window/layout refresh
--> roster table recalculates available height
--> no overflow into lower panel
+GuildSetting legacy progression spellRefs
+-> no longer contribute dependencies
+
+generic class/race/stat/resource progression definition
+-> dependency behavior unchanged
 ```
 
+## Constraints
+
+- Do not edit `client/client_Guild.lua` in this task unless compilation/load requires a tiny transitional fix; runtime removal is the next task.
+- Do not edit Guild window/Admin/editor UI here.
+- Do not remove generic progression systems.
+- Do not add a migration framework solely to purge old SavedVariables.
+- Do not change requisition, Daily Reward, Achievement, Skill, Item or Guild Rank semantics.
+
 ## Coding-agent instructions
-Use current `FrontierDev/rpe2` as authoritative. Inspect `client/character/guild/page_GuildAdmin.lua` and the sizing behavior of `VerticalLayoutGroup`, `UI.Panel`, and `UI.Table`/`ScrollLayout` before editing. This is a narrow layout correction to #49: preserve the table and scroll view, remove the top routine instruction row, and make the two main vertical regions strictly non-overlapping. Report exact files changed and runtime/static validation performed.
+Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md` first. Inspect every progression helper's callers before deletion, especially in `Dependecies.lua`, because generic non-Guild progression code must survive. Keep the change narrowly data-layer focused. Report exact files changed, legacy-input behavior, serialization results, dependency validation, and any unavoidable transitional edits.

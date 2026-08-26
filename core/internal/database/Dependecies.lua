@@ -554,19 +554,6 @@ local function getGuildSettingSourceRefs(guildSetting)
         end
     end
 
-    local progression = guildSetting.progression
-    local progressionEntries = type(progression) == "table" and type(progression.entries) == "table" and progression.entries or {}
-    for index = 1, #progressionEntries do
-        local entry = progressionEntries[index]
-        local spellRefs = type(entry) == "table" and type(entry.spellRefs) == "table" and entry.spellRefs or {}
-        for spellIndex = 1, #spellRefs do
-            local spellRef = spellRefs[spellIndex]
-            if type(spellRef) == "string" and spellRef ~= "" then
-                refs[#refs + 1] = spellRef
-            end
-        end
-    end
-
     return refs
 end
 
@@ -681,20 +668,6 @@ local function pruneGuildSettingReferences(guildSettings, deletedDatasetId, dele
             end
         end
 
-        local progression = type(guildSetting) == "table" and guildSetting.progression or nil
-        local entries = type(progression) == "table" and type(progression.entries) == "table" and progression.entries or {}
-        for entryIndex = 1, #entries do
-            local entry = entries[entryIndex]
-            local spellRefs = type(entry) == "table" and type(entry.spellRefs) == "table" and entry.spellRefs or {}
-            for spellIndex = #spellRefs, 1, -1 do
-                if (not collectionKey or collectionKey == "spells")
-                    and isDeletedReference(spellRefs[spellIndex], deletedDatasetId, deletedRef)
-                then
-                    table.remove(spellRefs, spellIndex)
-                    mutated = true
-                end
-            end
-        end
     end
 
     return mutated

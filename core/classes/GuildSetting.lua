@@ -128,7 +128,6 @@ local function normalizeGeneral(value)
     return {
         enableRequisitions = normalizeBoolean(source.enableRequisitions),
         enableDailyRewards = normalizeBoolean(source.enableDailyRewards),
-        enableProgression = normalizeBoolean(source.enableProgression),
     }
 end
 
@@ -211,60 +210,6 @@ local function normalizeDailyRewards(value)
     return rewards
 end
 
-local function normalizeSpellRefs(value)
-    if type(value) ~= "table" then
-        return {}
-    end
-
-    local spellRefs = {}
-    local seen = {}
-    for index = 1, #value do
-        local spellRef = normalizeReference(value[index])
-        if spellRef ~= "" and not seen[spellRef] then
-            spellRefs[#spellRefs + 1] = spellRef
-            seen[spellRef] = true
-        end
-    end
-
-    return spellRefs
-end
-
-local function normalizeProgressionEntry(value, index, usedIds)
-    local source = type(value) == "table" and value or {}
-
-    return {
-        id = normalizeStableId(source.id, index, "progression_entry", usedIds),
-        name = ensureString(source.name),
-        description = ensureString(source.description),
-        icon = ensureString(source.icon),
-        lockedText = ensureString(source.lockedText),
-        spellRefs = normalizeSpellRefs(source.spellRefs),
-    }
-end
-
-local function normalizeProgressionEntries(value)
-    if type(value) ~= "table" then
-        return {}
-    end
-
-    local entries = {}
-    local usedIds = {}
-    for index = 1, #value do
-        entries[index] = normalizeProgressionEntry(value[index], index, usedIds)
-    end
-
-    return entries
-end
-
-local function normalizeProgression(value)
-    local source = type(value) == "table" and value or {}
-
-    return {
-        slotCount = normalizeInteger(source.slotCount, 3, 1),
-        entries = normalizeProgressionEntries(source.entries),
-    }
-end
-
 function GuildSetting:New(data)
     return setmetatable({
         id = nil,
@@ -275,25 +220,18 @@ function GuildSetting:New(data)
         general = {
             enableRequisitions = false,
             enableDailyRewards = false,
-            enableProgression = false,
         },
         requisitions = {},
         dailyRewards = {},
-        progression = {
-            slotCount = 3,
-            entries = {},
-        },
         tags = {},
     }, GuildSetting):Merge(data)
 end
 
 function GuildSetting:Merge(data)
-    if type(data) ~= "table" then
-        return self
-    end
-
-    for key, value in pairs(data) do
-        self[key] = value
+    if type(data) == "table" then
+        for key, value in pairs(data) do
+            self[key] = value
+        end
     end
 
     self.name = ensureString(self.name)
@@ -303,7 +241,9 @@ function GuildSetting:Merge(data)
     self.general = normalizeGeneral(self.general)
     self.requisitions = normalizeRequisitions(self.requisitions)
     self.dailyRewards = normalizeDailyRewards(self.dailyRewards)
-    self.progression = normalizeProgression(self.progression)
+    -- Discard the removed Guild Progression definition, including legacy data
+    -- copied onto an existing GuildSetting before normalization.
+    self.progression = nil
     self.tags = normalizeTags(self.tags)
 
     return self
@@ -319,7 +259,6 @@ function GuildSetting:ToTable()
         general = normalizeGeneral(self.general),
         requisitions = normalizeRequisitions(self.requisitions),
         dailyRewards = normalizeDailyRewards(self.dailyRewards),
-        progression = normalizeProgression(self.progression),
         tags = normalizeTags(self.tags),
     }
 end
