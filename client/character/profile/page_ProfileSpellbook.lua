@@ -10,6 +10,7 @@ local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local Client = Addon.Client or {}
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 local Tooltips = Addon.Client.UI and Addon.Client.UI.Tooltips or {}
 local SpellbookEntry = UI.SpellbookEntry
 
@@ -31,6 +32,33 @@ local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local function getConfigurationRevision()
     return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
+local function getRuntimeRevision(domain)
+    if type(Runtime) == "table" and type(Runtime.GetRevision) == "function" then
+        return math.max(0, math.floor(tonumber(Runtime:GetRevision(domain)) or 0))
+    end
+
+    return 0
+end
+
+local function revisionTuplesEqual(left, right)
+    if type(left) ~= "table" or type(right) ~= "table" then
+        return false
+    end
+
+    for key, value in pairs(left) do
+        if right[key] ~= value then
+            return false
+        end
+    end
+    for key, value in pairs(right) do
+        if left[key] ~= value then
+            return false
+        end
+    end
+
+    return true
 end
 
 local function trimString(value)
@@ -173,6 +201,51 @@ function SpellbookPage:GetKnownSpellRows()
     }) or {}
     self.KnownSpellRowsRevision = revision
     return self.KnownSpellRows
+end
+
+function SpellbookPage:MarkDirty()
+    self.dirty = true
+    return self
+end
+
+function SpellbookPage:IsVisible()
+    if not self.frame or not self.frame.IsShown or not self.frame:IsShown() then
+        return false
+    end
+
+    if self.owner and self.owner.IsVisible then
+        return self.owner:IsVisible()
+    end
+
+    return true
+end
+
+function SpellbookPage:GetRevisionTuple()
+    return {
+        configurationRevision = getConfigurationRevision(),
+        actionBarBindingRevision = getRuntimeRevision("ActionBarBindingRevision"),
+        selectedDatasetId = tostring(self.SelectedDatasetId or ""),
+        selectedSpellbookCategory = tostring(self.SelectedSpellbookCategory or ""),
+        currentSpellPage = math.max(1, math.floor(tonumber(self.CurrentSpellPage) or 1)),
+    }
+end
+
+function SpellbookPage:RefreshIfDirty()
+    if not self.frame then
+        return nil, false
+    end
+
+    local revision = self:GetRevisionTuple()
+    if not self.dirty and revisionTuplesEqual(self.lastRenderedRevision, revision) then
+        return self.frame, false
+    end
+
+    if not self:IsVisible() then
+        self:MarkDirty()
+        return self.frame, false
+    end
+
+    return self:Refresh(), true
 end
 
 function SpellbookPage:GetNavigationRows(knownSpellRows)
@@ -614,6 +687,9 @@ function SpellbookPage:RefreshSpellEntries(rows)
         end
         self.GridEmptyText:SetText(self.LastGridEmptyStateText)
     end
+
+    self.lastRenderedRevision = self:GetRevisionTuple()
+    self.dirty = false
 end
 
 function SpellbookPage:PreviousSpellPage()
@@ -659,6 +735,8 @@ function SpellbookPage:RefreshVisibleState()
     end
 
     self:RefreshSpellEntries(self.KnownSpellRows)
+    self.lastRenderedRevision = self:GetRevisionTuple()
+    self.dirty = false
     return self.frame
 end
 
@@ -842,7 +920,6 @@ function SpellbookPage:Build(parent, owner)
         self:CreateSpellEntry(index, self.EntryListFrame)
     end
 
-    self:Refresh()
     return self.frame
 end
 
@@ -850,6 +927,17 @@ function SpellbookPage:Refresh()
     if not self.frame then
         return nil
     end
+
+    if not self:IsVisible() then
+        self:MarkDirty()
+        return self.frame
+    end
+
+    if self.refreshInProgress then
+        return self.frame
+    end
+
+    self.refreshInProgress = true
 
     local knownSpellRows = self:GetKnownSpellRows()
     local datasetRows = self:GetNavigationRows(knownSpellRows)
@@ -868,7 +956,11 @@ function SpellbookPage:Refresh()
         self.DatasetEmptyText:SetText(self.LastDatasetEmptyStateText)
     end
 
-    return self:RefreshVisibleState()
+    local frame = self:RefreshVisibleState()
+    self.lastRenderedRevision = self:GetRevisionTuple()
+    self.dirty = false
+    self.refreshInProgress = false
+    return frame
 end
 
 return SpellbookPage

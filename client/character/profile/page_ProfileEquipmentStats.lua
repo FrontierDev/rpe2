@@ -12,7 +12,7 @@ local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Ruleset = Addon.Internal and Addon.Internal.Ruleset or {}
-local ItemClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Item or nil
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
@@ -37,6 +37,37 @@ local function stopTiming(timer, cardinality)
     if timings and type(timings.Stop) == "function" then
         timings:Stop(timer, { cardinality = cardinality })
     end
+end
+
+local function getRuntimeRevision(domain)
+    if type(Runtime) == "table" and type(Runtime.GetRevision) == "function" then
+        return math.max(0, math.floor(tonumber(Runtime:GetRevision(domain)) or 0))
+    end
+
+    return 0
+end
+
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
+local function revisionTuplesEqual(left, right)
+    if type(left) ~= "table" or type(right) ~= "table" then
+        return false
+    end
+
+    for key, value in pairs(left) do
+        if right[key] ~= value then
+            return false
+        end
+    end
+    for key, value in pairs(right) do
+        if left[key] ~= value then
+            return false
+        end
+    end
+
+    return true
 end
 
 local EquipmentStatsPage = ProfileUI.EquipmentStatsPage or {}
@@ -275,30 +306,38 @@ local function buildEquippedTooltip(slotInfo)
     }
 end
 
-local function updateSlotVisual(page, slotKey)
+local function updateSlotVisual(page, slotKey, equippedBySlot)
     local slot = page.SlotWidgets and page.SlotWidgets[slotKey] or nil
     if not slot then
         return
     end
 
     local scope = page.GetActiveEquipmentScope and page:GetActiveEquipmentScope() or "character"
-    local slotInfo = Profile.GetEquippedItemByScope and Profile.GetEquippedItemByScope(scope, slotKey) or Profile.GetEquippedItem and Profile.GetEquippedItem(slotKey) or nil
+    local slotInfo = equippedBySlot and equippedBySlot[slotKey]
+    if slotInfo == nil then
+        slotInfo = Profile.GetEquippedItemByScope and Profile.GetEquippedItemByScope(scope, slotKey) or Profile.GetEquippedItem and Profile.GetEquippedItem(slotKey) or nil
+    end
     local emptyTexture = Profile.GetSlotTexture and Profile.GetSlotTexture(slotKey) or "Interface\\Icons\\INV_Misc_QuestionMark"
     local icon = emptyTexture
     local enabled = true
-    local tooltip = buildEmptyTooltip(slotKey)
 
     if slotInfo and slotInfo.item then
         icon = ensureString(slotInfo.item.icon, emptyTexture)
-        tooltip = buildEquippedTooltip(slotInfo)
     elseif slotInfo and slotInfo.itemRef ~= nil and slotInfo.itemRef ~= "" then
         icon = "Interface\\Icons\\INV_Misc_QuestionMark"
-        tooltip = buildEquippedTooltip(slotInfo)
     end
 
     slot:SetIcon(icon)
     slot:SetEnabled(enabled)
-    slot:SetTooltip(tooltip)
+    slot.resolvedSlotInfo = slotInfo
+    slot:SetTooltip(function()
+        local currentSlotInfo = slot.resolvedSlotInfo
+        if currentSlotInfo and (currentSlotInfo.item or (currentSlotInfo.itemRef ~= nil and currentSlotInfo.itemRef ~= "")) then
+            return buildEquippedTooltip(currentSlotInfo)
+        end
+
+        return buildEmptyTooltip(slotKey)
+    end)
 
     local isSelected = page.owner and page.owner.SelectedSlotKey == slotKey
     if slot.SetBorderColor then
@@ -551,7 +590,7 @@ local function refreshActionBarResourceDisplay()
     end
 end
 
-local function refreshItemLevelSummary(page, layout)
+local function refreshItemLevelSummary(page, itemLevelSummary)
     local summaryPanel = page and page.ItemLevelSummaryPanel or nil
     local summaryText = page and page.ItemLevelSummaryText or nil
     if not summaryPanel or not summaryText or not summaryText.SetText then
@@ -573,31 +612,9 @@ local function refreshItemLevelSummary(page, layout)
         return
     end
 
-    local total = 0
-    local count = 0
-    local minimum = nil
-    local maximum = nil
-    local scope = page and page.GetActiveEquipmentScope and page:GetActiveEquipmentScope() or "character"
-    for index = 1, #(layout and layout.ordered or {}) do
-        local slotKey = layout.ordered[index]
-        local slotInfo = Profile.GetEquippedItemByScope and Profile.GetEquippedItemByScope(scope, slotKey) or Profile.GetEquippedItem and Profile.GetEquippedItem(slotKey) or nil
-        local item = slotInfo and slotInfo.item or nil
-        if slotInfo and slotInfo.isMissing ~= true
-            and type(item) == "table"
-            and type(ItemClass) == "table"
-            and type(ItemClass.IsItemLevelEligible) == "function"
-            and type(ItemClass.ResolveItemLevel) == "function"
-            and ItemClass.IsItemLevelEligible(item)
-        then
-            local itemLevel = math.max(0, math.floor(tonumber(ItemClass.ResolveItemLevel(item)) or 0))
-            if itemLevel > 0 then
-                total = total + itemLevel
-                count = count + 1
-                minimum = minimum and math.min(minimum, itemLevel) or itemLevel
-                maximum = maximum and math.max(maximum, itemLevel) or itemLevel
-            end
-        end
-    end
+    local summary = type(itemLevelSummary) == "table" and itemLevelSummary or {}
+    local total = tonumber(summary.total) or 0
+    local count = tonumber(summary.count) or 0
 
     if count <= 0 then
         summaryText:SetText("Item Level: --")
@@ -607,7 +624,7 @@ local function refreshItemLevelSummary(page, layout)
     summaryText:SetText(("Item Level: %.1f"):format(total / count))
 end
 
-local function refreshMovementSpeedEntry(page)
+local function refreshMovementSpeedEntry(page, cachedStatRow)
     local movementPanel = page and page.MovementSpeedPanel or nil
     local movementEntry = page and page.MovementSpeedEntry or nil
     if not movementPanel or not movementEntry then
@@ -615,7 +632,10 @@ local function refreshMovementSpeedEntry(page)
     end
 
     local statRef = getMountRuleValue("movement_range_stat", "")
-    local statRow = statRef ~= "" and Profile.GetResolvedStatRow and Profile.GetResolvedStatRow(statRef) or nil
+    local statRow = cachedStatRow
+    if statRow == nil then
+        statRow = statRef ~= "" and Profile.GetResolvedStatRow and Profile.GetResolvedStatRow(statRef) or nil
+    end
     local frame = movementEntry.GetFrame and movementEntry:GetFrame() or nil
     if not frame then
         return
@@ -690,7 +710,7 @@ local function buildSpecialResourceItems(resources, healthResourceRef, selectedP
     return items
 end
 
-local function refreshResourceSelectors(page, resources, healthResourceRef)
+local function refreshResourceSelectors(page, resources, healthResourceRef, presentation)
     local primaryDropdown = page.PrimaryResourceDropdown
     local specialDropdown = page.SpecialResourceDropdown
     if not primaryDropdown or not specialDropdown then
@@ -708,8 +728,14 @@ local function refreshResourceSelectors(page, resources, healthResourceRef)
         return
     end
 
-    local selectedPrimaryRef = Profile.GetPrimaryResourceRef and Profile.GetPrimaryResourceRef() or nil
-    local selectedSpecialRef = Profile.GetSpecialResourceRef and Profile.GetSpecialResourceRef() or nil
+    local selectedPrimaryRef = presentation and presentation.primaryResourceRef
+    if selectedPrimaryRef == nil then
+        selectedPrimaryRef = Profile.GetPrimaryResourceRef and Profile.GetPrimaryResourceRef() or nil
+    end
+    local selectedSpecialRef = presentation and presentation.specialResourceRef
+    if selectedSpecialRef == nil then
+        selectedSpecialRef = Profile.GetSpecialResourceRef and Profile.GetSpecialResourceRef() or nil
+    end
     local primaryItems = buildPrimaryResourceItems(resources or {}, healthResourceRef, selectedSpecialRef)
     local specialItems = buildSpecialResourceItems(resources or {}, healthResourceRef, selectedPrimaryRef)
 
@@ -761,7 +787,7 @@ local function definitionItemsContainValue(items, value)
     return false
 end
 
-local function refreshProfileSelectors(page)
+local function refreshProfileSelectors(page, presentation)
     local useLevelSystem = getCharacterRuleValue("use_level_system", false) == true
     local useRaces = getCharacterRuleValue("use_races", false) == true
     local useClasses = getCharacterRuleValue("use_classes", false) == true
@@ -769,8 +795,12 @@ local function refreshProfileSelectors(page)
     local showScopeControls = activeScope == "mount" or activeScope == "pet"
     local showLevel = useLevelSystem
 
+    local level = presentation and presentation.level
+    if level == nil then
+        level = Profile.GetLevel and Profile.GetLevel() or 1
+    end
     if page.LevelInput then
-        page.LevelInput:SetText(tostring(Profile.GetLevel and Profile.GetLevel() or 1))
+        page.LevelInput:SetText(tostring(level))
     end
 
     setWidgetVisibility(page.LevelLabel, showLevel and not showScopeControls)
@@ -786,8 +816,14 @@ local function refreshProfileSelectors(page)
 
     local raceItems = buildProfileDefinitionItems("races")
     local classItems = buildProfileDefinitionItems("classes")
-    local selectedRaceRef = Profile.GetRaceRef and Profile.GetRaceRef() or nil
-    local selectedClassRef = Profile.GetClassRef and Profile.GetClassRef() or nil
+    local selectedRaceRef = presentation and presentation.raceRef
+    if selectedRaceRef == nil then
+        selectedRaceRef = Profile.GetRaceRef and Profile.GetRaceRef() or nil
+    end
+    local selectedClassRef = presentation and presentation.classRef
+    if selectedClassRef == nil then
+        selectedClassRef = Profile.GetClassRef and Profile.GetClassRef() or nil
+    end
 
     if page.RaceDropdown and useRaces then
         page.RaceDropdown:SetItems(raceItems)
@@ -846,6 +882,53 @@ function EquipmentStatsPage:GetActiveEquipmentScope()
     return scope
 end
 
+function EquipmentStatsPage:MarkDirty()
+    self.dirty = true
+    return self
+end
+
+function EquipmentStatsPage:IsVisible()
+    if not self.frame or not self.frame.IsShown or not self.frame:IsShown() then
+        return false
+    end
+
+    if self.owner and self.owner.IsVisible then
+        return self.owner:IsVisible()
+    end
+
+    return true
+end
+
+function EquipmentStatsPage:GetRevisionTuple()
+    return {
+        configurationRevision = getConfigurationRevision(),
+        profileStatsRevision = getRuntimeRevision("ProfileStatsRevision"),
+        profileResourcesRevision = getRuntimeRevision("ProfileResourcesRevision"),
+        equipmentRevision = getRuntimeRevision("EquipmentRevision"),
+        resolvedProfileRevision = getRuntimeRevision("ResolvedProfileRevision"),
+        scope = self:GetActiveEquipmentScope(),
+        selectedSlotKey = self.owner and tostring(self.owner.SelectedSlotKey or "") or "",
+    }
+end
+
+function EquipmentStatsPage:RefreshIfDirty()
+    if not self.frame then
+        return nil, false
+    end
+
+    local revision = self:GetRevisionTuple()
+    if not self.dirty and revisionTuplesEqual(self.lastRenderedRevision, revision) then
+        return self.frame, false
+    end
+
+    if not self:IsVisible() then
+        self.dirty = true
+        return self.frame, false
+    end
+
+    return self:Refresh(), true
+end
+
 function EquipmentStatsPage:SetActiveEquipmentScope(scope, skipRefresh)
     local normalizedScope = tostring(scope or "character")
     if normalizedScope ~= "mount" and normalizedScope ~= "pet" then
@@ -861,6 +944,7 @@ function EquipmentStatsPage:SetActiveEquipmentScope(scope, skipRefresh)
         self.owner.SelectedSlotKey = nil
     end
     self.LastLayoutSignature = nil
+    self:MarkDirty()
     if not skipRefresh then
         self:Refresh()
     end
@@ -870,6 +954,30 @@ end
 function EquipmentStatsPage:GetActiveEquipmentLayout()
     local scope = self:GetActiveEquipmentScope()
     return Profile.GetEquipmentLayoutByScope and Profile.GetEquipmentLayoutByScope(scope) or Profile.GetEquipmentLayout()
+end
+
+function EquipmentStatsPage:GetScopeChoiceItems(scope)
+    local normalizedScope = tostring(scope or "character")
+    if normalizedScope ~= "mount" and normalizedScope ~= "pet" then
+        return {}
+    end
+
+    self.ScopeChoiceCache = self.ScopeChoiceCache or {}
+    local cacheKey = table.concat({
+        normalizedScope,
+        tostring(getConfigurationRevision()),
+    }, ":")
+    local cached = self.ScopeChoiceCache[normalizedScope]
+    if type(cached) == "table" and cached.key == cacheKey and type(cached.items) == "table" then
+        return cached.items
+    end
+
+    local items = normalizedScope == "pet" and buildPetItems() or buildMountItems()
+    self.ScopeChoiceCache[normalizedScope] = {
+        key = cacheKey,
+        items = items,
+    }
+    return items
 end
 
 function EquipmentStatsPage:RefreshScopeButtons()
@@ -893,14 +1001,17 @@ function EquipmentStatsPage:RefreshScopeButtons()
     end
 end
 
-function EquipmentStatsPage:RefreshEquipmentHeader()
+function EquipmentStatsPage:RefreshEquipmentHeader(presentation)
     local scope = self:GetActiveEquipmentScope()
     local showScopeHeader = scope == "mount" or scope == "pet"
     local headerLabel = scope == "pet" and "Active Pet" or "Active Mount"
-    local headerItems = scope == "pet" and buildPetItems() or buildMountItems()
-    local selectedRef = scope == "pet"
-        and (Profile.GetPetRef and (Profile.GetPetRef() or "") or "")
-        or (Profile.GetMountRef and (Profile.GetMountRef() or "") or "")
+    local headerItems = self:GetScopeChoiceItems(scope)
+    local selectedRef = scope == "pet" and (presentation and presentation.petRef or nil) or (presentation and presentation.mountRef or nil)
+    if selectedRef == nil then
+        selectedRef = scope == "pet"
+            and (Profile.GetPetRef and (Profile.GetPetRef() or "") or "")
+            or (Profile.GetMountRef and (Profile.GetMountRef() or "") or "")
+    end
 
     if self.EquipmentHeaderPanel and self.EquipmentHeaderPanel.GetFrame then
         local headerFrame = self.EquipmentHeaderPanel:GetFrame()
@@ -1856,7 +1967,6 @@ function EquipmentStatsPage:Build(parent, owner)
     UI.Utils.AnchorFill(self.StatScroll, self.StatScrollPanel:GetContentFrame(), 0, 0, 0, 0)
 
     self:ApplyMetrics()
-    self:Refresh()
     return self.frame
 end
 
@@ -1865,15 +1975,28 @@ function EquipmentStatsPage:Refresh()
         return nil
     end
 
+    if not self:IsVisible() then
+        self:MarkDirty()
+        return self.frame
+    end
+
+    if self.refreshInProgress then
+        return self.frame
+    end
+
+    self.refreshInProgress = true
+
     local timer = startTiming("EquipmentStatsPage:Refresh", 8, "equipment")
     self:ApplyMetrics()
     local owner = self.owner
     local scope = self:GetActiveEquipmentScope()
     local viewModelTimer = startTiming("EquipmentStatsPage:ViewModel", 4, scope)
-    local layout = self:GetActiveEquipmentLayout() or { left = {}, right = {}, bottom = {}, ordered = {} }
-    local statRows = Profile.ListProfileStatRows and Profile.ListProfileStatRows() or {}
-    local resourceRows = Profile.ListResolvedResources and Profile.ListResolvedResources() or {}
-    local healthResourceRef = getHealthResourceRef()
+    local snapshot = Profile.GetPresentationSnapshot and Profile.GetPresentationSnapshot(scope) or nil
+    local layout = snapshot and snapshot.layout or self:GetActiveEquipmentLayout() or { left = {}, right = {}, bottom = {}, ordered = {} }
+    local equippedBySlot = snapshot and snapshot.equippedBySlot or nil
+    local statRows = snapshot and snapshot.statRows or (Profile.ListProfileStatRows and Profile.ListProfileStatRows() or {})
+    local resourceRows = snapshot and snapshot.resourceRows or (Profile.ListResolvedResources and Profile.ListResolvedResources() or {})
+    local healthResourceRef = snapshot and snapshot.healthResourceRef or getHealthResourceRef()
     local layoutSignature = buildLayoutSignature(layout)
     if viewModelTimer then
         stopTiming(viewModelTimer, {
@@ -1883,14 +2006,14 @@ function EquipmentStatsPage:Refresh()
         })
     end
     self:RefreshScopeButtons()
-    self:RefreshEquipmentHeader()
+    self:RefreshEquipmentHeader(snapshot)
     if self.LastLayoutSignature ~= layoutSignature then
         self.LastLayoutSignature = layoutSignature
         self:ApplySlotLayout(layout)
     end
 
     for index = 1, #(layout.ordered or {}) do
-        updateSlotVisual(self, layout.ordered[index])
+        updateSlotVisual(self, layout.ordered[index], equippedBySlot)
     end
 
     local selectedSlotKey = owner.SelectedSlotKey
@@ -1910,10 +2033,13 @@ function EquipmentStatsPage:Refresh()
 
     refreshStatRows(self, statRows)
     refreshHealthEntry(self, resourceRows, healthResourceRef)
-    refreshMovementSpeedEntry(self)
-    refreshItemLevelSummary(self, layout)
-    refreshResourceSelectors(self, resourceRows, healthResourceRef)
-    refreshProfileSelectors(self)
+    refreshMovementSpeedEntry(self, snapshot and snapshot.movementStatRow or nil)
+    refreshItemLevelSummary(self, snapshot and snapshot.itemLevelSummary or nil)
+    refreshResourceSelectors(self, resourceRows, healthResourceRef, snapshot)
+    refreshProfileSelectors(self, snapshot)
+    self.lastRenderedRevision = self:GetRevisionTuple()
+    self.dirty = false
+    self.refreshInProgress = false
     if timer then
         stopTiming(timer, {
             equipmentSlots = #(layout.ordered or {}),

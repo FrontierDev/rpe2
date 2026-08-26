@@ -7,6 +7,7 @@ Addon.Client.UI.Profile = Addon.Client.UI.Profile or {}
 local Client = Addon.Client
 local ProfileUI = Addon.Client.UI.Profile
 local UI = Addon.UI or {}
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
@@ -63,6 +64,7 @@ local function createInstance()
         traitsPage = ProfileUI.TraitsPage,
         skillsPage = ProfileUI.SkillsPage,
         achievementsPage = ProfileUI.AchievementsPage,
+        runtimeChangeListenerHandle = nil,
     }, ProfileWindow)
 end
 
@@ -76,6 +78,9 @@ end
 
 function ProfileWindow:SetSelectedSlotKey(slotKey, skipRefresh)
     self.SelectedSlotKey = slotKey
+    if self.equipmentStatsPage and self.equipmentStatsPage.MarkDirty then
+        self.equipmentStatsPage:MarkDirty()
+    end
     if not skipRefresh then
         self:Refresh()
     end
@@ -106,27 +111,103 @@ end
 
 function ProfileWindow:RefreshTab(tabKey)
     local normalizedKey = tostring(tabKey or "equipment")
+    local page = nil
     if normalizedKey == "equipment" then
-        if self.equipmentStatsPage and self.equipmentStatsPage.Refresh then
-            self.equipmentStatsPage:Refresh()
-        end
+        page = self.equipmentStatsPage
     elseif normalizedKey == "spellbook" then
-        if self.spellbookPage and self.spellbookPage.Refresh then
-            self.spellbookPage:Refresh()
-        end
+        page = self.spellbookPage
     elseif normalizedKey == "traits" then
-        if self.traitsPage and self.traitsPage.Refresh then
-            self.traitsPage:Refresh()
-        end
+        page = self.traitsPage
     elseif normalizedKey == "skills" then
-        if self.skillsPage and self.skillsPage.Refresh then
-            self.skillsPage:Refresh()
-        end
+        page = self.skillsPage
     elseif normalizedKey == "achievements" then
-        if self.achievementsPage and self.achievementsPage.Refresh then
-            self.achievementsPage:Refresh()
+        page = self.achievementsPage
+    end
+
+    if page then
+        if page.RefreshIfDirty then
+            page:RefreshIfDirty()
+        elseif page.Refresh then
+            page:Refresh()
         end
     end
+end
+
+function ProfileWindow:MarkPagesDirty()
+    local pages = {
+        self.equipmentStatsPage,
+        self.spellbookPage,
+        self.traitsPage,
+        self.skillsPage,
+        self.achievementsPage,
+    }
+    for index = 1, #pages do
+        local page = pages[index]
+        if page and page.MarkDirty then
+            page:MarkDirty()
+        end
+    end
+end
+
+function ProfileWindow:HandleRuntimeChange(changeSet)
+    if type(changeSet) ~= "table" then
+        return
+    end
+
+    local profileChanges = changeSet.profile
+    local revisionChanges = changeSet.revisions
+    local equipmentChanged = (type(profileChanges) == "table"
+        and (profileChanges.equipment == true or profileChanges.stats == true or profileChanges.resources == true))
+        or (type(revisionChanges) == "table"
+        and (revisionChanges.EquipmentRevision ~= nil
+            or revisionChanges.ProfileStatsRevision ~= nil
+            or revisionChanges.ProfileResourcesRevision ~= nil
+            or revisionChanges.ResolvedProfileRevision ~= nil))
+    local skillsChanged = (type(profileChanges) == "table" and profileChanges.skills ~= nil)
+        or (type(revisionChanges) == "table" and revisionChanges.SkillRevision ~= nil)
+    local achievementsChanged = (type(changeSet.achievements) == "table")
+        or (type(revisionChanges) == "table" and revisionChanges.AchievementRevision ~= nil)
+    local spellbookChanged = type(revisionChanges) == "table"
+        and revisionChanges.ActionBarBindingRevision ~= nil
+
+    if equipmentChanged and self.equipmentStatsPage and self.equipmentStatsPage.MarkDirty then
+        self.equipmentStatsPage:MarkDirty()
+    end
+    if skillsChanged and self.skillsPage and self.skillsPage.MarkDirty then
+        self.skillsPage:MarkDirty()
+    end
+    if achievementsChanged and self.achievementsPage and self.achievementsPage.MarkDirty then
+        self.achievementsPage:MarkDirty()
+    end
+    if spellbookChanged and self.spellbookPage and self.spellbookPage.MarkDirty then
+        self.spellbookPage:MarkDirty()
+    end
+
+    if not self:IsVisible() then
+        return
+    end
+
+    local activeTabKey = self:GetActiveTabKey()
+    if (activeTabKey == "equipment" and equipmentChanged)
+        or (activeTabKey == "skills" and skillsChanged)
+        or (activeTabKey == "achievements" and achievementsChanged)
+        or (activeTabKey == "spellbook" and spellbookChanged)
+    then
+        self:RefreshTab(activeTabKey)
+    end
+end
+
+function ProfileWindow:EnsureChangeListeners()
+    if self.runtimeChangeListenerHandle
+        or type(Runtime) ~= "table"
+        or type(Runtime.RegisterPostCommitListener) ~= "function"
+    then
+        return
+    end
+
+    self.runtimeChangeListenerHandle = Runtime:RegisterPostCommitListener(function(changeSet)
+        self:HandleRuntimeChange(changeSet)
+    end)
 end
 
 function ProfileWindow:RefreshVisible()
@@ -139,6 +220,7 @@ end
 
 function ProfileWindow:BuildWindow()
     if self.window then
+        self:EnsureChangeListeners()
         local frame = self.window.GetFrame and self.window:GetFrame() or nil
         if frame and frame.SetSize then
             frame:SetSize(WINDOW_WIDTH, WINDOW_HEIGHT)
@@ -177,7 +259,6 @@ function ProfileWindow:BuildWindow()
                     refreshPageOnShow(page, function()
                         self:RefreshTab("equipment")
                     end)
-                    self.equipmentStatsPage:Refresh()
                 end,
             },
             {
@@ -200,7 +281,6 @@ function ProfileWindow:BuildWindow()
                     refreshPageOnShow(page, function()
                         self:RefreshTab("traits")
                     end)
-                    self.traitsPage:Refresh()
                 end,
             },
             {
@@ -212,7 +292,6 @@ function ProfileWindow:BuildWindow()
                     refreshPageOnShow(page, function()
                         self:RefreshTab("skills")
                     end)
-                    self.skillsPage:Refresh()
                 end,
             },
             {
@@ -224,7 +303,6 @@ function ProfileWindow:BuildWindow()
                     refreshPageOnShow(page, function()
                         self:RefreshTab("achievements")
                     end)
-                    self.achievementsPage:Refresh()
                 end,
             },
         },
@@ -235,11 +313,17 @@ function ProfileWindow:BuildWindow()
     if frame and frame.SetSize then
         frame:SetSize(WINDOW_WIDTH, WINDOW_HEIGHT)
     end
+    self:EnsureChangeListeners()
 
     return self.window
 end
 
 function ProfileWindow:Refresh()
+    if not self:IsVisible() then
+        self:MarkPagesDirty()
+        return self.window
+    end
+
     local timer = startTiming("ProfileWindow:Refresh", 8, "profile")
     self:RefreshTab(self:GetActiveTabKey())
     if timer then
@@ -258,20 +342,20 @@ function ProfileWindow:ShowTab(tabKey)
     if window and window.SetActiveTab then
         window:SetActiveTab(tabIndex)
     end
-    self:RefreshTab(tabKey)
     if window and window.Show then
         window:Show()
     end
+    self:RefreshTab(self:GetActiveTabKey())
     return window
 end
 
 function ProfileWindow:Show()
     local timer = startTiming("ProfileWindow:Show", 8, "profile")
     local window = self:BuildWindow()
-    self:Refresh()
     if window and window.Show then
         window:Show()
     end
+    self:Refresh()
     if timer then
         local activeTab = self:GetActiveTabKey() or "profile"
         stopTiming(timer, {

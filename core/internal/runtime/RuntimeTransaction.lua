@@ -468,6 +468,7 @@ local revisionBumpCounts = {}
 for _, domain in ipairs({
     "ProfileStateRevision", "CurrencyRevision", "AchievementRevision",
     "InventoryRevision", "EquipmentRevision", "SkillRevision",
+    "ProfileStatsRevision", "ProfileResourcesRevision",
     "ActionBarBindingRevision", "ResolvedProfileRevision", "EventRuntimeRevision",
 }) do
     revisionValues[domain] = 0
@@ -481,6 +482,7 @@ end
 Runtime.RevisionDomains = {
     "ConfigurationRevision", "ProfileStateRevision", "CurrencyRevision",
     "AchievementRevision", "InventoryRevision", "EquipmentRevision", "SkillRevision",
+    "ProfileStatsRevision", "ProfileResourcesRevision",
     "ActionBarBindingRevision", "ResolvedProfileRevision", "EventRuntimeRevision",
     "AuraRevisionByEventId", "CooldownRevisionByEventId", "SpellcastRevisionByEventId",
 }
@@ -494,6 +496,8 @@ local revisionAliases = {
     inventory = "InventoryRevision", inventoryrevision = "InventoryRevision",
     equipment = "EquipmentRevision", equipmentrevision = "EquipmentRevision",
     skill = "SkillRevision", skillrevision = "SkillRevision",
+    profilestats = "ProfileStatsRevision", profilestatsrevision = "ProfileStatsRevision",
+    profileresources = "ProfileResourcesRevision", profileresourcesrevision = "ProfileResourcesRevision",
     actionbarbinding = "ActionBarBindingRevision", actionbarbindingrevision = "ActionBarBindingRevision",
     resolvedprofile = "ResolvedProfileRevision", resolvedprofilerevision = "ResolvedProfileRevision",
     eventruntime = "EventRuntimeRevision", eventruntimerevision = "EventRuntimeRevision",
@@ -592,6 +596,12 @@ local function requestChangesRevisions(transaction)
         end
         if profile.stats or profile.resources or profile.changed then
             requestRevision(transaction, "ProfileStateRevision")
+        end
+        if profile.stats then
+            requestRevision(transaction, "ProfileStatsRevision")
+        end
+        if profile.resources then
+            requestRevision(transaction, "ProfileResourcesRevision")
         end
         if profile.skills then
             requestRevision(transaction, "SkillRevision")

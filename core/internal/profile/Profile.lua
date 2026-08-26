@@ -432,6 +432,25 @@ local function getProfileRuntimeRevision()
     return math.max(1, math.floor(tonumber(builder and builder.ProfileTooltipContextRevision) or 1))
 end
 
+local function getProfileRevision(domain)
+    local runtime = Addon.Internal and Addon.Internal.Runtime or nil
+    if type(runtime) == "table" and type(runtime.GetRevision) == "function" then
+        return math.max(0, math.floor(tonumber(runtime:GetRevision(domain)) or 0))
+    end
+
+    return 0
+end
+
+local function getProfileResolverRevisionKey()
+    return table.concat({
+        tostring(getProfileRuntimeRevision()),
+        tostring(getProfileRevision("ProfileStatsRevision")),
+        tostring(getProfileRevision("ProfileResourcesRevision")),
+        tostring(getProfileRevision("EquipmentRevision")),
+        tostring(getProfileRevision("ResolvedProfileRevision")),
+    }, ":")
+end
+
 local function getProfileIdentityKey()
     if type(Database.ResolveCurrentCharacterIdentity) == "function" then
         local characterKey, _, isStable = Database.ResolveCurrentCharacterIdentity()
@@ -446,6 +465,9 @@ end
 function Profile.InvalidateResolvedLookupCaches()
     Profile.ResolvedStatLookupCache = nil
     Profile.ResolvedResourceLookupCache = nil
+    Profile.ProfilePresentationSnapshotCache = nil
+    Profile.MountListCache = nil
+    Profile.PetListCache = nil
 end
 
 local function getResolvedBootstrapReadiness()
@@ -567,9 +589,9 @@ getCachedResolvedStatLookup = function(options)
 
     local readiness = refreshResolvedBootstrapReadiness()
     local configurationRevision = getProfileConfigurationRevision()
-    local runtimeRevision = getProfileRuntimeRevision()
+    local runtimeRevision = getProfileResolverRevisionKey()
     local identityKey = getProfileIdentityKey()
-    local cacheKey = ("%d:%d:%s:base"):format(configurationRevision, runtimeRevision, identityKey)
+    local cacheKey = ("%d:%s:%s:base"):format(configurationRevision, runtimeRevision, identityKey)
     local cache = Profile.ResolvedStatLookupCache
     if type(cache) == "table"
         and tostring(cache.key or "") == cacheKey
@@ -615,9 +637,9 @@ getCachedResolvedResourceLookup = function(options)
 
     local readiness = refreshResolvedBootstrapReadiness()
     local configurationRevision = getProfileConfigurationRevision()
-    local runtimeRevision = getProfileRuntimeRevision()
+    local runtimeRevision = getProfileResolverRevisionKey()
     local identityKey = getProfileIdentityKey()
-    local cacheKey = ("%d:%d:%s:base"):format(configurationRevision, runtimeRevision, identityKey)
+    local cacheKey = ("%d:%s:%s:base"):format(configurationRevision, runtimeRevision, identityKey)
     local cache = Profile.ResolvedResourceLookupCache
     if type(cache) == "table"
         and tostring(cache.key or "") == cacheKey
@@ -1404,6 +1426,15 @@ function Profile.GetEquipmentLayout()
 end
 
 function Profile.ListMounts()
+    local configurationRevision = getProfileConfigurationRevision()
+    local cached = Profile.MountListCache
+    if type(cached) == "table"
+        and tonumber(cached.configurationRevision) == configurationRevision
+        and type(cached.rows) == "table"
+    then
+        return cached.rows
+    end
+
     local rows = {}
     local registry = getRegistry()
     local dependencies = getDependencies()
@@ -1439,10 +1470,23 @@ function Profile.ListMounts()
         return leftName < rightName
     end)
 
+    Profile.MountListCache = {
+        configurationRevision = configurationRevision,
+        rows = rows,
+    }
     return rows
 end
 
 function Profile.ListPets()
+    local configurationRevision = getProfileConfigurationRevision()
+    local cached = Profile.PetListCache
+    if type(cached) == "table"
+        and tonumber(cached.configurationRevision) == configurationRevision
+        and type(cached.rows) == "table"
+    then
+        return cached.rows
+    end
+
     local rows = {}
     local registry = getRegistry()
     local dependencies = getDependencies()
@@ -1483,6 +1527,10 @@ function Profile.ListPets()
         return leftName < rightName
     end)
 
+    Profile.PetListCache = {
+        configurationRevision = configurationRevision,
+        rows = rows,
+    }
     return rows
 end
 
@@ -3534,6 +3582,128 @@ function Profile.ListProfileStatRows(options)
     end
 
     return rows
+end
+
+local function buildProfileItemLevelSummary(equippedBySlot, orderedSlotKeys)
+    local itemClass = getItemClass()
+    local summary = {
+        total = 0,
+        count = 0,
+        minimum = nil,
+        maximum = nil,
+    }
+
+    if getRulesetValue("interface", "use_item_level", true) ~= true then
+        return summary
+    end
+
+    if type(itemClass) ~= "table"
+        or type(itemClass.IsItemLevelEligible) ~= "function"
+        or type(itemClass.ResolveItemLevel) ~= "function"
+    then
+        return summary
+    end
+
+    for index = 1, #(orderedSlotKeys or {}) do
+        local slotInfo = equippedBySlot and equippedBySlot[orderedSlotKeys[index]] or nil
+        local item = slotInfo and slotInfo.item or nil
+        if slotInfo and slotInfo.isMissing ~= true
+            and type(item) == "table"
+            and itemClass.IsItemLevelEligible(item)
+        then
+            local itemLevel = math.max(0, math.floor(tonumber(itemClass.ResolveItemLevel(item)) or 0))
+            if itemLevel > 0 then
+                summary.total = summary.total + itemLevel
+                summary.count = summary.count + 1
+                summary.minimum = summary.minimum and math.min(summary.minimum, itemLevel) or itemLevel
+                summary.maximum = summary.maximum and math.max(summary.maximum, itemLevel) or itemLevel
+            end
+        end
+    end
+
+    return summary
+end
+
+function Profile.GetPresentationSnapshot(scope)
+    local normalizedScope = Equipment.NormalizeSlotType and Equipment.NormalizeSlotType(scope) or tostring(scope or "character")
+    if normalizedScope ~= "mount" and normalizedScope ~= "pet" then
+        normalizedScope = "character"
+    end
+
+    local configurationRevision = getProfileConfigurationRevision()
+    local profileStatsRevision = getProfileRevision("ProfileStatsRevision")
+    local profileResourcesRevision = getProfileRevision("ProfileResourcesRevision")
+    local equipmentRevision = getProfileRevision("EquipmentRevision")
+    local resolvedProfileRevision = getProfileRevision("ResolvedProfileRevision")
+    local profileRuntimeRevision = getProfileRuntimeRevision()
+    local identityKey = getProfileIdentityKey()
+    local cacheKey = table.concat({
+        tostring(configurationRevision),
+        tostring(profileStatsRevision),
+        tostring(profileResourcesRevision),
+        tostring(equipmentRevision),
+        tostring(resolvedProfileRevision),
+        tostring(profileRuntimeRevision),
+        tostring(identityKey),
+        normalizedScope,
+    }, ":")
+
+    local cached = Profile.ProfilePresentationSnapshotCache
+    if type(cached) == "table" and tostring(cached.key or "") == cacheKey then
+        return cached
+    end
+
+    local layout = Profile.GetEquipmentLayoutByScope(normalizedScope) or {
+        left = {},
+        right = {},
+        bottom = {},
+        ordered = {},
+        entries = {},
+    }
+    local equippedBySlot = {}
+    for index = 1, #(layout.ordered or {}) do
+        local slotKey = layout.ordered[index]
+        equippedBySlot[slotKey] = Profile.GetEquippedItemByScope(normalizedScope, slotKey)
+    end
+
+    local statRows = Profile.ListProfileStatRows()
+    local resourceRows = Profile.ListResolvedResources()
+    local healthResourceRef = getRulesetValue("resources", "health_stat", nil)
+    if type(healthResourceRef) ~= "string" then
+        healthResourceRef = nil
+    end
+    local movementStatRef = Profile.GetMovementRangeStatRef and Profile.GetMovementRangeStatRef() or nil
+    local movementStatRow = movementStatRef and Profile.GetResolvedStatRow(movementStatRef) or nil
+
+    local snapshot = {
+        key = cacheKey,
+        revisions = {
+            configurationRevision = configurationRevision,
+            profileStatsRevision = profileStatsRevision,
+            profileResourcesRevision = profileResourcesRevision,
+            equipmentRevision = equipmentRevision,
+            resolvedProfileRevision = resolvedProfileRevision,
+            profileRuntimeRevision = profileRuntimeRevision,
+        },
+        scope = normalizedScope,
+        layout = layout,
+        equippedBySlot = equippedBySlot,
+        statRows = statRows,
+        resourceRows = resourceRows,
+        healthResourceRef = healthResourceRef,
+        movementStatRow = movementStatRow,
+        raceRef = Profile.GetRaceRef and Profile.GetRaceRef() or nil,
+        classRef = Profile.GetClassRef and Profile.GetClassRef() or nil,
+        level = Profile.GetLevel and Profile.GetLevel() or 1,
+        primaryResourceRef = Profile.GetPrimaryResourceRef and Profile.GetPrimaryResourceRef() or nil,
+        specialResourceRef = Profile.GetSpecialResourceRef and Profile.GetSpecialResourceRef() or nil,
+        mountRef = Profile.GetMountRef and Profile.GetMountRef() or nil,
+        petRef = Profile.GetPetRef and Profile.GetPetRef() or nil,
+        itemLevelSummary = buildProfileItemLevelSummary(equippedBySlot, layout.ordered),
+    }
+
+    Profile.ProfilePresentationSnapshotCache = snapshot
+    return snapshot
 end
 
 function Profile.ListEquipableItemsForSlot(slotKey)

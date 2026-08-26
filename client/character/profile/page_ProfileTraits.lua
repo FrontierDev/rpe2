@@ -27,6 +27,29 @@ local TRAITBOOK_NAV_HEIGHT = 24
 local TRAIT_ENTRIES_PER_PAGE = TRAITBOOK_COLUMNS * TRAITBOOK_ROWS
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
+local function revisionTuplesEqual(left, right)
+    if type(left) ~= "table" or type(right) ~= "table" then
+        return false
+    end
+
+    for key, value in pairs(left) do
+        if right[key] ~= value then
+            return false
+        end
+    end
+    for key, value in pairs(right) do
+        if left[key] ~= value then
+            return false
+        end
+    end
+
+    return true
+end
+
 local CATEGORY_LABELS = {
     class_passives = "Class Passives",
     class_talents = "Class Talents",
@@ -221,6 +244,49 @@ function TraitsPage:EnsureCategorySelection(rows)
     end
 
     self.SelectedCategoryKey = categories[1] and categories[1].key or nil
+end
+
+function TraitsPage:MarkDirty()
+    self.dirty = true
+    return self
+end
+
+function TraitsPage:IsVisible()
+    if not self.frame or not self.frame.IsShown or not self.frame:IsShown() then
+        return false
+    end
+
+    if self.owner and self.owner.IsVisible then
+        return self.owner:IsVisible()
+    end
+
+    return true
+end
+
+function TraitsPage:GetRevisionTuple()
+    return {
+        configurationRevision = getConfigurationRevision(),
+        selectedCategoryKey = tostring(self.SelectedCategoryKey or ""),
+        currentTraitPage = math.max(1, math.floor(tonumber(self.CurrentTraitPage) or 1)),
+    }
+end
+
+function TraitsPage:RefreshIfDirty()
+    if not self.frame then
+        return nil, false
+    end
+
+    local revision = self:GetRevisionTuple()
+    if not self.dirty and revisionTuplesEqual(self.lastRenderedRevision, revision) then
+        return self.frame, false
+    end
+
+    if not self:IsVisible() then
+        self:MarkDirty()
+        return self.frame, false
+    end
+
+    return self:Refresh(), true
 end
 
 function TraitsPage:RefreshTraitRuntime(reason)
@@ -509,6 +575,9 @@ function TraitsPage:RefreshTraitEntries()
         end
         self.GridEmptyText:SetText(self.LastGridEmptyStateText)
     end
+
+    self.lastRenderedRevision = self:GetRevisionTuple()
+    self.dirty = false
 end
 
 function TraitsPage:PreviousTraitPage()
@@ -715,7 +784,6 @@ function TraitsPage:Build(parent, owner)
         self:CreateTraitEntry(index, self.EntryListFrame)
     end
 
-    self:Refresh()
     return self.frame
 end
 
@@ -723,6 +791,17 @@ function TraitsPage:Refresh()
     if not self.frame then
         return nil
     end
+
+    if not self:IsVisible() then
+        self:MarkDirty()
+        return self.frame
+    end
+
+    if self.refreshInProgress then
+        return self.frame
+    end
+
+    self.refreshInProgress = true
 
     local categoryRows, traitRows = buildCategoryRows()
     self.CategoryRows = categoryRows
@@ -756,6 +835,9 @@ function TraitsPage:Refresh()
     end
 
     self:RefreshTraitEntries()
+    self.lastRenderedRevision = self:GetRevisionTuple()
+    self.dirty = false
+    self.refreshInProgress = false
     return self.frame
 end
 

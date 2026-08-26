@@ -17,6 +17,7 @@ local Debug = Addon.Debug or {}
 local Client = Addon.Client or {}
 local Crafting = Client and Client.Crafting or nil
 local Tasks = Addon.Internal and Addon.Internal.Tasks or {}
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 local SkillsPage = ProfileUI.SkillsPage or {}
 ProfileUI.SkillsPage = SkillsPage
 
@@ -33,6 +34,37 @@ local CRAFTING_RECIPE_ASYNC_BATCH_SIZE = 12
 local CRAFTING_TRAINER_SYNC_OVERSCAN = 4
 local CRAFTING_TRAINER_ASYNC_BATCH_SIZE = 12
 local CRAFTING_UI_INTERNAL_TRACE = false
+
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
+local function getRuntimeRevision(domain)
+    if type(Runtime) == "table" and type(Runtime.GetRevision) == "function" then
+        return math.max(0, math.floor(tonumber(Runtime:GetRevision(domain)) or 0))
+    end
+
+    return 0
+end
+
+local function revisionTuplesEqual(left, right)
+    if type(left) ~= "table" or type(right) ~= "table" then
+        return false
+    end
+
+    for key, value in pairs(left) do
+        if right[key] ~= value then
+            return false
+        end
+    end
+    for key, value in pairs(right) do
+        if left[key] ~= value then
+            return false
+        end
+    end
+
+    return true
+end
 
 local CATEGORY_DEFINITIONS = {
     { key = "weapon", label = "Weapon Skills" },
@@ -641,6 +673,11 @@ end
 
 function SkillsPage:ApplySkillListSessionRows(session, replaceItems)
     if not self:IsSkillListSessionCurrent(session) then
+        return false
+    end
+
+    if not self:IsVisible() then
+        self:MarkDirty()
         return false
     end
 
@@ -1979,7 +2016,9 @@ function SkillsPage:RefreshCraftingView(row, refreshRecipeList)
         self.CraftingDetailIcon:SetTexture(detail and detail.output and detail.output.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
     end
     if self.CraftingDetailIcon and self.CraftingDetailIcon.SetTooltip then
-        self.CraftingDetailIcon:SetTooltip(buildCraftingOutputTooltip(detail))
+        self.CraftingDetailIcon:SetTooltip(function()
+            return buildCraftingOutputTooltip(detail)
+        end)
     end
     if self.CraftingDetailTitle and self.CraftingDetailTitle.SetText then
         local outputName = detail and detail.output and detail.output.name or detail and detail.name or nil
@@ -2240,6 +2279,56 @@ function SkillsPage:HandleFooterAction(skillRef)
         self:Refresh()
     end
     return true
+end
+
+function SkillsPage:MarkDirty()
+    self.dirty = true
+    return self
+end
+
+function SkillsPage:IsVisible()
+    if not self.frame or not self.frame.IsShown or not self.frame:IsShown() then
+        return false
+    end
+
+    if self.owner and self.owner.IsVisible then
+        return self.owner:IsVisible()
+    end
+
+    return true
+end
+
+function SkillsPage:GetRevisionTuple()
+    return {
+        configurationRevision = getConfigurationRevision(),
+        skillRevision = getRuntimeRevision("SkillRevision"),
+        selectedCategoryKey = tostring(self.SelectedCategoryKey or ""),
+        selectedSkillRef = tostring(self.SelectedSkillRef or ""),
+        showCraftingUI = self.ShowCraftingUI == true,
+        showCraftingConversionMode = self.ShowCraftingConversionMode == true,
+        showCraftingTrainerMode = self.ShowCraftingTrainerMode == true,
+        selectedRecipeRef = tostring(self.SelectedRecipeRef or ""),
+        selectedTrainerRecipeRef = tostring(self.SelectedTrainerRecipeRef or ""),
+        selectedConversionMaterialRef = tostring(self.SelectedConversionMaterialRef or ""),
+    }
+end
+
+function SkillsPage:RefreshIfDirty()
+    if not self.frame then
+        return nil, false
+    end
+
+    local revision = self:GetRevisionTuple()
+    if not self.dirty and revisionTuplesEqual(self.lastRenderedRevision, revision) then
+        return self.frame, false
+    end
+
+    if not self:IsVisible() then
+        self:MarkDirty()
+        return self.frame, false
+    end
+
+    return self:Refresh(), true
 end
 
 function SkillsPage:Build(parent, owner)
@@ -3071,7 +3160,9 @@ function SkillsPage:Build(parent, owner)
         if frame then
             frame:EnableMouse(true)
             if row.SetTooltip then
-                row:SetTooltip(buildCraftingConversionItemTooltip(item))
+                row:SetTooltip(function()
+                    return buildCraftingConversionItemTooltip(item)
+                end)
             end
             frame:SetScript("OnMouseUp", function(_, button)
                 if button ~= "LeftButton" or not item then
@@ -3270,12 +3361,14 @@ function SkillsPage:Build(parent, owner)
                 self.CraftingRecipeItemsDirty = true
                 self.CraftingTrainerItemsDirty = true
                 self.CraftingTrainerListApplied = false
-                self:Refresh()
+                self:MarkDirty()
+                if self:IsVisible() then
+                    self:Refresh()
+                end
             end
         end)
     end
 
-    self:Refresh()
     return self.frame
 end
 
@@ -3283,6 +3376,17 @@ function SkillsPage:Refresh()
     if not self.frame then
         return nil
     end
+
+    if not self:IsVisible() then
+        self:MarkDirty()
+        return self.frame
+    end
+
+    if self.refreshInProgress then
+        return self.frame
+    end
+
+    self.refreshInProgress = true
 
     local navRows, skillRefsByCategory, skillEntriesByCategory, authoredCount = buildNavigationRows()
     self.NavRows = navRows
@@ -3331,6 +3435,9 @@ function SkillsPage:Refresh()
         self:RefreshCraftingView(selectedRow)
     end
 
+    self.lastRenderedRevision = self:GetRevisionTuple()
+    self.dirty = false
+    self.refreshInProgress = false
     return self.frame
 end
 
