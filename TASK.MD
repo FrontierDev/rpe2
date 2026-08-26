@@ -1,79 +1,195 @@
-## Static validation rev 1: FAIL — rolled-back item grants still publish `item_gain`
+## Goal
+Refactor Inventory presentation so opening/refreshing the window reuses the cached Inventory display snapshot from #62 and updates **only the visible dirty page**, eliminating repeated full Inventory resolution and hidden-page refreshes.
 
-Re-validation of current `main` / `a2d0643f068f43649486e2d72d4cfd7c537824a3` confirms that rev 1 fixes the original successful-path ordering defect:
+Authoritative documents:
 
-- canonical `Inventory.AddItem()` now emits a typed `item_gain` Runtime mutation event;
-- Achievements registers a `RegisterBeforeCommitProcessor("item_gain", ...)` processor;
-- the old post-commit Inventory listener is removed when that processor is available;
-- successful direct and reward item grants can therefore drive `item_gain` Achievement progress inside the existing outer Runtime transaction.
+- `.docs/RPE2-Runtime-Performance-Hitch-Elimination-PDD.md`
+- `.docs/RPE2-Runtime-Performance-Hitch-Elimination-Implementation-Plan.md`
 
-However, the rollback case required by the previous diagnostic is still incorrect.
+Depends on: #62
 
-### Blocking diagnosis
+This task owns Inventory window/page presentation only. Do not change item storage/stacking semantics established by #62.
 
-`client/character/inventory/Inventory.lua::markInventoryMutation()` currently calls:
+## Primary files
 
-```lua
-Runtime:MarkChanged("inventory", mutation)
-Runtime:EmitMutationEvent("item_gain", mutation)
-```
+- `client/character/inventory/window_Inventory.lua`
+- `client/character/inventory/page_Inventory.lua`
+- `client/character/inventory/page_Consumables.lua`
+- `client/character/inventory/page_Reagents.lua`
+- `core/ui/elements/TabContainer.lua` only if a tiny generic active-tab visibility hook is strictly required
+- `core/ui/prefabs/CurrencyPanel.lua` only if revision-aware refresh integration requires a narrow reusable hook
 
-for every canonical add. The event is appended immediately to the current Runtime transaction's mutation queue.
+Inspect how the three pages share `InventoryGridPage` behavior before editing.
 
-`RuntimeTransaction.lua` drains every queued mutation during commit. There is currently no cancellation/netting mechanism for an already queued mutation event.
+## 1. Consume one display snapshot per page refresh
 
-Achievement reward delivery can then legitimately roll an item grant back **before the outer Runtime transaction commits**:
+`InventoryGridPage:Refresh()` must obtain the current Inventory display snapshot once and pass/reuse it for all computations in that refresh.
+
+Refactor helpers so the same refresh does **not** independently call `Inventory.GetDisplayItems()` through:
 
 ```text
-reward item AddItem()
- -> item_gain event queued
- -> later reward verification/persistence/currency step fails
- -> finishFailedTransaction()
- -> rollbackTransaction()
- -> Inventory.RemoveVariantQuantity() removes the awarded item
- -> reward function returns failure normally
- -> outer Runtime transaction still proceeds to commit
- -> queued item_gain event is drained
- -> Achievement progresses for an item the player no longer owns
+GetCategoryDisplayItems
+BuildFilterItems
+GetFilteredDisplayItems
+slot rendering
+empty-state calculations
 ```
 
-This path is visible in `client/client_AchievementRewards.lua`: `finishFailedTransaction()` calls `rollbackTransaction()`, which removes prior item awards through `RemoveVariantQuantity()`. `Inventory.RemoveVariantQuantity()` records a removal mutation but does not cancel or offset the pending authoritative `item_gain` event.
+Use a flow equivalent to:
 
-Because reward failure is represented by normal return values rather than throwing the Runtime transaction, the queued event survives to the before-commit processor.
+```text
+snapshot = Inventory.GetDisplayItems()
+categoryItems = FilterCategory(snapshot)
+filterItems = BuildFilterItems(categoryItems)
+visibleItems = ApplySearchAndFilters(categoryItems)
+render slots from visibleItems
+```
 
-This violates:
+If the Inventory revision changes during the refresh, abort/retry safely rather than mixing two revisions.
 
-- the previous rev-1 requirement: **failed/rolled-back reward delivery must not publish a spurious authoritative item-gain event for an item that did not remain granted**;
-- #62's requirement to preserve existing item-gain Achievement semantics;
-- the transaction model that authoritative dependent effects reflect the final state of the logical transaction.
+## 2. Reuse precomputed snapshot fields
 
-### Required fix
+Use the normalized search text, quality, item type, tags, source state and resolved definitions from #62.
 
-Make authoritative Inventory gain events represent the **settled/net gain of the outer transaction**, not an irrevocable event at the instant `AddItem()` mutates storage.
+Do not rebuild equivalent search strings or repeatedly resolve dataset/item definitions in the page.
 
-An acceptable implementation is either:
+Page helpers should treat the snapshot as read-only.
 
-1. **Cancellable/netted pending gain events**
-   - retain transaction-local pending item-gain records keyed by exact stack variant/item identity;
-   - when a removal/rollback in the same transaction removes quantity that came from a pending gain, decrement/cancel that pending gain before before-commit processing;
-   - the Achievement processor must ignore gains whose settled quantity is `<= 0`.
+## 3. Refresh only the active Inventory page
 
-or an equivalent design where:
+`InventoryWindow:Refresh()` currently refreshes every built page.
 
-2. **A final Inventory-settlement before-commit processor** computes authoritative item gains only after all Inventory mutations/rollbacks for the transaction have settled, and only then invokes `ProcessTrigger("item_gain", ...)`.
+Change behavior to:
 
-Do not solve this by moving Achievement processing back to post-commit; it must remain authoritative before-commit work and remain in the same outer transaction.
+```text
+visible active page -> RefreshIfDirty()
+hidden built pages -> mark stale/dirty only
+unbuilt pages -> no work until first activation
+```
 
-### Re-validation required
+Inventory mutation listeners must not render hidden pages.
 
-After the fix, verify statically:
+When a hidden page becomes active, compare its last-rendered relevant revision tuple against current revisions and refresh exactly once if stale.
 
-- direct successful `Inventory.AddItem()` -> one before-commit `item_gain` with exact quantity;
-- multiple successful reward item grants -> dependent `item_gain` Achievements remain in the same outer transaction;
-- item grant followed by reward rollback -> **zero** `item_gain` progress for the rolled-back quantity;
-- partial/net rollback -> only the settled retained quantity is exposed if that case is possible;
-- one `InventoryRevision` publish per outer transaction;
-- one consolidated post-commit Inventory listener payload;
-- presentation listeners remain post-commit only.
+Preserve lazy tab construction behavior.
 
-No configured commit status checks are present for this revision. Issue remains open; do not run the in-game performance gate yet.
+## 4. Add page revision/dirty tracking
+
+Each Inventory page must track the revisions/state that affect its rendered content.
+
+At minimum consider:
+
+```text
+InventoryRevision
+ConfigurationRevision
+currency revision if the page displays CurrencyPanel
+search query
+selected filter values
+page/category identity
+```
+
+`RefreshIfDirty()` must return immediately when neither the data revisions nor page-local search/filter state changed.
+
+Do not make every currency change rebuild all item filters if only the currency panel needs updating. Prefer a narrower CurrencyPanel refresh when practical.
+
+## 5. Remove duplicate refresh ownership
+
+Audit `Build()`, page builders, `InventoryWindow:Show()`, tab activation callbacks, Inventory change listeners and any `OnShow` handlers.
+
+There must be one clear owner of initial/stale page refresh.
+
+Required lifecycle:
+
+```text
+Build -> construct controls only
+activate/show page -> RefreshIfDirty once
+mutation while visible -> queue/coalesce one refresh
+mutation while hidden -> mark dirty only
+show unchanged already-rendered window -> visibility/layout work, no full data rebuild
+```
+
+Do not leave a Build -> Refresh + Show -> Refresh + OnShow -> Refresh chain.
+
+## 6. Coalesce Inventory UI refresh requests
+
+Consume the consolidated Inventory ChangeSet/listener payload from #62.
+
+Requirements:
+
+- multiple mutations in one outer transaction queue at most one Inventory UI flush;
+- if the Inventory window is hidden, do not perform page rendering work;
+- if visible, refresh only the active page;
+- if a payload identifies a narrow quantity-only change and current sorting/filter membership is unaffected, targeted slot update is allowed but not mandatory;
+- a full active-page refresh remains acceptable when membership/order can change, provided it uses the cached snapshot.
+
+Reuse existing TaskQueue/dirty-refresh conventions where practical.
+
+## 7. First construction performance
+
+Keep the current 48-slot pool if #58 timings show construction remains under budget.
+
+If first construction exceeds the PDD’s per-frame hard threshold because of slot creation itself, split **control construction only** into bounded batches without changing page semantics. Do not preemptively complicate construction if profiling does not justify it.
+
+## Acceptance criteria
+
+- [ ] One `InventoryGridPage:Refresh()` consumes one Inventory display snapshot.
+- [ ] Page helpers do not repeatedly call `Inventory.GetDisplayItems()` during one refresh.
+- [ ] Search/filter logic reuses precomputed snapshot presentation fields.
+- [ ] `InventoryWindow:Refresh()` renders only the active page.
+- [ ] Hidden built pages become dirty but perform no render work until shown.
+- [ ] Unbuilt tabs remain lazy.
+- [ ] Reopening unchanged Inventory does not rebuild the display snapshot or refilter the active page unnecessarily.
+- [ ] Duplicate Build/Show/OnShow refreshes are removed.
+- [ ] Multiple Inventory changes in one transaction queue one UI refresh.
+- [ ] Search, filtering, context menus, equip interactions and CurrencyPanel behavior remain correct.
+
+## Validation matrix
+
+```text
+open Inventory first time
+-> active tab builds
+-> one current snapshot consumed
+-> hidden tabs do not build/refresh unnecessarily
+
+close and reopen unchanged Inventory
+-> cached snapshot reused
+-> active page RefreshIfDirty fast-paths
+
+receive one item while Inventory hidden
+-> page marked dirty
+-> no page render until window shown
+
+receive one item while Inventory visible
+-> one UI refresh for active page
+-> hidden Consumables/Reagents pages not refreshed
+
+receive 5 reward items in one transaction
+-> one Inventory UI refresh request
+
+switch Inventory -> Consumables -> Reagents
+-> each stale page refreshes once on activation
+-> subsequent unchanged switch fast-paths
+
+change search query
+-> active page refilters cached category snapshot
+-> no dataset/item re-resolution
+
+change filter selection
+-> same
+
+currency-only change
+-> CurrencyPanel updates correctly
+-> item display/filter snapshot not unnecessarily rebuilt
+```
+
+## Constraints
+
+- Do not change Inventory storage/stacking APIs from #62 except for a tiny compatibility fix.
+- Do not refresh hidden pages.
+- Do not add broad window refresh calls to low-level data mutation code.
+- Do not rebuild search text or resolve item definitions already present in the cached snapshot.
+- Do not modify unrelated TabContainer behavior unless a minimal reusable hook is proven necessary.
+- Preserve current visual layout and feature behavior.
+
+## Coding-agent instructions
+Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read both runtime-performance documents and completed #62. Trace the actual refresh call graph from `InventoryWindow:Show()` and Inventory change listeners into each page before editing. Keep the patch presentation-focused. Report the final page lifecycle, revision tuple, number of snapshot fetches per refresh, hidden-page behavior, files changed, and timing results for first/open/reopen with 10/50/150+ stacks.

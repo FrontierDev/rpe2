@@ -5,6 +5,7 @@ Addon.UI = UI
 
 local BaseElement = UI.BaseElement
 local Common = Addon.Utils and Addon.Utils.Common or {}
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 
 UI.CurrencyPanel = UI.CurrencyPanel or {}
 local CurrencyPanel = UI.CurrencyPanel
@@ -26,6 +27,18 @@ local function buildIconMarkup(icon)
     end
 
     return ("|T%s:14:14:0:0|t"):format(tostring(normalized))
+end
+
+local function getRuntimeRevision(domain)
+    if type(Runtime) == "table" and type(Runtime.GetRevision) == "function" then
+        return math.max(0, math.floor(tonumber(Runtime:GetRevision(domain)) or 0))
+    end
+
+    return 0
+end
+
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
 end
 
 local function buildTooltip(definition, amount, amountText)
@@ -119,6 +132,9 @@ function CurrencyPanel:New(options)
     instance.expandedHeight = tonumber(options and options.height) or 108
     instance.summaryRowHeight = tonumber(options and options.summaryRowHeight) or 18
     instance.onHeightChanged = options and options.onHeightChanged or nil
+    instance.currencyRevision = -1
+    instance.configurationRevision = -1
+    instance.dirty = true
     return instance
 end
 
@@ -128,6 +144,7 @@ function CurrencyPanel:SetProvider(provider)
     else
         self.provider = getDefaultProvider()
     end
+    self.dirty = true
 end
 
 function CurrencyPanel:SetItems(items)
@@ -145,7 +162,7 @@ function CurrencyPanel:GetCurrentHeight()
     return self.collapsedHeight
 end
 
-function CurrencyPanel:SetExpanded(isExpanded)
+function CurrencyPanel:SetExpanded(isExpanded, options)
     local nextExpanded = isExpanded == true
     local previousHeight = self:GetCurrentHeight()
     self.isExpanded = nextExpanded
@@ -177,7 +194,9 @@ function CurrencyPanel:SetExpanded(isExpanded)
         self.scroll:UpdateGeometry()
     end
 
-    self:Refresh()
+    if not (type(options) == "table" and options.skipRefresh == true) then
+        self:RefreshIfDirty()
+    end
 
     if previousHeight ~= currentHeight and type(self.onHeightChanged) == "function" then
         self.onHeightChanged(self, currentHeight, previousHeight)
@@ -266,7 +285,24 @@ function CurrencyPanel:Refresh()
         end
     end
 
+    self.currencyRevision = getRuntimeRevision("CurrencyRevision")
+    self.configurationRevision = getConfigurationRevision()
+    self.dirty = false
+
     return self.frame
+end
+
+function CurrencyPanel:RefreshIfDirty()
+    local currencyRevision = getRuntimeRevision("CurrencyRevision")
+    local configurationRevision = getConfigurationRevision()
+    if not self.dirty
+        and self.currencyRevision == currencyRevision
+        and self.configurationRevision == configurationRevision
+    then
+        return self.frame, false
+    end
+
+    return self:Refresh(), true
 end
 
 function CurrencyPanel:Create()
@@ -409,7 +445,6 @@ function CurrencyPanel:Create()
     })
     self.emptyText:GetFrame():SetPoint("CENTER", self.panel:GetContentFrame(), "CENTER", 0, -6)
 
-    self:Refresh()
-    self:SetExpanded(self.isExpanded)
+    self:SetExpanded(self.isExpanded, { skipRefresh = true })
     return self.frame
 end

@@ -8,6 +8,7 @@ local Client = Addon.Client
 local UI = Addon.UI or {}
 local Inventory = Addon.Client.Inventory or {}
 local InventoryUI = Addon.Client.UI.Inventory
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
@@ -32,6 +33,26 @@ local function stopTiming(timer, cardinality)
     if timings and type(timings.Stop) == "function" then
         timings:Stop(timer, { cardinality = cardinality })
     end
+end
+
+local function enqueueRefreshWork(fn, ...)
+    local tasks = Addon.Internal and Addon.Internal.Tasks or nil
+    if type(tasks) == "table" and type(tasks.Enqueue) == "function" then
+        tasks:Enqueue(fn, ...)
+        return true
+    end
+
+    if C_Timer and type(C_Timer.After) == "function" then
+        local args = { ... }
+        local argCount = select("#", ...)
+        C_Timer.After(0, function()
+            fn(unpack(args, 1, argCount))
+        end)
+        return true
+    end
+
+    fn(...)
+    return true
 end
 
 local InventoryWindow = InventoryUI.Window or {}
@@ -74,6 +95,8 @@ local function createInstance()
         consumablesPage = InventoryUI.ConsumablesPage,
         reagentsPage = InventoryUI.ReagentsPage,
         changeListenerHandle = nil,
+        runtimeChangeListenerHandle = nil,
+        refreshQueued = false,
     }, InventoryWindow)
 end
 
@@ -102,6 +125,67 @@ function InventoryWindow:GetActivePage()
     return self:GetPageForTabIndex(activeTabIndex)
 end
 
+function InventoryWindow:IsVisible()
+    local frame = self.window and self.window.GetFrame and self.window:GetFrame() or nil
+    return frame and frame.IsShown and frame:IsShown() == true or false
+end
+
+function InventoryWindow:MarkPagesDirty()
+    local pages = {
+        self.inventoryPage,
+        self.consumablesPage,
+        self.reagentsPage,
+    }
+    for index = 1, #pages do
+        local page = pages[index]
+        if page and page.MarkDirty then
+            page:MarkDirty()
+        end
+    end
+end
+
+function InventoryWindow:EnsureChangeListeners()
+    if not self.changeListenerHandle and Inventory.RegisterChangeListener then
+        self.changeListenerHandle = Inventory.RegisterChangeListener(function()
+            self:QueueRefresh("inventory-changed")
+        end)
+    end
+
+    if not self.runtimeChangeListenerHandle
+        and type(Runtime) == "table"
+        and type(Runtime.RegisterPostCommitListener) == "function"
+    then
+        self.runtimeChangeListenerHandle = Runtime:RegisterPostCommitListener(function(changeSet)
+            if type(changeSet) == "table" and type(changeSet.currencies) == "table" then
+                self:QueueRefresh("currency-changed")
+            end
+        end)
+    end
+end
+
+function InventoryWindow:QueueRefresh()
+    self:MarkPagesDirty()
+    if not self:IsVisible() then
+        return self.window
+    end
+
+    if self.refreshQueued then
+        return self.window
+    end
+
+    self.refreshQueued = true
+    enqueueRefreshWork(function(controller)
+        controller.refreshQueued = false
+        if controller:IsVisible() then
+            controller:Refresh()
+        else
+            controller:MarkPagesDirty()
+        end
+    end, self)
+
+    return self.window
+end
+
 function InventoryWindow:RefreshWindowLayout()
     if not self.window then
         return nil
@@ -116,11 +200,7 @@ end
 
 function InventoryWindow:BuildWindow()
     if self.window then
-        if not self.changeListenerHandle and Inventory.RegisterChangeListener then
-            self.changeListenerHandle = Inventory.RegisterChangeListener(function()
-                self:Refresh()
-            end)
-        end
+        self:EnsureChangeListeners()
         return self.window
     end
 
@@ -160,7 +240,6 @@ function InventoryWindow:BuildWindow()
                 width = 60,
                 builder = function(page)
                     self.inventoryPage:Build(page)
-                    self.inventoryPage:Refresh()
                 end,
             },
             {
@@ -168,7 +247,6 @@ function InventoryWindow:BuildWindow()
                 width = 78,
                 builder = function(page)
                     self.consumablesPage:Build(page)
-                    self.consumablesPage:Refresh()
                 end,
             },
             {
@@ -176,7 +254,6 @@ function InventoryWindow:BuildWindow()
                 width = 60,
                 builder = function(page)
                     self.reagentsPage:Build(page)
-                    self.reagentsPage:Refresh()
                 end,
             },
         },
@@ -190,16 +267,20 @@ function InventoryWindow:BuildWindow()
         tabContainer.SetActiveTab = function(container, index)
             local result = originalSetActiveTab(container, index)
             self:RefreshWindowLayout()
+            local page = self:GetActivePage()
+            if page then
+                if self:IsVisible() and page.RefreshIfDirty then
+                    page:RefreshIfDirty()
+                elseif page.MarkDirty then
+                    page:MarkDirty()
+                end
+            end
             return result
         end
         self._tabLayoutHookInstalled = true
     end
 
-    if not self.changeListenerHandle and Inventory.RegisterChangeListener then
-        self.changeListenerHandle = Inventory.RegisterChangeListener(function()
-            self:Refresh()
-        end)
-    end
+    self:EnsureChangeListeners()
 
     self:RefreshWindowLayout()
 
@@ -207,14 +288,26 @@ function InventoryWindow:BuildWindow()
 end
 
 function InventoryWindow:Refresh()
-    if self.inventoryPage and self.inventoryPage.Refresh then
-        self.inventoryPage:Refresh()
+    local activePage = self:GetActivePage()
+    if not self:IsVisible() then
+        self:MarkPagesDirty()
+        return self.window
     end
-    if self.consumablesPage and self.consumablesPage.Refresh then
-        self.consumablesPage:Refresh()
-    end
-    if self.reagentsPage and self.reagentsPage.Refresh then
-        self.reagentsPage:Refresh()
+
+    local pages = {
+        self.inventoryPage,
+        self.consumablesPage,
+        self.reagentsPage,
+    }
+    for index = 1, #pages do
+        local page = pages[index]
+        if page == activePage then
+            if page.RefreshIfDirty then
+                page:RefreshIfDirty()
+            end
+        elseif page and page.MarkDirty then
+            page:MarkDirty()
+        end
     end
 
     return self.window
@@ -223,15 +316,17 @@ end
 function InventoryWindow:Show()
     local timer = startTiming("InventoryWindow:Show", 8, self.activeTabKey or "inventory")
     local window = self:BuildWindow()
-    self:Refresh()
-    self:RefreshWindowLayout()
     if window and window.Show then
         window:Show()
     end
+    self:RefreshWindowLayout()
+    self:Refresh()
     if timer then
         stopTiming(timer, {
             activeTab = self.activeTabKey or "inventory",
-            builtPages = 3,
+            builtPages = (self.inventoryPage and self.inventoryPage.frame and 1 or 0)
+                + (self.consumablesPage and self.consumablesPage.frame and 1 or 0)
+                + (self.reagentsPage and self.reagentsPage.frame and 1 or 0),
         })
     end
     return window

@@ -8,6 +8,7 @@ local InventoryUI = Addon.Client.UI.Inventory
 local Inventory = Addon.Client.Inventory or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 local UI = Addon.UI or {}
 local TooltipBuilders = Addon.Client.UI and Addon.Client.UI.Tooltips or {}
 
@@ -100,17 +101,62 @@ local function normalizeSearchToken(value)
     return string.lower(trimString(value))
 end
 
-local function appendSearchValue(buffer, value)
-    local text = trimString(value)
-    if text ~= "" then
-        buffer[#buffer + 1] = string.lower(text)
+local function getRuntimeRevision(domain)
+    if type(Runtime) == "table" and type(Runtime.GetRevision) == "function" then
+        return math.max(0, math.floor(tonumber(Runtime:GetRevision(domain)) or 0))
     end
+
+    return 0
 end
 
-local function appendSearchValues(buffer, values)
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
+local function buildFilterSignature(values)
+    local normalized = {}
     for index = 1, #(values or {}) do
-        appendSearchValue(buffer, values[index])
+        normalized[#normalized + 1] = tostring(values[index] or "")
     end
+
+    table.sort(normalized)
+    return table.concat(normalized, "\31")
+end
+
+local function revisionTuplesEqual(left, right)
+    if type(left) ~= "table" or type(right) ~= "table" then
+        return false
+    end
+
+    return left.inventoryRevision == right.inventoryRevision
+        and left.configurationRevision == right.configurationRevision
+        and left.currencyRevision == right.currencyRevision
+        and left.searchQuery == right.searchQuery
+        and left.selectedFilters == right.selectedFilters
+        and left.categoryKey == right.categoryKey
+end
+
+local function dataRevisionsEqual(left, right)
+    if type(left) ~= "table" or type(right) ~= "table" then
+        return false
+    end
+
+    return left.inventoryRevision == right.inventoryRevision
+        and left.configurationRevision == right.configurationRevision
+        and left.currencyRevision == right.currencyRevision
+end
+
+local function isCurrencyOnlyChange(previous, current)
+    if type(previous) ~= "table" or type(current) ~= "table" then
+        return false
+    end
+
+    return previous.inventoryRevision == current.inventoryRevision
+        and previous.configurationRevision == current.configurationRevision
+        and previous.searchQuery == current.searchQuery
+        and previous.selectedFilters == current.selectedFilters
+        and previous.categoryKey == current.categoryKey
+        and previous.currencyRevision ~= current.currencyRevision
 end
 
 local function getQualityLabel(quality)
@@ -233,6 +279,9 @@ local function createInventoryGridPage(config)
         ContextMenuResolvedItem = nil,
         CurrencyPanel = nil,
         windowController = nil,
+        dirty = true,
+        lastRenderedRevision = nil,
+        refreshInProgress = false,
     }, InventoryGridPage)
 end
 
@@ -240,6 +289,23 @@ InventoryUI.CreateInventoryGridPage = createInventoryGridPage
 
 function InventoryGridPage:SetWindowController(windowController)
     self.windowController = windowController
+end
+
+function InventoryGridPage:IsVisible()
+    if not self.frame or not self.frame.IsShown or not self.frame:IsShown() then
+        return false
+    end
+
+    if self.windowController and self.windowController.IsVisible then
+        return self.windowController:IsVisible()
+    end
+
+    return true
+end
+
+function InventoryGridPage:MarkDirty()
+    self.dirty = true
+    return self
 end
 
 function InventoryGridPage:GetCurrencyPanelHeight()
@@ -264,6 +330,17 @@ end
 
 function InventoryGridPage:GetSearchQuery()
     return normalizeSearchToken(self.appliedSearchQuery)
+end
+
+function InventoryGridPage:GetRevisionTuple()
+    return {
+        inventoryRevision = getRuntimeRevision("InventoryRevision"),
+        configurationRevision = getConfigurationRevision(),
+        currencyRevision = self.CurrencyPanel and getRuntimeRevision("CurrencyRevision") or 0,
+        searchQuery = self:GetSearchQuery(),
+        selectedFilters = buildFilterSignature(self:GetSelectedFilterValues()),
+        categoryKey = self.categoryKey,
+    }
 end
 
 function InventoryGridPage:GetDraftSearchQuery()
@@ -293,7 +370,7 @@ function InventoryGridPage:RefreshSearchButtons()
 end
 
 function InventoryGridPage:MatchesCategory(resolved)
-    local itemType = resolved and resolved.item and tostring(resolved.item.itemType or "none") or ""
+    local itemType = resolved and tostring(resolved.itemType or "none") or ""
 
     if self.categoryKey == "consumable" then
         return itemType == "consumable"
@@ -306,8 +383,8 @@ function InventoryGridPage:MatchesCategory(resolved)
     return itemType ~= "consumable" and itemType ~= "material"
 end
 
-function InventoryGridPage:GetCategoryDisplayItems()
-    local resolvedItems = Inventory.GetDisplayItems and Inventory.GetDisplayItems() or {}
+function InventoryGridPage:GetCategoryDisplayItems(snapshot)
+    local resolvedItems = snapshot or {}
     local filtered = {}
 
     for index = 1, #resolvedItems do
@@ -320,8 +397,8 @@ function InventoryGridPage:GetCategoryDisplayItems()
     return filtered
 end
 
-function InventoryGridPage:BuildFilterItems()
-    local resolvedItems = self:GetCategoryDisplayItems()
+function InventoryGridPage:BuildFilterItems(categoryItems)
+    local resolvedItems = categoryItems or {}
     local datasetItems = {}
     local qualityItems = {}
     local itemTypeItems = {}
@@ -330,7 +407,6 @@ function InventoryGridPage:BuildFilterItems()
     for index = 1, #resolvedItems do
         local resolved = resolvedItems[index]
         local dataset = resolved and resolved.dataset or nil
-        local item = resolved and resolved.item or nil
 
         if dataset and dataset.id then
             datasetItems[dataset.id] = {
@@ -344,17 +420,17 @@ function InventoryGridPage:BuildFilterItems()
             }
         end
 
-        if item then
-            qualityItems[tostring(item.quality or "common")] = {
-                label = getQualityLabel(item.quality),
-                value = "quality:" .. tostring(item.quality or "common"),
+        if resolved and resolved.item then
+            qualityItems[tostring(resolved.quality or "common")] = {
+                label = getQualityLabel(resolved.quality),
+                value = "quality:" .. tostring(resolved.quality or "common"),
             }
-            itemTypeItems[tostring(item.itemType or "none")] = {
-                label = getItemTypeLabel(item.itemType),
-                value = "itemType:" .. tostring(item.itemType or "none"),
+            itemTypeItems[tostring(resolved.itemType or "none")] = {
+                label = getItemTypeLabel(resolved.itemType),
+                value = "itemType:" .. tostring(resolved.itemType or "none"),
             }
 
-            local tags = type(item.tags) == "table" and item.tags or {}
+            local tags = type(resolved.tags) == "table" and resolved.tags or {}
             for tagIndex = 1, #tags do
                 local tag = tostring(tags[tagIndex] or "")
                 if tag ~= "" then
@@ -460,21 +536,21 @@ function InventoryGridPage:PassesFilters(resolved, selection)
     end
 
     if selectionCount(selection.quality) > 0 then
-        local quality = resolved.item and tostring(resolved.item.quality or "common") or ""
+        local quality = resolved.item and tostring(resolved.quality or "common") or ""
         if not selection.quality[quality] then
             return false
         end
     end
 
     if selectionCount(selection.itemType) > 0 then
-        local itemType = resolved.item and tostring(resolved.item.itemType or "none") or ""
+        local itemType = resolved.item and tostring(resolved.itemType or "none") or ""
         if not selection.itemType[itemType] then
             return false
         end
     end
 
     if selectionCount(selection.tag) > 0 then
-        local tags = resolved.item and type(resolved.item.tags) == "table" and resolved.item.tags or {}
+        local tags = type(resolved.tags) == "table" and resolved.tags or {}
         local matchesTag = false
         for index = 1, #tags do
             if selection.tag[tostring(tags[index] or "")] then
@@ -492,19 +568,7 @@ function InventoryGridPage:PassesFilters(resolved, selection)
 end
 
 function InventoryGridPage:BuildSearchIndex(resolved)
-    local values = {}
-    local item = resolved and resolved.item or nil
-    local dataset = resolved and resolved.dataset or nil
-
-    appendSearchValue(values, item and item.name or nil)
-    appendSearchValue(values, resolved and resolved.itemId or nil)
-    appendSearchValue(values, dataset and dataset.id or resolved and resolved.datasetId or nil)
-    appendSearchValue(values, dataset and Database.GetDatasetDisplayName and Database.GetDatasetDisplayName(dataset) or nil)
-    appendSearchValue(values, item and getItemTypeLabel(item.itemType) or nil)
-    appendSearchValue(values, item and getQualityLabel(item.quality) or nil)
-    appendSearchValues(values, item and item.tags or nil)
-
-    return table.concat(values, "\n")
+    return resolved and resolved.normalizedSearchText or ""
 end
 
 function InventoryGridPage:PassesSearch(resolved, searchQuery)
@@ -515,19 +579,21 @@ function InventoryGridPage:PassesSearch(resolved, searchQuery)
     return string.find(self:BuildSearchIndex(resolved), searchQuery, 1, true) ~= nil
 end
 
-function InventoryGridPage:GetFilteredDisplayItems()
-    local resolvedItems = self:GetCategoryDisplayItems()
+function InventoryGridPage:GetFilteredDisplayItems(categoryItems)
+    local resolvedItems = categoryItems or {}
     local selection = self:BuildFilterSelection()
     local searchQuery = self:GetSearchQuery()
     local filtered = {}
     local matches = {}
     local others = {}
+    local searchMatches = {}
 
     for index = 1, #resolvedItems do
         local resolved = resolvedItems[index]
         if resolved and self:PassesFilters(resolved, selection) then
-            resolved.searchMatched = self:PassesSearch(resolved, searchQuery)
-            if searchQuery == "" or resolved.searchMatched then
+            local searchMatched = self:PassesSearch(resolved, searchQuery)
+            searchMatches[resolved] = searchMatched
+            if searchQuery == "" or searchMatched then
                 matches[#matches + 1] = resolved
             else
                 others[#others + 1] = resolved
@@ -542,7 +608,7 @@ function InventoryGridPage:GetFilteredDisplayItems()
         filtered[#filtered + 1] = others[index]
     end
 
-    return filtered
+    return filtered, searchMatches
 end
 
 function InventoryGridPage:CreateSlot(index, parent)
@@ -632,7 +698,7 @@ function InventoryGridPage:ShowItemContextMenu(anchorFrame, resolved)
 
     local menu = self:EnsureItemContextMenu()
     self.ContextMenuResolvedItem = resolved
-    local itemType = resolved and resolved.item and tostring(resolved.item.itemType or "none") or "none"
+    local itemType = resolved and tostring(resolved.itemType or "none") or "none"
     local isEquipmentItem = itemType == "weapon" or itemType == "armor"
     local canEquip = resolved.isMissing ~= true
         and resolved.isActive == true
@@ -720,7 +786,7 @@ function InventoryGridPage:Build(parent)
         if self.SearchInput and self.SearchInput.SetText then
             self.SearchInput:SetText("")
         end
-        self:Refresh()
+        self:RefreshIfDirty()
     end, {
         height = SEARCH_ROW_HEIGHT,
         fontSize = 8,
@@ -729,7 +795,7 @@ function InventoryGridPage:Build(parent)
 
     self.SearchButton = UI.CreateButton(toolbarContent, self.searchButtonName, "Search", SEARCH_BUTTON_WIDTH, function()
         self:ApplySearchQuery(self.SearchInput and self.SearchInput.GetText and self.SearchInput:GetText() or self.draftSearchQuery)
-        self:Refresh()
+        self:RefreshIfDirty()
     end, {
         height = SEARCH_ROW_HEIGHT,
         fontSize = 8,
@@ -749,7 +815,7 @@ function InventoryGridPage:Build(parent)
     end)
     self.SearchInput:SetScript("OnEnterPressed", function(_, text)
         self:ApplySearchQuery(text)
-        self:Refresh()
+        self:RefreshIfDirty()
     end)
 
     self.FilterDropdown = UI.CreateDropdown(toolbarContent, self.filterDropdownName, {
@@ -760,9 +826,9 @@ function InventoryGridPage:Build(parent)
         popupWidth = 118,
         visibleRows = 10,
         placeholder = "Filter items...",
-        items = self:BuildFilterItems(),
+        items = {},
         onValueChanged = function()
-            self:Refresh()
+            self:RefreshIfDirty()
         end,
     })
     self.FilterDropdown:GetFrame():SetPoint("TOPLEFT", toolbarContent, "TOPLEFT", 0, -(SEARCH_ROW_HEIGHT + TOOLBAR_ROW_SPACING))
@@ -799,27 +865,104 @@ function InventoryGridPage:Build(parent)
     return self.frame
 end
 
+function InventoryGridPage:RefreshIfDirty()
+    if not self.frame then
+        return nil, false
+    end
+
+    local revision = self:GetRevisionTuple()
+    if not self.dirty and revisionTuplesEqual(self.lastRenderedRevision, revision) then
+        return self.frame, false
+    end
+
+    if not self:IsVisible() then
+        self.dirty = true
+        return self.frame, false
+    end
+
+    if isCurrencyOnlyChange(self.lastRenderedRevision, revision) then
+        if self.CurrencyPanel and self.CurrencyPanel.RefreshIfDirty then
+            self.CurrencyPanel:RefreshIfDirty()
+        end
+        self.lastRenderedRevision = revision
+        self.dirty = false
+        return self.frame, true
+    end
+
+    return self:Refresh(), true
+end
+
 function InventoryGridPage:Refresh()
     if not self.frame then
         return nil
     end
 
+    if not self:IsVisible() then
+        self.dirty = true
+        return self.frame
+    end
+
+    if self.refreshInProgress then
+        return self.frame
+    end
+
+    self.refreshInProgress = true
     local timer = startTiming("InventoryGridPage:Refresh", 8, self.categoryKey or self.pageLabel or "inventory")
+    local revision = self:GetRevisionTuple()
+    local getDisplayItems = Inventory.GetDisplayItems
+    local snapshot = type(getDisplayItems) == "function" and getDisplayItems() or {}
+    local snapshotRevision = self:GetRevisionTuple()
+
+    if not dataRevisionsEqual(revision, snapshotRevision) then
+        self.refreshInProgress = false
+        self.dirty = true
+        if timer then
+            stopTiming(timer, {
+                aborted = true,
+                reason = "revision-changed-before-filtering",
+            })
+        end
+        if self.windowController and self.windowController.QueueRefresh then
+            self.windowController:QueueRefresh("inventory-revision-changed-during-refresh")
+        end
+        return self.frame
+    end
+
+    local categoryItems = self:GetCategoryDisplayItems(snapshot)
+    local filterItems = self:BuildFilterItems(categoryItems)
 
     if self.FilterDropdown and self.FilterDropdown.SetItems then
         local selectedValues = self:GetSelectedFilterValues()
-        self.FilterDropdown:SetItems(self:BuildFilterItems())
+        self.FilterDropdown:SetItems(filterItems)
         self.FilterDropdown:SetSelectedValues(selectedValues, true)
     end
 
-    if self.CurrencyPanel and self.CurrencyPanel.Refresh then
-        self.CurrencyPanel:Refresh()
+    local renderRevision = self:GetRevisionTuple()
+    local displayItems, searchMatches = self:GetFilteredDisplayItems(categoryItems)
+
+    if self.CurrencyPanel and self.CurrencyPanel.RefreshIfDirty then
+        self.CurrencyPanel:RefreshIfDirty()
     end
 
     self:RefreshSearchButtons()
 
-    local categoryItems = self:GetCategoryDisplayItems()
-    local displayItems = self:GetFilteredDisplayItems()
+    local preRenderRevision = self:GetRevisionTuple()
+    if not revisionTuplesEqual(renderRevision, preRenderRevision) then
+        self.refreshInProgress = false
+        self.dirty = true
+        if timer then
+            stopTiming(timer, {
+                aborted = true,
+                reason = "revision-changed-before-render",
+                categoryItems = #categoryItems,
+                filteredItems = #displayItems,
+            })
+        end
+        if self.windowController and self.windowController.QueueRefresh then
+            self.windowController:QueueRefresh("inventory-revision-changed-before-render")
+        end
+        return self.frame
+    end
 
     if self.EmptyText and self.EmptyText.SetText and self.EmptyText.GetFrame then
         if self.showEmptyOverlay and #displayItems == 0 then
@@ -834,6 +977,7 @@ function InventoryGridPage:Refresh()
         end
     end
 
+    local searchQuery = renderRevision.searchQuery
     for index = 1, TOTAL_SLOTS do
         local slot = self.slots[index]
         local resolved = displayItems[index]
@@ -846,7 +990,7 @@ function InventoryGridPage:Refresh()
 
                 slot:SetIcon(icon)
                 slot:SetCount((tonumber(resolved.quantity) or 1) > 1 and tostring(math.floor(tonumber(resolved.quantity) or 1)) or "")
-                slot:SetEnabled((resolved.isActive and not resolved.isMissing) and (self:GetSearchQuery() == "" or resolved.searchMatched == true))
+                slot:SetEnabled((resolved.isActive and not resolved.isMissing) and (searchQuery == "" or searchMatches[resolved] == true))
                 slot:SetTooltip(buildTooltipText(resolved))
                 slot.resolvedItem = resolved
             else
@@ -859,12 +1003,35 @@ function InventoryGridPage:Refresh()
         end
     end
 
+    local finalRevision = self:GetRevisionTuple()
+    if not revisionTuplesEqual(renderRevision, finalRevision) then
+        self.refreshInProgress = false
+        self.dirty = true
+        if timer then
+            stopTiming(timer, {
+                aborted = true,
+                reason = "revision-changed-during-render",
+                categoryItems = #categoryItems,
+                filteredItems = #displayItems,
+            })
+        end
+        if self.windowController and self.windowController.QueueRefresh then
+            self.windowController:QueueRefresh("inventory-revision-changed-during-render")
+        end
+        return self.frame
+    end
+
+    self.lastRenderedRevision = finalRevision
+    self.dirty = false
+    self.refreshInProgress = false
+
     if timer then
         stopTiming(timer, {
             categoryItems = #categoryItems,
             filteredItems = #displayItems,
-            resolvedItems = #displayItems,
+            resolvedItems = #snapshot,
             visibleSlots = TOTAL_SLOTS,
+            snapshotFetches = 1,
         })
     end
     return self.frame
