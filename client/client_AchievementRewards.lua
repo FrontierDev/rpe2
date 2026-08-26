@@ -7,6 +7,7 @@ local Client = Addon.Client
 local Profile = Addon.Internal.Profile or {}
 local Registry = Addon.Internal.Registry or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
+local Runtime = Addon.Internal.Runtime or {}
 
 local Achievements = Client.Achievements or {}
 Client.Achievements = Achievements
@@ -934,7 +935,7 @@ function Achievements:RecoverInProgressRewards()
     return recovered
 end
 
-function Achievements:DeliverRewards(achievementRef, achievement, options)
+function Achievements:_DeliverRewards(achievementRef, achievement, options)
     local normalizedRef = trimText(achievementRef)
     if normalizedRef == "" or type(achievement) ~= "table" then
         return false, "achievement-unavailable"
@@ -1068,6 +1069,22 @@ function Achievements:DeliverRewards(achievementRef, achievement, options)
     return success, reason, result
 end
 
+function Achievements:DeliverRewards(achievementRef, achievement, options)
+    local normalizedRef = trimText(achievementRef)
+    local function deliver()
+        return self:_DeliverRewards(normalizedRef, achievement, options)
+    end
+
+    if type(Runtime) == "table" and type(Runtime.RunTransaction) == "function" then
+        return Runtime:RunTransaction(
+            "achievement-reward:" .. normalizedRef,
+            deliver
+        )
+    end
+
+    return deliver()
+end
+
 function Achievements:RetryRewards(achievementRef)
     local normalizedRef = trimText(achievementRef)
     if normalizedRef == "" then
@@ -1113,6 +1130,10 @@ function Achievements:RetryRewards(achievementRef)
     end
 
     return self:DeliverRewards(normalizedRef, achievement, { retry = true })
+end
+
+if type(Achievements.Initialize) == "function" then
+    Achievements:Initialize()
 end
 
 return Achievements

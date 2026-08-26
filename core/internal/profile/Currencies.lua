@@ -7,6 +7,7 @@ local Profile = Addon.Internal.Profile
 
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
 
 local BUILTIN_ORDER = {
@@ -363,29 +364,37 @@ function Profile.AddCurrencyAmount(currencyRefOrId, amount)
         return nil
     end
 
-    local currentAmount = Profile.GetCurrencyAmount(normalizedKey)
-    local persistedAmount = Profile.SetCurrencyAmount(normalizedKey, currentAmount + normalizeCurrencyAmount(amount))
-    local updatedAmount = Profile.GetCurrencyAmount(normalizedKey)
-    local actualGain = updatedAmount - currentAmount
-    if actualGain > 0 then
-        local achievements = Addon.Client and Addon.Client.Achievements or nil
-        if achievements and type(achievements.ProcessTrigger) == "function" then
-            pcall(
-                achievements.ProcessTrigger,
-                achievements,
-                "currency_gain",
-                {
-                    currencyRef = normalizedKey,
-                    previousAmount = currentAmount,
-                    updatedAmount = updatedAmount,
-                    amount = actualGain,
-                    source = "currency-add",
-                }
-            )
+    local function add()
+        local currentAmount = Profile.GetCurrencyAmount(normalizedKey)
+        local persistedAmount = Profile.SetCurrencyAmount(normalizedKey, currentAmount + normalizeCurrencyAmount(amount))
+        local updatedAmount = Profile.GetCurrencyAmount(normalizedKey)
+        local actualGain = updatedAmount - currentAmount
+        if actualGain > 0 then
+            local achievements = Addon.Client and Addon.Client.Achievements or nil
+            if achievements and type(achievements.ProcessTrigger) == "function" then
+                pcall(
+                    achievements.ProcessTrigger,
+                    achievements,
+                    "currency_gain",
+                    {
+                        currencyRef = normalizedKey,
+                        previousAmount = currentAmount,
+                        updatedAmount = updatedAmount,
+                        amount = actualGain,
+                        source = "currency-add",
+                    }
+                )
+            end
         end
+
+        return persistedAmount
     end
 
-    return persistedAmount
+    if type(Runtime) == "table" and type(Runtime.RunTransaction) == "function" then
+        return Runtime:RunTransaction("currency-add:" .. normalizedKey, add)
+    end
+
+    return add()
 end
 
 function Profile.SpendCurrencyAmount(currencyRefOrId, amount)

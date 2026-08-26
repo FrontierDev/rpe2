@@ -6,6 +6,8 @@ local Client = Addon.Client
 local Common = Addon.Utils and Addon.Utils.Common or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
+local Debug = Addon.Debug or {}
 
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
@@ -323,6 +325,120 @@ local function persistAchievementState(achievementRef, state)
     return callOk and type(persistedState) == "table"
 end
 
+local function createAchievementTransactionState()
+    return {
+        activeEarnedRefs = {},
+        earnedPath = {},
+        reportedCycles = {},
+        queuedAnnouncements = {},
+        changedCount = 0,
+        completedCount = 0,
+        uiMarked = false,
+    }
+end
+
+local function emptyTriggerResult(trigger)
+    return {
+        trigger = trigger,
+        updated = 0,
+        completed = 0,
+    }
+end
+
+local function getRuntimeTransaction()
+    if type(Runtime) == "table" and type(Runtime.GetCurrentTransaction) == "function" then
+        return Runtime:GetCurrentTransaction()
+    end
+
+    return nil
+end
+
+local function getAchievementTransactionState()
+    local transaction = getRuntimeTransaction()
+    if type(transaction) ~= "table" then
+        return createAchievementTransactionState()
+    end
+
+    if type(transaction.achievementTransaction) ~= "table" then
+        transaction.achievementTransaction = createAchievementTransactionState()
+    end
+
+    return transaction.achievementTransaction
+end
+
+local function markAchievementChange(transactionState, achievementRef, newlyCompleted)
+    if type(transactionState) ~= "table" then
+        return
+    end
+
+    transactionState.changedCount = (tonumber(transactionState.changedCount) or 0) + 1
+    if newlyCompleted then
+        transactionState.completedCount = (tonumber(transactionState.completedCount) or 0) + 1
+    end
+
+    if type(Runtime) ~= "table" or type(Runtime.MarkChanged) ~= "function" then
+        return
+    end
+
+    Runtime:MarkChanged("achievements", {
+        ref = achievementRef,
+        completedRef = newlyCompleted and achievementRef or nil,
+    })
+
+    if not transactionState.uiMarked then
+        transactionState.uiMarked = true
+        Runtime:MarkChanged("ui", {
+            profileTabs = {
+                achievements = true,
+            },
+        })
+    end
+end
+
+local function queueAfterCommit(callback)
+    if type(Runtime) == "table"
+        and type(Runtime.QueueAfterCommit) == "function"
+        and getRuntimeTransaction() ~= nil
+    then
+        Runtime:QueueAfterCommit(callback)
+        return
+    end
+
+    callback()
+end
+
+local function queueAchievementAnnouncement(transactionState, achievementRef, achievement, options)
+    if type(options) == "table" and options.announce == false then
+        return
+    end
+    if type(transactionState) ~= "table" or transactionState.queuedAnnouncements[achievementRef] then
+        return
+    end
+
+    transactionState.queuedAnnouncements[achievementRef] = true
+    queueAfterCommit(function()
+        announceAchievement(achievement)
+    end)
+end
+
+local function reportAchievementCycle(transactionState, achievementRef)
+    local path = {}
+    for index = 1, #transactionState.earnedPath do
+        path[index] = transactionState.earnedPath[index]
+    end
+    path[#path + 1] = achievementRef
+
+    local pathText = table.concat(path, " -> ")
+    if transactionState.reportedCycles[pathText] then
+        return
+    end
+    transactionState.reportedCycles[pathText] = true
+
+    if type(Debug.Warn) == "function" then
+        Debug.Warn("Achievement dependency cycle guarded: %s.", pathText)
+    end
+end
+
 function Achievements:RebuildIndex()
     local index = {}
     for trigger in pairs(SUPPORTED_TRIGGERS) do
@@ -510,7 +626,7 @@ function Achievements:Announce(achievementRef)
     return false
 end
 
-function Achievements:_CommitState(achievementRef, achievement, state, options)
+function Achievements:_CommitState(achievementRef, achievement, state, options, transactionState)
     local wasCompleted = state.completedAt ~= nil
     local isComplete = isAchievementComplete(achievement, state)
     local newlyCompleted = false
@@ -523,53 +639,65 @@ function Achievements:_CommitState(achievementRef, achievement, state, options)
         return false, false
     end
 
-    refreshProfileUI()
-    if newlyCompleted then
-        local rewardTimer = startTiming("Achievement reward-chain", 8, achievementRef)
-        local dependentContext = {
-            achievementRef = achievementRef,
-            source = "achievement-complete",
-        }
-        if type(options) == "table" and options.announce ~= nil then
-            dependentContext.announce = options.announce
-        end
-        self:ProcessTrigger("achievement_earned", dependentContext)
-        if not (type(options) == "table" and options.announce == false) then
-            announceAchievement(achievement)
-        end
-
-        if type(self.DeliverRewards) == "function" then
-            pcall(self.DeliverRewards, self, achievementRef, achievement, {
-                newlyCompleted = true,
-            })
-        end
-        if rewardTimer then
-            stopTiming(rewardTimer, {
-                achievementCriteria = #(achievement.criteria or {}),
-                changedAchievements = 1,
-            })
-        end
-    end
-
+    markAchievementChange(
+        transactionState or getAchievementTransactionState(),
+        achievementRef,
+        newlyCompleted
+    )
     return true, newlyCompleted
 end
 
-function Achievements:ProcessTrigger(trigger, context)
-    local normalizedTrigger = normalizeTrigger(trigger)
-    if normalizedTrigger == "" then
-        return {
-            trigger = normalizedTrigger,
-            updated = 0,
-            completed = 0,
-        }
+local processTriggerInternal
+
+local function processCompletedAchievement(achievements, achievementRef, achievement, options, transactionState)
+    local rewardTimer = startTiming("Achievement reward-chain", 8, achievementRef)
+    local dependentContext = {
+        achievementRef = achievementRef,
+        source = "achievement-complete",
+    }
+    if type(options) == "table" and options.announce ~= nil then
+        dependentContext.announce = options.announce
     end
 
+    -- Resolve dependent criteria before this Achievement's reward, preserving
+    -- the existing depth-first completion/reward order while keeping all work
+    -- inside the same Runtime transaction.
+    processTriggerInternal(
+        achievements,
+        "achievement_earned",
+        dependentContext,
+        transactionState
+    )
+    queueAchievementAnnouncement(transactionState, achievementRef, achievement, options)
+
+    if type(achievements.DeliverRewards) == "function" then
+        pcall(
+            achievements.DeliverRewards,
+            achievements,
+            achievementRef,
+            achievement,
+            {
+                newlyCompleted = true,
+            }
+        )
+    end
+
+    if rewardTimer then
+        stopTiming(rewardTimer, {
+            achievementCriteria = #(achievement.criteria or {}),
+            changedAchievements = 1,
+        })
+    end
+end
+
+local function processTriggerBody(achievements, normalizedTrigger, context, transactionState)
     local timer = startTiming("Achievements:ProcessTrigger", 4, normalizedTrigger)
-    local index = self:EnsureIndex() or {}
+    local index = achievements:EnsureIndex() or {}
     local entries = index[normalizedTrigger] or {}
     local statesByAchievement = {}
     local entriesByAchievement = {}
     local achievementOrder = {}
+    local completions = {}
     local amount = normalizeInteger(type(context) == "table" and context.amount or 1, 0)
     if amount <= 0 then
         if timer then
@@ -606,6 +734,13 @@ function Achievements:ProcessTrigger(trigger, context)
                     state.criteria[entry.criterionId] = nextValue
                     entriesByAchievement[achievementRef][#entriesByAchievement[achievementRef] + 1] = entry
                 end
+            elseif normalizedTrigger == "achievement_earned"
+                and transactionState.activeEarnedRefs[achievementRef]
+            then
+                -- A completed Achievement appearing again on the active
+                -- dependency path is a cycle/re-entry, even though its state
+                -- correctly prevents another completion.
+                reportAchievementCycle(transactionState, achievementRef)
             end
         end
     end
@@ -618,19 +753,35 @@ function Achievements:ProcessTrigger(trigger, context)
         local changedEntries = entriesByAchievement[achievementRef]
         if type(changedEntries) == "table" and #changedEntries > 0 then
             local achievement = changedEntries[1].achievement
-            local commitOk, newlyCompleted = self:_CommitState(
+            local commitOk, newlyCompleted = achievements:_CommitState(
                 achievementRef,
                 achievement,
                 state,
-                context
+                context,
+                transactionState
             )
             if commitOk then
                 updated = updated + 1
                 if newlyCompleted then
                     completed = completed + 1
+                    completions[#completions + 1] = {
+                        achievementRef = achievementRef,
+                        achievement = achievement,
+                    }
                 end
             end
         end
+    end
+
+    for indexEntry = 1, #completions do
+        local completion = completions[indexEntry]
+        processCompletedAchievement(
+            achievements,
+            completion.achievementRef,
+            completion.achievement,
+            context,
+            transactionState
+        )
     end
 
     if timer then
@@ -645,6 +796,61 @@ function Achievements:ProcessTrigger(trigger, context)
         updated = updated,
         completed = completed,
     }
+end
+
+processTriggerInternal = function(achievements, normalizedTrigger, context, transactionState)
+    local earnedRef = nil
+    if normalizedTrigger == "achievement_earned" then
+        earnedRef = trimText(type(context) == "table" and context.achievementRef or "")
+        if earnedRef ~= "" then
+            if transactionState.activeEarnedRefs[earnedRef] then
+                reportAchievementCycle(transactionState, earnedRef)
+                return emptyTriggerResult(normalizedTrigger)
+            end
+
+            transactionState.activeEarnedRefs[earnedRef] = true
+            transactionState.earnedPath[#transactionState.earnedPath + 1] = earnedRef
+        end
+    end
+
+    local result = processTriggerBody(
+        achievements,
+        normalizedTrigger,
+        context,
+        transactionState
+    )
+
+    if earnedRef ~= nil then
+        transactionState.activeEarnedRefs[earnedRef] = nil
+        transactionState.earnedPath[#transactionState.earnedPath] = nil
+    end
+
+    return result
+end
+
+function Achievements:ProcessTrigger(trigger, context)
+    local normalizedTrigger = normalizeTrigger(trigger)
+    if normalizedTrigger == "" then
+        return emptyTriggerResult(normalizedTrigger)
+    end
+
+    local function process()
+        return processTriggerInternal(
+            self,
+            normalizedTrigger,
+            context,
+            getAchievementTransactionState()
+        )
+    end
+
+    if type(Runtime) == "table" and type(Runtime.RunTransaction) == "function" then
+        return Runtime:RunTransaction(
+            "achievement-trigger:" .. normalizedTrigger,
+            process
+        )
+    end
+
+    return process()
 end
 
 function Achievements:HandleRPEKill(context)
@@ -682,14 +888,6 @@ function Achievements:HandleRPEKill(context)
     result.updated = (tonumber(result.updated) or 0) + (tonumber(bossResult.updated) or 0)
     result.completed = (tonumber(result.completed) or 0) + (tonumber(bossResult.completed) or 0)
     return result
-end
-
-local function emptyTriggerResult(trigger)
-    return {
-        trigger = trigger,
-        updated = 0,
-        completed = 0,
-    }
 end
 
 local function processAuthoritativeHealthAchievement(achievements, trigger, context)
@@ -811,35 +1009,60 @@ function Achievements:Grant(achievementRef, options)
         return false, "achievement-unavailable"
     end
 
-    local state = getAchievementState(normalizedRef)
-    if state.completedAt ~= nil then
-        return false, "already-complete"
-    end
-
-    local criteria = type(achievement.criteria) == "table" and achievement.criteria or {}
-    if #criteria == 0 then
-        return false, "achievement-has-no-criteria"
-    end
-
-    local hasCriterion = false
-    for index = 1, #criteria do
-        local criterion = criteria[index]
-        local criterionId = trimText(criterion and criterion.id)
-        if criterionId ~= "" then
-            state.criteria[criterionId] = getCriterionGoal(criterion)
-            hasCriterion = true
+    local function grant()
+        local state = getAchievementState(normalizedRef)
+        if state.completedAt ~= nil then
+            return false, "already-complete"
         end
-    end
-    if not hasCriterion then
-        return false, "achievement-has-no-criteria"
+
+        local criteria = type(achievement.criteria) == "table" and achievement.criteria or {}
+        if #criteria == 0 then
+            return false, "achievement-has-no-criteria"
+        end
+
+        local hasCriterion = false
+        for index = 1, #criteria do
+            local criterion = criteria[index]
+            local criterionId = trimText(criterion and criterion.id)
+            if criterionId ~= "" then
+                state.criteria[criterionId] = getCriterionGoal(criterion)
+                hasCriterion = true
+            end
+        end
+        if not hasCriterion then
+            return false, "achievement-has-no-criteria"
+        end
+
+        local transactionState = getAchievementTransactionState()
+        local commitOk, newlyCompleted = self:_CommitState(
+            normalizedRef,
+            achievement,
+            state,
+            options,
+            transactionState
+        )
+        if not commitOk then
+            return false, "profile-persistence-failed"
+        end
+
+        if newlyCompleted then
+            processCompletedAchievement(
+                self,
+                normalizedRef,
+                achievement,
+                options,
+                transactionState
+            )
+        end
+
+        return newlyCompleted == true, newlyCompleted and "completed" or "updated"
     end
 
-    local commitOk, newlyCompleted = self:_CommitState(normalizedRef, achievement, state, options)
-    if not commitOk then
-        return false, "profile-persistence-failed"
+    if type(Runtime) == "table" and type(Runtime.RunTransaction) == "function" then
+        return Runtime:RunTransaction("achievement-grant", grant)
     end
 
-    return newlyCompleted == true, newlyCompleted and "completed" or "updated"
+    return grant()
 end
 
 return Achievements
