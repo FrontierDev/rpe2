@@ -46,6 +46,8 @@ Inventory._changeListeners = Inventory._changeListeners or {}
 Inventory._nextChangeListenerId = Inventory._nextChangeListenerId or 0
 Inventory.RuntimeByCharacter = Inventory.RuntimeByCharacter or {}
 Inventory._fallbackRevision = tonumber(Inventory._fallbackRevision) or 0
+Inventory.ItemDefinitionIndexCache = Inventory.ItemDefinitionIndexCache or {}
+Inventory.ItemDefinitionIndexRevision = tonumber(Inventory.ItemDefinitionIndexRevision) or -1
 
 local function ensureTable(value)
     if type(value) == "table" then
@@ -306,6 +308,10 @@ end
 
 local invalidateDisplaySnapshot
 
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
 local function removeRecordFromIndex(state, record)
     local entry = state and state.indexByRecord and state.indexByRecord[record] or nil
     if not entry then
@@ -486,20 +492,39 @@ function Inventory.InvalidateRuntimeState()
     end
 end
 
-local function findDatasetItem(dataset, itemId)
-    local items = dataset and dataset.items or nil
-    if type(items) ~= "table" then
-        return nil
+local function getItemDefinitionIndex(datasetId)
+    local normalizedDatasetId = ensureString(datasetId)
+    if normalizedDatasetId == "" then
+        return nil, {}
     end
 
-    for index = 1, #items do
-        local item = items[index]
-        if type(item) == "table" and tostring(item.id or "") == itemId then
-            return item, index
+    local configurationRevision = getConfigurationRevision()
+    if Inventory.ItemDefinitionIndexRevision ~= configurationRevision then
+        Inventory.ItemDefinitionIndexCache = {}
+        Inventory.ItemDefinitionIndexRevision = configurationRevision
+    end
+
+    local cached = Inventory.ItemDefinitionIndexCache[normalizedDatasetId]
+    if type(cached) == "table" and cached.revision == configurationRevision then
+        return cached.dataset, cached.itemById
+    end
+
+    local dataset = Database.GetDatasetByID and Database.GetDatasetByID(normalizedDatasetId) or nil
+    local itemById = {}
+    for index = 1, #(dataset and dataset.items or {}) do
+        local item = dataset.items[index]
+        local itemId = ensureString(item and item.id)
+        if itemId ~= "" then
+            itemById[itemId] = item
         end
     end
 
-    return nil
+    Inventory.ItemDefinitionIndexCache[normalizedDatasetId] = {
+        revision = configurationRevision,
+        dataset = dataset,
+        itemById = itemById,
+    }
+    return dataset, itemById
 end
 
 local function resolveCanonicalItemDefinition(itemRecord)
@@ -507,8 +532,8 @@ local function resolveCanonicalItemDefinition(itemRecord)
         return nil, nil
     end
 
-    local dataset = Database.GetDatasetByID and Database.GetDatasetByID(itemRecord.dataset) or nil
-    local item = findDatasetItem(dataset, itemRecord.id)
+    local dataset, itemById = getItemDefinitionIndex(itemRecord.dataset)
+    local item = itemById and itemById[ensureString(itemRecord.id)] or nil
     return dataset, item
 end
 
@@ -558,10 +583,6 @@ local function getRuntimeRevision(domain)
     end
 
     return 0
-end
-
-local function getConfigurationRevision()
-    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
 end
 
 local function getCurrentTransaction()
