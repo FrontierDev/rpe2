@@ -1,190 +1,200 @@
 ## Goal
-Establish the **measurement and diagnostic baseline** required for the Runtime Performance and Hitch Elimination project before changing runtime behavior.
+Add the shared **runtime transaction / ChangeSet / revision foundation** required by the performance refactor, without yet rewriting individual subsystems to use it extensively.
 
 Authoritative documents:
 
 - `.docs/RPE2-Runtime-Performance-Hitch-Elimination-PDD.md`
 - `.docs/RPE2-Runtime-Performance-Hitch-Elimination-Implementation-Plan.md`
 
-This task is instrumentation-only. Do not optimize or reorder gameplay logic here except where a tiny non-semantic hook is required to measure it.
+Depends on: #58
+
+This task establishes the common infrastructure that later currency, Achievement, Inventory, Profile, event, aura, cooldown and spell tasks will consume.
 
 ## Primary files
 
-- `core/debug/Timings.lua`
-- `Commands.lua`
-- `core/internal/tasks/TaskQueue.lua`
-- `core/internal/database/Database.lua`
-- `client/character/inventory/Inventory.lua`
-- `client/character/inventory/page_Inventory.lua`
-- `client/character/inventory/window_Inventory.lua`
-- `client/character/profile/window_Profile.lua`
-- `client/character/profile/page_ProfileEquipmentStats.lua`
-- `client/client_Achievements.lua`
-- `client/client_Session.lua`
-- `client/client_Event.lua`
-- `client/spellcasting/Core.lua`
-- `client/spellcasting/Lifecycle.lua`
-- `client/spellcasting/Cooldowns.lua`
-- `client/spellcasting/AuraManager.lua`
+- `core/internal/Runtime.lua`
+- `RPEngine_Dev.toc`
+- new runtime transaction/revision module in `core/internal/` at a location consistent with the existing namespace/load order
 
-Inspect current timing hooks before adding new ones. Extend `Addon.Debug.Timings`; do not introduce a second profiling framework.
+Inspect the current `Addon.Internal` runtime organization before choosing the exact filename. Prefer one focused module rather than spreading transaction state across unrelated files.
 
-## 1. Add required timing scopes
+## 1. Introduce in-memory revision domains
 
-Add timings for at least:
+Add explicit monotonic runtime revision domains for at least:
 
 ```text
-Inventory.AddItem
-Inventory bulk commit / SetItems
-Inventory.GetDisplayItems or display snapshot build path
-InventoryGridPage:Refresh
-InventoryWindow:Show
-ProfileWindow:Show
-EquipmentStatsPage refresh/view-model work
-Achievements:ProcessTrigger
-Achievement reward-chain execution
-Client:HandleLocalConfigurationChanged
-event start total + startup phases
-event end total + teardown phases
-event-state immediate handler
-spellcast advancement
-cooldown advancement
-aura advancement
-spell start
-spell completion
-spell component execution
-visual refresh flush where an existing flush exists
-network/resource flush where an existing flush exists
+ProfileStateRevision
+CurrencyRevision
+AchievementRevision
+InventoryRevision
+EquipmentRevision
+SkillRevision
+ActionBarBindingRevision
+ResolvedProfileRevision
+EventRuntimeRevision
+AuraRevisionByEventId
+CooldownRevisionByEventId
+SpellcastRevisionByEventId
 ```
-
-Use thresholds consistent with the PDD:
-
-```text
-normally-cheap mutation: >4ms slow
-user-action immediate path: >8ms slow
-cooperative slice later: >2ms slow
-single-frame hard concern: >16ms
-```
-
-Do not force timing output when debug timings are disabled.
-
-## 2. Include cardinality/context with slow operations
-
-Where available, slow logs must include the scale of the operation rather than only elapsed time.
-
-Examples:
-
-```text
-inventoryStacks
-resolvedItems
-achievementCriteria
-changedAchievements
-eventUnits
-activeAuras
-dueAuras
-activeCooldowns
-activeCasts
-spellComponents
-targetCount
-queuedTasks
-```
-
-Use concise context strings or structured helper arguments consistent with the existing `Timings` API.
-
-## 3. Add recent slow-operation diagnostics
-
-Extend the existing timing/debug system with a bounded in-memory record of recent slow operations suitable for development diagnosis.
 
 Requirements:
 
-- bounded size; do not grow indefinitely;
-- records contain label, elapsed time, threshold, context/cardinality where supplied, and timestamp/order information;
-- disabled timing mode should have negligible overhead;
-- expose a small read/print API rather than making callers inspect private tables.
+- `ConfigurationRevision` remains owned by the existing configuration system and is not replaced;
+- new revisions are in-memory only unless the existing architecture has a compelling reason otherwise;
+- expose stable getter/bump APIs rather than allowing arbitrary modules to mutate private counters directly;
+- event-scoped revisions must be cleanly removable when an event ends;
+- revision values reset safely on `/reload`.
 
-Add a `/rpe` debug command to print recent slow operations and TaskQueue summary state. Keep the existing `/rpe debug timings on|off` command intact.
+The exact API may differ, but callers need operations equivalent to:
 
-A command shape such as:
-
-```text
-/rpe debug perf
+```lua
+Runtime.GetRevision(domain, key)
+Runtime.BumpRevision(domain, key)
+Runtime.GetRevisionTuple(...)
 ```
 
-is acceptable if it matches the current command router cleanly.
+Do not over-engineer a generic dependency graph.
 
-## 4. Add TaskQueue diagnostics only
+## 2. Add lightweight Runtime transactions
 
-Expose diagnostic state for the existing queue without changing queue scheduling semantics yet.
+Implement an API equivalent to:
 
-At minimum report:
-
-```text
-pending jobs
-jobs executed in last flush if readily available
-last/max flush elapsed time if readily available
-current configured job/time budgets
+```lua
+Runtime.BeginTransaction(reason, options)
+Runtime.GetCurrentTransaction()
+Runtime.MarkChanged(scope, detail)
+Runtime.CommitTransaction(transaction)
+Runtime.RunTransaction(reason, fn, options)
 ```
 
-Do **not** implement cooperative slicing in this issue; that is a later task.
+Requirements:
 
-## 5. Instrument configuration invalidation entry points
+- nested calls participate in the existing outer transaction by default;
+- only the outermost successful commit publishes the consolidated result;
+- independent subsystem calls still work through short implicit transactions once later tasks adopt the API;
+- transaction identity/reason is available for diagnostics;
+- transaction state must not be persisted;
+- no coroutine or actual concurrency requirement exists.
 
-Add timing/context around the global configuration refresh path so later tasks can prove runtime state no longer reaches it.
+## 3. Define a typed ChangeSet contract
 
-At minimum make it possible to identify:
+Create a compact ChangeSet shape sufficient for later tasks to mark only changed scopes.
+
+It must support at least:
 
 ```text
-notifyConfigurationChanged(reason)
-QueueLocalConfigurationRefresh(reason)
-HandleLocalConfigurationChanged(reason)
+inventory
+currencies
+achievements
+profile equipment/stats/resources/skills
+event units/auras/cooldowns/spellcasts/structural state
+UI profile tabs
+UI inventory pages
+UI action-bar slots/structural state
+UI event portraits
+targeting
 ```
 
-and see the `reason` in timing/debug output.
+Do not require every field to be eagerly allocated. Prefer lazy bucket creation so cheap mutations do not create large temporary tables.
 
-Do not change which reasons currently enter the path in this task.
+Provide narrow helpers for common patterns such as:
+
+```text
+mark key in set
+mark boolean scope
+mark event unit
+merge child ChangeSet into parent
+```
+
+## 4. Add commit listeners / post-commit hooks
+
+Provide a small subscription API so UI/runtime systems can react to a committed ChangeSet in later tasks.
+
+Requirements:
+
+- listeners receive one committed consolidated payload;
+- listeners are not called for every nested mutation;
+- listener iteration is safe if a listener errors;
+- listener registration/unregistration is explicit;
+- no broad UI refresh behavior should be wired in this issue yet.
+
+If the existing codebase already has a generic event/listener mechanism that cleanly satisfies this requirement, reuse it rather than creating a duplicate bus.
+
+## 5. Define failure/re-entrancy behavior
+
+Transactions must behave predictably when a wrapped function errors.
+
+At minimum:
+
+- do not publish a successful post-commit ChangeSet after an uncaught transaction error;
+- always clear/restore the current transaction pointer/depth;
+- surface the original error through the existing debug/error conventions;
+- do not claim full database rollback unless the implementation actually provides rollback.
+
+The transaction system is primarily a **notification/invalidation batching boundary**, not a general ACID database.
+
+## 6. Add diagnostics
+
+Integrate with #58 diagnostics.
+
+Expose at least:
+
+```text
+current transaction id/reason/depth
+last committed transaction summary
+change-scope counts
+revision bump counts if practical
+```
+
+Do not print by default.
 
 ## Acceptance criteria
 
-- [ ] Every reported hitch category has a timing scope or timed sub-phases sufficient to locate the cost.
-- [ ] Slow logs include useful cardinality/context where the code already knows it.
-- [ ] Existing spellcast timing output remains functional.
-- [ ] `HandleLocalConfigurationChanged` is timed with its reason.
-- [ ] Recent slow operations are kept in a bounded debug buffer.
-- [ ] A `/rpe` debug command prints recent slow operations and TaskQueue diagnostics.
-- [ ] Existing `/rpe debug timings on|off` behavior remains intact.
-- [ ] TaskQueue execution behavior is unchanged.
-- [ ] No gameplay, persistence, UI refresh, or networking semantics are intentionally changed.
+- [ ] A focused runtime transaction/revision module is loaded before consumers that require it.
+- [ ] Required revision domains have stable getter/bump APIs.
+- [ ] `ConfigurationRevision` is not replaced or repurposed.
+- [ ] Nested `RunTransaction` calls produce one outer commit.
+- [ ] ChangeSet buckets are typed/narrow and lazily allocated where practical.
+- [ ] Commit listeners receive one consolidated payload per outer transaction.
+- [ ] Listener errors do not abort unrelated listeners or corrupt transaction state.
+- [ ] Event-scoped revision state can be cleared by event ID.
+- [ ] Error paths restore transaction state cleanly.
+- [ ] No existing gameplay behavior changes merely because the infrastructure exists.
 
 ## Validation matrix
 
 ```text
-/rpe debug timings off
--> normal gameplay produces no timing spam
+RunTransaction("outer")
+ -> MarkChanged currency:valor
+ -> nested RunTransaction("inner")
+    -> MarkChanged achievement:A
+-> one commit listener call
+-> ChangeSet contains both scopes
 
-/rpe debug timings on
--> add item -> Inventory timing appears
--> add currency -> profile/config-related timings appear
--> open Inventory -> Show/Refresh timings appear
--> open Profile -> Show/page timings appear
--> start/end/advance event -> event phase timings appear
--> cast/complete spell -> lifecycle/component timings appear
+transaction with no changes
+-> completes safely
+-> does not create spurious UI/config refresh
 
-/rpe debug perf
--> prints bounded recent slow operations
--> prints TaskQueue diagnostic summary
+transaction callback errors
+-> current transaction state clears
+-> no successful commit event is published
+-> error remains visible through existing debug behavior
 
-repeat many slow operations
--> diagnostic buffer remains bounded
+bump CurrencyRevision
+-> ConfigurationRevision unchanged
+
+clear event runtime revisions for event X
+-> event X scoped counters removed/reset
+-> unrelated event Y untouched
 ```
 
 ## Constraints
 
-- Do not optimize code paths yet.
-- Do not add a second profiler/debug framework.
-- Do not enable profiling permanently for normal users.
-- Do not materially increase allocations on hot paths when timings are disabled.
-- Do not change TaskQueue scheduling behavior.
-- Do not change spell/event ordering.
+- Do not migrate currency/Achievement/Inventory/event call sites in bulk yet.
+- Do not implement UI refresh policy here.
+- Do not persist runtime revisions.
+- Do not build a generalized reactive framework beyond what the PDD requires.
+- Do not change networking, spell ordering, Achievement semantics, or SavedVariables.
 
 ## Coding-agent instructions
-Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read both runtime-performance documents first, then inspect existing `core/debug/Timings.lua`, spellcast timing helpers, and `/rpe` command routing before editing. Keep this task instrumentation-only. Report exact timing scopes added, the debug command added, cardinality fields captured, files changed, and baseline observations obtainable from the new instrumentation.
+Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read both runtime-performance documents and completed #58. Inspect `core/internal/Runtime.lua` and TOC ordering before choosing the new module location. Keep the infrastructure minimal and explicit because many later tasks depend on its API. Report the exact public/internal transaction API, revision domains, ChangeSet representation, load-order change, diagnostics added, and validation performed.
