@@ -1,184 +1,222 @@
 ## Goal
-Remove the **data-layer foundation** of Guild Progression while preserving every unrelated Guild and character-progression system.
+Remove the **runtime Guild Progression subsystem** from `client/client_Guild.lua`, including active progression resolution, local/remote progression mutations, and Guild Admin query payload progression state.
 
 Authoritative plan: `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md`.
 
-This task covers only:
+Depends on: #51
 
-- `GuildSetting` schema/normalization/serialization;
-- Guild-specific Profile progression APIs/state access;
-- GuildSetting progression dependency discovery/pruning.
+This task is intentionally limited to the Guild client/runtime layer. Guild Admin visual controls, the Progression tab/page, and the GuildSetting editor are removed by later tasks.
 
-Do **not** remove runtime/UI callers in this task; those are handled by follow-up issues.
+## Primary file
 
-## Primary files
+- `client/client_Guild.lua`
 
-- `core/classes/GuildSetting.lua`
-- `core/internal/profile/Guild.lua`
-- `core/internal/database/Dependecies.lua`
+Reference files to inspect before editing:
 
-## Critical scope boundary
-RPE 2 contains unrelated progression systems. Preserve generic character progression code including concepts such as:
+- `core/internal/profile/Guild.lua` after #51
+- `core/internal/comms/Operations.lua`
+- `client/character/guild/page_GuildAdmin.lua`
+- `client/character/guild/page_GuildProgression.lua`
 
-```text
-statProgressions
-resourceProgressions
-```
+## 1. Remove active Guild Progression resolution
 
-and generic helpers used by class/race/stat/resource progression.
-
-Only remove **Guild-specific** progression concepts such as:
+Delete Guild Progression-only helpers and APIs, including current equivalents of:
 
 ```text
-GuildSetting.progression
-general.enableProgression
-profile.guild.byGuild[...].progression
-Guild Progression spellRefs
+normalizeProgressionSlotCount
+getProgressionEntryMap
+isConfiguredSpell
+buildActiveGuildProgression
+Guild:GetActiveGuildProgression
+getProgressionMutationContext
+persistProgressionMutation
 ```
 
-Before deleting any helper named `progression`, inspect its callers and prove it belongs only to Guild Progression.
-
-## 1. Remove Guild Progression from `GuildSetting`
-
-In `core/classes/GuildSetting.lua`:
-
-- remove `general.enableProgression` from defaults and normalization;
-- remove the `progression = { slotCount = ..., entries = ... }` definition;
-- remove Guild Progression-only normalization helpers such as the current progression-entry/spell-ref normalization chain;
-- remove progression normalization from `Merge()`;
-- remove progression from `ToTable()` serialization.
-
-### Legacy definition handling
-`GuildSetting:Merge()` currently accepts incoming table keys before normalization. Do not leave legacy input able to reintroduce active `self.progression` state simply because the normalizer was deleted.
-
-After merge/normalization, a live GuildSetting object must not expose active Guild Progression data. Explicitly discard legacy:
+Remove progression-only state/status handling such as:
 
 ```text
-progression
-general.enableProgression
+progression-disabled
+progression-unavailable
+no-active-progression
 ```
 
-where necessary in the existing normalization path.
+where those values have no remaining non-progression caller.
 
-Do not introduce a new schema migration framework for this removal.
+Do not remove generic Guild Rank resolution, requisition, Daily Reward, Achievement, Skill or Item logic.
 
-Newly serialized GuildSettings must contain neither field.
+## 2. Remove local Guild Progression mutation APIs
 
-## 2. Remove Guild Profile progression APIs
-
-In `core/internal/profile/Guild.lua`, remove Guild Progression-only helpers and public APIs, including the current equivalents of:
+Delete current progression mutation APIs and aliases such as:
 
 ```text
-normalizeProgressionEntryId
-normalizeProgressionState
-getGuildProgressionState
-updateGuildProgressionState
-
-Profile.GetGuildProgression
-Profile.SetGuildProgression
-Profile.SetGuildProgressionSlot
-Profile.SetGuildProgressionEntryUnlocked
-Profile.SetGuildProgressionSelectedSpell
-Profile.ClearGuildProgressionSelectedSpell
+Guild:AssignProgressionEntryToSlot
+Guild:SetProgressionEntryUnlocked
+Guild:SelectProgressionSpell
+Guild:ClearProgressionSpell
+SetProgressionSlot
+UnlockProgressionEntry
+LockProgressionEntry
+SelectGuildProgressionSpell
+ClearGuildProgressionSpell
 ```
 
-Remove aliases/wrappers whose only purpose is Guild Progression.
+Remove helpers whose only consumer was one of those APIs.
 
-Preserve all remaining Guild profile behavior, especially:
+## 3. Remove progression state from Guild Admin query responses
+
+Guild Admin member query responses currently serialize Achievements, Skills, and Progression.
+
+Change the payload to carry only the still-supported Admin state:
 
 ```text
-assignedRankRef
-assignedRankAt
-assignedRankBy
-requisition usage
-daily reward claim state
-daily reward transaction state
-guild identity migration
+Achievements
+Skills
 ```
 
-### Legacy SavedVariables
-Do **not** add permanent migration code solely to erase an already-saved:
+Remove progression query helpers such as:
+
+```text
+appendQueryProgressionStateArguments
+getProgressionQuerySnapshot
+```
+
+Update the response builder and parser so result/profile state no longer contains:
 
 ```lua
-profile.guild.byGuild[guildKey].progression
+progression = ...
 ```
 
-Legacy progression state may remain physically present in SavedVariables as inert data. The requirement is that no active Profile API reads or writes it after the full removal.
-
-## 3. Remove GuildSetting progression dependency handling
-
-In `core/internal/database/Dependecies.lua`, remove only the dependency logic that traverses:
+and no longer parses progression fields such as:
 
 ```text
-GuildSetting.progression.entries[*].spellRefs
+active
+rankRef
+slotCount
+slots
+unlocked entries
+selected spells
 ```
 
-This includes both:
+Do not leave placeholder progression fields merely to make the transport look unchanged.
 
-- source-reference discovery;
-- reference rewrite/pruning for GuildSetting progression spell refs.
+## 4. Remove remote Guild Progression Admin mutation APIs
 
-### Do not remove the generic progression dependency helper
-The file also contains progression-reference logic used by unrelated class/race/stat/resource definitions. Inspect callers carefully and preserve generic logic such as the helper that handles:
+Delete request-side APIs such as current equivalents of:
 
 ```text
-statProgressions
-resourceProgressions
-traitRefs
-skillBonuses
+AssignProgressionEntryForMember
+SetProgressionEntryLockForMember
+ClearProgressionSpellForMember
 ```
 
-Do not delete that generic helper wholesale merely because its name contains `Progression`.
+Remove mutation operation strings and receiver-side dispatch branches for:
+
+```text
+assign_progression_entry
+lock_progression_entry
+unlock_progression_entry
+clear_progression_spell
+```
+
+Remove progression-only validation/result codes if no longer referenced, including equivalents of:
+
+```text
+invalid-progression-slot
+unknown-progression-entry
+progression-entry-locked
+invalid-progression-spell
+no-active-progression
+```
+
+## 5. Preserve generic Guild Admin protocol/opcodes
+
+Do **not** delete or renumber:
+
+```text
+GUILD_ADMIN_QUERY
+GUILD_ADMIN_QUERY_RESPONSE
+GUILD_ADMIN_MUTATION
+GUILD_ADMIN_MUTATION_RESPONSE
+```
+
+These generic opcodes are still required for non-progression Guild Admin operations such as:
+
+```text
+Guild Rank assignment
+Achievement grant
+Skill adjustment
+Item grant
+```
+
+Preserve all remaining mutation operation strings and transaction/acknowledgement behavior.
+
+## 6. Decide protocol version deliberately
+
+Inspect the current `GUILD_ADMIN_PROTOCOL_VERSION` and parser contract before changing it.
+
+Because progression fields are being removed from the query response payload:
+
+- if old/new clients could silently misparse positional fields, increment the protocol version and preserve the existing explicit incompatibility behavior;
+- if the parser already treats the removed trailing fields as optional and mixed-version operation is demonstrably safe, a version bump is not required.
+
+Do not guess. Base the decision on the actual current serializer/parser.
+
+Report the decision and rationale in the task result.
 
 ## Acceptance criteria
 
-- [ ] `GuildSetting.general` no longer contains `enableProgression`.
-- [ ] `GuildSetting` no longer defines or serializes `progression`.
-- [ ] Legacy GuildSetting input cannot leave active `self.progression` or `general.enableProgression` state after normalization/merge.
-- [ ] Newly serialized GuildSettings contain no Guild Progression fields.
-- [ ] Guild Profile exposes no Guild Progression get/set/mutation APIs.
-- [ ] Existing legacy profile progression SavedVariables can remain inert without causing load errors.
-- [ ] GuildSetting dependency discovery no longer adds progression `spellRefs`.
-- [ ] GuildSetting dependency rewrite/pruning no longer traverses progression entries.
-- [ ] Requisition, Daily Reward, Guild Rank and guild-identity Profile state remain unchanged.
-- [ ] Generic class/race/stat/resource progression dependency logic remains intact.
+- [ ] `client_Guild.lua` exposes no active Guild Progression resolution API.
+- [ ] Local Guild Progression mutation APIs and aliases are removed.
+- [ ] Guild Admin query responses contain no progression snapshot/state.
+- [ ] Guild Admin query parsing contains no progression parser/state field.
+- [ ] Remote Guild Progression Admin mutation request APIs are removed.
+- [ ] Progression mutation operation strings/dispatch branches are removed.
+- [ ] Unused progression-only error/result codes are removed.
+- [ ] Generic Guild Admin query/mutation opcodes remain unchanged unless a documented protocol-version change requires otherwise.
+- [ ] Guild Rank, Achievement, Skill and Item Admin operations remain intact.
+- [ ] Requisition and Daily Reward runtime behavior remains unchanged.
+- [ ] Protocol-version decision is explicitly validated and reported.
 
 ## Validation matrix
 
 ```text
-new GuildSetting
--> no enableProgression
--> no progression table
+Guild Admin query response
+-> serializes Achievement state
+-> serializes Skill state
+-> does not serialize Progression state
 
-legacy GuildSetting table containing progression + enableProgression
--> merge/load succeeds
--> live normalized object does not expose active Guild Progression state
--> ToTable() omits both legacy fields
+Guild Admin response parser
+-> reconstructs Achievement/Skill state
+-> does not expect/store progression
 
-existing character profile containing guild.progression SavedVariables
--> profile loads without error
--> unrelated Guild state remains readable
+set Guild Rank remotely
+-> request/validation/ack still works
 
-GuildSetting requisition/item/currency dependencies
--> still discovered normally
+grant Achievement remotely
+-> still works
 
-GuildSetting Daily Reward dependencies
--> still discovered normally
+adjust Skill remotely
+-> still works
 
-GuildSetting legacy progression spellRefs
--> no longer contribute dependencies
+give Item remotely
+-> still works
 
-generic class/race/stat/resource progression definition
--> dependency behavior unchanged
+old progression mutation operation string received
+-> no active progression mutation path remains
+-> fails safely through existing unknown/unsupported-operation behavior
+
+Requisitions / Daily Rewards
+-> unaffected
 ```
 
 ## Constraints
 
-- Do not edit `client/client_Guild.lua` in this task unless compilation/load requires a tiny transitional fix; runtime removal is the next task.
-- Do not edit Guild window/Admin/editor UI here.
-- Do not remove generic progression systems.
-- Do not add a migration framework solely to purge old SavedVariables.
-- Do not change requisition, Daily Reward, Achievement, Skill, Item or Guild Rank semantics.
+- Do not delete the generic Guild Admin opcodes.
+- Do not edit the Admin page UI in this task except for an unavoidable compile/load compatibility adjustment; #53 owns that cleanup.
+- Do not delete `page_GuildProgression.lua` or the Guild tab here; #54 owns that cleanup.
+- Do not edit the GuildSetting inspector here.
+- Do not reintroduce Profile progression persistence removed by #51.
+- Do not change non-progression Guild transaction semantics.
 
 ## Coding-agent instructions
-Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md` first. Inspect every progression helper's callers before deletion, especially in `Dependecies.lua`, because generic non-Guild progression code must survive. Keep the change narrowly data-layer focused. Report exact files changed, legacy-input behavior, serialization results, dependency validation, and any unavoidable transitional edits.
+Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read `.docs/RPE2-Remove-Guild-Progression-Implementation-Plan.md` and completed #51 before editing. Trace each serializer/parser and mutation dispatch path end-to-end rather than deleting by name only. Preserve the four generic Guild Admin opcodes and all non-progression operations. Inspect mixed-version behavior before deciding whether to bump `GUILD_ADMIN_PROTOCOL_VERSION`. Report exact functions removed, protocol decision, files changed, and validation performed.

@@ -182,15 +182,6 @@ local function normalizeWowGuildRankIndex(value)
     return integer
 end
 
-local function normalizeProgressionSlotCount(value)
-    local slotCount = tonumber(value)
-    if not slotCount or slotCount ~= slotCount or slotCount == math.huge or slotCount == -math.huge then
-        return 0
-    end
-
-    return math.max(0, math.floor(slotCount))
-end
-
 local function getGuildKey(identity)
     if type(Profile.GetGuildKey) ~= "function" then
         return ""
@@ -454,57 +445,7 @@ local function appendQueryProfileStateArguments(arguments)
     return arguments
 end
 
-local function appendQueryProgressionStateArguments(arguments, snapshot)
-    if type(snapshot) ~= "table" then
-        arguments[#arguments + 1] = "0"
-        return arguments
-    end
-
-    arguments[#arguments + 1] = "1"
-    arguments[#arguments + 1] = trimText(snapshot.rankRef)
-    arguments[#arguments + 1] = normalizeProgressionSlotCount(snapshot.slotCount)
-
-    local slots = type(snapshot.slots) == "table" and snapshot.slots or {}
-    local slotKeys = {}
-    for slot, entryId in pairs(slots) do
-        local numericSlot = tonumber(slot)
-        local normalizedSlot = numericSlot and numericSlot == math.floor(numericSlot)
-            and numericSlot >= 1 and math.floor(numericSlot) or nil
-        if normalizedSlot and trimText(entryId) ~= "" then
-            slotKeys[#slotKeys + 1] = normalizedSlot
-        end
-    end
-    table.sort(slotKeys)
-    arguments[#arguments + 1] = #slotKeys
-    for index = 1, #slotKeys do
-        local slot = slotKeys[index]
-        arguments[#arguments + 1] = slot
-        arguments[#arguments + 1] = trimText(slots[slot])
-    end
-
-    local unlockedKeys = getSortedStringKeys(snapshot.unlocked, function(value)
-        return value == true
-    end)
-    arguments[#arguments + 1] = #unlockedKeys
-    for index = 1, #unlockedKeys do
-        arguments[#arguments + 1] = unlockedKeys[index]
-    end
-
-    local selectedSpells = type(snapshot.selectedSpells) == "table" and snapshot.selectedSpells or {}
-    local selectedKeys = getSortedStringKeys(selectedSpells, function(value)
-        return trimText(value) ~= ""
-    end)
-    arguments[#arguments + 1] = #selectedKeys
-    for index = 1, #selectedKeys do
-        local entryId = selectedKeys[index]
-        arguments[#arguments + 1] = entryId
-        arguments[#arguments + 1] = trimText(selectedSpells[entryId])
-    end
-
-    return arguments
-end
-
-local function buildQueryResponseArguments(requestId, success, reason, identity, assignedRankRef, progressionSnapshot)
+local function buildQueryResponseArguments(requestId, success, reason, identity, assignedRankRef)
     local arguments = {
         requestId,
         GUILD_ADMIN_PROTOCOL_VERSION,
@@ -516,13 +457,9 @@ local function buildQueryResponseArguments(requestId, success, reason, identity,
         identity and identity.guildName or "",
     }
     if success then
-        appendQueryProfileStateArguments(arguments)
-        return appendQueryProgressionStateArguments(arguments, progressionSnapshot)
+        return appendQueryProfileStateArguments(arguments)
     end
 
-    arguments[#arguments + 1] = ""
-    arguments[#arguments + 1] = ""
-    arguments[#arguments + 1] = "0"
     return arguments
 end
 
@@ -636,7 +573,6 @@ local function parseQueryProfileStateArguments(arguments)
     local result = {
         achievements = {},
         skills = {},
-        progression = nil,
     }
     local cursor = 9
     local achievementCount = normalizeIntegerArgument(getArgument(arguments, cursor), 0, 10000) or 0
@@ -661,53 +597,6 @@ local function parseQueryProfileStateArguments(arguments)
         if skillRef ~= "" and level ~= nil then
             result.skills[skillRef] = level
         end
-    end
-
-    local progressionActive = getArgument(arguments, cursor)
-    cursor = cursor + 1
-    if isSuccessfulArgument(progressionActive) then
-        local progression = {
-            rankRef = getArgument(arguments, cursor),
-            slotCount = normalizeIntegerArgument(getArgument(arguments, cursor + 1), 0) or 0,
-            slots = {},
-            unlocked = {},
-            selectedSpells = {},
-        }
-        cursor = cursor + 2
-
-        local slotCount = normalizeIntegerArgument(getArgument(arguments, cursor), 0, 10000) or 0
-        cursor = cursor + 1
-        for index = 1, slotCount do
-            local slot = normalizeIntegerArgument(getArgument(arguments, cursor), 1)
-            local entryId = getArgument(arguments, cursor + 1)
-            cursor = cursor + 2
-            if slot and entryId ~= "" then
-                progression.slots[slot] = entryId
-            end
-        end
-
-        local unlockedCount = normalizeIntegerArgument(getArgument(arguments, cursor), 0, 10000) or 0
-        cursor = cursor + 1
-        for index = 1, unlockedCount do
-            local entryId = getArgument(arguments, cursor)
-            cursor = cursor + 1
-            if entryId ~= "" then
-                progression.unlocked[entryId] = true
-            end
-        end
-
-        local selectedCount = normalizeIntegerArgument(getArgument(arguments, cursor), 0, 10000) or 0
-        cursor = cursor + 1
-        for index = 1, selectedCount do
-            local entryId = getArgument(arguments, cursor)
-            local spellRef = getArgument(arguments, cursor + 1)
-            cursor = cursor + 2
-            if entryId ~= "" and spellRef ~= "" then
-                progression.selectedSpells[entryId] = spellRef
-            end
-        end
-
-        result.progression = progression
     end
 
     return result
@@ -954,258 +843,6 @@ function Guild:GetAssignedGuildRank()
 
     return result.rank, result
 end
-
-local function getProgressionEntryMap(progression)
-    local entries = type(progression and progression.entries) == "table" and progression.entries or {}
-    local byId = {}
-    for index = 1, #entries do
-        local entry = entries[index]
-        local entryId = trimText(entry and entry.id)
-        if entryId ~= "" then
-            byId[entryId] = entry
-        end
-    end
-
-    return entries, byId
-end
-
-local function isConfiguredSpell(entry, spellRef)
-    local normalizedRef = trimText(spellRef)
-    if normalizedRef == "" then
-        return false
-    end
-
-    local spellRefs = type(entry and entry.spellRefs) == "table" and entry.spellRefs or {}
-    for index = 1, #spellRefs do
-        if trimText(spellRefs[index]) == normalizedRef then
-            return true
-        end
-    end
-
-    return false
-end
-
-local function buildActiveGuildProgression(self)
-    local result = {
-        status = "unavailable",
-        reason = "no-active-progression",
-        guildKey = "",
-        rankRef = nil,
-        rank = nil,
-        progression = nil,
-        state = { slots = {}, unlocked = {}, selectedSpells = {} },
-        activeSlots = {},
-        activeUnlocked = {},
-        activeSelectedSpells = {},
-        entries = {},
-        entryById = {},
-        slotCount = 0,
-    }
-
-    local assignment = self:GetAssignedGuildRankStatus()
-    result.assignment = assignment
-    result.guildKey = trimText(assignment and assignment.guildKey)
-    result.rankRef = trimText(assignment and assignment.assignedRankRef)
-    result.rank = assignment and assignment.rank or nil
-    if not assignment or assignment.status ~= "valid" or type(assignment.rank) ~= "table" then
-        result.status = assignment and assignment.status or "unavailable"
-        result.reason = assignment and assignment.reason or "no-active-progression"
-        return result
-    end
-
-    local general = type(assignment.rank.general) == "table" and assignment.rank.general or {}
-    if general.enableProgression ~= true then
-        result.status = "progression-disabled"
-        result.reason = result.status
-        return result
-    end
-
-    local progression = type(assignment.rank.progression) == "table" and assignment.rank.progression or nil
-    if not progression then
-        result.status = "progression-unavailable"
-        result.reason = result.status
-        return result
-    end
-
-    result.status = "valid"
-    result.reason = result.status
-    result.progression = progression
-    result.slotCount = normalizeProgressionSlotCount(progression.slotCount)
-    result.entries, result.entryById = getProgressionEntryMap(progression)
-
-    if type(Profile.GetGuildProgression) == "function" and result.guildKey ~= "" and result.rankRef ~= "" then
-        local stateOk, state = pcall(Profile.GetGuildProgression, result.guildKey, result.rankRef)
-        if stateOk and type(state) == "table" then
-            result.state = state
-        end
-    end
-
-    local rawState = result.state
-    for slot = 1, result.slotCount do
-        local entryId = trimText(rawState.slots and rawState.slots[slot])
-        local entry = result.entryById[entryId]
-        if entry and rawState.unlocked and rawState.unlocked[entryId] == true then
-            result.activeSlots[slot] = entryId
-        end
-    end
-
-    for index = 1, #result.entries do
-        local entry = result.entries[index]
-        local entryId = trimText(entry and entry.id)
-        if entryId ~= "" and rawState.unlocked and rawState.unlocked[entryId] == true then
-            result.activeUnlocked[entryId] = true
-            local spellRef = trimText(rawState.selectedSpells and rawState.selectedSpells[entryId])
-            if isConfiguredSpell(entry, spellRef) then
-                result.activeSelectedSpells[entryId] = spellRef
-            end
-        end
-    end
-
-    return result
-end
-
-function Guild:GetActiveGuildProgression()
-    return buildActiveGuildProgression(self)
-end
-
-local function getProgressionQuerySnapshot(self)
-    if type(self.GetActiveGuildProgression) ~= "function" then
-        return nil
-    end
-
-    local ok, active = pcall(self.GetActiveGuildProgression, self)
-    if not ok or type(active) ~= "table" or active.status ~= "valid" then
-        return nil
-    end
-
-    return {
-        rankRef = active.rankRef,
-        slotCount = active.slotCount,
-        slots = active.state and active.state.slots or {},
-        unlocked = active.state and active.state.unlocked or {},
-        selectedSpells = active.state and active.state.selectedSpells or {},
-    }
-end
-
-local function getProgressionMutationContext(self)
-    local active = self:GetActiveGuildProgression()
-    if active.status ~= "valid" then
-        return nil, active.reason or "no-active-progression"
-    end
-    if type(Profile.SetGuildProgression) ~= "function" then
-        return nil, "profile-api-unavailable"
-    end
-
-    return active, nil
-end
-
-local function persistProgressionMutation(active, state)
-    local ok, persisted = pcall(
-        Profile.SetGuildProgression,
-        active.guildKey,
-        active.rankRef,
-        state
-    )
-    if not ok or type(persisted) ~= "table" then
-        return false, "persistence-failed"
-    end
-
-    return true, "ok"
-end
-
-function Guild:AssignProgressionEntryToSlot(slotIndex, entryId)
-    local active, reason = getProgressionMutationContext(self)
-    local normalizedSlot = normalizeIntegerArgument(slotIndex, 1, active and active.slotCount or 0)
-    local normalizedEntryId = trimText(entryId)
-    if not active then
-        return false, reason
-    end
-    if normalizedSlot == nil then
-        return false, "invalid-progression-slot"
-    end
-    if normalizedEntryId == "" or not active.entryById[normalizedEntryId] then
-        return false, "unknown-progression-entry"
-    end
-    if active.state.unlocked[normalizedEntryId] ~= true then
-        return false, "progression-entry-locked"
-    end
-
-    active.state.slots[normalizedSlot] = normalizedEntryId
-    return persistProgressionMutation(active, active.state)
-end
-
-function Guild:SetProgressionEntryUnlocked(entryId, unlocked)
-    local active, reason = getProgressionMutationContext(self)
-    local normalizedEntryId = trimText(entryId)
-    if not active then
-        return false, reason
-    end
-    if normalizedEntryId == "" or not active.entryById[normalizedEntryId] then
-        return false, "unknown-progression-entry"
-    end
-
-    if unlocked == true then
-        active.state.unlocked[normalizedEntryId] = true
-    else
-        active.state.unlocked[normalizedEntryId] = nil
-        for slot = 1, active.slotCount do
-            if trimText(active.state.slots[slot]) == normalizedEntryId then
-                active.state.slots[slot] = nil
-            end
-        end
-        active.state.selectedSpells[normalizedEntryId] = nil
-    end
-
-    return persistProgressionMutation(active, active.state)
-end
-
-function Guild:SelectProgressionSpell(entryId, spellRef)
-    local active, reason = getProgressionMutationContext(self)
-    local normalizedEntryId = trimText(entryId)
-    local normalizedSpellRef = trimText(spellRef)
-    if not active then
-        return false, reason
-    end
-    local entry = active.entryById[normalizedEntryId]
-    if not entry then
-        return false, "unknown-progression-entry"
-    end
-    if active.state.unlocked[normalizedEntryId] ~= true then
-        return false, "progression-entry-locked"
-    end
-    if not isConfiguredSpell(entry, normalizedSpellRef) then
-        return false, "invalid-progression-spell"
-    end
-
-    active.state.selectedSpells[normalizedEntryId] = normalizedSpellRef
-    return persistProgressionMutation(active, active.state)
-end
-
-function Guild:ClearProgressionSpell(entryId)
-    local active, reason = getProgressionMutationContext(self)
-    local normalizedEntryId = trimText(entryId)
-    if not active then
-        return false, reason
-    end
-    if normalizedEntryId == "" or not active.entryById[normalizedEntryId] then
-        return false, "unknown-progression-entry"
-    end
-
-    active.state.selectedSpells[normalizedEntryId] = nil
-    return persistProgressionMutation(active, active.state)
-end
-
--- Explicit aliases keep the API readable to callers without introducing a
--- second progression state or mutation path.
-Guild.SetProgressionSlot = Guild.AssignProgressionEntryToSlot
-Guild.UnlockProgressionEntry = function(self, entryId)
-    return self:SetProgressionEntryUnlocked(entryId, true)
-end
-Guild.LockProgressionEntry = function(self, entryId)
-    return self:SetProgressionEntryUnlocked(entryId, false)
-end
-Guild.SelectGuildProgressionSpell = Guild.SelectProgressionSpell
-Guild.ClearGuildProgressionSpell = Guild.ClearProgressionSpell
 
 local function getInventoryService()
     return Client.Inventory or {}
@@ -2476,127 +2113,6 @@ function Guild:GiveItemToMember(targetName, itemRef, quantity, callback)
     })
 end
 
-function Guild:AssignProgressionEntryForMember(targetName, slotIndex, entryId, callback)
-    local available, reason, member = self:IsGuildAdminTargetAvailable(targetName)
-    local normalizedSlot = normalizeIntegerArgument(slotIndex, 1)
-    local normalizedEntryId = trimText(entryId)
-    if not available then
-        invokeGuildAdminCallback({ callback = callback }, {
-            success = false,
-            operation = "assign_progression_entry",
-            reason = reason,
-        })
-        return false, reason
-    end
-    if normalizedSlot == nil then
-        invokeGuildAdminCallback({ callback = callback }, {
-            success = false,
-            operation = "assign_progression_entry",
-            reason = "invalid-progression-slot",
-        })
-        return false, "invalid-progression-slot"
-    end
-    if normalizedEntryId == "" then
-        invokeGuildAdminCallback({ callback = callback }, {
-            success = false,
-            operation = "assign_progression_entry",
-            reason = "unknown-progression-entry",
-        })
-        return false, "unknown-progression-entry"
-    end
-
-    local requestId = getGuildAdminRequestId()
-    return sendGuildAdminRequest(self, GUILD_ADMIN_MUTATION_OPCODE, member.name, {
-        requestId,
-        GUILD_ADMIN_PROTOCOL_VERSION,
-        "assign_progression_entry",
-        member.name,
-        normalizedSlot,
-        normalizedEntryId,
-    }, {
-        requestId = requestId,
-        kind = "mutation",
-        operation = "assign_progression_entry",
-        targetName = member.name,
-        callback = callback,
-    })
-end
-
-function Guild:SetProgressionEntryLockForMember(targetName, entryId, unlocked, callback)
-    local available, reason, member = self:IsGuildAdminTargetAvailable(targetName)
-    local normalizedEntryId = trimText(entryId)
-    local operation = unlocked == true and "unlock_progression_entry" or "lock_progression_entry"
-    if not available then
-        invokeGuildAdminCallback({ callback = callback }, {
-            success = false,
-            operation = operation,
-            reason = reason,
-        })
-        return false, reason
-    end
-    if normalizedEntryId == "" then
-        invokeGuildAdminCallback({ callback = callback }, {
-            success = false,
-            operation = operation,
-            reason = "unknown-progression-entry",
-        })
-        return false, "unknown-progression-entry"
-    end
-
-    local requestId = getGuildAdminRequestId()
-    return sendGuildAdminRequest(self, GUILD_ADMIN_MUTATION_OPCODE, member.name, {
-        requestId,
-        GUILD_ADMIN_PROTOCOL_VERSION,
-        operation,
-        member.name,
-        normalizedEntryId,
-    }, {
-        requestId = requestId,
-        kind = "mutation",
-        operation = operation,
-        targetName = member.name,
-        callback = callback,
-    })
-end
-
-function Guild:ClearProgressionSpellForMember(targetName, entryId, spellRef, callback)
-    local available, reason, member = self:IsGuildAdminTargetAvailable(targetName)
-    local normalizedEntryId = trimText(entryId)
-    local normalizedSpellRef = trimText(spellRef)
-    if not available then
-        invokeGuildAdminCallback({ callback = callback }, {
-            success = false,
-            operation = "clear_progression_spell",
-            reason = reason,
-        })
-        return false, reason
-    end
-    if normalizedEntryId == "" then
-        invokeGuildAdminCallback({ callback = callback }, {
-            success = false,
-            operation = "clear_progression_spell",
-            reason = "unknown-progression-entry",
-        })
-        return false, "unknown-progression-entry"
-    end
-
-    local requestId = getGuildAdminRequestId()
-    return sendGuildAdminRequest(self, GUILD_ADMIN_MUTATION_OPCODE, member.name, {
-        requestId,
-        GUILD_ADMIN_PROTOCOL_VERSION,
-        "clear_progression_spell",
-        member.name,
-        normalizedEntryId,
-        normalizedSpellRef,
-    }, {
-        requestId = requestId,
-        kind = "mutation",
-        operation = "clear_progression_spell",
-        targetName = member.name,
-        callback = callback,
-    })
-end
-
 local function getPendingResponse(self, arguments, sender, distribution)
     local requestId = getArgument(arguments, 1)
     local pending = self._guildAdminPending and self._guildAdminPending[requestId] or nil
@@ -2641,7 +2157,6 @@ function Guild:HandleGuildAdminQueryResponse(arguments, sender, distribution, ta
         profileState = profileState,
         achievements = profileState.achievements,
         skills = profileState.skills,
-        progression = profileState.progression,
         sender = sender,
     })
 end
@@ -2700,8 +2215,7 @@ function Guild:HandleGuildAdminQuery(arguments, sender, distribution, target, me
             true,
             "ok",
             identity,
-            getAssignedGuildRankRef(identity),
-            getProgressionQuerySnapshot(self)
+            getAssignedGuildRankRef(identity)
         )
     )
 end
@@ -2776,112 +2290,6 @@ function Guild:HandleGuildAdminMutation(arguments, sender, distribution, target,
                     sender,
                     buildMutationResponseArguments(requestId, operation, true, "ok")
                 )
-            end
-        end
-
-        return sendGuildAdminMessage(
-            GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
-            sender,
-            buildMutationResponseArguments(requestId, operation, false, reason)
-        )
-    end
-
-    if operation == "assign_progression_entry"
-        or operation == "lock_progression_entry"
-        or operation == "unlock_progression_entry"
-        or operation == "clear_progression_spell" then
-        local active = type(self.GetActiveGuildProgression) == "function"
-            and self:GetActiveGuildProgression()
-            or nil
-        if type(active) ~= "table" or active.status ~= "valid" then
-            reason = active and active.reason or "no-active-progression"
-        else
-            local entryId
-            local entry
-            if operation == "assign_progression_entry" then
-                local slotIndex = normalizeIntegerArgument(getArgument(arguments, 5), 1, active.slotCount)
-                entryId = getArgument(arguments, 6)
-                entry = active.entryById and active.entryById[entryId] or nil
-                if slotIndex == nil then
-                    reason = "invalid-progression-slot"
-                elseif not entry then
-                    reason = "unknown-progression-entry"
-                elseif active.state.unlocked[entryId] ~= true then
-                    reason = "progression-entry-locked"
-                else
-                    local changed, changeReason = self:AssignProgressionEntryToSlot(slotIndex, entryId)
-                    if changed then
-                        self:RefreshWindow()
-                        return sendGuildAdminMessage(
-                            GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
-                            sender,
-                            buildMutationResponseArguments(
-                                requestId,
-                                operation,
-                                true,
-                                "ok",
-                                active.rankRef,
-                                "progression-slot-assigned",
-                                slotIndex
-                            )
-                        )
-                    end
-                    reason = changeReason or "persistence-failed"
-                end
-            else
-                entryId = getArgument(arguments, 5)
-                entry = active.entryById and active.entryById[entryId] or nil
-                if not entry then
-                    reason = "unknown-progression-entry"
-                elseif operation == "lock_progression_entry" or operation == "unlock_progression_entry" then
-                    local shouldUnlock = operation == "unlock_progression_entry"
-                    local changed, changeReason = self:SetProgressionEntryUnlocked(entryId, shouldUnlock)
-                    if changed then
-                        self:RefreshWindow()
-                        return sendGuildAdminMessage(
-                            GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
-                            sender,
-                            buildMutationResponseArguments(
-                                requestId,
-                                operation,
-                                true,
-                                "ok",
-                                active.rankRef,
-                                shouldUnlock and "progression-entry-unlocked" or "progression-entry-locked",
-                                entryId
-                            )
-                        )
-                    end
-                    reason = changeReason or "persistence-failed"
-                else
-                    local expectedSpellRef = getArgument(arguments, 6)
-                    local currentSpellRef = trimText(active.state.selectedSpells and active.state.selectedSpells[entryId])
-                    -- An expected value makes this cleanup mutation safe against
-                    -- concurrent edits. A matching stale value may still be
-                    -- cleared so administrators can repair obsolete definitions.
-                    if expectedSpellRef ~= "" and currentSpellRef ~= expectedSpellRef then
-                        reason = "selected-spell-changed"
-                    else
-                        local changed, changeReason = self:ClearProgressionSpell(entryId)
-                        if changed then
-                            self:RefreshWindow()
-                            return sendGuildAdminMessage(
-                                GUILD_ADMIN_MUTATION_RESPONSE_OPCODE,
-                                sender,
-                                buildMutationResponseArguments(
-                                    requestId,
-                                    operation,
-                                    true,
-                                    "ok",
-                                    active.rankRef,
-                                    "progression-spell-cleared",
-                                    entryId
-                                )
-                            )
-                        end
-                        reason = changeReason or "persistence-failed"
-                    end
-                end
             end
         end
 
