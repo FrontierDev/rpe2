@@ -940,6 +940,8 @@ local function completeResolvedStatFrame(frame, context)
     }
 end
 
+local shouldYieldResolvedStateContinuation
+
 local function stepResolvedStatComponents(continuation, context, entry, deadlineMs)
     local state = continuation.statResolution
     if type(state) ~= "table" then
@@ -1091,7 +1093,7 @@ local function finalizeResolvedResourceRows(rows, progressionContext)
     end
 end
 
-local function shouldYieldResolvedStateContinuation(deadlineMs)
+shouldYieldResolvedStateContinuation = function(deadlineMs)
     local tasks = Addon.Internal and Addon.Internal.Tasks or nil
     return type(tasks) == "table"
         and type(tasks.ShouldYield) == "function"
