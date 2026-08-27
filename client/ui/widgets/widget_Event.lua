@@ -292,6 +292,23 @@ local function advanceEventStepFromWidget()
         return false
     end
 
+    local client = Addon.Client
+    local eventState = type(client) == "table"
+        and type(client.GetEventState) == "function"
+        and client:GetEventState()
+        or nil
+    if type(client) ~= "table"
+        or type(eventState) ~= "table"
+        or not isLocalHostForEvent(eventState)
+        or type(client.CanPerformEventAction) ~= "function"
+    then
+        return false
+    end
+
+    if client:CanPerformEventAction(eventState, "advance-event-step") ~= true then
+        return false
+    end
+
     local advanced = server:AdvanceEventStep()
     local eventManage = server.UI and server.UI.EventManage or nil
     if advanced and eventManage and type(eventManage.RefreshDashboard) == "function" then
@@ -2071,11 +2088,18 @@ function EventWidget:Refresh(reason)
         local canStop = isHost == true
             and type(Addon.Server) == "table"
             and type(Addon.Server.EndEvent) == "function"
-        local canAdvance = isHost == true
-            and state.unitsReady == true
-            and state.startupReady == true
+        local canAdvance = false
+        if isHost == true
+            and type(Client.CanPerformEventAction) == "function"
             and type(Addon.Server) == "table"
             and type(Addon.Server.AdvanceEventStep) == "function"
+        then
+            local clientEventState = type(Client.GetEventState) == "function" and Client:GetEventState() or nil
+            canAdvance = type(clientEventState) == "table"
+                and clientEventState == state
+                and clientEventState.unitsReady == true
+                and Client:CanPerformEventAction(clientEventState, "advance-event-step") == true
+        end
         if controlRowFrame then
             if isHost then
                 controlRowFrame:Show()

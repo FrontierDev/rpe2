@@ -75,7 +75,7 @@ function EventManage:BuildDashboardPage(page)
     toolbar:AddChild(self.StopEventButton)
 
     self.AdvanceEventStepButton = UI.CreateButton(toolbar:GetFrame(), "RPEServerEventManageAdvanceEventStepButton", "Next Tick / Turn", advanceButtonWidth, function()
-        if Server.AdvanceEventStep then
+        if Server.AdvanceEventStep and EventManage:CanAdvanceEventStep() == true then
             Server:AdvanceEventStep()
             EventManage:RefreshDashboard()
         end

@@ -314,6 +314,39 @@ function EventManage:BuildUnitCellTooltip(_, rowData)
     return self:BuildUnitTooltip(rowData)
 end
 
+function EventManage:CanAdvanceEventStep()
+    local client = Addon.Client
+    if type(client) ~= "table"
+        or type(client.GetEventState) ~= "function"
+        or type(client.CanPerformEventAction) ~= "function"
+        or type(client.IsLocalEventHost) ~= "function"
+        or type(Server.AdvanceEventStep) ~= "function"
+    then
+        return false
+    end
+
+    if type(Server.IsActive) ~= "function" or Server:IsActive() ~= true then
+        return false
+    end
+    if type(Server.IsEventUnitsReady) ~= "function" or Server:IsEventUnitsReady() ~= true then
+        return false
+    end
+
+    local serverEventState = Server.GetEventState and Server:GetEventState() or Server.EventState
+    local eventState = client:GetEventState()
+    if type(serverEventState) ~= "table"
+        or serverEventState.active ~= true
+        or type(eventState) ~= "table"
+        or eventState.active ~= true
+        or tostring(serverEventState.id or "") ~= tostring(eventState.id or "")
+        or client:IsLocalEventHost(eventState) ~= true
+    then
+        return false
+    end
+
+    return client:CanPerformEventAction(eventState, "advance-event-step") == true
+end
+
 function EventManage:RefreshDashboard()
     local layout = self.Layout or {}
     local hasClientHashMismatch = Server.HasClientHashMismatch and Server:HasClientHashMismatch() or false
@@ -325,6 +358,7 @@ function EventManage:RefreshDashboard()
     local serverActive = Server.IsActive and Server:IsActive() or false
     local eventActive = Server.IsEventActive and Server:IsEventActive() or false
     local eventUnitsReady = Server.IsEventUnitsReady and Server:IsEventUnitsReady() or false
+    local canAdvanceEventStep = self:CanAdvanceEventStep()
     local signature = buildSignature(
         datasetHash,
         rulesetHash,
@@ -334,7 +368,8 @@ function EventManage:RefreshDashboard()
         hasClientHashMismatch == true and 1 or 0,
         serverActive == true and 1 or 0,
         eventActive == true and 1 or 0,
-        eventUnitsReady == true and 1 or 0
+        eventUnitsReady == true and 1 or 0,
+        canAdvanceEventStep == true and 1 or 0
     )
 
     if self.LastDashboardRefreshSignature == signature then
@@ -383,7 +418,7 @@ function EventManage:RefreshDashboard()
     end
 
     if self.AdvanceEventStepButton and self.AdvanceEventStepButton.SetEnabled then
-        self.AdvanceEventStepButton:SetEnabled(eventActive and eventUnitsReady)
+        self.AdvanceEventStepButton:SetEnabled(canAdvanceEventStep)
     end
 
     return true

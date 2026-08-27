@@ -210,6 +210,22 @@ Client.TurnEndPending = Client.TurnEndPending or false
 Client.EventUnitInteractionMarkers = Client.EventUnitInteractionMarkers or {}
 Client.LastLocalInteractionMarker = Client.LastLocalInteractionMarker or nil
 
+local function refreshEventManageDashboard()
+    local server = Addon.Server
+    local eventManage = type(server) == "table" and server.UI and server.UI.EventManage or nil
+    if type(eventManage) ~= "table"
+        or type(eventManage.IsWindowVisible) ~= "function"
+        or eventManage:IsWindowVisible() ~= true
+        or type(eventManage.IsDashboardPageActive) ~= "function"
+        or eventManage:IsDashboardPageActive() ~= true
+        or type(eventManage.RefreshDashboard) ~= "function"
+    then
+        return false
+    end
+
+    return eventManage:RefreshDashboard() == true
+end
+
 local EVENT_STARTUP_STEP_COUNT = 9
 
 local function getTransitionGeneration(client)
@@ -243,6 +259,7 @@ function Client:BeginEventTransition(kind, eventId, transaction)
         transition.eventState.transitionPhase = transition.phase
     end
     self.EventTransition = transition
+    refreshEventManageDashboard()
     return transition
 end
 
@@ -301,6 +318,7 @@ function Client:EndEventTransition(eventId, generation, eventState, reason)
     transition.eventState = nil
     transition.transaction = nil
     self.EventTransition = nil
+    refreshEventManageDashboard()
     return true
 end
 

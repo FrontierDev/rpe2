@@ -1,212 +1,49 @@
-## Goal
-Refactor client event **startup and teardown** into explicit, deterministic transition state machines whose expensive phases can be cooperatively sliced without freezing WoW.
+## Static validation: FAIL — host event-step advancement bypasses the transition readiness gate
 
-Authoritative documents:
+Validated commit `bffcec9c169dadad6970f5ab207cdaef200bb69f` (`Issue #66`). `TASK.MD` is intentionally ignored.
 
-- `.docs/RPE2-Runtime-Performance-Hitch-Elimination-PDD.md`
-- `.docs/RPE2-Runtime-Performance-Hitch-Elimination-Implementation-Plan.md`
+The transition/state-machine work is substantially present: `Client:CanPerformEventAction(...)` centrally rejects actions while the matching event is starting/ending, and the implementation wires that gate into local spell activation/lifecycle, targeting mutation/confirmation, reactions, `Client:EndTurn()`, pending-turn flush, and companion control. Startup/end phases are also represented explicitly and the content-scaled trait/aura/resolved-state work uses the #65 continuation/sliceable infrastructure.
 
-Depends on: #65
+### Blocking defect
 
-This task owns event start/end transition orchestration. Sparse turn advancement and spell-component execution are separate follow-up tasks.
+The **host authoritative advance path is not gated through `Client:CanPerformEventAction(...)`**.
 
-## Primary files
+There are two concrete entry points:
 
-- `client/client_Event.lua`
-- `client/client_Traits.lua`
-- `client/client_Resources.lua`
-- `client/spellcasting/Core.lua` only for reset/transition integration
-- `client/spellcasting/AuraManager.lua` only for startup/end integration
-- `client/spellcasting/Cooldowns.lua` only for reset integration
-- `client/spellcasting/Helpers.lua` for existing dirty visual queues where required
-- `server/server_Event.lua` only if #58 profiling proves host-side synchronous construction/broadcast is itself a material hitch
+1. `client/ui/widgets/widget_Event.lua`
 
-Reuse the cooperative TaskQueue API from #65 and Runtime transactions from #59.
+`advanceEventStepFromWidget()` calls `Server:AdvanceEventStep()` directly. The widget's refresh logic only disables the button using local `state.unitsReady` / `state.startupReady`; the click handler itself does not re-check the central transition gate. Because transition visual refresh is deferred/coalesced, a previously-enabled button can remain clickable briefly after `HandleEventEnd()` synchronously marks the local event as ending / not-ready.
 
-## 1. Add explicit local event transition state
+2. `server/ui/eventmanage/page_EventManageDashboard.lua`
 
-Introduce a local runtime transition structure equivalent to:
+`AdvanceEventStepButton` calls `Server:AdvanceEventStep()` directly with no client-transition check at all. The dashboard enablement in `page_EventManageShared.lua` is based on the **server** event being active and `unitsReady`; it does not know whether the matching local client event is still in `EventTransition.kind == "starting"` or `"ending"`.
 
-```lua
-{
-    kind = "starting" | "ending",
-    eventId = ...,
-    transactionId = ...,
-    phase = ...,
-    generation/revision = ...,
-}
-```
+This creates a larger deterministic failure case during high-content startup: server `unitsReady` can already be true while the client is still slicing trait runtime, automatic/event aura sync, resolved-state work, resource sync, or consumable prompts. The host can press **Next Tick / Turn** from Event Manager and advance authoritative event state while the local startup transition is incomplete.
 
-Requirements:
+That violates #66's explicit requirements:
 
-- only one transition for the active event is authoritative at a time;
-- stale queued transition work verifies event ID/generation before applying state;
-- transition completion/abort clears retained continuation state;
-- normal WoW UI/rendering remains responsive while transition work continues.
+- conflicting end-turn/advance-related actions must be rejected while authoritative transition work is incomplete;
+- use the central transition/readiness check rather than scattered UI flags;
+- no partial authoritative mutation during starting/ending state.
 
-Do not add a blocking loading screen.
+### Required fix
 
-## 2. Gate conflicting RPE gameplay actions during transitions
+Route every local-host event-step advance entry point through the existing central readiness gate before calling `Server:AdvanceEventStep()`.
 
-While startup/end authoritative work is incomplete, disable/reject RPE actions which would conflict with the partially-transitioned event state.
+At minimum:
 
-Examples to inspect:
+- `client/ui/widgets/widget_Event.lua`: `advanceEventStepFromWidget()` must resolve the matching client event state and require `Client:CanPerformEventAction(eventState, "advance-event-step") == true` immediately before the server call.
+- `server/ui/eventmanage/page_EventManageDashboard.lua`: the `AdvanceEventStepButton` handler must perform the same authoritative click-time check before calling `Server:AdvanceEventStep()`.
+- Update Event Manager dashboard enablement so the button is visibly disabled while the matching local event is starting/ending/not `startupReady`, but **do not rely on enablement alone**; retain the click-time gate to protect against stale UI state.
+- Prefer reusing `Client:CanPerformEventAction(...)` (or a single thin host-advance wrapper around it) rather than adding another transition flag/readiness implementation.
+- This does not require changing server transition semantics; the local host UI entry points can enforce the gate before invoking the authoritative server advance.
 
-```text
-spell activation/cast actions
-end-turn/advance-related local actions
-targeting actions that mutate event runtime
-reaction/companion controls if they can mutate the same event
-```
+### Revalidation after fix
 
-Harmless UI should remain interactive where possible.
+1. Start a simple event: advance remains blocked until the client transition reaches ready, then works normally.
+2. Start a high-content event: while startup phases are still slicing, both the event widget and Event Manager **Next Tick / Turn** remain disabled; forced/stale click attempts do not advance server `turnNumber`/`tickNumber`.
+3. End an event while either advance control was previously enabled: neither control can advance the event during the ending transition.
+4. Re-run static checks for the existing spell/targeting/reaction/end-turn/companion gates and startup/end stale-generation handling.
+5. If static validation then passes, proceed to the issue's mandatory in-game start/end performance gate rather than closing immediately.
 
-Use one central transition/readiness check rather than scattered arbitrary flags.
-
-## 3. Make startup phases explicit and sliceable
-
-Preserve current startup semantics/order but express phases explicitly, conceptually:
-
-```text
-apply/validate event state
-prime action-bar metadata
-refresh/compile trait runtime
-sync automatic trait auras
-sync event auras
-refresh resolved trait state
-initialize/queue resource sync
-process startup/consumable prompts
-mark event ready
-```
-
-Requirements:
-
-- phases that can scale with content use #65 sliceable jobs;
-- phases pass forward one stable startup context/snapshot where possible instead of re-resolving shared data;
-- do not rebuild the same derived state between phases without an actual revision change;
-- startup Achievement trigger participates in the runtime transaction/ChangeSet model from #61 and must not invoke global configuration refresh;
-- visual refreshes are dirty/coalesced rather than executed after each startup sub-step.
-
-## 4. Make end-event processing transactional
-
-Client event end must conceptually:
-
-```text
-mark event ending
--> reject new conflicting actions
--> process rpe_event_complete Achievements
--> resolve end-phase/consumable effects/prompts
--> commit resulting item/currency/Achievement/Profile changes coherently
--> clear event spellcast/cooldown/aura/trait runtime buckets
--> queue one final visual teardown
--> clear event-scoped revisions/jobs
--> release transition lock
-```
-
-Requirements:
-
-- Achievement completion/rewards during event end use the existing outer transaction where practical;
-- no Achievement/currency state change invokes `HandleLocalConfigurationChanged()`;
-- clear event runtime using direct bucket/index teardown rather than unnecessary broad rescans;
-- stale queued event presentation/derived jobs are cancelled through #65 mechanisms.
-
-## 5. Preserve prompt behavior without blocking teardown incorrectly
-
-Current event end may defer reset while consumable/end-phase prompts are active.
-
-Preserve prompt semantics, but represent the wait as a transition phase rather than leaving runtime in an ambiguous half-ended state.
-
-Requirements:
-
-- prompt callback resumes the correct transition generation only;
-- obsolete callback from a replaced/new event cannot reset the new event;
-- duplicate prompt callbacks cannot double-run teardown.
-
-## 6. Keep network authority/order intact
-
-Do not weaken server/client event authority.
-
-Packet receipt may stage heavy client work, but:
-
-- event IDs/state validation remain immediate;
-- required acknowledgements/messages keep existing ordering;
-- UI-only invalidation must not generate network traffic;
-- client-connect/configuration refresh must not be triggered merely because event runtime state changed.
-
-Modify `server_Event.lua` only for a measured concrete host-side problem; client-side orchestration is the primary scope.
-
-## 7. Integrate transition timings
-
-Using #58 diagnostics, report:
-
-```text
-start immediate handler
-startup phase slice timings
-start total wall-clock transition duration
-end immediate handler
-end phase slice timings
-end total wall-clock transition duration
-max single RPE slice/frame contribution
-```
-
-Wall-clock multi-frame completion may exceed 16 ms; the requirement is that no individual RPE work chunk creates a frame hitch.
-
-## Acceptance criteria
-
-- [ ] Event startup uses explicit transition phases.
-- [ ] Event teardown uses explicit transition phases.
-- [ ] Content-scaled startup/end phases are sliceable.
-- [ ] Conflicting RPE gameplay actions are gated while authoritative transition work is incomplete.
-- [ ] Harmless UI/WoW rendering remains responsive.
-- [ ] Startup/end Achievement triggers remain correct and do not cause global configuration refresh.
-- [ ] End-event rewards/profile mutations commit coherently rather than refreshing between each mutation.
-- [ ] Obsolete event-scoped jobs/callbacks cannot mutate a replacement event.
-- [ ] Event runtime buckets/revisions are cleared cleanly at end.
-- [ ] Visual startup/teardown refresh is coalesced.
-- [ ] Existing event authority/network ordering remains intact.
-
-## Validation matrix
-
-```text
-start simple event
--> transition reaches ready
--> controls enabled only when authoritative startup state is ready
-
-start high-content event with many traits/auras
--> startup work spans bounded slices
--> no individual RPE slice exceeds hard threshold
--> resulting runtime matches expected state
-
-start event A then replace/end it with event B while stale derived work exists
--> A jobs/callbacks cannot alter B
-
-end event with no Achievement/rewards
--> teardown completes once
--> runtime buckets cleared
-
-end event completing Achievement with item+currency rewards
--> rewards delivered exactly once
--> one coherent transaction/notification flow
--> no global configuration refresh
-
-end event with consumable prompt
--> transition waits in explicit prompt phase
--> callback resumes same event generation
--> duplicate/stale callback ignored safely
-
-attempt spell/action during starting/ending state
--> blocked through central readiness gate
--> no partial authoritative mutation
-```
-
-## Constraints
-
-- Do not redesign turn-step due-work indexes here; next task owns them.
-- Do not redesign spell component execution here.
-- Do not add a blocking loading screen.
-- Do not change event gameplay semantics/order merely to simplify slicing.
-- Do not modify server behavior without profiling evidence.
-- Do not allow stale transition work to mutate a new/replaced event.
-
-## Coding-agent instructions
-Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read both runtime-performance documents and completed #65. Trace current startup runtime flags/steps and `HandleEventEnd`/`ResetEventState`/prompt callbacks before editing. Preserve the existing semantic phase order, but make transition ownership explicit and every content-scaled phase sliceable. Report the transition state machine, action gating rule, converted phases, stale/cancellation handling, files changed, and per-phase timing validation.
+No configured commit-status checks are present. #66 remains open.
