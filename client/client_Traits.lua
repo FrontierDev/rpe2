@@ -1761,22 +1761,14 @@ function Client:HandleProfileEquipmentRuntimeChange(changeSet)
         traitState.appliedEventAuras = {}
     end
 
-    if self.ActivateEventTraits then
-        self:ActivateEventTraits(eventState, {
-            suppressResolvedRefresh = true,
-            suppressProfileRefresh = true,
-        })
-    elseif self.RefreshTraitRuntimeEntries then
-        self:RefreshTraitRuntimeEntries(eventState)
+    if type(self.QueueEventTraitRuntimeRefresh) ~= "function" then
+        if type(Debug) == "table" and type(Debug.Error) == "function" then
+            Debug.Error("Profile equipment runtime change cannot queue event trait refresh.")
+        end
+        return false
     end
 
-    if self.RefreshTraitResolvedState then
-        self:RefreshTraitResolvedState(eventState, "profile-equipment", {
-            suppressProfileRefresh = true,
-        })
-    end
-
-    return true
+    return self:QueueEventTraitRuntimeRefresh(eventState, "profile-equipment")
 end
 
 function Client:ResolveTraitAutoAuraTargets(eventState, ownerUnit, targetScope)

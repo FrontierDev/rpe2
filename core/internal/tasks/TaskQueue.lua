@@ -167,12 +167,12 @@ local function releaseSliceableJob(job, outcome, reason)
     job.finalized = true
     Tasks.JobsById[job.id] = nil
     local state = job.state
-    if outcome == "cancelled" and type(job.onCancel) == "function" then
+    if (outcome == "cancelled" or outcome == "failed") and type(job.onCancel) == "function" then
         local ok, err = xpcall(function()
             job.onCancel(state, reason, job)
         end, formatError)
         if not ok then
-            logError("Task queue sliceable cancellation handler failed for '%s': %s", tostring(job.label or job.id), err)
+            logError("Task queue sliceable terminal handler failed for '%s': %s", tostring(job.label or job.id), err)
         end
     elseif outcome == "completed" and type(job.onComplete) == "function" then
         local ok, err = xpcall(function()

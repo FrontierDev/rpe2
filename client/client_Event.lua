@@ -693,19 +693,19 @@ local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
         return true
     end
 
-    if runtime.traitRuntimeRefreshed ~= true and type(targetClient.RefreshTraitRuntimeEntries) == "function" then
+    if runtime.traitRuntimeRefreshed ~= true then
         local phaseTimer = startTiming("Event startup phase: trait-runtime", 8, queuedEventId)
-        runtime.traitRuntimeContinuation = runtime.traitRuntimeContinuation
-            or (type(targetClient.CreateTraitRuntimeRefreshContinuation) == "function"
-                and targetClient:CreateTraitRuntimeRefreshContinuation(eventState)
-                or nil)
-        local completed = runtime.traitRuntimeContinuation == nil
-        if runtime.traitRuntimeContinuation and type(targetClient.StepTraitRuntimeRefreshContinuation) == "function" then
-            completed = targetClient:StepTraitRuntimeRefreshContinuation(runtime.traitRuntimeContinuation, deadlineMs) == true
-        elseif runtime.traitRuntimeContinuation == nil then
-            targetClient:RefreshTraitRuntimeEntries(eventState)
-            completed = true
+        if type(targetClient.CreateTraitRuntimeRefreshContinuation) ~= "function"
+            or type(targetClient.StepTraitRuntimeRefreshContinuation) ~= "function"
+        then
+            error("Event startup trait-runtime continuation is unavailable.")
         end
+        runtime.traitRuntimeContinuation = runtime.traitRuntimeContinuation
+            or targetClient:CreateTraitRuntimeRefreshContinuation(eventState)
+        if type(runtime.traitRuntimeContinuation) ~= "table" then
+            error("Event startup trait-runtime continuation could not be created.")
+        end
+        local completed = targetClient:StepTraitRuntimeRefreshContinuation(runtime.traitRuntimeContinuation, deadlineMs) == true
         if phaseTimer then
             stopEventTiming(phaseTimer, eventState, {
                 startupPhase = "trait-runtime",
@@ -721,19 +721,19 @@ local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
         return true
     end
 
-    if runtime.automaticAurasSynced ~= true and type(targetClient.SyncAutomaticTraitAuras) == "function" then
+    if runtime.automaticAurasSynced ~= true then
         local phaseTimer = startTiming("Event startup phase: automatic-auras", 8, queuedEventId)
-        runtime.automaticAuraContinuation = runtime.automaticAuraContinuation
-            or (type(targetClient.CreateAutomaticTraitAuraContinuation) == "function"
-                and targetClient:CreateAutomaticTraitAuraContinuation(eventState, { suppressResolvedRefresh = true })
-                or nil)
-        local completed = runtime.automaticAuraContinuation == nil
-        if runtime.automaticAuraContinuation and type(targetClient.StepAutomaticTraitAuraContinuation) == "function" then
-            completed = targetClient:StepAutomaticTraitAuraContinuation(runtime.automaticAuraContinuation, deadlineMs) == true
-        elseif runtime.automaticAuraContinuation == nil then
-            targetClient:SyncAutomaticTraitAuras(eventState, { suppressResolvedRefresh = true })
-            completed = true
+        if type(targetClient.CreateAutomaticTraitAuraContinuation) ~= "function"
+            or type(targetClient.StepAutomaticTraitAuraContinuation) ~= "function"
+        then
+            error("Event startup automatic-aura continuation is unavailable.")
         end
+        runtime.automaticAuraContinuation = runtime.automaticAuraContinuation
+            or targetClient:CreateAutomaticTraitAuraContinuation(eventState, { suppressResolvedRefresh = true })
+        if type(runtime.automaticAuraContinuation) ~= "table" then
+            error("Event startup automatic-aura continuation could not be created.")
+        end
+        local completed = targetClient:StepAutomaticTraitAuraContinuation(runtime.automaticAuraContinuation, deadlineMs) == true
         if phaseTimer then
             stopEventTiming(phaseTimer, eventState, {
                 startupPhase = "automatic-auras",
@@ -749,19 +749,19 @@ local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
         return true
     end
 
-    if runtime.eventAurasSynced ~= true and type(targetClient.SyncEventAuras) == "function" then
+    if runtime.eventAurasSynced ~= true then
         local phaseTimer = startTiming("Event startup phase: event-auras", 8, queuedEventId)
-        runtime.eventAuraContinuation = runtime.eventAuraContinuation
-            or (type(targetClient.CreateEventAuraContinuation) == "function"
-                and targetClient:CreateEventAuraContinuation(eventState, { suppressResolvedRefresh = true })
-                or nil)
-        local completed = runtime.eventAuraContinuation == nil
-        if runtime.eventAuraContinuation and type(targetClient.StepEventAuraContinuation) == "function" then
-            completed = targetClient:StepEventAuraContinuation(runtime.eventAuraContinuation, deadlineMs) == true
-        elseif runtime.eventAuraContinuation == nil then
-            targetClient:SyncEventAuras(eventState, { suppressResolvedRefresh = true })
-            completed = true
+        if type(targetClient.CreateEventAuraContinuation) ~= "function"
+            or type(targetClient.StepEventAuraContinuation) ~= "function"
+        then
+            error("Event startup event-aura continuation is unavailable.")
         end
+        runtime.eventAuraContinuation = runtime.eventAuraContinuation
+            or targetClient:CreateEventAuraContinuation(eventState, { suppressResolvedRefresh = true })
+        if type(runtime.eventAuraContinuation) ~= "table" then
+            error("Event startup event-aura continuation could not be created.")
+        end
+        local completed = targetClient:StepEventAuraContinuation(runtime.eventAuraContinuation, deadlineMs) == true
         if phaseTimer then
             stopEventTiming(phaseTimer, eventState, {
                 startupPhase = "event-auras",
@@ -930,7 +930,12 @@ local function queueEventStartupWork(client, eventState, reason)
                 if type(currentEventState) == "table"
                     and currentEventState.active == true
                     and tostring(currentEventState.id or "") == tostring(work and work.eventId or "")
+                    and type(currentRuntime) == "table"
                 then
+                    currentRuntime.traitRuntimeRefreshed = false
+                    currentRuntime.automaticAurasSynced = false
+                    currentRuntime.eventAurasSynced = false
+                    currentRuntime.resolvedStateRefreshed = false
                     queueEventStartupWork(targetClient, currentEventState, "startup-stale-restart")
                 end
             end
@@ -961,6 +966,32 @@ local function queueEventStartupWork(client, eventState, reason)
 
     runtime.queued = false
     return false
+end
+
+local function queueEventTraitRuntimeRefresh(client, eventState, reason)
+    if type(client) ~= "table" or type(eventState) ~= "table" or eventState.active ~= true then
+        return false
+    end
+
+    -- A roster delta invalidates target selection and derived output. Cancel the
+    -- old event-scoped state machine first, then let startup replay the same
+    -- ordered phases against the new roster.
+    cancelEventSliceableWork(client, eventState.id, reason or "event-units-changed")
+    local runtime = getEventStartupRuntime(client, eventState.id, true)
+    if type(runtime) ~= "table" then
+        return false
+    end
+
+    runtime.queued = false
+    runtime.traitRuntimeRefreshed = false
+    runtime.automaticAurasSynced = false
+    runtime.eventAurasSynced = false
+    runtime.resolvedStateRefreshed = false
+    return queueEventStartupWork(client, eventState, reason or "event-units-changed")
+end
+
+function Client:QueueEventTraitRuntimeRefresh(eventState, reason)
+    return queueEventTraitRuntimeRefresh(self, eventState, reason)
 end
 
 local function hasLocalSessionMember(sessionState)
@@ -1996,9 +2027,7 @@ function Client:HandleEventUnitDeltaBatch(arguments)
         targeting = true,
         actionBar = true,
     })
-    if self.ActivateEventTraits then
-        self:ActivateEventTraits(eventState)
-    end
+    queueEventTraitRuntimeRefresh(self, eventState, "event-unit-delta-batch")
     return true
 end
 
