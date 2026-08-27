@@ -1539,10 +1539,11 @@ function AuraManager:QueueLocalPlayerDerivedStateRefresh(eventState, options)
             local currentEventState = type(targetClient) == "table" and type(targetClient.GetEventState) == "function"
                 and targetClient:GetEventState()
                 or nil
+            local currentLocalEventId = currentEventState and resolveLocalEventId(currentEventState) or 0
             return type(currentEventState) ~= "table"
                 or currentEventState.active ~= true
                 or tostring(currentEventState.id or "") ~= tostring(state and state.eventId or "")
-                or tonumber(resolveLocalEventId(currentEventState)) ~= tonumber(state and state.localEventId)
+                or tonumber(currentLocalEventId) ~= tonumber(state and state.localEventId)
                 or (type(Profile.IsResolvedStateContinuationCurrent) == "function"
                     and Profile.IsResolvedStateContinuationCurrent(state and state.continuation and state.continuation.profileContinuation) ~= true)
         end,

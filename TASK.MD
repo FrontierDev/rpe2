@@ -1,82 +1,71 @@
-## Rev 5 static validation: FAIL — nested resolver stale signal is swallowed by Profile wrapper
+## Rev 6 in-game validation: FAIL — `aura-derived-state` stale check passes a multi-return into `tonumber`
 
-Validated commit `961e04c04c993e5d95ca3fdc66bd51488ce8f16e` (`Issue #65 rev 5`) against #65 and the existing runtime-performance contract. `TASK.MD` is intentionally ignored.
+Validated commit `22725f82aa10c8b044a30d2ac7dfc6d2afcacb80` (`Issue #65 rev 6`). `TASK.MD` is intentionally ignored.
 
-### What rev 5 fixes correctly
+In-game failure when applying an aura that modifies player stats:
 
-Rev 5 addresses the rev-4 cold aura aggregation blocker:
+```text
+Task queue sliceable stale check failed for 'aura-derived-state':
+.../client/spellcasting/AuraManager.lua:1545: bad argument #2 to '?' (number expected, got table)
+```
 
-- local-player aura stat modifiers now have a continuation-owned aggregate path;
-- aura/effect-key traversal is incremental and checks the supplied deadline;
-- the aggregate is published to the shared bucket cache only after completion and after a final current/stale check;
-- resolved stat completion now reads `context.auraModifiersByStat[statRef]` in O(1) instead of calling the cold `BuildStatModifierTotals(...)` path per stat;
-- the previous explicit derived-stat dependency stack, incremental item/equipment preparation, TaskQueue slicing, event-start continuations, and outbound aura batching remain intact.
+### Root cause
 
-No configured commit-status checks are present.
-
-### Blocking defect: `Profile.StepResolvedStateContinuation()` loses `nil, reason` from the Resolver
-
-The new resolver path correctly treats a nested aura-modifier continuation becoming stale as a terminal stale result:
+`resolveLocalEventId(eventState)` returns two values:
 
 ```lua
-local completed, reason = auraContext.auraManager:StepStatModifierTotalsContinuation(
-    auraContinuation,
-    deadlineMs
-)
-if completed == nil then
-    return nil, reason or "aura-stale"
+return tonumber(localUnit and localUnit.eventID) or 0, localUnit
+```
+
+But the `aura-derived-state` stale check currently does:
+
+```lua
+or tonumber(resolveLocalEventId(currentEventState)) ~= tonumber(state and state.localEventId)
+```
+
+In Lua, because `resolveLocalEventId(currentEventState)` is the sole argument expression to `tonumber`, **both** return values are forwarded. The call therefore becomes effectively:
+
+```lua
+tonumber(numericEventId, localUnitTable)
+```
+
+The second argument to `tonumber` is its optional numeric base, so passing the local-unit table produces exactly the observed error: `bad argument #2 ... (number expected, got table)`.
+
+The TaskQueue catches this as a stale-check error, so the derived-state job is cancelled instead of refreshing the stat-modifying aura state.
+
+### Required fix
+
+Capture only the first return value before comparing it. Prefer the explicit local form:
+
+```lua
+isStale = function(state)
+    local targetClient = state and state.client or nil
+    local currentEventState = type(targetClient) == "table" and type(targetClient.GetEventState) == "function"
+        and targetClient:GetEventState()
+        or nil
+    local currentLocalEventId = currentEventState and resolveLocalEventId(currentEventState) or 0
+
+    return type(currentEventState) ~= "table"
+        or currentEventState.active ~= true
+        or tostring(currentEventState.id or "") ~= tostring(state and state.eventId or "")
+        or tonumber(currentLocalEventId) ~= tonumber(state and state.localEventId)
+        or (type(Profile.IsResolvedStateContinuationCurrent) == "function"
+            and Profile.IsResolvedStateContinuationCurrent(state and state.continuation and state.continuation.profileContinuation) ~= true)
 end
 ```
 
-However `core/internal/profile/Profile.lua` currently wraps the resolver like this:
+Alternatively, `(resolveLocalEventId(currentEventState))` can force a single return value, but the named local is clearer and less error-prone.
 
-```lua
-local completed = Resolver.StepResolvedStateContinuation(
-    continuation.resolverContinuation,
-    deadlineMs
-) == true
-if not completed then
-    return false
-end
-```
+Also audit this file/repo for any other calls that pass a multi-return helper directly into `tonumber(...)` or another function with optional trailing arguments. Code search currently finds this `tonumber(resolveLocalEventId(...))` occurrence as the relevant one.
 
-That boolean coercion discards the resolver's terminal stale signal. `nil, "aura-stale"` becomes ordinary `false`.
+### Revalidation
 
-The outer local-player derived-state continuation explicitly depends on `Profile.StepResolvedStateContinuation(...)` preserving `nil, reason`:
+After the fix:
 
-```lua
-local completed, reason = Profile.StepResolvedStateContinuation(...)
-if completed == nil then
-    return nil, reason or "profile-stale"
-end
-if completed ~= true then
-    return false
-end
-```
-
-So the newly added nested stale contract is broken at the Profile layer. Instead of aborting/discarding stale work, the parent can treat the stale resolver as merely incomplete and attempt to resume it again. This violates #65's requirements that stale event/config/runtime work be rejected safely and that cancelled/stale continuation state not be allowed to continue toward publication.
-
-## Required fix
-
-Preserve the Resolver's tri-state result in `Profile.StepResolvedStateContinuation()` instead of coercing it immediately to boolean. For example:
-
-```lua
-local completed, reason = Resolver.StepResolvedStateContinuation(
-    continuation.resolverContinuation,
-    deadlineMs
-)
-if completed == nil then
-    return nil, reason or "resolver-stale"
-end
-if completed ~= true then
-    return false
-end
-```
-
-Then continue the existing successful-completion path unchanged.
-
-Do not convert terminal/stale resolver results to ordinary incomplete results. The outer `AuraManager:StepLocalPlayerDerivedStateContinuation()` already has the correct tri-state handling and should receive the propagated reason.
-
-After this fix, re-run static validation. If no additional blocker appears, #65 should proceed to the mandatory in-game high-content event/startup gate with timings enabled, including a stale/cancel restart check.
+1. `/reload` with no Lua errors.
+2. Enable timings and enter an event.
+3. Apply/remove a stat-modifying aura to the local player.
+4. Confirm no `aura-derived-state` stale-check error, stats/resources update correctly, and the derived-state job completes.
+5. Re-run the remaining #65 gate: bounded slice timings and stale event restart/cancellation without stale publication.
 
 #65 remains open.
