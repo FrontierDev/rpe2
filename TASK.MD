@@ -1,60 +1,82 @@
-## Rev 4 static validation: FAIL — cold aura stat aggregation can still monopolize one slice
+## Rev 5 static validation: FAIL — nested resolver stale signal is swallowed by Profile wrapper
 
-Validated commit `c35396bf98a142e0ed70a81d8d524181e5862a80` (`Issue #65 rev 4`) against #65, the runtime-performance plan, and the previous rev-3 failure. `TASK.MD` is intentionally ignored.
+Validated commit `961e04c04c993e5d95ca3fdc66bd51488ce8f16e` (`Issue #65 rev 5`) against #65 and the existing runtime-performance contract. `TASK.MD` is intentionally ignored.
 
-### What rev 4 fixes correctly
+### What rev 5 fixes correctly
 
-The prior Lua scoping blocker is fixed correctly. `Resolver.lua` now forward-declares `shouldYieldResolvedStateContinuation` before `stepResolvedStatComponents(...)` and assigns the function later, so the continuation no longer resolves a nil global at the yield check.
+Rev 5 addresses the rev-4 cold aura aggregation blocker:
 
-The other #65 architecture remains in place:
-
-- explicit TaskQueue sliceable jobs with ~2 ms deadlines, diagnostics, cancellation/stale hooks and normal `Enqueue` compatibility;
-- event startup uses explicit trait-runtime, automatic-aura, event-aura and resolved-state continuations with no monolithic fallback;
-- derived-stat dependency traversal uses an explicit continuation stack with a deadline check between dependency operations;
-- item/equipment preparation is incremental rather than `equipped slots × dataset.items` synchronous scanning;
-- outbound aura flushing remains incremental/batched.
+- local-player aura stat modifiers now have a continuation-owned aggregate path;
+- aura/effect-key traversal is incremental and checks the supplied deadline;
+- the aggregate is published to the shared bucket cache only after completion and after a final current/stale check;
+- resolved stat completion now reads `context.auraModifiersByStat[statRef]` in O(1) instead of calling the cold `BuildStatModifierTotals(...)` path per stat;
+- the previous explicit derived-stat dependency stack, incremental item/equipment preparation, TaskQueue slicing, event-start continuations, and outbound aura batching remain intact.
 
 No configured commit-status checks are present.
 
-### Blocking defect: one resolved-stat completion still performs an unbounded cold aura scan
+### Blocking defect: `Profile.StepResolvedStateContinuation()` loses `nil, reason` from the Resolver
 
-The converted resolved-state path is not yet fully frame-bounded.
-
-`completeResolvedStatFrame(...)` still obtains aura modifiers via `resolveAuraBonusesForStat(...)`, which synchronously calls:
+The new resolver path correctly treats a nested aura-modifier continuation becoming stale as a terminal stale result:
 
 ```lua
-AuraManager:BuildStatModifierTotals(eventState, unitEventId, statRef)
+local completed, reason = auraContext.auraManager:StepStatModifierTotalsContinuation(
+    auraContinuation,
+    deadlineMs
+)
+if completed == nil then
+    return nil, reason or "aura-stale"
+end
 ```
 
-On a cache hit that is fine. On a cache miss, however, `BuildStatModifierTotals(...)` performs content-scaled work before returning:
+However `core/internal/profile/Profile.lua` currently wraps the resolver like this:
 
-1. `getBucketAuraEntriesForTarget(...)` materializes the full aura list for the target;
-2. it loops over every target aura;
-3. for each aura it obtains/builds the aura runtime;
-4. it loops that aura's effect keys and calls the effect accumulator.
+```lua
+local completed = Resolver.StepResolvedStateContinuation(
+    continuation.resolverContinuation,
+    deadlineMs
+) == true
+if not completed then
+    return false
+end
+```
 
-So a single call to `completeResolvedStatFrame(...)` can still execute `target auras × aura effects` synchronously. The next `shouldYieldResolvedStateContinuation(deadlineMs)` check happens only **after** that whole call returns.
+That boolean coercion discards the resolver's terminal stale signal. `nil, "aura-stale"` becomes ordinary `false`.
 
-This is particularly relevant during event startup because the aura synchronization immediately preceding resolved-state refresh changes the aura bucket revision, making the per-stat modifier cache cold. With many auras/effects, one nominal continuation operation can therefore still become a long indivisible frame.
+The outer local-player derived-state continuation explicitly depends on `Profile.StepResolvedStateContinuation(...)` preserving `nil, reason`:
 
-That violates #65's explicit acceptance criterion:
+```lua
+local completed, reason = Profile.StepResolvedStateContinuation(...)
+if completed == nil then
+    return nil, reason or "profile-stale"
+end
+if completed ~= true then
+    return false
+end
+```
 
-> No converted slice processes its full potentially-large collection unconditionally in one call.
-
-and the requirement that the converted `resolved trait-state refresh` path be genuinely frame-bounded.
+So the newly added nested stale contract is broken at the Profile layer. Instead of aborting/discarding stale work, the parent can treat the stale resolver as merely incomplete and attempt to resume it again. This violates #65's requirements that stale event/config/runtime work be rejected safely and that cancelled/stale continuation state not be allowed to continue toward publication.
 
 ## Required fix
 
-Make local-player aura stat-modifier aggregation cooperative for the derived-state continuation. A good design is to build the aura modifier map once, incrementally, before stat rows are finalized:
+Preserve the Resolver's tri-state result in `Profile.StepResolvedStateContinuation()` instead of coercing it immediately to boolean. For example:
 
-1. Add continuation-owned state for the local unit's aura modifier aggregation, keyed by the current event id / aura bucket revision / configuration revision.
-2. Iterate the target aura key list directly with retained `auraIndex` / `effectIndex` state and check the supplied deadline between aura/effect operations. Do not materialize and scan the entire target-aura collection inside one helper call.
-3. Accumulate all affected stat refs into a temporary map such as `statRef -> { flat, percent }`, preserving the existing `contract:Accumulate(...)` semantics and effect order.
-4. `completeResolvedStatFrame(...)` should then read the prepared map in O(1) rather than call cold `BuildStatModifierTotals(...)` per stat.
-5. Preserve the existing AuraManager cache semantics where useful, but only publish/populate shared cache entries once the continuation is complete and still current. Stale/cancelled work must not expose a partial aggregate.
-6. If cold `buildAuraRuntimeEntry(...)` itself can process an unbounded effect/event collection for one aura, either make that preparation cooperative as part of the same continuation or ensure the required runtime data is already prepared by the preceding sliced aura-sync phase. Do not hide another unbounded nested loop inside one aura step.
-7. Preserve event/config/aura revision staleness checks and final stat/resource results exactly.
+```lua
+local completed, reason = Resolver.StepResolvedStateContinuation(
+    continuation.resolverContinuation,
+    deadlineMs
+)
+if completed == nil then
+    return nil, reason or "resolver-stale"
+end
+if completed ~= true then
+    return false
+end
+```
 
-After this is fixed, static re-validation should confirm that the full cold event-start resolved-state path has no remaining potentially-large collection traversal hidden between deadline checks. Then proceed to the mandatory in-game high-content startup test with timings enabled.
+Then continue the existing successful-completion path unchanged.
+
+Do not convert terminal/stale resolver results to ordinary incomplete results. The outer `AuraManager:StepLocalPlayerDerivedStateContinuation()` already has the correct tri-state handling and should receive the propagated reason.
+
+After this fix, re-run static validation. If no additional blocker appears, #65 should proceed to the mandatory in-game high-content event/startup gate with timings enabled, including a stale/cancel restart check.
 
 #65 remains open.

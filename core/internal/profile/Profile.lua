@@ -823,7 +823,13 @@ function Profile.StepResolvedStateContinuation(continuation, deadlineMs)
         return nil, "missing-resolver"
     end
 
-    local completed = Resolver.StepResolvedStateContinuation(continuation.resolverContinuation, deadlineMs) == true
+    local completed, reason = Resolver.StepResolvedStateContinuation(
+        continuation.resolverContinuation,
+        deadlineMs
+    )
+    if completed == nil then
+        return nil, reason or "resolver-stale"
+    end
     if not completed then
         return false
     end
