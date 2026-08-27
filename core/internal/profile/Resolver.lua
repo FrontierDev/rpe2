@@ -480,11 +480,15 @@ local function resolveLocalAuraContext(options)
     end
 
     local auraManager = type(client) == "table" and client.Spellcasting and client.Spellcasting.AuraManager or nil
-    if type(auraManager) ~= "table" or type(auraManager.BuildStatModifierTotals) ~= "function" then
+    if type(auraManager) ~= "table"
+        or type(auraManager.BuildStatModifierTotals) ~= "function"
+        or type(auraManager.CreateStatModifierTotalsContinuation) ~= "function"
+    then
         return nil
     end
 
     return {
+        client = client,
         auraManager = auraManager,
         eventState = eventState,
         unitEventId = unitEventId,
@@ -914,7 +918,11 @@ local function completeResolvedStatFrame(frame, context)
         + frame.classBaseValue
         + frame.profileBonusBaseValue
         + frame.traitBonusBaseValue
-    local auraFlatBonus, auraPercentBonus = resolveAuraBonusesForStat(context.auraContext, entry.ref)
+    local auraTotals = type(context.auraModifiersByStat) == "table"
+        and context.auraModifiersByStat[entry.ref]
+        or nil
+    local auraFlatBonus = tonumber(auraTotals and auraTotals.flat) or 0
+    local auraPercentBonus = tonumber(auraTotals and auraTotals.percent) or 0
     local value = baseValue + frame.derivedContribution + frame.equipmentBonus + auraFlatBonus
     local totalPercentBonus = frame.traitPercentBonus + auraPercentBonus
     if totalPercentBonus ~= 0 then
@@ -1647,6 +1655,7 @@ function Resolver.CreateResolvedStateContinuation(options)
             profileBonuses = {},
             bonuses = equipmentBonuses,
             auraContext = nil,
+            auraModifiersByStat = {},
             progressionContext = {
                 level = 1,
                 useFallback = true,
@@ -1718,6 +1727,36 @@ function Resolver.StepResolvedStateContinuation(continuation, deadlineMs)
             end
         elseif continuation.phase == "prepare-aura" then
             continuation.context.auraContext = resolveLocalAuraContext(continuation.options)
+            continuation.context.auraModifiersByStat = {}
+            if continuation.context.auraContext == nil then
+                continuation.phase = "prepare-progression"
+            else
+                local auraContext = continuation.context.auraContext
+                continuation.auraModifierContinuation = auraContext.auraManager:CreateStatModifierTotalsContinuation(
+                    auraContext.client,
+                    auraContext.eventState,
+                    auraContext.unitEventId
+                )
+                if type(continuation.auraModifierContinuation) ~= "table" then
+                    error("Resolved-state aura modifier continuation is unavailable.")
+                end
+                continuation.phase = "prepare-aura-modifiers"
+            end
+        elseif continuation.phase == "prepare-aura-modifiers" then
+            local auraContext = continuation.context.auraContext
+            local auraContinuation = continuation.auraModifierContinuation
+            local completed, reason = auraContext.auraManager:StepStatModifierTotalsContinuation(
+                auraContinuation,
+                deadlineMs
+            )
+            if completed == nil then
+                return nil, reason or "aura-stale"
+            end
+            if completed ~= true then
+                return false
+            end
+            continuation.context.auraModifiersByStat = auraContinuation.modifiersByStat or {}
+            continuation.auraModifierContinuation = nil
             continuation.phase = "prepare-progression"
         elseif continuation.phase == "prepare-progression" then
             if advanceProgressionPreparation(continuation) then

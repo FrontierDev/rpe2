@@ -197,6 +197,7 @@ local function ensureBucket(client, eventId, createIfMissing)
         controlStateByTarget = {},
         revision = 1,
         statModifierTotalsCache = {},
+        statModifierAggregateCache = {},
     }
     client.ActiveAurasByEventId[normalizedEventId] = bucket
     return bucket
@@ -209,6 +210,7 @@ local function bumpAuraBucketRevision(bucket)
 
     bucket.revision = math.max(1, math.floor(tonumber(bucket.revision) or 1) + 1)
     bucket.statModifierTotalsCache = {}
+    bucket.statModifierAggregateCache = {}
 
     local combat = Addon.Client and Addon.Client.Combat or nil
     if type(combat) == "table" and type(combat.BumpCombatRuntimeRevision) == "function" then
@@ -575,6 +577,71 @@ sortedNumericKeys = function(values)
         return left.sortKey < right.sortKey
     end)
     return keys
+end
+
+local function createSortedNumericKeyContinuation(values)
+    return {
+        values = type(values) == "table" and values or {},
+        scanKey = nil,
+        keys = {},
+        phase = "scan",
+        sortIndex = 2,
+        sortCompareIndex = nil,
+        sortValue = nil,
+    }
+end
+
+local function stepSortedNumericKeyContinuation(state)
+    if type(state) ~= "table" then
+        return true
+    end
+
+    if state.phase == "scan" then
+        local key = next(state.values, state.scanKey)
+        state.scanKey = key
+        if key == nil then
+            state.phase = "sort"
+            state.sortIndex = 2
+            state.sortCompareIndex = nil
+            state.sortValue = nil
+        else
+            local numericKey = tonumber(key)
+            if numericKey and numericKey > 0 and math.floor(numericKey) == numericKey then
+                state.keys[#state.keys + 1] = {
+                    sortKey = numericKey,
+                    key = key,
+                }
+            end
+        end
+        return false
+    end
+
+    if state.phase == "sort" then
+        if state.sortIndex > #state.keys then
+            state.phase = "complete"
+            return true
+        end
+
+        if state.sortValue == nil then
+            state.sortValue = state.keys[state.sortIndex]
+            state.sortCompareIndex = state.sortIndex - 1
+        end
+
+        if state.sortCompareIndex >= 1
+            and state.keys[state.sortCompareIndex].sortKey > state.sortValue.sortKey
+        then
+            state.keys[state.sortCompareIndex + 1] = state.keys[state.sortCompareIndex]
+            state.sortCompareIndex = state.sortCompareIndex - 1
+        else
+            state.keys[state.sortCompareIndex + 1] = state.sortValue
+            state.sortIndex = state.sortIndex + 1
+            state.sortCompareIndex = nil
+            state.sortValue = nil
+        end
+        return false
+    end
+
+    return true
 end
 
 local function normalizeStackBehavior(value)
@@ -3856,6 +3923,224 @@ function AuraManager:AdvanceAuraState(client, previousTurnNumber, previousTickNu
     return queued
 end
 
+local function getAuraConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
+local function buildStatModifierTotalsCacheKey(unitEventId, statRef, revision, configurationRevision)
+    return ("%d:%s:%d:%d"):format(
+        tonumber(unitEventId) or 0,
+        tostring(statRef or ""),
+        tonumber(revision) or 0,
+        tonumber(configurationRevision) or 0
+    )
+end
+
+local function buildStatModifierAggregateCacheKey(eventId, unitEventId, revision, configurationRevision)
+    return ("%s:%d:%d:%d"):format(
+        tostring(eventId or ""),
+        tonumber(unitEventId) or 0,
+        tonumber(revision) or 0,
+        tonumber(configurationRevision) or 0
+    )
+end
+
+local function isStatModifierContinuationCurrent(continuation)
+    if type(continuation) ~= "table" then
+        return false
+    end
+
+    local client = type(continuation.client) == "table" and continuation.client or Client
+    local currentEventState = type(client.GetEventState) == "function" and client:GetEventState() or client.EventState
+    if type(currentEventState) ~= "table"
+        or currentEventState.active ~= true
+        or tostring(currentEventState.id or "") ~= tostring(continuation.eventId or "")
+        or (type(continuation.eventState) == "table" and currentEventState ~= continuation.eventState)
+    then
+        return false
+    end
+    local currentLocalUnit = resolveLocalEventUnit(currentEventState)
+    if tonumber(currentLocalUnit and currentLocalUnit.eventID) ~= tonumber(continuation.unitEventId) then
+        return false
+    end
+
+    local currentBucket = ensureBucket(client, continuation.eventId, false)
+    if currentBucket ~= continuation.bucket then
+        return false
+    end
+    if currentBucket
+        and math.floor(tonumber(currentBucket.revision) or 0) ~= tonumber(continuation.auraRevision)
+    then
+        return false
+    end
+
+    return getAuraConfigurationRevision() == tonumber(continuation.configurationRevision)
+end
+
+function AuraManager:CreateStatModifierTotalsContinuation(client, eventState, unitEventId)
+    local targetClient = type(client) == "table" and client or Client
+    local eventId = tostring(eventState and eventState.id or "")
+    local numericUnitEventId = tonumber(unitEventId) or 0
+    if type(eventState) ~= "table"
+        or eventState.active ~= true
+        or eventId == ""
+        or numericUnitEventId <= 0
+    then
+        return nil
+    end
+
+    local bucket = self:GetEventAuraBucket(targetClient, eventId, false)
+    local revision = math.max(0, math.floor(tonumber(bucket and bucket.revision) or 0))
+    local configurationRevision = getAuraConfigurationRevision()
+    local aggregateCacheKey = buildStatModifierAggregateCacheKey(
+        eventId,
+        numericUnitEventId,
+        revision,
+        configurationRevision
+    )
+    local cached = type(bucket) == "table"
+        and type(bucket.statModifierAggregateCache) == "table"
+        and bucket.statModifierAggregateCache[aggregateCacheKey]
+        or nil
+
+    return {
+        client = targetClient,
+        eventState = eventState,
+        eventId = eventId,
+        unitEventId = numericUnitEventId,
+        bucket = bucket,
+        auraRevision = revision,
+        configurationRevision = configurationRevision,
+        aggregateCacheKey = aggregateCacheKey,
+        auraKeys = type(bucket) == "table"
+            and type(bucket.auraKeysByTarget) == "table"
+            and type(bucket.auraKeysByTarget[numericUnitEventId]) == "table"
+            and bucket.auraKeysByTarget[numericUnitEventId]
+            or {},
+        auraIndex = 1,
+        currentAura = nil,
+        currentDefinition = nil,
+        targetUnit = nil,
+        targetUnitResolved = false,
+        effectKeyContinuation = nil,
+        effectKeys = nil,
+        effectIndex = 1,
+        modifiersByStat = type(cached) == "table" and cached or {},
+        failedStatRefs = {},
+        phase = type(cached) == "table" and "complete" or "auras",
+    }
+end
+
+function AuraManager:StepStatModifierTotalsContinuation(continuation, deadlineMs)
+    if type(continuation) ~= "table" then
+        return true
+    end
+    if not isStatModifierContinuationCurrent(continuation) then
+        return nil, "aura-stale"
+    end
+    if continuation.phase == "complete" then
+        return true
+    end
+
+    while true do
+        if continuation.phase == "auras" then
+            local auraKey = continuation.auraKeys[continuation.auraIndex]
+            if auraKey == nil then
+                continuation.phase = "publish"
+            else
+                continuation.auraIndex = continuation.auraIndex + 1
+                local entry = continuation.bucket.byKey and continuation.bucket.byKey[auraKey] or nil
+                if type(entry) == "table"
+                    and (tonumber(entry.stacks) or 0) > 0
+                    and type(entry.definition) == "table"
+                then
+                    if not continuation.targetUnitResolved then
+                        continuation.targetUnit = findEventUnit(
+                            continuation.eventState or (type(continuation.client.GetEventState) == "function" and continuation.client:GetEventState()),
+                            continuation.unitEventId
+                        )
+                        continuation.targetUnitResolved = true
+                    end
+                    continuation.currentAura = entry
+                    continuation.currentDefinition = entry.definition
+                    continuation.effectKeyContinuation = createSortedNumericKeyContinuation(entry.definition.effects)
+                    continuation.effectKeys = nil
+                    continuation.effectIndex = 1
+                    continuation.currentCasterUnit = findEventUnit(
+                        continuation.eventState or (type(continuation.client.GetEventState) == "function" and continuation.client:GetEventState()),
+                        entry.casterEventId
+                    )
+                    continuation.phase = "effect-keys"
+                end
+            end
+        elseif continuation.phase == "effect-keys" then
+            if stepSortedNumericKeyContinuation(continuation.effectKeyContinuation) then
+                continuation.effectKeys = continuation.effectKeyContinuation.keys
+                continuation.effectKeyContinuation = nil
+                continuation.effectIndex = 1
+                continuation.phase = "effects"
+            end
+        elseif continuation.phase == "effects" then
+            local keyEntry = continuation.effectKeys[continuation.effectIndex]
+            if keyEntry == nil then
+                continuation.currentAura = nil
+                continuation.currentDefinition = nil
+                continuation.currentCasterUnit = nil
+                continuation.effectKeys = nil
+                continuation.phase = "auras"
+            else
+                continuation.effectIndex = continuation.effectIndex + 1
+                local effect = continuation.currentDefinition.effects[keyEntry.key]
+                local statRef = normalizeRef(effect and effect.statRef)
+                local contract = statRef and self:GetEffect(effect and effect.type or nil) or nil
+                if statRef
+                    and type(continuation.currentCasterUnit) == "table"
+                    and contract
+                    and type(contract.Accumulate) == "function"
+                    and not continuation.failedStatRefs[statRef]
+                then
+                    local accumulator = continuation.modifiersByStat[statRef]
+                    if type(accumulator) ~= "table" then
+                        accumulator = { flat = 0, percent = 0 }
+                        continuation.modifiersByStat[statRef] = accumulator
+                    end
+                    local ok = pcall(contract.Accumulate, contract, {
+                        aura = continuation.currentAura,
+                        auraDefinition = continuation.currentDefinition,
+                        eventState = continuation.eventState
+                            or (type(continuation.client.GetEventState) == "function" and continuation.client:GetEventState()),
+                        casterUnit = continuation.currentCasterUnit,
+                        targetUnit = continuation.targetUnit,
+                        statRef = statRef,
+                    }, effect, accumulator)
+                    if not ok then
+                        continuation.failedStatRefs[statRef] = true
+                        continuation.modifiersByStat[statRef] = nil
+                    end
+                end
+            end
+        else
+            if not isStatModifierContinuationCurrent(continuation) then
+                return nil, "aura-stale"
+            end
+            local bucket = continuation.bucket
+            if type(bucket) ~= "table" then
+                continuation.phase = "complete"
+                return true
+            end
+            bucket.statModifierAggregateCache = bucket.statModifierAggregateCache or {}
+            bucket.statModifierAggregateCache[continuation.aggregateCacheKey] = continuation.modifiersByStat
+            continuation.failedStatRefs = nil
+            continuation.phase = "complete"
+            return true
+        end
+
+        if shouldYieldAuraSlice(deadlineMs) then
+            return false
+        end
+    end
+end
+
 function AuraManager:BuildStatModifierTotals(eventState, unitEventId, statRef)
     local bucket = self:GetEventAuraBucket(Client, eventState and eventState.id or nil, false)
     if not bucket then
@@ -3873,12 +4158,36 @@ function AuraManager:BuildStatModifierTotals(eventState, unitEventId, statRef)
     end
 
     bucket.statModifierTotalsCache = bucket.statModifierTotalsCache or {}
+    bucket.statModifierAggregateCache = bucket.statModifierAggregateCache or {}
     local revision = math.max(0, math.floor(tonumber(bucket.revision) or 0))
-    local configurationRevision = math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
-    local cacheKey = ("%d:%s:%d:%d"):format(numericUnitEventId, normalizedStatRef, revision, configurationRevision)
+    local configurationRevision = getAuraConfigurationRevision()
+    local cacheKey = buildStatModifierTotalsCacheKey(
+        numericUnitEventId,
+        normalizedStatRef,
+        revision,
+        configurationRevision
+    )
     local cached = bucket.statModifierTotalsCache[cacheKey]
     if type(cached) == "table" then
         return tonumber(cached.flat) or 0, tonumber(cached.percent) or 0
+    end
+
+    local aggregateCacheKey = buildStatModifierAggregateCacheKey(
+        eventState and eventState.id or nil,
+        numericUnitEventId,
+        revision,
+        configurationRevision
+    )
+    local aggregate = bucket.statModifierAggregateCache[aggregateCacheKey]
+    if type(aggregate) == "table" then
+        local aggregateValue = aggregate[normalizedStatRef]
+        local flat = tonumber(aggregateValue and aggregateValue.flat) or 0
+        local percent = tonumber(aggregateValue and aggregateValue.percent) or 0
+        bucket.statModifierTotalsCache[cacheKey] = {
+            flat = flat,
+            percent = percent,
+        }
+        return flat, percent
     end
 
     local flatTotal = 0
