@@ -9,6 +9,7 @@ local Database = Addon.Internal and Addon.Internal.Database or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Ruleset = Addon.Internal and Addon.Internal.Ruleset or {}
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 local Inventory = Addon.Client and Addon.Client.Inventory or {}
 local Conditions = Addon.Client and Addon.Client.Conditions or {}
 local CONSUMABLE_PROMPT_BATCH_SIZE = 8
@@ -82,6 +83,7 @@ end
 Client.TraitRuntimeByEventId = Client.TraitRuntimeByEventId or {}
 Client.TraitRuntimeCompileCache = Client.TraitRuntimeCompileCache or {
     configurationRevision = -1,
+    equipmentRevision = -1,
     activeTraits = nil,
     equippedTraits = nil,
 }
@@ -973,17 +975,23 @@ end
 local function getTraitSourceCache(client)
     client.TraitRuntimeCompileCache = client.TraitRuntimeCompileCache or {
         configurationRevision = -1,
+        equipmentRevision = -1,
         activeTraits = nil,
         equippedTraits = nil,
     }
 
     local cache = client.TraitRuntimeCompileCache
     local configurationRevision = getTraitConfigurationRevision()
+    local equipmentRevision = type(Runtime) == "table" and type(Runtime.GetRevision) == "function"
+        and math.max(0, math.floor(tonumber(Runtime:GetRevision("EquipmentRevision")) or 0))
+        or 0
     if tonumber(cache.configurationRevision) ~= configurationRevision
+        or tonumber(cache.equipmentRevision) ~= equipmentRevision
         or type(cache.activeTraits) ~= "table"
         or type(cache.equippedTraits) ~= "table"
     then
         cache.configurationRevision = configurationRevision
+        cache.equipmentRevision = equipmentRevision
         cache.activeTraits = Profile.ListActiveTraits and Profile.ListActiveTraits()
             or Profile.ListKnownTraits and Profile.ListKnownTraits()
             or {}
@@ -1121,6 +1129,7 @@ function Client:GetTraitRuntimeState(eventId, createIfMissing)
         registeredCombatEvents = {},
         appliedConsumableTraits = {},
         compiledConfigurationRevision = -1,
+        compiledEquipmentRevision = -1,
         compiledConsumableRevision = 0,
         automaticAuraStateByKey = {},
         appliedEventAuras = {},
@@ -1449,10 +1458,12 @@ function Client:RefreshTraitRuntimeEntries(eventState)
 
     local ownerUnit = getLocalTraitOwnerUnit(eventState)
     local ownerEventId = math.floor(tonumber(ownerUnit and ownerUnit.eventID) or 0)
-    local _, configurationRevision = getTraitSourceCache(self)
+    local sourceCache, configurationRevision = getTraitSourceCache(self)
+    local equipmentRevision = tonumber(sourceCache and sourceCache.equipmentRevision) or 0
     local consumableRevision = #(state.appliedConsumableTraits or {})
     if state.ownerEventId == ownerEventId
         and tonumber(state.compiledConfigurationRevision) == configurationRevision
+        and tonumber(state.compiledEquipmentRevision) == equipmentRevision
         and tonumber(state.compiledConsumableRevision) == consumableRevision
         and type(state.activeEntries) == "table"
         and type(state.registeredCombatEvents) == "table"
@@ -1462,6 +1473,7 @@ function Client:RefreshTraitRuntimeEntries(eventState)
 
     state.ownerEventId = ownerEventId
     state.compiledConfigurationRevision = configurationRevision
+    state.compiledEquipmentRevision = equipmentRevision
     state.compiledConsumableRevision = consumableRevision
     state.activeEntries = self:BuildActiveTraitEntries(eventState)
     state.registeredCombatEvents = buildRegisteredTraitCombatEvents(state.activeEntries)
@@ -1469,10 +1481,10 @@ function Client:RefreshTraitRuntimeEntries(eventState)
     return state
 end
 
-function Client:RefreshTraitResolvedState(eventState, reason)
+function Client:RefreshTraitResolvedState(eventState, reason, options)
     local auraManager = self.Spellcasting and self.Spellcasting.AuraManager or nil
     if type(auraManager) == "table" and type(auraManager.RefreshLocalPlayerDerivedState) == "function" then
-        auraManager:RefreshLocalPlayerDerivedState(eventState)
+        auraManager:RefreshLocalPlayerDerivedState(eventState, options)
     end
 
     if type(self.QueueEventWidgetRefresh) == "function" then
@@ -1491,15 +1503,64 @@ function Client:RefreshTraitResolvedState(eventState, reason)
         self:RefreshActionBarWidget(reason or "traits")
     end
 
-    local profileWindow = self.UI and self.UI.Profile and self.UI.Profile.Window or nil
-    local instance = type(profileWindow) == "table" and profileWindow._singleton or nil
-    if type(instance) == "table" then
-        if type(instance.RefreshVisible) == "function" then
-            instance:RefreshVisible()
-        elseif type(instance.Refresh) == "function" then
-            instance:Refresh()
+    if not (type(options) == "table" and options.suppressProfileRefresh == true) then
+        local profileWindow = self.UI and self.UI.Profile and self.UI.Profile.Window or nil
+        local instance = type(profileWindow) == "table" and profileWindow._singleton or nil
+        if type(instance) == "table" then
+            if type(instance.RefreshVisible) == "function" then
+                instance:RefreshVisible()
+            elseif type(instance.Refresh) == "function" then
+                instance:Refresh()
+            end
         end
     end
+end
+
+function Client:HandleProfileEquipmentRuntimeChange(changeSet)
+    if type(changeSet) ~= "table" then
+        return false
+    end
+
+    local profileChanges = changeSet.profile
+    local revisionChanges = changeSet.revisions
+    local equipmentChanged = (type(profileChanges) == "table" and profileChanges.equipment == true)
+        or (type(revisionChanges) == "table" and revisionChanges.EquipmentRevision ~= nil)
+    if not equipmentChanged then
+        return false
+    end
+
+    if self._lastProfileEquipmentRuntimeChangeSet == changeSet then
+        return false
+    end
+    self._lastProfileEquipmentRuntimeChangeSet = changeSet
+
+    local eventState = self.GetEventState and self:GetEventState() or nil
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return true
+    end
+
+    local traitState = self:GetTraitRuntimeState(eventState.id, true)
+    if type(traitState) == "table" then
+        traitState.automaticAurasApplied = false
+        traitState.appliedEventAuras = {}
+    end
+
+    if self.ActivateEventTraits then
+        self:ActivateEventTraits(eventState, {
+            suppressResolvedRefresh = true,
+            suppressProfileRefresh = true,
+        })
+    elseif self.RefreshTraitRuntimeEntries then
+        self:RefreshTraitRuntimeEntries(eventState)
+    end
+
+    if self.RefreshTraitResolvedState then
+        self:RefreshTraitResolvedState(eventState, "profile-equipment", {
+            suppressProfileRefresh = true,
+        })
+    end
+
+    return true
 end
 
 function Client:ResolveTraitAutoAuraTargets(eventState, ownerUnit, targetScope)
@@ -1531,7 +1592,7 @@ function Client:ResolveTraitAutoAuraTargets(eventState, ownerUnit, targetScope)
     return targets
 end
 
-function Client:ApplyTraitAutomaticAuras(eventState, ownerUnit, payload, sourceEntry, targetUnitOverride)
+function Client:ApplyTraitAutomaticAuras(eventState, ownerUnit, payload, sourceEntry, targetUnitOverride, options)
     local auraManager = self.Spellcasting and self.Spellcasting.AuraManager or nil
     if type(auraManager) ~= "table" or type(auraManager.ApplyAuraFromContext) ~= "function" then
         return false
@@ -1549,6 +1610,7 @@ function Client:ApplyTraitAutomaticAuras(eventState, ownerUnit, payload, sourceE
                 targetUnit = targets[targetIndex],
                 dataset = sourceEntry and sourceEntry.dataset or nil,
                 datasetId = sourceEntry and sourceEntry.datasetId or nil,
+                suppressProfileRefresh = type(options) == "table" and options.suppressProfileRefresh == true,
             }, automaticAura.auraRef, automaticAura.stacks, automaticAura.turns, automaticAura.powerLevel) or changed
         end
     end
@@ -1911,7 +1973,7 @@ function Client:SyncAutomaticTraitAuras(eventState, options)
                     turns = entry.turns,
                     powerLevel = entry.powerLevel,
                 }},
-            }, entry.sourceEntry, entry.targetUnit) or changed
+            }, entry.sourceEntry, entry.targetUnit, options) or changed
         end
         state.automaticAuraStateByKey[key] = {
             auraRef = entry.auraRef,
@@ -1991,7 +2053,7 @@ function Client:SyncEventAuras(eventState, options)
     return changed
 end
 
-function Client:ActivateEventTraits(eventState)
+function Client:ActivateEventTraits(eventState, options)
     local totalStartTime = getTimingNowMilliseconds()
     local localUnit = getLocalTraitOwnerUnit(eventState)
     if type(eventState) ~= "table" or eventState.active ~= true or type(localUnit) ~= "table" then
@@ -2033,9 +2095,12 @@ function Client:ActivateEventTraits(eventState)
             }
         end
     end
-    if changed and self.RefreshTraitResolvedState then
+    if changed
+        and self.RefreshTraitResolvedState
+        and not (type(options) == "table" and options.suppressResolvedRefresh == true)
+    then
         local resolvedRefreshStartTime = timingParts and getTimingNowMilliseconds() or nil
-        self:RefreshTraitResolvedState(eventState, "trait-activate")
+        self:RefreshTraitResolvedState(eventState, "trait-activate", options)
         if resolvedRefreshStartTime then
             timingParts[#timingParts + 1] = {
                 label = "refresh-resolved",
@@ -2048,6 +2113,15 @@ function Client:ActivateEventTraits(eventState)
         logTimingParts("ActivateEventTraits", timingParts, getTimingNowMilliseconds() - totalStartTime, 25)
     end
     return changed
+end
+
+if type(Runtime) == "table"
+    and type(Runtime.RegisterPostCommitListener) == "function"
+    and Client._profileEquipmentRuntimeListenerId == nil
+then
+    Client._profileEquipmentRuntimeListenerId = Runtime:RegisterPostCommitListener(function(changeSet)
+        Client:HandleProfileEquipmentRuntimeChange(changeSet)
+    end)
 end
 
 function Client:CollectEligiblePhaseConsumables(eventState, phase)

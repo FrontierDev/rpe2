@@ -9,6 +9,7 @@ local Database = Addon.Internal.Database or {}
 local TraitClass = Database.Classes and Database.Classes.Trait or {}
 local Equipment = Profile.Equipment or {}
 local Resolver = Profile.Resolver or {}
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 local RECIPE_PROFILE_INTERNAL_TRACE = false
 
 Profile._skillChangeListeners = Profile._skillChangeListeners or {}
@@ -80,6 +81,14 @@ end
 
 local function getInventory()
     return Addon.Client and Addon.Client.Inventory or {}
+end
+
+local function runProfileEquipmentMutation(reason, mutation)
+    if type(Runtime) ~= "table" or type(Runtime.RunTransaction) ~= "function" then
+        error("Profile equipment mutation requires the Runtime transaction module.", 2)
+    end
+
+    return Runtime:RunTransaction(reason, mutation)
 end
 
 local function getDependencies()
@@ -441,14 +450,52 @@ local function getProfileRevision(domain)
     return 0
 end
 
+local function getProfileDynamicResolverRevisionKey()
+    local client = Addon.Client or {}
+    local eventState = type(client.GetEventState) == "function" and client:GetEventState() or client.EventState
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return "inactive"
+    end
+
+    local eventId = tostring(eventState.id or "")
+    local localUnit = type(client.ResolveLocalEventUnit) == "function"
+        and client:ResolveLocalEventUnit(eventState)
+        or nil
+    local unitEventId = tonumber(localUnit and localUnit.eventID) or 0
+    local auraRevision = 0
+    local auraManager = client.Spellcasting and client.Spellcasting.AuraManager or nil
+    if type(auraManager) == "table" and type(auraManager.GetEventAuraRevision) == "function" then
+        auraRevision = math.max(0, math.floor(tonumber(auraManager:GetEventAuraRevision(client, eventId)) or 0))
+    end
+
+    local combat = client.Combat or nil
+    local combatRevision = type(combat) == "table"
+        and math.max(0, math.floor(tonumber(combat.CombatRuntimeRevision) or 0))
+        or 0
+
+    return table.concat({
+        eventId,
+        tostring(unitEventId),
+        tostring(auraRevision),
+        tostring(getProfileRevision("EventRuntimeRevision")),
+        tostring(combatRevision),
+    }, ":")
+end
+
 local function getProfileResolverRevisionKey()
     return table.concat({
         tostring(getProfileRuntimeRevision()),
+        tostring(getProfileRevision("ProfileStateRevision")),
         tostring(getProfileRevision("ProfileStatsRevision")),
         tostring(getProfileRevision("ProfileResourcesRevision")),
         tostring(getProfileRevision("EquipmentRevision")),
         tostring(getProfileRevision("ResolvedProfileRevision")),
+        getProfileDynamicResolverRevisionKey(),
     }, ":")
+end
+
+function Profile.GetResolvedPresentationRevisionKey()
+    return getProfileResolverRevisionKey()
 end
 
 local function getProfileIdentityKey()
@@ -520,30 +567,42 @@ function Profile.WarmResolvedBootstrapState(_)
         return false, readiness
     end
 
-    getCachedResolvedStatLookup({ includeAuraBonuses = false })
+    getCachedResolvedStatLookup(nil)
     getCachedResolvedResourceLookup(nil)
     return true, readiness
 end
 
 local function canUseDefaultResolvedResourceCache(options)
-    return type(options) ~= "table" or next(options) == nil
+    return canUseDefaultResolvedStatCache(options)
 end
 
 local function canUseDefaultResolvedStatCache(options)
+    if options == nil then
+        return true
+    end
+
     if type(options) ~= "table" then
         return false
     end
 
-    local sawBaseStatRequest = false
+    local sawAuraOption = false
     for key, value in pairs(options) do
-        if key == "includeAuraBonuses" and value == false then
-            sawBaseStatRequest = true
+        if key == "includeAuraBonuses" and type(value) == "boolean" then
+            sawAuraOption = true
         else
             return false
         end
     end
 
-    return sawBaseStatRequest
+    return sawAuraOption or next(options) == nil
+end
+
+local function getResolvedCacheVariant(options)
+    if type(options) == "table" and options.includeAuraBonuses == false then
+        return "base"
+    end
+
+    return "aura"
 end
 
 local function cloneResolvedResourceRow(row)
@@ -591,7 +650,12 @@ getCachedResolvedStatLookup = function(options)
     local configurationRevision = getProfileConfigurationRevision()
     local runtimeRevision = getProfileResolverRevisionKey()
     local identityKey = getProfileIdentityKey()
-    local cacheKey = ("%d:%s:%s:base"):format(configurationRevision, runtimeRevision, identityKey)
+    local cacheKey = ("%d:%s:%s:%s"):format(
+        configurationRevision,
+        runtimeRevision,
+        identityKey,
+        getResolvedCacheVariant(options)
+    )
     local cache = Profile.ResolvedStatLookupCache
     if type(cache) == "table"
         and tostring(cache.key or "") == cacheKey
@@ -629,9 +693,10 @@ local function buildResolvedResourceRowsByRef(rows)
     return rowsByRef
 end
 
-getCachedResolvedResourceLookup = function(options)
+getCachedResolvedResourceLookup = function(options, resolvedStatRows)
     if not canUseDefaultResolvedResourceCache(options) then
-        local rows = Resolver.ListResolvedResources and Resolver.ListResolvedResources(options) or {}
+        resolvedStatRows = resolvedStatRows or select(1, getCachedResolvedStatLookup(options))
+        local rows = Resolver.ListResolvedResources and Resolver.ListResolvedResources(options, resolvedStatRows) or {}
         return rows, buildResolvedResourceRowsByRef(rows)
     end
 
@@ -639,7 +704,12 @@ getCachedResolvedResourceLookup = function(options)
     local configurationRevision = getProfileConfigurationRevision()
     local runtimeRevision = getProfileResolverRevisionKey()
     local identityKey = getProfileIdentityKey()
-    local cacheKey = ("%d:%s:%s:base"):format(configurationRevision, runtimeRevision, identityKey)
+    local cacheKey = ("%d:%s:%s:%s"):format(
+        configurationRevision,
+        runtimeRevision,
+        identityKey,
+        getResolvedCacheVariant(options)
+    )
     local cache = Profile.ResolvedResourceLookupCache
     if type(cache) == "table"
         and tostring(cache.key or "") == cacheKey
@@ -649,7 +719,8 @@ getCachedResolvedResourceLookup = function(options)
         return cache.rows, cache.rowsByRef
     end
 
-    local rows = Resolver.ListResolvedResources and Resolver.ListResolvedResources(options) or {}
+    resolvedStatRows = resolvedStatRows or select(1, getCachedResolvedStatLookup(options))
+    local rows = Resolver.ListResolvedResources and Resolver.ListResolvedResources(options, resolvedStatRows) or {}
     local rowsByRef = buildResolvedResourceRowsByRef(rows)
     if readiness.ready == true then
         Profile.ResolvedResourceLookupCache = {
@@ -1888,29 +1959,34 @@ function Profile.EquipInventoryItem(slotIndex, record, options)
         return nil, "invalid-slot"
     end
 
-    local previousEntry = Equipment.GetEquippedEntryByScope and Equipment.GetEquippedEntryByScope(equipmentScope, slotKey) or nil
-    if previousEntry and Inventory.AddItem then
-        Inventory.AddItem({
-            dataset = previousEntry.datasetId,
-            id = previousEntry.itemId,
-            modifications = previousEntry.modifications,
-            soulbound = previousEntry.soulbound == true,
-        })
-    end
+    return runProfileEquipmentMutation(
+        ("profile-%s-equipment-equip"):format(equipmentScope),
+        function()
+            local previousEntry = Equipment.GetEquippedEntryByScope and Equipment.GetEquippedEntryByScope(equipmentScope, slotKey) or nil
+            if previousEntry and Inventory.AddItem then
+                Inventory.AddItem({
+                    dataset = previousEntry.datasetId,
+                    id = previousEntry.itemId,
+                    modifications = previousEntry.modifications,
+                    soulbound = previousEntry.soulbound == true,
+                })
+            end
 
-    local itemClass = getItemClass()
-    local equippedSoulbound = inventoryRecord.soulbound == true
-        or (itemClass and itemClass.IsBindOnEquip and itemClass.IsBindOnEquip(item) or false)
-    local equipped = Equipment.EquipItemInScope and Equipment.EquipItemInScope(equipmentScope, slotKey, itemRef, inventoryRecord.modifications, slotRef, equippedSoulbound) or nil
-    if not equipped then
-        return nil, "equip-failed"
-    end
+            local itemClass = getItemClass()
+            local equippedSoulbound = inventoryRecord.soulbound == true
+                or (itemClass and itemClass.IsBindOnEquip and itemClass.IsBindOnEquip(item) or false)
+            local equipped = Equipment.EquipItemInScope and Equipment.EquipItemInScope(equipmentScope, slotKey, itemRef, inventoryRecord.modifications, slotRef, equippedSoulbound) or nil
+            if not equipped then
+                return nil, "equip-failed"
+            end
 
-    if Inventory.RemoveItem then
-        Inventory.RemoveItem(slotIndex)
-    end
+            if Inventory.RemoveItem then
+                Inventory.RemoveItem(slotIndex)
+            end
 
-    return equipped, slotKey
+            return equipped, slotKey
+        end
+    )
 end
 
 function Profile.UnequipItem(slotKey)
@@ -1924,16 +2000,21 @@ function Profile.UnequipSlotToInventoryByScope(scope, slotKey)
         return false
     end
 
-    if Inventory.AddItem then
-        Inventory.AddItem({
-            dataset = equippedEntry.datasetId,
-            id = equippedEntry.itemId,
-            modifications = equippedEntry.modifications,
-            soulbound = equippedEntry.soulbound == true,
-        })
-    end
+    return runProfileEquipmentMutation(
+        ("profile-%s-equipment-unequip"):format(Equipment.NormalizeSlotType and Equipment.NormalizeSlotType(scope) or tostring(scope or "character")),
+        function()
+            if Inventory.AddItem then
+                Inventory.AddItem({
+                    dataset = equippedEntry.datasetId,
+                    id = equippedEntry.itemId,
+                    modifications = equippedEntry.modifications,
+                    soulbound = equippedEntry.soulbound == true,
+                })
+            end
 
-    return Equipment.UnequipItemInScope and Equipment.UnequipItemInScope(scope, slotKey) or false
+            return Equipment.UnequipItemInScope and Equipment.UnequipItemInScope(scope, slotKey) or false
+        end
+    )
 end
 
 function Profile.UnequipSlotToInventory(slotKey)
@@ -1983,8 +2064,8 @@ function Profile.GetResolvedStatValue(statRef, fallback, options)
     return nil, false, nil
 end
 
-function Profile.ListResolvedResources(options)
-    local rows = getCachedResolvedResourceLookup(options)
+function Profile.ListResolvedResources(options, resolvedStatRows)
+    local rows = getCachedResolvedResourceLookup(options, resolvedStatRows)
     local cloned = {}
     for index = 1, #(rows or {}) do
         cloned[index] = cloneResolvedResourceRow(rows[index])
@@ -3522,8 +3603,11 @@ function Profile.ClearSkillLevel(skillRef)
     return false
 end
 
-function Profile.ListProfileStatRows(options)
-    local resolvedStats = Profile.ListResolvedStats(options)
+function Profile.ListProfileStatRows(options, resolvedStatRows)
+    local resolvedStats = resolvedStatRows
+    if type(resolvedStats) ~= "table" then
+        resolvedStats = Profile.ListResolvedStats(options)
+    end
     local grouped = {}
     local rows = {}
     local movementRangeStatRef = Profile.GetMovementRangeStatRef and ensureString(Profile.GetMovementRangeStatRef()) or ""
@@ -3636,6 +3720,7 @@ function Profile.GetPresentationSnapshot(scope)
     local equipmentRevision = getProfileRevision("EquipmentRevision")
     local resolvedProfileRevision = getProfileRevision("ResolvedProfileRevision")
     local profileRuntimeRevision = getProfileRuntimeRevision()
+    local resolverRevisionKey = getProfileResolverRevisionKey()
     local identityKey = getProfileIdentityKey()
     local cacheKey = table.concat({
         tostring(configurationRevision),
@@ -3644,6 +3729,7 @@ function Profile.GetPresentationSnapshot(scope)
         tostring(equipmentRevision),
         tostring(resolvedProfileRevision),
         tostring(profileRuntimeRevision),
+        resolverRevisionKey,
         tostring(identityKey),
         normalizedScope,
     }, ":")
@@ -3666,8 +3752,9 @@ function Profile.GetPresentationSnapshot(scope)
         equippedBySlot[slotKey] = Profile.GetEquippedItemByScope(normalizedScope, slotKey)
     end
 
-    local statRows = Profile.ListProfileStatRows()
-    local resourceRows = Profile.ListResolvedResources()
+    local resolvedStatRows = Profile.ListResolvedStats()
+    local statRows = Profile.ListProfileStatRows(nil, resolvedStatRows)
+    local resourceRows = Profile.ListResolvedResources(nil, resolvedStatRows)
     local healthResourceRef = getRulesetValue("resources", "health_stat", nil)
     if type(healthResourceRef) ~= "string" then
         healthResourceRef = nil
@@ -3684,6 +3771,7 @@ function Profile.GetPresentationSnapshot(scope)
             equipmentRevision = equipmentRevision,
             resolvedProfileRevision = resolvedProfileRevision,
             profileRuntimeRevision = profileRuntimeRevision,
+            resolverRevisionKey = resolverRevisionKey,
         },
         scope = normalizedScope,
         layout = layout,

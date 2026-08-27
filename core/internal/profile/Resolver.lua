@@ -977,9 +977,11 @@ function Resolver.GetResolvedStatRowsByRefs(statRefs, options)
     return rows
 end
 
-function Resolver.ListResolvedResources(options)
+function Resolver.ListResolvedResources(options, resolvedStatRows)
     local entries = collectActivatedResources()
-    local statRows = Resolver.ListResolvedStats(options)
+    local statRows = type(resolvedStatRows) == "table"
+        and resolvedStatRows
+        or Resolver.ListResolvedStats(options)
     local progressionContext = buildProfileProgressionContext()
     local resolvedStatsByRef = {}
     local rows = {}

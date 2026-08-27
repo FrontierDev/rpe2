@@ -906,6 +906,9 @@ function EquipmentStatsPage:GetRevisionTuple()
         profileResourcesRevision = getRuntimeRevision("ProfileResourcesRevision"),
         equipmentRevision = getRuntimeRevision("EquipmentRevision"),
         resolvedProfileRevision = getRuntimeRevision("ResolvedProfileRevision"),
+        resolvedPresentationRevision = Profile.GetResolvedPresentationRevisionKey
+            and Profile.GetResolvedPresentationRevisionKey()
+            or "",
         scope = self:GetActiveEquipmentScope(),
         selectedSlotKey = self.owner and tostring(self.owner.SelectedSlotKey or "") or "",
     }

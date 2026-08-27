@@ -110,8 +110,8 @@ local CONFIGURATION_CHANGE_CLASSIFICATION = {
     ["profile-achievements"] = "runtime/profile state",
     ["profile-achievement-rewards"] = "runtime/profile state",
 
-    ["profile-equipment"] = "structural profile change",
-    ["profile-%s-equipment"] = "structural profile change",
+    ["profile-equipment"] = "runtime/profile state",
+    ["profile-%s-equipment"] = "runtime/profile state",
     ["profile-traits"] = "structural profile change",
     ["profile-active-traits"] = "structural profile change",
     ["profile-inactive-traits"] = "structural profile change",
@@ -1792,16 +1792,7 @@ function Database.UpdateActiveProfile(mutator)
 end
 
 function Database.SetProfileEquipmentSlot(slotKey, equippedEntry)
-    local normalizedSlotKey = ensureString(slotKey, "")
-    if normalizedSlotKey == "" then
-        return nil
-    end
-
-    local profile = Database.GetOrCreateActiveProfile()
-    profile.equipment = ensureTable(profile.equipment)
-    profile.equipment[normalizedSlotKey] = normalizeProfileEquipmentEntry(equippedEntry)
-    notifyConfigurationChanged("profile-equipment")
-    return profile.equipment[normalizedSlotKey]
+    return Database.SetProfileEquipmentSlotByScope("character", slotKey, equippedEntry)
 end
 
 function Database.ListProfileEquipmentByScope(scope)
@@ -1832,6 +1823,7 @@ function Database.SetProfileEquipmentSlotByScope(scope, slotKey, equippedEntry)
     end
 
     local normalizedScope = ensureString(scope, "character")
+    local normalizedEntry = normalizeProfileEquipmentEntry(equippedEntry)
     local profile = Database.GetOrCreateActiveProfile()
     local target = nil
 
@@ -1846,9 +1838,19 @@ function Database.SetProfileEquipmentSlotByScope(scope, slotKey, equippedEntry)
         target = profile[fieldName]
     end
 
-    target[normalizedSlotKey] = normalizeProfileEquipmentEntry(equippedEntry)
-    notifyConfigurationChanged(("profile-%s-equipment"):format(normalizedScope))
-    return target[normalizedSlotKey]
+    return runProfileRuntimeMutation(
+        ("profile-%s-equipment"):format(normalizedScope),
+        "profile.equipment",
+        {
+            scope = normalizedScope,
+            slotKey = normalizedSlotKey,
+            itemRef = normalizedEntry.itemRef,
+        },
+        function()
+            target[normalizedSlotKey] = normalizedEntry
+            return target[normalizedSlotKey]
+        end
+    )
 end
 
 function Database.ClearProfileEquipmentSlotByScope(scope, slotKey)
@@ -1872,28 +1874,30 @@ function Database.ClearProfileEquipmentSlotByScope(scope, slotKey)
         target = profile[fieldName]
     end
 
-    local existed = target[normalizedSlotKey] ~= nil
-    target[normalizedSlotKey] = nil
-    if existed then
-        notifyConfigurationChanged(("profile-%s-equipment"):format(normalizedScope))
-    end
-    return existed
-end
-
-function Database.ClearProfileEquipmentSlot(slotKey)
-    local normalizedSlotKey = ensureString(slotKey, "")
-    if normalizedSlotKey == "" then
+    local existingEntry = target[normalizedSlotKey]
+    local existed = existingEntry ~= nil
+    if not existed then
         return false
     end
 
-    local profile = Database.GetOrCreateActiveProfile()
-    profile.equipment = ensureTable(profile.equipment)
-    local existed = profile.equipment[normalizedSlotKey] ~= nil
-    profile.equipment[normalizedSlotKey] = nil
-    if existed then
-        notifyConfigurationChanged("profile-equipment")
-    end
-    return existed
+    return runProfileRuntimeMutation(
+        ("profile-%s-equipment"):format(normalizedScope),
+        "profile.equipment",
+        {
+            scope = normalizedScope,
+            slotKey = normalizedSlotKey,
+            itemRef = existingEntry and existingEntry.itemRef or nil,
+            removed = true,
+        },
+        function()
+            target[normalizedSlotKey] = nil
+            return true
+        end
+    )
+end
+
+function Database.ClearProfileEquipmentSlot(slotKey)
+    return Database.ClearProfileEquipmentSlotByScope("character", slotKey)
 end
 
 function Database.ListProfileMountEquipment()

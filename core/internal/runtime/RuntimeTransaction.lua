@@ -308,7 +308,13 @@ local function markProfile(result, field, detail)
         return
     end
 
-    if field == "equipment" or field == "stats" or field == "resources" then
+    if field == "equipment" then
+        result[field] = true
+        if type(detail) == "table" then
+            result.equipmentDetails = result.equipmentDetails or {}
+            result.equipmentDetails[#result.equipmentDetails + 1] = copy(detail)
+        end
+    elseif field == "stats" or field == "resources" then
         result[field] = true
     elseif field == "skills" then
         result.skills = result.skills or {}

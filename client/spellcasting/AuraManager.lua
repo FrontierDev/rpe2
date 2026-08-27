@@ -1454,7 +1454,7 @@ local function rebuildLocalPlayerResolvedStateSubset(eventState, localUnit, impa
     return changed
 end
 
-local function refreshLocalPlayerAuraDerivedState(eventState, targetEventId, impact)
+local function refreshLocalPlayerAuraDerivedState(eventState, targetEventId, impact, options)
     local numericTargetEventId = tonumber(targetEventId) or 0
     if numericTargetEventId <= 0 then
         return false
@@ -1473,12 +1473,14 @@ local function refreshLocalPlayerAuraDerivedState(eventState, targetEventId, imp
         if type(combat) == "table" and type(combat.BumpCombatRuntimeRevision) == "function" then
             combat:BumpCombatRuntimeRevision(eventState.id, numericTargetEventId)
         end
-        refreshProfileWindowIfVisible()
+        if not (type(options) == "table" and options.suppressProfileRefresh == true) then
+            refreshProfileWindowIfVisible()
+        end
     end
     return refreshed
 end
 
-local function queueLocalPlayerAuraDerivedStateRefresh(eventState, targetEventId, impact)
+local function queueLocalPlayerAuraDerivedStateRefresh(eventState, targetEventId, impact, options)
     local numericTargetEventId = tonumber(targetEventId) or 0
     local eventId = tostring(eventState and eventState.id or "")
     if numericTargetEventId <= 0 or eventId == "" then
@@ -1496,6 +1498,14 @@ local function queueLocalPlayerAuraDerivedStateRefresh(eventState, targetEventId
     else
         Client.PendingAuraDerivedStateRefreshImpact = nil
     end
+    if Client.PendingAuraDerivedStateRefreshSuppressProfileRefresh == nil then
+        Client.PendingAuraDerivedStateRefreshSuppressProfileRefresh = false
+    end
+    if type(options) == "table" and options.suppressProfileRefresh == true then
+        Client.PendingAuraDerivedStateRefreshSuppressProfileRefresh = true
+    elseif type(options) ~= "table" or options.suppressProfileRefresh == false then
+        Client.PendingAuraDerivedStateRefreshSuppressProfileRefresh = false
+    end
     if Client.PendingAuraDerivedStateRefreshQueued == true then
         return true
     end
@@ -1506,13 +1516,17 @@ local function queueLocalPlayerAuraDerivedStateRefresh(eventState, targetEventId
         local refreshEventId = targetClient.PendingAuraDerivedStateRefreshEventId
         local refreshTargetEventId = targetClient.PendingAuraDerivedStateRefreshTargetEventId
         local refreshImpact = targetClient.PendingAuraDerivedStateRefreshImpact
+        local suppressProfileRefresh = targetClient.PendingAuraDerivedStateRefreshSuppressProfileRefresh == true
         targetClient.PendingAuraDerivedStateRefreshEventId = nil
         targetClient.PendingAuraDerivedStateRefreshTargetEventId = nil
         targetClient.PendingAuraDerivedStateRefreshImpact = nil
+        targetClient.PendingAuraDerivedStateRefreshSuppressProfileRefresh = nil
 
         local currentEventState = targetClient.GetEventState and targetClient:GetEventState() or nil
         if type(currentEventState) == "table" and tostring(currentEventState.id or "") == tostring(refreshEventId or "") then
-            refreshLocalPlayerAuraDerivedState(currentEventState, refreshTargetEventId, refreshImpact)
+            refreshLocalPlayerAuraDerivedState(currentEventState, refreshTargetEventId, refreshImpact, {
+                suppressProfileRefresh = suppressProfileRefresh,
+            })
         end
     end, Client)
     if not enqueued then
@@ -1520,6 +1534,7 @@ local function queueLocalPlayerAuraDerivedStateRefresh(eventState, targetEventId
         Client.PendingAuraDerivedStateRefreshEventId = nil
         Client.PendingAuraDerivedStateRefreshTargetEventId = nil
         Client.PendingAuraDerivedStateRefreshImpact = nil
+        Client.PendingAuraDerivedStateRefreshSuppressProfileRefresh = nil
         return false
     end
 
@@ -2784,7 +2799,9 @@ function AuraManager:ApplyAuraFromContext(client, context, auraRef, stacks, turn
     end
     local derivedStateImpact = buildAuraDerivedStateImpact(previousEntry, entry) or buildEmptyDerivedStateImpact()
     publishAuraCombatLog(client, eventState, previousEntry, entry, false)
-    queueLocalPlayerAuraDerivedStateRefresh(eventState, entry.targetEventId, derivedStateImpact)
+    queueLocalPlayerAuraDerivedStateRefresh(eventState, entry.targetEventId, derivedStateImpact, {
+        suppressProfileRefresh = type(context) == "table" and context.suppressProfileRefresh == true,
+    })
     refreshAuraDisplays("aura-apply", eventState, entry.targetEventId, derivedStateImpact)
     return true, entry
 end
@@ -2812,7 +2829,9 @@ function AuraManager:DispelAuraFromContext(client, context, auraRef, casterEvent
     local previousEntry = cloneAuraTickerState(removedState or removedEntry)
     local derivedStateImpact = buildAuraDerivedStateImpact(previousEntry) or buildEmptyDerivedStateImpact()
     publishAuraCombatLog(client, eventState, previousEntry, nil, false)
-    queueLocalPlayerAuraDerivedStateRefresh(eventState, targetEventId, derivedStateImpact)
+    queueLocalPlayerAuraDerivedStateRefresh(eventState, targetEventId, derivedStateImpact, {
+        suppressProfileRefresh = type(context) == "table" and context.suppressProfileRefresh == true,
+    })
     refreshAuraDisplays("aura-dispel", eventState, targetEventId, derivedStateImpact)
     return true
 end
@@ -3836,13 +3855,13 @@ function AuraManager:ApplyStatModifiers(unit, statRef, baseValue)
     return math.floor(value + 0.5)
 end
 
-function AuraManager:RefreshLocalPlayerDerivedState(eventState)
+function AuraManager:RefreshLocalPlayerDerivedState(eventState, options)
     local localPlayerEventId = resolveLocalEventId(eventState)
     if localPlayerEventId <= 0 then
         return false
     end
 
-    return refreshLocalPlayerAuraDerivedState(eventState, localPlayerEventId)
+    return refreshLocalPlayerAuraDerivedState(eventState, localPlayerEventId, nil, options)
 end
 
 function AuraManager:ValidateInboundAuraPayload(client, sender, channelName, eventId, casterEventId, targetEventId, auraRef, stacks, turns, powerLevel)

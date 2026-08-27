@@ -156,6 +156,8 @@ function ProfileWindow:HandleRuntimeChange(changeSet)
 
     local profileChanges = changeSet.profile
     local revisionChanges = changeSet.revisions
+    local equipmentRuntimeChanged = (type(profileChanges) == "table" and profileChanges.equipment == true)
+        or (type(revisionChanges) == "table" and revisionChanges.EquipmentRevision ~= nil)
     local equipmentChanged = (type(profileChanges) == "table"
         and (profileChanges.equipment == true or profileChanges.stats == true or profileChanges.resources == true))
         or (type(revisionChanges) == "table"
@@ -174,6 +176,10 @@ function ProfileWindow:HandleRuntimeChange(changeSet)
         or (type(revisionChanges) == "table"
         and (revisionChanges.InventoryRevision ~= nil
             or revisionChanges.EquipmentRevision ~= nil))
+
+    if equipmentRuntimeChanged and type(Client.HandleProfileEquipmentRuntimeChange) == "function" then
+        Client:HandleProfileEquipmentRuntimeChange(changeSet)
+    end
 
     if equipmentChanged and self.equipmentStatsPage and self.equipmentStatsPage.MarkDirty then
         self.equipmentStatsPage:MarkDirty()

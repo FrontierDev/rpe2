@@ -9,6 +9,7 @@ Profile.Equipment = Equipment
 
 local Database = Addon.Internal.Database or {}
 local Definitions = Profile.Definitions or {}
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 
 local function ensureTable(value)
     if type(value) == "table" then
@@ -404,19 +405,31 @@ function Equipment.EquipItemInScope(scope, slotKey, itemRef, modifications, slot
         return nil, "invalid-slot"
     end
 
-    local entry = Database.SetProfileEquipmentSlotByScope and Database.SetProfileEquipmentSlotByScope(scope, normalizedSlotKey, {
-        datasetId = dataset and dataset.id or "",
-        itemId = item.id,
-        itemRef = itemRef,
-        slotRef = finalSlotRef,
-        modifications = ensureTable(modifications),
-        soulbound = soulbound == true,
-    }) or nil
+    local normalizedScope = normalizeSlotType(scope)
+    local function persistEquipment()
+        local entry = Database.SetProfileEquipmentSlotByScope and Database.SetProfileEquipmentSlotByScope(normalizedScope, normalizedSlotKey, {
+            datasetId = dataset and dataset.id or "",
+            itemId = item.id,
+            itemRef = itemRef,
+            slotRef = finalSlotRef,
+            modifications = ensureTable(modifications),
+            soulbound = soulbound == true,
+        }) or nil
 
-    if entry ~= nil then
-        bumpProfileTooltipContextRevision()
+        if entry ~= nil then
+            bumpProfileTooltipContextRevision()
+        end
+        return entry
     end
-    return entry
+
+    if type(Runtime) ~= "table" or type(Runtime.RunTransaction) ~= "function" then
+        error("Profile equipment mutation requires the Runtime transaction module.", 2)
+    end
+
+    return Runtime:RunTransaction(
+        ("profile-%s-equipment"):format(normalizedScope),
+        persistEquipment
+    )
 end
 
 function Equipment.EquipItem(slotKey, itemRef, modifications, slotRef, soulbound)
@@ -433,11 +446,23 @@ function Equipment.UnequipItemInScope(scope, slotKey)
         return false
     end
 
-    local changed = Database.ClearProfileEquipmentSlotByScope and Database.ClearProfileEquipmentSlotByScope(scope, normalizedSlotKey) or false
-    if changed then
-        bumpProfileTooltipContextRevision()
+    local normalizedScope = normalizeSlotType(scope)
+    local function clearEquipment()
+        local changed = Database.ClearProfileEquipmentSlotByScope and Database.ClearProfileEquipmentSlotByScope(normalizedScope, normalizedSlotKey) or false
+        if changed then
+            bumpProfileTooltipContextRevision()
+        end
+        return changed
     end
-    return changed
+
+    if type(Runtime) ~= "table" or type(Runtime.RunTransaction) ~= "function" then
+        error("Profile equipment mutation requires the Runtime transaction module.", 2)
+    end
+
+    return Runtime:RunTransaction(
+        ("profile-%s-equipment"):format(normalizedScope),
+        clearEquipment
+    )
 end
 
 function Equipment.UnequipItem(slotKey)
