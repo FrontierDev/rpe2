@@ -735,6 +735,149 @@ getCachedResolvedResourceLookup = function(options, resolvedStatRows)
     return rows, rowsByRef
 end
 
+local function getResolvedStateContinuationIdentity(options)
+    local readiness = refreshResolvedBootstrapReadiness()
+    local configurationRevision = getProfileConfigurationRevision()
+    local runtimeRevision = getProfileResolverRevisionKey()
+    local identityKey = getProfileIdentityKey()
+    local variant = getResolvedCacheVariant(options)
+    local cacheKey = ("%d:%s:%s:%s"):format(
+        configurationRevision,
+        runtimeRevision,
+        identityKey,
+        variant
+    )
+
+    return {
+        readiness = readiness,
+        configurationRevision = configurationRevision,
+        runtimeRevision = runtimeRevision,
+        identityKey = identityKey,
+        variant = variant,
+        cacheKey = cacheKey,
+    }
+end
+
+local function isResolvedStateContinuationCurrent(continuation)
+    if type(continuation) ~= "table" then
+        return false
+    end
+
+    local current = getResolvedStateContinuationIdentity(continuation.options)
+    return tostring(current.cacheKey or "") == tostring(continuation.cacheKey or "")
+end
+
+function Profile.CreateResolvedStateContinuation(options)
+    if not canUseDefaultResolvedStatCache(options) or not canUseDefaultResolvedResourceCache(options) then
+        return nil
+    end
+
+    local identity = getResolvedStateContinuationIdentity(options)
+    local continuation = {
+        options = options,
+        cacheKey = identity.cacheKey,
+        configurationRevision = identity.configurationRevision,
+        runtimeRevision = identity.runtimeRevision,
+        identityKey = identity.identityKey,
+        variant = identity.variant,
+        cacheReady = identity.readiness.ready == true,
+    }
+    local statCache = Profile.ResolvedStatLookupCache
+    local resourceCache = Profile.ResolvedResourceLookupCache
+    if type(statCache) == "table"
+        and tostring(statCache.key or "") == identity.cacheKey
+        and type(statCache.rows) == "table"
+        and type(resourceCache) == "table"
+        and tostring(resourceCache.key or "") == identity.cacheKey
+        and type(resourceCache.rows) == "table"
+    then
+        continuation.statRows = statCache.rows
+        continuation.resourceRows = resourceCache.rows
+        continuation.completed = true
+        return continuation
+    end
+
+    if type(Resolver.CreateResolvedStateContinuation) ~= "function" then
+        return nil
+    end
+
+    continuation.resolverContinuation = Resolver.CreateResolvedStateContinuation(options)
+    return continuation
+end
+
+function Profile.IsResolvedStateContinuationCurrent(continuation)
+    return isResolvedStateContinuationCurrent(continuation)
+end
+
+function Profile.StepResolvedStateContinuation(continuation, deadlineMs)
+    if type(continuation) ~= "table" then
+        return true
+    end
+    if not isResolvedStateContinuationCurrent(continuation) then
+        return nil, "stale"
+    end
+    if continuation.completed == true then
+        return true
+    end
+    if type(Resolver.StepResolvedStateContinuation) ~= "function" then
+        return nil, "missing-resolver"
+    end
+
+    local completed = Resolver.StepResolvedStateContinuation(continuation.resolverContinuation, deadlineMs) == true
+    if not completed then
+        return false
+    end
+
+    continuation.statRows = type(continuation.resolverContinuation) == "table"
+        and continuation.resolverContinuation.statRows
+        or {}
+    continuation.statRowsByRef = type(continuation.resolverContinuation) == "table"
+        and continuation.resolverContinuation.statRowsByRef
+        or {}
+    continuation.resourceRows = type(continuation.resolverContinuation) == "table"
+        and continuation.resolverContinuation.resourceRows
+        or {}
+    continuation.resourceRowsByRef = type(continuation.resolverContinuation) == "table"
+        and continuation.resolverContinuation.resourceRowsByRef
+        or {}
+    continuation.resolverContinuation = nil
+    continuation.completed = true
+
+    if continuation.cacheReady == true then
+        Profile.ResolvedStatLookupCache = {
+            key = continuation.cacheKey,
+            configurationRevision = continuation.configurationRevision,
+            runtimeRevision = continuation.runtimeRevision,
+            identityKey = continuation.identityKey,
+            rows = continuation.statRows,
+            rowsByRef = continuation.statRowsByRef,
+        }
+        Profile.ResolvedResourceLookupCache = {
+            key = continuation.cacheKey,
+            configurationRevision = continuation.configurationRevision,
+            runtimeRevision = continuation.runtimeRevision,
+            identityKey = continuation.identityKey,
+            rows = continuation.resourceRows,
+            rowsByRef = continuation.resourceRowsByRef,
+        }
+    end
+
+    return true
+end
+
+function Profile.ReleaseResolvedStateContinuation(continuation)
+    if type(continuation) ~= "table" then
+        return false
+    end
+
+    continuation.resolverContinuation = nil
+    continuation.statRows = nil
+    continuation.statRowsByRef = nil
+    continuation.resourceRows = nil
+    continuation.resourceRowsByRef = nil
+    return true
+end
+
 local function canUseDefaultResolvedSkillCache(options)
     return options == nil or (type(options) == "table" and next(options) == nil)
 end

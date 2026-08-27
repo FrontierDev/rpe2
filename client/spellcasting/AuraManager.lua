@@ -83,6 +83,25 @@ local function enqueueAuraWork(fn, ...)
     return false
 end
 
+local function enqueueAuraSliceable(options)
+    local tasks = getTasks()
+    if type(tasks) == "table" and type(tasks.EnqueueSliceable) == "function" then
+        return tasks:EnqueueSliceable(options)
+    end
+
+    if Debug and Debug.Error then
+        Debug.Error("Aura sliceable queue unavailable: Addon.Internal.Tasks is missing EnqueueSliceable.")
+    end
+    return nil
+end
+
+local function shouldYieldAuraSlice(deadlineMs)
+    local tasks = getTasks()
+    return type(tasks) == "table"
+        and type(tasks.ShouldYield) == "function"
+        and tasks:ShouldYield(deadlineMs) == true
+end
+
 local function emitTriggeredDamageCombatLog(client, eventState, casterUnit, targetUnit, result, effect)
     if type(client) ~= "table" or type(eventState) ~= "table" or type(result) ~= "table" then
         return false
@@ -1249,296 +1268,289 @@ mergeDerivedStateImpact = function(targetImpact, impact)
     return changed
 end
 
-local function setToOrderedList(values)
-    local ordered = {}
-    for ref in pairs(type(values) == "table" and values or {}) do
-        ordered[#ordered + 1] = ref
+function AuraManager:CreateLocalPlayerDerivedStateContinuation(client, eventState, options)
+    local localUnit = resolveLocalEventUnit(eventState)
+    local localEventId = math.floor(tonumber(localUnit and localUnit.eventID) or 0)
+    if type(client) ~= "table"
+        or type(eventState) ~= "table"
+        or eventState.active ~= true
+        or type(localUnit) ~= "table"
+        or localEventId <= 0
+        or type(Profile.CreateResolvedStateContinuation) ~= "function"
+    then
+        return nil
     end
-    table.sort(ordered)
-    return ordered
+
+    local profileContinuation = Profile.CreateResolvedStateContinuation({
+        includeAuraBonuses = true,
+    })
+    if type(profileContinuation) ~= "table" then
+        return nil
+    end
+
+    return {
+        client = client,
+        eventId = tostring(eventState.id or ""),
+        localEventId = localEventId,
+        localUnit = localUnit,
+        options = options,
+        profileContinuation = profileContinuation,
+        phase = "resolve",
+        statIndex = 1,
+        existingResourceIndex = 1,
+        resourceIndex = 1,
+        existingResourcesByRef = {},
+        nextStats = {},
+        nextResources = {},
+    }
 end
 
-local function updateLocalUnitStatsSubset(localUnit, statRows)
-    local stats = type(localUnit.stats) == "table" and localUnit.stats or {}
-    local indexByRef = {}
-    local changed = false
-
-    for index = 1, #stats do
-        local entry = stats[index]
-        local statRef = type(entry) == "table" and normalizeRef(entry.statRef) or nil
-        if statRef then
-            indexByRef[statRef] = index
-        end
+function AuraManager:ReleaseLocalPlayerDerivedStateContinuation(continuation)
+    if type(continuation) ~= "table" then
+        return
     end
 
-    for index = 1, #statRows do
-        local row = statRows[index]
-        local statRef = type(row) == "table" and normalizeRef(row.ref) or nil
-        if statRef then
-            local value = tonumber(row.value) or 0
-            local existingIndex = indexByRef[statRef]
-            if existingIndex then
-                local existing = stats[existingIndex]
-                if tonumber(existing and existing.value) ~= value or tonumber(existing and existing.currentValue) ~= value then
-                    stats[existingIndex] = {
+    if type(Profile.ReleaseResolvedStateContinuation) == "function" then
+        Profile.ReleaseResolvedStateContinuation(continuation.profileContinuation)
+    end
+    continuation.profileContinuation = nil
+    continuation.statRows = nil
+    continuation.resourceRows = nil
+    continuation.existingResourcesByRef = nil
+    continuation.nextStats = nil
+    continuation.nextResources = nil
+end
+
+function AuraManager:StepLocalPlayerDerivedStateContinuation(continuation, deadlineMs)
+    if type(continuation) ~= "table" then
+        return true
+    end
+
+    local client = continuation.client
+    local eventState = type(client) == "table" and type(client.GetEventState) == "function"
+        and client:GetEventState()
+        or nil
+    local localUnit = resolveLocalEventUnit(eventState)
+    if type(eventState) ~= "table"
+        or eventState.active ~= true
+        or tostring(eventState.id or "") ~= tostring(continuation.eventId or "")
+        or tonumber(localUnit and localUnit.eventID) ~= tonumber(continuation.localEventId)
+        or localUnit ~= continuation.localUnit
+    then
+        return nil, "event-stale"
+    end
+    if type(Profile.IsResolvedStateContinuationCurrent) == "function"
+        and Profile.IsResolvedStateContinuationCurrent(continuation.profileContinuation) ~= true
+    then
+        return nil, "profile-stale"
+    end
+
+    while true do
+        if continuation.phase == "resolve" then
+            if type(Profile.StepResolvedStateContinuation) ~= "function" then
+                return nil, "missing-profile-resolver"
+            end
+            local completed, reason = Profile.StepResolvedStateContinuation(continuation.profileContinuation, deadlineMs)
+            if completed == nil then
+                return nil, reason or "profile-stale"
+            end
+            if completed ~= true then
+                return false
+            end
+            continuation.statRows = continuation.profileContinuation.statRows or {}
+            continuation.resourceRows = continuation.profileContinuation.resourceRows or {}
+            continuation.phase = "copy-stats"
+        elseif continuation.phase == "copy-stats" then
+            local row = continuation.statRows[continuation.statIndex]
+            if row == nil then
+                continuation.phase = "index-resources"
+            else
+                local statRef = type(row.ref) == "string" and row.ref or ""
+                if statRef ~= "" then
+                    local value = tonumber(row.value) or 0
+                    continuation.nextStats[#continuation.nextStats + 1] = {
                         statRef = statRef,
                         value = value,
                         currentValue = value,
                     }
-                    changed = true
                 end
+                continuation.statIndex = continuation.statIndex + 1
+            end
+        elseif continuation.phase == "index-resources" then
+            local entry = (localUnit.resources or {})[continuation.existingResourceIndex]
+            if entry == nil then
+                continuation.phase = "copy-resources"
             else
-                stats[#stats + 1] = {
-                    statRef = statRef,
-                    value = value,
-                    currentValue = value,
-                }
-                indexByRef[statRef] = #stats
-                changed = true
-            end
-        end
-    end
-
-    localUnit.stats = stats
-    return changed
-end
-
-local function updateLocalUnitResourcesSubset(localUnit, resourceRows)
-    local resources = type(localUnit.resources) == "table" and localUnit.resources or {}
-    local indexByRef = {}
-    local changed = false
-
-    for index = 1, #resources do
-        local entry = resources[index]
-        local resourceRef = type(entry) == "table" and normalizeRef(entry.resourceRef) or nil
-        if resourceRef then
-            indexByRef[resourceRef] = index
-        end
-    end
-
-    for index = 1, #resourceRows do
-        local row = resourceRows[index]
-        local resourceRef = type(row) == "table" and normalizeRef(row.ref) or nil
-        if resourceRef then
-            local maxValue = math.max(0, tonumber(row.value) or 0)
-            local existingIndex = indexByRef[resourceRef]
-            local existing = existingIndex and resources[existingIndex] or nil
-            local previousMaxValue = tonumber(existing and existing.maxValue)
-            local currentValue = tonumber(existing and existing.currentValue)
-            if currentValue == nil then
-                currentValue = row.resource and row.resource.startsAtZero == true and 0 or maxValue
-            elseif previousMaxValue ~= nil and previousMaxValue > 0 and maxValue ~= previousMaxValue then
-                local preservedRatio = math.max(0, math.min(1, currentValue / previousMaxValue))
-                if type(Common.Round) == "function" then
-                    currentValue = Common.Round(maxValue * preservedRatio)
-                else
-                    currentValue = math.floor((maxValue * preservedRatio) + 0.5)
+                local resourceRef = type(entry.resourceRef) == "string" and entry.resourceRef or ""
+                if resourceRef ~= "" then
+                    continuation.existingResourcesByRef[resourceRef] = entry
                 end
+                continuation.existingResourceIndex = continuation.existingResourceIndex + 1
             end
-            currentValue = math.max(0, math.min(currentValue, maxValue))
-
-            if existingIndex then
-                if previousMaxValue ~= maxValue or tonumber(existing and existing.currentValue) ~= currentValue then
-                    resources[existingIndex] = {
+        elseif continuation.phase == "copy-resources" then
+            local row = continuation.resourceRows[continuation.resourceIndex]
+            if row == nil then
+                continuation.phase = "commit"
+            else
+                local resourceRef = type(row.ref) == "string" and row.ref or ""
+                if resourceRef ~= "" then
+                    local maxValue = math.max(0, tonumber(row.value) or 0)
+                    local existing = continuation.existingResourcesByRef[resourceRef]
+                    local previousMaxValue = tonumber(existing and existing.maxValue)
+                    local currentValue = tonumber(existing and existing.currentValue)
+                    if currentValue == nil then
+                        currentValue = row.resource and row.resource.startsAtZero == true and 0 or maxValue
+                    elseif previousMaxValue ~= nil and previousMaxValue > 0 and maxValue ~= previousMaxValue then
+                        local preservedRatio = math.max(0, math.min(1, currentValue / previousMaxValue))
+                        if type(Common.Round) == "function" then
+                            currentValue = Common.Round(maxValue * preservedRatio)
+                        else
+                            currentValue = math.floor((maxValue * preservedRatio) + 0.5)
+                        end
+                    end
+                    continuation.nextResources[#continuation.nextResources + 1] = {
                         resourceRef = resourceRef,
-                        currentValue = currentValue,
+                        currentValue = math.max(0, math.min(currentValue, maxValue)),
                         maxValue = maxValue,
                     }
-                    changed = true
                 end
-            else
-                resources[#resources + 1] = {
-                    resourceRef = resourceRef,
-                    currentValue = currentValue,
-                    maxValue = maxValue,
-                }
-                indexByRef[resourceRef] = #resources
-                changed = true
+                continuation.resourceIndex = continuation.resourceIndex + 1
             end
+        else
+            localUnit.stats = continuation.nextStats
+            localUnit.resources = continuation.nextResources
+            if not (type(continuation.options) == "table" and continuation.options.suppressProfileRefresh == true) then
+                refreshProfileWindowIfVisible()
+            end
+            self:ReleaseLocalPlayerDerivedStateContinuation(continuation)
+            return true
+        end
+
+        if shouldYieldAuraSlice(deadlineMs) then
+            return false
         end
     end
-
-    localUnit.resources = resources
-    return changed
 end
 
-local function rebuildLocalPlayerResolvedState(eventState, localUnit)
-    if type(eventState) ~= "table" or eventState.active ~= true or type(localUnit) ~= "table" then
+function AuraManager:QueueLocalPlayerDerivedStateRefresh(eventState, options)
+    local client = type(options) == "table" and options.client or Client
+    local eventId = tostring(eventState and eventState.id or "")
+    local localEventId = resolveLocalEventId(eventState)
+    if type(client) ~= "table"
+        or type(eventState) ~= "table"
+        or eventState.active ~= true
+        or eventId == ""
+        or localEventId <= 0
+    then
         return false
     end
 
-    local resolvedStats = type(Profile.ListResolvedStats) == "function" and Profile.ListResolvedStats({
-        includeAuraBonuses = true,
-    }) or {}
-    local nextStats = {}
-    for index = 1, #resolvedStats do
-        local row = resolvedStats[index]
-        local statRef = type(row and row.ref) == "string" and row.ref or ""
-        if statRef ~= "" then
-            local value = tonumber(row.value) or 0
-            nextStats[#nextStats + 1] = {
-                statRef = statRef,
-                value = value,
-                currentValue = value,
-            }
-        end
+    client.PendingFullAuraDerivedStateRefreshByEventId = client.PendingFullAuraDerivedStateRefreshByEventId or {}
+    if client.PendingFullAuraDerivedStateRefreshByEventId[eventId] then
+        return true
     end
 
-    local existingResourcesByRef = {}
-    for index = 1, #(localUnit.resources or {}) do
-        local entry = localUnit.resources[index]
-        local resourceRef = type(entry and entry.resourceRef) == "string" and entry.resourceRef or ""
-        if resourceRef ~= "" then
-            existingResourcesByRef[resourceRef] = entry
-        end
+    local continuation = self:CreateLocalPlayerDerivedStateContinuation(client, eventState, options)
+    if type(continuation) ~= "table" then
+        return false
     end
 
-    local resolvedResources = type(Profile.ListResolvedResources) == "function" and Profile.ListResolvedResources({
-        includeAuraBonuses = true,
-    }) or {}
-    local nextResources = {}
-    for index = 1, #resolvedResources do
-        local row = resolvedResources[index]
-        local resourceRef = type(row and row.ref) == "string" and row.ref or ""
-        if resourceRef ~= "" then
-            local maxValue = math.max(0, tonumber(row.value) or 0)
-            local existing = existingResourcesByRef[resourceRef]
-            local previousMaxValue = tonumber(existing and existing.maxValue)
-            local currentValue = tonumber(existing and existing.currentValue)
-            if currentValue == nil then
-                currentValue = row.resource and row.resource.startsAtZero == true and 0 or maxValue
-            elseif previousMaxValue ~= nil and previousMaxValue > 0 and maxValue ~= previousMaxValue then
-                local preservedRatio = math.max(0, math.min(1, currentValue / previousMaxValue))
-                if type(Common.Round) == "function" then
-                    currentValue = Common.Round(maxValue * preservedRatio)
-                else
-                    currentValue = math.floor((maxValue * preservedRatio) + 0.5)
+    local work = {
+        manager = self,
+        client = client,
+        eventId = eventId,
+        localEventId = localEventId,
+        options = options,
+        continuation = continuation,
+    }
+    local job = enqueueAuraSliceable({
+        label = "aura-derived-state",
+        scope = "event:" .. eventId,
+        state = work,
+        isStale = function(state)
+            local targetClient = state and state.client or nil
+            local currentEventState = type(targetClient) == "table" and type(targetClient.GetEventState) == "function"
+                and targetClient:GetEventState()
+                or nil
+            return type(currentEventState) ~= "table"
+                or currentEventState.active ~= true
+                or tostring(currentEventState.id or "") ~= tostring(state and state.eventId or "")
+                or tonumber(resolveLocalEventId(currentEventState)) ~= tonumber(state and state.localEventId)
+                or (type(Profile.IsResolvedStateContinuationCurrent) == "function"
+                    and Profile.IsResolvedStateContinuationCurrent(state and state.continuation and state.continuation.profileContinuation) ~= true)
+        end,
+        step = function(state, deadlineMs)
+            local manager = state and state.manager or nil
+            if type(manager) ~= "table" then
+                return true
+            end
+            local completed, reason = manager:StepLocalPlayerDerivedStateContinuation(state.continuation, deadlineMs)
+            if completed == nil then
+                state.staleReason = reason
+                return true
+            end
+            return completed == true
+        end,
+        onCancel = function(state, cancelReason)
+            local targetClient = state and state.client or nil
+            local targetEventId = tostring(state and state.eventId or "")
+            if type(targetClient) == "table" and type(targetClient.PendingFullAuraDerivedStateRefreshByEventId) == "table" then
+                targetClient.PendingFullAuraDerivedStateRefreshByEventId[targetEventId] = nil
+            end
+            if type(state) == "table" and type(state.manager) == "table" then
+                state.manager:ReleaseLocalPlayerDerivedStateContinuation(state.continuation)
+                state.continuation = nil
+            end
+            if cancelReason == "stale" and type(targetClient) == "table" then
+                local currentEventState = type(targetClient.GetEventState) == "function" and targetClient:GetEventState() or nil
+                if type(currentEventState) == "table"
+                    and currentEventState.active == true
+                    and tostring(currentEventState.id or "") == targetEventId
+                    and type(state) == "table"
+                    and type(state.manager) == "table"
+                then
+                    state.manager:QueueLocalPlayerDerivedStateRefresh(currentEventState, state.options)
                 end
             end
-            currentValue = math.max(0, math.min(currentValue, maxValue))
-            nextResources[#nextResources + 1] = {
-                resourceRef = resourceRef,
-                currentValue = currentValue,
-                maxValue = maxValue,
-            }
-        end
+        end,
+        onComplete = function(state)
+            local targetClient = state and state.client or nil
+            local targetEventId = tostring(state and state.eventId or "")
+            if type(targetClient) == "table" and type(targetClient.PendingFullAuraDerivedStateRefreshByEventId) == "table" then
+                targetClient.PendingFullAuraDerivedStateRefreshByEventId[targetEventId] = nil
+            end
+            if type(state) == "table" then
+                state.continuation = nil
+            end
+        end,
+    })
+    if not job then
+        self:ReleaseLocalPlayerDerivedStateContinuation(continuation)
+        return false
     end
 
-    localUnit.stats = nextStats
-    localUnit.resources = nextResources
+    client.PendingFullAuraDerivedStateRefreshByEventId[eventId] = job
     return true
-end
-
-local function rebuildLocalPlayerResolvedStateSubset(eventState, localUnit, impact)
-    if type(eventState) ~= "table" or eventState.active ~= true or type(localUnit) ~= "table" or type(impact) ~= "table" then
-        return false
-    end
-
-    local changed = false
-    local statRefs = setToOrderedList(impact.statRefs)
-    if #statRefs > 0 and type(Profile.GetResolvedStatRowsByRefs) == "function" then
-        local statRows = Profile.GetResolvedStatRowsByRefs(statRefs, {
-            includeAuraBonuses = true,
-        }) or {}
-        changed = updateLocalUnitStatsSubset(localUnit, statRows) or changed
-    end
-
-    local resourceRefs = setToOrderedList(impact.resourceRefs)
-    if #resourceRefs > 0 and type(Profile.GetResolvedResourceRowsByRefs) == "function" then
-        local resourceRows = Profile.GetResolvedResourceRowsByRefs(resourceRefs, {
-            includeAuraBonuses = true,
-        }) or {}
-        changed = updateLocalUnitResourcesSubset(localUnit, resourceRows) or changed
-    end
-
-    return changed
-end
-
-local function refreshLocalPlayerAuraDerivedState(eventState, targetEventId, impact, options)
-    local numericTargetEventId = tonumber(targetEventId) or 0
-    if numericTargetEventId <= 0 then
-        return false
-    end
-
-    local localUnit = resolveLocalEventUnit(eventState)
-    if tonumber(localUnit and localUnit.eventID) ~= numericTargetEventId then
-        return false
-    end
-
-    local refreshed = type(impact) == "table"
-        and rebuildLocalPlayerResolvedStateSubset(eventState, localUnit, impact)
-        or rebuildLocalPlayerResolvedState(eventState, localUnit)
-    if refreshed then
-        local combat = Addon.Client and Addon.Client.Combat or nil
-        if type(combat) == "table" and type(combat.BumpCombatRuntimeRevision) == "function" then
-            combat:BumpCombatRuntimeRevision(eventState.id, numericTargetEventId)
-        end
-        if not (type(options) == "table" and options.suppressProfileRefresh == true) then
-            refreshProfileWindowIfVisible()
-        end
-    end
-    return refreshed
 end
 
 local function queueLocalPlayerAuraDerivedStateRefresh(eventState, targetEventId, impact, options)
     local numericTargetEventId = tonumber(targetEventId) or 0
-    local eventId = tostring(eventState and eventState.id or "")
-    if numericTargetEventId <= 0 or eventId == "" then
+    local localUnit = resolveLocalEventUnit(eventState)
+    if numericTargetEventId <= 0
+        or type(eventState) ~= "table"
+        or eventState.active ~= true
+        or tonumber(localUnit and localUnit.eventID) ~= numericTargetEventId
+    then
         return false
     end
-
-    Client.PendingAuraDerivedStateRefreshEventId = eventId
-    Client.PendingAuraDerivedStateRefreshTargetEventId = numericTargetEventId
-    if type(impact) == "table" then
-        Client.PendingAuraDerivedStateRefreshImpact = Client.PendingAuraDerivedStateRefreshImpact or {
-            statRefs = {},
-            resourceRefs = {},
-        }
-        mergeDerivedStateImpact(Client.PendingAuraDerivedStateRefreshImpact, impact)
-    else
-        Client.PendingAuraDerivedStateRefreshImpact = nil
-    end
-    if Client.PendingAuraDerivedStateRefreshSuppressProfileRefresh == nil then
-        Client.PendingAuraDerivedStateRefreshSuppressProfileRefresh = false
-    end
-    if type(options) == "table" and options.suppressProfileRefresh == true then
-        Client.PendingAuraDerivedStateRefreshSuppressProfileRefresh = true
-    elseif type(options) ~= "table" or options.suppressProfileRefresh == false then
-        Client.PendingAuraDerivedStateRefreshSuppressProfileRefresh = false
-    end
-    if Client.PendingAuraDerivedStateRefreshQueued == true then
+    if type(impact) == "table"
+        and next(type(impact.statRefs) == "table" and impact.statRefs or {}) == nil
+        and next(type(impact.resourceRefs) == "table" and impact.resourceRefs or {}) == nil
+    then
         return true
     end
 
-    Client.PendingAuraDerivedStateRefreshQueued = true
-    local enqueued = enqueueAuraWork(function(targetClient)
-        targetClient.PendingAuraDerivedStateRefreshQueued = false
-        local refreshEventId = targetClient.PendingAuraDerivedStateRefreshEventId
-        local refreshTargetEventId = targetClient.PendingAuraDerivedStateRefreshTargetEventId
-        local refreshImpact = targetClient.PendingAuraDerivedStateRefreshImpact
-        local suppressProfileRefresh = targetClient.PendingAuraDerivedStateRefreshSuppressProfileRefresh == true
-        targetClient.PendingAuraDerivedStateRefreshEventId = nil
-        targetClient.PendingAuraDerivedStateRefreshTargetEventId = nil
-        targetClient.PendingAuraDerivedStateRefreshImpact = nil
-        targetClient.PendingAuraDerivedStateRefreshSuppressProfileRefresh = nil
-
-        local currentEventState = targetClient.GetEventState and targetClient:GetEventState() or nil
-        if type(currentEventState) == "table" and tostring(currentEventState.id or "") == tostring(refreshEventId or "") then
-            refreshLocalPlayerAuraDerivedState(currentEventState, refreshTargetEventId, refreshImpact, {
-                suppressProfileRefresh = suppressProfileRefresh,
-            })
-        end
-    end, Client)
-    if not enqueued then
-        Client.PendingAuraDerivedStateRefreshQueued = false
-        Client.PendingAuraDerivedStateRefreshEventId = nil
-        Client.PendingAuraDerivedStateRefreshTargetEventId = nil
-        Client.PendingAuraDerivedStateRefreshImpact = nil
-        Client.PendingAuraDerivedStateRefreshSuppressProfileRefresh = nil
-        return false
-    end
-
-    return true
+    return AuraManager:QueueLocalPlayerDerivedStateRefresh(eventState, options)
 end
 
 local function findEventUnit(eventState, eventId)
@@ -2032,26 +2044,64 @@ end
 function AuraManager:ResetAuraState(client, eventId)
     local normalizedEventId = type(eventId) == "string" and eventId or nil
     if normalizedEventId ~= nil then
-        client.PendingOutboundAuraOperations = client.PendingOutboundAuraOperations or {}
-        client.PendingOutboundAuraOperationOrder = client.PendingOutboundAuraOperationOrder or {}
-
-        local filteredOperations = {}
-        local filteredOrder = {}
-        for index = 1, #(client.PendingOutboundAuraOperationOrder or {}) do
-            local operationKey = client.PendingOutboundAuraOperationOrder[index]
-            local operation = client.PendingOutboundAuraOperations[operationKey]
-            if type(operation) == "table" and tostring(operation.eventId or "") ~= normalizedEventId then
-                filteredOperations[operationKey] = operation
-                filteredOrder[#filteredOrder + 1] = operationKey
+        local tasks = getTasks()
+        local derivedJobs = client.PendingFullAuraDerivedStateRefreshByEventId or {}
+        if type(tasks) == "table" and type(tasks.Cancel) == "function" then
+            tasks:Cancel(derivedJobs[normalizedEventId], "event-aura-reset")
+            local outboundJobs = {}
+            for _, job in pairs(client.PendingOutboundAuraFlushJobsByScope or {}) do
+                outboundJobs[#outboundJobs + 1] = job
+            end
+            for index = 1, #outboundJobs do
+                tasks:Cancel(outboundJobs[index], "event-aura-reset")
             end
         end
+        client.PendingOutboundAuraOperations = client.PendingOutboundAuraOperations or {}
+        client.PendingOutboundAuraOperationOrderByScope = client.PendingOutboundAuraOperationOrderByScope or {}
+
+        local filteredOperations = {}
+        local filteredOrdersByScope = {}
+        local filteredCountsByScope = {}
+        for scope, pendingOrder in pairs(client.PendingOutboundAuraOperationOrderByScope) do
+            local filteredOrder = {}
+            for index = 1, #(pendingOrder or {}) do
+                local operationKey = pendingOrder[index]
+                local operation = client.PendingOutboundAuraOperations[operationKey]
+                if type(operation) == "table" and tostring(operation.eventId or "") ~= normalizedEventId then
+                    filteredOperations[operationKey] = operation
+                    filteredOrder[#filteredOrder + 1] = operationKey
+                    filteredCountsByScope[scope] = (filteredCountsByScope[scope] or 0) + 1
+                end
+            end
+            filteredOrdersByScope[scope] = filteredOrder
+        end
         client.PendingOutboundAuraOperations = filteredOperations
-        client.PendingOutboundAuraOperationOrder = filteredOrder
+        client.PendingOutboundAuraOperationOrderByScope = filteredOrdersByScope
+        client.PendingOutboundAuraOperationCountsByScope = filteredCountsByScope
+        client.PendingOutboundAuraOperationOrder = {}
+        if type(client.PendingFullAuraDerivedStateRefreshByEventId) == "table" then
+            client.PendingFullAuraDerivedStateRefreshByEventId[normalizedEventId] = nil
+        end
     end
 
     if type(eventId) == "string" and eventId ~= "" then
         self:ClearEventAuraBucket(client, eventId)
         return true
+    end
+
+    local tasks = getTasks()
+    if type(tasks) == "table" and type(tasks.CancelScope) == "function" then
+        tasks:CancelScope("aura-flush:turn", "aura-reset")
+        tasks:CancelScope("aura-flush:reaction", "aura-reset")
+    end
+    if type(tasks) == "table" and type(tasks.Cancel) == "function" then
+        local derivedJobs = {}
+        for _, job in pairs(client.PendingFullAuraDerivedStateRefreshByEventId or {}) do
+            derivedJobs[#derivedJobs + 1] = job
+        end
+        for index = 1, #derivedJobs do
+            tasks:Cancel(derivedJobs[index], "aura-reset")
+        end
     end
 
     client.ActiveAurasByEventId = {}
@@ -2061,13 +2111,14 @@ function AuraManager:ResetAuraState(client, eventId)
     client.PendingLocalAuraDispelBatchEchoSignatures = nil
     client.PendingOutboundAuraFlushQueued = false
     client.PendingOutboundAuraFlushQueuedByScope = {}
+    client.PendingOutboundAuraFlushJobsByScope = {}
     client.PendingOutboundAuraOperations = {}
     client.PendingOutboundAuraOperationOrder = {}
+    client.PendingOutboundAuraOperationOrderByScope = {}
+    client.PendingOutboundAuraOperationCountsByScope = {}
+    client.PendingFullAuraDerivedStateRefreshByEventId = {}
     client.PendingAuraDisplayRefreshQueued = false
     client.PendingAuraDisplayRefreshReason = nil
-    client.PendingAuraDerivedStateRefreshQueued = false
-    client.PendingAuraDerivedStateRefreshEventId = nil
-    client.PendingAuraDerivedStateRefreshTargetEventId = nil
 
     -- Clear aura tooltip cache on full reset
     client.AuraTooltipLinesCached = {}
@@ -2282,77 +2333,74 @@ function AuraManager:RemoveAllAurasForUnit(client, eventState, targetEventId, op
     return true, removedEntries
 end
 
-function AuraManager:FlushOutboundAuraOperations(client, scopeOverride)
+local OUTBOUND_AURA_BATCH_ENTRY_LIMIT = 16
+
+local function getPendingOutboundAuraScopeCount(client, scope)
+    local counts = type(client) == "table" and client.PendingOutboundAuraOperationCountsByScope or nil
+    return math.max(0, math.floor(tonumber(type(counts) == "table" and counts[scope] or 0) or 0))
+end
+
+local function adjustPendingOutboundAuraScopeCount(client, scope, delta)
     if type(client) ~= "table" then
-        return false
+        return 0
     end
 
-    local scope = normalizePendingScope(scopeOverride)
-    client.PendingOutboundAuraFlushQueued = false
-    client.PendingOutboundAuraFlushQueuedByScope = client.PendingOutboundAuraFlushQueuedByScope or {}
-    client.PendingOutboundAuraFlushQueuedByScope[scope] = false
-    local eventId = nil
+    client.PendingOutboundAuraOperationCountsByScope = client.PendingOutboundAuraOperationCountsByScope or {}
+    local nextCount = math.max(0, getPendingOutboundAuraScopeCount(client, scope) + (tonumber(delta) or 0))
+    client.PendingOutboundAuraOperationCountsByScope[scope] = nextCount
+    return nextCount
+end
 
-    local pendingOperations = client.PendingOutboundAuraOperations or {}
-    local pendingOrder = client.PendingOutboundAuraOperationOrder or {}
-    if type(client.QueueActionBarRefresh) == "function" then
-        client:QueueActionBarRefresh("pending-aura-flush")
-    elseif type(client.RefreshActionBarWidget) == "function" then
-        client:RefreshActionBarWidget("pending-aura-flush")
-    end
-    if type(client.QueuePendingTurnChangesTooltipRefresh) == "function" then
-        client:QueuePendingTurnChangesTooltipRefresh()
-    elseif type(client.RefreshPendingTurnChangesTooltip) == "function" then
-        client:RefreshPendingTurnChangesTooltip()
+local function getPendingOutboundAuraOrder(client, scope)
+    if type(client) ~= "table" then
+        return {}
     end
 
-    local function flushOperationBatch(batch)
-        if type(batch) ~= "table" or #((batch.entries) or {}) == 0 then
-            return false
-        end
+    client.PendingOutboundAuraOperationOrderByScope = client.PendingOutboundAuraOperationOrderByScope or {}
+    client.PendingOutboundAuraOperationOrderByScope[scope] = client.PendingOutboundAuraOperationOrderByScope[scope] or {}
+    return client.PendingOutboundAuraOperationOrderByScope[scope]
+end
 
-        eventId = batch.eventId or eventId
+local function areOutboundAuraOperationsBatchCompatible(batch, operation)
+    return type(batch) == "table"
+        and type(operation) == "table"
+        and batch.kind == operation.kind
+        and batch.sessionState == operation.sessionState
+        and batch.eventState == operation.eventState
+        and tostring(batch.eventId or "") == tostring(operation.eventId or "")
+        and tostring(batch.channelName or "") == tostring(operation.sessionState and operation.sessionState.channelName or "")
+end
 
-        local context = {
-            sessionState = batch.sessionState,
-            eventState = batch.eventState,
-        }
-        if batch.kind == "apply" then
-            return self:SendAuraApplyBatch(client, context, batch.entries)
-        elseif batch.kind == "dispel" then
-            return self:SendAuraDispelBatch(client, context, batch.entries)
-        end
+local function createOutboundAuraOperationBatch(operation)
+    return {
+        kind = operation.kind,
+        sessionState = operation.sessionState,
+        eventState = operation.eventState,
+        eventId = operation.eventId,
+        channelName = operation.sessionState and operation.sessionState.channelName or nil,
+        operationKeys = {},
+    }
+end
 
-        return false
+local function flushOutboundAuraOperationBatch(manager, state)
+    local batch = state and state.currentBatch or nil
+    local client = state and state.client or nil
+    local pendingOperations = type(client) == "table" and client.PendingOutboundAuraOperations or nil
+    if type(manager) ~= "table" or type(batch) ~= "table" or type(pendingOperations) ~= "table" then
+        return true, false
     end
 
-    local currentBatch = nil
-    local flushed = false
-    for index = 1, #pendingOrder do
-        local operationKey = pendingOrder[index]
+    local entries = {}
+    local operationKeys = {}
+    for index = 1, #(batch.operationKeys or {}) do
+        local operationKey = batch.operationKeys[index]
         local operation = pendingOperations[operationKey]
-        if type(operation) == "table" and normalizePendingScope(operation.scope) == scope then
-            pendingOperations[operationKey] = nil
-            local canMerge = currentBatch
-                and currentBatch.kind == operation.kind
-                and currentBatch.sessionState == operation.sessionState
-                and currentBatch.eventState == operation.eventState
-                and tostring(currentBatch.eventId or "") == tostring(operation.eventId or "")
-                and tostring(currentBatch.channelName or "") == tostring(operation.sessionState and operation.sessionState.channelName or "")
-            if not canMerge then
-                flushed = flushOperationBatch(currentBatch) or flushed
-                currentBatch = {
-                    kind = operation.kind,
-                    sessionState = operation.sessionState,
-                    eventState = operation.eventState,
-                    eventId = operation.eventId,
-                    channelName = operation.sessionState and operation.sessionState.channelName or nil,
-                    entries = {},
-                }
-            end
-
+        if type(operation) == "table"
+            and normalizePendingScope(operation.scope) == state.scope
+            and areOutboundAuraOperationsBatchCompatible(batch, operation)
+        then
             if operation.kind == "apply" then
-                currentBatch.entries[#currentBatch.entries + 1] = {
+                entries[#entries + 1] = {
                     casterEventId = operation.casterEventId,
                     targetEventId = operation.targetEventId,
                     auraRef = operation.auraRef,
@@ -2361,19 +2409,49 @@ function AuraManager:FlushOutboundAuraOperations(client, scopeOverride)
                     powerLevel = operation.powerLevel,
                     fullState = operation.fullState == true,
                 }
+                operationKeys[#operationKeys + 1] = operationKey
             elseif operation.kind == "dispel" then
-                currentBatch.entries[#currentBatch.entries + 1] = {
+                entries[#entries + 1] = {
                     casterEventId = operation.casterEventId,
                     targetEventId = operation.targetEventId,
                     auraRef = operation.auraRef,
                 }
+                operationKeys[#operationKeys + 1] = operationKey
             end
         end
     end
 
-    flushed = flushOperationBatch(currentBatch) or flushed
+    if #entries == 0 then
+        return true, false
+    end
 
-    return flushed
+    local context = {
+        sessionState = batch.sessionState,
+        eventState = batch.eventState,
+    }
+    local sent = batch.kind == "apply"
+        and manager:SendAuraApplyBatch(client, context, entries)
+        or batch.kind == "dispel"
+            and manager:SendAuraDispelBatch(client, context, entries)
+            or false
+    if not sent then
+        return false, true
+    end
+
+    for index = 1, #operationKeys do
+        local operationKey = operationKeys[index]
+        if pendingOperations[operationKey] ~= nil then
+            pendingOperations[operationKey] = nil
+            adjustPendingOutboundAuraScopeCount(client, state.scope, -1)
+        end
+    end
+    return true, true
+end
+
+local queueOutboundAuraFlush
+
+function AuraManager:FlushOutboundAuraOperations(client, scopeOverride)
+    return queueOutboundAuraFlush(self, client, normalizePendingScope(scopeOverride))
 end
 
 local function shouldDeferTurnAuraOperations(client, context)
@@ -2391,6 +2469,193 @@ local function shouldDeferTurnAuraOperations(client, context)
         and type(eventState) == "table"
         and eventState.active == true
         and eventState.channelName == sessionState.channelName
+end
+
+local function updatePendingOutboundAuraFlushQueued(client)
+    if type(client) ~= "table" then
+        return false
+    end
+
+    local queuedByScope = client.PendingOutboundAuraFlushQueuedByScope or {}
+    client.PendingOutboundAuraFlushQueued = queuedByScope.turn == true or queuedByScope.reaction == true
+    return client.PendingOutboundAuraFlushQueued
+end
+
+local function clearOutboundAuraFlushState(state)
+    if type(state) ~= "table" then
+        return
+    end
+
+    state.currentBatch = nil
+    state.order = nil
+    state.compactedOrder = nil
+end
+
+local function finishOutboundAuraFlush(state)
+    local client = state and state.client or nil
+    local scope = state and state.scope or nil
+    if type(client) ~= "table" or type(scope) ~= "string" then
+        return
+    end
+
+    client.PendingOutboundAuraFlushQueuedByScope = client.PendingOutboundAuraFlushQueuedByScope or {}
+    client.PendingOutboundAuraFlushQueuedByScope[scope] = false
+    if type(client.PendingOutboundAuraFlushJobsByScope) == "table" then
+        client.PendingOutboundAuraFlushJobsByScope[scope] = nil
+    end
+    updatePendingOutboundAuraFlushQueued(client)
+
+    local shouldRetry = state.blocked ~= true and getPendingOutboundAuraScopeCount(client, scope) > 0
+    clearOutboundAuraFlushState(state)
+    if shouldRetry then
+        queueOutboundAuraFlush(state.manager, client, scope)
+    end
+end
+
+local function cancelOutboundAuraFlush(state)
+    local client = state and state.client or nil
+    local scope = state and state.scope or nil
+    if type(client) ~= "table" or type(scope) ~= "string" then
+        return
+    end
+
+    client.PendingOutboundAuraFlushQueuedByScope = client.PendingOutboundAuraFlushQueuedByScope or {}
+    client.PendingOutboundAuraFlushQueuedByScope[scope] = false
+    if type(client.PendingOutboundAuraFlushJobsByScope) == "table" then
+        client.PendingOutboundAuraFlushJobsByScope[scope] = nil
+    end
+    updatePendingOutboundAuraFlushQueued(client)
+    clearOutboundAuraFlushState(state)
+end
+
+local function stepOutboundAuraFlush(state, deadlineMs)
+    local manager = state and state.manager or nil
+    local client = state and state.client or nil
+    if type(manager) ~= "table" or type(client) ~= "table" then
+        return true
+    end
+
+    while true do
+        if state.phase == "scan" then
+            if state.orderIndex > state.orderLimit then
+                state.phase = state.currentBatch and "flush" or "compact"
+            else
+                local operationKey = state.order[state.orderIndex]
+                local operation = type(client.PendingOutboundAuraOperations) == "table"
+                    and client.PendingOutboundAuraOperations[operationKey]
+                    or nil
+                if type(operation) ~= "table" or normalizePendingScope(operation.scope) ~= state.scope then
+                    state.orderIndex = state.orderIndex + 1
+                elseif state.currentBatch and not areOutboundAuraOperationsBatchCompatible(state.currentBatch, operation) then
+                    state.phase = "flush"
+                else
+                    state.currentBatch = state.currentBatch or createOutboundAuraOperationBatch(operation)
+                    state.currentBatch.operationKeys[#state.currentBatch.operationKeys + 1] = operationKey
+                    state.orderIndex = state.orderIndex + 1
+                    if #state.currentBatch.operationKeys >= OUTBOUND_AURA_BATCH_ENTRY_LIMIT then
+                        state.phase = "flush"
+                    end
+                end
+            end
+        elseif state.phase == "flush" then
+            local sent, hadEntries = flushOutboundAuraOperationBatch(manager, state)
+            if hadEntries and not sent then
+                state.blocked = true
+                state.phase = "complete"
+            else
+                state.flushed = state.flushed or sent
+                state.currentBatch = nil
+                state.phase = "scan"
+            end
+        elseif state.phase == "compact" then
+            local operationKey = state.order[state.compactIndex]
+            if operationKey == nil then
+                client.PendingOutboundAuraOperationOrderByScope[state.scope] = state.compactedOrder
+                state.phase = "complete"
+            else
+                local operation = type(client.PendingOutboundAuraOperations) == "table"
+                    and client.PendingOutboundAuraOperations[operationKey]
+                    or nil
+                if type(operation) == "table" and normalizePendingScope(operation.scope) == state.scope then
+                    state.compactedOrder[#state.compactedOrder + 1] = operationKey
+                end
+                state.compactIndex = state.compactIndex + 1
+            end
+        else
+            return true
+        end
+
+        if shouldYieldAuraSlice(deadlineMs) then
+            return false
+        end
+    end
+end
+
+queueOutboundAuraFlush = function(manager, client, scope)
+    if type(manager) ~= "table" or type(client) ~= "table" then
+        return false
+    end
+
+    local normalizedScope = normalizePendingScope(scope)
+    client.PendingOutboundAuraFlushQueuedByScope = client.PendingOutboundAuraFlushQueuedByScope or {}
+    if client.PendingOutboundAuraFlushQueuedByScope[normalizedScope] == true then
+        return true
+    end
+
+    local order = getPendingOutboundAuraOrder(client, normalizedScope)
+    if getPendingOutboundAuraScopeCount(client, normalizedScope) <= 0 and #order == 0 then
+        return false
+    end
+
+    if type(client.QueueActionBarRefresh) == "function" then
+        client:QueueActionBarRefresh("pending-aura-flush")
+    elseif type(client.RefreshActionBarWidget) == "function" then
+        client:RefreshActionBarWidget("pending-aura-flush")
+    end
+    if type(client.QueuePendingTurnChangesTooltipRefresh) == "function" then
+        client:QueuePendingTurnChangesTooltipRefresh()
+    elseif type(client.RefreshPendingTurnChangesTooltip) == "function" then
+        client:RefreshPendingTurnChangesTooltip()
+    end
+
+    client.PendingOutboundAuraFlushQueuedByScope[normalizedScope] = true
+    updatePendingOutboundAuraFlushQueued(client)
+    local state = {
+        manager = manager,
+        client = client,
+        scope = normalizedScope,
+        order = order,
+        orderIndex = 1,
+        orderLimit = #order,
+        compactIndex = 1,
+        compactedOrder = {},
+        phase = "scan",
+        currentBatch = nil,
+        blocked = false,
+        flushed = false,
+    }
+    local job = enqueueAuraSliceable({
+        label = "outbound-aura-flush",
+        scope = "aura-flush:" .. normalizedScope,
+        state = state,
+        step = stepOutboundAuraFlush,
+        onCancel = function(work)
+            cancelOutboundAuraFlush(work)
+        end,
+        onComplete = function(work)
+            finishOutboundAuraFlush(work)
+        end,
+    })
+    if not job then
+        client.PendingOutboundAuraFlushQueuedByScope[normalizedScope] = false
+        updatePendingOutboundAuraFlushQueued(client)
+        clearOutboundAuraFlushState(state)
+        return false
+    end
+
+    client.PendingOutboundAuraFlushJobsByScope = client.PendingOutboundAuraFlushJobsByScope or {}
+    client.PendingOutboundAuraFlushJobsByScope[normalizedScope] = job
+    return true
 end
 
 function AuraManager:QueueAuraApply(client, context, entry, payload)
@@ -2425,9 +2690,10 @@ function AuraManager:QueueAuraApply(client, context, entry, payload)
     end
 
     client.PendingOutboundAuraOperations = client.PendingOutboundAuraOperations or {}
-    client.PendingOutboundAuraOperationOrder = client.PendingOutboundAuraOperationOrder or {}
     if not client.PendingOutboundAuraOperations[operationKey] then
-        client.PendingOutboundAuraOperationOrder[#client.PendingOutboundAuraOperationOrder + 1] = operationKey
+        local pendingOrder = getPendingOutboundAuraOrder(client, scope)
+        pendingOrder[#pendingOrder + 1] = operationKey
+        adjustPendingOutboundAuraScopeCount(client, scope, 1)
     end
 
     local existing = client.PendingOutboundAuraOperations[operationKey]
@@ -2477,23 +2743,7 @@ function AuraManager:QueueAuraApply(client, context, entry, payload)
         return true
     end
 
-    client.PendingOutboundAuraFlushQueuedByScope = client.PendingOutboundAuraFlushQueuedByScope or {}
-    if client.PendingOutboundAuraFlushQueuedByScope[scope] == true then
-        return true
-    end
-
-    client.PendingOutboundAuraFlushQueued = true
-    client.PendingOutboundAuraFlushQueuedByScope[scope] = true
-    local enqueued = enqueueAuraWork(function(targetClient)
-        AuraManager:FlushOutboundAuraOperations(targetClient, scope)
-    end, client)
-    if not enqueued then
-        client.PendingOutboundAuraFlushQueued = false
-        client.PendingOutboundAuraFlushQueuedByScope[scope] = false
-        return false
-    end
-
-    return true
+    return queueOutboundAuraFlush(self, client, scope)
 end
 
 function AuraManager:QueueAuraDispel(client, context, auraRef, casterEventId, targetEventId)
@@ -2518,7 +2768,6 @@ function AuraManager:QueueAuraDispel(client, context, auraRef, casterEventId, ta
     end
 
     client.PendingOutboundAuraOperations = client.PendingOutboundAuraOperations or {}
-    client.PendingOutboundAuraOperationOrder = client.PendingOutboundAuraOperationOrder or {}
 
     local pendingApplyKey = buildAuraOperationKey(
         "apply",
@@ -2529,10 +2778,15 @@ function AuraManager:QueueAuraDispel(client, context, auraRef, casterEventId, ta
         auraRef,
         scope
     )
-    client.PendingOutboundAuraOperations[pendingApplyKey] = nil
+    if client.PendingOutboundAuraOperations[pendingApplyKey] ~= nil then
+        client.PendingOutboundAuraOperations[pendingApplyKey] = nil
+        adjustPendingOutboundAuraScopeCount(client, scope, -1)
+    end
 
     if not client.PendingOutboundAuraOperations[operationKey] then
-        client.PendingOutboundAuraOperationOrder[#client.PendingOutboundAuraOperationOrder + 1] = operationKey
+        local pendingOrder = getPendingOutboundAuraOrder(client, scope)
+        pendingOrder[#pendingOrder + 1] = operationKey
+        adjustPendingOutboundAuraScopeCount(client, scope, 1)
     end
 
     client.PendingOutboundAuraOperations[operationKey] = {
@@ -2561,23 +2815,7 @@ function AuraManager:QueueAuraDispel(client, context, auraRef, casterEventId, ta
         return true
     end
 
-    client.PendingOutboundAuraFlushQueuedByScope = client.PendingOutboundAuraFlushQueuedByScope or {}
-    if client.PendingOutboundAuraFlushQueuedByScope[scope] == true then
-        return true
-    end
-
-    client.PendingOutboundAuraFlushQueued = true
-    client.PendingOutboundAuraFlushQueuedByScope[scope] = true
-    local enqueued = enqueueAuraWork(function(targetClient)
-        AuraManager:FlushOutboundAuraOperations(targetClient, scope)
-    end, client)
-    if not enqueued then
-        client.PendingOutboundAuraFlushQueued = false
-        client.PendingOutboundAuraFlushQueuedByScope[scope] = false
-        return false
-    end
-
-    return true
+    return queueOutboundAuraFlush(self, client, scope)
 end
 
 function AuraManager:SendAuraApply(client, context, entry)
@@ -3861,7 +4099,7 @@ function AuraManager:RefreshLocalPlayerDerivedState(eventState, options)
         return false
     end
 
-    return refreshLocalPlayerAuraDerivedState(eventState, localPlayerEventId, nil, options)
+    return self:QueueLocalPlayerDerivedStateRefresh(eventState, options)
 end
 
 function AuraManager:ValidateInboundAuraPayload(client, sender, channelName, eventId, casterEventId, targetEventId, auraRef, stacks, turns, powerLevel)
@@ -4150,13 +4388,13 @@ end
 Client.ActiveAurasByEventId = Client.ActiveAurasByEventId or {}
 Client.PendingOutboundAuraFlushQueued = Client.PendingOutboundAuraFlushQueued or false
 Client.PendingOutboundAuraFlushQueuedByScope = Client.PendingOutboundAuraFlushQueuedByScope or {}
+Client.PendingOutboundAuraFlushJobsByScope = Client.PendingOutboundAuraFlushJobsByScope or {}
 Client.PendingOutboundAuraOperations = Client.PendingOutboundAuraOperations or {}
 Client.PendingOutboundAuraOperationOrder = Client.PendingOutboundAuraOperationOrder or {}
+Client.PendingOutboundAuraOperationOrderByScope = Client.PendingOutboundAuraOperationOrderByScope or {}
+Client.PendingOutboundAuraOperationCountsByScope = Client.PendingOutboundAuraOperationCountsByScope or {}
+Client.PendingFullAuraDerivedStateRefreshByEventId = Client.PendingFullAuraDerivedStateRefreshByEventId or {}
 Client.PendingLocalAuraApplyBatchEchoSignatures = Client.PendingLocalAuraApplyBatchEchoSignatures or {}
 Client.PendingLocalAuraDispelBatchEchoSignatures = Client.PendingLocalAuraDispelBatchEchoSignatures or {}
 Client.PendingAuraDisplayRefreshQueued = Client.PendingAuraDisplayRefreshQueued or false
 Client.PendingAuraDisplayRefreshReason = Client.PendingAuraDisplayRefreshReason or nil
-Client.PendingAuraDerivedStateRefreshQueued = Client.PendingAuraDerivedStateRefreshQueued or false
-Client.PendingAuraDerivedStateRefreshEventId = Client.PendingAuraDerivedStateRefreshEventId or nil
-Client.PendingAuraDerivedStateRefreshTargetEventId = Client.PendingAuraDerivedStateRefreshTargetEventId or nil
-Client.PendingAuraDerivedStateRefreshImpact = Client.PendingAuraDerivedStateRefreshImpact or nil

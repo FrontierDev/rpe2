@@ -779,12 +779,54 @@ local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
 
     if runtime.resolvedStateRefreshed ~= true and type(targetClient.RefreshTraitResolvedState) == "function" then
         local phaseTimer = startTiming("Event startup phase: resolved-state", 8, queuedEventId)
-        targetClient:RefreshTraitResolvedState(eventState, "startup")
+        local auraManager = targetClient.Spellcasting and targetClient.Spellcasting.AuraManager or nil
+        runtime.resolvedStateContinuation = runtime.resolvedStateContinuation
+            or (type(auraManager) == "table"
+                and type(auraManager.CreateLocalPlayerDerivedStateContinuation) == "function"
+                and auraManager:CreateLocalPlayerDerivedStateContinuation(targetClient, eventState)
+                or nil)
+        if type(runtime.resolvedStateContinuation) ~= "table"
+            or type(auraManager) ~= "table"
+            or type(auraManager.StepLocalPlayerDerivedStateContinuation) ~= "function"
+        then
+            error("Event startup resolved-state continuation is unavailable.")
+        end
+        local completed, continuationReason = auraManager:StepLocalPlayerDerivedStateContinuation(
+            runtime.resolvedStateContinuation,
+            deadlineMs
+        )
+        if completed == nil then
+            if type(auraManager.ReleaseLocalPlayerDerivedStateContinuation) == "function" then
+                auraManager:ReleaseLocalPlayerDerivedStateContinuation(runtime.resolvedStateContinuation)
+            end
+            runtime.resolvedStateContinuation = nil
+            if phaseTimer then
+                stopEventTiming(phaseTimer, eventState, {
+                    startupPhase = "resolved-state",
+                    completed = 0,
+                    stale = continuationReason or "unknown",
+                })
+            end
+            return true
+        end
+        if completed ~= true then
+            if phaseTimer then
+                stopEventTiming(phaseTimer, eventState, {
+                    startupPhase = "resolved-state",
+                    completed = 0,
+                })
+            end
+            return true
+        end
+        runtime.resolvedStateContinuation = nil
+        targetClient:RefreshTraitResolvedState(eventState, "startup", {
+            suppressDerivedStateRefresh = true,
+        })
         runtime.resolvedStateRefreshed = true
         local sessionState = targetClient.GetState and targetClient:GetState() or targetClient.State
         tryQueueInitialLocalResourceSync(targetClient, sessionState, eventState, "startup-resolved-state")
         if phaseTimer then
-            stopEventTiming(phaseTimer, eventState, { startupPhase = "resolved-state" })
+            stopEventTiming(phaseTimer, eventState, { startupPhase = "resolved-state", completed = 1 })
         end
         setEventStartupPhase(eventState, runtime, "syncing-local")
         return true
@@ -870,11 +912,18 @@ local function queueEventStartupWork(client, eventState, reason)
             local targetClient = work and work.client or nil
             local currentRuntime = targetClient and getEventStartupRuntime(targetClient, work.eventId, false) or nil
             if type(currentRuntime) == "table" then
+                local auraManager = targetClient.Spellcasting and targetClient.Spellcasting.AuraManager or nil
+                if type(auraManager) == "table"
+                    and type(auraManager.ReleaseLocalPlayerDerivedStateContinuation) == "function"
+                then
+                    auraManager:ReleaseLocalPlayerDerivedStateContinuation(currentRuntime.resolvedStateContinuation)
+                end
                 currentRuntime.queued = false
                 currentRuntime.sliceJob = nil
                 currentRuntime.traitRuntimeContinuation = nil
                 currentRuntime.automaticAuraContinuation = nil
                 currentRuntime.eventAuraContinuation = nil
+                currentRuntime.resolvedStateContinuation = nil
             end
             if cancelReason == "stale" and type(targetClient) == "table" then
                 local currentEventState = targetClient.GetEventState and targetClient:GetEventState() or nil
@@ -890,11 +939,18 @@ local function queueEventStartupWork(client, eventState, reason)
             local targetClient = work and work.client or nil
             local currentRuntime = targetClient and getEventStartupRuntime(targetClient, work.eventId, false) or nil
             if type(currentRuntime) == "table" then
+                local auraManager = targetClient.Spellcasting and targetClient.Spellcasting.AuraManager or nil
+                if type(auraManager) == "table"
+                    and type(auraManager.ReleaseLocalPlayerDerivedStateContinuation) == "function"
+                then
+                    auraManager:ReleaseLocalPlayerDerivedStateContinuation(currentRuntime.resolvedStateContinuation)
+                end
                 currentRuntime.queued = false
                 currentRuntime.sliceJob = nil
                 currentRuntime.traitRuntimeContinuation = nil
                 currentRuntime.automaticAuraContinuation = nil
                 currentRuntime.eventAuraContinuation = nil
+                currentRuntime.resolvedStateContinuation = nil
             end
         end,
     })

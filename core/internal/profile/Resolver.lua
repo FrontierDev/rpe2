@@ -936,6 +936,296 @@ local function finalizeResolvedResourceRows(rows, progressionContext)
     end
 end
 
+local function shouldYieldResolvedStateContinuation(deadlineMs)
+    local tasks = Addon.Internal and Addon.Internal.Tasks or nil
+    return type(tasks) == "table"
+        and type(tasks.ShouldYield) == "function"
+        and tasks:ShouldYield(deadlineMs) == true
+end
+
+local function compareResolvedStatRows(left, right)
+    if left.priority == right.priority then
+        local leftName = string.lower(tostring(left.name or ""))
+        local rightName = string.lower(tostring(right.name or ""))
+        if leftName == rightName then
+            return tostring(left.statId or "") < tostring(right.statId or "")
+        end
+        return leftName < rightName
+    end
+
+    return left.priority > right.priority
+end
+
+local function compareResolvedResourceRows(left, right)
+    local leftName = string.lower(tostring(left.name or ""))
+    local rightName = string.lower(tostring(right.name or ""))
+    if leftName == rightName then
+        return tostring(left.resourceId or "") < tostring(right.resourceId or "")
+    end
+
+    return leftName < rightName
+end
+
+local function stepInsertionSort(continuation, rows, prefix, compare)
+    local indexKey = prefix .. "SortIndex"
+    local currentKey = prefix .. "SortCurrent"
+    local compareKey = prefix .. "SortCompareIndex"
+    local sortIndex = continuation[indexKey] or 2
+
+    if sortIndex > #rows then
+        continuation[indexKey] = nil
+        continuation[currentKey] = nil
+        continuation[compareKey] = nil
+        return true
+    end
+
+    local current = continuation[currentKey]
+    local compareIndex = continuation[compareKey]
+    if current == nil then
+        current = rows[sortIndex]
+        compareIndex = sortIndex - 1
+        continuation[currentKey] = current
+        continuation[compareKey] = compareIndex
+    end
+
+    if compareIndex >= 1 and compare(current, rows[compareIndex]) then
+        rows[compareIndex + 1] = rows[compareIndex]
+        continuation[compareKey] = compareIndex - 1
+        return false
+    end
+
+    rows[compareIndex + 1] = current
+    continuation[indexKey] = sortIndex + 1
+    continuation[currentKey] = nil
+    continuation[compareKey] = nil
+    return false
+end
+
+local function getRuntimeTraitEntries()
+    local client = Addon.Client or nil
+    local eventState = type(client) == "table" and type(client.GetEventState) == "function"
+        and client:GetEventState()
+        or nil
+    local state = type(client) == "table"
+        and type(client.GetTraitRuntimeState) == "function"
+        and client:GetTraitRuntimeState(eventState and eventState.id or nil, false)
+        or nil
+    return type(state) == "table" and type(state.activeEntries) == "table" and state.activeEntries or {}
+end
+
+function Resolver.CreateResolvedStateContinuation(options)
+    local registry = Addon.Internal and Addon.Internal.Registry or nil
+    local datasetIds = type(registry) == "table" and type(registry.ListActivatedDatasetIds) == "function"
+        and registry:ListActivatedDatasetIds()
+        or {}
+    local profile = Database.GetActiveProfile and Database.GetActiveProfile() or nil
+    local storedBonuses = type(profile) == "table" and profile.statBonuses or nil
+    local progressionContext = buildProfileProgressionContext()
+    local equipmentBonuses = buildItemStatBonusMap()
+    local traitBonuses = {}
+    local traitPercentBonuses = {}
+    equipmentBonuses.__traitBonuses = traitBonuses
+    equipmentBonuses.__traitPercentBonuses = traitPercentBonuses
+
+    return {
+        options = options,
+        phase = "profile-bonuses",
+        datasetIds = datasetIds,
+        datasetIndex = 1,
+        entryIndex = 1,
+        profileBonusSource = type(storedBonuses) == "table" and storedBonuses or {},
+        profileBonusKey = nil,
+        traitEntries = getRuntimeTraitEntries(),
+        traitIndex = 1,
+        traitBonusIndex = 1,
+        context = {
+            entries = {},
+            byRef = {},
+            cache = {},
+            profileBonuses = {},
+            bonuses = equipmentBonuses,
+            auraContext = resolveLocalAuraContext(options),
+            progressionContext = progressionContext,
+        },
+        statRows = {},
+        statRowsByRef = {},
+        resourceEntries = {},
+        resourceRows = {},
+        resourceRowsByRef = {},
+    }
+end
+
+function Resolver.StepResolvedStateContinuation(continuation, deadlineMs)
+    if type(continuation) ~= "table" then
+        return true
+    end
+
+    local context = continuation.context
+    if type(context) ~= "table" then
+        return true
+    end
+
+    while true do
+        if continuation.phase == "profile-bonuses" then
+            local statRef, bonus = next(continuation.profileBonusSource, continuation.profileBonusKey)
+            continuation.profileBonusKey = statRef
+            if statRef == nil then
+                continuation.phase = "trait-bonuses"
+            else
+                local normalizedStatRef = ensureString(statRef)
+                if normalizedStatRef ~= "" then
+                    context.profileBonuses[normalizedStatRef] = tonumber(bonus) or 0
+                end
+            end
+        elseif continuation.phase == "trait-bonuses" then
+            local sourceEntry = continuation.traitEntries[continuation.traitIndex]
+            if sourceEntry == nil then
+                continuation.phase = "collect-stats"
+                continuation.datasetIndex = 1
+                continuation.entryIndex = 1
+            else
+                local payload = type(sourceEntry) == "table" and sourceEntry.payload or nil
+                local statBonus = type(payload) == "table"
+                    and type(payload.statBonuses) == "table"
+                    and payload.statBonuses[continuation.traitBonusIndex]
+                    or nil
+                if statBonus == nil then
+                    continuation.traitIndex = continuation.traitIndex + 1
+                    continuation.traitBonusIndex = 1
+                else
+                    local statRef = type(statBonus) == "table" and ensureString(statBonus.statRef) or ""
+                    if statRef ~= "" then
+                        if tostring(statBonus.operation or "flat") == "percent" then
+                            context.bonuses.__traitPercentBonuses[statRef] = (context.bonuses.__traitPercentBonuses[statRef] or 0)
+                                + (tonumber(statBonus.value) or 0)
+                        else
+                            context.bonuses.__traitBonuses[statRef] = (context.bonuses.__traitBonuses[statRef] or 0)
+                                + (tonumber(statBonus.value) or 0)
+                        end
+                    end
+                    continuation.traitBonusIndex = continuation.traitBonusIndex + 1
+                end
+            end
+        elseif continuation.phase == "collect-stats" then
+            local datasetId = continuation.datasetIds[continuation.datasetIndex]
+            if datasetId == nil then
+                continuation.phase = "build-stats"
+                continuation.entryIndex = 1
+            else
+                local dataset = Database.GetDatasetByID and Database.GetDatasetByID(datasetId) or nil
+                local stat = type(dataset) == "table" and type(dataset.stats) == "table"
+                    and dataset.stats[continuation.entryIndex]
+                    or nil
+                if stat == nil then
+                    continuation.datasetIndex = continuation.datasetIndex + 1
+                    continuation.entryIndex = 1
+                elseif stat.id then
+                    local ref = Dependencies.ComposeSourceStatRef and Dependencies.ComposeSourceStatRef(dataset.id, stat.id) or nil
+                    if ref then
+                        local entry = {
+                            ref = ref,
+                            dataset = dataset,
+                            stat = stat,
+                        }
+                        context.entries[#context.entries + 1] = entry
+                        context.byRef[ref] = entry
+                    end
+                    continuation.entryIndex = continuation.entryIndex + 1
+                else
+                    continuation.entryIndex = continuation.entryIndex + 1
+                end
+            end
+        elseif continuation.phase == "build-stats" then
+            local entry = context.entries[continuation.entryIndex]
+            if entry == nil then
+                continuation.phase = "sort-stats"
+            else
+                local row = buildResolvedStatRow(entry, context)
+                if row then
+                    continuation.statRows[#continuation.statRows + 1] = row
+                    continuation.statRowsByRef[row.ref] = row
+                end
+                continuation.entryIndex = continuation.entryIndex + 1
+            end
+        elseif continuation.phase == "sort-stats" then
+            if stepInsertionSort(continuation, continuation.statRows, "stat", compareResolvedStatRows) then
+                continuation.phase = "collect-resources"
+                continuation.datasetIndex = 1
+                continuation.entryIndex = 1
+            end
+        elseif continuation.phase == "collect-resources" then
+            local datasetId = continuation.datasetIds[continuation.datasetIndex]
+            if datasetId == nil then
+                continuation.phase = "build-resources"
+                continuation.entryIndex = 1
+            else
+                local dataset = Database.GetDatasetByID and Database.GetDatasetByID(datasetId) or nil
+                local resource = type(dataset) == "table" and type(dataset.resources) == "table"
+                    and dataset.resources[continuation.entryIndex]
+                    or nil
+                if resource == nil then
+                    continuation.datasetIndex = continuation.datasetIndex + 1
+                    continuation.entryIndex = 1
+                elseif resource.id then
+                    local ref = Dependencies.ComposeSourceStatRef and Dependencies.ComposeSourceStatRef(dataset.id, resource.id) or nil
+                    if ref then
+                        continuation.resourceEntries[#continuation.resourceEntries + 1] = {
+                            ref = ref,
+                            dataset = dataset,
+                            resource = resource,
+                        }
+                    end
+                    continuation.entryIndex = continuation.entryIndex + 1
+                else
+                    continuation.entryIndex = continuation.entryIndex + 1
+                end
+            end
+        elseif continuation.phase == "build-resources" then
+            local entry = continuation.resourceEntries[continuation.entryIndex]
+            if entry == nil then
+                continuation.phase = "finalize-resources"
+                continuation.entryIndex = 1
+            else
+                local row = buildResolvedResourceRow(entry, continuation.statRowsByRef, context.progressionContext)
+                if row then
+                    continuation.resourceRows[#continuation.resourceRows + 1] = row
+                    continuation.resourceRowsByRef[row.ref] = row
+                end
+                continuation.entryIndex = continuation.entryIndex + 1
+            end
+        elseif continuation.phase == "finalize-resources" then
+            local row = continuation.resourceRows[continuation.entryIndex]
+            if row == nil then
+                continuation.phase = "sort-resources"
+            else
+                local computedBaseResource = tonumber(row.intrinsicBaseResourceValue) or 0
+                local fallbackBaseValue = 0
+                if computedBaseResource <= 0 and context.progressionContext.useFallback == true then
+                    fallbackBaseValue = (tonumber(row.value) or 0) * context.progressionContext.fallbackFraction
+                    computedBaseResource = fallbackBaseValue
+                end
+                row.fallbackBaseValue = fallbackBaseValue
+                row.baseResourceValue = computedBaseResource
+                continuation.entryIndex = continuation.entryIndex + 1
+            end
+        elseif continuation.phase == "sort-resources" then
+            if stepInsertionSort(continuation, continuation.resourceRows, "resource", compareResolvedResourceRows) then
+                continuation.phase = "complete"
+            end
+        else
+            continuation.context = nil
+            continuation.datasetIds = nil
+            continuation.traitEntries = nil
+            continuation.resourceEntries = nil
+            return true
+        end
+
+        if shouldYieldResolvedStateContinuation(deadlineMs) then
+            return false
+        end
+    end
+end
+
 function Resolver.ListResolvedStats(options)
     local context = buildStatResolutionContext(options)
     local rows = {}

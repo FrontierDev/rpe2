@@ -157,7 +157,8 @@ end
 local function buildAuraSummary(client, sessionState, eventState)
     local rows = {}
     local pendingOperations = client.PendingOutboundAuraOperations or {}
-    local pendingOrder = client.PendingOutboundAuraOperationOrder or {}
+    local pendingOrderByScope = client.PendingOutboundAuraOperationOrderByScope or {}
+    local pendingOrder = pendingOrderByScope.turn or client.PendingOutboundAuraOperationOrder or {}
     for index = 1, #pendingOrder do
         local operation = pendingOperations[pendingOrder[index]]
         if type(operation) == "table"

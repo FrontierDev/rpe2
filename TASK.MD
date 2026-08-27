@@ -1,174 +1,90 @@
-## Goal
-Make deferred work **genuinely frame-bounded** by adding cooperative sliceable jobs to `TaskQueue` and converting existing deferred loops whose runtime can scale with content size.
+## Static validation: FAIL — two hot content-scaled jobs remain indivisible
 
-Authoritative documents:
+Validated commit `fa5d6f3f447b6e5290c1370afce74fce8bc92fbc` (`Issue #65`) against the #65 body and the runtime-performance plan. `TASK.MD` is intentionally ignored per user instruction.
 
-- `.docs/RPE2-Runtime-Performance-Hitch-Elimination-PDD.md`
-- `.docs/RPE2-Runtime-Performance-Hitch-Elimination-Implementation-Plan.md`
+A large part of the implementation is correct:
 
-Depends on: #64
+- existing `Tasks:Enqueue(fn, ...)` compatibility is preserved;
+- `Tasks:EnqueueSliceable(...)` retains explicit state across frames and supplies a deadline;
+- labels, timing diagnostics, per-slice stats, cancellation by id/scope, stale checks, and error containment are present;
+- incomplete sliceable jobs are resumed on later flushes without blocking later queued work;
+- event startup is now a scoped/stale-checked sliceable job;
+- trait-runtime compilation, automatic-trait-aura synchronization, and event-aura synchronization now use continuations and check the deadline between continuation iterations.
 
-The current TaskQueue only checks its time budget between jobs. A single slow queued function can still monopolize a frame. This task fixes the scheduler contract; event/spell-specific state machines are completed in later issues.
+No configured commit status checks are present.
 
-## Primary files
+### Blocking defect 1: event-startup resolved-state refresh is still one monolithic slice
 
-- `core/internal/tasks/TaskQueue.lua`
-- `core/debug/Timings.lua`
-- `Commands.lua` only for extending #58 queue diagnostics where required
-- `client/client_Event.lua`
-- `client/client_Traits.lua`
-- `client/spellcasting/AuraManager.lua`
-- Inventory/Profile files only if #58 proves an existing queued first-build/snapshot operation is unbounded and can be converted without broadening scope
-
-Inspect every existing `Tasks:Enqueue(...)` call in hot runtime paths before converting anything.
-
-## 1. Preserve existing bounded-job API
-
-Keep the existing normal API for known-small work:
+`client/client_Event.lua` still performs this startup phase synchronously inside `runEventStartupStep(...)`:
 
 ```lua
-Tasks:Enqueue(fn, ...)
+if runtime.resolvedStateRefreshed ~= true and type(targetClient.RefreshTraitResolvedState) == "function" then
+    targetClient:RefreshTraitResolvedState(eventState, "startup")
+    runtime.resolvedStateRefreshed = true
+    ...
+end
 ```
 
-Existing callers must continue to work unless deliberately converted.
-
-Do not force every tiny task through a continuation object.
-
-## 2. Add sliceable/continuation jobs
-
-Add a cooperative API equivalent to:
+That call reaches `AuraManager:RefreshLocalPlayerDerivedState(eventState, nil)`. With no narrow impact supplied it takes the full rebuild path:
 
 ```lua
-Tasks:EnqueueSliceable({
-    label = "...",
-    state = state,
-    step = function(jobState, deadlineMs)
-        -- bounded work
-        -- return true when complete
-    end,
-})
+rebuildLocalPlayerResolvedState(eventState, localUnit)
 ```
 
-Alternative iterator/continuation syntax is acceptable if it provides the same guarantees.
+The full rebuild performs a complete `Profile.ListResolvedStats({ includeAuraBonuses = true })`, iterates all resolved stat rows, resolves the complete resource list, and iterates all resolved resources before returning. There is no continuation index or deadline check in this path.
+
+This is exactly the kind of content-scaled operation #65 is intended to eliminate, and `resolved trait-state refresh` is explicitly named in the issue. Wrapping the caller in a sliceable TaskQueue job does not make this function preemptible: one call can still consume an arbitrarily long frame before the scheduler regains control.
+
+### Blocking defect 2: outbound aura flush remains a normal queued full-collection scan
+
+`client/spellcasting/AuraManager.lua` is unchanged by #65 and still queues `AuraManager:FlushOutboundAuraOperations(...)` through the normal `enqueueAuraWork` / `Tasks:Enqueue` path.
+
+`FlushOutboundAuraOperations` then unconditionally scans the complete pending order in one job:
+
+```lua
+for index = 1, #pendingOrder do
+    ...
+end
+```
+
+The size of `PendingOutboundAuraOperationOrder` is not hard-bounded by the scheduler. A sufficiently large aura batch can therefore still become a 50+ ms indivisible queued operation, which violates the issue's core acceptance criterion and the instruction to inspect hot `Tasks:Enqueue(...)` call sites.
+
+## Required fix
+
+### A. Make full local derived-state rebuilding cooperative
+
+Add a continuation/sliceable path for the **full** local-player derived-state rebuild used by event startup and full aura/trait invalidations.
 
 Requirements:
 
-- each slice receives/can query the current deadline or elapsed budget;
-- incomplete jobs retain their state and resume later;
-- completed jobs are removed cleanly;
-- job labels are available in timing/error diagnostics;
-- errors identify the sliceable job and do not corrupt the queue;
-- cancellation/stale-check hooks exist for event-scoped jobs that become obsolete;
-- normal and sliceable jobs share predictable queue ordering/priority semantics.
+1. Event startup must create/resume a derived-state continuation instead of calling `RefreshTraitResolvedState(..., "startup")` as one indivisible operation.
+2. Process stat/resource preparation and row application with explicit continuation state and deadline checks.
+3. Preserve atomic presentation/gameplay state: do not expose half-built `localUnit.stats` / `localUnit.resources`; build into continuation-owned temporary structures and commit only on completion.
+4. Preserve existing ordering and resource-current/max semantics.
+5. If `Profile.ListResolvedStats(...)` / `ListResolvedResources(...)` itself remains a cold monolithic resolver operation, merely slicing the subsequent copy loop is insufficient. Reuse a valid revision-keyed cache or add a cooperative resolver path so a cold full rebuild itself cannot monopolize a frame.
+6. Narrow subset refreshes may remain normal only where their cardinality is explicitly bounded/proven small.
+7. Event/config/equipment staleness must cancel/restart safely without committing partial derived state.
 
-Do not rely on Lua coroutine yielding unless repository/runtime constraints make it clearly safer than explicit continuation state.
+### B. Make outbound aura flushing bounded
 
-## 3. Enforce per-slice timing discipline
-
-Target approximately 2 ms of RPE work per slice.
+Convert `FlushOutboundAuraOperations` (or the queued wrapper around it) to a sliceable continuation when the pending collection can be large.
 
 Requirements:
 
-- scheduler checks time within/around repeated slice steps, not only after a complete large job;
-- a well-behaved slice can stop before the deadline and resume next frame;
-- record slow slices through #58 timing diagnostics;
-- expose current normal/sliceable pending counts and last/max slice elapsed time.
+1. Retain an explicit pending-order index/current batch state and stop at the deadline.
+2. Preserve existing batching and operation order exactly.
+3. Do not remove/drop operations in a way that loses unsent authoritative aura updates if the job is cancelled or becomes stale mid-run.
+4. Scope/stale-check event work appropriately and clear continuation state on complete/cancel.
+5. A large pending aura queue must no longer be scanned in full by one normal `Tasks:Enqueue` callback.
 
-The scheduler cannot magically preempt arbitrary Lua functions; converted job `step` functions must cooperate by checking the deadline/processed count.
+### Re-validation after fix
 
-## 4. Add cancellation/staleness support
+Static re-check should confirm there is no full derived-state rebuild or full pending-aura scan hidden inside a single slice. Then run the existing required in-game gate with timings enabled:
 
-Event/configuration transitions can invalidate queued work.
+- high-content event startup -> trait/aura/derived-state work spans bounded slices with no visible freeze;
+- `TaskQueue.Slice` timings stay near the ~2 ms target and no converted slice exceeds the hard frame threshold;
+- final trait/aura/stat/resource state matches the unsliced behavior;
+- cancellation/stale restart does not commit stale or partial state;
+- normal tiny `Tasks:Enqueue` behavior remains unchanged.
 
-Provide a narrow mechanism equivalent to:
-
-```text
-cancel by token/job id
-cancel by event scope
-job checks expected event id/revision before mutating state
-```
-
-Requirements:
-
-- obsolete presentation/derived work can be dropped safely;
-- authoritative work is not silently discarded after partially mutating state;
-- cancellation state is visible in diagnostics where useful.
-
-## 5. Convert currently deferred unbounded loops
-
-At minimum inspect and convert large deferred work in current event startup/trait/aura paths where #58 timing/cardinality shows content-scaled loops, including current equivalents of:
-
-```text
-trait runtime refresh/compilation
-automatic trait aura synchronization
-event aura synchronization
-resolved trait-state refresh
-large aura advancement/tick queues if one queued job processes many entries
-```
-
-Do not yet redesign turn due-work indexes or spell-component state machines; later issues own those.
-
-For each converted job:
-
-- retain explicit continuation indexes/state;
-- preserve operation order;
-- verify stale event/config revisions before applying resumed work;
-- clear large continuation tables on completion/cancel.
-
-## 6. Keep queue semantics deterministic
-
-Slicing may change which frame presentation finishes on, but must not reorder dependent authoritative operations incorrectly.
-
-Where a sequence requires strict completion before the next phase, chain phases explicitly rather than enqueueing unrelated independent jobs and relying on incidental queue order.
-
-## Acceptance criteria
-
-- [ ] Existing `Tasks:Enqueue` callers remain supported.
-- [ ] TaskQueue exposes a sliceable/continuation API.
-- [ ] Sliceable work retains state and resumes across frames.
-- [ ] Scheduler diagnostics distinguish normal and sliceable jobs.
-- [ ] Slow slices are timed against the ~2 ms target.
-- [ ] Event-scoped/stale work can be cancelled or rejected safely.
-- [ ] At least the existing large event-start trait/aura deferred loops are converted where profiling shows they are unbounded.
-- [ ] No converted slice processes its full potentially-large collection unconditionally in one call.
-- [ ] Converted jobs preserve logical order/results.
-- [ ] A queued 50+ ms content-scaled operation no longer executes as one indivisible frame solely because it was deferred.
-
-## Validation matrix
-
-```text
-normal tiny Enqueue job
--> behavior unchanged
-
-sliceable job with 10,000 synthetic iterations
--> completes over multiple slices/frames
--> each slice respects target budget approximately
--> result equals unsliced reference
-
-sliceable job errors on later slice
--> error identifies job label
--> queue remains usable
-
-cancel queued event-scoped job before first slice
--> no mutation occurs
-
-cancel/stale event-scoped derived job after event id changes
--> resumed job does not apply stale output
-
-event startup with many trait/aura entries
--> work is visibly split into bounded slices
--> no individual converted job exceeds hard frame threshold
--> final runtime state matches expected result
-```
-
-## Constraints
-
-- Do not increase the global TaskQueue budget as the primary fix.
-- Do not claim arbitrary functions are preemptible; callers must cooperate.
-- Do not redesign spell component execution here.
-- Do not redesign cooldown/aura due indexes here.
-- Do not drop partially authoritative work through unsafe cancellation.
-- Do not change gameplay ordering to improve throughput.
-
-## Coding-agent instructions
-Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read both runtime-performance documents and completed #64. Inspect the current `TaskQueue:Flush()` implementation and hot `Tasks:Enqueue` call sites before designing the continuation API. Keep compatibility for bounded jobs, convert only proven unbounded deferred loops, and make cancellation/stale checks explicit. Report the new scheduler API, slice budget behavior, converted call sites, cancellation semantics, diagnostics, files changed, and timing validation.
+#65 remains open pending these fixes.

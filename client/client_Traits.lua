@@ -1696,7 +1696,10 @@ end
 
 function Client:RefreshTraitResolvedState(eventState, reason, options)
     local auraManager = self.Spellcasting and self.Spellcasting.AuraManager or nil
-    if type(auraManager) == "table" and type(auraManager.RefreshLocalPlayerDerivedState) == "function" then
+    if not (type(options) == "table" and options.suppressDerivedStateRefresh == true)
+        and type(auraManager) == "table"
+        and type(auraManager.RefreshLocalPlayerDerivedState) == "function"
+    then
         auraManager:RefreshLocalPlayerDerivedState(eventState, options)
     end
 
