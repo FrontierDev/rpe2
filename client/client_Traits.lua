@@ -62,6 +62,14 @@ local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
 end
 
+local function shouldYieldTaskSlice(deadlineMs)
+    local tasks = getTasks()
+    return deadlineMs ~= nil
+        and type(tasks) == "table"
+        and type(tasks.ShouldYield) == "function"
+        and tasks:ShouldYield(deadlineMs) == true
+end
+
 local function enqueueTask(fn, ...)
     local tasks = getTasks()
     if type(tasks) == "table" and type(tasks.Enqueue) == "function" then
@@ -1033,78 +1041,87 @@ local function buildQualifiedAutomaticAuraRef(client, sourceEntry, auraRef)
     return trimString(qualifiedAuraRef or auraRef)
 end
 
+local function appendRuntimeActiveTraitEntry(client, eventState, rows, row)
+    local trait = row and row.trait or nil
+    local category = row and row.category or getTraitCategory(row)
+    local conditionState = row and trait and evaluateRuntimeConditions("trait", trait, {
+        traitRef = row and row.traitRef or nil,
+        eventState = eventState,
+    }) or nil
+    if row
+        and trait
+        and row.isMissing ~= true
+        and trait.isEnvironmental ~= true
+        and client:IsTraitCategoryAllowed(category)
+        and conditionState
+        and conditionState.passed == true
+    then
+        rows[#rows + 1] = {
+            sourceType = "trait",
+            category = category,
+            name = row.name,
+            payload = trait,
+            traitRef = row.traitRef,
+            origin = row.origin or "manual",
+            isAutoGranted = row.isAutoGranted == true,
+        }
+    end
+end
+
+local function appendRuntimeEquippedTraitEntry(eventState, rows, row)
+    local payload = row and (row.payload or row.equipmentTrait) or nil
+    local conditionState = row and type(payload) == "table" and evaluateRuntimeItemAndPayloadConditions(row.item, payload, {
+        itemRef = row.itemRef,
+        item = row.item,
+        eventState = eventState,
+        equipmentScope = (row.sourceType == "mount_equipment" or row.sourceType == "mount_equipment_modification") and "mount" or nil,
+    }) or nil
+    if row
+        and type(payload) == "table"
+        and row.isMissing ~= true
+        and conditionState
+        and conditionState.passed == true
+    then
+        rows[#rows + 1] = {
+            sourceType = row.sourceType or "equipment",
+            category = "equipment",
+            name = row.name,
+            itemName = row.itemName,
+            itemRef = row.itemRef,
+            dataset = row.dataset,
+            datasetId = row.datasetId,
+            payload = payload,
+        }
+    end
+end
+
+local function appendRuntimeConsumableTraitEntry(eventState, rows, entry)
+    if type(entry) == "table"
+        and type(entry.payload) == "table"
+        and evaluateRuntimeItemAndPayloadConditions(entry.item, entry.payload, {
+            itemRef = entry.itemRef,
+            item = entry.item,
+            eventState = eventState,
+        }).passed == true
+    then
+        rows[#rows + 1] = entry
+    end
+end
+
 local function buildActiveTraitEntriesFromSources(client, eventState, activeTraits, equippedTraits, appliedConsumables)
     local rows = {}
 
     for index = 1, #activeTraits do
-        local row = activeTraits[index]
-        local trait = row and row.trait or nil
-        local category = row and row.category or getTraitCategory(row)
-        local conditionState = row and trait and evaluateRuntimeConditions("trait", trait, {
-            traitRef = row and row.traitRef or nil,
-            eventState = eventState,
-        }) or nil
-        if row
-            and trait
-            and row.isMissing ~= true
-            and trait.isEnvironmental ~= true
-            and client:IsTraitCategoryAllowed(category)
-            and conditionState
-            and conditionState.passed == true
-        then
-            rows[#rows + 1] = {
-                sourceType = "trait",
-                category = category,
-                name = row.name,
-                payload = trait,
-                traitRef = row.traitRef,
-                origin = row.origin or "manual",
-                isAutoGranted = row.isAutoGranted == true,
-            }
-        end
+        appendRuntimeActiveTraitEntry(client, eventState, rows, activeTraits[index])
     end
 
     for index = 1, #equippedTraits do
-        local row = equippedTraits[index]
-        local payload = row and (row.payload or row.equipmentTrait) or nil
-        local conditionState = row and type(payload) == "table" and evaluateRuntimeItemAndPayloadConditions(row.item, payload, {
-            itemRef = row.itemRef,
-            item = row.item,
-            eventState = eventState,
-            equipmentScope = (row.sourceType == "mount_equipment" or row.sourceType == "mount_equipment_modification") and "mount" or nil,
-        }) or nil
-        if row
-            and type(payload) == "table"
-            and row.isMissing ~= true
-            and conditionState
-            and conditionState.passed == true
-        then
-            rows[#rows + 1] = {
-                sourceType = row.sourceType or "equipment",
-                category = "equipment",
-                name = row.name,
-                itemName = row.itemName,
-                itemRef = row.itemRef,
-                dataset = row.dataset,
-                datasetId = row.datasetId,
-                payload = payload,
-            }
-        end
+        appendRuntimeEquippedTraitEntry(eventState, rows, equippedTraits[index])
     end
 
     if type(eventState) == "table" and eventState.active == true and client:IsTraitCategoryAllowed("consumable") then
         for index = 1, #appliedConsumables do
-            local entry = appliedConsumables[index]
-            if type(entry) == "table"
-                and type(entry.payload) == "table"
-                and evaluateRuntimeItemAndPayloadConditions(entry.item, entry.payload, {
-                    itemRef = entry.itemRef,
-                    item = entry.item,
-                    eventState = eventState,
-                }).passed == true
-            then
-                rows[#rows + 1] = entry
-            end
+            appendRuntimeConsumableTraitEntry(eventState, rows, appliedConsumables[index])
         end
     end
 
@@ -1446,6 +1463,42 @@ local function buildRegisteredTraitCombatEvents(activeEntries)
     return registered
 end
 
+local function appendRegisteredTraitCombatEvent(registered, activeEntry, payload, eventEntry)
+    local combatEventId = string.lower(ensureString(eventEntry and eventEntry.combatEventId))
+    if combatEventId == "" then
+        logTraitRegistrationDebug("registered-event-skipped", {
+            sourceType = activeEntry and activeEntry.sourceType or "unknown",
+            name = activeEntry and activeEntry.name or nil,
+            itemName = activeEntry and activeEntry.itemName or nil,
+            itemRef = activeEntry and activeEntry.itemRef or nil,
+            traitRef = activeEntry and activeEntry.traitRef or nil,
+            payload = payload,
+            reason = "missing-combatEventId",
+        })
+        return
+    end
+
+    local bucket = registered[combatEventId]
+    if type(bucket) ~= "table" then
+        bucket = {}
+        registered[combatEventId] = bucket
+    end
+    bucket[#bucket + 1] = {
+        source = activeEntry,
+        payload = payload,
+        event = eventEntry,
+    }
+    logTraitRegistrationDebug("registered-event-added", {
+        sourceType = activeEntry and activeEntry.sourceType or "unknown",
+        name = activeEntry and activeEntry.name or nil,
+        itemName = activeEntry and activeEntry.itemName or nil,
+        itemRef = activeEntry and activeEntry.itemRef or nil,
+        traitRef = activeEntry and activeEntry.traitRef or nil,
+        payload = payload,
+        reason = combatEventId,
+    })
+end
+
 function Client:RefreshTraitRuntimeEntries(eventState)
     if type(eventState) ~= "table" or eventState.active ~= true then
         return nil
@@ -1479,6 +1532,166 @@ function Client:RefreshTraitRuntimeEntries(eventState)
     state.registeredCombatEvents = buildRegisteredTraitCombatEvents(state.activeEntries)
     logTraitRuntimeRefreshDebug(eventState, state)
     return state
+end
+
+local function resetTraitRuntimeRefreshContinuation(client, eventState, continuation)
+    local state = client:GetTraitRuntimeState(eventState and eventState.id or nil, true)
+    local ownerUnit = getLocalTraitOwnerUnit(eventState)
+    local ownerEventId = math.floor(tonumber(ownerUnit and ownerUnit.eventID) or 0)
+    local sourceCache, configurationRevision = getTraitSourceCache(client)
+    local equipmentRevision = tonumber(sourceCache and sourceCache.equipmentRevision) or 0
+    local consumableRevision = #(state and state.appliedConsumableTraits or {})
+
+    continuation.eventId = tostring(eventState and eventState.id or "")
+    continuation.state = state
+    continuation.ownerEventId = ownerEventId
+    continuation.configurationRevision = configurationRevision
+    continuation.equipmentRevision = equipmentRevision
+    continuation.consumableRevision = consumableRevision
+    continuation.activeTraits = type(sourceCache) == "table" and (sourceCache.activeTraits or {}) or {}
+    continuation.equippedTraits = type(sourceCache) == "table" and (sourceCache.equippedTraits or {}) or {}
+    continuation.appliedConsumables = type(state) == "table" and (state.appliedConsumableTraits or {}) or {}
+    continuation.rows = {}
+    continuation.registered = {}
+    continuation.phase = "active-traits"
+    continuation.index = 1
+    continuation.eventIndex = 1
+    continuation.completed = false
+
+    if type(state) == "table"
+        and state.ownerEventId == ownerEventId
+        and tonumber(state.compiledConfigurationRevision) == configurationRevision
+        and tonumber(state.compiledEquipmentRevision) == equipmentRevision
+        and tonumber(state.compiledConsumableRevision) == consumableRevision
+        and type(state.activeEntries) == "table"
+        and type(state.registeredCombatEvents) == "table"
+    then
+        continuation.completed = true
+    end
+    return continuation
+end
+
+function Client:CreateTraitRuntimeRefreshContinuation(eventState)
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return nil
+    end
+
+    return resetTraitRuntimeRefreshContinuation(self, eventState, {})
+end
+
+function Client:StepTraitRuntimeRefreshContinuation(continuation, deadlineMs)
+    if type(continuation) ~= "table" then
+        return true
+    end
+
+    local eventState = self.GetEventState and self:GetEventState() or nil
+    if type(eventState) ~= "table"
+        or eventState.active ~= true
+        or tostring(eventState.id or "") ~= tostring(continuation.eventId or "")
+    then
+        return true
+    end
+
+    local runtimeState = self:GetTraitRuntimeState(eventState.id, true)
+    local sourceCache, configurationRevision = getTraitSourceCache(self)
+    local equipmentRevision = tonumber(sourceCache and sourceCache.equipmentRevision) or 0
+    local consumableRevision = #(runtimeState and runtimeState.appliedConsumableTraits or {})
+    local ownerUnit = getLocalTraitOwnerUnit(eventState)
+    local ownerEventId = math.floor(tonumber(ownerUnit and ownerUnit.eventID) or 0)
+    if continuation.configurationRevision ~= configurationRevision
+        or continuation.equipmentRevision ~= equipmentRevision
+        or continuation.consumableRevision ~= consumableRevision
+        or continuation.ownerEventId ~= ownerEventId
+        or continuation.state ~= runtimeState
+    then
+        resetTraitRuntimeRefreshContinuation(self, eventState, continuation)
+    end
+
+    if continuation.completed == true then
+        return true
+    end
+
+    while true do
+        if continuation.phase == "active-traits" then
+            if continuation.index > #continuation.activeTraits then
+                continuation.phase = "equipped-traits"
+                continuation.index = 1
+            else
+                appendRuntimeActiveTraitEntry(self, eventState, continuation.rows, continuation.activeTraits[continuation.index])
+                continuation.index = continuation.index + 1
+            end
+        elseif continuation.phase == "equipped-traits" then
+            if continuation.index > #continuation.equippedTraits then
+                continuation.phase = "consumables"
+                continuation.index = 1
+            else
+                appendRuntimeEquippedTraitEntry(eventState, continuation.rows, continuation.equippedTraits[continuation.index])
+                continuation.index = continuation.index + 1
+            end
+        elseif continuation.phase == "consumables" then
+            if continuation.index > #continuation.appliedConsumables then
+                continuation.phase = "registered-events"
+                continuation.index = 1
+                continuation.eventIndex = 1
+            elseif self:IsTraitCategoryAllowed("consumable") then
+                appendRuntimeConsumableTraitEntry(eventState, continuation.rows, continuation.appliedConsumables[continuation.index])
+                continuation.index = continuation.index + 1
+            else
+                continuation.index = #continuation.appliedConsumables + 1
+            end
+        elseif continuation.phase == "registered-events" then
+            local activeEntry = continuation.rows[continuation.index]
+            if activeEntry == nil then
+                continuation.phase = "commit"
+            else
+                local payload = activeEntry.payload
+                local events = type(payload) == "table" and payload.events or nil
+                if continuation.eventIndex == 1 and (type(events) ~= "table" or #events == 0) then
+                    logTraitRegistrationDebug("registered-events-skipped", {
+                        sourceType = activeEntry.sourceType or "unknown",
+                        name = activeEntry.name,
+                        itemName = activeEntry.itemName,
+                        itemRef = activeEntry.itemRef,
+                        traitRef = activeEntry.traitRef,
+                        payload = payload,
+                        reason = type(payload) ~= "table" and "missing-payload" or "no-events",
+                    })
+                    continuation.index = continuation.index + 1
+                    continuation.eventIndex = 1
+                elseif continuation.eventIndex > #events then
+                    continuation.index = continuation.index + 1
+                    continuation.eventIndex = 1
+                else
+                    appendRegisteredTraitCombatEvent(
+                        continuation.registered,
+                        activeEntry,
+                        payload,
+                        events[continuation.eventIndex]
+                    )
+                    continuation.eventIndex = continuation.eventIndex + 1
+                end
+            end
+        else
+            runtimeState.ownerEventId = continuation.ownerEventId
+            runtimeState.compiledConfigurationRevision = continuation.configurationRevision
+            runtimeState.compiledEquipmentRevision = continuation.equipmentRevision
+            runtimeState.compiledConsumableRevision = continuation.consumableRevision
+            runtimeState.activeEntries = continuation.rows
+            runtimeState.registeredCombatEvents = continuation.registered
+            logTraitRuntimeRefreshDebug(eventState, runtimeState)
+            continuation.activeTraits = nil
+            continuation.equippedTraits = nil
+            continuation.appliedConsumables = nil
+            continuation.rows = nil
+            continuation.registered = nil
+            continuation.completed = true
+            return true
+        end
+
+        if shouldYieldTaskSlice(deadlineMs) then
+            return false
+        end
+    end
 end
 
 function Client:RefreshTraitResolvedState(eventState, reason, options)
@@ -2051,6 +2264,331 @@ function Client:SyncEventAuras(eventState, options)
         self:RefreshTraitResolvedState(eventState, "event-aura")
     end
     return changed
+end
+
+function Client:CreateAutomaticTraitAuraContinuation(eventState, options)
+    local localUnit = getLocalTraitOwnerUnit(eventState)
+    if type(eventState) ~= "table" or eventState.active ~= true or type(localUnit) ~= "table" then
+        return nil
+    end
+
+    local state = self:GetTraitRuntimeState(eventState.id, true)
+    if type(state) ~= "table" then
+        return nil
+    end
+    state.automaticAuraStateByKey = type(state.automaticAuraStateByKey) == "table" and state.automaticAuraStateByKey or {}
+
+    return {
+        eventId = tostring(eventState.id or ""),
+        state = state,
+        localUnit = localUnit,
+        ownerEventId = math.floor(tonumber(localUnit.eventID) or 0),
+        ownerTeam = math.floor(tonumber(localUnit.team) or 0),
+        options = options,
+        phase = "collect",
+        traitIndex = 1,
+        auraIndex = 1,
+        targetIndex = 1,
+        targetCount = 0,
+        targetScope = nil,
+        desired = {},
+        existingKeys = {},
+        existingScanKey = nil,
+        existingIndex = 1,
+        desiredScanKey = nil,
+        changed = false,
+    }
+end
+
+function Client:StepAutomaticTraitAuraContinuation(continuation, deadlineMs)
+    if type(continuation) ~= "table" then
+        return true
+    end
+
+    local eventState = self.GetEventState and self:GetEventState() or nil
+    if type(eventState) ~= "table"
+        or eventState.active ~= true
+        or tostring(eventState.id or "") ~= tostring(continuation.eventId or "")
+    then
+        return true
+    end
+
+    local state = continuation.state
+    local localUnit = continuation.localUnit
+    if type(state) ~= "table" or type(localUnit) ~= "table" then
+        return true
+    end
+    state.automaticAuraStateByKey = type(state.automaticAuraStateByKey) == "table" and state.automaticAuraStateByKey or {}
+    local auraManager = self.Spellcasting and self.Spellcasting.AuraManager or nil
+
+    while true do
+        if continuation.phase == "collect" then
+            local sourceEntry = (state.activeEntries or {})[continuation.traitIndex]
+            if sourceEntry == nil then
+                continuation.phase = "scan-existing"
+            else
+                local payload = sourceEntry.payload
+                local automaticAura = type(payload) == "table"
+                    and type(payload.automaticAuras) == "table"
+                    and payload.automaticAuras[continuation.auraIndex]
+                    or nil
+                if automaticAura == nil then
+                    continuation.traitIndex = continuation.traitIndex + 1
+                    continuation.auraIndex = 1
+                    continuation.targetIndex = 1
+                    continuation.targetCount = 0
+                    continuation.targetScope = nil
+                else
+                    if continuation.targetScope == nil then
+                        continuation.targetScope = automaticAura.targetScope or "self"
+                        continuation.targetCount = continuation.targetScope == "self" and 1
+                            or ((continuation.targetScope == "all_allies" or continuation.targetScope == "all_enemies")
+                                and #(eventState.units or {})
+                                or 0)
+                        continuation.qualifiedAuraRef = buildQualifiedAutomaticAuraRef(self, sourceEntry, automaticAura.auraRef)
+                        continuation.sourceKey = buildAutomaticTraitAuraSourceKey(sourceEntry, continuation.auraIndex)
+                    end
+                    if continuation.targetIndex > continuation.targetCount then
+                        continuation.auraIndex = continuation.auraIndex + 1
+                        continuation.targetIndex = 1
+                        continuation.targetCount = 0
+                        continuation.targetScope = nil
+                    else
+                        local targetUnit = continuation.targetScope == "self"
+                            and localUnit
+                            or (eventState.units or {})[continuation.targetIndex]
+                        continuation.targetIndex = continuation.targetIndex + 1
+                        local targetEventId = math.floor(tonumber(targetUnit and targetUnit.eventID) or 0)
+                        local targetTeam = math.floor(tonumber(targetUnit and targetUnit.team) or 0)
+                        local isValidTarget = continuation.targetScope == "self"
+                            or (type(targetUnit) == "table"
+                                and targetEventId ~= continuation.ownerEventId
+                                and ((continuation.targetScope == "all_allies" and targetTeam == continuation.ownerTeam)
+                                    or (continuation.targetScope == "all_enemies" and targetTeam ~= continuation.ownerTeam)))
+                        if isValidTarget
+                            and continuation.qualifiedAuraRef ~= ""
+                            and continuation.ownerEventId > 0
+                            and targetEventId > 0
+                        then
+                            local key = buildAutomaticTraitAuraStateKey(
+                                continuation.qualifiedAuraRef,
+                                continuation.ownerEventId,
+                                targetEventId,
+                                continuation.sourceKey
+                            )
+                            continuation.desired[key] = {
+                                auraRef = continuation.qualifiedAuraRef,
+                                sourceAuraRef = automaticAura.auraRef,
+                                casterEventId = continuation.ownerEventId,
+                                targetEventId = targetEventId,
+                                stacks = automaticAura.stacks,
+                                turns = automaticAura.turns,
+                                powerLevel = automaticAura.powerLevel,
+                                targetUnit = targetUnit,
+                                sourceEntry = sourceEntry,
+                            }
+                        end
+                    end
+                end
+            end
+        elseif continuation.phase == "scan-existing" then
+            local key = next(state.automaticAuraStateByKey, continuation.existingScanKey)
+            continuation.existingScanKey = key
+            if key == nil then
+                continuation.phase = "remove"
+            else
+                continuation.existingKeys[#continuation.existingKeys + 1] = key
+            end
+        elseif continuation.phase == "remove" then
+            local key = continuation.existingKeys[continuation.existingIndex]
+            if key == nil then
+                continuation.phase = "apply"
+            else
+                local entry = state.automaticAuraStateByKey[key]
+                if entry and not continuation.desired[key]
+                    and type(auraManager) == "table"
+                    and type(auraManager.RemoveAura) == "function"
+                then
+                    continuation.changed = auraManager:RemoveAura(
+                        self,
+                        eventState,
+                        entry.auraRef,
+                        entry.casterEventId,
+                        entry.targetEventId
+                    ) or continuation.changed
+                    state.automaticAuraStateByKey[key] = nil
+                end
+                continuation.existingIndex = continuation.existingIndex + 1
+            end
+        elseif continuation.phase == "apply" then
+            local key, entry = next(continuation.desired, continuation.desiredScanKey)
+            continuation.desiredScanKey = key
+            if key == nil then
+                continuation.phase = "finish"
+            else
+                if not state.automaticAuraStateByKey[key] then
+                    continuation.changed = self:ApplyTraitAutomaticAuras(eventState, localUnit, {
+                        automaticAuras = {{
+                            auraRef = entry.sourceAuraRef,
+                            stacks = entry.stacks,
+                            turns = entry.turns,
+                            powerLevel = entry.powerLevel,
+                        }},
+                    }, entry.sourceEntry, entry.targetUnit, continuation.options) or continuation.changed
+                end
+                state.automaticAuraStateByKey[key] = {
+                    auraRef = entry.auraRef,
+                    casterEventId = entry.casterEventId,
+                    targetEventId = entry.targetEventId,
+                }
+            end
+        else
+            if continuation.changed
+                and not (type(continuation.options) == "table" and continuation.options.suppressResolvedRefresh == true)
+            then
+                self:RefreshTraitResolvedState(eventState, "trait-auto-aura")
+            end
+            continuation.desired = nil
+            continuation.existingKeys = nil
+            return true
+        end
+
+        if shouldYieldTaskSlice(deadlineMs) then
+            return false
+        end
+    end
+end
+
+function Client:CreateEventAuraContinuation(eventState, options)
+    local localUnit = getLocalTraitOwnerUnit(eventState)
+    local auraManager = self.Spellcasting and self.Spellcasting.AuraManager or nil
+    if type(eventState) ~= "table" or eventState.active ~= true or type(localUnit) ~= "table"
+        or type(auraManager) ~= "table"
+        or type(auraManager.UpsertAura) ~= "function"
+        or type(auraManager.RemoveAura) ~= "function"
+    then
+        return nil
+    end
+
+    local state = self:GetTraitRuntimeState(eventState.id, true)
+    local localEventId = math.floor(tonumber(localUnit.eventID) or 0)
+    local localTeam = math.floor(tonumber(localUnit.team) or 0)
+    if type(state) ~= "table" or localEventId <= 0 or localTeam <= 0 then
+        return nil
+    end
+    state.appliedEventAuras = type(state.appliedEventAuras) == "table" and state.appliedEventAuras or {}
+
+    return {
+        eventId = tostring(eventState.id or ""),
+        state = state,
+        localEventId = localEventId,
+        localTeam = localTeam,
+        options = options,
+        phase = "collect",
+        eventAuraIndex = 1,
+        desired = {},
+        existingKeys = {},
+        existingScanKey = nil,
+        existingIndex = 1,
+        desiredScanKey = nil,
+        changed = false,
+    }
+end
+
+function Client:StepEventAuraContinuation(continuation, deadlineMs)
+    if type(continuation) ~= "table" then
+        return true
+    end
+
+    local eventState = self.GetEventState and self:GetEventState() or nil
+    if type(eventState) ~= "table"
+        or eventState.active ~= true
+        or tostring(eventState.id or "") ~= tostring(continuation.eventId or "")
+    then
+        return true
+    end
+
+    local state = continuation.state
+    local auraManager = self.Spellcasting and self.Spellcasting.AuraManager or nil
+    if type(state) ~= "table" or type(auraManager) ~= "table" then
+        return true
+    end
+    state.appliedEventAuras = type(state.appliedEventAuras) == "table" and state.appliedEventAuras or {}
+
+    while true do
+        if continuation.phase == "collect" then
+            local entry = (eventState.eventAuras or {})[continuation.eventAuraIndex]
+            if entry == nil then
+                continuation.phase = "scan-existing"
+            else
+                local auraRef = trimString(entry.auraRef)
+                if auraRef ~= "" and eventAuraAppliesToTeam(eventState, entry, continuation.localTeam) then
+                    continuation.desired[buildEventAuraStateKey(auraRef, continuation.localEventId)] = auraRef
+                end
+                continuation.eventAuraIndex = continuation.eventAuraIndex + 1
+            end
+        elseif continuation.phase == "scan-existing" then
+            local key = next(state.appliedEventAuras, continuation.existingScanKey)
+            continuation.existingScanKey = key
+            if key == nil then
+                continuation.phase = "remove"
+            else
+                continuation.existingKeys[#continuation.existingKeys + 1] = key
+            end
+        elseif continuation.phase == "remove" then
+            local key = continuation.existingKeys[continuation.existingIndex]
+            if key == nil then
+                continuation.phase = "apply"
+            else
+                local auraRef = state.appliedEventAuras[key]
+                if auraRef and not continuation.desired[key] then
+                    continuation.changed = auraManager:RemoveAura(
+                        self,
+                        eventState,
+                        auraRef,
+                        continuation.localEventId,
+                        continuation.localEventId
+                    ) or continuation.changed
+                    state.appliedEventAuras[key] = nil
+                end
+                continuation.existingIndex = continuation.existingIndex + 1
+            end
+        elseif continuation.phase == "apply" then
+            local key, auraRef = next(continuation.desired, continuation.desiredScanKey)
+            continuation.desiredScanKey = key
+            if key == nil then
+                continuation.phase = "finish"
+            elseif not state.appliedEventAuras[key] then
+                local applied = auraManager:UpsertAura(self, {
+                    eventState = eventState,
+                    auraRef = auraRef,
+                    stacks = 1,
+                    turns = 9999,
+                    powerLevel = 0,
+                    casterEventId = continuation.localEventId,
+                    targetEventId = continuation.localEventId,
+                    fullState = true,
+                })
+                if applied then
+                    state.appliedEventAuras[key] = auraRef
+                    continuation.changed = true
+                end
+            end
+        else
+            if continuation.changed
+                and not (type(continuation.options) == "table" and continuation.options.suppressResolvedRefresh == true)
+            then
+                self:RefreshTraitResolvedState(eventState, "event-aura")
+            end
+            continuation.desired = nil
+            continuation.existingKeys = nil
+            return true
+        end
+
+        if shouldYieldTaskSlice(deadlineMs) then
+            return false
+        end
+    end
 end
 
 function Client:ActivateEventTraits(eventState, options)

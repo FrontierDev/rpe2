@@ -569,6 +569,44 @@ local function enqueueClientTask(fn, ...)
     return true
 end
 
+local function enqueueClientSliceable(options)
+    local tasks = Addon.Internal and Addon.Internal.Tasks or nil
+    if type(tasks) == "table" and type(tasks.EnqueueSliceable) == "function" then
+        return tasks:EnqueueSliceable(options)
+    end
+
+    if Debug and Debug.Error then
+        Debug.Error("Event startup sliceable queue unavailable: Addon.Internal.Tasks is missing EnqueueSliceable.")
+    end
+    return nil
+end
+
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
+local function getEquipmentRevision()
+    local runtime = Addon.Internal and Addon.Internal.Runtime or nil
+    if type(runtime) == "table" and type(runtime.GetRevision) == "function" then
+        return math.max(0, math.floor(tonumber(runtime:GetRevision("EquipmentRevision")) or 0))
+    end
+
+    return 0
+end
+
+local function cancelEventSliceableWork(client, eventId, reason)
+    local tasks = Addon.Internal and Addon.Internal.Tasks or nil
+    local normalizedEventId = tostring(eventId or "")
+    if normalizedEventId == ""
+        or type(tasks) ~= "table"
+        or type(tasks.CancelScope) ~= "function"
+    then
+        return 0
+    end
+
+    return tasks:CancelScope("event:" .. normalizedEventId, reason or "event-reset")
+end
+
 local function queueDeferredMovementSync(client, wasLocalTurn, eventState, previousTurnNumber, previousTickNumber, reason)
     local expectedEventId = tostring(type(eventState) == "table" and eventState.id or "")
     if expectedEventId == "" then
@@ -600,7 +638,7 @@ end
 
 local tryQueueInitialLocalResourceSync
 
-local function runEventStartupStep(targetClient, queuedEventId)
+local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
     if type(targetClient) ~= "table" then
         return false
     end
@@ -657,10 +695,27 @@ local function runEventStartupStep(targetClient, queuedEventId)
 
     if runtime.traitRuntimeRefreshed ~= true and type(targetClient.RefreshTraitRuntimeEntries) == "function" then
         local phaseTimer = startTiming("Event startup phase: trait-runtime", 8, queuedEventId)
-        targetClient:RefreshTraitRuntimeEntries(eventState)
-        if phaseTimer then
-            stopEventTiming(phaseTimer, eventState, { startupPhase = "trait-runtime" })
+        runtime.traitRuntimeContinuation = runtime.traitRuntimeContinuation
+            or (type(targetClient.CreateTraitRuntimeRefreshContinuation) == "function"
+                and targetClient:CreateTraitRuntimeRefreshContinuation(eventState)
+                or nil)
+        local completed = runtime.traitRuntimeContinuation == nil
+        if runtime.traitRuntimeContinuation and type(targetClient.StepTraitRuntimeRefreshContinuation) == "function" then
+            completed = targetClient:StepTraitRuntimeRefreshContinuation(runtime.traitRuntimeContinuation, deadlineMs) == true
+        elseif runtime.traitRuntimeContinuation == nil then
+            targetClient:RefreshTraitRuntimeEntries(eventState)
+            completed = true
         end
+        if phaseTimer then
+            stopEventTiming(phaseTimer, eventState, {
+                startupPhase = "trait-runtime",
+                completed = completed and 1 or 0,
+            })
+        end
+        if not completed then
+            return true
+        end
+        runtime.traitRuntimeContinuation = nil
         runtime.traitRuntimeRefreshed = true
         setEventStartupPhase(eventState, runtime, "syncing-local")
         return true
@@ -668,10 +723,27 @@ local function runEventStartupStep(targetClient, queuedEventId)
 
     if runtime.automaticAurasSynced ~= true and type(targetClient.SyncAutomaticTraitAuras) == "function" then
         local phaseTimer = startTiming("Event startup phase: automatic-auras", 8, queuedEventId)
-        targetClient:SyncAutomaticTraitAuras(eventState, { suppressResolvedRefresh = true })
-        if phaseTimer then
-            stopEventTiming(phaseTimer, eventState, { startupPhase = "automatic-auras" })
+        runtime.automaticAuraContinuation = runtime.automaticAuraContinuation
+            or (type(targetClient.CreateAutomaticTraitAuraContinuation) == "function"
+                and targetClient:CreateAutomaticTraitAuraContinuation(eventState, { suppressResolvedRefresh = true })
+                or nil)
+        local completed = runtime.automaticAuraContinuation == nil
+        if runtime.automaticAuraContinuation and type(targetClient.StepAutomaticTraitAuraContinuation) == "function" then
+            completed = targetClient:StepAutomaticTraitAuraContinuation(runtime.automaticAuraContinuation, deadlineMs) == true
+        elseif runtime.automaticAuraContinuation == nil then
+            targetClient:SyncAutomaticTraitAuras(eventState, { suppressResolvedRefresh = true })
+            completed = true
         end
+        if phaseTimer then
+            stopEventTiming(phaseTimer, eventState, {
+                startupPhase = "automatic-auras",
+                completed = completed and 1 or 0,
+            })
+        end
+        if not completed then
+            return true
+        end
+        runtime.automaticAuraContinuation = nil
         runtime.automaticAurasSynced = true
         setEventStartupPhase(eventState, runtime, "syncing-local")
         return true
@@ -679,10 +751,27 @@ local function runEventStartupStep(targetClient, queuedEventId)
 
     if runtime.eventAurasSynced ~= true and type(targetClient.SyncEventAuras) == "function" then
         local phaseTimer = startTiming("Event startup phase: event-auras", 8, queuedEventId)
-        targetClient:SyncEventAuras(eventState, { suppressResolvedRefresh = true })
-        if phaseTimer then
-            stopEventTiming(phaseTimer, eventState, { startupPhase = "event-auras" })
+        runtime.eventAuraContinuation = runtime.eventAuraContinuation
+            or (type(targetClient.CreateEventAuraContinuation) == "function"
+                and targetClient:CreateEventAuraContinuation(eventState, { suppressResolvedRefresh = true })
+                or nil)
+        local completed = runtime.eventAuraContinuation == nil
+        if runtime.eventAuraContinuation and type(targetClient.StepEventAuraContinuation) == "function" then
+            completed = targetClient:StepEventAuraContinuation(runtime.eventAuraContinuation, deadlineMs) == true
+        elseif runtime.eventAuraContinuation == nil then
+            targetClient:SyncEventAuras(eventState, { suppressResolvedRefresh = true })
+            completed = true
         end
+        if phaseTimer then
+            stopEventTiming(phaseTimer, eventState, {
+                startupPhase = "event-auras",
+                completed = completed and 1 or 0,
+            })
+        end
+        if not completed then
+            return true
+        end
+        runtime.eventAuraContinuation = nil
         runtime.eventAurasSynced = true
         setEventStartupPhase(eventState, runtime, "syncing-local")
         return true
@@ -742,21 +831,80 @@ local function queueEventStartupWork(client, eventState, reason)
         return runtime ~= nil
     end
 
-    runtime.queued = true
     local queuedEventId = tostring(eventState.id or "")
-    return enqueueClientTask(function(targetClient, expectedEventId, queueReason)
-        local currentRuntime = getEventStartupRuntime(targetClient, expectedEventId, false)
-        if type(currentRuntime) == "table" then
-            currentRuntime.queued = false
-        end
-
-        if runEventStartupStep(targetClient, expectedEventId) then
-            if type(targetClient.QueueEventWidgetRefresh) == "function" then
-                targetClient:QueueEventWidgetRefresh("startup-progress")
+    runtime.queued = true
+    local sliceJob = enqueueClientSliceable({
+        label = "event-startup",
+        scope = "event:" .. queuedEventId,
+        state = {
+            client = client,
+            eventId = queuedEventId,
+            reason = reason or "startup",
+            configurationRevision = getConfigurationRevision(),
+            equipmentRevision = getEquipmentRevision(),
+        },
+        isStale = function(work)
+            local targetClient = work and work.client or nil
+            local currentEventState = targetClient and targetClient.GetEventState and targetClient:GetEventState() or nil
+            return type(currentEventState) ~= "table"
+                or currentEventState.active ~= true
+                or tostring(currentEventState.id or "") ~= tostring(work and work.eventId or "")
+                or getConfigurationRevision() ~= math.max(0, math.floor(tonumber(work and work.configurationRevision) or 0))
+                or getEquipmentRevision() ~= math.max(0, math.floor(tonumber(work and work.equipmentRevision) or 0))
+        end,
+        step = function(work, deadlineMs)
+            local targetClient = work and work.client or nil
+            local expectedEventId = work and work.eventId or nil
+            if type(targetClient) ~= "table" then
+                return true
             end
-            queueEventStartupWork(targetClient, targetClient.GetEventState and targetClient:GetEventState() or targetClient.EventState, queueReason)
-        end
-    end, client, queuedEventId, reason or "startup")
+            if runEventStartupStep(targetClient, expectedEventId, deadlineMs) then
+                if type(targetClient.QueueEventWidgetRefresh) == "function" then
+                    targetClient:QueueEventWidgetRefresh("startup-progress")
+                end
+                return false
+            end
+            return true
+        end,
+        onCancel = function(work, cancelReason)
+            local targetClient = work and work.client or nil
+            local currentRuntime = targetClient and getEventStartupRuntime(targetClient, work.eventId, false) or nil
+            if type(currentRuntime) == "table" then
+                currentRuntime.queued = false
+                currentRuntime.sliceJob = nil
+                currentRuntime.traitRuntimeContinuation = nil
+                currentRuntime.automaticAuraContinuation = nil
+                currentRuntime.eventAuraContinuation = nil
+            end
+            if cancelReason == "stale" and type(targetClient) == "table" then
+                local currentEventState = targetClient.GetEventState and targetClient:GetEventState() or nil
+                if type(currentEventState) == "table"
+                    and currentEventState.active == true
+                    and tostring(currentEventState.id or "") == tostring(work and work.eventId or "")
+                then
+                    queueEventStartupWork(targetClient, currentEventState, "startup-stale-restart")
+                end
+            end
+        end,
+        onComplete = function(work)
+            local targetClient = work and work.client or nil
+            local currentRuntime = targetClient and getEventStartupRuntime(targetClient, work.eventId, false) or nil
+            if type(currentRuntime) == "table" then
+                currentRuntime.queued = false
+                currentRuntime.sliceJob = nil
+                currentRuntime.traitRuntimeContinuation = nil
+                currentRuntime.automaticAuraContinuation = nil
+                currentRuntime.eventAuraContinuation = nil
+            end
+        end,
+    })
+    if sliceJob then
+        runtime.sliceJob = sliceJob
+        return true
+    end
+
+    runtime.queued = false
+    return false
 end
 
 local function hasLocalSessionMember(sessionState)
@@ -1402,6 +1550,7 @@ end
 
 function Client:ResetEventState(reason)
     local state = self.EventState
+    cancelEventSliceableWork(self, state and state.id or nil, "event-reset")
     local sessionState = self:GetState()
     local timer = startTiming("Event end teardown", 16, reason or "ended")
     local activeCasts, activeAuras = 0, 0

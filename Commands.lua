@@ -45,15 +45,24 @@ local function printTaskStats(router, prefix)
     end
 
     router:Print(
-        "%sTaskQueue pending=%d lastFlushJobs=%d lastFlush=%.2fms maxFlush=%.2fms budget=%d timeBudget=%.2fms interval=%.3fs paused=%s totalExecuted=%d.",
+        "%sTaskQueue pending=%d normal=%d sliceable=%d lastFlushJobs=%d lastFlush=%.2fms maxFlush=%.2fms budget=%d timeBudget=%.2fms sliceBudget=%.2fms lastSlice=%s/%.2fms maxSlice=%.2fms slices=%d cancelled=%d stale=%d interval=%.3fs paused=%s totalExecuted=%d.",
         nil,
         prefix or "",
         tonumber(stats.queueLength) or 0,
+        tonumber(stats.normalQueuedJobs) or 0,
+        tonumber(stats.sliceableQueuedJobs) or 0,
         tonumber(stats.jobsExecutedLastFlush) or 0,
         tonumber(stats.lastFlushElapsedMs) or 0,
         tonumber(stats.maxFlushElapsedMs) or 0,
         tonumber(stats.budget) or 0,
         tonumber(stats.timeBudget) or 0,
+        tonumber(stats.sliceBudget) or 0,
+        tostring(stats.lastSliceLabel or "none"),
+        tonumber(stats.lastSliceElapsedMs) or 0,
+        tonumber(stats.maxSliceElapsedMs) or 0,
+        tonumber(stats.totalSlicesExecuted) or 0,
+        tonumber(stats.totalCancelled) or 0,
+        tonumber(stats.totalStaleCancelled) or 0,
         tonumber(stats.flushInterval) or 0,
         stats.paused and "yes" or "no",
         tonumber(stats.totalExecuted) or 0
