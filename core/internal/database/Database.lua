@@ -233,8 +233,10 @@ local function runProfileRuntimeMutation(reason, scope, detail, mutation)
     end
 
     return Runtime:RunTransaction(reason, function()
-        local result = mutation()
-        Runtime:MarkChanged(scope, detail)
+        local result, changed = mutation()
+        if changed ~= false then
+            Runtime:MarkChanged(scope, detail)
+        end
         return result
     end)
 end
@@ -1824,20 +1826,6 @@ function Database.SetProfileEquipmentSlotByScope(scope, slotKey, equippedEntry)
 
     local normalizedScope = ensureString(scope, "character")
     local normalizedEntry = normalizeProfileEquipmentEntry(equippedEntry)
-    local profile = Database.GetOrCreateActiveProfile()
-    local target = nil
-
-    if normalizedScope == "pet" then
-        target = select(1, getActiveProfilePetEquipmentBucket(profile, true))
-        if not target then
-            return nil
-        end
-    else
-        local fieldName = getProfileEquipmentFieldName(normalizedScope)
-        profile[fieldName] = normalizeProfileEquipmentMap(profile[fieldName])
-        target = profile[fieldName]
-    end
-
     return runProfileRuntimeMutation(
         ("profile-%s-equipment"):format(normalizedScope),
         "profile.equipment",
@@ -1847,8 +1835,20 @@ function Database.SetProfileEquipmentSlotByScope(scope, slotKey, equippedEntry)
             itemRef = normalizedEntry.itemRef,
         },
         function()
+            local profile = Database.GetOrCreateActiveProfile()
+            local target = nil
+            if normalizedScope == "pet" then
+                target = select(1, getActiveProfilePetEquipmentBucket(profile, true))
+                if not target then
+                    return nil, false
+                end
+            else
+                local fieldName = getProfileEquipmentFieldName(normalizedScope)
+                profile[fieldName] = normalizeProfileEquipmentMap(profile[fieldName])
+                target = profile[fieldName]
+            end
             target[normalizedSlotKey] = normalizedEntry
-            return target[normalizedSlotKey]
+            return target[normalizedSlotKey], true
         end
     )
 end
@@ -1860,38 +1860,36 @@ function Database.ClearProfileEquipmentSlotByScope(scope, slotKey)
     end
 
     local normalizedScope = ensureString(scope, "character")
-    local profile = Database.GetOrCreateActiveProfile()
-    local target = nil
-
-    if normalizedScope == "pet" then
-        target = select(1, getActiveProfilePetEquipmentBucket(profile, false))
-        if not target then
-            return false
-        end
-    else
-        local fieldName = getProfileEquipmentFieldName(normalizedScope)
-        profile[fieldName] = normalizeProfileEquipmentMap(profile[fieldName])
-        target = profile[fieldName]
-    end
-
-    local existingEntry = target[normalizedSlotKey]
-    local existed = existingEntry ~= nil
-    if not existed then
-        return false
-    end
-
+    local changeDetail = {
+        scope = normalizedScope,
+        slotKey = normalizedSlotKey,
+        removed = true,
+    }
     return runProfileRuntimeMutation(
         ("profile-%s-equipment"):format(normalizedScope),
         "profile.equipment",
-        {
-            scope = normalizedScope,
-            slotKey = normalizedSlotKey,
-            itemRef = existingEntry and existingEntry.itemRef or nil,
-            removed = true,
-        },
+        changeDetail,
         function()
+            local profile = Database.GetOrCreateActiveProfile()
+            local target = nil
+            if normalizedScope == "pet" then
+                target = select(1, getActiveProfilePetEquipmentBucket(profile, false))
+                if not target then
+                    return false, false
+                end
+            else
+                local fieldName = getProfileEquipmentFieldName(normalizedScope)
+                profile[fieldName] = normalizeProfileEquipmentMap(profile[fieldName])
+                target = profile[fieldName]
+            end
+
+            local existingEntry = target[normalizedSlotKey]
+            if existingEntry == nil then
+                return false, false
+            end
+            changeDetail.itemRef = existingEntry.itemRef
             target[normalizedSlotKey] = nil
-            return true
+            return true, true
         end
     )
 end
