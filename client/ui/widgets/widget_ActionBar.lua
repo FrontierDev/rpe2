@@ -37,7 +37,11 @@ local PET_BUTTON_TEXTURE = "Interface\\Icons\\Ability_Hunter_BeastCall"
 local function isStartupPending(eventState)
     return type(eventState) == "table"
         and eventState.active == true
-        and (eventState.unitsReady ~= true or eventState.startupReady ~= true)
+        and (eventState.ending == true
+            or eventState.unitsReady ~= true
+            or eventState.startupReady ~= true
+            or (type(Client.EventTransition) == "table"
+                and Client.EventTransition.eventState == eventState))
 end
 
 local function buildSignature(...)
@@ -284,6 +288,7 @@ local function resolveRuntimeSpellDetail(detail)
 
     local eventState = type(Client.GetEventState) == "function" and Client:GetEventState() or nil
     local waitingForEventStartup = isStartupPending(eventState)
+    local transitionStatus = eventState and eventState.ending == true and "Event ending" or "Event starting"
 
     local activationState = type(Client.ResolveSpellActivationRuntimeState) == "function"
         and Client:ResolveSpellActivationRuntimeState(resolved.spellRef)
@@ -292,13 +297,19 @@ local function resolveRuntimeSpellDetail(detail)
             includeTargetCandidates = false,
         }) or nil)
     if type(activationState) ~= "table" then
-        resolved.canCast = waitingForEventStartup
+        resolved.canCast = false
         resolved.cooldownOverlayText = resolved.cooldownOverlayText or ""
         resolved.pendingActivationState = waitingForEventStartup
+        resolved.statusText = waitingForEventStartup and transitionStatus or resolved.statusText
         return resolved
     end
 
     resolved.canCast = activationState.canCast == true
+    if waitingForEventStartup then
+        resolved.canCast = false
+        resolved.pendingActivationState = true
+        resolved.statusText = "Event starting"
+    end
     resolved.casterUnit = activationState.casterUnit
     resolved.cooldownRemaining = activationState.cooldownRemaining
     resolved.rechargeRemaining = activationState.rechargeRemaining
@@ -318,7 +329,9 @@ local function resolveRuntimeSpellDetail(detail)
         local failureText = type(activationState.failureText) == "string" and activationState.failureText or ""
         if failureText == "" then
             local reason = tostring(activationState.reason or "")
-            if reason == "cooldown" or reason == "global-cooldown" or reason == "no-charges" then
+            if waitingForEventStartup then
+                failureText = eventState and eventState.ending == true and "Event ending" or "Event starting"
+            elseif reason == "cooldown" or reason == "global-cooldown" or reason == "no-charges" then
                 failureText = "Unavailable"
             elseif reason == "insufficient-resources" then
                 failureText = "Insufficient Resources"
@@ -348,16 +361,23 @@ local function resolveRuntimeSpellDetailWithActivationState(detail, activationSt
 
     local eventState = type(Client.GetEventState) == "function" and Client:GetEventState() or nil
     local waitingForEventStartup = isStartupPending(eventState)
+    local transitionStatus = eventState and eventState.ending == true and "Event ending" or "Event starting"
 
     if type(activationState) ~= "table" then
-        resolved.canCast = waitingForEventStartup
+        resolved.canCast = false
         resolved.cooldownOverlayText = resolved.cooldownOverlayText or ""
         resolved.pendingActivationState = waitingForEventStartup
+        resolved.statusText = waitingForEventStartup and transitionStatus or resolved.statusText
         resolved.activationState = nil
         return resolved
     end
 
     resolved.canCast = activationState.canCast == true
+    if waitingForEventStartup then
+        resolved.canCast = false
+        resolved.pendingActivationState = true
+        resolved.statusText = "Event starting"
+    end
     resolved.casterUnit = activationState.casterUnit
     resolved.cooldownRemaining = activationState.cooldownRemaining
     resolved.rechargeRemaining = activationState.rechargeRemaining
@@ -378,7 +398,9 @@ local function resolveRuntimeSpellDetailWithActivationState(detail, activationSt
         local failureText = type(activationState.failureText) == "string" and activationState.failureText or ""
         if failureText == "" then
             local reason = tostring(activationState.reason or "")
-            if reason == "cooldown" or reason == "global-cooldown" or reason == "no-charges" then
+            if waitingForEventStartup then
+                failureText = eventState and eventState.ending == true and "Event ending" or "Event starting"
+            elseif reason == "cooldown" or reason == "global-cooldown" or reason == "no-charges" then
                 failureText = "Unavailable"
             elseif reason == "insufficient-resources" then
                 failureText = "Insufficient Resources"

@@ -362,6 +362,11 @@ local function queueLocalInstantSpellcastCompletion(targetClient, spellRef, cast
 end
 
 function Spellcasting.InterruptUnitSpellcast(self, eventState, targetUnit, options)
+    if type(self.CanPerformEventAction) == "function"
+        and self:CanPerformEventAction(eventState, "spell-interrupt") ~= true
+    then
+        return false
+    end
     local sessionState = self.GetState and self:GetState() or nil
     local numericTargetEventId = tonumber(targetUnit and targetUnit.eventID) or 0
     if type(eventState) ~= "table" or eventState.active ~= true or numericTargetEventId <= 0 then
@@ -491,6 +496,11 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
         appendTimingPhase(timingPhases, "context", getNowMilliseconds() - contextStartTime, SPELLCAST_SLOW_HELPER_MS)
     end
     if not sessionState or not eventState then
+        return false
+    end
+    if type(self.CanPerformEventAction) == "function"
+        and self:CanPerformEventAction(eventState, "spell-cast") ~= true
+    then
         return false
     end
 
@@ -684,6 +694,11 @@ function Client:OnSpellcastComplete(spellRef, castEntryOverride)
     if not sessionState or not eventState then
         return false
     end
+    if type(self.CanPerformEventAction) == "function"
+        and self:CanPerformEventAction(eventState, "spell-complete") ~= true
+    then
+        return false
+    end
 
     local channelStartTime = timingEnabled and getNowMilliseconds() or nil
     local channelId = Spellcasting.ResolveSessionChannelId(sessionState)
@@ -803,6 +818,11 @@ function Client:OnSpellcastInterrupted(spellRef, castEntryOverride)
     if not sessionState or not eventState then
         return false
     end
+    if type(self.CanPerformEventAction) == "function"
+        and self:CanPerformEventAction(eventState, "spell-interrupt") ~= true
+    then
+        return false
+    end
 
     local channelId = Spellcasting.ResolveSessionChannelId(sessionState)
     if not channelId then
@@ -879,6 +899,11 @@ end
 function Client:OnSpellcastChannelTick(spellRef)
     local eventState = self.GetEventState and self:GetEventState() or nil
     if not eventState or eventState.active ~= true then
+        return false
+    end
+    if type(self.CanPerformEventAction) == "function"
+        and self:CanPerformEventAction(eventState, "spell-channel") ~= true
+    then
         return false
     end
 

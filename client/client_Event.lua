@@ -13,6 +13,7 @@ local Comms = Addon.Internal.Comms
 local Event = Addon.Internal.Database.Classes.Event
 local ResourceSync = Addon.Internal.Comms and Addon.Internal.Comms.ResourceSync or {}
 local EventUnit = Addon.Internal.Database.Classes.EventUnit
+local Runtime = Addon.Internal.Runtime or {}
 
 local function getTimings()
     return Addon.Debug and Addon.Debug.Timings or nil
@@ -34,13 +35,15 @@ end
 
 local function stopTiming(timer, cardinality)
     if not timer then
-        return
+        return nil
     end
 
     local timings = getTimings()
     if timings and type(timings.Stop) == "function" then
-        timings:Stop(timer, { cardinality = cardinality })
+        return timings:Stop(timer, { cardinality = cardinality })
     end
+
+    return nil
 end
 
 local function isTimingsEnabled()
@@ -115,12 +118,37 @@ end
 
 local function stopEventTiming(timer, eventState, cardinality)
     if not timer then
-        return
+        return nil
     end
 
     cardinality = cardinality or {}
     cardinality.eventUnits = type(eventState) == "table" and countList(eventState.units) or 0
-    stopTiming(timer, cardinality)
+    return stopTiming(timer, cardinality)
+end
+
+local function stopTransitionPhaseTiming(transition, timer, eventState, cardinality, label)
+    local elapsedMs = stopEventTiming(timer, eventState, cardinality)
+    if type(transition) == "table" and elapsedMs ~= nil then
+        transition.phaseTimings = transition.phaseTimings or {}
+        transition.phaseTimings[#transition.phaseTimings + 1] = {
+            label = tostring(label or cardinality and cardinality.startupPhase or cardinality and cardinality.teardownPhase or "phase"),
+            elapsedMs = elapsedMs,
+            thresholdMs = tonumber(timer and timer.thresholdMs) or 8,
+        }
+    end
+    return elapsedMs
+end
+
+local function recordTransitionSlice(transition, startedAtMs, label)
+    if type(transition) ~= "table" or tonumber(startedAtMs) == nil or tonumber(startedAtMs) <= 0 then
+        return nil
+    end
+
+    local elapsedMs = math.max(0, getTimingNowMilliseconds() - startedAtMs)
+    transition.lastSliceElapsedMs = elapsedMs
+    transition.maxSliceElapsedMs = math.max(tonumber(transition.maxSliceElapsedMs) or 0, elapsedMs)
+    transition.maxSliceLabel = label or transition.maxSliceLabel
+    return elapsedMs
 end
 
 local function getInline()
@@ -172,6 +200,8 @@ local function coerceEventUnitBoolean(value, defaultValue)
 end
 
 Client.EventState = Client.EventState or nil
+Client.EventTransition = Client.EventTransition or nil
+Client.EventTransitionGeneration = tonumber(Client.EventTransitionGeneration) or 0
 Client.LastEventEndReason = Client.LastEventEndReason or nil
 Client.EventWidgetRefreshQueued = Client.EventWidgetRefreshQueued or false
 Client.EventStartupRuntimeByEventId = Client.EventStartupRuntimeByEventId or {}
@@ -180,7 +210,117 @@ Client.TurnEndPending = Client.TurnEndPending or false
 Client.EventUnitInteractionMarkers = Client.EventUnitInteractionMarkers or {}
 Client.LastLocalInteractionMarker = Client.LastLocalInteractionMarker or nil
 
-local EVENT_STARTUP_STEP_COUNT = 6
+local EVENT_STARTUP_STEP_COUNT = 9
+
+local function getTransitionGeneration(client)
+    return math.max(0, math.floor(tonumber(client and client.EventTransitionGeneration) or 0))
+end
+
+function Client:BeginEventTransition(kind, eventId, transaction)
+    self.EventTransitionGeneration = getTransitionGeneration(self) + 1
+    local normalizedKind = tostring(kind or "starting")
+    local normalizedEventId = tostring(eventId or "")
+    local totalLabel = normalizedKind == "ending"
+        and "Event end total transition"
+        or "Event start total transition"
+    local transition = {
+        kind = normalizedKind,
+        eventId = normalizedEventId,
+        transactionId = type(transaction) == "table" and transaction.id or nil,
+        transaction = transaction,
+        phase = normalizedKind == "ending" and "ending" or "starting",
+        generation = self.EventTransitionGeneration,
+        revision = self.EventTransitionGeneration,
+        eventState = self.EventState,
+        startedAtMs = getTimingNowMilliseconds(),
+        totalTimer = startTiming(totalLabel, 16, normalizedEventId),
+        phaseTimings = {},
+        lastSliceElapsedMs = 0,
+        maxSliceElapsedMs = 0,
+        maxSliceLabel = nil,
+    }
+    if type(transition.eventState) == "table" then
+        transition.eventState.transitionPhase = transition.phase
+    end
+    self.EventTransition = transition
+    return transition
+end
+
+function Client:IsEventTransitionCurrent(eventId, generation, kind, eventState)
+    local transition = self.EventTransition
+    if type(transition) ~= "table" then
+        return false
+    end
+    if eventId ~= nil and tostring(transition.eventId or "") ~= tostring(eventId or "") then
+        return false
+    end
+    if generation ~= nil and tonumber(transition.generation) ~= tonumber(generation) then
+        return false
+    end
+    if kind ~= nil and transition.kind ~= kind then
+        return false
+    end
+    if eventState ~= nil and transition.eventState ~= eventState then
+        return false
+    end
+    return true
+end
+
+function Client:SetEventTransitionPhase(phase, eventState)
+    local transition = self.EventTransition
+    if type(transition) ~= "table" then
+        return false
+    end
+    if eventState ~= nil and transition.eventState ~= eventState then
+        return false
+    end
+    transition.phase = tostring(phase or transition.phase or "starting")
+    if type(eventState) == "table" then
+        eventState.transitionPhase = transition.phase
+    end
+    return true
+end
+
+function Client:EndEventTransition(eventId, generation, eventState, reason)
+    local transition = self.EventTransition
+    if not self:IsEventTransitionCurrent(eventId, generation, nil, eventState) then
+        return false
+    end
+    if transition.totalTimer then
+        stopEventTiming(transition.totalTimer, eventState, {
+            transitionKind = transition.kind,
+            transitionPhase = transition.phase,
+            transitionGeneration = transition.generation,
+            transitionReason = reason,
+        })
+        transition.totalTimer = nil
+    end
+    if type(transition.eventState) == "table" then
+        transition.eventState.transitionPhase = nil
+    end
+    transition.eventState = nil
+    transition.transaction = nil
+    self.EventTransition = nil
+    return true
+end
+
+function Client:CanPerformEventAction(eventState, actionKind)
+    local state = eventState or self:GetEventState()
+    if type(state) ~= "table" or state.active ~= true or state.ending == true then
+        return false, "event-inactive"
+    end
+
+    local transition = self.EventTransition
+    if type(transition) == "table"
+        and (transition.eventState == state or tostring(transition.eventId or "") == tostring(state.id or ""))
+    then
+        return false, transition.kind == "ending" and "event-ending" or "event-starting"
+    end
+    if state.startupReady ~= true then
+        return false, "event-startup"
+    end
+    return true
+end
 
 local function getEventStartupRuntime(client, eventId, createIfMissing)
     local normalizedEventId = tostring(eventId or "")
@@ -203,7 +343,11 @@ local function getEventStartupRuntime(client, eventId, createIfMissing)
         automaticAurasSynced = false,
         eventAurasSynced = false,
         resolvedStateRefreshed = false,
+        resourceSyncQueued = false,
         consumablesQueued = false,
+        consumablePromptPending = false,
+        transitionGeneration = nil,
+        eventState = nil,
         achievementStartIdentity = nil,
     }
     client.EventStartupRuntimeByEventId[normalizedEventId] = runtime
@@ -228,6 +372,9 @@ local function getStartupProgressReceived(runtime)
     end
 
     local completed = 0
+    if runtime.startupStateReceived == true then
+        completed = completed + 1
+    end
     if runtime.actionBarPrimed == true then
         completed = completed + 1
     end
@@ -246,6 +393,12 @@ local function getStartupProgressReceived(runtime)
     if runtime.consumablesQueued == true then
         completed = completed + 1
     end
+    if runtime.resourceSyncQueued == true then
+        completed = completed + 1
+    end
+    if runtime.phase == "ready" then
+        completed = completed + 1
+    end
 
     return completed
 end
@@ -255,10 +408,14 @@ local function setEventStartupPhase(eventState, runtime, phase)
         return false
     end
 
-    eventState.startupPhase = tostring(phase or "starting")
+    local normalizedPhase = tostring(phase or "starting")
+    eventState.startupPhase = normalizedPhase
+    if type(runtime) == "table" then
+        runtime.phase = normalizedPhase
+    end
     eventState.startupProgressExpected = EVENT_STARTUP_STEP_COUNT
     eventState.startupProgressReceived = getStartupProgressReceived(runtime)
-    eventState.startupReady = eventState.startupPhase == "ready"
+    eventState.startupReady = normalizedPhase == "ready"
     return true
 end
 
@@ -274,16 +431,46 @@ local function refreshEventStartupPhase(eventState, runtime)
         return setEventStartupPhase(eventState, runtime, "waiting-units")
     end
     if type(runtime) ~= "table" or runtime.startupStateReceived ~= true then
-        return setEventStartupPhase(eventState, runtime, "waiting-state")
+        return setEventStartupPhase(eventState, runtime, "apply-validate-state")
     end
 
-    return setEventStartupPhase(eventState, runtime, "syncing-local")
+    if runtime.actionBarPrimed ~= true then
+        return setEventStartupPhase(eventState, runtime, "action-bar-metadata")
+    end
+    if runtime.traitRuntimeRefreshed ~= true then
+        return setEventStartupPhase(eventState, runtime, "trait-runtime")
+    end
+    if runtime.automaticAurasSynced ~= true then
+        return setEventStartupPhase(eventState, runtime, "automatic-auras")
+    end
+    if runtime.eventAurasSynced ~= true then
+        return setEventStartupPhase(eventState, runtime, "event-auras")
+    end
+    if runtime.resolvedStateRefreshed ~= true then
+        return setEventStartupPhase(eventState, runtime, "resolved-trait")
+    end
+    if runtime.resourceSyncQueued ~= true then
+        return setEventStartupPhase(eventState, runtime, "resource-sync")
+    end
+    if runtime.consumablesQueued ~= true then
+        return setEventStartupPhase(eventState, runtime, "consumable-prompts")
+    end
+    return setEventStartupPhase(eventState, runtime, "ready")
 end
 
 local function isEventStartupPending(eventState)
     return type(eventState) == "table"
         and eventState.active == true
         and (eventState.unitsReady ~= true or eventState.startupReady ~= true)
+end
+
+local function hasLocalSessionMemberForStartup(sessionState)
+    if type(sessionState) ~= "table" or type(sessionState.membersByName) ~= "table" then
+        return false
+    end
+    local playerName = Common.GetPlayerName and Common.GetPlayerName() or nil
+    playerName = Common.NormalizeName and Common.NormalizeName(playerName) or playerName
+    return type(playerName) == "string" and playerName ~= "" and sessionState.membersByName[playerName] ~= nil
 end
 
 local function getMovementTracker()
@@ -613,7 +800,7 @@ local function queueDeferredMovementSync(client, wasLocalTurn, eventState, previ
         return false
     end
 
-    return enqueueClientTask(function(targetClient, queuedEventId, queuedWasLocalTurn, queuedPreviousTurnNumber, queuedPreviousTickNumber)
+    return enqueueClientTask(function(targetClient, queuedEventId, queuedEventState, queuedTransitionGeneration, queuedWasLocalTurn, queuedPreviousTurnNumber, queuedPreviousTickNumber)
         if type(targetClient) ~= "table" then
             return
         end
@@ -622,6 +809,7 @@ local function queueDeferredMovementSync(client, wasLocalTurn, eventState, previ
         if type(currentEventState) ~= "table"
             or currentEventState.active ~= true
             or tostring(currentEventState.id or "") ~= queuedEventId
+            or (queuedEventState ~= nil and currentEventState ~= queuedEventState)
         then
             return
         end
@@ -633,12 +821,12 @@ local function queueDeferredMovementSync(client, wasLocalTurn, eventState, previ
             queuedPreviousTurnNumber,
             queuedPreviousTickNumber
         )
-    end, client, expectedEventId, wasLocalTurn == true, previousTurnNumber, previousTickNumber, reason)
+    end, client, expectedEventId, eventState, getTransitionGeneration(client), wasLocalTurn == true, previousTurnNumber, previousTickNumber, reason)
 end
 
 local tryQueueInitialLocalResourceSync
 
-local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
+local function runEventStartupStep(targetClient, queuedEventId, queuedGeneration, queuedEventState, deadlineMs)
     if type(targetClient) ~= "table" then
         return false
     end
@@ -647,6 +835,9 @@ local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
     if type(eventState) ~= "table"
         or eventState.active ~= true
         or tostring(eventState.id or "") ~= tostring(queuedEventId or "")
+        or eventState ~= queuedEventState
+        or type(targetClient.IsEventTransitionCurrent) ~= "function"
+        or not targetClient:IsEventTransitionCurrent(queuedEventId, queuedGeneration, "starting", queuedEventState)
     then
         return false
     end
@@ -657,29 +848,22 @@ local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
     end
 
     if eventState.unitsReady ~= true then
-        refreshEventStartupPhase(eventState, runtime)
-        if type(targetClient.QueueEventWidgetRefresh) == "function" then
-            targetClient:QueueEventWidgetRefresh("startup-waiting-units")
-        end
-        return false
+        setEventStartupPhase(eventState, runtime, "waiting-units")
+        targetClient:SetEventTransitionPhase("waiting-units", eventState)
+        return true
     end
 
     if runtime.startupStateReceived ~= true then
-        refreshEventStartupPhase(eventState, runtime)
-        if type(targetClient.QueueEventWidgetRefresh) == "function" then
-            targetClient:QueueEventWidgetRefresh("startup-waiting-state")
-        end
-        return false
-    end
-
-    setEventStartupPhase(eventState, runtime, "syncing-local")
-    if type(targetClient.QueueEventWidgetRefresh) == "function" then
-        targetClient:QueueEventWidgetRefresh("startup-syncing")
+        setEventStartupPhase(eventState, runtime, "apply-validate-state")
+        targetClient:SetEventTransitionPhase("apply-validate-state", eventState)
+        return true
     end
 
     if runtime.actionBarPrimed ~= true and runtime.visualGate ~= "syncing-local" then
         runtime.visualGate = "syncing-local"
         runtime.actionBarPrimed = true
+        setEventStartupPhase(eventState, runtime, "action-bar-metadata")
+        targetClient:SetEventTransitionPhase("action-bar-metadata", eventState)
         local phaseTimer = startTiming("Event startup phase: action-bar", 8, queuedEventId)
         queueSharedEventVisualRefresh(targetClient, "startup-action-bar", {
             eventWidget = false,
@@ -687,13 +871,15 @@ local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
             actionBar = true,
         })
         if phaseTimer then
-            stopEventTiming(phaseTimer, eventState, { startupPhase = "action-bar" })
+            stopTransitionPhaseTiming(targetClient.EventTransition, phaseTimer, eventState, { startupPhase = "action-bar" }, "action-bar-metadata")
         end
-        setEventStartupPhase(eventState, runtime, "syncing-local")
+        setEventStartupPhase(eventState, runtime, "action-bar-metadata")
         return true
     end
 
     if runtime.traitRuntimeRefreshed ~= true then
+        setEventStartupPhase(eventState, runtime, "trait-runtime")
+        targetClient:SetEventTransitionPhase("trait-runtime", eventState)
         local phaseTimer = startTiming("Event startup phase: trait-runtime", 8, queuedEventId)
         if type(targetClient.CreateTraitRuntimeRefreshContinuation) ~= "function"
             or type(targetClient.StepTraitRuntimeRefreshContinuation) ~= "function"
@@ -707,21 +893,23 @@ local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
         end
         local completed = targetClient:StepTraitRuntimeRefreshContinuation(runtime.traitRuntimeContinuation, deadlineMs) == true
         if phaseTimer then
-            stopEventTiming(phaseTimer, eventState, {
+            stopTransitionPhaseTiming(targetClient.EventTransition, phaseTimer, eventState, {
                 startupPhase = "trait-runtime",
                 completed = completed and 1 or 0,
-            })
+            }, "trait-runtime")
         end
         if not completed then
             return true
         end
         runtime.traitRuntimeContinuation = nil
         runtime.traitRuntimeRefreshed = true
-        setEventStartupPhase(eventState, runtime, "syncing-local")
+        setEventStartupPhase(eventState, runtime, "trait-runtime")
         return true
     end
 
     if runtime.automaticAurasSynced ~= true then
+        setEventStartupPhase(eventState, runtime, "automatic-auras")
+        targetClient:SetEventTransitionPhase("automatic-auras", eventState)
         local phaseTimer = startTiming("Event startup phase: automatic-auras", 8, queuedEventId)
         if type(targetClient.CreateAutomaticTraitAuraContinuation) ~= "function"
             or type(targetClient.StepAutomaticTraitAuraContinuation) ~= "function"
@@ -735,21 +923,23 @@ local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
         end
         local completed = targetClient:StepAutomaticTraitAuraContinuation(runtime.automaticAuraContinuation, deadlineMs) == true
         if phaseTimer then
-            stopEventTiming(phaseTimer, eventState, {
+            stopTransitionPhaseTiming(targetClient.EventTransition, phaseTimer, eventState, {
                 startupPhase = "automatic-auras",
                 completed = completed and 1 or 0,
-            })
+            }, "automatic-auras")
         end
         if not completed then
             return true
         end
         runtime.automaticAuraContinuation = nil
         runtime.automaticAurasSynced = true
-        setEventStartupPhase(eventState, runtime, "syncing-local")
+        setEventStartupPhase(eventState, runtime, "automatic-auras")
         return true
     end
 
     if runtime.eventAurasSynced ~= true then
+        setEventStartupPhase(eventState, runtime, "event-auras")
+        targetClient:SetEventTransitionPhase("event-auras", eventState)
         local phaseTimer = startTiming("Event startup phase: event-auras", 8, queuedEventId)
         if type(targetClient.CreateEventAuraContinuation) ~= "function"
             or type(targetClient.StepEventAuraContinuation) ~= "function"
@@ -763,21 +953,23 @@ local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
         end
         local completed = targetClient:StepEventAuraContinuation(runtime.eventAuraContinuation, deadlineMs) == true
         if phaseTimer then
-            stopEventTiming(phaseTimer, eventState, {
+            stopTransitionPhaseTiming(targetClient.EventTransition, phaseTimer, eventState, {
                 startupPhase = "event-auras",
                 completed = completed and 1 or 0,
-            })
+            }, "event-auras")
         end
         if not completed then
             return true
         end
         runtime.eventAuraContinuation = nil
         runtime.eventAurasSynced = true
-        setEventStartupPhase(eventState, runtime, "syncing-local")
+        setEventStartupPhase(eventState, runtime, "event-auras")
         return true
     end
 
     if runtime.resolvedStateRefreshed ~= true and type(targetClient.RefreshTraitResolvedState) == "function" then
+        setEventStartupPhase(eventState, runtime, "resolved-trait")
+        targetClient:SetEventTransitionPhase("resolved-trait", eventState)
         local phaseTimer = startTiming("Event startup phase: resolved-state", 8, queuedEventId)
         local auraManager = targetClient.Spellcasting and targetClient.Spellcasting.AuraManager or nil
         runtime.resolvedStateContinuation = runtime.resolvedStateContinuation
@@ -801,49 +993,108 @@ local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
             end
             runtime.resolvedStateContinuation = nil
             if phaseTimer then
-                stopEventTiming(phaseTimer, eventState, {
+                stopTransitionPhaseTiming(targetClient.EventTransition, phaseTimer, eventState, {
                     startupPhase = "resolved-state",
                     completed = 0,
                     stale = continuationReason or "unknown",
-                })
+                }, "resolved-trait")
             end
             return true
         end
         if completed ~= true then
             if phaseTimer then
-                stopEventTiming(phaseTimer, eventState, {
+                stopTransitionPhaseTiming(targetClient.EventTransition, phaseTimer, eventState, {
                     startupPhase = "resolved-state",
                     completed = 0,
-                })
+                }, "resolved-trait")
             end
             return true
         end
         runtime.resolvedStateContinuation = nil
         targetClient:RefreshTraitResolvedState(eventState, "startup", {
             suppressDerivedStateRefresh = true,
+            suppressVisualRefresh = true,
         })
         runtime.resolvedStateRefreshed = true
-        local sessionState = targetClient.GetState and targetClient:GetState() or targetClient.State
-        tryQueueInitialLocalResourceSync(targetClient, sessionState, eventState, "startup-resolved-state")
         if phaseTimer then
-            stopEventTiming(phaseTimer, eventState, { startupPhase = "resolved-state", completed = 1 })
+            stopTransitionPhaseTiming(targetClient.EventTransition, phaseTimer, eventState, { startupPhase = "resolved-state", completed = 1 }, "resolved-trait")
         end
-        setEventStartupPhase(eventState, runtime, "syncing-local")
+        setEventStartupPhase(eventState, runtime, "resolved-trait")
         return true
     end
 
-    if runtime.consumablesQueued ~= true and type(targetClient.QueueDeferredConsumablePrompt) == "function" then
-        local phaseTimer = startTiming("Event startup phase: consumables", 8, queuedEventId)
-        targetClient:QueueDeferredConsumablePrompt(eventState, "event_start")
+    if runtime.resourceSyncQueued ~= true then
+        setEventStartupPhase(eventState, runtime, "resource-sync")
+        targetClient:SetEventTransitionPhase("resource-sync", eventState)
+        local phaseTimer = startTiming("Event startup phase: resource-sync", 8, queuedEventId)
+        local sessionState = targetClient.GetState and targetClient:GetState() or targetClient.State
+        local queuedResourceSync = tryQueueInitialLocalResourceSync(
+            targetClient,
+            sessionState,
+            eventState,
+            "startup-resolved-state"
+        ) == true
+        runtime.resourceSyncQueued = queuedResourceSync
+            or type(sessionState) ~= "table"
+            or sessionState.lastResourceSyncEventId == eventState.id
+            or not hasLocalSessionMemberForStartup(sessionState)
+            or type(targetClient.QueueClientResourceSync) ~= "function"
         if phaseTimer then
-            stopEventTiming(phaseTimer, eventState, { startupPhase = "consumables" })
+            stopTransitionPhaseTiming(targetClient.EventTransition, phaseTimer, eventState, {
+                startupPhase = "resource-sync",
+                queued = runtime.resourceSyncQueued and 1 or 0,
+            }, "resource-sync")
         end
-        runtime.consumablesQueued = true
-        setEventStartupPhase(eventState, runtime, "syncing-local")
+        if not runtime.resourceSyncQueued then
+            return true
+        end
+        return true
+    end
+
+    if runtime.consumablesQueued ~= true and not runtime.consumablePromptPending then
+        setEventStartupPhase(eventState, runtime, "consumable-prompts")
+        targetClient:SetEventTransitionPhase("consumable-prompts", eventState)
+        local phaseTimer = startTiming("Event startup phase: consumable-prompts", 8, queuedEventId)
+        runtime.consumablePromptPending = true
+        if type(targetClient.QueueDeferredConsumablePrompt) == "function" then
+            local promptQueued = targetClient:QueueDeferredConsumablePrompt(eventState, "event_start", function()
+                if not targetClient:IsEventTransitionCurrent(queuedEventId, queuedGeneration, "starting", queuedEventState) then
+                    return
+                end
+                local currentRuntime = getEventStartupRuntime(targetClient, queuedEventId, false)
+                if currentRuntime ~= runtime then
+                    return
+                end
+                runtime.consumablePromptPending = false
+                runtime.consumablesQueued = true
+                setEventStartupPhase(eventState, runtime, "consumable-prompts")
+            end)
+            if promptQueued ~= true then
+                runtime.consumablePromptPending = false
+                runtime.consumablesQueued = true
+            end
+        else
+            runtime.consumablePromptPending = false
+            runtime.consumablesQueued = true
+        end
+        if type(targetClient.QueueEventWidgetRefresh) == "function" then
+            targetClient:QueueEventWidgetRefresh("startup-consumable-prompts")
+        end
+        if phaseTimer then
+            stopTransitionPhaseTiming(targetClient.EventTransition, phaseTimer, eventState, { startupPhase = "consumable-prompts" }, "consumable-prompts")
+        end
+        return true
+    end
+
+    if runtime.consumablePromptPending then
+        setEventStartupPhase(eventState, runtime, "consumable-prompts")
+        targetClient:SetEventTransitionPhase("consumable-prompts", eventState)
         return true
     end
 
     setEventStartupPhase(eventState, runtime, "ready")
+    targetClient:SetEventTransitionPhase("ready", eventState)
+    runtime.phase = "ready"
     runtime.visualGate = "ready"
     local readyTimer = startTiming("Event startup phase: ready", 8, queuedEventId)
     if type(targetClient.QueueEventWidgetRefresh) == "function" then
@@ -858,7 +1109,7 @@ local function runEventStartupStep(targetClient, queuedEventId, deadlineMs)
         targetClient:RefreshActionBarCompanionBars("startup-ready")
     end
     if readyTimer then
-        stopEventTiming(readyTimer, eventState, { startupPhase = "ready" })
+        stopTransitionPhaseTiming(targetClient.EventTransition, readyTimer, eventState, { startupPhase = "ready" }, "ready")
     end
     return false
 end
@@ -874,7 +1125,16 @@ local function queueEventStartupWork(client, eventState, reason)
     end
 
     local queuedEventId = tostring(eventState.id or "")
+    local queuedEventState = eventState
+    local queuedGeneration = getTransitionGeneration(client)
+    if type(client.IsEventTransitionCurrent) ~= "function"
+        or not client:IsEventTransitionCurrent(queuedEventId, queuedGeneration, "starting", queuedEventState)
+    then
+        return false
+    end
     runtime.queued = true
+    runtime.transitionGeneration = queuedGeneration
+    runtime.eventState = queuedEventState
     local sliceJob = enqueueClientSliceable({
         label = "event-startup",
         scope = "event:" .. queuedEventId,
@@ -882,6 +1142,8 @@ local function queueEventStartupWork(client, eventState, reason)
             client = client,
             eventId = queuedEventId,
             reason = reason or "startup",
+            eventState = queuedEventState,
+            transitionGeneration = queuedGeneration,
             configurationRevision = getConfigurationRevision(),
             equipmentRevision = getEquipmentRevision(),
         },
@@ -891,6 +1153,14 @@ local function queueEventStartupWork(client, eventState, reason)
             return type(currentEventState) ~= "table"
                 or currentEventState.active ~= true
                 or tostring(currentEventState.id or "") ~= tostring(work and work.eventId or "")
+                or currentEventState ~= work.eventState
+                or type(targetClient.IsEventTransitionCurrent) ~= "function"
+                or not targetClient:IsEventTransitionCurrent(
+                    work and work.eventId,
+                    work and work.transitionGeneration,
+                    "starting",
+                    work and work.eventState
+                )
                 or getConfigurationRevision() ~= math.max(0, math.floor(tonumber(work and work.configurationRevision) or 0))
                 or getEquipmentRevision() ~= math.max(0, math.floor(tonumber(work and work.equipmentRevision) or 0))
         end,
@@ -900,12 +1170,19 @@ local function queueEventStartupWork(client, eventState, reason)
             if type(targetClient) ~= "table" then
                 return true
             end
-            if runEventStartupStep(targetClient, expectedEventId, deadlineMs) then
-                if type(targetClient.QueueEventWidgetRefresh) == "function" then
-                    targetClient:QueueEventWidgetRefresh("startup-progress")
-                end
+            local transition = targetClient.EventTransition
+            local sliceStartedAtMs = getTimingNowMilliseconds()
+            if runEventStartupStep(
+                targetClient,
+                expectedEventId,
+                work and work.transitionGeneration,
+                work and work.eventState,
+                deadlineMs
+            ) then
+                recordTransitionSlice(transition, sliceStartedAtMs, "event-startup")
                 return false
             end
+            recordTransitionSlice(transition, sliceStartedAtMs, "event-startup")
             return true
         end,
         onCancel = function(work, cancelReason)
@@ -925,17 +1202,54 @@ local function queueEventStartupWork(client, eventState, reason)
                 currentRuntime.eventAuraContinuation = nil
                 currentRuntime.resolvedStateContinuation = nil
             end
+            if cancelReason ~= "stale"
+                and type(targetClient) == "table"
+                and type(targetClient.IsEventTransitionCurrent) == "function"
+                and targetClient:IsEventTransitionCurrent(
+                    work and work.eventId,
+                    work and work.transitionGeneration,
+                    "starting",
+                    work and work.eventState
+                )
+            then
+                targetClient:EndEventTransition(work and work.eventId, work and work.transitionGeneration, work and work.eventState, cancelReason)
+            end
             if cancelReason == "stale" and type(targetClient) == "table" then
                 local currentEventState = targetClient.GetEventState and targetClient:GetEventState() or nil
                 if type(currentEventState) == "table"
                     and currentEventState.active == true
                     and tostring(currentEventState.id or "") == tostring(work and work.eventId or "")
+                    and currentEventState == (work and work.eventState)
+                    and type(targetClient.IsEventTransitionCurrent) == "function"
+                    and targetClient:IsEventTransitionCurrent(
+                        work and work.eventId,
+                        work and work.transitionGeneration,
+                        "starting",
+                        work and work.eventState
+                    )
                     and type(currentRuntime) == "table"
                 then
                     currentRuntime.traitRuntimeRefreshed = false
                     currentRuntime.automaticAurasSynced = false
                     currentRuntime.eventAurasSynced = false
                     currentRuntime.resolvedStateRefreshed = false
+                    if currentRuntime.consumablePromptPending then
+                        currentRuntime.consumablePromptPending = false
+                        currentRuntime.consumablesQueued = false
+                        if type(targetClient.CancelDeferredConsumablePrompt) == "function" then
+                            targetClient:CancelDeferredConsumablePrompt(currentEventState, "event_start")
+                        end
+                    end
+                    targetClient:EndEventTransition(
+                        work and work.eventId,
+                        work and work.transitionGeneration,
+                        work and work.eventState,
+                        "startup-stale"
+                    )
+                    local transition = targetClient:BeginEventTransition("starting", currentEventState.id)
+                    transition.eventState = currentEventState
+                    currentRuntime.transitionGeneration = transition.generation
+                    currentRuntime.eventState = currentEventState
                     queueEventStartupWork(targetClient, currentEventState, "startup-stale-restart")
                 end
             end
@@ -956,6 +1270,25 @@ local function queueEventStartupWork(client, eventState, reason)
                 currentRuntime.automaticAuraContinuation = nil
                 currentRuntime.eventAuraContinuation = nil
                 currentRuntime.resolvedStateContinuation = nil
+                currentRuntime.transitionGeneration = nil
+                currentRuntime.eventState = nil
+                if type(targetClient) == "table"
+                    and type(targetClient.IsEventTransitionCurrent) == "function"
+                    and targetClient:IsEventTransitionCurrent(
+                        work and work.eventId,
+                        work and work.transitionGeneration,
+                        "starting",
+                        work and work.eventState
+                    )
+                then
+                    targetClient:EndEventTransition(work and work.eventId, work and work.transitionGeneration, work and work.eventState, "startup-ready")
+                    if type(targetClient.QueueActionBarRefresh) == "function" then
+                        targetClient:QueueActionBarRefresh("startup-ready-transition-complete")
+                    end
+                    if type(targetClient.QueueTargetingWidgetRefresh) == "function" then
+                        targetClient:QueueTargetingWidgetRefresh("startup-ready-transition-complete")
+                    end
+                end
             end
         end,
     })
@@ -982,11 +1315,29 @@ local function queueEventTraitRuntimeRefresh(client, eventState, reason)
         return false
     end
 
+    local previousTransition = client.EventTransition
+    if type(previousTransition) == "table"
+        and previousTransition.eventState == eventState
+        and previousTransition.kind == "starting"
+    then
+        client:EndEventTransition(eventState.id, previousTransition.generation, eventState, reason or "event-units-changed")
+    end
+    local transition = client:BeginEventTransition("starting", eventState.id)
+    transition.eventState = eventState
     runtime.queued = false
+    runtime.transitionGeneration = transition.generation
+    runtime.eventState = eventState
+    eventState.startupReady = false
+    runtime.actionBarPrimed = false
+    runtime.visualGate = ""
     runtime.traitRuntimeRefreshed = false
     runtime.automaticAurasSynced = false
     runtime.eventAurasSynced = false
     runtime.resolvedStateRefreshed = false
+    runtime.consumablePromptPending = false
+    if type(client.CancelDeferredConsumablePrompt) == "function" then
+        client:CancelDeferredConsumablePrompt(eventState, "event_start")
+    end
     return queueEventStartupWork(client, eventState, reason or "event-units-changed")
 end
 
@@ -1050,6 +1401,9 @@ function Client:QueueEventWidgetRefresh(reason)
             end
             if targetClient.RefreshEventWidget then
                 targetClient:RefreshEventWidget(refreshReason)
+            end
+            if type(targetClient.FlushDeferredConsumablePrompt) == "function" then
+                targetClient:FlushDeferredConsumablePrompt(eventState, "event_start")
             end
             return
         end
@@ -1528,6 +1882,7 @@ function Client:FlushPendingTurnChanges(sessionStateOverride, eventStateOverride
         or type(eventState) ~= "table"
         or eventState.active ~= true
         or eventState.channelName ~= sessionState.channelName
+        or not self:CanPerformEventAction(eventState, "pending-turn-flush")
     then
         return false
     end
@@ -1565,12 +1920,14 @@ end
 function Client:EndTurn()
     local sessionState = self:GetState()
     local eventState = self:GetEventState()
+    local canAct = self:CanPerformEventAction(eventState, "end-turn")
     if type(sessionState) ~= "table"
         or sessionState.active ~= true
         or type(eventState) ~= "table"
         or eventState.active ~= true
         or self:IsLocalEventHost(eventState)
         or not self:IsLocalTurnActive(eventState)
+        or not canAct
     then
         return false
     end
@@ -1586,7 +1943,9 @@ end
 
 function Client:TakeControlOfEventUnit(eventUnit)
     local eventState = self:GetEventState()
-    if type(eventState) ~= "table" or eventState.active ~= true then
+    if type(eventState) ~= "table" or eventState.active ~= true
+        or not self:CanPerformEventAction(eventState, "companion-control")
+    then
         return false
     end
 
@@ -1635,89 +1994,393 @@ function Client:ReleaseControl(reason)
     return true
 end
 
-function Client:ResetEventState(reason)
-    local state = self.EventState
-    cancelEventSliceableWork(self, state and state.id or nil, "event-reset")
-    local sessionState = self:GetState()
+local function processEventCompletionAchievement(client, eventState, reason)
+    local achievements = type(client) == "table" and client.Achievements or nil
+    if not achievements or type(achievements.HandleRPEEventComplete) ~= "function" then
+        return true
+    end
+    local ok, err = pcall(achievements.HandleRPEEventComplete, achievements, eventState, reason)
+    if not ok then
+        if Debug and Debug.Error then
+            Debug.Error("Event end achievement transaction failed: %s", tostring(err))
+        end
+        return false
+    end
+    return true
+end
+
+local function commitEventTransitionTransaction(client, transition, reason)
+    local transaction = type(transition) == "table" and transition.transaction or nil
+    if type(transaction) ~= "table" or transaction.status ~= "active" then
+        return true
+    end
+    if type(Runtime) ~= "table" or type(Runtime.GetCurrentTransaction) ~= "function"
+        or Runtime:GetCurrentTransaction() ~= transaction
+    then
+        return false
+    end
+    if transition.kind == "ending" and type(transition.eventState) == "table" then
+        processEventCompletionAchievement(client, transition.eventState, reason)
+    end
+    local ok, committed = pcall(Runtime.CommitTransaction, Runtime, transaction)
+    if not ok then
+        if Debug and Debug.Error then
+            Debug.Error("Event transition transaction commit failed (%s): %s", tostring(reason or "unknown"), tostring(committed))
+        end
+        return false
+    end
+    transition.transaction = nil
+    transition.transactionId = transaction.id
+    return committed == true
+end
+
+local function clearEventStateNow(client, state, reason, options)
+    options = type(options) == "table" and options or {}
+    local transition = client.EventTransition
+    local eventState = type(state) == "table" and state or (transition and transition.eventState)
+    local eventId = eventState and eventState.id or nil
+    if options.skipCancel ~= true then
+        cancelEventSliceableWork(client, eventId, options.cancelReason or "event-reset")
+    end
+    commitEventTransitionTransaction(client, transition, reason or "event-reset")
+
+    local sessionState = client:GetState()
     local timer = startTiming("Event end teardown", 16, reason or "ended")
     local activeCasts, activeAuras = 0, 0
     if timer then
-        activeCasts, activeAuras = getActiveEventCardinality(self, state)
+        activeCasts, activeAuras = getActiveEventCardinality(client, eventState)
     end
     local tracker = getMovementTracker()
     if tracker and type(tracker.OnPlayerTurnEnd) == "function" then
         tracker:OnPlayerTurnEnd()
     end
-    if state then
-        state.active = false
-        state.endedAt = Common.GetNow()
-        self.LastEventEndReason = reason
+    if eventState then
+        eventState.active = false
+        eventState.ending = false
+        eventState.startupReady = false
+        eventState.endedAt = Common.GetNow()
+        client.LastEventEndReason = reason
         Debug.Info(
             "Event ended: %s.",
-            tostring(state.name ~= "" and state.name or state.id or "unnamed")
+            tostring(eventState.name ~= "" and eventState.name or eventState.id or "unnamed")
         )
     end
 
-    self.EventState = nil
-    self.ControlledEventUnitId = nil
-    self.TurnEndPending = false
-    self.LastAppliedTurnRegenKey = nil
-    self.PendingStartupActionBarRefresh = false
-    self.PendingStartupActionBarRefreshReason = nil
-    self.EventUnitInteractionMarkers = {}
-    self.LastLocalInteractionMarker = nil
+    if client.EventState == eventState then
+        client.EventState = nil
+    end
+    client.ControlledEventUnitId = nil
+    client.TurnEndPending = false
+    client.LastAppliedTurnRegenKey = nil
+    client.PendingStartupActionBarRefresh = false
+    client.PendingStartupActionBarRefreshReason = nil
+    client.EventUnitInteractionMarkers = {}
+    client.LastLocalInteractionMarker = nil
+
     local combatLogTimer = startTiming("Event end teardown: combat-log", 8, reason or "ended")
-    if self.ClearEventWidgetCombatLog then
-        self:ClearEventWidgetCombatLog(reason or "ended")
+    if client.ClearEventWidgetCombatLog then
+        client:ClearEventWidgetCombatLog(reason or "ended")
     end
     if combatLogTimer then
-        stopEventTiming(combatLogTimer, state, { teardownPhase = "combat-log" })
+        stopEventTiming(combatLogTimer, eventState, { teardownPhase = "combat-log" })
     end
     local spellcastingTimer = startTiming("Event end teardown: spellcasting", 8, reason or "ended")
-    if self.ResetSpellcastingState then
-        self:ResetSpellcastingState(state and state.id or nil)
+    if client.ResetSpellcastingState then
+        client:ResetSpellcastingState(eventId)
     end
     if spellcastingTimer then
-        stopEventTiming(spellcastingTimer, state, { teardownPhase = "spellcasting" })
+        stopEventTiming(spellcastingTimer, eventState, { teardownPhase = "spellcasting" })
     end
     local traitTimer = startTiming("Event end teardown: traits", 8, reason or "ended")
-    if self.ResetTraitRuntime then
-        self:ResetTraitRuntime(state and state.id or nil)
+    if client.ResetTraitRuntime then
+        client:ResetTraitRuntime(eventId)
     end
     if traitTimer then
-        stopEventTiming(traitTimer, state, { teardownPhase = "traits" })
+        stopEventTiming(traitTimer, eventState, { teardownPhase = "traits" })
     end
-    resetEventStartupRuntime(self, state and state.id or nil)
+    resetEventStartupRuntime(client, eventId)
     local targetingTimer = startTiming("Event end teardown: targeting", 8, reason or "ended")
-    if self.CancelSpellTargeting then
-        self:CancelSpellTargeting("")
+    if client.CancelSpellTargeting then
+        client:CancelSpellTargeting("")
     end
     if sessionState then
         sessionState.lastResourceSyncEventId = nil
     end
-    if self.InvalidatePendingSpellTargetingDisplayState then
-        self:InvalidatePendingSpellTargetingDisplayState()
+    if client.InvalidatePendingSpellTargetingDisplayState then
+        client:InvalidatePendingSpellTargetingDisplayState()
     end
     if targetingTimer then
-        stopEventTiming(targetingTimer, state, { teardownPhase = "targeting" })
+        stopEventTiming(targetingTimer, eventState, { teardownPhase = "targeting" })
     end
-    local visualTimer = startTiming("Event end teardown: visual-queue", 8, reason or "ended")
-    queueSharedEventVisualRefresh(self, reason or "ended", {
-        eventWidget = true,
-        targeting = false,
-        actionBar = true,
-    })
-    if visualTimer then
-        stopEventTiming(visualTimer, state, { teardownPhase = "visual-queue" })
+    if type(Runtime) == "table" and type(Runtime.ClearEventRevisions) == "function" then
+        Runtime:ClearEventRevisions(eventId)
+    end
+
+    if options.queueVisual ~= false then
+        local visualTimer = startTiming("Event end teardown: visual-queue", 8, reason or "ended")
+        queueSharedEventVisualRefresh(client, reason or "ended", {
+            eventWidget = true,
+            targeting = false,
+            actionBar = true,
+        })
+        if visualTimer then
+            stopEventTiming(visualTimer, eventState, { teardownPhase = "visual-queue" })
+        end
+    end
+    if type(client.IsEventTransitionCurrent) == "function" and transition then
+        client:EndEventTransition(eventId, transition.generation, eventState, reason or "event-reset")
     end
     if timer then
-        stopEventTiming(timer, state, {
+        stopEventTiming(timer, eventState, {
             teardownReason = reason or "ended",
             activeCasts = activeCasts,
             activeAuras = activeAuras,
         })
     end
-    return state
+    return eventState
+end
+
+function Client:ResetEventState(reason)
+    return clearEventStateNow(self, self.EventState, reason or "event-reset")
+end
+
+local function runEventEndStep(targetClient, work, deadlineMs)
+    if type(targetClient) ~= "table" or type(work) ~= "table" then
+        return false
+    end
+
+    local eventState = targetClient:GetEventState()
+    if type(eventState) ~= "table"
+        or eventState.active ~= true
+        or eventState.ending ~= true
+        or eventState ~= work.eventState
+        or type(targetClient.IsEventTransitionCurrent) ~= "function"
+        or not targetClient:IsEventTransitionCurrent(work.eventId, work.transitionGeneration, "ending", work.eventState)
+    then
+        return false
+    end
+
+    if work.phase == "achievement" then
+        targetClient:SetEventTransitionPhase("achievement", eventState)
+        local timer = startTiming("Event end phase: achievement", 8, work.eventId)
+        processEventCompletionAchievement(targetClient, eventState, work.reason)
+        stopTransitionPhaseTiming(targetClient.EventTransition, timer, eventState, { teardownPhase = "achievement" }, "achievement")
+
+        work.phase = "consumable-prompts"
+        if targetClient.PromptPhaseConsumableTraits then
+            local prompted = targetClient:PromptPhaseConsumableTraits(eventState, "event_end", function()
+                if not targetClient:IsEventTransitionCurrent(work.eventId, work.transitionGeneration, "ending", eventState) then
+                    return
+                end
+                work.promptResolved = true
+                targetClient:SetEventTransitionPhase("consumable-prompts", eventState)
+            end)
+            if not prompted and not work.promptResolved then
+                work.promptResolved = true
+            end
+        else
+            work.promptResolved = true
+        end
+        return true
+    end
+
+    if work.phase == "consumable-prompts" then
+        targetClient:SetEventTransitionPhase("consumable-prompts", eventState)
+        if not work.promptResolved then
+            return true
+        end
+        work.phase = "commit"
+        return true
+    end
+
+    if work.phase == "commit" then
+        targetClient:SetEventTransitionPhase("commit", eventState)
+        local timer = startTiming("Event end phase: commit", 8, work.eventId)
+        commitEventTransitionTransaction(targetClient, targetClient.EventTransition, work.reason)
+        stopTransitionPhaseTiming(targetClient.EventTransition, timer, eventState, { teardownPhase = "commit" }, "commit")
+        work.phase = "combat-log"
+        return true
+    end
+
+    if work.phase == "combat-log" then
+        targetClient:SetEventTransitionPhase("clear-combat-log", eventState)
+        local timer = startTiming("Event end phase: combat-log", 8, work.eventId)
+        if targetClient.ClearEventWidgetCombatLog then
+            targetClient:ClearEventWidgetCombatLog(work.reason)
+        end
+        stopTransitionPhaseTiming(targetClient.EventTransition, timer, eventState, { teardownPhase = "combat-log" }, "clear-combat-log")
+        work.phase = "spellcasting"
+        return true
+    end
+
+    if work.phase == "spellcasting" then
+        targetClient:SetEventTransitionPhase("clear-spellcasting", eventState)
+        local timer = startTiming("Event end phase: spellcasting", 8, work.eventId)
+        if targetClient.ResetSpellcastingState then
+            targetClient:ResetSpellcastingState(work.eventId)
+        end
+        stopTransitionPhaseTiming(targetClient.EventTransition, timer, eventState, { teardownPhase = "spellcasting" }, "clear-spellcasting")
+        work.phase = "traits"
+        return true
+    end
+
+    if work.phase == "traits" then
+        targetClient:SetEventTransitionPhase("clear-traits", eventState)
+        local timer = startTiming("Event end phase: traits", 8, work.eventId)
+        if targetClient.ResetTraitRuntime then
+            targetClient:ResetTraitRuntime(work.eventId)
+        end
+        stopTransitionPhaseTiming(targetClient.EventTransition, timer, eventState, { teardownPhase = "traits" }, "clear-traits")
+        work.phase = "targeting"
+        return true
+    end
+
+    if work.phase == "targeting" then
+        targetClient:SetEventTransitionPhase("clear-targeting", eventState)
+        local timer = startTiming("Event end phase: targeting", 8, work.eventId)
+        local tracker = getMovementTracker()
+        if tracker and type(tracker.OnPlayerTurnEnd) == "function" then
+            tracker:OnPlayerTurnEnd()
+        end
+        targetClient.ControlledEventUnitId = nil
+        targetClient.TurnEndPending = false
+        targetClient.LastAppliedTurnRegenKey = nil
+        targetClient.PendingStartupActionBarRefresh = false
+        targetClient.PendingStartupActionBarRefreshReason = nil
+        targetClient.EventUnitInteractionMarkers = {}
+        targetClient.LastLocalInteractionMarker = nil
+        if targetClient.CancelSpellTargeting then
+            targetClient:CancelSpellTargeting("")
+        end
+        local sessionState = targetClient:GetState()
+        if sessionState then
+            sessionState.lastResourceSyncEventId = nil
+        end
+        if targetClient.InvalidatePendingSpellTargetingDisplayState then
+            targetClient:InvalidatePendingSpellTargetingDisplayState()
+        end
+        stopTransitionPhaseTiming(targetClient.EventTransition, timer, eventState, { teardownPhase = "targeting" }, "clear-targeting")
+        work.phase = "clear-revisions"
+        return true
+    end
+
+    if work.phase == "clear-revisions" then
+        targetClient:SetEventTransitionPhase("clear-revisions", eventState)
+        local timer = startTiming("Event end phase: clear-revisions", 8, work.eventId)
+        if type(Runtime) == "table" and type(Runtime.ClearEventRevisions) == "function" then
+            Runtime:ClearEventRevisions(work.eventId)
+        end
+        resetEventStartupRuntime(targetClient, work.eventId)
+        stopTransitionPhaseTiming(targetClient.EventTransition, timer, eventState, { teardownPhase = "clear-revisions" }, "clear-revisions")
+        work.phase = "visual-queue"
+        return true
+    end
+
+    if work.phase == "visual-queue" then
+        targetClient:SetEventTransitionPhase("visual-teardown", eventState)
+        local timer = startTiming("Event end phase: visual-queue", 8, work.eventId)
+        eventState.active = false
+        eventState.ending = false
+        eventState.startupReady = false
+        eventState.endedAt = Common.GetNow()
+        targetClient.LastEventEndReason = work.reason
+        Debug.Info(
+            "Event ended: %s.",
+            tostring(eventState.name ~= "" and eventState.name or eventState.id or "unnamed")
+        )
+        if targetClient.EventState == eventState then
+            targetClient.EventState = nil
+        end
+        queueSharedEventVisualRefresh(targetClient, work.reason, {
+            eventWidget = true,
+            targeting = false,
+            actionBar = true,
+        })
+        stopTransitionPhaseTiming(targetClient.EventTransition, timer, eventState, { teardownPhase = "visual-queue" }, "visual-teardown")
+        targetClient:EndEventTransition(work.eventId, work.transitionGeneration, eventState, work.reason)
+        work.completed = true
+        return false
+    end
+
+    return false
+end
+
+local function queueEventEndWork(client, eventState, transition, reason, work)
+    if type(client) ~= "table" or type(eventState) ~= "table" or type(transition) ~= "table" then
+        return false
+    end
+    local queuedEventId = tostring(eventState.id or "")
+    local endWork = work or {
+        client = client,
+        eventId = queuedEventId,
+        eventState = eventState,
+        transitionGeneration = transition.generation,
+        reason = reason or "ended",
+        phase = "achievement",
+        promptResolved = false,
+    }
+    local job = enqueueClientSliceable({
+        label = "event-end",
+        scope = "event:" .. queuedEventId,
+        state = endWork,
+        isStale = function(currentWork)
+            local targetClient = currentWork and currentWork.client or nil
+            local currentEventState = targetClient and targetClient:GetEventState() or nil
+            return type(currentEventState) ~= "table"
+                or currentEventState ~= (currentWork and currentWork.eventState)
+                or currentEventState.active ~= true
+                or currentEventState.ending ~= true
+                or type(targetClient.IsEventTransitionCurrent) ~= "function"
+                or not targetClient:IsEventTransitionCurrent(
+                    currentWork and currentWork.eventId,
+                    currentWork and currentWork.transitionGeneration,
+                    "ending",
+                    currentWork and currentWork.eventState
+                )
+        end,
+        step = function(currentWork, deadlineMs)
+            local transition = currentWork and currentWork.client and currentWork.client.EventTransition or nil
+            local sliceStartedAtMs = getTimingNowMilliseconds()
+            if runEventEndStep(currentWork and currentWork.client or nil, currentWork, deadlineMs) then
+                recordTransitionSlice(transition, sliceStartedAtMs, "event-end")
+                return false
+            end
+            recordTransitionSlice(transition, sliceStartedAtMs, "event-end")
+            return true
+        end,
+        onCancel = function(currentWork, cancelReason)
+            if type(currentWork) == "table" then
+                currentWork.cancelled = true
+                local targetClient = currentWork.client
+                if (cancelReason == "error" or cancelReason == "stale-check-error")
+                    and type(targetClient) == "table"
+                    and type(targetClient.IsEventTransitionCurrent) == "function"
+                    and targetClient.EventState == currentWork.eventState
+                    and targetClient:IsEventTransitionCurrent(
+                        currentWork.eventId,
+                        currentWork.transitionGeneration,
+                        "ending",
+                        currentWork.eventState
+                    )
+                then
+                    clearEventStateNow(targetClient, currentWork.eventState, "event-end-failed", {
+                        skipCancel = true,
+                        cancelReason = "event-end-failed",
+                    })
+                end
+            end
+        end,
+        onComplete = function(currentWork)
+            if type(currentWork) == "table" then
+                currentWork.completed = true
+            end
+        end,
+    })
+    if not job then
+        return false
+    end
+    endWork.job = job
+    return true
 end
 
 function Client:HandleEventStart(arguments, sender)
@@ -1733,8 +2396,7 @@ function Client:HandleEventStart(arguments, sender)
         return false
     end
 
-    local timer = startTiming("Event start total", 16, "event-start")
-
+    local timer = startTiming("Event start immediate handler", 8, "event-start")
     local parseStartTime = timingParts and getTimingNowMilliseconds() or nil
     local nextState = Event.FromStartArguments(arguments)
     appendTimingPart(timingParts, "parse-start", parseStartTime, 10)
@@ -1742,6 +2404,7 @@ function Client:HandleEventStart(arguments, sender)
     nextState.hostName = Common.NormalizeName(nextState.hostName ~= "" and nextState.hostName or sender)
     nextState.channelName = channelName
     nextState.active = true
+    nextState.ending = false
     nextState.endedAt = 0
     nextState.turnNumber = math.max(1, tonumber(nextState.turnNumber) or 1)
     nextState.tickNumber = math.max(1, tonumber(nextState.tickNumber) or 1)
@@ -1750,6 +2413,12 @@ function Client:HandleEventStart(arguments, sender)
     nextState.unitsReady = false
     nextState.unitsChunkReceived = 0
     nextState.unitsChunkExpected = 0
+
+    if type(self.EventState) == "table" then
+        clearEventStateNow(self, self.EventState, "event-replaced", {
+            cancelReason = "event-replaced",
+        })
+    end
 
     local hydrateStartTime = timingParts and getTimingNowMilliseconds() or nil
     if ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
@@ -1762,6 +2431,8 @@ function Client:HandleEventStart(arguments, sender)
     appendTimingPart(timingParts, "hydrate-resources", hydrateStartTime, 10)
 
     self.EventState = nextState
+    local transition = self:BeginEventTransition("starting", nextState.id)
+    transition.eventState = nextState
     local startupRuntime = getEventStartupRuntime(self, nextState.id, true)
     if startupRuntime then
         startupRuntime.startupStateReceived = false
@@ -1771,14 +2442,32 @@ function Client:HandleEventStart(arguments, sender)
         startupRuntime.automaticAurasSynced = false
         startupRuntime.eventAurasSynced = false
         startupRuntime.resolvedStateRefreshed = false
+        startupRuntime.resourceSyncQueued = false
         startupRuntime.consumablesQueued = false
+        startupRuntime.consumablePromptPending = false
         startupRuntime.queued = false
+        startupRuntime.transitionGeneration = transition.generation
+        startupRuntime.eventState = nextState
     end
     setEventStartupPhase(nextState, startupRuntime, "starting")
 
     local achievements = Client.Achievements
     if achievements and type(achievements.HandleRPEEventStart) == "function" then
-        pcall(achievements.HandleRPEEventStart, achievements, nextState, startupRuntime)
+        local ok, err = pcall(function()
+            if type(Runtime) == "table" and type(Runtime.RunTransaction) == "function" then
+                Runtime:RunTransaction("event-start:" .. tostring(nextState.id), function()
+                    local currentTransaction = type(Runtime.GetCurrentTransaction) == "function"
+                        and Runtime:GetCurrentTransaction() or nil
+                    transition.transactionId = currentTransaction and currentTransaction.id or nil
+                    achievements:HandleRPEEventStart(nextState, startupRuntime)
+                end, { eventId = nextState.id })
+            else
+                achievements:HandleRPEEventStart(nextState, startupRuntime)
+            end
+        end)
+        if not ok and Debug and Debug.Error then
+            Debug.Error("Event start achievement transaction failed: %s", tostring(err))
+        end
     end
 
     local wasLocalTurn = false
@@ -1792,10 +2481,6 @@ function Client:HandleEventStart(arguments, sender)
     end
     self.LastEventEndReason = nil
     playEventStartSound()
-
-    local syncStartTime = timingParts and getTimingNowMilliseconds() or nil
-    tryQueueInitialLocalResourceSync(self, sessionState, nextState, "event-start")
-    appendTimingPart(timingParts, "resource-sync-queue", syncStartTime, 10)
 
     local movementStartTime = timingParts and getTimingNowMilliseconds() or nil
     queueDeferredMovementSync(self, wasLocalTurn, nextState, nil, nil, "event-start")
@@ -1850,28 +2535,57 @@ function Client:HandleEventEnd(arguments)
     end
 
     local reason = arguments and arguments[3] or "ended"
-    local timer = startTiming("Event end total", 16, reason)
-    local achievements = Client.Achievements
-    if achievements and type(achievements.HandleRPEEventComplete) == "function" then
-        pcall(achievements.HandleRPEEventComplete, achievements, state, reason)
-    end
-    if self.PromptPhaseConsumableTraits then
-        local prompted = self:PromptPhaseConsumableTraits(state, "event_end", function()
-            Client:ResetEventState(reason)
-        end)
-        if prompted then
-            if timer then
-                stopEventTiming(timer, state, { prompted = 1 })
-            end
-            return true
-        end
+    local activeTransition = self.EventTransition
+    if state.ending == true
+        and type(activeTransition) == "table"
+        and activeTransition.kind == "ending"
+        and activeTransition.eventState == state
+    then
+        return true
     end
 
-    local resetState = self:ResetEventState(reason)
-    if timer then
-        stopEventTiming(timer, resetState, { prompted = 0 })
+    local timer = startTiming("Event end immediate handler", 8, reason)
+    cancelEventSliceableWork(self, state.id, "event-ending")
+    local startupRuntime = getEventStartupRuntime(self, state.id, false)
+    if type(startupRuntime) == "table" then
+        startupRuntime.consumablePromptPending = false
     end
-    return resetState ~= nil
+    if type(self.CancelDeferredConsumablePrompt) == "function" then
+        self:CancelDeferredConsumablePrompt(state, "event_start")
+    end
+    local transition = self:BeginEventTransition("ending", state.id)
+    transition.eventState = state
+    state.ending = true
+    state.startupReady = false
+    local transaction
+    if type(Runtime) == "table" and type(Runtime.BeginTransaction) == "function" then
+        transaction = Runtime:BeginTransaction("event-end:" .. tostring(state.id), { eventId = state.id })
+        transition.transaction = transaction
+        transition.transactionId = transaction and transaction.id or nil
+    end
+    local endWork = {
+        client = self,
+        eventId = tostring(state.id or ""),
+        eventState = state,
+        transitionGeneration = transition.generation,
+        reason = reason,
+        phase = "achievement",
+        promptResolved = false,
+    }
+
+    local queued = queueEventEndWork(self, state, transition, reason, endWork)
+    queueSharedEventVisualRefresh(self, "event-ending", {
+        eventWidget = true,
+        targeting = true,
+        actionBar = true,
+    })
+    if timer then
+        stopEventTiming(timer, state, { promptQueued = queued and 1 or 0 })
+    end
+    if not queued then
+        clearEventStateNow(self, state, reason, { cancelReason = "event-end-queue-failed" })
+    end
+    return true
 end
 
 function Client:HandleEventUnits(arguments)
@@ -1879,7 +2593,7 @@ function Client:HandleEventUnits(arguments)
     local timingParts = totalStartTime > 0 and {} or nil
     local sessionState = self:GetState()
     local eventState = self.EventState
-    if not sessionState or sessionState.active ~= true or not eventState or eventState.active ~= true then
+    if not sessionState or sessionState.active ~= true or not eventState or eventState.active ~= true or eventState.ending == true then
         return false
     end
 
@@ -1917,10 +2631,6 @@ function Client:HandleEventUnits(arguments)
     end
     refreshEventStartupPhase(eventState, startupRuntime)
     appendTimingPart(timingParts, "readiness", readinessStartTime, 10)
-
-    local syncStartTime = timingParts and getTimingNowMilliseconds() or nil
-    tryQueueInitialLocalResourceSync(self, sessionState, eventState, "event-units")
-    appendTimingPart(timingParts, "resource-sync-queue", syncStartTime, 10)
 
     local cooldownStartTime = timingParts and getTimingNowMilliseconds() or nil
     if self.PruneCooldownState then
@@ -1971,7 +2681,7 @@ end
 function Client:HandleEventUnitDeltaBatch(arguments)
     local sessionState = self:GetState()
     local eventState = self.EventState
-    if not sessionState or sessionState.active ~= true or not eventState or eventState.active ~= true then
+    if not sessionState or sessionState.active ~= true or not eventState or eventState.active ~= true or eventState.ending == true then
         return false
     end
 
@@ -2013,7 +2723,6 @@ function Client:HandleEventUnitDeltaBatch(arguments)
     if ResourceSync.UpdateEventReadiness then
         ResourceSync.UpdateEventReadiness(eventState)
     end
-    tryQueueInitialLocalResourceSync(self, sessionState, eventState, "event-unit-delta-batch")
     if self.PruneCooldownState then
         self:PruneCooldownState(eventState)
     end
@@ -2037,7 +2746,7 @@ function Client:HandleInboundChunkProgress(packet, receivedCount, distribution, 
     end
 
     local eventState = self.EventState
-    if not eventState or eventState.active ~= true or eventState.unitsReady == true then
+    if not eventState or eventState.active ~= true or eventState.ending == true or eventState.unitsReady == true then
         return false
     end
 
@@ -2086,7 +2795,7 @@ function Client:HandleEventState(arguments)
     local timingParts = totalStartTime > 0 and {} or nil
     local sessionState = self:GetState()
     local eventState = self.EventState
-    if not sessionState or sessionState.active ~= true or not eventState or eventState.active ~= true then
+    if not sessionState or sessionState.active ~= true or not eventState or eventState.active ~= true or eventState.ending == true then
         return false
     end
 

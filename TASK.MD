@@ -1,71 +1,212 @@
-## Rev 6 in-game validation: FAIL — `aura-derived-state` stale check passes a multi-return into `tonumber`
+## Goal
+Refactor client event **startup and teardown** into explicit, deterministic transition state machines whose expensive phases can be cooperatively sliced without freezing WoW.
 
-Validated commit `22725f82aa10c8b044a30d2ac7dfc6d2afcacb80` (`Issue #65 rev 6`). `TASK.MD` is intentionally ignored.
+Authoritative documents:
 
-In-game failure when applying an aura that modifies player stats:
+- `.docs/RPE2-Runtime-Performance-Hitch-Elimination-PDD.md`
+- `.docs/RPE2-Runtime-Performance-Hitch-Elimination-Implementation-Plan.md`
+
+Depends on: #65
+
+This task owns event start/end transition orchestration. Sparse turn advancement and spell-component execution are separate follow-up tasks.
+
+## Primary files
+
+- `client/client_Event.lua`
+- `client/client_Traits.lua`
+- `client/client_Resources.lua`
+- `client/spellcasting/Core.lua` only for reset/transition integration
+- `client/spellcasting/AuraManager.lua` only for startup/end integration
+- `client/spellcasting/Cooldowns.lua` only for reset integration
+- `client/spellcasting/Helpers.lua` for existing dirty visual queues where required
+- `server/server_Event.lua` only if #58 profiling proves host-side synchronous construction/broadcast is itself a material hitch
+
+Reuse the cooperative TaskQueue API from #65 and Runtime transactions from #59.
+
+## 1. Add explicit local event transition state
+
+Introduce a local runtime transition structure equivalent to:
+
+```lua
+{
+    kind = "starting" | "ending",
+    eventId = ...,
+    transactionId = ...,
+    phase = ...,
+    generation/revision = ...,
+}
+```
+
+Requirements:
+
+- only one transition for the active event is authoritative at a time;
+- stale queued transition work verifies event ID/generation before applying state;
+- transition completion/abort clears retained continuation state;
+- normal WoW UI/rendering remains responsive while transition work continues.
+
+Do not add a blocking loading screen.
+
+## 2. Gate conflicting RPE gameplay actions during transitions
+
+While startup/end authoritative work is incomplete, disable/reject RPE actions which would conflict with the partially-transitioned event state.
+
+Examples to inspect:
 
 ```text
-Task queue sliceable stale check failed for 'aura-derived-state':
-.../client/spellcasting/AuraManager.lua:1545: bad argument #2 to '?' (number expected, got table)
+spell activation/cast actions
+end-turn/advance-related local actions
+targeting actions that mutate event runtime
+reaction/companion controls if they can mutate the same event
 ```
 
-### Root cause
+Harmless UI should remain interactive where possible.
 
-`resolveLocalEventId(eventState)` returns two values:
+Use one central transition/readiness check rather than scattered arbitrary flags.
 
-```lua
-return tonumber(localUnit and localUnit.eventID) or 0, localUnit
+## 3. Make startup phases explicit and sliceable
+
+Preserve current startup semantics/order but express phases explicitly, conceptually:
+
+```text
+apply/validate event state
+prime action-bar metadata
+refresh/compile trait runtime
+sync automatic trait auras
+sync event auras
+refresh resolved trait state
+initialize/queue resource sync
+process startup/consumable prompts
+mark event ready
 ```
 
-But the `aura-derived-state` stale check currently does:
+Requirements:
 
-```lua
-or tonumber(resolveLocalEventId(currentEventState)) ~= tonumber(state and state.localEventId)
+- phases that can scale with content use #65 sliceable jobs;
+- phases pass forward one stable startup context/snapshot where possible instead of re-resolving shared data;
+- do not rebuild the same derived state between phases without an actual revision change;
+- startup Achievement trigger participates in the runtime transaction/ChangeSet model from #61 and must not invoke global configuration refresh;
+- visual refreshes are dirty/coalesced rather than executed after each startup sub-step.
+
+## 4. Make end-event processing transactional
+
+Client event end must conceptually:
+
+```text
+mark event ending
+-> reject new conflicting actions
+-> process rpe_event_complete Achievements
+-> resolve end-phase/consumable effects/prompts
+-> commit resulting item/currency/Achievement/Profile changes coherently
+-> clear event spellcast/cooldown/aura/trait runtime buckets
+-> queue one final visual teardown
+-> clear event-scoped revisions/jobs
+-> release transition lock
 ```
 
-In Lua, because `resolveLocalEventId(currentEventState)` is the sole argument expression to `tonumber`, **both** return values are forwarded. The call therefore becomes effectively:
+Requirements:
 
-```lua
-tonumber(numericEventId, localUnitTable)
+- Achievement completion/rewards during event end use the existing outer transaction where practical;
+- no Achievement/currency state change invokes `HandleLocalConfigurationChanged()`;
+- clear event runtime using direct bucket/index teardown rather than unnecessary broad rescans;
+- stale queued event presentation/derived jobs are cancelled through #65 mechanisms.
+
+## 5. Preserve prompt behavior without blocking teardown incorrectly
+
+Current event end may defer reset while consumable/end-phase prompts are active.
+
+Preserve prompt semantics, but represent the wait as a transition phase rather than leaving runtime in an ambiguous half-ended state.
+
+Requirements:
+
+- prompt callback resumes the correct transition generation only;
+- obsolete callback from a replaced/new event cannot reset the new event;
+- duplicate prompt callbacks cannot double-run teardown.
+
+## 6. Keep network authority/order intact
+
+Do not weaken server/client event authority.
+
+Packet receipt may stage heavy client work, but:
+
+- event IDs/state validation remain immediate;
+- required acknowledgements/messages keep existing ordering;
+- UI-only invalidation must not generate network traffic;
+- client-connect/configuration refresh must not be triggered merely because event runtime state changed.
+
+Modify `server_Event.lua` only for a measured concrete host-side problem; client-side orchestration is the primary scope.
+
+## 7. Integrate transition timings
+
+Using #58 diagnostics, report:
+
+```text
+start immediate handler
+startup phase slice timings
+start total wall-clock transition duration
+end immediate handler
+end phase slice timings
+end total wall-clock transition duration
+max single RPE slice/frame contribution
 ```
 
-The second argument to `tonumber` is its optional numeric base, so passing the local-unit table produces exactly the observed error: `bad argument #2 ... (number expected, got table)`.
+Wall-clock multi-frame completion may exceed 16 ms; the requirement is that no individual RPE work chunk creates a frame hitch.
 
-The TaskQueue catches this as a stale-check error, so the derived-state job is cancelled instead of refreshing the stat-modifying aura state.
+## Acceptance criteria
 
-### Required fix
+- [ ] Event startup uses explicit transition phases.
+- [ ] Event teardown uses explicit transition phases.
+- [ ] Content-scaled startup/end phases are sliceable.
+- [ ] Conflicting RPE gameplay actions are gated while authoritative transition work is incomplete.
+- [ ] Harmless UI/WoW rendering remains responsive.
+- [ ] Startup/end Achievement triggers remain correct and do not cause global configuration refresh.
+- [ ] End-event rewards/profile mutations commit coherently rather than refreshing between each mutation.
+- [ ] Obsolete event-scoped jobs/callbacks cannot mutate a replacement event.
+- [ ] Event runtime buckets/revisions are cleared cleanly at end.
+- [ ] Visual startup/teardown refresh is coalesced.
+- [ ] Existing event authority/network ordering remains intact.
 
-Capture only the first return value before comparing it. Prefer the explicit local form:
+## Validation matrix
 
-```lua
-isStale = function(state)
-    local targetClient = state and state.client or nil
-    local currentEventState = type(targetClient) == "table" and type(targetClient.GetEventState) == "function"
-        and targetClient:GetEventState()
-        or nil
-    local currentLocalEventId = currentEventState and resolveLocalEventId(currentEventState) or 0
+```text
+start simple event
+-> transition reaches ready
+-> controls enabled only when authoritative startup state is ready
 
-    return type(currentEventState) ~= "table"
-        or currentEventState.active ~= true
-        or tostring(currentEventState.id or "") ~= tostring(state and state.eventId or "")
-        or tonumber(currentLocalEventId) ~= tonumber(state and state.localEventId)
-        or (type(Profile.IsResolvedStateContinuationCurrent) == "function"
-            and Profile.IsResolvedStateContinuationCurrent(state and state.continuation and state.continuation.profileContinuation) ~= true)
-end
+start high-content event with many traits/auras
+-> startup work spans bounded slices
+-> no individual RPE slice exceeds hard threshold
+-> resulting runtime matches expected state
+
+start event A then replace/end it with event B while stale derived work exists
+-> A jobs/callbacks cannot alter B
+
+end event with no Achievement/rewards
+-> teardown completes once
+-> runtime buckets cleared
+
+end event completing Achievement with item+currency rewards
+-> rewards delivered exactly once
+-> one coherent transaction/notification flow
+-> no global configuration refresh
+
+end event with consumable prompt
+-> transition waits in explicit prompt phase
+-> callback resumes same event generation
+-> duplicate/stale callback ignored safely
+
+attempt spell/action during starting/ending state
+-> blocked through central readiness gate
+-> no partial authoritative mutation
 ```
 
-Alternatively, `(resolveLocalEventId(currentEventState))` can force a single return value, but the named local is clearer and less error-prone.
+## Constraints
 
-Also audit this file/repo for any other calls that pass a multi-return helper directly into `tonumber(...)` or another function with optional trailing arguments. Code search currently finds this `tonumber(resolveLocalEventId(...))` occurrence as the relevant one.
+- Do not redesign turn-step due-work indexes here; next task owns them.
+- Do not redesign spell component execution here.
+- Do not add a blocking loading screen.
+- Do not change event gameplay semantics/order merely to simplify slicing.
+- Do not modify server behavior without profiling evidence.
+- Do not allow stale transition work to mutate a new/replaced event.
 
-### Revalidation
-
-After the fix:
-
-1. `/reload` with no Lua errors.
-2. Enable timings and enter an event.
-3. Apply/remove a stat-modifying aura to the local player.
-4. Confirm no `aura-derived-state` stale-check error, stats/resources update correctly, and the derived-state job completes.
-5. Re-run the remaining #65 gate: bounded slice timings and stale event restart/cancellation without stale publication.
-
-#65 remains open.
+## Coding-agent instructions
+Use current `FrontierDev/rpe2` as authoritative. This task is intended for **5.6-Luna-ExtraHigh**. Read both runtime-performance documents and completed #65. Trace current startup runtime flags/steps and `HandleEventEnd`/`ResetEventState`/prompt callbacks before editing. Preserve the existing semantic phase order, but make transition ownership explicit and every content-scaled phase sliceable. Report the transition state machine, action gating rule, converted phases, stale/cancellation handling, files changed, and per-phase timing validation.

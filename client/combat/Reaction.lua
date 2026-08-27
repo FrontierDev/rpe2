@@ -1210,6 +1210,11 @@ function Client:ResolveCombatReactionAction(actionId)
     if type(entry) ~= "table" then
         return false
     end
+    if type(self.CanPerformEventAction) == "function"
+        and self:CanPerformEventAction(entry.eventState, "combat-reaction") ~= true
+    then
+        return false
+    end
 
     local action = Combat:FindReactionAction(entry, actionId)
     if type(action) ~= "table" or action.enabled == false then

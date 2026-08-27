@@ -1940,7 +1940,11 @@ function EventWidget:Refresh(reason)
         self.turnStatusText:SetText(tostring(math.max(1, tonumber(state.turnNumber) or 1)))
     end
     local startupPending = state.unitsReady ~= true or state.startupReady ~= true
-    local startupPhase = tostring(state.startupPhase or (state.unitsReady == true and "syncing-local" or "waiting-units"))
+    local startupPhase = tostring(
+        state.transitionPhase
+            or state.startupPhase
+            or (state.unitsReady == true and "syncing-local" or "waiting-units")
+    )
     if self.waitingPanel and self.waitingPanel.GetFrame then
         local waitingFrame = self.waitingPanel:GetFrame()
         if waitingFrame then
@@ -1969,8 +1973,42 @@ function EventWidget:Refresh(reason)
         if startupPending then
             if startupPhase == "starting" then
                 waitingText = "Starting Event"
+            elseif startupPhase == "ending" then
+                waitingText = "Ending Event"
+            elseif startupPhase == "apply-validate-state" then
+                waitingText = "Applying Event State"
             elseif startupPhase == "waiting-state" then
                 waitingText = "Waiting for Server State"
+            elseif startupPhase == "action-bar-metadata" then
+                waitingText = "Preparing Action Bar"
+            elseif startupPhase == "trait-runtime" then
+                waitingText = "Preparing Traits"
+            elseif startupPhase == "automatic-auras" then
+                waitingText = "Syncing Automatic Auras"
+            elseif startupPhase == "event-auras" then
+                waitingText = "Syncing Event Auras"
+            elseif startupPhase == "resolved-trait" then
+                waitingText = "Resolving Traits"
+            elseif startupPhase == "resource-sync" then
+                waitingText = "Syncing Resources"
+            elseif startupPhase == "consumable-prompts" then
+                waitingText = "Waiting for Consumable Choice"
+            elseif startupPhase == "achievement" then
+                waitingText = "Completing Event"
+            elseif startupPhase == "clear-combat-log" then
+                waitingText = "Clearing Event Log"
+            elseif startupPhase == "clear-spellcasting" then
+                waitingText = "Clearing Spellcasting"
+            elseif startupPhase == "clear-traits" then
+                waitingText = "Clearing Traits"
+            elseif startupPhase == "clear-targeting" then
+                waitingText = "Clearing Targeting"
+            elseif startupPhase == "clear-revisions" then
+                waitingText = "Clearing Event State"
+            elseif startupPhase == "commit" then
+                waitingText = "Saving Event Results"
+            elseif startupPhase == "visual-teardown" then
+                waitingText = "Closing Event"
             elseif startupPhase == "syncing-local" then
                 waitingText = "Preparing Event"
             else

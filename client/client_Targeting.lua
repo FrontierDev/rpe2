@@ -859,7 +859,10 @@ function Client:QueuePendingSpellTargetingMetricsRefresh(pending, revision, even
         end
 
         local currentEventState = targetClient.GetEventState and targetClient:GetEventState() or nil
-        if type(currentEventState) ~= "table" or tostring(currentEventState.id or "") ~= tostring(requestEventId or "") then
+        if type(currentEventState) ~= "table"
+            or currentEventState ~= eventState
+            or tostring(currentEventState.id or "") ~= tostring(requestEventId or "")
+        then
             targetClient.PendingSpellTargetingMetricsRequest = nil
             return
         end
@@ -923,7 +926,7 @@ function Client:QueuePendingSpellTargetingMetricsRefresh(pending, revision, even
         if type(targetClient.QueueTargetingWidgetRefresh) == "function" then
             targetClient:QueueTargetingWidgetRefresh("target-metrics")
         end
-    end, self, metricsKey, pending, revision, eventState.id, casterUnit.eventID, selectedEventId)
+    end, self, metricsKey, pending, revision, eventState.id, casterUnit.eventID, selectedEventId, eventState)
     if enqueued then
         return true
     end
@@ -1332,6 +1335,11 @@ function Client:ConfirmPendingSpellTargeting()
     if not pending then
         return false
     end
+    if type(self.CanPerformEventAction) == "function"
+        and not self:CanPerformEventAction(self:GetEventState(), "targeting-confirm")
+    then
+        return false
+    end
 
     local displayState = self:GetPendingSpellTargetingDisplayState()
     if not displayState then
@@ -1403,6 +1411,11 @@ function Client:SetPendingSpellTargetGroup(groupKey)
     if not pending then
         return false
     end
+    if type(self.CanPerformEventAction) == "function"
+        and not self:CanPerformEventAction(self:GetEventState(), "targeting-group")
+    then
+        return false
+    end
 
     local group = getPendingTargetGroup(pending, groupKey)
     if not group then
@@ -1417,6 +1430,11 @@ end
 function Client:TogglePendingSpellTarget(eventId)
     local pending = self.PendingSpellTargeting
     if not pending then
+        return false
+    end
+    if type(self.CanPerformEventAction) == "function"
+        and not self:CanPerformEventAction(self:GetEventState(), "targeting-mutation")
+    then
         return false
     end
 
@@ -1469,6 +1487,11 @@ function Client:TogglePendingSpellTarget(eventId)
 end
 
 function Client:ActivateActionBarSpell(spellRef)
+    if type(self.CanPerformEventAction) == "function"
+        and not self:CanPerformEventAction(self:GetEventState(), "spell-cast")
+    then
+        return false
+    end
     local activationSnapshot = self.ResolveSpellActivationSnapshot and self:ResolveSpellActivationSnapshot(spellRef, {
         includeTargetCandidates = true,
     }) or nil

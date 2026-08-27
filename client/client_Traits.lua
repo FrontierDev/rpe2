@@ -1203,7 +1203,7 @@ function Client:GetAppliedConsumableTraitsForEvent(eventState)
     return rows
 end
 
-function Client:QueueDeferredConsumablePrompt(eventState, phase)
+function Client:QueueDeferredConsumablePrompt(eventState, phase, onFinished)
     local state = self:GetTraitRuntimeState(eventState and eventState.id or nil, true)
     local normalizedPhase = ensureString(phase)
     if type(state) ~= "table" or normalizedPhase == "" then
@@ -1212,6 +1212,12 @@ function Client:QueueDeferredConsumablePrompt(eventState, phase)
 
     state.deferredPromptPhases = state.deferredPromptPhases or {}
     state.deferredPromptPhases[normalizedPhase] = true
+    if type(onFinished) == "function" then
+        state.deferredPromptCallbacks = state.deferredPromptCallbacks or {}
+        state.deferredPromptCallbacks[normalizedPhase] = onFinished
+    elseif type(state.deferredPromptCallbacks) == "table" then
+        state.deferredPromptCallbacks[normalizedPhase] = nil
+    end
     return true
 end
 
@@ -1229,7 +1235,39 @@ function Client:FlushDeferredConsumablePrompt(eventState, phase)
     end
 
     deferredPromptPhases[normalizedPhase] = nil
-    return self.PromptPhaseConsumableTraits and self:PromptPhaseConsumableTraits(activeEventState, normalizedPhase) or false
+    local callbacks = type(state) == "table" and state.deferredPromptCallbacks or nil
+    local onFinished = type(callbacks) == "table" and callbacks[normalizedPhase] or nil
+    if type(callbacks) == "table" then
+        callbacks[normalizedPhase] = nil
+    end
+    if not self.PromptPhaseConsumableTraits then
+        if type(onFinished) == "function" then
+            onFinished(false)
+        end
+        return false
+    end
+    return self:PromptPhaseConsumableTraits(activeEventState, normalizedPhase, onFinished) or false
+end
+
+function Client:CancelDeferredConsumablePrompt(eventState, phase)
+    local state = self:GetTraitRuntimeState(eventState and eventState.id or nil, false)
+    local normalizedPhase = ensureString(phase)
+    if type(state) ~= "table" or normalizedPhase == "" then
+        return false
+    end
+    if type(state.deferredPromptPhases) == "table" then
+        state.deferredPromptPhases[normalizedPhase] = nil
+    end
+    if type(state.deferredPromptCallbacks) == "table" then
+        state.deferredPromptCallbacks[normalizedPhase] = nil
+    end
+    if type(state.pendingPromptSessions) == "table" then
+        state.pendingPromptSessions[normalizedPhase] = nil
+    end
+    if type(state.promptedPhases) == "table" then
+        state.promptedPhases[normalizedPhase] = nil
+    end
+    return true
 end
 
 function Client:BuildProfileTraitRows()
@@ -1703,7 +1741,9 @@ function Client:RefreshTraitResolvedState(eventState, reason, options)
         auraManager:RefreshLocalPlayerDerivedState(eventState, options)
     end
 
-    if type(self.QueueEventWidgetRefresh) == "function" then
+    if not (type(options) == "table" and options.suppressVisualRefresh == true)
+        and type(self.QueueEventWidgetRefresh) == "function"
+    then
         self:QueueEventWidgetRefresh(reason or "traits")
     end
     bumpTooltipContextRevisions(eventState)
@@ -2877,6 +2917,8 @@ local function showPhaseConsumablePrompt(targetClient, eventState, phase, state,
     end
 
     local popupStartTime = timingParts and getTimingNowMilliseconds() or nil
+    local promptTransition = type(targetClient) == "table" and targetClient.EventTransition or nil
+    local promptCallbackInvoked = false
     UI.Popup:ShowConfirmation({
         title = "Consumables",
         message = phase == "event_end"
@@ -2905,6 +2947,25 @@ local function showPhaseConsumablePrompt(targetClient, eventState, phase, state,
             return targetClient:TryToggleConsumableSelection(rows, currentSelectedValues, value)
         end,
         onConfirm = function(spec)
+            if promptCallbackInvoked then
+                return false
+            end
+            local currentEventState = targetClient.GetEventState and targetClient:GetEventState() or nil
+            if currentEventState ~= eventState or eventState.active ~= true then
+                return false
+            end
+            if type(promptTransition) == "table" then
+                if type(targetClient.IsEventTransitionCurrent) ~= "function"
+                    or not targetClient:IsEventTransitionCurrent(
+                        promptTransition.eventId,
+                        promptTransition.generation,
+                        promptTransition.kind,
+                        eventState
+                    )
+                then
+                    return false
+                end
+            end
             local selectedValues = normalizeSelectedValues(spec and spec.selectedChoices or {}, lookupByChoice)
             local appliedAny = false
 
@@ -2932,12 +2993,17 @@ local function showPhaseConsumablePrompt(targetClient, eventState, phase, state,
             if not appliedAny and type(state.promptedPhases) == "table" then
                 state.promptedPhases[phase] = nil
             end
+            promptCallbackInvoked = true
             if type(onFinished) == "function" then
                 onFinished(appliedAny)
             end
             return appliedAny
         end,
         onCancel = function()
+            if promptCallbackInvoked then
+                return false
+            end
+            promptCallbackInvoked = true
             if type(onFinished) == "function" then
                 onFinished(false)
             end
@@ -2963,7 +3029,7 @@ local function showPhaseConsumablePrompt(targetClient, eventState, phase, state,
     return true
 end
 
-local function continueConsumablePromptBuild(targetClient, eventId, phase, sessionId)
+local function continueConsumablePromptBuild(targetClient, eventId, phase, sessionId, expectedEventState, transitionGeneration, transitionKind)
     if type(targetClient) ~= "table" then
         return false
     end
@@ -2975,8 +3041,12 @@ local function continueConsumablePromptBuild(targetClient, eventId, phase, sessi
     if type(eventState) ~= "table"
         or eventState.active ~= true
         or tostring(eventState.id or "") ~= tostring(eventId or "")
+        or (expectedEventState ~= nil and eventState ~= expectedEventState)
         or type(session) ~= "table"
         or tonumber(session.id) ~= tonumber(sessionId)
+        or (transitionGeneration ~= nil
+            and (type(targetClient.IsEventTransitionCurrent) ~= "function"
+                or not targetClient:IsEventTransitionCurrent(eventId, transitionGeneration, transitionKind, expectedEventState)))
     then
         return false
     end
@@ -2997,7 +3067,16 @@ local function continueConsumablePromptBuild(targetClient, eventId, phase, sessi
     session.collectElapsedMs = (tonumber(session.collectElapsedMs) or 0) + math.max(0, getTimingNowMilliseconds() - batchStartTime)
 
     if session.nextIndex <= #(session.displayItems or {}) then
-        enqueueTask(continueConsumablePromptBuild, targetClient, eventId, phase, sessionId)
+        enqueueTask(
+            continueConsumablePromptBuild,
+            targetClient,
+            eventId,
+            phase,
+            sessionId,
+            session.eventState,
+            session.transitionGeneration,
+            session.transitionKind
+        )
         return true
     end
 
@@ -3198,8 +3277,20 @@ function Client:PromptPhaseConsumableTraits(eventState, phase, onFinished)
             collectElapsedMs = 0,
             timingParts = timingParts,
             onFinished = onFinished,
+            eventState = eventState,
+            transitionGeneration = type(self.EventTransition) == "table" and self.EventTransition.generation or nil,
+            transitionKind = type(self.EventTransition) == "table" and self.EventTransition.kind or nil,
         }
-        enqueueTask(continueConsumablePromptBuild, self, eventState.id, phase, state.pendingPromptSessionSeed)
+        enqueueTask(
+            continueConsumablePromptBuild,
+            self,
+            eventState.id,
+            phase,
+            state.pendingPromptSessionSeed,
+            eventState,
+            type(self.EventTransition) == "table" and self.EventTransition.generation or nil,
+            type(self.EventTransition) == "table" and self.EventTransition.kind or nil
+        )
         return true
     end
 
