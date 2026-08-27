@@ -169,6 +169,11 @@ function ProfileWindow:HandleRuntimeChange(changeSet)
         or (type(revisionChanges) == "table" and revisionChanges.AchievementRevision ~= nil)
     local spellbookChanged = type(revisionChanges) == "table"
         and revisionChanges.ActionBarBindingRevision ~= nil
+    local traitsChanged = type(changeSet.inventory) == "table"
+        or (type(profileChanges) == "table" and profileChanges.equipment == true)
+        or (type(revisionChanges) == "table"
+        and (revisionChanges.InventoryRevision ~= nil
+            or revisionChanges.EquipmentRevision ~= nil))
 
     if equipmentChanged and self.equipmentStatsPage and self.equipmentStatsPage.MarkDirty then
         self.equipmentStatsPage:MarkDirty()
@@ -182,6 +187,9 @@ function ProfileWindow:HandleRuntimeChange(changeSet)
     if spellbookChanged and self.spellbookPage and self.spellbookPage.MarkDirty then
         self.spellbookPage:MarkDirty()
     end
+    if traitsChanged and self.traitsPage and self.traitsPage.MarkDirty then
+        self.traitsPage:MarkDirty()
+    end
 
     if not self:IsVisible() then
         return
@@ -192,6 +200,7 @@ function ProfileWindow:HandleRuntimeChange(changeSet)
         or (activeTabKey == "skills" and skillsChanged)
         or (activeTabKey == "achievements" and achievementsChanged)
         or (activeTabKey == "spellbook" and spellbookChanged)
+        or (activeTabKey == "traits" and traitsChanged)
     then
         self:RefreshTab(activeTabKey)
     end

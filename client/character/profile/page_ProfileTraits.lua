@@ -9,6 +9,7 @@ local UI = Addon.UI or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Client = Addon.Client or {}
 local Tooltips = Addon.Client and Addon.Client.UI and Addon.Client.UI.Tooltips or {}
+local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 local SpellbookEntry = UI.SpellbookEntry
 
 local TraitsPage = ProfileUI.TraitsPage or {}
@@ -29,6 +30,14 @@ local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local function getConfigurationRevision()
     return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
+local function getRuntimeRevision(domain)
+    if type(Runtime) == "table" and type(Runtime.GetRevision) == "function" then
+        return math.max(0, math.floor(tonumber(Runtime:GetRevision(domain)) or 0))
+    end
+
+    return 0
 end
 
 local function revisionTuplesEqual(left, right)
@@ -266,6 +275,8 @@ end
 function TraitsPage:GetRevisionTuple()
     return {
         configurationRevision = getConfigurationRevision(),
+        inventoryRevision = getRuntimeRevision("InventoryRevision"),
+        equipmentRevision = getRuntimeRevision("EquipmentRevision"),
         selectedCategoryKey = tostring(self.SelectedCategoryKey or ""),
         currentTraitPage = math.max(1, math.floor(tonumber(self.CurrentTraitPage) or 1)),
     }
