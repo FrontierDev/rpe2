@@ -807,22 +807,12 @@ local function buildStatResolutionContext(options)
     }
 end
 
-local function buildResolvedStatRow(entry, context)
-    if type(entry) ~= "table" or type(context) ~= "table" then
+local function buildResolvedStatRowFromComponents(entry, resolved)
+    if type(entry) ~= "table" or type(resolved) ~= "table" then
         return nil
     end
 
     local stat = entry.stat or {}
-    local resolved = resolveStatComponents(
-        entry,
-        context.byRef,
-        context.cache,
-        {},
-        context.profileBonuses,
-        context.bonuses,
-        context.auraContext,
-        context.progressionContext
-    )
     local statName = ensureString(stat.name)
     if statName == "" then
         statName = ensureString(stat.id)
@@ -853,6 +843,171 @@ local function buildResolvedStatRow(entry, context)
         value = resolved.value,
         stat = stat,
     }
+end
+
+local function buildResolvedStatRow(entry, context)
+    if type(entry) ~= "table" or type(context) ~= "table" then
+        return nil
+    end
+
+    local resolved = resolveStatComponents(
+        entry,
+        context.byRef,
+        context.cache,
+        {},
+        context.profileBonuses,
+        context.bonuses,
+        context.auraContext,
+        context.progressionContext
+    )
+    return buildResolvedStatRowFromComponents(entry, resolved)
+end
+
+local function createResolvedStatFrame(entry, context, activeRefs)
+    if type(entry) ~= "table" or not entry.ref then
+        return {
+            resolved = buildEmptyResolvedComponents(),
+        }
+    end
+
+    if context.cache[entry.ref] ~= nil then
+        return {
+            resolved = context.cache[entry.ref],
+        }
+    end
+
+    if activeRefs[entry.ref] then
+        return {
+            resolved = buildEmptyResolvedComponents(),
+        }
+    end
+
+    activeRefs[entry.ref] = true
+    local stat = entry.stat or {}
+    local valueMode = tostring(stat.valueMode or "manual")
+    local definitionBaseValue = tonumber(stat.baseValue) or 0
+    local progressionContext = context.progressionContext or {}
+    local profileBonuses = context.profileBonuses or {}
+    local bonuses = context.bonuses or {}
+    local traitBonuses = bonuses.__traitBonuses or {}
+    local traitPercentBonuses = bonuses.__traitPercentBonuses or {}
+
+    return {
+        entry = entry,
+        valueMode = valueMode,
+        sourceIndex = 1,
+        derivedContribution = 0,
+        definitionBaseValue = definitionBaseValue,
+        raceBaseValue = tonumber(progressionContext.raceStatValues and progressionContext.raceStatValues[entry.ref]) or 0,
+        classBaseValue = tonumber(progressionContext.classStatValues and progressionContext.classStatValues[entry.ref]) or 0,
+        profileBonusBaseValue = tonumber(profileBonuses[entry.ref]) or 0,
+        traitBonusBaseValue = tonumber(traitBonuses[entry.ref]) or 0,
+        traitPercentBonus = tonumber(traitPercentBonuses[entry.ref]) or 0,
+        equipmentBonus = tonumber(bonuses[entry.ref]) or 0,
+    }
+end
+
+local function completeResolvedStatFrame(frame, context)
+    local entry = frame.entry
+    local baseValue = frame.definitionBaseValue
+        + frame.raceBaseValue
+        + frame.classBaseValue
+        + frame.profileBonusBaseValue
+        + frame.traitBonusBaseValue
+    local auraFlatBonus, auraPercentBonus = resolveAuraBonusesForStat(context.auraContext, entry.ref)
+    local value = baseValue + frame.derivedContribution + frame.equipmentBonus + auraFlatBonus
+    local totalPercentBonus = frame.traitPercentBonus + auraPercentBonus
+    if totalPercentBonus ~= 0 then
+        value = value * (1 + (totalPercentBonus / 100))
+    end
+    if auraFlatBonus ~= 0 or totalPercentBonus ~= 0 then
+        value = roundResolvedValue(value)
+    end
+
+    return {
+        definitionBaseValue = frame.definitionBaseValue,
+        raceBaseValue = frame.raceBaseValue,
+        classBaseValue = frame.classBaseValue,
+        profileBonusBaseValue = frame.profileBonusBaseValue,
+        traitBonusBaseValue = frame.traitBonusBaseValue,
+        traitPercentBonus = frame.traitPercentBonus,
+        baseValue = baseValue,
+        derivedContribution = frame.derivedContribution,
+        equipmentBonus = frame.equipmentBonus,
+        auraFlatBonus = auraFlatBonus,
+        auraPercentBonus = auraPercentBonus,
+        value = value,
+    }
+end
+
+local function stepResolvedStatComponents(continuation, context, entry, deadlineMs)
+    local state = continuation.statResolution
+    if type(state) ~= "table" then
+        state = {
+            stack = {},
+            activeRefs = {},
+            depth = 0,
+        }
+        continuation.statResolution = state
+        local rootFrame = createResolvedStatFrame(entry, context, state.activeRefs)
+        if rootFrame.resolved ~= nil then
+            state.resolved = rootFrame.resolved
+            state.depth = 0
+        else
+            state.depth = 1
+            state.stack[1] = rootFrame
+        end
+    end
+
+    if state.resolved ~= nil then
+        return true
+    end
+
+    while state.depth > 0 do
+        local frame = state.stack[state.depth]
+        local stat = frame.entry and frame.entry.stat or nil
+        local sources = frame.valueMode == "derived" and stat and stat.derivedSources or nil
+        if type(sources) == "table" and frame.sourceIndex <= #sources then
+            local source = sources[frame.sourceIndex]
+            frame.sourceIndex = frame.sourceIndex + 1
+            local sourceRef = type(source) == "table" and source.sourceStatRef or nil
+            local coefficient = type(source) == "table" and tonumber(source.coefficient) or 1
+            local sourceEntry = sourceRef and context.byRef[sourceRef] or nil
+            if sourceEntry then
+                local sourceComponents = context.cache[sourceRef]
+                if sourceComponents ~= nil then
+                    frame.derivedContribution = frame.derivedContribution
+                        + ((sourceComponents.value or 0) * coefficient)
+                elseif state.activeRefs[sourceRef] then
+                    -- Match resolveStatComponents: a cycle contributes an empty component set.
+                else
+                    local childFrame = createResolvedStatFrame(sourceEntry, context, state.activeRefs)
+                    childFrame.parentCoefficient = coefficient
+                    state.depth = state.depth + 1
+                    state.stack[state.depth] = childFrame
+                end
+            end
+        else
+            local resolved = completeResolvedStatFrame(frame, context)
+            context.cache[frame.entry.ref] = resolved
+            state.activeRefs[frame.entry.ref] = nil
+            state.stack[state.depth] = nil
+            state.depth = state.depth - 1
+            if state.depth <= 0 then
+                state.resolved = resolved
+            else
+                local parentFrame = state.stack[state.depth]
+                parentFrame.derivedContribution = parentFrame.derivedContribution
+                    + ((resolved.value or 0) * (frame.parentCoefficient or 1))
+            end
+        end
+
+        if shouldYieldResolvedStateContinuation(deadlineMs) then
+            return false
+        end
+    end
+
+    return true
 end
 
 local function buildResolvedStatsByRef(statRefs, options)
@@ -1013,6 +1168,443 @@ local function getRuntimeTraitEntries()
     return type(state) == "table" and type(state.activeEntries) == "table" and state.activeEntries or {}
 end
 
+local function parseResolvedItemReference(itemRef)
+    if type(Dependencies.ParseSourceStatRef) ~= "function" then
+        return nil, nil
+    end
+
+    local datasetId, itemId = Dependencies.ParseSourceStatRef(itemRef)
+    if not datasetId or not itemId then
+        return nil, nil
+    end
+    return tostring(datasetId), tostring(itemId)
+end
+
+local function buildResolvedItemIndexKey(datasetId, itemId)
+    if not datasetId or not itemId then
+        return ""
+    end
+    return tostring(datasetId) .. ":" .. tostring(itemId)
+end
+
+local function createProgressionPreparation()
+    local profile = Database.GetActiveProfile and Database.GetActiveProfile() or nil
+    local raceDatasetId, raceEntryId = nil, nil
+    local classDatasetId, classEntryId = nil, nil
+    if type(Dependencies.ParseSourceStatRef) == "function" then
+        raceDatasetId, raceEntryId = Dependencies.ParseSourceStatRef(profile and profile.raceRef)
+        classDatasetId, classEntryId = Dependencies.ParseSourceStatRef(profile and profile.classRef)
+    end
+
+    return {
+        phase = "race-definition",
+        entryIndex = 1,
+        raceDatasetId = raceDatasetId,
+        raceEntryId = raceEntryId,
+        classDatasetId = classDatasetId,
+        classEntryId = classEntryId,
+        race = nil,
+        class = nil,
+        raceStatValues = {},
+        classStatValues = {},
+        raceResourceValues = {},
+        classResourceValues = {},
+        level = getProfileLevel(),
+        useRaces = getRulesetRuleValue("character", "use_races", false) == true,
+        useClasses = getRulesetRuleValue("character", "use_classes", false) == true,
+        useFallback = getRulesetRuleValue("resources", "use_base_resource_fallback", true) ~= false,
+        fallbackFraction = clampNumber(getRulesetRuleValue("resources", "base_resource_fallback", 1), 0, 1),
+    }
+end
+
+local function advanceProgressionPreparation(continuation)
+    local preparation = continuation.progressionPreparation
+    local context = continuation.context.progressionContext
+    if type(preparation) ~= "table" or type(context) ~= "table" then
+        return true
+    end
+
+    if preparation.phase == "race-definition" then
+        if not preparation.useRaces or not preparation.raceDatasetId or not preparation.raceEntryId then
+            preparation.phase = "class-definition"
+            preparation.entryIndex = 1
+        else
+            local dataset = Database.GetDatasetByID and Database.GetDatasetByID(preparation.raceDatasetId) or nil
+            local entries = dataset and dataset.races or nil
+            local entryCount = type(entries) == "table" and #entries or 0
+            if preparation.entryIndex > entryCount then
+                preparation.phase = "class-definition"
+                preparation.entryIndex = 1
+            else
+                local entry = entries[preparation.entryIndex]
+                if entry and tostring(entry.id or "") == tostring(preparation.raceEntryId) then
+                    preparation.race = entry
+                    preparation.phase = "class-definition"
+                    preparation.entryIndex = 1
+                else
+                    preparation.entryIndex = preparation.entryIndex + 1
+                end
+            end
+        end
+    elseif preparation.phase == "class-definition" then
+        if not preparation.useClasses or not preparation.classDatasetId or not preparation.classEntryId then
+            preparation.phase = "race-stats"
+            preparation.entryIndex = 1
+        else
+            local dataset = Database.GetDatasetByID and Database.GetDatasetByID(preparation.classDatasetId) or nil
+            local entries = dataset and dataset.classes or nil
+            local entryCount = type(entries) == "table" and #entries or 0
+            if preparation.entryIndex > entryCount then
+                preparation.phase = "race-stats"
+                preparation.entryIndex = 1
+            else
+                local entry = entries[preparation.entryIndex]
+                if entry and tostring(entry.id or "") == tostring(preparation.classEntryId) then
+                    preparation.class = entry
+                    preparation.phase = "race-stats"
+                    preparation.entryIndex = 1
+                else
+                    preparation.entryIndex = preparation.entryIndex + 1
+                end
+            end
+        end
+    else
+        local list, refKey, target = nil, nil, nil
+        if preparation.phase == "race-stats" then
+            list, refKey, target = preparation.race and preparation.race.statProgressions, "statRef", preparation.raceStatValues
+        elseif preparation.phase == "class-stats" then
+            list, refKey, target = preparation.class and preparation.class.statProgressions, "statRef", preparation.classStatValues
+        elseif preparation.phase == "race-resources" then
+            list, refKey, target = preparation.race and preparation.race.resourceProgressions, "resourceRef", preparation.raceResourceValues
+        elseif preparation.phase == "class-resources" then
+            list, refKey, target = preparation.class and preparation.class.resourceProgressions, "resourceRef", preparation.classResourceValues
+        else
+            context.level = preparation.level
+            context.useFallback = preparation.useFallback
+            context.fallbackFraction = preparation.fallbackFraction
+            context.raceStatValues = preparation.raceStatValues
+            context.classStatValues = preparation.classStatValues
+            context.raceResourceValues = preparation.raceResourceValues
+            context.classResourceValues = preparation.classResourceValues
+            continuation.progressionPreparation = nil
+            return true
+        end
+
+        local entryCount = type(list) == "table" and #list or 0
+        if preparation.entryIndex > entryCount then
+            if preparation.phase == "race-stats" then
+                preparation.phase = "class-stats"
+            elseif preparation.phase == "class-stats" then
+                preparation.phase = "race-resources"
+            elseif preparation.phase == "race-resources" then
+                preparation.phase = "class-resources"
+            else
+                preparation.phase = "complete"
+            end
+            preparation.entryIndex = 1
+        else
+            local entry = list[preparation.entryIndex]
+            local reference = type(entry) == "table" and ensureString(entry[refKey]) or ""
+            if reference ~= "" then
+                target[reference] = (target[reference] or 0)
+                    + (tonumber(entry.initialValue) or 0)
+                    + ((math.max(1, preparation.level) - 1) * (tonumber(entry.perLevelValue) or 0))
+            end
+            preparation.entryIndex = preparation.entryIndex + 1
+        end
+    end
+
+    return false
+end
+
+local function stepResolvedItemIndex(continuation)
+    local datasetId = continuation.datasetIds[continuation.itemDatasetIndex]
+    if datasetId == nil then
+        continuation.itemDataset = nil
+        continuation.itemEntryLimit = nil
+        continuation.itemDatasetIndex = nil
+        continuation.itemEntryIndex = nil
+        return true
+    end
+
+    if continuation.itemDataset == nil then
+        continuation.itemDataset = Database.GetDatasetByID and Database.GetDatasetByID(datasetId) or false
+        continuation.itemEntryIndex = 1
+        local items = continuation.itemDataset and continuation.itemDataset.items or nil
+        continuation.itemEntryLimit = type(items) == "table" and #items or 0
+    end
+
+    local items = continuation.itemDataset and continuation.itemDataset.items or nil
+    if continuation.itemEntryIndex > (continuation.itemEntryLimit or 0) then
+        continuation.itemDatasetScanned[tostring(datasetId)] = true
+        continuation.itemDataset = nil
+        continuation.itemEntryLimit = nil
+        continuation.itemDatasetIndex = continuation.itemDatasetIndex + 1
+        continuation.itemEntryIndex = 1
+        return false
+    end
+
+    local item = items[continuation.itemEntryIndex]
+    if item == nil then
+        continuation.itemEntryIndex = continuation.itemEntryIndex + 1
+        return false
+    end
+
+    if item.id ~= nil then
+        local key = buildResolvedItemIndexKey(datasetId, item.id)
+        if key ~= "" then
+            continuation.itemDefinitionIndex[key] = {
+                item = item,
+                dataset = continuation.itemDataset,
+            }
+        end
+    end
+    continuation.itemEntryIndex = continuation.itemEntryIndex + 1
+    return false
+end
+
+local function beginResolvedItemLookup(continuation, datasetId, itemId)
+    if not datasetId or not itemId then
+        return false
+    end
+
+    local normalizedDatasetId = tostring(datasetId)
+    if continuation.itemDatasetScanned[normalizedDatasetId] then
+        return false
+    end
+
+    continuation.itemLookup = {
+        datasetId = normalizedDatasetId,
+        dataset = Database.GetDatasetByID and Database.GetDatasetByID(normalizedDatasetId) or nil,
+        entryIndex = 1,
+        entryLimit = nil,
+    }
+    local items = continuation.itemLookup.dataset and continuation.itemLookup.dataset.items or nil
+    continuation.itemLookup.entryLimit = type(items) == "table" and #items or 0
+    return true
+end
+
+local function stepResolvedItemLookup(continuation)
+    local lookup = continuation.itemLookup
+    if type(lookup) ~= "table" then
+        return true
+    end
+
+    local items = lookup.dataset and lookup.dataset.items or nil
+    if lookup.entryIndex > (lookup.entryLimit or 0) then
+        continuation.itemDatasetScanned[lookup.datasetId] = true
+        continuation.itemLookup = nil
+        return true
+    end
+
+    local item = items[lookup.entryIndex]
+    if item == nil then
+        lookup.entryIndex = lookup.entryIndex + 1
+        return false
+    end
+
+    if item.id ~= nil then
+        local key = buildResolvedItemIndexKey(lookup.datasetId, item.id)
+        if key ~= "" then
+            continuation.itemDefinitionIndex[key] = {
+                item = item,
+                dataset = lookup.dataset,
+            }
+        end
+    end
+    lookup.entryIndex = lookup.entryIndex + 1
+    return false
+end
+
+local function addResolvedEquipmentStatBonus(bonuses, statEntry)
+    local statRef = type(statEntry) == "table" and statEntry.sourceStatRef or nil
+    local value = type(statEntry) == "table" and tonumber(statEntry.value) or 0
+    if statRef and value ~= 0 then
+        bonuses[statRef] = (bonuses[statRef] or 0) + value
+    end
+end
+
+local function addResolvedModificationStatBonus(bonuses, statEntry)
+    local statRef = type(statEntry) == "table" and ensureString(statEntry.sourceStatRef) or ""
+    local value = type(statEntry) == "table" and tonumber(statEntry.value) or 0
+    if statRef ~= "" and value ~= 0 then
+        bonuses[statRef] = (bonuses[statRef] or 0) + value
+    end
+end
+
+local function addResolvedMountStatBonus(bonuses, statEntry)
+    local statRef = type(statEntry) == "table" and ensureString(statEntry.statRef) or ""
+    local value = type(statEntry) == "table" and tonumber(statEntry.value) or 0
+    if statRef ~= "" and value ~= 0 then
+        bonuses[statRef] = (bonuses[statRef] or 0) + value
+    end
+end
+
+local function createResolvedEquipmentPreparation()
+    return {
+        phase = "character-init",
+        rowIndex = 1,
+        rows = nil,
+        current = nil,
+        mountStats = nil,
+        mountStatIndex = 1,
+    }
+end
+
+local function startResolvedEquipmentRow(continuation, preparation, scope)
+    local row = preparation.rows[preparation.rowIndex]
+    if row == nil then
+        return false
+    end
+
+    local equippedEntry = row.entry
+    local datasetId, itemId = parseResolvedItemReference(equippedEntry and equippedEntry.itemRef)
+    local indexed = continuation.itemDefinitionIndex[buildResolvedItemIndexKey(datasetId, itemId)]
+    if not indexed and beginResolvedItemLookup(continuation, datasetId, itemId) then
+        return false, true
+    end
+    local item = indexed and indexed.item or nil
+    if item and not evaluateProfileConditions("item", item, {
+        itemRef = equippedEntry and equippedEntry.itemRef,
+        item = item,
+        equipmentScope = scope,
+    }) then
+        item = nil
+    end
+
+    preparation.current = {
+        equippedEntry = equippedEntry,
+        item = item,
+        phase = "item-stats",
+        statIndex = 1,
+        modKey = nil,
+        modItem = nil,
+        modStatIndex = 1,
+    }
+    return true
+end
+
+local function stepResolvedEquipmentPreparation(continuation)
+    local preparation = continuation.equipmentPreparation
+    local bonuses = continuation.context.bonuses
+    if type(preparation) ~= "table" then
+        return true
+    end
+
+    if continuation.itemLookup ~= nil then
+        stepResolvedItemLookup(continuation)
+        return false
+    end
+
+    if preparation.phase == "character-init" then
+        preparation.rows = Equipment.ListEquippedSlots and Equipment.ListEquippedSlots() or {}
+        preparation.rowIndex = 1
+        preparation.phase = "character"
+        return false
+    elseif preparation.phase == "mount-stats-init" then
+        local selectedMount = type(Profile.IsMounted) == "function" and Profile.IsMounted()
+            and type(Profile.GetSelectedMount) == "function" and Profile.GetSelectedMount()
+            or nil
+        preparation.mountStats = selectedMount and selectedMount.mount and selectedMount.mount.stats or {}
+        preparation.mountStatIndex = 1
+        preparation.phase = "mount-stats"
+        return false
+    elseif preparation.phase == "mount-equipment-init" then
+        preparation.rows = Profile.ListEquippedSlotsByScope and Profile.ListEquippedSlotsByScope("mount") or {}
+        preparation.rowIndex = 1
+        preparation.phase = "mount-equipment"
+        return false
+    elseif preparation.phase == "mount-stats" then
+        local statEntry = preparation.mountStats[preparation.mountStatIndex]
+        if statEntry == nil then
+            preparation.phase = "mount-equipment-init"
+        else
+            addResolvedMountStatBonus(bonuses, statEntry)
+            preparation.mountStatIndex = preparation.mountStatIndex + 1
+        end
+        return false
+    elseif preparation.phase == "complete" then
+        continuation.equipmentPreparation = nil
+        return true
+    end
+
+    if preparation.current == nil then
+        local started, pendingLookup = startResolvedEquipmentRow(
+            continuation,
+            preparation,
+            preparation.phase == "mount-equipment" and "mount" or nil
+        )
+        if pendingLookup then
+            return false
+        end
+        if not started then
+            if preparation.phase == "character" then
+                if type(Profile.IsMounted) == "function" and Profile.IsMounted() then
+                    preparation.phase = "mount-stats-init"
+                else
+                    preparation.phase = "complete"
+                end
+            else
+                preparation.phase = "complete"
+            end
+            return false
+        end
+    end
+
+    local current = preparation.current
+    if current.phase == "item-stats" then
+        local statEntry = current.item and current.item.stats and current.item.stats[current.statIndex] or nil
+        if statEntry == nil then
+            current.phase = "modifications"
+        else
+            addResolvedEquipmentStatBonus(bonuses, statEntry)
+            current.statIndex = current.statIndex + 1
+        end
+    elseif current.phase == "modifications" then
+        local modKey, modData = next(current.equippedEntry and current.equippedEntry.modifications or {}, current.modKey)
+        current.modKey = modKey
+        if modKey == nil then
+            preparation.current = nil
+            preparation.rowIndex = preparation.rowIndex + 1
+        elseif string.match(tostring(modKey), "^mod_") then
+            local datasetId, itemId = parseResolvedItemReference(modData and modData.itemRef)
+            local indexed = continuation.itemDefinitionIndex[buildResolvedItemIndexKey(datasetId, itemId)]
+            if not indexed and beginResolvedItemLookup(continuation, datasetId, itemId) then
+                current.lookupDatasetId = datasetId
+                current.lookupItemId = itemId
+                current.phase = "modification-lookup"
+                return false
+            end
+            current.modItem = indexed and indexed.item or nil
+            current.modStatIndex = 1
+            current.phase = "modification-stats"
+        end
+    elseif current.phase == "modification-lookup" then
+        local indexed = continuation.itemDefinitionIndex[buildResolvedItemIndexKey(
+            current.lookupDatasetId,
+            current.lookupItemId
+        )]
+        current.modItem = indexed and indexed.item or nil
+        current.lookupDatasetId = nil
+        current.lookupItemId = nil
+        current.modStatIndex = 1
+        current.phase = "modification-stats"
+    else
+        local statEntry = current.modItem
+            and current.modItem.stats
+            and current.modItem.stats[current.modStatIndex]
+            or nil
+        if statEntry == nil then
+            current.modItem = nil
+            current.phase = "modifications"
+        else
+            addResolvedModificationStatBonus(bonuses, statEntry)
+            current.modStatIndex = current.modStatIndex + 1
+        end
+    end
+    return false
+end
+
 function Resolver.CreateResolvedStateContinuation(options)
     local registry = Addon.Internal and Addon.Internal.Registry or nil
     local datasetIds = type(registry) == "table" and type(registry.ListActivatedDatasetIds) == "function"
@@ -1020,10 +1612,9 @@ function Resolver.CreateResolvedStateContinuation(options)
         or {}
     local profile = Database.GetActiveProfile and Database.GetActiveProfile() or nil
     local storedBonuses = type(profile) == "table" and profile.statBonuses or nil
-    local progressionContext = buildProfileProgressionContext()
-    local equipmentBonuses = buildItemStatBonusMap()
     local traitBonuses = {}
     local traitPercentBonuses = {}
+    local equipmentBonuses = {}
     equipmentBonuses.__traitBonuses = traitBonuses
     equipmentBonuses.__traitPercentBonuses = traitPercentBonuses
 
@@ -1038,14 +1629,31 @@ function Resolver.CreateResolvedStateContinuation(options)
         traitEntries = getRuntimeTraitEntries(),
         traitIndex = 1,
         traitBonusIndex = 1,
+        progressionPreparation = createProgressionPreparation(),
+        itemDatasetIndex = 1,
+        itemEntryIndex = 1,
+        itemDataset = nil,
+        itemEntryLimit = nil,
+        itemDatasetScanned = {},
+        itemDefinitionIndex = {},
+        itemLookup = nil,
+        equipmentPreparation = createResolvedEquipmentPreparation(),
         context = {
             entries = {},
             byRef = {},
             cache = {},
             profileBonuses = {},
             bonuses = equipmentBonuses,
-            auraContext = resolveLocalAuraContext(options),
-            progressionContext = progressionContext,
+            auraContext = nil,
+            progressionContext = {
+                level = 1,
+                useFallback = true,
+                fallbackFraction = 1,
+                raceStatValues = {},
+                classStatValues = {},
+                raceResourceValues = {},
+                classResourceValues = {},
+            },
         },
         statRows = {},
         statRowsByRef = {},
@@ -1080,7 +1688,7 @@ function Resolver.StepResolvedStateContinuation(continuation, deadlineMs)
         elseif continuation.phase == "trait-bonuses" then
             local sourceEntry = continuation.traitEntries[continuation.traitIndex]
             if sourceEntry == nil then
-                continuation.phase = "collect-stats"
+                continuation.phase = "prepare-aura"
                 continuation.datasetIndex = 1
                 continuation.entryIndex = 1
             else
@@ -1105,6 +1713,23 @@ function Resolver.StepResolvedStateContinuation(continuation, deadlineMs)
                     end
                     continuation.traitBonusIndex = continuation.traitBonusIndex + 1
                 end
+            end
+        elseif continuation.phase == "prepare-aura" then
+            continuation.context.auraContext = resolveLocalAuraContext(continuation.options)
+            continuation.phase = "prepare-progression"
+        elseif continuation.phase == "prepare-progression" then
+            if advanceProgressionPreparation(continuation) then
+                continuation.phase = "prepare-items"
+            end
+        elseif continuation.phase == "prepare-items" then
+            if stepResolvedItemIndex(continuation) then
+                continuation.phase = "prepare-equipment"
+            end
+        elseif continuation.phase == "prepare-equipment" then
+            if stepResolvedEquipmentPreparation(continuation) then
+                continuation.phase = "collect-stats"
+                continuation.datasetIndex = 1
+                continuation.entryIndex = 1
             end
         elseif continuation.phase == "collect-stats" then
             local datasetId = continuation.datasetIds[continuation.datasetIndex]
@@ -1140,11 +1765,26 @@ function Resolver.StepResolvedStateContinuation(continuation, deadlineMs)
             if entry == nil then
                 continuation.phase = "sort-stats"
             else
-                local row = buildResolvedStatRow(entry, context)
+                continuation.statEntry = continuation.statEntry or entry
+                local completed = stepResolvedStatComponents(
+                    continuation,
+                    context,
+                    continuation.statEntry,
+                    deadlineMs
+                )
+                if not completed then
+                    return false
+                end
+                local row = buildResolvedStatRowFromComponents(
+                    continuation.statEntry,
+                    continuation.statResolution.resolved
+                )
                 if row then
                     continuation.statRows[#continuation.statRows + 1] = row
                     continuation.statRowsByRef[row.ref] = row
                 end
+                continuation.statResolution = nil
+                continuation.statEntry = nil
                 continuation.entryIndex = continuation.entryIndex + 1
             end
         elseif continuation.phase == "sort-stats" then
@@ -1217,6 +1857,14 @@ function Resolver.StepResolvedStateContinuation(continuation, deadlineMs)
             continuation.datasetIds = nil
             continuation.traitEntries = nil
             continuation.resourceEntries = nil
+            continuation.progressionPreparation = nil
+            continuation.itemDatasetScanned = nil
+            continuation.itemEntryLimit = nil
+            continuation.itemDefinitionIndex = nil
+            continuation.itemLookup = nil
+            continuation.equipmentPreparation = nil
+            continuation.statResolution = nil
+            continuation.statEntry = nil
             return true
         end
 
