@@ -572,10 +572,6 @@ function Profile.WarmResolvedBootstrapState(_)
     return true, readiness
 end
 
-local function canUseDefaultResolvedResourceCache(options)
-    return canUseDefaultResolvedStatCache(options)
-end
-
 local function canUseDefaultResolvedStatCache(options)
     if options == nil then
         return true
@@ -595,6 +591,10 @@ local function canUseDefaultResolvedStatCache(options)
     end
 
     return sawAuraOption or next(options) == nil
+end
+
+local function canUseDefaultResolvedResourceCache(options)
+    return canUseDefaultResolvedStatCache(options)
 end
 
 local function getResolvedCacheVariant(options)
