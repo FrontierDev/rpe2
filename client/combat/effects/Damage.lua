@@ -1438,25 +1438,11 @@ function Combat:BeginHitCheck(context, effect, component)
         end
         if type(action) ~= "table" then
             action = RESULT_PASS
-        elseif action.enabled == false
-            or (type(Combat.CanUseDefensiveReaction) == "function"
-                and Combat:CanUseDefensiveReaction(entry, action) ~= true)
-        then
+        elseif action.enabled == false then
             action = RESULT_PASS
         end
 
         local resultToken, resolution = self:ResolveHitCheckOutcome(entry, action)
-        if resultToken and type(action) == "table"
-            and normalizeResultToken(action.id) ~= RESULT_PASS
-            and type(Combat.ConsumeDefensiveReactionUse) == "function"
-            and Combat:ConsumeDefensiveReactionUse(entry, action) ~= true
-        then
-            resultToken = RESULT_PASS
-            resolution = {
-                attackerTotal = tonumber(entry.attackerTotal) or 0,
-                defenceSystem = RESULT_PASS,
-            }
-        end
         entry.lastResolution = resolution
         if type(Combat.LogDefenceAttempt) == "function" then
             Combat:LogDefenceAttempt(entry, resultToken, resolution)

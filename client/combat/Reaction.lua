@@ -997,7 +997,12 @@ function Combat:BuildReactionActions(entry)
         return {}
     end
     if type(entry.reactionActionsCache) == "table" then
-        return self:RefreshDefensiveReactionAvailability(entry, entry.reactionActionsCache)
+        -- The turn ledger is a player-defender UI concern. NPC callers may
+        -- reuse this action builder for automatic strength evaluation.
+        if type(entry.defenderUnit) == "table" and entry.defenderUnit.isPlayer == true then
+            return self:RefreshDefensiveReactionAvailability(entry, entry.reactionActionsCache)
+        end
+        return entry.reactionActionsCache
     end
     local actions = {}
 
@@ -1157,7 +1162,9 @@ function Combat:BuildReactionActions(entry)
         enabled = true,
     }
 
-    self:RefreshDefensiveReactionAvailability(entry, actions)
+    if type(entry.defenderUnit) == "table" and entry.defenderUnit.isPlayer == true then
+        self:RefreshDefensiveReactionAvailability(entry, actions)
+    end
     entry.reactionActionsCache = actions
     return actions
 end
@@ -1184,96 +1191,61 @@ function Combat:ChooseAutomaticReactionAction(entry)
         return RESULT_PASS
     end
 
-    if type(entry.sharedHitPreview) == "table" and type(entry.sharedHitPreview.reactionActions) == "table" then
-        local actions = entry.sharedHitPreview.reactionActions
-        for index = 1, #actions do
-            local action = actions[index]
-            if action
-                and action.id
-                and action.id ~= RESULT_PASS
-                and action.enabled ~= false
-                and self:CanUseDefensiveReaction(entry, action)
-                and tostring(action.resolutionSystem or "") == tostring(entry.defenceSystem or "")
-            then
-                return action
-            end
-        end
-
-        for index = 1, #actions do
-            local action = actions[index]
-            if action and action.id and action.id ~= RESULT_PASS and action.enabled ~= false then
-                if self:CanUseDefensiveReaction(entry, action) then
-                    return action
-                end
-            end
-        end
-
+    -- Automatic NPC reactions are intentionally outside the player-only
+    -- per-turn ledger. Selection is based only on current action eligibility
+    -- and the defender's resolved values.
+    local defenceSystem = tostring(entry.defenceSystem or "")
+    if defenceSystem ~= "ac" and defenceSystem ~= "simple"
+        and defenceSystem ~= "complex" and defenceSystem ~= "percent"
+    then
         return RESULT_PASS
     end
 
-    local defenceSystem = tostring(entry.defenceSystem or "")
-    if defenceSystem == "ac" or defenceSystem == "simple" then
-        local action = {
-            id = ("%s:resolve"):format(defenceSystem),
-            resolutionSystem = defenceSystem,
-            statRef = self:ResolveDefenceStatRef(defenceSystem, entry.attackType),
-        }
-        if self:CanUseDefensiveReaction(entry, action) then
-            return action
-        end
-    end
+    local actions = type(entry.sharedHitPreview) == "table"
+        and type(entry.sharedHitPreview.reactionActions) == "table"
+        and entry.sharedHitPreview.reactionActions
+        or self:BuildReactionActions(entry)
+    local strongestAction = nil
+    local strongestValue = nil
 
-    if defenceSystem == "complex" then
-        local statRefs = self:ResolveComplexDefenceStats(entry.attackType)
-        local statRef = normalizeToken(statRefs and statRefs[1] or nil)
-        if statRef then
-            local action = {
-                id = ("complex:%s"):format(statRef),
-                resolutionSystem = "complex",
-                statRef = statRef,
-            }
-            if self:CanUseDefensiveReaction(entry, action) then
-                return action
-            end
-        end
-    end
-
-    if defenceSystem == "percent" then
-        local statRefs = self:ResolvePercentResistanceStatRefs(entry.attackType)
-        local statRef = normalizeToken(statRefs and statRefs[1] or nil)
-        local action = {
-            id = statRef and ("percent:%s"):format(statRef) or "percent:resolve",
-            resolutionSystem = "percent",
-            statRef = statRef,
-        }
-        if self:CanUseDefensiveReaction(entry, action) then
-            return action
-        end
-    end
-
-    local actions = self:BuildReactionActions(entry)
     for index = 1, #actions do
         local action = actions[index]
         if action
             and action.id
             and action.id ~= RESULT_PASS
             and action.enabled ~= false
-            and self:CanUseDefensiveReaction(entry, action)
-            and tostring(action.resolutionSystem or "") == tostring(entry and entry.defenceSystem or "")
+            and tostring(action.resolutionSystem or "") == defenceSystem
         then
-            return action.id
+            local value = 0
+            local statRef = normalizeToken(action.statRef)
+            if statRef and type(self.GetCachedCombatStatValue) == "function" then
+                value = tonumber(self:GetCachedCombatStatValue(
+                    entry.context,
+                    entry.defenderUnit,
+                    statRef,
+                    0
+                )) or 0
+            elseif defenceSystem == "percent" then
+                value = tonumber(self:SumStatValues(
+                    entry.defenderUnit,
+                    self:ResolvePercentResistanceStatRefs(entry.attackType),
+                    entry.context
+                )) or 0
+            end
+
+            if strongestAction == nil or value > strongestValue then
+                strongestAction = action
+                strongestValue = value
+            end
         end
     end
 
-    for index = 1, #actions do
-        local action = actions[index]
-        if action and action.id and action.id ~= RESULT_PASS and action.enabled ~= false
-            and self:CanUseDefensiveReaction(entry, action)
-        then
-            return action.id
-        end
+    if strongestAction then
+        return strongestAction
     end
 
+    -- No valid configured reaction remains for this system/attack type.
+    -- Passing is the existing automatic-resolution fallback.
     return RESULT_PASS
 end
 
