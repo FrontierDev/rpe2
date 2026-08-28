@@ -684,17 +684,6 @@ local function normalizeTurnCount(turnCount)
     return math.max(1, math.ceil(numericTurns))
 end
 
-local function resolveEventProgressStep(turnNumber, tickNumber, totalTicks)
-    local normalizedTotalTicks = math.max(1, math.floor(tonumber(totalTicks) or 1))
-    local normalizedTurnNumber = math.max(1, math.floor(tonumber(turnNumber) or 1))
-    local normalizedTickNumber = math.max(1, math.floor(tonumber(tickNumber) or 1))
-    if normalizedTickNumber > normalizedTotalTicks then
-        normalizedTickNumber = normalizedTotalTicks
-    end
-
-    return ((normalizedTurnNumber - 1) * normalizedTotalTicks) + normalizedTickNumber
-end
-
 local function buildAuraKey(auraRef, casterEventId, targetEventId)
     return table.concat({
         tostring(auraRef or ""),
@@ -1785,6 +1774,65 @@ local function shouldExecuteLocalAuraTick(client, eventState, casterUnit)
     return resolveExpectedSender(eventState, casterUnit) == localPlayerName
 end
 
+local function resolveAuraOwnerPageIndex(eventState, casterEventId)
+    local casterUnit = findEventUnit(eventState, casterEventId)
+    local ownerEventId = resolveAuraTurnOwnerEventId(eventState, casterUnit, casterEventId)
+    if ownerEventId == nil or type(Spellcasting.GetUnitPageIndex) ~= "function" then
+        return nil
+    end
+
+    local pageIndex = tonumber(Spellcasting.GetUnitPageIndex(eventState, ownerEventId))
+    if pageIndex == nil or pageIndex <= 0 then
+        return nil
+    end
+
+    return math.max(1, math.floor(pageIndex))
+end
+
+-- Aura progression is an owner-turn cursor, not an event-step scalar.
+--
+-- Expected behavior:
+--   * applied before the caster page: this turn's owner occurrence remains due;
+--   * applied on/after the caster page: the next turn is the first due one;
+--   * intentional refresh: UpsertAura resets this cursor from the new cast
+--     position, just like it resets the authored duration/stack state;
+--   * a page move from roster topology: the current page is read at each state
+--     update, so growth delays the occurrence and shrink makes it due at most
+--     once for the current turn.
+--
+-- The cursor is stable because it records only the logical owner turn. It does
+-- not encode a page count or multiply a turn by mutable totalTicks.
+local function resolveAuraActivationOwnerTurn(eventState, casterEventId, turnNumber, tickNumber)
+    local currentTurn = math.max(1, math.floor(tonumber(turnNumber) or 1))
+    local currentTick = math.max(1, math.floor(tonumber(tickNumber) or 1))
+    local ownerPage = resolveAuraOwnerPageIndex(eventState, casterEventId)
+    if ownerPage ~= nil and currentTick < ownerPage then
+        return currentTurn - 1
+    end
+
+    return currentTurn
+end
+
+local function isAuraOwnerOccurrenceDue(eventState, entry, turnNumber, tickNumber)
+    if type(entry) ~= "table" then
+        return false
+    end
+
+    local ownerPage = resolveAuraOwnerPageIndex(eventState, entry.casterEventId)
+    if ownerPage == nil then
+        return false
+    end
+
+    local currentTurn = math.max(1, math.floor(tonumber(turnNumber) or 1))
+    local currentTick = math.max(1, math.floor(tonumber(tickNumber) or 1))
+    local lastOwnerTurn = tonumber(entry.lastAdvancedOwnerTurnNumber)
+    if lastOwnerTurn == nil then
+        lastOwnerTurn = tonumber(entry.lastAdvancedTurnNumber)
+    end
+    lastOwnerTurn = math.floor(lastOwnerTurn or currentTurn)
+    return currentTurn > lastOwnerTurn and currentTick >= ownerPage
+end
+
 local function resolveTriggeredAuraTarget(auraEvent, auraCasterUnit, auraTargetUnit, eventSourceUnit, eventOtherUnit)
     local triggerTarget = normalizeTriggerTarget(type(auraEvent) == "table" and auraEvent.triggerTarget or nil)
     if triggerTarget == "event_source" then
@@ -2110,7 +2158,7 @@ function AuraManager:ClearEventAuraBucket(client, eventId)
 end
 
 function AuraManager:ResetAuraState(client, eventId)
-    local normalizedEventId = type(eventId) == "string" and eventId or nil
+    local normalizedEventId = eventId ~= nil and tostring(eventId) or nil
     if normalizedEventId ~= nil then
         local tasks = getTasks()
         local derivedJobs = client.PendingFullAuraDerivedStateRefreshByEventId or {}
@@ -2118,7 +2166,12 @@ function AuraManager:ResetAuraState(client, eventId)
             tasks:Cancel(derivedJobs[normalizedEventId], "event-aura-reset")
             local outboundJobs = {}
             for _, job in pairs(client.PendingOutboundAuraFlushJobsByScope or {}) do
-                outboundJobs[#outboundJobs + 1] = job
+                local jobState = type(job) == "table" and job.state or nil
+                if type(jobState) ~= "table"
+                    or tostring(jobState.eventId or "") == normalizedEventId
+                then
+                    outboundJobs[#outboundJobs + 1] = job
+                end
             end
             for index = 1, #outboundJobs do
                 tasks:Cancel(outboundJobs[index], "event-aura-reset")
@@ -2146,14 +2199,17 @@ function AuraManager:ResetAuraState(client, eventId)
         client.PendingOutboundAuraOperations = filteredOperations
         client.PendingOutboundAuraOperationOrderByScope = filteredOrdersByScope
         client.PendingOutboundAuraOperationCountsByScope = filteredCountsByScope
+        client.PendingOutboundAuraFlushStatusByScope = client.PendingOutboundAuraFlushStatusByScope or {}
+        client.PendingOutboundAuraFlushStatusByScope.turn = "cancelled"
+        client.PendingOutboundAuraFlushStatusByScope.reaction = "cancelled"
         client.PendingOutboundAuraOperationOrder = {}
         if type(client.PendingFullAuraDerivedStateRefreshByEventId) == "table" then
             client.PendingFullAuraDerivedStateRefreshByEventId[normalizedEventId] = nil
         end
     end
 
-    if type(eventId) == "string" and eventId ~= "" then
-        self:ClearEventAuraBucket(client, eventId)
+    if normalizedEventId ~= nil and normalizedEventId ~= "" then
+        self:ClearEventAuraBucket(client, normalizedEventId)
         return true
     end
 
@@ -2180,6 +2236,7 @@ function AuraManager:ResetAuraState(client, eventId)
     client.PendingOutboundAuraFlushQueued = false
     client.PendingOutboundAuraFlushQueuedByScope = {}
     client.PendingOutboundAuraFlushJobsByScope = {}
+    client.PendingOutboundAuraFlushStatusByScope = {}
     client.PendingOutboundAuraOperations = {}
     client.PendingOutboundAuraOperationOrder = {}
     client.PendingOutboundAuraOperationOrderByScope = {}
@@ -2244,7 +2301,12 @@ function AuraManager:UpsertAura(client, payload)
     local stackBehavior = normalizeStackBehavior(auraDefinition.stackBehavior)
     local currentTurnNumber = math.max(1, math.floor(tonumber(eventState and eventState.turnNumber) or 1))
     local currentTickNumber = math.max(1, math.floor(tonumber(eventState and eventState.tickNumber) or 1))
-    local currentStepNumber = resolveEventProgressStep(currentTurnNumber, currentTickNumber, eventState and eventState.totalTicks)
+    local activationOwnerTurn = resolveAuraActivationOwnerTurn(
+        eventState,
+        payload.casterEventId,
+        currentTurnNumber,
+        currentTickNumber
+    )
     local powerLevel = tonumber(payload.powerLevel) or 0
     local replaceState = type(payload) == "table" and payload.fullState == true
     local entry = bucket.byKey[auraKey]
@@ -2280,8 +2342,7 @@ function AuraManager:UpsertAura(client, payload)
             entry.stackTurns = nil
         end
 
-        entry.lastAdvancedTurnNumber = currentTurnNumber
-        entry.lastAdvancedStep = currentStepNumber
+        entry.lastAdvancedOwnerTurnNumber = activationOwnerTurn
         addAuraKeyToTargetIndex(bucket, entry.targetEventId, auraKey)
         invalidateAuraRuntime(bucket, auraKey)
         invalidateControlStateCache(bucket, entry.targetEventId)
@@ -2300,8 +2361,7 @@ function AuraManager:UpsertAura(client, payload)
         powerLevel = powerLevel,
         stackBehavior = stackBehavior,
         maxStacks = maxStacks,
-        lastAdvancedTurnNumber = currentTurnNumber,
-        lastAdvancedStep = currentStepNumber,
+        lastAdvancedOwnerTurnNumber = activationOwnerTurn,
         definition = auraDefinition,
     }
 
@@ -2429,6 +2489,94 @@ local function getPendingOutboundAuraOrder(client, scope)
     return client.PendingOutboundAuraOperationOrderByScope[scope]
 end
 
+local function hasPendingOutboundAuraOperations(client, scope, expectedEventState, sourceTurnNumber, sourceTickNumber)
+    local pendingOperations = type(client) == "table" and client.PendingOutboundAuraOperations or nil
+    if type(pendingOperations) ~= "table" then
+        return false
+    end
+
+    local normalizedScope = normalizePendingScope(scope)
+    for _, operation in pairs(pendingOperations) do
+        if type(operation) == "table"
+            and normalizePendingScope(operation.scope) == normalizedScope
+            and (expectedEventState == nil or operation.eventState == expectedEventState)
+            and (sourceTurnNumber == nil or tonumber(operation.sourceTurnNumber) == tonumber(sourceTurnNumber))
+            and (sourceTickNumber == nil or tonumber(operation.sourceTickNumber) == tonumber(sourceTickNumber))
+        then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function discardPendingOutboundAuraOperations(client, scope, eventId, sourceTurnNumber, sourceTickNumber)
+    if type(client) ~= "table" then
+        return 0
+    end
+
+    local normalizedEventId = tostring(eventId or "")
+    local normalizedScope = normalizePendingScope(scope)
+    local pendingOperations = client.PendingOutboundAuraOperations or {}
+    local removed = 0
+    for operationKey, operation in pairs(pendingOperations) do
+        if type(operation) == "table"
+            and normalizePendingScope(operation.scope) == normalizedScope
+            and tostring(operation.eventId or "") == normalizedEventId
+            and (sourceTurnNumber == nil or tonumber(operation.sourceTurnNumber) == tonumber(sourceTurnNumber))
+            and (sourceTickNumber == nil or tonumber(operation.sourceTickNumber) == tonumber(sourceTickNumber))
+        then
+            pendingOperations[operationKey] = nil
+            adjustPendingOutboundAuraScopeCount(client, normalizedScope, -1)
+            removed = removed + 1
+        end
+    end
+
+    return removed
+end
+
+local function findPendingOutboundAuraSource(client, scope, expectedEventState)
+    local pendingOperations = type(client) == "table" and client.PendingOutboundAuraOperations or nil
+    if type(pendingOperations) ~= "table" then
+        return nil, nil
+    end
+
+    local normalizedScope = normalizePendingScope(scope)
+    for _, operation in pairs(pendingOperations) do
+        if type(operation) == "table"
+            and normalizePendingScope(operation.scope) == normalizedScope
+            and (expectedEventState == nil or operation.eventState == expectedEventState)
+        then
+            return operation.sourceTurnNumber, operation.sourceTickNumber
+        end
+    end
+
+    return nil, nil
+end
+
+local function removePendingOutboundAuraOperationsForEvent(client, eventId)
+    if type(client) ~= "table" then
+        return 0
+    end
+
+    local normalizedEventId = tostring(eventId or "")
+    if normalizedEventId == "" then
+        return 0
+    end
+
+    local pendingOperations = client.PendingOutboundAuraOperations or {}
+    local removed = 0
+    for operationKey, operation in pairs(pendingOperations) do
+        if type(operation) == "table" and tostring(operation.eventId or "") == normalizedEventId then
+            pendingOperations[operationKey] = nil
+            adjustPendingOutboundAuraScopeCount(client, normalizePendingScope(operation.scope), -1)
+            removed = removed + 1
+        end
+    end
+
+    return removed
+end
+
 local function areOutboundAuraOperationsBatchCompatible(batch, operation)
     return type(batch) == "table"
         and type(operation) == "table"
@@ -2465,6 +2613,9 @@ local function flushOutboundAuraOperationBatch(manager, state)
         local operation = pendingOperations[operationKey]
         if type(operation) == "table"
             and normalizePendingScope(operation.scope) == state.scope
+            and (state.expectedEventState == nil or operation.eventState == state.expectedEventState)
+            and (state.sourceTurnNumber == nil or tonumber(operation.sourceTurnNumber) == tonumber(state.sourceTurnNumber))
+            and (state.sourceTickNumber == nil or tonumber(operation.sourceTickNumber) == tonumber(state.sourceTickNumber))
             and areOutboundAuraOperationsBatchCompatible(batch, operation)
         then
             if operation.kind == "apply" then
@@ -2511,6 +2662,7 @@ local function flushOutboundAuraOperationBatch(manager, state)
         if pendingOperations[operationKey] ~= nil then
             pendingOperations[operationKey] = nil
             adjustPendingOutboundAuraScopeCount(client, state.scope, -1)
+            state.removedCount = (tonumber(state.removedCount) or 0) + 1
         end
     end
     return true, true
@@ -2518,8 +2670,47 @@ end
 
 local queueOutboundAuraFlush
 
-function AuraManager:FlushOutboundAuraOperations(client, scopeOverride)
-    return queueOutboundAuraFlush(self, client, normalizePendingScope(scopeOverride))
+function AuraManager:FlushOutboundAuraOperations(client, scopeOverride, eventStateOverride, sourceTurnNumber, sourceTickNumber)
+    return queueOutboundAuraFlush(
+        self,
+        client,
+        normalizePendingScope(scopeOverride),
+        eventStateOverride,
+        sourceTurnNumber,
+        sourceTickNumber
+    )
+end
+
+function AuraManager:HasPendingOutboundAuraOperations(client, scopeOverride, eventStateOverride, sourceTurnNumber, sourceTickNumber)
+    return hasPendingOutboundAuraOperations(
+        client,
+        normalizePendingScope(scopeOverride),
+        eventStateOverride,
+        sourceTurnNumber,
+        sourceTickNumber
+    )
+end
+
+function AuraManager:DiscardPendingOutboundAuraOperations(client, scopeOverride, eventId, sourceTurnNumber, sourceTickNumber)
+    return discardPendingOutboundAuraOperations(
+        client,
+        normalizePendingScope(scopeOverride),
+        eventId,
+        sourceTurnNumber,
+        sourceTickNumber
+    )
+end
+
+function AuraManager:GetOutboundAuraFlushStatus(client, scopeOverride)
+    local scope = normalizePendingScope(scopeOverride)
+    local statusByScope = type(client) == "table" and client.PendingOutboundAuraFlushStatusByScope or nil
+    local jobByScope = type(client) == "table" and client.PendingOutboundAuraFlushJobsByScope or nil
+    local job = type(jobByScope) == "table" and jobByScope[scope] or nil
+    if type(job) == "table" and job.finalized ~= true then
+        return tostring(type(statusByScope) == "table" and statusByScope[scope] or "pending")
+    end
+
+    return tostring(type(statusByScope) == "table" and statusByScope[scope] or "idle")
 end
 
 local function shouldDeferTurnAuraOperations(client, context)
@@ -2568,19 +2759,41 @@ local function finishOutboundAuraFlush(state)
 
     client.PendingOutboundAuraFlushQueuedByScope = client.PendingOutboundAuraFlushQueuedByScope or {}
     client.PendingOutboundAuraFlushQueuedByScope[scope] = false
+    client.PendingOutboundAuraFlushStatusByScope = client.PendingOutboundAuraFlushStatusByScope or {}
+    client.PendingOutboundAuraFlushStatusByScope[scope] = state.blocked == true and "failed" or "complete"
     if type(client.PendingOutboundAuraFlushJobsByScope) == "table" then
         client.PendingOutboundAuraFlushJobsByScope[scope] = nil
     end
     updatePendingOutboundAuraFlushQueued(client)
 
-    local shouldRetry = state.blocked ~= true and getPendingOutboundAuraScopeCount(client, scope) > 0
+    local shouldRetry = state.blocked ~= true
+        and hasPendingOutboundAuraOperations(client, scope, state.expectedEventState)
+    local retrySourceTurn, retrySourceTick = findPendingOutboundAuraSource(client, scope, state.expectedEventState)
     clearOutboundAuraFlushState(state)
     if shouldRetry then
-        queueOutboundAuraFlush(state.manager, client, scope)
+        queueOutboundAuraFlush(
+            state.manager,
+            client,
+            scope,
+            state.expectedEventState,
+            retrySourceTurn,
+            retrySourceTick
+        )
+    elseif (tonumber(state.removedCount) or 0) > 0 then
+        if type(client.QueueActionBarRefresh) == "function" then
+            client:QueueActionBarRefresh(state.blocked == true and "pending-aura-failed" or "pending-aura-sent")
+        elseif type(client.RefreshActionBarWidget) == "function" then
+            client:RefreshActionBarWidget(state.blocked == true and "pending-aura-failed" or "pending-aura-sent")
+        end
+        if type(client.QueuePendingTurnChangesTooltipRefresh) == "function" then
+            client:QueuePendingTurnChangesTooltipRefresh()
+        elseif type(client.RefreshPendingTurnChangesTooltip) == "function" then
+            client:RefreshPendingTurnChangesTooltip()
+        end
     end
 end
 
-local function cancelOutboundAuraFlush(state)
+local function cancelOutboundAuraFlush(state, reason)
     local client = state and state.client or nil
     local scope = state and state.scope or nil
     if type(client) ~= "table" or type(scope) ~= "string" then
@@ -2589,8 +2802,28 @@ local function cancelOutboundAuraFlush(state)
 
     client.PendingOutboundAuraFlushQueuedByScope = client.PendingOutboundAuraFlushQueuedByScope or {}
     client.PendingOutboundAuraFlushQueuedByScope[scope] = false
+    client.PendingOutboundAuraFlushStatusByScope = client.PendingOutboundAuraFlushStatusByScope or {}
+    client.PendingOutboundAuraFlushStatusByScope[scope] = "cancelled"
     if type(client.PendingOutboundAuraFlushJobsByScope) == "table" then
         client.PendingOutboundAuraFlushJobsByScope[scope] = nil
+    end
+    if tostring(reason or "") == "stale"
+        or tostring(reason or "") == "event-replaced"
+        or tostring(reason or "") == "event-ending"
+        or tostring(reason or "") == "event-aura-reset"
+        or tostring(reason or "") == "aura-reset"
+    then
+        if tostring(reason or "") == "stale" and state.sourceTurnNumber ~= nil then
+            discardPendingOutboundAuraOperations(
+                client,
+                scope,
+                state.eventId,
+                state.sourceTurnNumber,
+                state.sourceTickNumber
+            )
+        else
+            removePendingOutboundAuraOperationsForEvent(client, state.eventId)
+        end
     end
     updatePendingOutboundAuraFlushQueued(client)
     clearOutboundAuraFlushState(state)
@@ -2612,7 +2845,12 @@ local function stepOutboundAuraFlush(state, deadlineMs)
                 local operation = type(client.PendingOutboundAuraOperations) == "table"
                     and client.PendingOutboundAuraOperations[operationKey]
                     or nil
-                if type(operation) ~= "table" or normalizePendingScope(operation.scope) ~= state.scope then
+                if type(operation) ~= "table"
+                    or normalizePendingScope(operation.scope) ~= state.scope
+                    or (state.expectedEventState ~= nil and operation.eventState ~= state.expectedEventState)
+                    or (state.sourceTurnNumber ~= nil and tonumber(operation.sourceTurnNumber) ~= tonumber(state.sourceTurnNumber))
+                    or (state.sourceTickNumber ~= nil and tonumber(operation.sourceTickNumber) ~= tonumber(state.sourceTickNumber))
+                then
                     state.orderIndex = state.orderIndex + 1
                 elseif state.currentBatch and not areOutboundAuraOperationsBatchCompatible(state.currentBatch, operation) then
                     state.phase = "flush"
@@ -2659,7 +2897,7 @@ local function stepOutboundAuraFlush(state, deadlineMs)
     end
 end
 
-queueOutboundAuraFlush = function(manager, client, scope)
+queueOutboundAuraFlush = function(manager, client, scope, eventStateOverride, sourceTurnNumber, sourceTickNumber)
     if type(manager) ~= "table" or type(client) ~= "table" then
         return false
     end
@@ -2680,18 +2918,18 @@ queueOutboundAuraFlush = function(manager, client, scope)
     elseif type(client.RefreshActionBarWidget) == "function" then
         client:RefreshActionBarWidget("pending-aura-flush")
     end
-    if type(client.QueuePendingTurnChangesTooltipRefresh) == "function" then
-        client:QueuePendingTurnChangesTooltipRefresh()
-    elseif type(client.RefreshPendingTurnChangesTooltip) == "function" then
-        client:RefreshPendingTurnChangesTooltip()
-    end
-
     client.PendingOutboundAuraFlushQueuedByScope[normalizedScope] = true
+    client.PendingOutboundAuraFlushStatusByScope = client.PendingOutboundAuraFlushStatusByScope or {}
+    client.PendingOutboundAuraFlushStatusByScope[normalizedScope] = "pending"
     updatePendingOutboundAuraFlushQueued(client)
     local state = {
         manager = manager,
         client = client,
         scope = normalizedScope,
+        expectedEventState = eventStateOverride,
+        eventId = eventStateOverride and eventStateOverride.id or nil,
+        sourceTurnNumber = sourceTurnNumber,
+        sourceTickNumber = sourceTickNumber,
         order = order,
         orderIndex = 1,
         orderLimit = #order,
@@ -2701,14 +2939,30 @@ queueOutboundAuraFlush = function(manager, client, scope)
         currentBatch = nil,
         blocked = false,
         flushed = false,
+        removedCount = 0,
     }
     local job = enqueueAuraSliceable({
         label = "outbound-aura-flush",
         scope = "aura-flush:" .. normalizedScope,
         state = state,
+        isStale = function(work)
+            if work.expectedEventState == nil then
+                return false
+            end
+
+            local currentEventState = work.client.GetEventState and work.client:GetEventState() or nil
+            return currentEventState ~= work.expectedEventState
+                or type(currentEventState) ~= "table"
+                or currentEventState.active ~= true
+                or currentEventState.ending == true
+                or (work.sourceTurnNumber ~= nil
+                    and tonumber(currentEventState.turnNumber) ~= tonumber(work.sourceTurnNumber))
+                or (work.sourceTickNumber ~= nil
+                    and tonumber(currentEventState.tickNumber) ~= tonumber(work.sourceTickNumber))
+        end,
         step = stepOutboundAuraFlush,
-        onCancel = function(work)
-            cancelOutboundAuraFlush(work)
+        onCancel = function(work, reason)
+            cancelOutboundAuraFlush(work, reason)
         end,
         onComplete = function(work)
             finishOutboundAuraFlush(work)
@@ -2716,6 +2970,7 @@ queueOutboundAuraFlush = function(manager, client, scope)
     })
     if not job then
         client.PendingOutboundAuraFlushQueuedByScope[normalizedScope] = false
+        client.PendingOutboundAuraFlushStatusByScope[normalizedScope] = "failed"
         updatePendingOutboundAuraFlushQueued(client)
         clearOutboundAuraFlushState(state)
         return false
@@ -2743,6 +2998,8 @@ function AuraManager:QueueAuraApply(client, context, entry, payload)
     local turnsToApply = math.max(1, math.floor(rawTurns))
     local powerLevel = tonumber(type(payload) == "table" and payload.powerLevel or entry.powerLevel) or 0
     local scope = normalizePendingScope(type(context) == "table" and (context.pendingScope or context.scope) or nil)
+    local sourceTurnNumber = math.floor(tonumber(eventState.turnNumber) or 0)
+    local sourceTickNumber = math.floor(tonumber(eventState.tickNumber) or 0)
 
     local operationKey = buildAuraOperationKey(
         "apply",
@@ -2779,6 +3036,8 @@ function AuraManager:QueueAuraApply(client, context, entry, payload)
         existing.powerLevel = powerLevel
         existing.fullState = existing.fullState == true or replaceState
         existing.scope = scope
+        existing.sourceTurnNumber = sourceTurnNumber
+        existing.sourceTickNumber = sourceTickNumber
     else
         client.PendingOutboundAuraOperations[operationKey] = {
             kind = "apply",
@@ -2793,6 +3052,8 @@ function AuraManager:QueueAuraApply(client, context, entry, payload)
             powerLevel = powerLevel,
             fullState = replaceState,
             scope = scope,
+            sourceTurnNumber = sourceTurnNumber,
+            sourceTickNumber = sourceTickNumber,
         }
     end
 
@@ -2811,7 +3072,7 @@ function AuraManager:QueueAuraApply(client, context, entry, payload)
         return true
     end
 
-    return queueOutboundAuraFlush(self, client, scope)
+    return queueOutboundAuraFlush(self, client, scope, eventState, sourceTurnNumber, sourceTickNumber)
 end
 
 function AuraManager:QueueAuraDispel(client, context, auraRef, casterEventId, targetEventId)
@@ -2821,6 +3082,8 @@ function AuraManager:QueueAuraDispel(client, context, auraRef, casterEventId, ta
         return false
     end
     local scope = normalizePendingScope(type(context) == "table" and (context.pendingScope or context.scope) or nil)
+    local sourceTurnNumber = math.floor(tonumber(eventState.turnNumber) or 0)
+    local sourceTickNumber = math.floor(tonumber(eventState.tickNumber) or 0)
 
     local operationKey = buildAuraOperationKey(
         "dispel",
@@ -2866,6 +3129,8 @@ function AuraManager:QueueAuraDispel(client, context, auraRef, casterEventId, ta
         targetEventId = tonumber(targetEventId) or 0,
         auraRef = auraRef,
         scope = scope,
+        sourceTurnNumber = sourceTurnNumber,
+        sourceTickNumber = sourceTickNumber,
     }
 
     if shouldDeferTurnAuraOperations(client, context) then
@@ -2883,7 +3148,7 @@ function AuraManager:QueueAuraDispel(client, context, auraRef, casterEventId, ta
         return true
     end
 
-    return queueOutboundAuraFlush(self, client, scope)
+    return queueOutboundAuraFlush(self, client, scope, eventState, sourceTurnNumber, sourceTickNumber)
 end
 
 function AuraManager:SendAuraApply(client, context, entry)
@@ -3745,7 +4010,7 @@ function AuraManager:AdvanceAuraDurations(entry)
     return false
 end
 
-function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber, targetTickNumber, targetStepNumber)
+function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber, targetTickNumber)
     local eventState = client.GetEventState and client:GetEventState() or nil
     if type(eventState) ~= "table" or eventState.active ~= true or tostring(eventState.id or "") ~= tostring(eventId or "") then
         return false
@@ -3761,24 +4026,6 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
 
     local currentTurnNumber = math.max(1, math.floor(tonumber(targetTurnNumber) or tonumber(eventState.turnNumber) or 1))
     local currentTickNumber = math.max(1, math.floor(tonumber(targetTickNumber) or tonumber(eventState.tickNumber) or 1))
-    local currentStepNumber = math.max(1, math.floor(tonumber(targetStepNumber) or resolveEventProgressStep(currentTurnNumber, currentTickNumber, eventState.totalTicks)))
-    local lastAdvancedStep = math.max(
-        1,
-        math.floor(
-            tonumber(entry.lastAdvancedStep)
-            or resolveEventProgressStep(entry.lastAdvancedTurnNumber, currentTickNumber, eventState.totalTicks)
-        )
-    )
-    if currentStepNumber <= lastAdvancedStep then
-        if math.floor(tonumber(entry.pendingAdvancedStep) or 0) <= currentStepNumber then
-            entry.pendingAdvancedStep = nil
-        end
-        if timer then
-            stopTiming(timer, { activeAuras = countAuraEntries(bucket), dueAuras = 0, targetCount = 1 })
-        end
-        return false
-    end
-
     local casterUnit = findEventUnit(eventState, entry.casterEventId)
     local targetUnit = findEventUnit(eventState, entry.targetEventId)
     local localPlayerEventId = resolveLocalEventId(eventState)
@@ -3791,41 +4038,49 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
         end
         self:RemoveAura(client, eventState, entry.auraRef, entry.casterEventId, entry.targetEventId)
         changed = true
-    else
-        local turnOwnerEventId = resolveAuraTurnOwnerEventId(eventState, casterUnit, entry.casterEventId)
-        local turnOwnerTick = turnOwnerEventId ~= nil
-            and Spellcasting.GetUnitPageIndex
-            and Spellcasting.GetUnitPageIndex(eventState, turnOwnerEventId)
-            or nil
-        local shouldExecuteTick = turnOwnerTick ~= nil and shouldExecuteLocalAuraTick(client, eventState, casterUnit)
-        local totalTicks = math.max(1, math.floor(tonumber(eventState.totalTicks) or 1))
-
-        if turnOwnerTick ~= nil then
-            for step = lastAdvancedStep + 1, currentStepNumber do
-                local stepTick = ((step - 1) % totalTicks) + 1
-                if stepTick == turnOwnerTick then
-                    if shouldExecuteTick then
-                        self:TickAura(client, eventState, entry, casterUnit, targetUnit)
-                    end
-                    if self:AdvanceAuraDurations(entry) then
-                        if localPlayerEventId > 0 and tonumber(entry.targetEventId) == localPlayerEventId then
-                            localPlayerDerivedStateImpact = buildAuraDerivedStateImpact(entry)
-                        end
-                        self:RemoveAura(client, eventState, entry.auraRef, entry.casterEventId, entry.targetEventId)
-                        changed = true
-                        break
-                    end
-                    changed = true
-                end
-            end
+        local activeBucket = self:GetEventAuraBucket(client, eventId, false)
+        if activeBucket then
+            invalidateControlStateCache(activeBucket, entry.targetEventId)
+            bumpAuraBucketRevision(activeBucket)
         end
-
-        entry.lastAdvancedTurnNumber = currentTurnNumber
-        entry.lastAdvancedStep = currentStepNumber
+        if localPlayerDerivedStateImpact and localPlayerEventId > 0 then
+            queueLocalPlayerAuraDerivedStateRefresh(eventState, localPlayerEventId, localPlayerDerivedStateImpact)
+        end
+        refreshAuraDisplays("aura-advance", eventState, localPlayerEventId, localPlayerDerivedStateImpact)
+        if timer then
+            stopTiming(timer, { activeAuras = countAuraEntries(bucket), dueAuras = 1, targetCount = 1 })
+        end
+        return changed
     end
 
-    if math.floor(tonumber(entry.pendingAdvancedStep) or 0) <= currentStepNumber then
-        entry.pendingAdvancedStep = nil
+    if not isAuraOwnerOccurrenceDue(eventState, entry, currentTurnNumber, currentTickNumber) then
+        local pendingOwnerTurn = math.floor(tonumber(entry.pendingAdvancedOwnerTurnNumber) or 0)
+        if pendingOwnerTurn <= currentTurnNumber then
+            entry.pendingAdvancedOwnerTurnNumber = nil
+        end
+        if timer then
+            stopTiming(timer, { activeAuras = countAuraEntries(bucket), dueAuras = 0, targetCount = 1 })
+        end
+        return false
+    end
+
+    if shouldExecuteLocalAuraTick(client, eventState, casterUnit) then
+        self:TickAura(client, eventState, entry, casterUnit, targetUnit)
+    end
+    if self:AdvanceAuraDurations(entry) then
+        if localPlayerEventId > 0 and tonumber(entry.targetEventId) == localPlayerEventId then
+            localPlayerDerivedStateImpact = buildAuraDerivedStateImpact(entry)
+        end
+        self:RemoveAura(client, eventState, entry.auraRef, entry.casterEventId, entry.targetEventId)
+        changed = true
+    else
+        changed = true
+    end
+
+    entry.lastAdvancedOwnerTurnNumber = currentTurnNumber
+
+    if math.floor(tonumber(entry.pendingAdvancedOwnerTurnNumber) or 0) <= currentTurnNumber then
+        entry.pendingAdvancedOwnerTurnNumber = nil
     end
 
     if changed then
@@ -3865,7 +4120,6 @@ function AuraManager:AdvanceAuraState(client, previousTurnNumber, previousTickNu
 
     local currentTurnNumber = math.max(1, math.floor(tonumber(eventState.turnNumber) or 1))
     local currentTickNumber = math.max(1, math.floor(tonumber(eventState.tickNumber) or 1))
-    local currentStepNumber = resolveEventProgressStep(currentTurnNumber, currentTickNumber, eventState.totalTicks)
     local previousTurn = math.max(0, math.floor(tonumber(previousTurnNumber) or 0))
     local previousTick = math.max(0, math.floor(tonumber(previousTickNumber) or 0))
     if previousTurn == currentTurnNumber and previousTick == currentTickNumber then
@@ -3888,25 +4142,18 @@ function AuraManager:AdvanceAuraState(client, previousTurnNumber, previousTickNu
 
     for auraKey, entry in pairs(bucket.byKey or {}) do
         if type(entry) == "table" then
-            local lastAdvancedStep = math.max(
-                1,
-                math.floor(
-                    tonumber(entry.lastAdvancedStep)
-                    or resolveEventProgressStep(entry.lastAdvancedTurnNumber, currentTickNumber, eventState.totalTicks)
-                )
-            )
-            if currentStepNumber > lastAdvancedStep then
+            if isAuraOwnerOccurrenceDue(eventState, entry, currentTurnNumber, currentTickNumber) then
                 dueAuras = dueAuras + 1
-                local pendingAdvancedStep = math.floor(tonumber(entry.pendingAdvancedStep) or 0)
-                if pendingAdvancedStep < currentStepNumber then
-                    entry.pendingAdvancedStep = currentStepNumber
-                    local enqueued = enqueueAuraWork(function(manager, targetClient, targetEventId, targetAuraKey, turnNumber, tickNumber, stepNumber)
-                        manager:AdvanceAuraEntry(targetClient, targetEventId, targetAuraKey, turnNumber, tickNumber, stepNumber)
-                    end, self, client, eventId, auraKey, currentTurnNumber, currentTickNumber, currentStepNumber)
+                local pendingOwnerTurn = math.floor(tonumber(entry.pendingAdvancedOwnerTurnNumber) or 0)
+                if pendingOwnerTurn < currentTurnNumber then
+                    entry.pendingAdvancedOwnerTurnNumber = currentTurnNumber
+                    local enqueued = enqueueAuraWork(function(manager, targetClient, targetEventId, targetAuraKey, turnNumber, tickNumber)
+                        manager:AdvanceAuraEntry(targetClient, targetEventId, targetAuraKey, turnNumber, tickNumber)
+                    end, self, client, eventId, auraKey, currentTurnNumber, currentTickNumber)
                     if enqueued then
                         queued = true
                     else
-                        entry.pendingAdvancedStep = pendingAdvancedStep > 0 and pendingAdvancedStep or nil
+                        entry.pendingAdvancedOwnerTurnNumber = pendingOwnerTurn > 0 and pendingOwnerTurn or nil
                     end
                 end
             end
@@ -4699,6 +4946,7 @@ Client.ActiveAurasByEventId = Client.ActiveAurasByEventId or {}
 Client.PendingOutboundAuraFlushQueued = Client.PendingOutboundAuraFlushQueued or false
 Client.PendingOutboundAuraFlushQueuedByScope = Client.PendingOutboundAuraFlushQueuedByScope or {}
 Client.PendingOutboundAuraFlushJobsByScope = Client.PendingOutboundAuraFlushJobsByScope or {}
+Client.PendingOutboundAuraFlushStatusByScope = Client.PendingOutboundAuraFlushStatusByScope or {}
 Client.PendingOutboundAuraOperations = Client.PendingOutboundAuraOperations or {}
 Client.PendingOutboundAuraOperationOrder = Client.PendingOutboundAuraOperationOrder or {}
 Client.PendingOutboundAuraOperationOrderByScope = Client.PendingOutboundAuraOperationOrderByScope or {}

@@ -758,10 +758,13 @@ normalizePendingScope = function(value)
     return tostring(value or "turn") == "reaction" and "reaction" or "turn"
 end
 
-local function buildResourceDeltaBatchKey(channelName, targetEventId, allowLocalEchoApply, scope)
+local function buildResourceDeltaBatchKey(channelName, eventId, sourceTurnNumber, sourceTickNumber, targetEventId, allowLocalEchoApply, scope)
     return table.concat({
         normalizePendingScope(scope),
         tostring(channelName or ""),
+        tostring(eventId or ""),
+        tostring(sourceTurnNumber or ""),
+        tostring(sourceTickNumber or ""),
         tostring(targetEventId or 0),
         allowLocalEchoApply == true and "1" or "0",
     }, "\31")
@@ -1204,6 +1207,16 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
         return false
     end
 
+    local currentEventState = type(targetClient.GetEventState) == "function"
+        and targetClient:GetEventState()
+        or nil
+    local currentEventId = type(currentEventState) == "table" and tostring(currentEventState.id or "") or nil
+    local currentTurnNumber = type(currentEventState) == "table"
+        and tonumber(currentEventState.turnNumber)
+        or nil
+    local currentTickNumber = type(currentEventState) == "table"
+        and tonumber(currentEventState.tickNumber)
+        or nil
     local batchedPayloads = {}
     local flushed = false
     for batchKey, batch in pairs(pendingBatches) do
@@ -1211,9 +1224,14 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
             and batch.state == expectedState
             and batch.channelName == expectedState.channelName
             and normalizePendingScope(batch.scope) == scope
+            and (batch.eventId == nil
+                or (currentEventState ~= nil
+                    and currentEventState.active == true
+                    and tostring(batch.eventId or "") == currentEventId
+                    and (batch.sourceTurnNumber == nil or tonumber(batch.sourceTurnNumber) == currentTurnNumber)
+                    and (batch.sourceTickNumber == nil or tonumber(batch.sourceTickNumber) == currentTickNumber)))
             and type(batch.resourceDeltas) == "table"
         then
-            pendingBatches[batchKey] = nil
             local batchIndex = batch.allowLocalEchoApply == true and 1 or 0
             local aggregate = batchedPayloads[batchIndex]
             if not aggregate then
@@ -1223,10 +1241,12 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
                     targetedResourceDeltas = {},
                     targetEventIds = {},
                     threatUpdates = {},
+                    batches = {},
                 }
                 batchedPayloads[batchIndex] = aggregate
             end
 
+            aggregate.batches[#aggregate.batches + 1] = { key = batchKey, batch = batch }
             aggregate.reason = mergeReasons(aggregate.reason, batch.reason)
             local batchTargetEventId = tonumber(batch.targetEventId) or 0
             if batchTargetEventId > 0 then
@@ -1272,6 +1292,24 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
                 targetedResourceDeltas = aggregate.targetedResourceDeltas,
                 targetEventIds = aggregate.targetEventIds,
             }, sent == true)
+            if sent then
+                for batchIndex = 1, #(aggregate.batches or {}) do
+                    local batchEntry = aggregate.batches[batchIndex]
+                    if pendingBatches[batchEntry.key] == batchEntry.batch then
+                        pendingBatches[batchEntry.key] = nil
+                    end
+                end
+                if type(targetClient.QueueActionBarRefresh) == "function" then
+                    targetClient:QueueActionBarRefresh("pending-resource-sent")
+                elseif type(targetClient.RefreshActionBarWidget) == "function" then
+                    targetClient:RefreshActionBarWidget("pending-resource-sent")
+                end
+                if type(targetClient.QueuePendingTurnChangesTooltipRefresh) == "function" then
+                    targetClient:QueuePendingTurnChangesTooltipRefresh()
+                elseif type(targetClient.RefreshPendingTurnChangesTooltip) == "function" then
+                    targetClient:RefreshPendingTurnChangesTooltip()
+                end
+            end
             flushed = sent or flushed
         end
     end
@@ -1279,7 +1317,7 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
     return flushed
 end
 
-function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverride)
+function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverride, sourceTurnNumber, sourceTickNumber)
     local state = stateOverride or self:GetState()
     local eventState = eventStateOverride or (self.GetEventState and self:GetEventState() or nil)
     if type(state) ~= "table"
@@ -1300,23 +1338,21 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
     elseif type(self.RefreshActionBarWidget) == "function" then
         self:RefreshActionBarWidget("pending-resource-flush")
     end
-    if type(self.QueuePendingTurnChangesTooltipRefresh) == "function" then
-        self:QueuePendingTurnChangesTooltipRefresh()
-    elseif type(self.RefreshPendingTurnChangesTooltip) == "function" then
-        self:RefreshPendingTurnChangesTooltip()
-    end
-
     local targetedResourceDeltas = {}
     local targetEventIds = {}
     local reason = ""
+    local matchingBatches = {}
     for batchKey, batch in pairs(pendingBatches) do
         if type(batch) == "table"
             and batch.state == state
             and batch.channelName == state.channelName
+            and tostring(batch.eventId or "") == tostring(eventState.id or "")
+            and (sourceTurnNumber == nil or tonumber(batch.sourceTurnNumber) == tonumber(sourceTurnNumber))
+            and (sourceTickNumber == nil or tonumber(batch.sourceTickNumber) == tonumber(sourceTickNumber))
             and normalizePendingScope(batch.scope) == "turn"
             and type(batch.resourceDeltas) == "table"
         then
-            pendingBatches[batchKey] = nil
+            matchingBatches[#matchingBatches + 1] = { key = batchKey, batch = batch }
             reason = mergeReasons(reason, batch.reason)
             local batchTargetEventId = tonumber(batch.targetEventId) or 0
             if batchTargetEventId > 0 then
@@ -1368,7 +1404,73 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
         targetedResourceDeltas = targetedResourceDeltas,
         targetEventIds = targetEventIds,
     }, sent == true)
+    if sent then
+        for batchIndex = 1, #matchingBatches do
+            local batchEntry = matchingBatches[batchIndex]
+            if pendingBatches[batchEntry.key] == batchEntry.batch then
+                pendingBatches[batchEntry.key] = nil
+            end
+        end
+        if type(self.QueueActionBarRefresh) == "function" then
+            self:QueueActionBarRefresh("pending-resource-sent")
+        elseif type(self.RefreshActionBarWidget) == "function" then
+            self:RefreshActionBarWidget("pending-resource-sent")
+        end
+        if type(self.QueuePendingTurnChangesTooltipRefresh) == "function" then
+            self:QueuePendingTurnChangesTooltipRefresh()
+        elseif type(self.RefreshPendingTurnChangesTooltip) == "function" then
+            self:RefreshPendingTurnChangesTooltip()
+        end
+    end
     return sent
+end
+
+function Client:HasPendingTurnResourceDeltas(stateOverride, eventStateOverride, sourceTurnNumber, sourceTickNumber)
+    local state = stateOverride or self:GetState()
+    local eventState = eventStateOverride or (self.GetEventState and self:GetEventState() or nil)
+    if type(state) ~= "table" or type(eventState) ~= "table" then
+        return false
+    end
+
+    for _, batch in pairs(self.PendingResourceDeltaBatches or {}) do
+        if type(batch) == "table"
+            and batch.state == state
+            and batch.channelName == state.channelName
+            and tostring(batch.eventId or "") == tostring(eventState.id or "")
+            and (sourceTurnNumber == nil or tonumber(batch.sourceTurnNumber) == tonumber(sourceTurnNumber))
+            and (sourceTickNumber == nil or tonumber(batch.sourceTickNumber) == tonumber(sourceTickNumber))
+            and normalizePendingScope(batch.scope) == "turn"
+            and type(batch.resourceDeltas) == "table"
+            and #batch.resourceDeltas > 0
+        then
+            return true
+        end
+    end
+
+    return false
+end
+
+function Client:DiscardPendingTurnResourceDeltas(eventId, sourceTurnNumber, sourceTickNumber)
+    local normalizedEventId = tostring(eventId or "")
+    if normalizedEventId == "" then
+        return 0
+    end
+
+    local pendingBatches = self.PendingResourceDeltaBatches or {}
+    local removed = 0
+    for batchKey, batch in pairs(pendingBatches) do
+        if type(batch) == "table"
+            and normalizePendingScope(batch.scope) == "turn"
+            and tostring(batch.eventId or "") == normalizedEventId
+            and (sourceTurnNumber == nil or tonumber(batch.sourceTurnNumber) == tonumber(sourceTurnNumber))
+            and (sourceTickNumber == nil or tonumber(batch.sourceTickNumber) == tonumber(sourceTickNumber))
+        then
+            pendingBatches[batchKey] = nil
+            removed = removed + 1
+        end
+    end
+
+    return removed
 end
 
 local function syncServerEventState(eventState)
@@ -1397,6 +1499,30 @@ function Client:ResetResourceState()
     self.PendingRPEKillAchievements = {}
     self.PendingRPEHealthAchievements = {}
     self.LastAppliedTurnRegenKey = nil
+end
+
+function Client:ResetEventResourceDeltas(eventId)
+    local normalizedEventId = tostring(eventId or "")
+    if normalizedEventId == "" then
+        return false
+    end
+
+    local pendingBatches = self.PendingResourceDeltaBatches or {}
+    local removed = false
+    for batchKey, batch in pairs(pendingBatches) do
+        if type(batch) == "table" and tostring(batch.eventId or "") == normalizedEventId then
+            pendingBatches[batchKey] = nil
+            removed = true
+        end
+    end
+
+    if removed then
+        self.PendingResourceDeltaFlushQueuedByScope = self.PendingResourceDeltaFlushQueuedByScope or {}
+        self.PendingResourceDeltaFlushQueuedByScope.turn = false
+        self.PendingResourceDeltaFlushQueued = false
+    end
+
+    return removed
 end
 
 function Client:ApplyLocalTurnStartResourceRegeneration(stateOverride, eventStateOverride, options)
@@ -1560,17 +1686,32 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
     end
 
     bindStateSessionRuntime(state)
+    local eventState = self.GetEventState and self:GetEventState() or nil
+    local eventId = type(eventState) == "table" and eventState.id or nil
+    local sourceTurnNumber = type(eventState) == "table" and math.floor(tonumber(eventState.turnNumber) or 0) or nil
+    local sourceTickNumber = type(eventState) == "table" and math.floor(tonumber(eventState.tickNumber) or 0) or nil
     local playerName = getPlayerNameForState(state) or "unknown"
     local allowLocalEchoApply = type(options) == "table" and options.allowLocalEchoApply == true or false
     local scope = normalizePendingScope(type(options) == "table" and options.scope or nil)
     local threatUpdates = coalesceThreatUpdates(type(options) == "table" and options.threatUpdates or nil)
     self.PendingResourceDeltaBatches = self.PendingResourceDeltaBatches or {}
-    local batchKey = buildResourceDeltaBatchKey(state.channelName, targetEventId, allowLocalEchoApply, scope)
+    local batchKey = buildResourceDeltaBatchKey(
+        state.channelName,
+        eventId,
+        sourceTurnNumber,
+        sourceTickNumber,
+        targetEventId,
+        allowLocalEchoApply,
+        scope
+    )
     local batch = self.PendingResourceDeltaBatches[batchKey]
     if not batch or batch.state ~= state then
         batch = {
             state = state,
             channelName = state.channelName,
+            eventId = eventId,
+            sourceTurnNumber = sourceTurnNumber,
+            sourceTickNumber = sourceTickNumber,
             targetEventId = targetEventId,
             allowLocalEchoApply = allowLocalEchoApply,
             scope = scope,

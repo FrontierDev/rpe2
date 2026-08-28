@@ -1029,6 +1029,9 @@ end
 
 Server.EventState = Server.EventState or nil
 Server.EventDraftState = Server.EventDraftState or nil
+Server.PendingEventAdvanceCommit = Server.PendingEventAdvanceCommit or nil
+Server.EventAdvanceRequestGeneration = math.max(0, math.floor(tonumber(Server.EventAdvanceRequestGeneration) or 0))
+Server.LastEventAdvanceCommit = Server.LastEventAdvanceCommit or nil
 
 function Server:GetEventState()
     return self.EventState
@@ -1674,6 +1677,23 @@ function Server:EndEvent(reason)
         return false
     end
 
+    if type(self.PendingEventAdvanceCommit) == "table"
+        and tostring(self.PendingEventAdvanceCommit.eventId or "") == tostring(eventState.id or "")
+    then
+        if Client and type(Client.CancelPendingTurnCommit) == "function" then
+            Client:CancelPendingTurnCommit("event-ending", eventState.id)
+        end
+        self.PendingEventAdvanceCommit = nil
+    end
+
+    if Client and type(Client.ResetEventResourceDeltas) == "function" then
+        Client:ResetEventResourceDeltas(eventState.id)
+    end
+    local auraManager = Client and Client.Spellcasting and Client.Spellcasting.AuraManager or nil
+    if type(auraManager) == "table" and type(auraManager.ResetAuraState) == "function" then
+        auraManager:ResetAuraState(Client, eventState.id)
+    end
+
     eventState.active = false
     eventState.endedAt = Common.GetNow()
 
@@ -1704,18 +1724,48 @@ function Server:EndEvent(reason)
     return true
 end
 
-function Server:AdvanceEventStep()
-    local eventState = self.EventState
-    if not eventState or eventState.active ~= true or eventState.unitsReady ~= true then
+function Server:_AdvanceEventStepAfterCommit(commit, completed)
+    if type(commit) ~= "table" or completed ~= true then
+        if type(commit) == "table" and self.PendingEventAdvanceCommit == commit then
+            self.PendingEventAdvanceCommit = nil
+            self.LastEventAdvanceCommit = commit
+        end
+        refreshEventManagePage()
+        return false
+    end
+    if self.PendingEventAdvanceCommit ~= commit or commit.advanceApplied == true then
         return false
     end
 
-    if Client and type(Client.IsLocalEventHost) == "function" and Client:IsLocalEventHost(eventState) and type(Client.FlushPendingTurnChanges) == "function" then
-        Client:FlushPendingTurnChanges(Client.GetState and Client:GetState() or nil, eventState)
+    local eventState = self.EventState
+    local clientEventState = Client and Client.GetEventState and Client:GetEventState() or nil
+    if type(eventState) ~= "table"
+        or eventState.active ~= true
+        or eventState.unitsReady ~= true
+        or tostring(eventState.id or "") ~= tostring(commit.eventId or "")
+        or type(clientEventState) ~= "table"
+        or clientEventState.active ~= true
+        or clientEventState.unitsReady ~= true
+        or clientEventState ~= commit.eventState
+        or tonumber(self.EventAdvanceRequestGeneration) ~= tonumber(commit.serverRequestGeneration)
+        or tonumber(eventState.turnNumber) ~= tonumber(commit.sourceTurnNumber)
+        or tonumber(eventState.tickNumber) ~= tonumber(commit.sourceTickNumber)
+        or tonumber(clientEventState.turnNumber) ~= tonumber(commit.sourceTurnNumber)
+        or tonumber(clientEventState.tickNumber) ~= tonumber(commit.sourceTickNumber)
+    then
+        commit.status = "cancelled"
+        commit.failureReason = "event-step-stale"
+        self.PendingEventAdvanceCommit = nil
+        self.LastEventAdvanceCommit = commit
+        refreshEventManagePage()
+        return false
     end
 
-    normalizeEventStepState(eventState)
+    commit.advanceApplied = true
+    self.PendingEventAdvanceCommit = nil
+    self.LastEventAdvanceCommit = commit
 
+    normalizeEventStepState(eventState)
     if eventState.tickNumber < eventState.totalTicks then
         eventState.tickNumber = eventState.tickNumber + 1
     else
@@ -1750,4 +1800,65 @@ function Server:AdvanceEventStep()
 
     refreshEventManagePage()
     return true
+end
+
+function Server:AdvanceEventStep()
+    local eventState = self.EventState
+    if not eventState or eventState.active ~= true or eventState.unitsReady ~= true then
+        return false
+    end
+
+    local clientEventState = Client and Client.GetEventState and Client:GetEventState() or nil
+    if type(Client) ~= "table"
+        or type(clientEventState) ~= "table"
+        or clientEventState.active ~= true
+        or clientEventState.unitsReady ~= true
+        or tostring(clientEventState.id or "") ~= tostring(eventState.id or "")
+        or tonumber(clientEventState.turnNumber) ~= tonumber(eventState.turnNumber)
+        or tonumber(clientEventState.tickNumber) ~= tonumber(eventState.tickNumber)
+        or type(Client.IsLocalEventHost) ~= "function"
+        or Client:IsLocalEventHost(clientEventState) ~= true
+        or type(Client.BeginPendingTurnCommit) ~= "function"
+    then
+        return false
+    end
+
+    normalizeEventStepState(eventState)
+    local sourceTurnNumber = math.floor(tonumber(eventState.turnNumber) or 0)
+    local sourceTickNumber = math.floor(tonumber(eventState.tickNumber) or 0)
+    local pending = self.PendingEventAdvanceCommit
+    if type(pending) == "table" and pending.status == "pending" then
+        if tostring(pending.eventId or "") == tostring(eventState.id or "")
+            and tonumber(pending.sourceTurnNumber) == sourceTurnNumber
+            and tonumber(pending.sourceTickNumber) == sourceTickNumber
+        then
+            pending.duplicateRequests = (tonumber(pending.duplicateRequests) or 0) + 1
+            return false
+        end
+
+        if type(Client.CancelPendingTurnCommit) == "function" then
+            Client:CancelPendingTurnCommit("advance-source-changed", pending.eventId)
+        end
+        self.PendingEventAdvanceCommit = nil
+        return false
+    end
+
+    self.EventAdvanceRequestGeneration = math.max(0, math.floor(tonumber(self.EventAdvanceRequestGeneration) or 0)) + 1
+    local commit = Client:BeginPendingTurnCommit(
+        Client.GetState and Client:GetState() or nil,
+        clientEventState,
+        {
+            hostAdvancementRequested = true,
+            onFinished = function(completedCommit, completed, reason)
+                self:_AdvanceEventStepAfterCommit(completedCommit, completed, reason)
+            end,
+        }
+    )
+    if type(commit) ~= "table" then
+        return false
+    end
+    commit.serverRequestGeneration = self.EventAdvanceRequestGeneration
+    self.PendingEventAdvanceCommit = commit
+    refreshEventManagePage()
+    return false
 end

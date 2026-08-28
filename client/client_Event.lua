@@ -207,6 +207,9 @@ Client.EventWidgetRefreshQueued = Client.EventWidgetRefreshQueued or false
 Client.EventStartupRuntimeByEventId = Client.EventStartupRuntimeByEventId or {}
 Client.ControlledEventUnitId = Client.ControlledEventUnitId or nil
 Client.TurnEndPending = Client.TurnEndPending or false
+Client.PendingTurnCommit = Client.PendingTurnCommit or nil
+Client.TurnCommitGeneration = math.max(0, math.floor(tonumber(Client.TurnCommitGeneration) or 0))
+Client.LastTurnCommit = Client.LastTurnCommit or nil
 Client.EventUnitInteractionMarkers = Client.EventUnitInteractionMarkers or {}
 Client.LastLocalInteractionMarker = Client.LastLocalInteractionMarker or nil
 
@@ -336,6 +339,12 @@ function Client:CanPerformEventAction(eventState, actionKind)
     end
     if state.startupReady ~= true then
         return false, "event-startup"
+    end
+    if tostring(actionKind or "") == "advance-event-step"
+        and type(self.PendingTurnCommit) == "table"
+        and self.PendingTurnCommit.status == "pending"
+    then
+        return false, "turn-commit-pending"
     end
     return true
 end
@@ -1332,6 +1341,20 @@ local function queueEventTraitRuntimeRefresh(client, eventState, reason)
     if type(runtime) ~= "table" then
         return false
     end
+    local traitState = type(client.GetTraitRuntimeState) == "function"
+        and client:GetTraitRuntimeState(eventState.id, true)
+        or nil
+    if type(traitState) == "table" then
+        -- Runtime unit deltas restart startup work, but they do not represent
+        -- a new aura source. Keep these ownership maps so reconciliation can
+        -- remove only identities that actually disappeared.
+        traitState.automaticAuraStateByKey = type(traitState.automaticAuraStateByKey) == "table"
+            and traitState.automaticAuraStateByKey
+            or {}
+        traitState.appliedEventAuras = type(traitState.appliedEventAuras) == "table"
+            and traitState.appliedEventAuras
+            or {}
+    end
 
     local previousTransition = client.EventTransition
     if type(previousTransition) == "table"
@@ -1892,48 +1915,328 @@ function Client:WasEventUnitInteractedWithLastAction(eventUnit, eventState)
     return type(state) == "table" and state.visible == true
 end
 
-function Client:FlushPendingTurnChanges(sessionStateOverride, eventStateOverride)
+local function isCurrentTurnCommit(client, commit)
+    if type(client) ~= "table" or type(commit) ~= "table" then
+        return false
+    end
+
+    local currentSessionState = client.GetState and client:GetState() or nil
+    local currentEventState = client.GetEventState and client:GetEventState() or nil
+    return currentSessionState == commit.sessionState
+        and currentEventState == commit.eventState
+        and type(currentSessionState) == "table"
+        and currentSessionState.active == true
+        and type(currentEventState) == "table"
+        and currentEventState.active == true
+        and currentEventState.ending ~= true
+        and tostring(currentEventState.id or "") == tostring(commit.eventId or "")
+        and tonumber(currentEventState.turnNumber) == tonumber(commit.sourceTurnNumber)
+        and tonumber(currentEventState.tickNumber) == tonumber(commit.sourceTickNumber)
+        and tonumber(client.TurnCommitGeneration) == tonumber(commit.requestGeneration)
+        and getTransitionGeneration(client) == tonumber(commit.transitionGeneration)
+end
+
+local function refreshTurnCommitDisplays(client, reason)
+    if type(client) ~= "table" then
+        return
+    end
+
+    if type(client.QueueActionBarRefresh) == "function" then
+        client:QueueActionBarRefresh(reason or "turn-commit")
+    elseif type(client.RefreshActionBarWidget) == "function" then
+        client:RefreshActionBarWidget(reason or "turn-commit")
+    end
+end
+
+local function finishTurnCommit(client, commit, status, reason)
+    if type(client) ~= "table" or type(commit) ~= "table" or client.PendingTurnCommit ~= commit then
+        return false
+    end
+
+    commit.status = tostring(status or "failed")
+    commit.failureReason = commit.status == "complete" and nil or tostring(reason or commit.failureReason or "turn-commit-failed")
+    commit.completed = commit.status == "complete"
+    client.PendingTurnCommit = nil
+    client.LastTurnCommit = commit
+    if commit.status ~= "complete" then
+        -- A failed send keeps its batch for retry, but must release a non-host's
+        -- turn gate so the user can request that retry.
+        client.TurnEndPending = false
+    end
+    refreshTurnCommitDisplays(client, commit.status == "complete" and "turn-commit-complete" or "turn-commit-failed")
+
+    if type(commit.onFinished) == "function" then
+        commit.onFinished(commit, commit.status == "complete", commit.failureReason)
+    end
+    return true
+end
+
+local function stepPendingTurnCommit(commit, deadlineMs)
+    local client = commit and commit.client or nil
+    if type(client) ~= "table" or type(commit) ~= "table" then
+        return true
+    end
+
+    while true do
+        if commit.phase == "resource" then
+            local hasPending = type(client.HasPendingTurnResourceDeltas) == "function"
+                and client:HasPendingTurnResourceDeltas(
+                    commit.sessionState,
+                    commit.eventState,
+                    commit.sourceTurnNumber,
+                    commit.sourceTickNumber
+                )
+                or false
+            if hasPending then
+                commit.resourceFlushStatus = "sending"
+                local flushed = type(client.FlushDeferredTurnResourceDeltas) == "function"
+                    and client:FlushDeferredTurnResourceDeltas(
+                        commit.sessionState,
+                        commit.eventState,
+                        commit.sourceTurnNumber,
+                        commit.sourceTickNumber
+                    )
+                    or false
+                local remainsPending = type(client.HasPendingTurnResourceDeltas) == "function"
+                    and client:HasPendingTurnResourceDeltas(
+                        commit.sessionState,
+                        commit.eventState,
+                        commit.sourceTurnNumber,
+                        commit.sourceTickNumber
+                    )
+                    or false
+                if remainsPending or not flushed then
+                    commit.resourceFlushStatus = "failed"
+                    commit.failureReason = "resource-send-failed"
+                    commit.terminalStatus = "failed"
+                    return true
+                end
+            end
+            commit.resourceFlushStatus = "complete"
+            commit.phase = "aura"
+        elseif commit.phase == "aura" then
+            local auraManager = client.Spellcasting and client.Spellcasting.AuraManager or nil
+            local hasPending = type(auraManager) == "table"
+                and type(auraManager.HasPendingOutboundAuraOperations) == "function"
+                and auraManager:HasPendingOutboundAuraOperations(
+                    client,
+                    "turn",
+                    commit.eventState,
+                    commit.sourceTurnNumber,
+                    commit.sourceTickNumber
+                )
+                or false
+            if hasPending then
+                commit.auraFlushStatus = "queued"
+                local queued = type(auraManager) == "table"
+                    and type(auraManager.FlushOutboundAuraOperations) == "function"
+                    and auraManager:FlushOutboundAuraOperations(
+                        client,
+                        "turn",
+                        commit.eventState,
+                        commit.sourceTurnNumber,
+                        commit.sourceTickNumber
+                    )
+                    or false
+                if not queued then
+                    commit.auraFlushStatus = "failed"
+                    commit.failureReason = "aura-flush-queue-failed"
+                    commit.terminalStatus = "failed"
+                    return true
+                end
+                commit.phase = "aura-wait"
+            else
+                commit.auraFlushStatus = "complete"
+                commit.phase = "complete"
+            end
+        elseif commit.phase == "aura-wait" then
+            local auraManager = client.Spellcasting and client.Spellcasting.AuraManager or nil
+            local hasPending = type(auraManager) == "table"
+                and type(auraManager.HasPendingOutboundAuraOperations) == "function"
+                and auraManager:HasPendingOutboundAuraOperations(
+                    client,
+                    "turn",
+                    commit.eventState,
+                    commit.sourceTurnNumber,
+                    commit.sourceTickNumber
+                )
+                or false
+            local status = type(auraManager) == "table"
+                and type(auraManager.GetOutboundAuraFlushStatus) == "function"
+                and auraManager:GetOutboundAuraFlushStatus(client, "turn")
+                or "failed"
+            local jobs = type(client.PendingOutboundAuraFlushJobsByScope) == "table"
+                and client.PendingOutboundAuraFlushJobsByScope.turn
+                or nil
+            if hasPending then
+                if status == "failed" or status == "cancelled" or jobs == nil then
+                    commit.auraFlushStatus = "failed"
+                    commit.failureReason = "aura-send-failed"
+                    commit.terminalStatus = "failed"
+                    return true
+                end
+                return false
+            elseif type(jobs) == "table" and jobs.finalized ~= true then
+                -- Entries may already have been removed, but the sliceable job
+                -- is not complete until its completion callback has run.
+                return false
+            else
+                if status == "failed" or status == "cancelled" then
+                    commit.auraFlushStatus = "failed"
+                    commit.failureReason = "aura-send-failed"
+                    commit.terminalStatus = "failed"
+                    return true
+                end
+                commit.auraFlushStatus = "complete"
+                commit.phase = "complete"
+            end
+        elseif commit.phase == "complete" then
+            return true
+        else
+            commit.failureReason = "invalid-turn-commit-phase"
+            commit.terminalStatus = "failed"
+            return true
+        end
+
+        if shouldYieldTaskSlice(deadlineMs) then
+            return false
+        end
+    end
+end
+
+function Client:CancelPendingTurnCommit(reason, eventId)
+    local commit = self.PendingTurnCommit
+    if type(commit) ~= "table" then
+        return false
+    end
+    if eventId ~= nil and tostring(commit.eventId or "") ~= tostring(eventId or "") then
+        return false
+    end
+
+    local tasks = Addon.Internal and Addon.Internal.Tasks or nil
+    if type(tasks) == "table" and type(tasks.Cancel) == "function" and commit.job then
+        if tasks:Cancel(commit.job, reason or "turn-commit-cancelled") then
+            return true
+        end
+    end
+
+    return finishTurnCommit(self, commit, "cancelled", reason or "turn-commit-cancelled")
+end
+
+function Client:BeginPendingTurnCommit(sessionStateOverride, eventStateOverride, options)
     local sessionState = sessionStateOverride or self:GetState()
-    local eventState = eventStateOverride or self:GetEventState()
+    local eventState = eventStateOverride or (self.GetEventState and self:GetEventState() or nil)
+    options = type(options) == "table" and options or {}
     if type(sessionState) ~= "table"
         or sessionState.active ~= true
         or type(eventState) ~= "table"
         or eventState.active ~= true
+        or eventState.ending == true
         or eventState.channelName ~= sessionState.channelName
         or not self:CanPerformEventAction(eventState, "pending-turn-flush")
     then
         return false
     end
 
-    local timer = startTiming("Network/resource flush", 8, eventState.id or "turn-flush")
-    local flushed = false
-
-    if type(self.FlushDeferredTurnResourceDeltas) == "function" then
-        flushed = self:FlushDeferredTurnResourceDeltas(sessionState, eventState) or flushed
+    local existing = self.PendingTurnCommit
+    if type(existing) == "table" and existing.status == "pending" then
+        if isCurrentTurnCommit(self, existing) then
+            if options.hostAdvancementRequested == true then
+                existing.hostAdvancementRequested = true
+                existing.onFinished = options.onFinished or existing.onFinished
+            end
+            return existing
+        end
+        self:CancelPendingTurnCommit("turn-commit-superseded")
     end
 
-    local auraManager = self.Spellcasting and self.Spellcasting.AuraManager or nil
-    if type(auraManager) == "table" and type(auraManager.FlushOutboundAuraOperations) == "function" then
-        flushed = auraManager:FlushOutboundAuraOperations(self) or flushed
-    end
+    self.TurnCommitGeneration = math.max(0, math.floor(tonumber(self.TurnCommitGeneration) or 0)) + 1
+    local commit = {
+        client = self,
+        sessionState = sessionState,
+        eventState = eventState,
+        eventId = tostring(eventState.id or ""),
+        sourceTurnNumber = math.floor(tonumber(eventState.turnNumber) or 0),
+        sourceTickNumber = math.floor(tonumber(eventState.tickNumber) or 0),
+        requestGeneration = self.TurnCommitGeneration,
+        transitionGeneration = getTransitionGeneration(self),
+        resourceFlushStatus = "pending",
+        auraFlushStatus = "pending",
+        hostAdvancementRequested = options.hostAdvancementRequested == true,
+        onFinished = options.onFinished,
+        phase = "resource",
+        status = "pending",
+        startedAtMs = getTimingNowMilliseconds(),
+    }
+    self.PendingTurnCommit = commit
 
-    if self.QueueActionBarRefresh then
-        self:QueueActionBarRefresh("pending-flush")
-    elseif self.RefreshActionBarWidget then
-        self:RefreshActionBarWidget("pending-flush")
+    local job = enqueueClientSliceable({
+        label = "pending-turn-commit",
+        scope = "event-turn-commit:" .. commit.eventId,
+        state = commit,
+        isStale = function(work)
+            return not isCurrentTurnCommit(work and work.client, work)
+        end,
+        step = stepPendingTurnCommit,
+        onCancel = function(work, cancelReason)
+            local currentEventState = work.client.GetEventState and work.client:GetEventState() or nil
+            local sourceInvalidated = currentEventState ~= work.eventState
+                or type(currentEventState) ~= "table"
+                or currentEventState.active ~= true
+                or tonumber(currentEventState.turnNumber) ~= tonumber(work.sourceTurnNumber)
+                or tonumber(currentEventState.tickNumber) ~= tonumber(work.sourceTickNumber)
+            if (cancelReason == "stale" and sourceInvalidated)
+                or tostring(cancelReason or ""):find("source")
+            then
+                if type(work.client.DiscardPendingTurnResourceDeltas) == "function" then
+                    work.client:DiscardPendingTurnResourceDeltas(
+                        work.eventId,
+                        work.sourceTurnNumber,
+                        work.sourceTickNumber
+                    )
+                end
+                local auraManager = work.client.Spellcasting and work.client.Spellcasting.AuraManager or nil
+                if type(auraManager) == "table"
+                    and type(auraManager.DiscardPendingOutboundAuraOperations) == "function"
+                then
+                    auraManager:DiscardPendingOutboundAuraOperations(
+                        work.client,
+                        "turn",
+                        work.eventId,
+                        work.sourceTurnNumber,
+                        work.sourceTickNumber
+                    )
+                end
+            end
+            finishTurnCommit(work and work.client, work, "cancelled", cancelReason or "turn-commit-cancelled")
+        end,
+        onComplete = function(work)
+            local status = work and work.terminalStatus or "complete"
+            finishTurnCommit(work and work.client, work, status, work and work.failureReason or nil)
+        end,
+    })
+    if not job then
+        commit.terminalStatus = "failed"
+        commit.failureReason = "turn-commit-queue-failed"
+        finishTurnCommit(self, commit, "failed", commit.failureReason)
+        return commit
     end
-    if self.RefreshPendingTurnChangesTooltip then
-        self:RefreshPendingTurnChangesTooltip()
-    end
-    if timer then
-        stopEventTiming(timer, eventState, {
-            resourceFlush = flushed and 1 or 0,
-            queuedTasks = Addon.Internal and Addon.Internal.Tasks and Addon.Internal.Tasks.GetStats
-                and (tonumber(Addon.Internal.Tasks:GetStats().queueLength) or 0) or 0,
-        })
-    end
-    return flushed
+    commit.job = job
+    return commit
 end
+
+-- Returns an explicit commit handle. `queued` is not completion: callers must
+-- inspect handle.status or wait for onFinished before treating the turn scope
+-- as sent.
+function Client:FlushPendingTurnChanges(sessionStateOverride, eventStateOverride, options)
+    return self:BeginPendingTurnCommit(sessionStateOverride, eventStateOverride, options)
+end
+
+-- Legacy callers that only need to request a drain use FlushPendingTurnChanges;
+-- completion-aware callers use the handle returned above.
+--
+-- The old implementation intentionally remains absent: it conflated a queued
+-- task with a completed send and allowed the authoritative step to overtake it.
 
 function Client:EndTurn()
     local sessionState = self:GetState()
@@ -1955,7 +2258,11 @@ function Client:EndTurn()
     if tracker and type(tracker.OnPlayerTurnEnd) == "function" then
         tracker:OnPlayerTurnEnd()
     end
-    self:FlushPendingTurnChanges(sessionState, eventState)
+    local commit = self:FlushPendingTurnChanges(sessionState, eventState)
+    if type(commit) ~= "table" then
+        self.TurnEndPending = false
+        return false
+    end
     return true
 end
 
@@ -2057,6 +2364,12 @@ local function clearEventStateNow(client, state, reason, options)
     local transition = client.EventTransition
     local eventState = type(state) == "table" and state or (transition and transition.eventState)
     local eventId = eventState and eventState.id or nil
+    if type(client.CancelPendingTurnCommit) == "function" then
+        client:CancelPendingTurnCommit(options.cancelReason or "event-reset", eventId)
+    end
+    if type(client.ResetEventResourceDeltas) == "function" then
+        client:ResetEventResourceDeltas(eventId)
+    end
     if options.skipCancel ~= true then
         cancelEventSliceableWork(client, eventId, options.cancelReason or "event-reset")
     end
