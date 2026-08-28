@@ -1,71 +1,85 @@
-## Goal
-
-Handle the remaining aura-progression edge case that was deliberately moved out of #72 after #72 passed in-game validation.
-
 ## Problem
 
-Aura progression now uses a stable logical owner-turn cursor (`lastAdvancedOwnerTurnNumber`) rather than the old `totalTicks`-multiplied scalar. That fixes the main progression instability, but a same-step roster/page topology change can still make an aura newly due without triggering aura advancement.
+The Achievement inspector currently requires authors to type item/currency references manually instead of selecting valid dataset entries from dropdowns.
 
-`AuraManager:AdvanceAuraState(...)` normally short-circuits when `turnNumber` and `tickNumber` have not changed. `Client:HandleEventUnitDeltaBatch()` can, however, change roster ordering/page ownership while leaving the current turn/tick unchanged.
+Current examples in `client/ui/editor/inspectors/page_InspectorAchievement.lua`:
 
-Example:
+- `currency_gain` criteria use a free-text `Currency Reference` input.
+- `item_gain` criteria use a free-text `Item Ref` input.
+- Achievement rewards use a generic free-text `Reference` input even when the reward type is `item` or `currency`.
 
-```text
-turn 6, tick 1
-caster owner is on page 2
-lastAdvancedOwnerTurnNumber = 5
-EVENT_UNIT_DELTA_BATCH changes roster topology
-caster owner moves to page 1
-turnNumber remains 6
-tickNumber remains 1
-```
+This is inconsistent with the Recipe inspector, which uses dataset/entry dropdowns for item references. In `client/ui/editor/inspectors/page_InspectorRecipe.lua`, output/input item selection is driven by a dataset dropdown plus an item dropdown, populated from the current dataset contents.
 
-The turn-6 owner occurrence is now due exactly once, but no aura progression recheck is scheduled. If the next authoritative event state is already turn 7, the turn-6 tick/duration decrement can be skipped.
+## Goal
 
-This is separate from the original #72 regression. #72's in-game validation passed and should remain closed.
+Replace free-text item/currency reference authoring in the Achievement editor with validated dropdown selection, following the same authoring pattern as the Recipe editor.
 
-## Required fix
+## Required changes
 
-Keep the existing owner-turn cursor and normal same-step short-circuit, but add a bounded topology-triggered owner-occurrence recheck.
+### 1. Item criterion filters
 
-1. After a changed `EVENT_UNIT_DELTA_BATCH` has been applied, request aura owner-occurrence reconciliation for the current `(turnNumber, tickNumber)`.
-2. Implement either a narrow dedicated recheck helper or an explicit `forceTopologyRecheck` mode. Do not globally disable the same-step guard in `AdvanceAuraState(...)`.
-3. During the recheck, an aura is due only when:
-   - its resolved current owner page is `<= currentTick`; and
-   - `lastAdvancedOwnerTurnNumber < currentTurn`.
-4. Reuse `pendingAdvancedOwnerTurnNumber` / existing queued-entry protection so repeated topology updates cannot double-tick an aura for the same owner turn.
-5. Do not re-upsert, refresh, restack, or reset aura duration/cursor. This is progression reconciliation only.
-6. Keep the work bounded/sliceable and consistent with the TaskQueue model already used by aura advancement.
+For `item_gain` criteria:
+
+- replace the free-text `itemRef` field with dataset + item dropdown selection;
+- populate datasets/items from Data Editor dataset contents, using/reusing the same helper patterns as the Recipe inspector where practical;
+- persist the existing canonical `datasetId:itemId` reference format;
+- load existing references back into the correct dataset/item selections.
+
+### 2. Currency criterion filters
+
+For `currency_gain` criteria:
+
+- replace the free-text `currencyRef` field with a currency selector;
+- include built-in currencies (`copper`, `valor`, `justice`, `honor`, `conquest`);
+- include custom currencies from datasets available to the Data Editor;
+- persist the existing canonical currency key/reference format;
+- load existing references back into the selector correctly.
+
+A dataset + currency two-stage selector is acceptable for custom currencies if that best matches the Recipe inspector pattern; built-in currencies must remain straightforward to select.
+
+### 3. Achievement rewards
+
+The reward editor must switch its reference selector according to reward type:
+
+- `item` -> dataset + item dropdowns;
+- `currency` -> currency dropdown/selector;
+- amount remains a numeric input.
+
+Changing reward type must update the visible selector and must not leave an incompatible stale reference silently attached to the reward.
+
+### 4. Preserve existing data
+
+- Do not change the Achievement schema.
+- Existing valid `itemRef`, `currencyRef`, and reward `ref` values must continue to load and save unchanged.
+- If an existing reference no longer resolves, show it as missing/unresolved rather than silently clearing it before the user makes a new selection.
+- Do not require datasets to be activated merely to author references in the Data Editor.
 
 ## Primary files
 
-- `client/client_Event.lua`
-- `client/spellcasting/AuraManager.lua`
+- `client/ui/editor/inspectors/page_InspectorAchievement.lua`
+- `client/ui/editor/inspectors/page_InspectorRecipe.lua` as the reference implementation/pattern
+- shared Data Editor dataset/item/currency selector helpers where appropriate
 
 ## Acceptance criteria
 
-- [ ] Owner page 2 -> 1 at the same turn/tick causes exactly one current-turn tick/decrement when the owner occurrence becomes due.
-- [ ] Page-count shrink that moves the owner earlier causes exactly one due occurrence, not zero or multiple.
-- [ ] Owner page 1 -> 2 before the occurrence does not tick early; it waits for page 2.
-- [ ] Repeated `EVENT_UNIT_DELTA_BATCH` updates after the recheck do not double-tick the same owner turn.
-- [ ] Existing aura duration, stacks, and refresh semantics are unchanged except for the missing progression occurrence being processed.
-- [ ] Ordinary turn/tick advancement continues to use the existing fast path and same-step short-circuit.
-- [ ] No dependence on mutable `totalTicks` is reintroduced.
+- [ ] `item_gain` criteria can select an item without manually typing a reference.
+- [ ] `currency_gain` criteria can select built-in and custom currencies without manually typing a reference.
+- [ ] Item rewards use dropdown selection rather than a free-text reference.
+- [ ] Currency rewards use dropdown selection rather than a free-text reference.
+- [ ] Item selection follows the Recipe editor's dataset -> entry interaction pattern.
+- [ ] Existing valid Achievement references round-trip without schema changes.
+- [ ] Missing references remain visible/diagnosable and are not silently erased.
+- [ ] Switching reward type updates the selector and cannot retain an incompatible stale reference unnoticed.
+- [ ] Editing an Achievement still queues the normal dataset-entry change path and persists correctly.
 
 ## Validation
 
-```text
-owner page 2 -> 1, same turn/tick, same totalTicks
--> exactly one current-turn tick/decrement
+In the Data Editor:
 
-owner page 2 -> 1 through page-count shrink
--> exactly one current-turn tick/decrement
-
-owner page 1 -> 2 before occurrence
--> no early tick; waits for page 2
-
-repeated unit deltas after recheck
--> no duplicate tick for the same owner turn
-```
-
-Reference: this issue is the topology follow-up previously documented in #72.
+1. Create/edit an Achievement with an `item_gain` criterion and select an item from another dataset.
+2. Create/edit a `currency_gain` criterion using both a built-in currency and a custom dataset currency.
+3. Add an item reward and select its item through dropdowns.
+4. Add a currency reward and select its currency through dropdowns.
+5. Save/reopen the Achievement and confirm all selections resolve to the same stored refs.
+6. Change a reward from item -> currency and verify the selector/reference updates cleanly.
+7. Load an Achievement containing an unresolved legacy ref and confirm the editor exposes it rather than deleting it.

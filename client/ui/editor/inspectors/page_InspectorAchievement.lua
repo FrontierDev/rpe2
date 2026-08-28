@@ -7,6 +7,7 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
 local Client = Addon.Client or {}
+local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local AchievementClass = Addon.Internal
     and Addon.Internal.Database
     and Addon.Internal.Database.Classes
@@ -42,6 +43,22 @@ local REWARD_TYPE_ITEMS = {
     { label = "Currency", value = "currency" },
 }
 
+local BUILTIN_CURRENCY_DEFINITIONS = {
+    copper = { id = "copper", key = "copper", name = "Copper" },
+    valor = { id = "valor", key = "valor", name = "Valor" },
+    justice = { id = "justice", key = "justice", name = "Justice" },
+    honor = { id = "honor", key = "honor", name = "Honor" },
+    conquest = { id = "conquest", key = "conquest", name = "Conquest" },
+}
+
+local BUILTIN_CURRENCY_ORDER = {
+    "copper",
+    "valor",
+    "justice",
+    "honor",
+    "conquest",
+}
+
 local function applyTable(target, source)
     if type(target) ~= "table" or type(source) ~= "table" then
         return
@@ -60,6 +77,164 @@ end
 
 local function trim(value)
     return tostring(value or ""):match("^%s*(.-)%s*$")
+end
+
+local function parseDatasetQualifiedRef(value)
+    local datasetId, entryId = trim(value):match("^([^:]+):(.+)$")
+    return datasetId, entryId
+end
+
+local function dropdownItemsContainValue(items, value)
+    local normalizedValue = trim(value)
+    for index = 1, #(items or {}) do
+        local item = items[index]
+        if item and trim(item.value) == normalizedValue then
+            return true
+        end
+        if item and dropdownItemsContainValue(item.children, value) then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function appendMissingDropdownValue(items, value, label)
+    local reference = trim(value)
+    if reference ~= "" and not dropdownItemsContainValue(items, reference) then
+        items[#items + 1] = {
+            label = label or ("Missing: %s"):format(reference),
+            value = value,
+        }
+    end
+
+    return items
+end
+
+local function normalizeCurrencyReference(value)
+    local reference = trim(value)
+    if reference == "" then
+        return ""
+    end
+
+    if type(Profile.NormalizeCurrencyKey) == "function" then
+        return trim(Profile.NormalizeCurrencyKey(reference))
+    end
+
+    return string.lower(reference)
+end
+
+local function buildAchievementDatasetItems(self, datasetId)
+    local items = self:BuildItemInspectorDatasetItems()
+    return appendMissingDropdownValue(items, datasetId, ("Missing dataset: %s"):format(trim(datasetId)))
+end
+
+local function buildAchievementItemReferenceItems(self, datasetId, reference)
+    local items = self:BuildItemInspectorDatasetCollectionItems("items", datasetId, {
+        noneLabel = "None",
+    })
+    return appendMissingDropdownValue(items, reference, ("Missing item: %s"):format(trim(reference)))
+end
+
+local function buildAchievementCurrencyItems(self, reference)
+    local items = {
+        { label = "None", value = "" },
+    }
+    local knownValues = {}
+    local builtinDefinitions = {}
+
+    if type(Profile.GetBuiltinCurrencyDefinitions) == "function" then
+        for _, definition in ipairs(Profile.GetBuiltinCurrencyDefinitions() or {}) do
+            local key = normalizeCurrencyReference(definition and (definition.key or definition.id))
+            if key ~= "" then
+                builtinDefinitions[key] = definition
+            end
+        end
+    end
+
+    local builtinChildren = {}
+    for index = 1, #BUILTIN_CURRENCY_ORDER do
+        local key = BUILTIN_CURRENCY_ORDER[index]
+        local definition = builtinDefinitions[key] or BUILTIN_CURRENCY_DEFINITIONS[key]
+        local value = normalizeCurrencyReference(definition and (definition.key or definition.id) or key)
+        if value ~= "" and not knownValues[value] then
+            knownValues[value] = true
+            builtinChildren[#builtinChildren + 1] = {
+                label = trim(definition and definition.name) ~= "" and trim(definition.name) or value,
+                value = value,
+                icon = definition and definition.icon,
+            }
+        end
+    end
+
+    if #builtinChildren > 0 then
+        items[#items + 1] = {
+            label = "Built-in",
+            value = "achievement-currency-group:builtin",
+            enabled = true,
+            keepShownOnClick = true,
+            notCheckable = true,
+            children = builtinChildren,
+        }
+    end
+
+    local datasets = self:GetDatasets() or {}
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local datasetId = trim(dataset and dataset.id)
+        local currencyChildren = {}
+        for currencyIndex = 1, #(dataset and dataset.currencies or {}) do
+            local currency = dataset.currencies[currencyIndex]
+            local currencyId = trim(currency and currency.id)
+            if datasetId ~= "" and currencyId ~= "" then
+                local value = ("%s:%s"):format(datasetId, currencyId)
+                if not knownValues[value] then
+                    knownValues[value] = true
+                    currencyChildren[#currencyChildren + 1] = {
+                        label = self.GetEntryDisplayName and self:GetEntryDisplayName("currencies", currency) or currencyId,
+                        value = value,
+                        icon = currency.icon,
+                    }
+                end
+            end
+        end
+
+        if #currencyChildren > 0 then
+            items[#items + 1] = {
+                label = self.GetDatasetDisplayName and self:GetDatasetDisplayName(dataset) or datasetId,
+                value = ("achievement-currency-group:%s"):format(datasetId),
+                enabled = true,
+                keepShownOnClick = true,
+                notCheckable = true,
+                children = currencyChildren,
+            }
+        end
+    end
+
+    local currentReference = trim(reference)
+    local normalizedReference = normalizeCurrencyReference(currentReference)
+    if currentReference ~= ""
+        and not dropdownItemsContainValue(items, currentReference)
+        and not dropdownItemsContainValue(items, normalizedReference)
+    then
+        appendMissingDropdownValue(items, currentReference, ("Missing currency: %s"):format(currentReference))
+    end
+
+    return items
+end
+
+local function getAchievementCurrencySelectionValue(items, reference)
+    local rawReference = trim(reference)
+    if rawReference == "" or dropdownItemsContainValue(items, rawReference) then
+        return rawReference
+    end
+
+    local normalizedReference = normalizeCurrencyReference(rawReference)
+    if normalizedReference ~= "" and dropdownItemsContainValue(items, normalizedReference) then
+        return normalizedReference
+    end
+
+    return rawReference
 end
 
 local function setTextElementEnabled(element, enabled)
@@ -517,6 +692,7 @@ function DataEditor:BuildAchievementInspectorCriteriaPage(parent)
         fitChildrenHeight = false,
     })
     UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
+    self.AchievementInspectorCriteriaRoot = root
 
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorCriteriaLabel", "Criteria"))
     local criteriaPanel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorAchievementInspectorCriteriaPanel", {
@@ -677,47 +853,88 @@ function DataEditor:BuildAchievementInspectorCriteriaPage(parent)
     root:AddChild(self.AchievementInspectorCriterionGoalInput)
 
     self.AchievementInspectorCurrencyFilterGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorCurrencyFilterGroup", {
-        spacing = 2, height = 42, fitChildrenWidth = true, fitChildrenHeight = false,
+        spacing = 2, height = 34, fitChildrenWidth = true, fitChildrenHeight = false,
     })
-    self.AchievementInspectorCurrencyFilterGroup._visibleHeight = 42
-    self.AchievementInspectorCurrencyFilterGroup:AddChild(createLabel(self.AchievementInspectorCurrencyFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorCurrencyRefLabel", "Currency Reference"))
-    self.AchievementInspectorCurrencyRefInput = UI.CreateTextInput(self.AchievementInspectorCurrencyFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorCurrencyRefInput", {
-        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    local commitCurrencyRef = function()
-        local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
-        self:CommitSelectedAchievement(function(achievement)
-            local criterion = getCriterion(achievement, selectedIndex)
-            if criterion then
-                getFilter(criterion).currencyRef = self.AchievementInspectorCurrencyRefInput:GetText()
+    self.AchievementInspectorCurrencyFilterGroup._visibleHeight = 34
+    self.AchievementInspectorCurrencyFilterGroup:AddChild(createLabel(self.AchievementInspectorCurrencyFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorCurrencyRefLabel", "Currency"))
+    self.AchievementInspectorCurrencyRefDropdown = UI.CreateDropdown(self.AchievementInspectorCurrencyFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorCurrencyRefDropdown", {
+        width = FIELD_WIDTH,
+        height = CONTROL_HEIGHT,
+        items = buildAchievementCurrencyItems(self, ""),
+        onValueChanged = function(value)
+            if self._refreshingAchievementCriteria then
+                return
             end
-        end)
-    end
-    self.AchievementInspectorCurrencyRefInput:SetScript("OnEnterPressed", commitCurrencyRef)
-    self.AchievementInspectorCurrencyRefInput:SetScript("OnEditFocusLost", commitCurrencyRef)
-    self.AchievementInspectorCurrencyFilterGroup:AddChild(self.AchievementInspectorCurrencyRefInput)
+
+            local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+            self:CommitSelectedAchievement(function(achievement)
+                local criterion = getCriterion(achievement, selectedIndex)
+                if criterion then
+                    getFilter(criterion).currencyRef = normalizeCurrencyReference(value)
+                end
+            end)
+            self:RefreshAchievementCriteriaInspector()
+        end,
+    })
+    self.AchievementInspectorCurrencyFilterGroup:AddChild(self.AchievementInspectorCurrencyRefDropdown)
     root:AddChild(self.AchievementInspectorCurrencyFilterGroup)
 
     self.AchievementInspectorItemFilterGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorItemFilterGroup", {
-        spacing = 2, height = 42, fitChildrenWidth = true, fitChildrenHeight = false,
+        spacing = 2, height = 70, fitChildrenWidth = true, fitChildrenHeight = false,
     })
-    self.AchievementInspectorItemFilterGroup._visibleHeight = 42
-    self.AchievementInspectorItemFilterGroup:AddChild(createLabel(self.AchievementInspectorItemFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorItemRefLabel", "Item Ref"))
-    self.AchievementInspectorItemRefInput = UI.CreateTextInput(self.AchievementInspectorItemFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorItemRefInput", {
-        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    local commitItemRef = function()
-        local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
-        self:CommitSelectedAchievement(function(achievement)
-            local criterion = getCriterion(achievement, selectedIndex)
-            if criterion then
-                getFilter(criterion).itemRef = self.AchievementInspectorItemRefInput:GetText()
+    self.AchievementInspectorItemFilterGroup._visibleHeight = 70
+    self.AchievementInspectorItemFilterGroup:AddChild(createLabel(self.AchievementInspectorItemFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorItemDatasetLabel", "Item Dataset"))
+    self.AchievementInspectorItemDatasetDropdown = UI.CreateDropdown(self.AchievementInspectorItemFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorItemDatasetDropdown", {
+        width = FIELD_WIDTH,
+        height = CONTROL_HEIGHT,
+        items = buildAchievementDatasetItems(self, ""),
+        onValueChanged = function(value)
+            if self._refreshingAchievementCriteria then
+                return
             end
-        end)
-    end
-    self.AchievementInspectorItemRefInput:SetScript("OnEnterPressed", commitItemRef)
-    self.AchievementInspectorItemRefInput:SetScript("OnEditFocusLost", commitItemRef)
-    self.AchievementInspectorItemFilterGroup:AddChild(self.AchievementInspectorItemRefInput)
+
+            local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+            local selectedCriterion = getCriterion(self:GetSelectedAchievement(), selectedIndex)
+            local currentDatasetId = select(1, parseDatasetQualifiedRef(selectedCriterion and getFilter(selectedCriterion).itemRef or "")) or ""
+            if currentDatasetId == trim(value) then
+                return
+            end
+
+            self:CommitSelectedAchievement(function(achievement)
+                local criterion = getCriterion(achievement, selectedIndex)
+                if criterion then
+                    getFilter(criterion).itemRef = ""
+                end
+            end)
+            if self.AchievementInspectorItemRefDropdown then
+                self.AchievementInspectorItemRefDropdown:SetItems(buildAchievementItemReferenceItems(self, trim(value), ""))
+                self.AchievementInspectorItemRefDropdown:SetSelectedValue("", true)
+                setDropdownEnabled(self.AchievementInspectorItemRefDropdown, trim(value) ~= "")
+            end
+        end,
+    })
+    self.AchievementInspectorItemFilterGroup:AddChild(self.AchievementInspectorItemDatasetDropdown)
+    self.AchievementInspectorItemFilterGroup:AddChild(createLabel(self.AchievementInspectorItemFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorItemRefLabel", "Item"))
+    self.AchievementInspectorItemRefDropdown = UI.CreateDropdown(self.AchievementInspectorItemFilterGroup:GetFrame(), "RPEDataEditorAchievementInspectorItemRefDropdown", {
+        width = FIELD_WIDTH,
+        height = CONTROL_HEIGHT,
+        items = { { label = "None", value = "" } },
+        onValueChanged = function(value)
+            if self._refreshingAchievementCriteria then
+                return
+            end
+
+            local selectedIndex = tonumber(self.SelectedAchievementCriterionIndex)
+            self:CommitSelectedAchievement(function(achievement)
+                local criterion = getCriterion(achievement, selectedIndex)
+                if criterion then
+                    getFilter(criterion).itemRef = trim(value)
+                end
+            end)
+            self:RefreshAchievementCriteriaInspector()
+        end,
+    })
+    self.AchievementInspectorItemFilterGroup:AddChild(self.AchievementInspectorItemRefDropdown)
     root:AddChild(self.AchievementInspectorItemFilterGroup)
 
     self.AchievementInspectorSkillFilterGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorSkillFilterGroup", {
@@ -833,6 +1050,7 @@ function DataEditor:BuildAchievementInspectorRewardsPage(parent)
         fitChildrenHeight = false,
     })
     UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
+    self.AchievementInspectorRewardsRoot = root
 
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardsTitle", "Rewards"))
     local rewardPanel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardPanel", {
@@ -974,10 +1192,16 @@ function DataEditor:BuildAchievementInspectorRewardsPage(parent)
                 return
             end
 
+            local nextType = normalizeRewardType(value) or "item"
+            if normalizeRewardType(reward.type) == nextType then
+                return
+            end
+
             self:CommitSelectedAchievement(function(achievement)
                 local selectedReward = achievement.rewards and achievement.rewards[selectedIndex]
                 if isSupportedReward(selectedReward) then
-                    selectedReward.type = value
+                    selectedReward.type = nextType
+                    selectedReward.ref = ""
                 end
             end)
             self:RefreshAchievementRewardsInspector()
@@ -985,29 +1209,120 @@ function DataEditor:BuildAchievementInspectorRewardsPage(parent)
     })
     root:AddChild(self.AchievementInspectorRewardTypeDropdown)
 
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardRefLabel", "Reference"))
-    self.AchievementInspectorRewardRefInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardRefInput", {
-        width = FIELD_WIDTH,
-        height = 18,
-        text = "",
-        borderColor = UI.ResolveColor(nil, "panel.border"),
+    local itemDatasetGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorRewardItemDatasetGroup", {
+        spacing = 2,
+        height = 34,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
     })
-    local commitRewardRef = function()
-        local _, _, selectedIndex, reward = getSelectedAchievementReward(self)
-        if not isSupportedReward(reward) then
-            return
-        end
-
-        self:CommitSelectedAchievement(function(achievement)
-            local selectedReward = achievement.rewards and achievement.rewards[selectedIndex]
-            if isSupportedReward(selectedReward) then
-                selectedReward.ref = self.AchievementInspectorRewardRefInput:GetText()
+    itemDatasetGroup._visibleHeight = 34
+    itemDatasetGroup:AddChild(createLabel(itemDatasetGroup:GetFrame(), "RPEDataEditorAchievementInspectorRewardItemDatasetLabel", "Item Dataset"))
+    self.AchievementInspectorRewardItemDatasetDropdown = UI.CreateDropdown(itemDatasetGroup:GetFrame(), "RPEDataEditorAchievementInspectorRewardItemDatasetDropdown", {
+        width = FIELD_WIDTH,
+        height = CONTROL_HEIGHT,
+        items = buildAchievementDatasetItems(self, ""),
+        onValueChanged = function(value)
+            if self._refreshingAchievementRewards then
+                return
             end
-        end)
-    end
-    self.AchievementInspectorRewardRefInput:SetScript("OnEnterPressed", commitRewardRef)
-    self.AchievementInspectorRewardRefInput:SetScript("OnEditFocusLost", commitRewardRef)
-    root:AddChild(self.AchievementInspectorRewardRefInput)
+
+            local _, _, selectedIndex, reward = getSelectedAchievementReward(self)
+            if not isSupportedReward(reward) or normalizeRewardType(reward.type) ~= "item" then
+                return
+            end
+
+            local currentDatasetId = select(1, parseDatasetQualifiedRef(reward.ref or "")) or ""
+            if currentDatasetId == trim(value) then
+                return
+            end
+
+            self:CommitSelectedAchievement(function(achievement)
+                local selectedReward = achievement.rewards and achievement.rewards[selectedIndex]
+                if isSupportedReward(selectedReward) and normalizeRewardType(selectedReward.type) == "item" then
+                    selectedReward.ref = ""
+                end
+            end)
+            if self.AchievementInspectorRewardItemDropdown then
+                self.AchievementInspectorRewardItemDropdown:SetItems(buildAchievementItemReferenceItems(self, trim(value), ""))
+                self.AchievementInspectorRewardItemDropdown:SetSelectedValue("", true)
+                setDropdownEnabled(self.AchievementInspectorRewardItemDropdown, trim(value) ~= "")
+            end
+        end,
+    })
+    itemDatasetGroup:AddChild(self.AchievementInspectorRewardItemDatasetDropdown)
+    root:AddChild(itemDatasetGroup)
+
+    local itemGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorRewardItemGroup", {
+        spacing = 2,
+        height = 34,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    itemGroup._visibleHeight = 34
+    itemGroup:AddChild(createLabel(itemGroup:GetFrame(), "RPEDataEditorAchievementInspectorRewardItemLabel", "Item"))
+    self.AchievementInspectorRewardItemDropdown = UI.CreateDropdown(itemGroup:GetFrame(), "RPEDataEditorAchievementInspectorRewardItemDropdown", {
+        width = FIELD_WIDTH,
+        height = CONTROL_HEIGHT,
+        items = { { label = "None", value = "" } },
+        onValueChanged = function(value)
+            if self._refreshingAchievementRewards then
+                return
+            end
+
+            local _, _, selectedIndex, reward = getSelectedAchievementReward(self)
+            if not isSupportedReward(reward) or normalizeRewardType(reward.type) ~= "item" then
+                return
+            end
+
+            self:CommitSelectedAchievement(function(achievement)
+                local selectedReward = achievement.rewards and achievement.rewards[selectedIndex]
+                if isSupportedReward(selectedReward) and normalizeRewardType(selectedReward.type) == "item" then
+                    selectedReward.ref = trim(value)
+                end
+            end)
+            self:RefreshAchievementRewardsInspector()
+        end,
+    })
+    itemGroup:AddChild(self.AchievementInspectorRewardItemDropdown)
+    root:AddChild(itemGroup)
+
+    local currencyGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorAchievementInspectorRewardCurrencyGroup", {
+        spacing = 2,
+        height = 34,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    currencyGroup._visibleHeight = 34
+    currencyGroup:AddChild(createLabel(currencyGroup:GetFrame(), "RPEDataEditorAchievementInspectorRewardCurrencyLabel", "Currency"))
+    self.AchievementInspectorRewardCurrencyDropdown = UI.CreateDropdown(currencyGroup:GetFrame(), "RPEDataEditorAchievementInspectorRewardCurrencyDropdown", {
+        width = FIELD_WIDTH,
+        height = CONTROL_HEIGHT,
+        items = buildAchievementCurrencyItems(self, ""),
+        onValueChanged = function(value)
+            if self._refreshingAchievementRewards then
+                return
+            end
+
+            local _, _, selectedIndex, reward = getSelectedAchievementReward(self)
+            if not isSupportedReward(reward) or normalizeRewardType(reward.type) ~= "currency" then
+                return
+            end
+
+            self:CommitSelectedAchievement(function(achievement)
+                local selectedReward = achievement.rewards and achievement.rewards[selectedIndex]
+                if isSupportedReward(selectedReward) and normalizeRewardType(selectedReward.type) == "currency" then
+                    selectedReward.ref = normalizeCurrencyReference(value)
+                end
+            end)
+            self:RefreshAchievementRewardsInspector()
+        end,
+    })
+    currencyGroup:AddChild(self.AchievementInspectorRewardCurrencyDropdown)
+    root:AddChild(currencyGroup)
+
+    self.AchievementInspectorRewardItemDatasetGroup = itemDatasetGroup
+    self.AchievementInspectorRewardItemGroup = itemGroup
+    self.AchievementInspectorRewardCurrencyGroup = currencyGroup
 
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardAmountLabel", "Amount"))
     self.AchievementInspectorRewardAmountInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAchievementInspectorRewardAmountInput", {
@@ -1075,13 +1390,25 @@ function DataEditor:RefreshAchievementCriteriaInspector()
         self.AchievementInspectorCriterionGoalInput:SetText(tostring(math.max(1, math.floor(tonumber(criterion and criterion.goal) or 1))))
         setTextElementEnabled(self.AchievementInspectorCriterionGoalInput, hasCriterion)
     end
-    if self.AchievementInspectorCurrencyRefInput then
-        self.AchievementInspectorCurrencyRefInput:SetText(tostring(filters.currencyRef or ""))
-        setTextElementEnabled(self.AchievementInspectorCurrencyRefInput, hasCriterion and trigger == "currency_gain")
+    local currencyRef = trim(filters.currencyRef)
+    local itemRef = trim(filters.itemRef)
+    local itemDatasetId = select(1, parseDatasetQualifiedRef(itemRef)) or ""
+    if self.AchievementInspectorCurrencyRefDropdown then
+        local currencyItems = buildAchievementCurrencyItems(self, currencyRef)
+        self.AchievementInspectorCurrencyRefDropdown:SetItems(currencyItems)
+        self.AchievementInspectorCurrencyRefDropdown:SetSelectedValue(getAchievementCurrencySelectionValue(currencyItems, currencyRef), true)
+        setDropdownEnabled(self.AchievementInspectorCurrencyRefDropdown, hasCriterion and trigger == "currency_gain")
     end
-    if self.AchievementInspectorItemRefInput then
-        self.AchievementInspectorItemRefInput:SetText(tostring(filters.itemRef or ""))
-        setTextElementEnabled(self.AchievementInspectorItemRefInput, hasCriterion and trigger == "item_gain")
+    if self.AchievementInspectorItemDatasetDropdown then
+        self.AchievementInspectorItemDatasetDropdown:SetItems(buildAchievementDatasetItems(self, itemDatasetId))
+        self.AchievementInspectorItemDatasetDropdown:SetSelectedValue(itemDatasetId, true)
+        setDropdownEnabled(self.AchievementInspectorItemDatasetDropdown, hasCriterion and trigger == "item_gain")
+    end
+    if self.AchievementInspectorItemRefDropdown then
+        local itemItems = buildAchievementItemReferenceItems(self, itemDatasetId, itemRef)
+        self.AchievementInspectorItemRefDropdown:SetItems(itemItems)
+        self.AchievementInspectorItemRefDropdown:SetSelectedValue(itemRef, true)
+        setDropdownEnabled(self.AchievementInspectorItemRefDropdown, hasCriterion and trigger == "item_gain" and itemDatasetId ~= "")
     end
     if self.AchievementInspectorSkillRefInput then
         self.AchievementInspectorSkillRefInput:SetText(tostring(filters.skillRef or ""))
@@ -1123,9 +1450,22 @@ function DataEditor:RefreshAchievementCriteriaInspector()
         elseif hasCriterion and trigger == "rpe_event_complete" then
             hint = "RPE event complete criteria have no required filters in Phase 1."
         elseif hasCriterion and trigger == "currency_gain" then
-            hint = "Set the currency reference used by this criterion."
+            local currencyItems = buildAchievementCurrencyItems(self, "")
+            if currencyRef ~= ""
+                and not dropdownItemsContainValue(currencyItems, currencyRef)
+                and not dropdownItemsContainValue(currencyItems, normalizeCurrencyReference(currencyRef))
+            then
+                hint = ("Unresolved currency reference: %s. Choose a replacement to update it."):format(currencyRef)
+            else
+                hint = "Select the currency used by this criterion."
+            end
         elseif hasCriterion and trigger == "item_gain" then
-            hint = "Set the item reference used by this criterion."
+            local itemItems = buildAchievementItemReferenceItems(self, itemDatasetId, "")
+            if itemRef ~= "" and not dropdownItemsContainValue(itemItems, itemRef) then
+                hint = ("Unresolved item reference: %s. Choose a replacement to update it."):format(itemRef)
+            else
+                hint = "Select an item from an Item Dataset."
+            end
         elseif hasCriterion and trigger == "skill_gain" then
             hint = "Set the skill reference used by this criterion."
         elseif hasCriterion and combatTrigger then
@@ -1136,6 +1476,9 @@ function DataEditor:RefreshAchievementCriteriaInspector()
             hint = "Set the achievement reference used by this criterion."
         end
         self.AchievementInspectorFilterHint:SetText(hint)
+    end
+    if self.AchievementInspectorCriteriaRoot and self.AchievementInspectorCriteriaRoot.RefreshLayout then
+        self.AchievementInspectorCriteriaRoot:RefreshLayout()
     end
     self._refreshingAchievementCriteria = false
 end
@@ -1170,10 +1513,31 @@ function DataEditor:RefreshAchievementRewardsInspector()
         self.AchievementInspectorRewardTypeDropdown:SetSelectedValue(rewardType, true)
         setDropdownEnabled(self.AchievementInspectorRewardTypeDropdown, supported)
     end
-    if self.AchievementInspectorRewardRefInput then
-        self.AchievementInspectorRewardRefInput:SetText(reward and tostring(reward.ref or "") or "")
-        setTextElementEnabled(self.AchievementInspectorRewardRefInput, supported)
+    local rewardRef = trim(reward and reward.ref or "")
+    local rewardDatasetId = select(1, parseDatasetQualifiedRef(rewardRef)) or ""
+    local itemRef = rewardType == "item" and rewardRef or ""
+    local itemDatasetId = rewardType == "item" and rewardDatasetId or ""
+    local currencyRef = rewardType == "currency" and rewardRef or ""
+    if self.AchievementInspectorRewardItemDatasetDropdown then
+        self.AchievementInspectorRewardItemDatasetDropdown:SetItems(buildAchievementDatasetItems(self, itemDatasetId))
+        self.AchievementInspectorRewardItemDatasetDropdown:SetSelectedValue(itemDatasetId, true)
+        setDropdownEnabled(self.AchievementInspectorRewardItemDatasetDropdown, supported and rewardType == "item")
     end
+    if self.AchievementInspectorRewardItemDropdown then
+        local itemItems = buildAchievementItemReferenceItems(self, itemDatasetId, itemRef)
+        self.AchievementInspectorRewardItemDropdown:SetItems(itemItems)
+        self.AchievementInspectorRewardItemDropdown:SetSelectedValue(itemRef, true)
+        setDropdownEnabled(self.AchievementInspectorRewardItemDropdown, supported and rewardType == "item" and itemDatasetId ~= "")
+    end
+    if self.AchievementInspectorRewardCurrencyDropdown then
+        local currencyItems = buildAchievementCurrencyItems(self, currencyRef)
+        self.AchievementInspectorRewardCurrencyDropdown:SetItems(currencyItems)
+        self.AchievementInspectorRewardCurrencyDropdown:SetSelectedValue(getAchievementCurrencySelectionValue(currencyItems, currencyRef), true)
+        setDropdownEnabled(self.AchievementInspectorRewardCurrencyDropdown, supported and rewardType == "currency")
+    end
+    setGroupVisible(self.AchievementInspectorRewardItemDatasetGroup, supported and rewardType == "item")
+    setGroupVisible(self.AchievementInspectorRewardItemGroup, supported and rewardType == "item")
+    setGroupVisible(self.AchievementInspectorRewardCurrencyGroup, supported and rewardType == "currency")
     if self.AchievementInspectorRewardAmountInput then
         self.AchievementInspectorRewardAmountInput:SetText(tostring(normalizeRewardAmount(reward and reward.amount)))
         setTextElementEnabled(self.AchievementInspectorRewardAmountInput, supported)
@@ -1181,13 +1545,29 @@ function DataEditor:RefreshAchievementRewardsInspector()
     if self.AchievementInspectorRewardHint then
         local hint = "Select a reward to edit it. Item refs use datasetId:itemId; currency refs use a built-in or dataset currency ref."
         if supported and rewardType == "item" then
-            hint = "Item reference: datasetId:itemId. Editing only changes saved Achievement data; it never grants the item."
+            local itemItems = buildAchievementItemReferenceItems(self, itemDatasetId, "")
+            if itemRef ~= "" and not dropdownItemsContainValue(itemItems, itemRef) then
+                hint = ("Unresolved item reference: %s. Choose a replacement to update it."):format(itemRef)
+            else
+                hint = "Select an item from an Item Dataset. Editing only changes saved Achievement data; it never grants the item."
+            end
         elseif supported and rewardType == "currency" then
-            hint = "Currency reference: copper, valor, justice, honor, conquest, or datasetId:currencyId."
+            local currencyItems = buildAchievementCurrencyItems(self, "")
+            if currencyRef ~= ""
+                and not dropdownItemsContainValue(currencyItems, currencyRef)
+                and not dropdownItemsContainValue(currencyItems, normalizeCurrencyReference(currencyRef))
+            then
+                hint = ("Unresolved currency reference: %s. Choose a replacement to update it."):format(currencyRef)
+            else
+                hint = "Select a currency: copper, valor, justice, honor, conquest, or a dataset currency."
+            end
         elseif reward ~= nil then
             hint = "Unsupported legacy reward data is preserved and cannot be edited here."
         end
         self.AchievementInspectorRewardHint:SetText(hint)
+    end
+    if self.AchievementInspectorRewardsRoot and self.AchievementInspectorRewardsRoot.RefreshLayout then
+        self.AchievementInspectorRewardsRoot:RefreshLayout()
     end
     self._refreshingAchievementRewards = false
 end

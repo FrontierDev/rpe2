@@ -377,6 +377,45 @@ local function applyThreatToUnit(targetUnit, sourceEventId, threatAmount)
     return true, numericThreatAmount, targetUnit.threatTable[numericSourceEventId]
 end
 
+local function getThreatForUnit(targetUnit, sourceEventId)
+    local numericSourceEventId = math.floor(tonumber(sourceEventId) or 0)
+    if type(targetUnit) ~= "table" or numericSourceEventId <= 0 then
+        return 0
+    end
+
+    local threatTable = type(targetUnit.threatTable) == "table" and targetUnit.threatTable or nil
+    return math.max(0, tonumber(threatTable and threatTable[numericSourceEventId]) or 0)
+end
+
+local function commitResolvedDamageThreat(entry, result)
+    if type(entry) ~= "table" or type(entry.defenderUnit) ~= "table" or type(result) ~= "table" then
+        return false
+    end
+    if result.threatCommitted == true then
+        return result.threatApplied == true
+    end
+
+    result.threatCommitted = true
+    result.threatApplied = false
+    result.threatUpdate = nil
+    if entry.defenderUnit.isPlayer == true or (tonumber(result.amount) or 0) <= 0 then
+        return false
+    end
+
+    local threatApplied, generatedThreat, totalThreat = applyThreatToUnit(
+        entry.defenderUnit,
+        result.threatSourceEventId,
+        result.threatGenerated
+    )
+    result.threatGenerated = generatedThreat
+    result.threatApplied = threatApplied
+    result.threatTotal = totalThreat
+    if threatApplied then
+        result.threatUpdate = buildThreatUpdatePayload(entry.defenderUnit, entry.attackerUnit, generatedThreat)
+    end
+    return threatApplied
+end
+
 local function buildCombatResult(entry, resultToken, resultType)
     return {
         effectType = "damage",
@@ -1003,6 +1042,7 @@ buildResolvedDamageResult = function(self, entry)
         threatTargetEventId = 0,
         threatTotal = 0,
         threatUpdate = nil,
+        threatCommitted = false,
         critMitigationStatRef = nil,
         critMitigationStatValue = 0,
         critMitigation = nil,
@@ -1104,17 +1144,11 @@ buildResolvedDamageResult = function(self, entry)
             getCachedStatValue(hitContext, entry.attackerUnit, combatRules.threatGeneratedStat),
             false
         )))
-        local threatApplied, generatedThreat, totalThreat = applyThreatToUnit(
-            entry.defenderUnit,
-            attackerEventId,
-            threatAmount
-        )
-        result.threatGenerated = generatedThreat
-        result.threatApplied = threatApplied
+        result.threatGenerated = threatAmount
         result.threatSourceEventId = attackerEventId
         result.threatTargetEventId = defenderEventId
-        result.threatTotal = totalThreat
-        result.threatUpdate = buildThreatUpdatePayload(entry.defenderUnit, entry.attackerUnit, generatedThreat)
+        result.threatTotal = getThreatForUnit(entry.defenderUnit, attackerEventId) + threatAmount
+        result.threatUpdate = buildThreatUpdatePayload(entry.defenderUnit, entry.attackerUnit, threatAmount)
     end
 
     hitContext.resolvedResult = result
@@ -1157,11 +1191,24 @@ function Combat:ApplyResolvedDamage(entry, previewOnly)
         return false, result
     end
 
-    ensureHealthResourceEntry(entry, hitContext)
+    local resourceUnit = entry.defenderUnit
+    if previewOnly == true then
+        resourceUnit = self:CloneValue(entry.defenderUnit)
+        local previewHitContext = {
+            healthResourceContext = self:CloneValue(hitContext.healthResourceContext),
+        }
+        ensureHealthResourceEntry({
+            context = entry.context,
+            defenderUnit = resourceUnit,
+            eventState = entry.eventState,
+        }, previewHitContext)
+    else
+        ensureHealthResourceEntry(entry, hitContext)
+    end
 
     -- Damage results are always previewed locally and become authoritative only once
     -- the corresponding RESOURCE_DELTA message is handled back through the client.
-    local applied, resourceEntry, appliedDelta = self:PreviewResourceDelta(entry.defenderUnit, healthResourceRef, -finalDamage)
+    local applied, resourceEntry, appliedDelta = self:PreviewResourceDelta(resourceUnit, healthResourceRef, -finalDamage)
     result.applied = applied
     result.resourceEntry = resourceEntry
     result.appliedDelta = appliedDelta
@@ -1177,6 +1224,10 @@ function Combat:ApplyResolvedDamage(entry, previewOnly)
     end
     if not applied then
         return false, result
+    end
+
+    if previewOnly ~= true then
+        commitResolvedDamageThreat(entry, result)
     end
 
     return true, result

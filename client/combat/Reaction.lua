@@ -680,6 +680,14 @@ function Combat:FinalizeLocalDamageResult(entry, damageResult)
     end
 
     local immediate = type(entry.context) == "table" and entry.context.immediate == true
+    local threatUpdate = nil
+    if damageResult.threatCommitted == true
+        and damageResult.threatApplied == true
+        and damageResult.threatUpdateQueued ~= true
+        and type(damageResult.threatUpdate) == "table"
+    then
+        threatUpdate = damageResult.threatUpdate
+    end
     local queueStartTime = timingEnabled and getNowMilliseconds() or nil
     local queued = Client:QueueClientResourceDeltas(
         sessionState,
@@ -690,9 +698,12 @@ function Combat:FinalizeLocalDamageResult(entry, damageResult)
             allowLocalEchoApply = true,
             immediate = immediate,
             scope = immediate and (entry.context.pendingScope or "reaction") or "turn",
-            threatUpdates = damageResult and damageResult.threatUpdate and { damageResult.threatUpdate } or nil,
+            threatUpdates = threatUpdate and { threatUpdate } or nil,
         }
     )
+    if queued and threatUpdate then
+        damageResult.threatUpdateQueued = true
+    end
     if timingEnabled then
         timingParts[#timingParts + 1] = {
             label = "resource-queue",
