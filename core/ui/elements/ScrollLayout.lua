@@ -296,12 +296,18 @@ function ScrollLayout:RefreshRows()
         local row = self.rows[visibleIndex]
         local rowFrame = row and row.GetFrame and row:GetFrame() or nil
         if visibleIndex > self.visibleRows then
+            if row and type(row.Reset) == "function" then
+                row:Reset()
+            end
             if rowFrame and rowFrame.Hide then
                 rowFrame:Hide()
             end
         else
             local itemIndex = startIndex + visibleIndex
             local item = self.items[itemIndex]
+            if not item and row and type(row.Reset) == "function" then
+                row:Reset()
+            end
             if rowFrame then
                 if item then
                     if rowFrame.Show then
