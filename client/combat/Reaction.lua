@@ -38,6 +38,7 @@ local ACTION_ICONS = {
 local trimText = Normalization.TrimText
 local normalizeToken = Normalization.NormalizeToken
 local normalizeResultToken = Normalization.NormalizeResultToken
+local splitList = Normalization.SplitList
 local Dependencies = Database.Dependecies or {}
 local REACTION_ATTACK_TYPES = { "melee", "ranged", "spell" }
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
@@ -166,6 +167,278 @@ local function getCombatRuleValue(ruleKey, fallback)
     end
 
     return value
+end
+
+local function normalizeDefensiveReactionStatRef(value)
+    local token = normalizeToken(value)
+    return token and string.lower(token) or nil
+end
+
+local function isPassReactionAction(action)
+    if type(action) == "table" then
+        return normalizeResultToken(action.id) == RESULT_PASS
+            or normalizeResultToken(action.kind) == RESULT_PASS
+            or normalizeResultToken(action.resolutionSystem) == RESULT_PASS
+    end
+
+    return normalizeResultToken(action) == RESULT_PASS
+end
+
+local function resolveDefensiveReactionAction(entry, action)
+    if type(action) == "table" then
+        return action
+    end
+    if isPassReactionAction(action) then
+        return { id = RESULT_PASS, resolutionSystem = RESULT_PASS }
+    end
+    if type(entry) == "table" and type(Combat.FindReactionAction) == "function" then
+        return Combat:FindReactionAction(entry, action)
+    end
+    return nil
+end
+
+local function getDefensiveReactionStatRef(action)
+    return normalizeDefensiveReactionStatRef(type(action) == "table" and action.statRef or nil)
+end
+
+local function isDefensiveReactionStatBypassed(statRef)
+    local configured = getCombatRuleValue("defensive_reaction_limit_bypass_stats", {})
+    local candidates = {}
+
+    local function addCandidate(value)
+        local normalized = normalizeDefensiveReactionStatRef(value)
+        if normalized then
+            candidates[normalized] = true
+        end
+    end
+
+    if type(configured) == "table" then
+        for key, value in pairs(configured) do
+            if type(key) == "number" then
+                addCandidate(value)
+            elseif value == true then
+                addCandidate(key)
+            elseif type(value) == "string" then
+                addCandidate(value)
+            end
+        end
+    elseif type(splitList) == "function" then
+        local values = splitList(configured)
+        for index = 1, #values do
+            addCandidate(values[index])
+        end
+    else
+        addCandidate(configured)
+    end
+
+    return candidates[statRef] == true
+end
+
+local function getDefensiveReactionLedgerIdentity(entry, action)
+    if type(entry) ~= "table" or type(action) ~= "table" then
+        return nil
+    end
+
+    local eventState = entry.eventState
+    local eventId = normalizeToken(entry.eventId)
+    if not eventId then
+        eventId = normalizeToken(eventState and eventState.id)
+    end
+    local turnNumber = tonumber(entry.turnNumber)
+    if turnNumber == nil then
+        turnNumber = tonumber(eventState and eventState.turnNumber)
+    end
+    turnNumber = math.floor(turnNumber or 0)
+    local defenderEventId = math.floor(tonumber(entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID)) or 0)
+    local resolutionSystem = normalizeToken(action.resolutionSystem or entry.defenceSystem)
+    local statRef = getDefensiveReactionStatRef(action)
+    if not eventId or turnNumber <= 0 or defenderEventId <= 0 or not resolutionSystem or not statRef then
+        return nil
+    end
+
+    return table.concat({
+        string.lower(eventId),
+        tostring(turnNumber),
+        tostring(defenderEventId),
+        string.lower(resolutionSystem),
+        statRef,
+    }, "\031"), eventId, turnNumber
+end
+
+local function getCurrentEventIdentity(eventState, eventId, turnNumber)
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return false, "stale-event"
+    end
+
+    local currentEventState = Client.EventState
+    if type(currentEventState) ~= "table" then
+        return true
+    end
+    if currentEventState.active ~= true then
+        return false, "stale-event"
+    end
+    if currentEventState ~= eventState then
+        return false, "stale-event"
+    end
+
+    local currentEventId = normalizeToken(currentEventState.id)
+    if currentEventId and currentEventId ~= eventId then
+        return false, "stale-event"
+    end
+
+    local currentTurnNumber = math.floor(tonumber(currentEventState.turnNumber) or 0)
+    if currentTurnNumber > 0 and currentTurnNumber ~= turnNumber then
+        return false, currentTurnNumber < turnNumber and "stale-turn" or "stale-event"
+    end
+
+    return true
+end
+
+local function getDefensiveReactionLedger(eventId, turnNumber)
+    -- This is transient client runtime state. Keeping only the active event
+    -- turn bounds stale entries without making tick/page changes a reset.
+    local ledger = Combat.DefensiveReactionUseLedger
+    if type(ledger) == "table" then
+        if ledger.eventId == eventId and ledger.turnNumber == turnNumber then
+            return ledger
+        end
+        if ledger.eventId == eventId and (tonumber(ledger.turnNumber) or 0) > turnNumber then
+            return nil
+        end
+    end
+
+    ledger = {
+        eventId = eventId,
+        turnNumber = turnNumber,
+        uses = {},
+    }
+    Combat.DefensiveReactionUseLedger = ledger
+    return ledger
+end
+
+function Combat:ClearDefensiveReactionUseLedger(eventId)
+    local ledger = self.DefensiveReactionUseLedger
+    if type(ledger) ~= "table" then
+        return false
+    end
+
+    local normalizedEventId = normalizeToken(eventId)
+    if not normalizedEventId or ledger.eventId == normalizedEventId then
+        self.DefensiveReactionUseLedger = nil
+        return true
+    end
+
+    return false
+end
+
+function Combat:CanUseDefensiveReaction(entry, action)
+    if type(entry) ~= "table" then
+        if isPassReactionAction(action) then
+            return true
+        end
+        return false, "invalid-entry"
+    end
+    local resolvedAction = resolveDefensiveReactionAction(entry, action)
+    if not resolvedAction then
+        return false, "invalid-action"
+    end
+    if resolvedAction.enabled == false then
+        return false, resolvedAction.unavailableReason or "disabled"
+    end
+    if isPassReactionAction(resolvedAction) then
+        return true
+    end
+    if getCombatRuleValue("limit_defensive_reactions_per_turn", false) ~= true then
+        return true
+    end
+
+    local statRef = getDefensiveReactionStatRef(resolvedAction)
+    if not statRef then
+        return true
+    end
+    if isDefensiveReactionStatBypassed(statRef) then
+        return true
+    end
+
+    local identity, eventId, turnNumber = getDefensiveReactionLedgerIdentity(entry, resolvedAction)
+    if not identity then
+        return false, "invalid-defensive-context"
+    end
+
+    local currentEventValid, currentEventReason = getCurrentEventIdentity(entry.eventState, eventId, turnNumber)
+    if not currentEventValid then
+        return false, currentEventReason
+    end
+
+    local ledger = getDefensiveReactionLedger(eventId, turnNumber)
+    if not ledger then
+        return false, "stale-turn"
+    end
+    if ledger.uses[identity] == true then
+        return false, "used-this-turn"
+    end
+
+    return true
+end
+
+function Combat:ConsumeDefensiveReactionUse(entry, action)
+    local resolvedAction = resolveDefensiveReactionAction(entry, action)
+    if not resolvedAction or resolvedAction.enabled == false then
+        return false, "disabled"
+    end
+    if isPassReactionAction(resolvedAction) then
+        return true
+    end
+
+    local statRef = getDefensiveReactionStatRef(resolvedAction)
+    if getCombatRuleValue("limit_defensive_reactions_per_turn", false) ~= true or not statRef then
+        return true
+    end
+    if isDefensiveReactionStatBypassed(statRef) then
+        return true
+    end
+
+    local available, reason = self:CanUseDefensiveReaction(entry, resolvedAction)
+    if not available then
+        return false, reason
+    end
+
+    local identity, eventId, turnNumber = getDefensiveReactionLedgerIdentity(entry, resolvedAction)
+    if not identity then
+        return false, "invalid-defensive-context"
+    end
+
+    local ledger = getDefensiveReactionLedger(eventId, turnNumber)
+    if not ledger or ledger.uses[identity] == true then
+        return false, "used-this-turn"
+    end
+    ledger.uses[identity] = true
+    return true
+end
+
+function Combat:RefreshDefensiveReactionAvailability(entry, actions)
+    if type(actions) ~= "table" then
+        return actions
+    end
+
+    for index = 1, #actions do
+        local action = actions[index]
+        if type(action) == "table" and not isPassReactionAction(action) then
+            if action.enabled == false and action.unavailableReason == "used-this-turn" then
+                action.enabled = true
+                action.unavailableReason = nil
+            end
+            if action.enabled ~= false then
+                local available, reason = self:CanUseDefensiveReaction(entry, action)
+                if not available then
+                    action.enabled = false
+                    action.unavailableReason = reason
+                end
+            end
+        end
+    end
+
+    return actions
 end
 
 local function getConfigurationRevision()
@@ -724,7 +997,7 @@ function Combat:BuildReactionActions(entry)
         return {}
     end
     if type(entry.reactionActionsCache) == "table" then
-        return entry.reactionActionsCache
+        return self:RefreshDefensiveReactionAvailability(entry, entry.reactionActionsCache)
     end
     local actions = {}
 
@@ -884,6 +1157,7 @@ function Combat:BuildReactionActions(entry)
         enabled = true,
     }
 
+    self:RefreshDefensiveReactionAvailability(entry, actions)
     entry.reactionActionsCache = actions
     return actions
 end
@@ -918,6 +1192,7 @@ function Combat:ChooseAutomaticReactionAction(entry)
                 and action.id
                 and action.id ~= RESULT_PASS
                 and action.enabled ~= false
+                and self:CanUseDefensiveReaction(entry, action)
                 and tostring(action.resolutionSystem or "") == tostring(entry.defenceSystem or "")
             then
                 return action
@@ -927,7 +1202,9 @@ function Combat:ChooseAutomaticReactionAction(entry)
         for index = 1, #actions do
             local action = actions[index]
             if action and action.id and action.id ~= RESULT_PASS and action.enabled ~= false then
-                return action
+                if self:CanUseDefensiveReaction(entry, action) then
+                    return action
+                end
             end
         end
 
@@ -936,32 +1213,42 @@ function Combat:ChooseAutomaticReactionAction(entry)
 
     local defenceSystem = tostring(entry.defenceSystem or "")
     if defenceSystem == "ac" or defenceSystem == "simple" then
-        return {
+        local action = {
             id = ("%s:resolve"):format(defenceSystem),
             resolutionSystem = defenceSystem,
+            statRef = self:ResolveDefenceStatRef(defenceSystem, entry.attackType),
         }
+        if self:CanUseDefensiveReaction(entry, action) then
+            return action
+        end
     end
 
     if defenceSystem == "complex" then
         local statRefs = self:ResolveComplexDefenceStats(entry.attackType)
         local statRef = normalizeToken(statRefs and statRefs[1] or nil)
         if statRef then
-            return {
+            local action = {
                 id = ("complex:%s"):format(statRef),
                 resolutionSystem = "complex",
                 statRef = statRef,
             }
+            if self:CanUseDefensiveReaction(entry, action) then
+                return action
+            end
         end
     end
 
     if defenceSystem == "percent" then
         local statRefs = self:ResolvePercentResistanceStatRefs(entry.attackType)
         local statRef = normalizeToken(statRefs and statRefs[1] or nil)
-        return {
+        local action = {
             id = statRef and ("percent:%s"):format(statRef) or "percent:resolve",
             resolutionSystem = "percent",
             statRef = statRef,
         }
+        if self:CanUseDefensiveReaction(entry, action) then
+            return action
+        end
     end
 
     local actions = self:BuildReactionActions(entry)
@@ -971,6 +1258,7 @@ function Combat:ChooseAutomaticReactionAction(entry)
             and action.id
             and action.id ~= RESULT_PASS
             and action.enabled ~= false
+            and self:CanUseDefensiveReaction(entry, action)
             and tostring(action.resolutionSystem or "") == tostring(entry and entry.defenceSystem or "")
         then
             return action.id
@@ -979,7 +1267,9 @@ function Combat:ChooseAutomaticReactionAction(entry)
 
     for index = 1, #actions do
         local action = actions[index]
-        if action and action.id and action.id ~= RESULT_PASS and action.enabled ~= false then
+        if action and action.id and action.id ~= RESULT_PASS and action.enabled ~= false
+            and self:CanUseDefensiveReaction(entry, action)
+        then
             return action.id
         end
     end
@@ -1231,9 +1521,19 @@ function Client:ResolveCombatReactionAction(actionId)
     if type(action) ~= "table" or action.enabled == false then
         return false
     end
+    if type(Combat.CanUseDefensiveReaction) == "function"
+        and Combat:CanUseDefensiveReaction(entry, action) ~= true
+    then
+        return false
+    end
 
     local resultToken, resolution = Combat:ResolveHitCheckOutcome(entry, action)
     if not resultToken then
+        return false
+    end
+    if type(Combat.ConsumeDefensiveReactionUse) == "function"
+        and Combat:ConsumeDefensiveReactionUse(entry, action) ~= true
+    then
         return false
     end
 
@@ -1331,6 +1631,7 @@ function Combat:HandleDamageHitCheckRequest(client, arguments, sender)
         defenderUnit = defenderUnit,
         attackerEventId = attackerEventId,
         defenderEventId = defenderEventId,
+        turnNumber = math.max(1, math.floor(tonumber(eventState.turnNumber) or 1)),
         attackerTotal = attackerTotal,
         rawDamage = rawDamage,
         resultType = resultType,

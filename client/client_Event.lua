@@ -2372,6 +2372,10 @@ local function clearEventStateNow(client, state, reason, options)
     local transition = client.EventTransition
     local eventState = type(state) == "table" and state or (transition and transition.eventState)
     local eventId = eventState and eventState.id or nil
+    local combat = client.Combat or (Addon.Client and Addon.Client.Combat) or nil
+    if type(combat) == "table" and type(combat.ClearDefensiveReactionUseLedger) == "function" then
+        combat:ClearDefensiveReactionUseLedger(eventId)
+    end
     if type(client.CancelPendingTurnCommit) == "function" then
         client:CancelPendingTurnCommit(options.cancelReason or "event-reset", eventId)
     end
