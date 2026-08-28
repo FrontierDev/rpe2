@@ -795,6 +795,14 @@ local function enqueueClientSliceable(options)
     return nil
 end
 
+local function shouldYieldTaskSlice(deadlineMs)
+    local tasks = Addon.Internal and Addon.Internal.Tasks or nil
+    return deadlineMs ~= nil
+        and type(tasks) == "table"
+        and type(tasks.ShouldYield) == "function"
+        and tasks:ShouldYield(deadlineMs) == true
+end
+
 local function getConfigurationRevision()
     return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
 end
