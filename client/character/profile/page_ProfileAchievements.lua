@@ -20,9 +20,9 @@ ProfileUI.AchievementsPage = AchievementsPage
 local NAV_PANEL_WIDTH = 168
 local CONTENT_PANEL_WIDTH = 340
 local CONTENT_PADDING = 8
-local ENTRY_HEIGHT = 64
+local ENTRY_HEIGHT = 78
 local ENTRY_SPACING = 4
-local ENTRY_ROWS = 4
+local ENTRY_ROWS = 3
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local RETRY_BUTTON_WIDTH = 100
 local RETRY_BUTTON_HEIGHT = 18
@@ -189,6 +189,82 @@ local function buildCriterionProgress(achievement, state)
     return table.concat(progress, "  |  ")
 end
 
+local function getCriterionCurrent(stateCriteria, criterionId, goal)
+    local value = stateCriteria and stateCriteria[criterionId] or 0
+    if value == true then
+        return goal
+    end
+
+    return math.min(goal, normalizeProgress(value))
+end
+
+local function buildCriterionPresentation(achievement, state)
+    local criteria = achievement and achievement.criteria or {}
+    if type(criteria) ~= "table" then
+        return { kind = "none" }
+    end
+
+    local validCriteria = {}
+    for index = 1, #criteria do
+        if type(criteria[index]) == "table" then
+            validCriteria[#validCriteria + 1] = criteria[index]
+        end
+    end
+
+    if #validCriteria == 0 then
+        return { kind = "none" }
+    end
+
+    local stateCriteria = state and type(state.criteria) == "table" and state.criteria or {}
+    if #validCriteria == 1 then
+        local criterion = validCriteria[1]
+        local goal = normalizeGoal(criterion.goal)
+        local current = getCriterionCurrent(stateCriteria, trimString(criterion.id), goal)
+        if goal > 1 then
+            return {
+                kind = "bar",
+                current = current,
+                goal = goal,
+                text = ("%d / %d"):format(current, goal),
+            }
+        end
+
+        return {
+            kind = "summary",
+            text = current >= goal and "Criterion: Complete" or "Criterion: Incomplete",
+        }
+    end
+
+    local completed = 0
+    for index = 1, #validCriteria do
+        local criterion = validCriteria[index]
+        local goal = normalizeGoal(criterion.goal)
+        local current = getCriterionCurrent(stateCriteria, trimString(criterion.id), goal)
+        if current >= goal then
+            completed = completed + 1
+        end
+    end
+
+    return {
+        kind = "summary",
+        text = ("Criteria: %d / %d complete"):format(completed, #validCriteria),
+    }
+end
+
+local function getCompletionTimestamp(row)
+    local timestamp = tonumber(row and row.state and row.state.completedAt)
+    if not timestamp
+        or timestamp ~= timestamp
+        or timestamp == math.huge
+        or timestamp == -math.huge
+        or timestamp < 0
+    then
+        return nil
+    end
+
+    return timestamp
+end
+
 local function buildAchievementRows()
     local datasets = Registry.GetActivatedDatasets and Registry:GetActivatedDatasets() or {}
     local states = Profile.ListAchievementStates and Profile.ListAchievementStates() or {}
@@ -216,6 +292,7 @@ local function buildAchievementRows()
                         state = states[achievementRef],
                         category = normalizeAchievementCategory(achievement.category),
                         subcategory = normalizeAchievementSubcategory(achievement.subcategory),
+                        sourceOrder = #rows + 1,
                     }
                 end
             end
@@ -306,6 +383,33 @@ local function filterAchievementRows(rows, selectedCategory)
     end
 
     return filtered
+end
+
+local function sortAchievementRows(rows)
+    local sorted = {}
+    local sourceOrders = {}
+    for index = 1, #rows do
+        sorted[index] = rows[index]
+        sourceOrders[rows[index]] = index
+    end
+
+    table.sort(sorted, function(left, right)
+        local leftTimestamp = getCompletionTimestamp(left)
+        local rightTimestamp = getCompletionTimestamp(right)
+        local leftCompleted = leftTimestamp ~= nil
+        local rightCompleted = rightTimestamp ~= nil
+
+        if leftCompleted ~= rightCompleted then
+            return leftCompleted
+        end
+        if leftTimestamp and rightTimestamp and leftTimestamp ~= rightTimestamp then
+            return leftTimestamp > rightTimestamp
+        end
+
+        return (left.sourceOrder or sourceOrders[left] or 0) < (right.sourceOrder or sourceOrders[right] or 0)
+    end)
+
+    return sorted
 end
 
 local function findCategory(categories, selectedKey)
@@ -587,40 +691,6 @@ local function canRetryRewards(row)
     return rewardState and string.lower(trimString(rewardState.status)) == "failed"
 end
 
-local function getStatusText(row)
-    local completionDate = getCompletionDate(row and row.state and row.state.completedAt)
-    local status = completionDate and ("Complete\n" .. completionDate) or "Incomplete"
-    local rewardStatus = getRewardStatusText(row)
-    if rewardStatus ~= "" then
-        status = status .. "\n" .. rewardStatus
-    end
-
-    return status
-end
-
-local function getDisplayText(row)
-    local achievement = row and row.achievement or {}
-    local lines = { getAchievementName(achievement) }
-    local description = trimString(achievement.description)
-    local criterionProgress = buildCriterionProgress(achievement, row and row.state)
-
-    if description ~= "" then
-        lines[#lines + 1] = description
-    end
-    if criterionProgress ~= "" then
-        lines[#lines + 1] = criterionProgress
-    end
-    local rewardStatus = getRewardStatusText(row)
-    if rewardStatus ~= "" then
-        lines[#lines + 1] = rewardStatus
-    end
-    for index, rewardLine in ipairs(buildRewardLines(row)) do
-        lines[#lines + 1] = rewardLine
-    end
-
-    return table.concat(lines, "\n")
-end
-
 local function getTooltipLines(row)
     local achievement = row and row.achievement or {}
     local lines = {}
@@ -654,21 +724,6 @@ local function getTooltipLines(row)
     return lines
 end
 
-local function applyAchievementRowVisuals(row, achievementRow)
-    local isComplete = achievementRow and achievementRow.state and achievementRow.state.completedAt ~= nil
-    local background = isComplete
-        and UI.ResolveColor({ r = 0.08, g = 0.18, b = 0.11, a = 0.92 }, "list.rowBackground")
-        or UI.ResolveColor(nil, "list.rowBackground")
-    if row and row.entryBackground and row.entryBackground.SetColorTexture then
-        row.entryBackground:SetColorTexture(background.r or 0, background.g or 0, background.b or 0, background.a or 1)
-    end
-
-    if row and row.SetStatusColor then
-        local color = UI.ResolveColor(nil, isComplete and "success" or "text.muted")
-        row:SetStatusColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
-    end
-end
-
 function AchievementsPage:EnsureCategorySelection(categories)
     if findCategory(categories, self.SelectedCategoryKey) then
         return
@@ -679,7 +734,7 @@ end
 
 function AchievementsPage:GetSelectedAchievementRows()
     local selectedCategory = findCategory(self.CategoryRows or {}, self.SelectedCategoryKey)
-    return filterAchievementRows(self.AllAchievementRows or {}, selectedCategory)
+    return sortAchievementRows(filterAchievementRows(self.AllAchievementRows or {}, selectedCategory))
 end
 
 function AchievementsPage:UpdateRetryButton(selectedRows)
@@ -894,43 +949,37 @@ function AchievementsPage:Build(parent, owner)
         rowHeight = ENTRY_HEIGHT,
         rowSpacing = ENTRY_SPACING,
         border = false,
-        rowElementClass = UI.ScrollListEntry,
+        rowElementClass = UI.AchievementEntry,
         rowWidth = CONTENT_PANEL_WIDTH - (CONTENT_PADDING * 2),
-        categoryWidth = 48,
-        statusWidth = 118,
-        categoryInsetLeft = 4,
-        statusInsetRight = 4,
-        rowWordWrap = true,
     })
     self.EntryScroll:SetParent(self.EntryPanel:GetContentFrame())
     self.EntryScroll:SetRowRenderer(function(row, achievementRow)
         local achievement = achievementRow and achievementRow.achievement or {}
-        row._achievementRef = achievementRow and achievementRow.achievementRef or ""
-        local rowFrame = row.GetFrame and row:GetFrame() or nil
-        if rowFrame then
-            rowFrame:EnableMouse(true)
-            if not row._achievementSelectionBound then
-                local selectAchievement = function(_, button)
-                    if button == "LeftButton" and row._achievementRef ~= "" then
-                        self.SelectedAchievementRef = row._achievementRef
-                        self:Refresh()
-                    end
-                end
-                if rowFrame.HookScript then
-                    rowFrame:HookScript("OnMouseUp", selectAchievement)
-                    row._achievementSelectionBound = true
-                elseif rowFrame.SetScript then
-                    rowFrame:SetScript("OnMouseUp", selectAchievement)
-                    row._achievementSelectionBound = true
-                end
+        local achievementRef = achievementRow and achievementRow.achievementRef or ""
+        local completionTimestamp = getCompletionTimestamp(achievementRow)
+
+        row:SetOnClick(function(_, button)
+            if button == "LeftButton" and achievementRef ~= "" then
+                self.SelectedAchievementRef = achievementRef
+                self:Refresh()
             end
-        end
-        local iconMarkup = ("|T%s:24:24:0:0|t"):format(getAchievementIcon(achievement))
-        row:SetCategory(iconMarkup)
-        row:SetTestName(getDisplayText(achievementRow))
-        row:SetStatus(getStatusText(achievementRow))
-        row:SetDetail(table.concat(getTooltipLines(achievementRow), "\n"))
-        applyAchievementRowVisuals(row, achievementRow)
+        end)
+        row:SetAchievementData({
+            icon = getAchievementIcon(achievement),
+            name = getAchievementName(achievement),
+            description = trimString(achievement.description),
+            progress = buildCriterionPresentation(achievement, achievementRow and achievementRow.state),
+            completed = completionTimestamp ~= nil,
+            completionDate = getCompletionDate(completionTimestamp),
+            rewardStatus = getRewardStatusText(achievementRow),
+        })
+        row:SetTooltip(function()
+            return {
+                type = "custom",
+                title = getAchievementName(achievement),
+                lines = getTooltipLines(achievementRow),
+            }
+        end)
     end)
     self.EntryScroll:Create()
     UI.Utils.AnchorFill(self.EntryScroll, self.EntryPanel:GetContentFrame(), 0, 0, 0, 0)

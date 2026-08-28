@@ -1,285 +1,317 @@
 ## Goal
 
-Replace the current tag-derived Achievement categories with an explicit Achievement category model.
+Rework Profile -> Achievements so the main Achievement list reads like an Achievement interface rather than a generic text list, while preserving RPE's existing data/runtime semantics.
 
-Every Achievement must have one built-in top-level category from this fixed list, in this order:
+Completed Achievements must be shown **before incomplete Achievements**, with completed entries ordered by `completedAt` **most recent first**.
 
-```text
-General
-Character
-Combat
-Events
-Player vs. Player
-Reputation
-Feats of Strength
-Legacy
-```
+This task should use World of Warcraft's Achievement UI as the visual/interaction reference for information hierarchy, but adapt it to RPE's actual data model rather than copying Blizzard templates or inventing unsupported concepts such as Achievement Points.
 
-Achievements may additionally have a **freeform subcategory**, authored as text in the Achievement editor.
-
-Tags remain independent metadata and must no longer define the Profile Achievement category tree.
+Depends on: #76
 
 ## Current-code investigation / root cause
 
-### Achievement definition has no category fields
-
-`core/classes/Achievement.lua` currently serializes:
-
-```text
-id
-name
-description
-icon
-criteria
-rewards
-tags
-```
-
-There is no `category` or `subcategory` field.
-
-### The Data Editor can only author tags
-
-`client/ui/editor/inspectors/page_InspectorAchievement.lua` currently exposes on the General page:
-
-```text
-Name
-Icon
-Tags
-Description
-```
-
-There is no category selector or subcategory input.
-
-### Profile categories are currently inferred from tags
-
-`client/character/profile/page_ProfileAchievements.lua` copies `achievement.tags` into its row model. `buildCategoryRows()` then collects every unique tag and presents those values as Achievement categories; `filterAchievementRows()` filters by tag.
-
-This is the core model mismatch. A metadata tag such as `seasonal`, `hidden`, or `boss` currently also becomes a first-class navigation category, while there is no way to guarantee the fixed category taxonomy requested for the product.
-
-The original Profile Achievements implementation and current PDD explicitly describe tag-based filters. This issue supersedes that design.
-
-## Required data model
-
-Add explicit normalized fields to `Achievement`:
-
-```lua
-Achievement {
-    ...
-    category = "general",
-    subcategory = "",
-    tags = {},
-}
-```
-
-### Stable category keys
-
-Persist stable keys rather than display strings:
-
-```text
-general             -> General
-character           -> Character
-combat              -> Combat
-events              -> Events
-player_vs_player    -> Player vs. Player
-reputation          -> Reputation
-feats_of_strength   -> Feats of Strength
-legacy              -> Legacy
-```
-
-Centralize this key/label/order definition in one Achievement-owned/shared location. The editor and Profile page must consume the same source rather than each defining separate hard-coded lists.
-
-### Defaults and normalization
-
-- `category` defaults to `general` for new and legacy Achievements.
-- Unknown/invalid category keys normalize safely to `general` unless there is an existing repository convention for preserving invalid enum values for editor repair; do not allow invalid values to break Profile navigation.
-- `subcategory` defaults to `""`.
-- `subcategory` is freeform display text; trim leading/trailing whitespace when authored/normalized.
-- Blank subcategory is valid and means the Achievement belongs directly to its top-level category.
-- Keep case/punctuation as authored after trimming; do not silently rename freeform subcategories.
-- Existing `tags` remain normalized exactly as today and are **not migrated into category/subcategory**.
-
-Do not infer an old category from the first tag or otherwise reinterpret legacy tags. Existing Achievements without the new fields simply become `General` while retaining all tags.
-
-## Achievement class / serialization changes
-
-Update `core/classes/Achievement.lua` so:
-
-- `New()` establishes the new defaults;
-- `Merge()` accepts and normalizes the fields;
-- `ToTable()` serializes both fields;
-- import/export round-trips the values;
-- existing Achievement criteria/rewards/tags normalization is unchanged.
-
-The current Dataset schema on `main` is `17`. Because this changes the serialized dataset definition shape, bump the Dataset schema to the next version (`18`) using the repository's existing additive normalization convention.
-
-No Profile schema change is required: category/subcategory are definition data, not character progress.
-
-## Data Editor changes
-
-Primary file:
-
-- `client/ui/editor/inspectors/page_InspectorAchievement.lua`
-
-On the General inspector page, add:
-
-```text
-Category:     [dropdown]
-Subcategory:  [freeform text input]
-```
-
-Requirements:
-
-- Category dropdown contains exactly the eight built-in categories in the canonical order above.
-- The dropdown stores the stable category key, not the label.
-- Subcategory is a normal freeform text input.
-- Empty subcategory is allowed.
-- Existing Tags input remains available and is clearly independent of category navigation.
-- Editing either field uses the normal dataset-entry change/coalescing path.
-- Reopening the inspector restores the serialized values correctly.
-
-## Profile -> Achievements category navigation
-
 Primary file:
 
 - `client/character/profile/page_ProfileAchievements.lua`
 
-Replace tag-derived category navigation with the explicit model.
+### 1. The main list is a generic `ScrollListEntry`
 
-### Top-level rows
+The page currently uses `UI.ScrollLayout` with:
 
-The navigation should contain:
+```lua
+rowElementClass = UI.ScrollListEntry
+```
+
+for both navigation and the main Achievement rows.
+
+The Achievement content rows are fixed at approximately:
+
+```text
+ENTRY_HEIGHT = 64
+ENTRY_ROWS   = 4
+```
+
+and squeeze Achievement-specific content into the generic row's icon/category/status/text slots.
+
+This is the principal visual limitation: the generic list row has no Achievement-specific hierarchy for name, description, progress, completion state/date and rewards.
+
+### 2. Criterion presentation is flattened into text
+
+The current `buildCriterionProgress()` path turns criterion progress into a concatenated inline status string. This is compact but visually dense and does not resemble the way WoW presents Achievement progress.
+
+### 3. There is no Achievement ordering step
+
+`buildAchievementRows()` walks activated datasets and their Achievement arrays in source/definition order. The page does not sort Achievement rows by completion state or timestamp.
+
+Therefore completed Achievements can appear anywhere in the list, and recently completed Achievements receive no presentation priority.
+
+### 4. Completion data already exists
+
+Profile Achievement state already exposes `completedAt`, and the page already formats a completion date. No runtime or Profile schema change is needed to implement the requested ordering.
+
+## WoW Achievement UI reference
+
+Reference sources inspected:
+
+- Warcraft Wiki — Achievements: https://warcraft.wiki.gg/wiki/Achievements
+- Current Blizzard Achievement UI source mirror: https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_AchievementUI/Mainline/Blizzard_AchievementUI.lua
+
+Relevant characteristics of the native UI:
+
+- a dedicated left category pane and dedicated main content pane;
+- each Achievement is a purpose-built card/button rather than a generic list row;
+- icon on the left;
+- Achievement name is visually dominant;
+- description sits directly beneath the name;
+- completion date is visible for completed Achievements;
+- progress bars are used where an Achievement has progressive numeric completion;
+- individual criteria can be represented separately rather than concatenated into one technical status string;
+- completed entries have a distinctly brighter/gold treatment while incomplete entries are visually subdued;
+- the native implementation intentionally allows several text lines in a collapsed Achievement card (`ACHIEVEMENTUI_MAX_LINES_COLLAPSED = 3`);
+- native pane widths are roughly 175 px for categories and 330 px for Achievement content, which is already close to RPE's current 168/340 split. The broad two-pane geometry therefore does **not** need a wholesale redesign.
+
+WoW also displays Achievement Points/shields because those are part of Blizzard's Achievement model. RPE has no Achievement-point field and must not invent one for visual parity.
+
+The requested completed-first/most-recent-first ordering is an explicit RPE requirement for this issue. Do not assume Blizzard's normal list ordering is authoritative for that part.
+
+## Required solution
+
+### 1. Add a dedicated `AchievementEntry` prefab
+
+Create a reusable Achievement-specific row/card, for example:
+
+```text
+core/ui/prefabs/AchievementEntry.lua
+```
+
+and use it as the main Achievement `ScrollLayout` row class.
+
+The prefab should follow the existing RPE prefab conventions (`SpellbookEntry`, `ShopEntry`, etc.) and expose data/presentation setters rather than letting `page_ProfileAchievements.lua` reach directly into private frame children.
+
+Recommended collapsed layout:
+
+```text
+┌──────────────────────────────────────────────┐
+│ [ICON]  Achievement Name                    │
+│         Description text...                 │
+│         [progress / criterion summary]      │
+│                           Completed 28/08/26 │
+└──────────────────────────────────────────────┘
+```
+
+For an incomplete Achievement:
+
+```text
+┌──────────────────────────────────────────────┐
+│ [ICON]  Achievement Name                    │
+│         Description text...                 │
+│         [████████░░░░] 7 / 10               │
+└──────────────────────────────────────────────┘
+```
+
+Exact pixel dimensions may follow the current Profile content width, but the row must provide enough vertical structure for the fields instead of forcing all metadata into one line.
+
+### 2. Visual hierarchy
+
+Each entry must support:
+
+- Achievement icon on the left with normal RPE icon crop/border treatment;
+- name as the strongest text element;
+- description directly below the name, wrapping/truncating safely within the row;
+- progress presentation below the description where applicable;
+- completion date on completed entries;
+- compact reward text/state where current Achievement reward UI requires it;
+- distinct completed vs incomplete visual state.
+
+Use existing RPE colour tokens/textures where possible.
+
+Recommended state treatment inspired by WoW:
+
+```text
+completed   -> brighter/gold-accent border/header treatment, normal icon
+incomplete  -> darker/subdued surface and/or desaturated icon/accent
+```
+
+Do not make incomplete entries unreadable. Do not tint the entire UI with hard-coded Blizzard colours if equivalent RPE tokens exist.
+
+### 3. Improve progress presentation
+
+Replace the current single concatenated criterion string in the visible card with structured presentation.
+
+At minimum:
+
+- a single progressive numeric criterion (`goal > 1`) should use `UI.ProgressBar` plus `current / goal`;
+- a single binary criterion can use a compact complete/incomplete criterion line rather than a meaningless 0/1 bar if that reads better;
+- multiple criteria should use a compact criterion summary that does not become an unbounded one-line string;
+- detailed per-criterion information may remain available through the dedicated Achievement tooltip task; the list card does not have to expose every long criterion description at once.
+
+Do not sum heterogeneous criterion goals into a misleading aggregate value merely to make a bar.
+
+If a compact multi-criterion display is used, it should represent actual completed criterion count or a small bounded set of criterion lines, not a fabricated progress percentage.
+
+### 4. Preserve current reward-state information without dominating the row
+
+Issue #34 added Achievement reward delivery/status presentation. Do not lose that information.
+
+Where an Achievement has rewards, the card may show a compact user-facing reward/status line such as the existing resolved summary. Detailed reward diagnostics/recovery data can remain in the Achievement tooltip or existing explicit retry UI where appropriate.
+
+Do not cause reward delivery/retry merely by binding or showing a row.
+
+### 5. Completed-first, recency sorting
+
+Add an explicit deterministic sort for the visible Achievement rows.
+
+Required comparator:
+
+```text
+A completed, B incomplete
+-> A first
+
+A incomplete, B completed
+-> B first
+
+A completed, B completed
+-> larger completedAt first (most recent completion first)
+
+A incomplete, B incomplete
+-> preserve existing authored/source order
+```
+
+Because Lua `table.sort()` is not stable, capture a deterministic `sourceOrder`/`sourceIndex` while building the rows and use it as the tie-breaker:
+
+```text
+same completion timestamp -> sourceOrder ascending
+both incomplete           -> sourceOrder ascending
+```
+
+Do not alphabetize incomplete Achievements as an accidental side effect of the new comparator unless separately requested.
+
+The sorting rule applies consistently within:
 
 ```text
 All
-General
-Character
-Combat
-Events
-Player vs. Player
-Reputation
-Feats of Strength
-Legacy
+built-in category
+subcategory
 ```
 
-The eight built-in category rows must remain in the canonical order, not alphabetical tag order.
+filters introduced by #76.
 
-`All` remains a synthetic top-level filter and is not persisted into Achievement definitions.
+### 6. Keep filtering and sorting separate
 
-### Subcategory rows
-
-For each built-in category, collect the non-empty `achievement.subcategory` values actually used by active Achievement definitions in that category.
-
-Present them as child/indented rows under their parent category (or the closest existing tree-navigation treatment). Do not create a fake `Other`/`Uncategorized` subcategory for blank values.
-
-Filtering semantics:
+Recommended flow:
 
 ```text
-select All
--> all active Achievements
-
-select Combat
--> every Achievement with category == combat, regardless of subcategory
-
-select Combat / Raids
--> only category == combat AND subcategory == "Raids"
+build read-only Achievement row/view-model data
+-> filter by selected category/subcategory
+-> sort the filtered rows by completion/recency/sourceOrder
+-> bind AchievementEntry rows
 ```
 
-Parent counts should include all Achievements in that category. Child counts should include only the exact subcategory.
+Equivalent ordering is acceptable if it produces the same deterministic visible result.
 
-Subcategories are definition-driven, not Profile-progress-driven: incomplete and completed Achievements both count.
+Do not mutate the underlying dataset arrays to sort the UI.
 
-### Tags
+### 7. Keep Profile lifecycle/recycling efficient
 
-Tags must no longer produce navigation rows or participate in category filtering.
+Preserve the revision-driven Profile UI work from #64:
 
-Do not delete tags from the definition model; they may still be useful for runtime/editor metadata or future filters.
+- `Build()` constructs controls only;
+- hidden Achievement page does no rendering work;
+- `RefreshIfDirty()` consumes Achievement/Configuration revisions;
+- use the existing `ScrollLayout` row recycling model;
+- do not eagerly build expensive tooltip text for every row during refresh;
+- do not create/destroy a complete frame tree for every scroll operation.
 
-## Documentation update
-
-Update the active Achievement sections of:
-
-- `.docs/RPE2-Achievements-Guild-Systems-PDD.md`
-
-The current document still states that Profile Achievements use `tag-based filters` and lists only Tags in the General authoring fields. Replace those statements with the explicit built-in category + freeform subcategory model so future coding work does not restore tag-derived categories.
-
-Do not rewrite unrelated Guild/Achievement runtime sections.
+If a dedicated row prefab needs a small generic `ScrollLayout` hook, keep it reusable; `ScrollLayout` already accepts `rowElementClass`, so a core rewrite should not normally be needed.
 
 ## Primary files
 
-- `core/classes/Achievement.lua`
-- `core/internal/database/Database.lua`
-- `client/ui/editor/inspectors/page_InspectorAchievement.lua`
 - `client/character/profile/page_ProfileAchievements.lua`
-- `.docs/RPE2-Achievements-Guild-Systems-PDD.md`
+- `core/ui/prefabs/AchievementEntry.lua` — new
+- `RPEngine_Dev.toc` — load prefab before the Profile Achievement page
+
+Potential supporting file only if a concrete reusable gap is found:
+
+- `core/ui/elements/ScrollLayout.lua`
+
+Do not modify Achievement runtime/state semantics in this issue.
 
 ## Acceptance criteria
 
-- [ ] Achievement definitions serialize `category` and `subcategory`.
-- [ ] Existing Achievement definitions without the fields load as `General` with a blank subcategory.
-- [ ] Existing `tags` are preserved unchanged and are not converted into categories.
-- [ ] Category values use stable persisted keys with one centralized key/label/order definition.
-- [ ] Dataset schema advances from 17 to 18 through the normal additive normalization path.
-- [ ] Achievement editor shows a fixed Category dropdown containing exactly the requested eight categories.
-- [ ] Achievement editor shows an editable freeform Subcategory field.
-- [ ] Blank subcategory is valid.
-- [ ] Category/subcategory survive save, export/import and editor reopen.
-- [ ] Profile navigation no longer generates categories from tags.
-- [ ] Profile navigation contains All plus the eight built-in categories in canonical order.
-- [ ] Selecting a parent category shows all Achievements in that category.
-- [ ] Selecting a subcategory filters by both category and subcategory.
-- [ ] Subcategories with no active definitions are not emitted as child rows.
-- [ ] Blank-subcategory Achievements remain visible when their parent category is selected.
-- [ ] Viewing/filtering the Profile page remains read-only and cannot mutate Achievement/Profile state.
-- [ ] The active PDD no longer specifies tag-based Achievement categories.
+- [ ] Main Achievement rows use a dedicated Achievement-specific prefab instead of generic `ScrollListEntry` presentation.
+- [ ] Every row clearly presents icon, name and description.
+- [ ] Completed/incomplete rows are visually distinguishable without sacrificing readability.
+- [ ] Completed rows display completion date.
+- [ ] Progressive single-criterion Achievements use a real progress bar/current-goal presentation where appropriate.
+- [ ] Multiple criteria no longer collapse into an unbounded technical one-line string.
+- [ ] Existing reward-state information remains accessible and ordinary row binding remains read-only.
+- [ ] Completed Achievements appear before every incomplete Achievement.
+- [ ] Completed Achievements are sorted by `completedAt` descending.
+- [ ] Equal completion timestamps use deterministic source-order tie-breaking.
+- [ ] Incomplete Achievements retain current authored/source order.
+- [ ] Sorting behaves the same under All/category/subcategory filters from #76.
+- [ ] No dataset array/Profile state is mutated to achieve UI sorting.
+- [ ] The category/content pane geometry remains compatible with the current Profile window.
+- [ ] No Achievement Points/score field is invented merely to mimic WoW's shield.
+- [ ] Long names/descriptions/progress text remain contained within the card and do not overlap adjacent UI.
+- [ ] Scroll row recycling does not leak completion styling, progress bars, dates or reward text between rebound rows.
+- [ ] Opening/reopening the unchanged Profile Achievement tab retains the revision-driven fast path.
 
 ## Validation matrix
 
 ```text
-load legacy Achievement with tags = {"boss", "seasonal"}
--> category = general
--> subcategory = ""
--> tags remain boss/seasonal
--> no Boss/Seasonal Profile category rows are generated
+completed timestamps: A=100, B=300, C=200; D incomplete
+-> visible order B, C, A, D
 
-create Achievement -> Category Combat -> Subcategory Raids
--> stored category = "combat"
--> stored subcategory = "Raids"
--> Profile shows under Combat / Raids
+A/B same completedAt; source order A before B
+-> A before B deterministically
 
-create another Combat Achievement with blank subcategory
--> visible when Combat parent selected
--> no fake child category is created
+3 incomplete Achievements authored C, A, B
+-> remain C, A, B
 
-create Character / Professions and Events / Holidays
--> each appears beneath the correct built-in parent
+filter Combat
+-> completed Combat first by most-recent date
+-> incomplete Combat follow in authored order
 
-select All
--> all active definitions shown
+filter Combat / Raids
+-> same sorting rule inside subcategory
 
-select Combat
--> Combat/Raids + blank Combat entries shown
+single criterion current 7 / goal 10
+-> progress bar + 7 / 10
 
-select Combat / Raids
--> only exact Raids entries shown
+multi-criterion Achievement
+-> bounded readable criterion summary
+-> no long concatenated overflow
 
-save/export/import/reopen
--> category/subcategory unchanged
+completed Achievement with reward
+-> completion state/date and compact reward information visible
+-> no reward mutation occurs from display
 
-invalid/legacy category key
--> safe normalized General behavior; no navigation error
+incomplete Achievement with no Profile state
+-> safe 0/default progress and incomplete style
+
+long name + long description
+-> wraps/truncates within card
+-> no overlap with completion/status region
+
+scroll/recycle completed row into incomplete data
+-> completed border/date/icon treatment fully resets
+
+close/reopen unchanged Profile
+-> no unnecessary full presentation rebuild
 ```
 
 ## Constraints
 
-- Do not use tags as a fallback category system after this issue.
-- Do not remove the `tags` field.
-- Do not store category/subcategory in Profile state.
-- Do not create dataset-specific top-level Achievement categories.
-- Do not make subcategories a fixed enum; they are intentionally freeform text.
-- Do not introduce native Blizzard Achievement IDs/APIs; these remain RPE dataset Achievements.
-- Preserve Achievement criteria, completion, rewards and broadcasting semantics.
-- Preserve the revision-driven Profile UI lifecycle.
+- Do not change Achievement criteria completion semantics.
+- Do not change `completedAt` persistence or completion runtime behavior.
+- Do not reorder or rewrite dataset definitions themselves.
+- Do not invent Achievement Points.
+- Do not import/copy Blizzard Achievement XML/templates as a parallel UI system; reproduce the useful hierarchy using RPE UI abstractions.
+- Do not make tooltips eagerly during list refresh; a dedicated tooltip issue follows.
+- Preserve reward retry/security behavior.
+- Preserve #64 Profile revision/dirty lifecycle.
 
 ## Coding-agent instructions
 
-Use current `FrontierDev/rpe2` as authoritative. Inspect the current `Achievement` class normalization/serialization, Dataset schema handling, Achievement inspector, and `buildCategoryRows()` / `filterAchievementRows()` in the Profile page before editing. Treat this issue as the authoritative replacement for the old tag-based category design. Keep one canonical category definition consumed by both editor and Profile UI. Report schema behavior, legacy loading behavior, exact files changed, and validation results.
+Use current `FrontierDev/rpe2` as authoritative and implement after #76 so the final list consumes the explicit category/subcategory model. Before editing, inspect `page_ProfileAchievements.lua`, `ScrollLayout`, `ScrollListEntry`, `SpellbookEntry`, `ShopEntry`, `ProgressBar`, current reward-state display, and the current TOC order. Use the WoW Achievement UI sources above as a visual hierarchy reference, not as a code/template dependency. Report the final card structure, comparator/tie-break behavior, files changed, and runtime/static validation against the matrix.
