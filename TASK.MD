@@ -1,317 +1,350 @@
 ## Goal
 
-Rework Profile -> Achievements so the main Achievement list reads like an Achievement interface rather than a generic text list, while preserving RPE's existing data/runtime semantics.
+Add a dedicated RPE Achievement tooltip builder and bind it to Profile Achievement entries so hovering an Achievement exposes its full definition/progress/completion/reward context in a tooltip styled like a WoW Achievement/GameTooltip.
 
-Completed Achievements must be shown **before incomplete Achievements**, with completed entries ordered by `completedAt` **most recent first**.
+The tooltip must be Achievement-specific, read-only, lazy, and reusable by other RPE surfaces that display Achievement references later.
 
-This task should use World of Warcraft's Achievement UI as the visual/interaction reference for information hierarchy, but adapt it to RPE's actual data model rather than copying Blizzard templates or inventing unsupported concepts such as Achievement Points.
-
-Depends on: #76
+Depends on: #76, #77
 
 ## Current-code investigation / root cause
 
-Primary file:
+### 1. There is no Achievement tooltip module
 
-- `client/character/profile/page_ProfileAchievements.lua`
-
-### 1. The main list is a generic `ScrollListEntry`
-
-The page currently uses `UI.ScrollLayout` with:
-
-```lua
-rowElementClass = UI.ScrollListEntry
-```
-
-for both navigation and the main Achievement rows.
-
-The Achievement content rows are fixed at approximately:
+RPE already has domain-specific tooltip builders such as:
 
 ```text
-ENTRY_HEIGHT = 64
-ENTRY_ROWS   = 4
+client/ui/tooltips/tooltip_Spell.lua
+client/ui/tooltips/tooltip_Skill.lua
+client/ui/tooltips/tooltip_Trait.lua
+client/ui/tooltips/tooltip_Player.lua
+client/ui/tooltips/tooltip_Item.lua
 ```
 
-and squeeze Achievement-specific content into the generic row's icon/category/status/text slots.
+`RPEngine_Dev.toc` loads these after the shared tooltip system.
 
-This is the principal visual limitation: the generic list row has no Achievement-specific hierarchy for name, description, progress, completion state/date and rewards.
+There is currently no:
 
-### 2. Criterion presentation is flattened into text
+```text
+client/ui/tooltips/tooltip_Achievement.lua
+```
 
-The current `buildCriterionProgress()` path turns criterion progress into a concatenated inline status string. This is compact but visually dense and does not resemble the way WoW presents Achievement progress.
+### 2. Profile Achievement rows do not attach a tooltip
 
-### 3. There is no Achievement ordering step
+`client/character/profile/page_ProfileAchievements.lua` currently renders Achievement data into list rows but has no Achievement `SetTooltip(...)`/domain-builder integration.
 
-`buildAchievementRows()` walks activated datasets and their Achievement arrays in source/definition order. The page does not sort Achievement rows by completion state or timestamp.
+Therefore the only place to see criteria/completion/reward details is whatever fits into the row itself.
 
-Therefore completed Achievements can appear anywhere in the list, and recently completed Achievements receive no presentation priority.
+### 3. Existing tooltip infrastructure already supports the required lazy pattern
 
-### 4. Completion data already exists
+`core/ui/Tooltip.lua` already resolves a tooltip spec when it is shown, including **function-valued specs**. `BaseElement:SetTooltip(...)` stores the spec and hover handlers call `UI.Tooltip:ShowForElement(...)`.
 
-Profile Achievement state already exposes `completedAt`, and the page already formats a completion date. No runtime or Profile schema change is needed to implement the requested ordering.
+This means the Achievement row can use a lazy binding conceptually like:
 
-## WoW Achievement UI reference
+```lua
+entry:SetTooltip(function(owner)
+    return Tooltips.Achievement:Build(detail, owner)
+end)
+```
 
-Reference sources inspected:
+without eagerly constructing every tooltip during Profile refresh.
 
-- Warcraft Wiki — Achievements: https://warcraft.wiki.gg/wiki/Achievements
-- Current Blizzard Achievement UI source mirror: https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_AchievementUI/Mainline/Blizzard_AchievementUI.lua
+The existing domain tooltip builders, particularly `tooltip_Spell.lua`, already return structured tooltip specs using:
 
-Relevant characteristics of the native UI:
+```lua
+{
+    type = "game",
+    title = ...,
+    titleColor = ...,
+    lines = { ... },
+}
+```
 
-- a dedicated left category pane and dedicated main content pane;
-- each Achievement is a purpose-built card/button rather than a generic list row;
-- icon on the left;
-- Achievement name is visually dominant;
-- description sits directly beneath the name;
-- completion date is visible for completed Achievements;
-- progress bars are used where an Achievement has progressive numeric completion;
-- individual criteria can be represented separately rather than concatenated into one technical status string;
-- completed entries have a distinctly brighter/gold treatment while incomplete entries are visually subdued;
-- the native implementation intentionally allows several text lines in a collapsed Achievement card (`ACHIEVEMENTUI_MAX_LINES_COLLAPSED = 3`);
-- native pane widths are roughly 175 px for categories and 330 px for Achievement content, which is already close to RPE's current 168/340 split. The broad two-pane geometry therefore does **not** need a wholesale redesign.
+so a second tooltip framework is not needed.
 
-WoW also displays Achievement Points/shields because those are part of Blizzard's Achievement model. RPE has no Achievement-point field and must not invent one for visual parity.
+## WoW reference / adaptation
 
-The requested completed-first/most-recent-first ordering is an explicit RPE requirement for this issue. Do not assume Blizzard's normal list ordering is authoritative for that part.
+Reference material inspected:
+
+- Warcraft Wiki — Achievement window: https://warcraft.wiki.gg/wiki/Achievements
+- Warcraft Wiki — AchievementLink payload: https://warcraft.wiki.gg/wiki/AchievementLink
+- Blizzard Achievement UI source mirror: https://github.com/Gethe/wow-ui-source/blob/live/Interface/AddOns/Blizzard_AchievementUI/Mainline/Blizzard_AchievementUI.lua
+
+Relevant WoW conventions to preserve conceptually:
+
+- Achievement information is presented through the normal WoW `GameTooltip` visual language when exposed as a hyperlink/hover surface;
+- achievement completion state includes a completion date;
+- criteria are individual pieces of progress, not just one opaque combined string;
+- completed/incomplete state is immediately legible;
+- progressive state is displayed as current progress toward a goal;
+- Achievement UI tooltips use the existing GameTooltip rather than a completely separate tooltip subsystem.
+
+RPE Achievements are dataset definitions, not Blizzard Achievement IDs. Do **not** call `GetAchievementInfo`, `GetAchievementLink`, `GameTooltip:SetHyperlink("achievement:...")`, or otherwise pretend an RPE Achievement is a native WoW Achievement.
+
+Instead, build the equivalent presentation from RPE's definition/Profile state and feed it through the existing RPE tooltip service.
 
 ## Required solution
 
-### 1. Add a dedicated `AchievementEntry` prefab
+### 1. Add `Tooltips.Achievement`
 
-Create a reusable Achievement-specific row/card, for example:
+Create:
 
 ```text
+client/ui/tooltips/tooltip_Achievement.lua
+```
+
+following the namespace/pattern of the existing domain tooltip builders.
+
+Recommended public API:
+
+```lua
+Addon.Client.UI.Tooltips.Achievement:Build(detail, owner)
+```
+
+The exact detail shape may follow existing conventions, but it should be able to receive/resolve at least:
+
+```text
+achievementRef
+achievement definition
+Profile Achievement state
+category/subcategory
+criterion state
+reward definition/state
+resolved dataset context where useful
+```
+
+Prefer accepting already-resolved row/detail context from the Profile page while still failing safely if fields are missing.
+
+### 2. Use GameTooltip-style RPE tooltip specs
+
+Default to the existing structured:
+
+```lua
+type = "game"
+```
+
+presentation so the result visually belongs to WoW/RPE's existing tooltip family.
+
+Do not add a bespoke free-floating Achievement window merely to call it a tooltip.
+
+Only extend `core/ui/Tooltip.lua` if a concrete Achievement requirement cannot be represented through its existing title/double-line/wrapped-line APIs. Keep any extension generic and reusable.
+
+### 3. Tooltip content hierarchy
+
+The tooltip should contain, in this general order:
+
+```text
+Achievement Name
+Description
+
+Category / Subcategory
+
+Progress / Criteria
+  Criterion A                         Complete
+  Criterion B                           7 / 10
+  Criterion C                           0 / 1
+
+Completed: <date>              -- completed only
+or
+Incomplete                     -- incomplete only where useful
+
+Reward(s)                      -- when configured
+  Item / Currency summary
+  delivery state where relevant
+```
+
+The exact labels/spacing should follow existing tooltip conventions rather than literally rendering the ASCII structure.
+
+#### Title
+
+- use the Achievement name, with safe fallback to ref/ID;
+- completed state may use a gold/positive title accent consistent with #77's completed-card treatment;
+- incomplete state should remain readable, not aggressively greyed out.
+
+#### Description
+
+- show authored Achievement description as wrapped body text;
+- omit an empty description rather than showing a blank placeholder sentence.
+
+#### Category
+
+After #76, show the built-in category label and optional subcategory in a compact form such as:
+
+```text
+Combat — Raids
+```
+
+Do not show raw persisted keys (`player_vs_player`) to the user.
+
+#### Criteria
+
+Show criteria individually.
+
+For each criterion:
+
+- use authored criterion description, falling back safely to its ID/trigger where necessary;
+- derive current progress from Profile state, defaulting to zero;
+- clamp/display progress consistently with the existing Achievement page/runtime semantics;
+- show `current / goal` for numeric progress;
+- visually distinguish satisfied criteria from incomplete criteria using existing positive/muted colour tokens or compact check-style text;
+- do not expose raw filter tables/transport fields as normal user-facing tooltip text.
+
+Do not fabricate an aggregate percentage for heterogeneous criteria.
+
+#### Completion
+
+If `completedAt` exists:
+
+- show an explicit completion date using the same formatter/convention as the Achievement page;
+- treat `completedAt` as the authoritative visual completion signal, consistent with existing Profile Achievement semantics.
+
+If incomplete, no fake date/zero timestamp should be shown.
+
+#### Rewards
+
+Where rewards exist, include compact resolved reward information using the existing Item/Currency resolution APIs and reward-state model.
+
+Examples:
+
+```text
+Reward: Field Ration x2
+Reward: 5 Valor
+Rewards received
+```
+
+Requirements:
+
+- use Item/Currency names/icons where available through existing resolvers;
+- unresolved definitions show a safe missing-reference fallback;
+- delivery state from #34 remains distinguishable where useful (`Pending`, `Received`, `Delivery failed`, etc.);
+- do not trigger or retry reward delivery from hover.
+
+If the existing tooltip line API supports inline icons cleanly, use them; otherwise prioritize readable text rather than adding a one-off renderer solely for reward icons.
+
+### 4. Bind tooltip lazily to the new Achievement entry prefab
+
+After #77, the dedicated `UI.AchievementEntry` should expose normal BaseElement tooltip behavior.
+
+When binding a row in `page_ProfileAchievements.lua`:
+
+- set a function-valued tooltip spec that builds from the **currently bound row data**;
+- make sure recycled rows replace the old tooltip resolver/detail when rebound;
+- hovering an incomplete row shows its current progress;
+- hovering a completed row shows completion state/date;
+- hidden/unbound pooled rows must not retain stale Achievement tooltip data.
+
+Do not build all tooltip lines while refreshing the list. The builder should run on hover.
+
+### 5. Keep visible tooltip data current
+
+The Profile Achievement page already refreshes according to Achievement/Configuration revisions.
+
+Ensure a row rebound after progress/completion change produces the new tooltip data. If the existing tooltip is currently open during a relevant row refresh, either refresh it through the existing `Tooltip:RefreshForElement(...)` mechanism or allow the normal leave/re-enter path to rebuild it; do not introduce a polling ticker.
+
+Do not cache Achievement tooltip content beyond the revisions/data identity that affect it.
+
+### 6. Load order
+
+Update `RPEngine_Dev.toc` so:
+
+```text
+core/ui/Tooltip.lua
+...
+client/ui/tooltips/tooltip_Achievement.lua
+...
 core/ui/prefabs/AchievementEntry.lua
+client/character/profile/page_ProfileAchievements.lua
 ```
 
-and use it as the main Achievement `ScrollLayout` row class.
+are ordered such that the builder is available before the Profile page binds rows.
 
-The prefab should follow the existing RPE prefab conventions (`SpellbookEntry`, `ShopEntry`, etc.) and expose data/presentation setters rather than letting `page_ProfileAchievements.lua` reach directly into private frame children.
-
-Recommended collapsed layout:
-
-```text
-┌──────────────────────────────────────────────┐
-│ [ICON]  Achievement Name                    │
-│         Description text...                 │
-│         [progress / criterion summary]      │
-│                           Completed 28/08/26 │
-└──────────────────────────────────────────────┘
-```
-
-For an incomplete Achievement:
-
-```text
-┌──────────────────────────────────────────────┐
-│ [ICON]  Achievement Name                    │
-│         Description text...                 │
-│         [████████░░░░] 7 / 10               │
-└──────────────────────────────────────────────┘
-```
-
-Exact pixel dimensions may follow the current Profile content width, but the row must provide enough vertical structure for the fields instead of forcing all metadata into one line.
-
-### 2. Visual hierarchy
-
-Each entry must support:
-
-- Achievement icon on the left with normal RPE icon crop/border treatment;
-- name as the strongest text element;
-- description directly below the name, wrapping/truncating safely within the row;
-- progress presentation below the description where applicable;
-- completion date on completed entries;
-- compact reward text/state where current Achievement reward UI requires it;
-- distinct completed vs incomplete visual state.
-
-Use existing RPE colour tokens/textures where possible.
-
-Recommended state treatment inspired by WoW:
-
-```text
-completed   -> brighter/gold-accent border/header treatment, normal icon
-incomplete  -> darker/subdued surface and/or desaturated icon/accent
-```
-
-Do not make incomplete entries unreadable. Do not tint the entire UI with hard-coded Blizzard colours if equivalent RPE tokens exist.
-
-### 3. Improve progress presentation
-
-Replace the current single concatenated criterion string in the visible card with structured presentation.
-
-At minimum:
-
-- a single progressive numeric criterion (`goal > 1`) should use `UI.ProgressBar` plus `current / goal`;
-- a single binary criterion can use a compact complete/incomplete criterion line rather than a meaningless 0/1 bar if that reads better;
-- multiple criteria should use a compact criterion summary that does not become an unbounded one-line string;
-- detailed per-criterion information may remain available through the dedicated Achievement tooltip task; the list card does not have to expose every long criterion description at once.
-
-Do not sum heterogeneous criterion goals into a misleading aggregate value merely to make a bar.
-
-If a compact multi-criterion display is used, it should represent actual completed criterion count or a small bounded set of criterion lines, not a fabricated progress percentage.
-
-### 4. Preserve current reward-state information without dominating the row
-
-Issue #34 added Achievement reward delivery/status presentation. Do not lose that information.
-
-Where an Achievement has rewards, the card may show a compact user-facing reward/status line such as the existing resolved summary. Detailed reward diagnostics/recovery data can remain in the Achievement tooltip or existing explicit retry UI where appropriate.
-
-Do not cause reward delivery/retry merely by binding or showing a row.
-
-### 5. Completed-first, recency sorting
-
-Add an explicit deterministic sort for the visible Achievement rows.
-
-Required comparator:
-
-```text
-A completed, B incomplete
--> A first
-
-A incomplete, B completed
--> B first
-
-A completed, B completed
--> larger completedAt first (most recent completion first)
-
-A incomplete, B incomplete
--> preserve existing authored/source order
-```
-
-Because Lua `table.sort()` is not stable, capture a deterministic `sourceOrder`/`sourceIndex` while building the rows and use it as the tie-breaker:
-
-```text
-same completion timestamp -> sourceOrder ascending
-both incomplete           -> sourceOrder ascending
-```
-
-Do not alphabetize incomplete Achievements as an accidental side effect of the new comparator unless separately requested.
-
-The sorting rule applies consistently within:
-
-```text
-All
-built-in category
-subcategory
-```
-
-filters introduced by #76.
-
-### 6. Keep filtering and sorting separate
-
-Recommended flow:
-
-```text
-build read-only Achievement row/view-model data
--> filter by selected category/subcategory
--> sort the filtered rows by completion/recency/sourceOrder
--> bind AchievementEntry rows
-```
-
-Equivalent ordering is acceptable if it produces the same deterministic visible result.
-
-Do not mutate the underlying dataset arrays to sort the UI.
-
-### 7. Keep Profile lifecycle/recycling efficient
-
-Preserve the revision-driven Profile UI work from #64:
-
-- `Build()` constructs controls only;
-- hidden Achievement page does no rendering work;
-- `RefreshIfDirty()` consumes Achievement/Configuration revisions;
-- use the existing `ScrollLayout` row recycling model;
-- do not eagerly build expensive tooltip text for every row during refresh;
-- do not create/destroy a complete frame tree for every scroll operation.
-
-If a dedicated row prefab needs a small generic `ScrollLayout` hook, keep it reusable; `ScrollLayout` already accepts `rowElementClass`, so a core rewrite should not normally be needed.
+The exact relative position among the other domain tooltip files may follow the current TOC convention.
 
 ## Primary files
 
+- `client/ui/tooltips/tooltip_Achievement.lua` — new
 - `client/character/profile/page_ProfileAchievements.lua`
-- `core/ui/prefabs/AchievementEntry.lua` — new
-- `RPEngine_Dev.toc` — load prefab before the Profile Achievement page
+- `core/ui/prefabs/AchievementEntry.lua` — from #77, tooltip binding/reset support if needed
+- `RPEngine_Dev.toc`
 
-Potential supporting file only if a concrete reusable gap is found:
+Only if a proven generic capability is missing:
 
-- `core/ui/elements/ScrollLayout.lua`
-
-Do not modify Achievement runtime/state semantics in this issue.
+- `core/ui/Tooltip.lua`
 
 ## Acceptance criteria
 
-- [ ] Main Achievement rows use a dedicated Achievement-specific prefab instead of generic `ScrollListEntry` presentation.
-- [ ] Every row clearly presents icon, name and description.
-- [ ] Completed/incomplete rows are visually distinguishable without sacrificing readability.
-- [ ] Completed rows display completion date.
-- [ ] Progressive single-criterion Achievements use a real progress bar/current-goal presentation where appropriate.
-- [ ] Multiple criteria no longer collapse into an unbounded technical one-line string.
-- [ ] Existing reward-state information remains accessible and ordinary row binding remains read-only.
-- [ ] Completed Achievements appear before every incomplete Achievement.
-- [ ] Completed Achievements are sorted by `completedAt` descending.
-- [ ] Equal completion timestamps use deterministic source-order tie-breaking.
-- [ ] Incomplete Achievements retain current authored/source order.
-- [ ] Sorting behaves the same under All/category/subcategory filters from #76.
-- [ ] No dataset array/Profile state is mutated to achieve UI sorting.
-- [ ] The category/content pane geometry remains compatible with the current Profile window.
-- [ ] No Achievement Points/score field is invented merely to mimic WoW's shield.
-- [ ] Long names/descriptions/progress text remain contained within the card and do not overlap adjacent UI.
-- [ ] Scroll row recycling does not leak completion styling, progress bars, dates or reward text between rebound rows.
-- [ ] Opening/reopening the unchanged Profile Achievement tab retains the revision-driven fast path.
+- [ ] RPE has a dedicated `Addon.Client.UI.Tooltips.Achievement` builder.
+- [ ] Hovering a Profile Achievement entry shows an Achievement tooltip.
+- [ ] Tooltip uses the existing RPE/WoW GameTooltip-style system rather than a parallel tooltip framework.
+- [ ] Tooltip title shows the Achievement name with safe fallback.
+- [ ] Tooltip shows the authored description when present.
+- [ ] Tooltip shows the built-in category label and optional freeform subcategory from #76.
+- [ ] Tooltip shows each criterion separately with current/goal state.
+- [ ] Completed criteria are visually distinguishable from incomplete criteria.
+- [ ] Completed Achievement tooltip shows its completion date.
+- [ ] Incomplete Achievement tooltip never shows a fake completion date.
+- [ ] Configured rewards and meaningful delivery state are shown where available.
+- [ ] Missing Achievement/criterion/reward definitions fail safely without Lua errors.
+- [ ] Tooltip creation is lazy on hover; opening/refreshing the Achievement page does not eagerly build every tooltip.
+- [ ] Hovering never mutates Achievement progress, Profile state, Inventory, Currency state or reward delivery.
+- [ ] Recycled AchievementEntry rows cannot show the previous row's tooltip.
+- [ ] Progress/completion changes are reflected on the next tooltip build.
+- [ ] No native Blizzard Achievement ID/API dependency is introduced.
+- [ ] TOC load order makes the builder available before use.
 
 ## Validation matrix
 
 ```text
-completed timestamps: A=100, B=300, C=200; D incomplete
--> visible order B, C, A, D
+incomplete simple Achievement
+-> hover shows name + description + criterion 0 / 1
+-> no completion date
 
-A/B same completedAt; source order A before B
--> A before B deterministically
-
-3 incomplete Achievements authored C, A, B
--> remain C, A, B
-
-filter Combat
--> completed Combat first by most-recent date
--> incomplete Combat follow in authored order
-
-filter Combat / Raids
--> same sorting rule inside subcategory
-
-single criterion current 7 / goal 10
--> progress bar + 7 / 10
+progressive Achievement at 7 / 10
+-> hover shows criterion description + 7 / 10
 
 multi-criterion Achievement
--> bounded readable criterion summary
--> no long concatenated overflow
+-> each criterion appears separately
+-> completed and incomplete criteria distinguishable
 
-completed Achievement with reward
--> completion state/date and compact reward information visible
--> no reward mutation occurs from display
+completed Achievement
+-> hover shows completion date
+-> completed title/status treatment
 
-incomplete Achievement with no Profile state
--> safe 0/default progress and incomplete style
+Achievement with category Combat / Raids
+-> tooltip shows human-readable Combat — Raids
 
-long name + long description
--> wraps/truncates within card
--> no overlap with completion/status region
+Achievement with blank subcategory
+-> category shown cleanly without dangling separator
 
-scroll/recycle completed row into incomplete data
--> completed border/date/icon treatment fully resets
+Achievement with item + currency rewards
+-> readable resolved reward rows
+-> reward delivery state where applicable
 
-close/reopen unchanged Profile
--> no unnecessary full presentation rebuild
+missing reward/item/currency definition
+-> safe fallback, no error
+
+scroll list so row object is recycled from Achievement A to B
+-> hover shows B only
+-> no stale A title/criteria/rewards
+
+Achievement progresses while Profile page is open
+-> refreshed/rebound row's next hover shows new current value
+
+hover repeatedly
+-> no Profile/reward/runtime mutation
+-> no new ticker/listener leak
 ```
 
 ## Constraints
 
-- Do not change Achievement criteria completion semantics.
-- Do not change `completedAt` persistence or completion runtime behavior.
-- Do not reorder or rewrite dataset definitions themselves.
-- Do not invent Achievement Points.
-- Do not import/copy Blizzard Achievement XML/templates as a parallel UI system; reproduce the useful hierarchy using RPE UI abstractions.
-- Do not make tooltips eagerly during list refresh; a dedicated tooltip issue follows.
-- Preserve reward retry/security behavior.
-- Preserve #64 Profile revision/dirty lifecycle.
+- Do not use native Blizzard Achievement APIs for RPE definitions.
+- Do not make tooltip hover execute Achievement or reward logic.
+- Do not duplicate Item/Currency resolution logic if existing helpers can provide display data.
+- Do not eagerly build tooltip bodies for every row during page refresh.
+- Do not create a second tooltip manager.
+- Do not add Achievement Points merely for WoW visual similarity.
+- Do not expose internal criterion filter/debug payloads as the normal tooltip.
+- Preserve #64 revision-driven Profile behavior and #77 row recycling.
 
 ## Coding-agent instructions
 
-Use current `FrontierDev/rpe2` as authoritative and implement after #76 so the final list consumes the explicit category/subcategory model. Before editing, inspect `page_ProfileAchievements.lua`, `ScrollLayout`, `ScrollListEntry`, `SpellbookEntry`, `ShopEntry`, `ProgressBar`, current reward-state display, and the current TOC order. Use the WoW Achievement UI sources above as a visual hierarchy reference, not as a code/template dependency. Report the final card structure, comparator/tie-break behavior, files changed, and runtime/static validation against the matrix.
+Use current `FrontierDev/rpe2` as authoritative and implement after #76/#77. Inspect `core/ui/Tooltip.lua`, `core/ui/abstract/BaseElement.lua`, all current `client/ui/tooltips/tooltip_*.lua` builders (especially Spell/Item), the new AchievementEntry prefab, Profile Achievement reward-state helpers, and TOC ordering before editing. Reuse the function-valued lazy tooltip-spec path already supported by `Tooltip:ShowForElement()`. Report the final tooltip detail/spec contract, any generic Tooltip change (and why it was necessary), files changed, and validation results.

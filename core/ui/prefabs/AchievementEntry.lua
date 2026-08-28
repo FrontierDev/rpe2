@@ -245,6 +245,13 @@ function AchievementEntry:SetAchievementData(data)
     self:SetCompleted(value.completed == true)
 end
 
+function AchievementEntry:Reset()
+    self:SetOnClick(nil)
+    self:SetTooltip(nil)
+    self:SetAchievementData(nil)
+    return self
+end
+
 function AchievementEntry:SetLayoutMetrics(width, height)
     local resolvedWidth = math.max(1, tonumber(width) or self.options.width or DEFAULT_WIDTH)
     local resolvedHeight = math.max(1, tonumber(height) or self.options.height or DEFAULT_HEIGHT)
@@ -524,6 +531,9 @@ function AchievementEntry:Create()
         if self.hoverTexture then
             self.hoverTexture:Hide()
         end
+    end)
+    frame:HookScript("OnHide", function()
+        self:Reset()
     end)
     frame:SetScript("OnMouseUp", function(_, button)
         if self.onClick then

@@ -200,6 +200,7 @@ client/ui/tooltips/tooltip_Skill.lua
 client/ui/tooltips/tooltip_Trait.lua
 client/ui/tooltips/tooltip_Player.lua
 client/ui/tooltips/tooltip_Item.lua
+client/ui/tooltips/tooltip_Achievement.lua
 client/ui/windows/window_IconFinder.lua
 client/ui/windows/window_ModelFinder.lua
 client/ui/windows/window_LauncherMenu.lua

@@ -6,6 +6,8 @@ Addon.Client.UI.Profile = Addon.Client.UI.Profile or {}
 
 local ProfileUI = Addon.Client.UI.Profile
 local UI = Addon.UI or {}
+local Tooltips = Addon.Client.UI.Tooltips or {}
+local AchievementTooltip = Tooltips.Achievement or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
@@ -150,45 +152,6 @@ local function getCompletionDate(completedAt)
     return tostring(math.floor(timestamp))
 end
 
-local function getTimestampText(timestampValue)
-    local timestamp = tonumber(timestampValue)
-    if not timestamp or timestamp < 0 then
-        return nil
-    end
-
-    if type(date) == "function" then
-        return date("%Y-%m-%d %H:%M:%S", timestamp)
-    end
-
-    return tostring(math.floor(timestamp))
-end
-
-local function buildCriterionProgress(achievement, state)
-    local criteria = achievement and achievement.criteria or {}
-    if type(criteria) ~= "table" or #criteria == 0 then
-        return ""
-    end
-
-    local stateCriteria = state and type(state.criteria) == "table" and state.criteria or {}
-    local progress = {}
-    for index = 1, #criteria do
-        local criterion = criteria[index]
-        if type(criterion) == "table" then
-            local criterionId = trimString(criterion.id)
-            local label = trimString(criterion.description)
-            if label == "" then
-                label = criterionId ~= "" and criterionId or ("Criterion %d"):format(index)
-            end
-
-            local current = normalizeProgress(stateCriteria and stateCriteria[criterionId] or 0)
-            local goal = normalizeGoal(criterion.goal)
-            progress[#progress + 1] = ("%s: %d / %d"):format(label, current, goal)
-        end
-    end
-
-    return table.concat(progress, "  |  ")
-end
-
 local function getCriterionCurrent(stateCriteria, criterionId, goal)
     local value = stateCriteria and stateCriteria[criterionId] or 0
     if value == true then
@@ -248,6 +211,26 @@ local function buildCriterionPresentation(achievement, state)
     return {
         kind = "summary",
         text = ("Criteria: %d / %d complete"):format(completed, #validCriteria),
+    }
+end
+
+local function buildAchievementTooltipDetail(achievementRow)
+    local row = type(achievementRow) == "table" and achievementRow or {}
+    local achievement = type(row.achievement) == "table" and row.achievement or nil
+    local state = type(row.state) == "table" and row.state or nil
+
+    return {
+        achievementRef = row.achievementRef,
+        achievementId = row.achievementId,
+        achievement = achievement,
+        state = state,
+        category = row.category,
+        subcategory = row.subcategory,
+        dataset = row.dataset,
+        datasetId = row.datasetId,
+        criterionState = state and state.criteria or nil,
+        rewardDefinitions = achievement and achievement.rewards or nil,
+        rewardState = state and state.rewardState or nil,
     }
 end
 
@@ -422,253 +405,10 @@ local function findCategory(categories, selectedKey)
     return nil
 end
 
-local function getRewardDefinitions(row)
-    local rewards = row and row.achievement and row.achievement.rewards
-    return type(rewards) == "table" and rewards or {}
-end
-
 local function getRewardState(row)
     local state = row and row.state
     local rewardState = type(state) == "table" and state.rewardState or nil
     return type(rewardState) == "table" and rewardState or nil
-end
-
-local function getRewardEntryId(reward, index, usedIds)
-    local baseId = type(reward) == "table" and trimString(reward.id) or ""
-    if baseId == "" then
-        baseId = ("reward_%d"):format(index)
-    end
-
-    local rewardId = baseId
-    local suffix = 2
-    while usedIds[rewardId] do
-        rewardId = ("%s_%d"):format(baseId, suffix)
-        suffix = suffix + 1
-    end
-
-    usedIds[rewardId] = true
-    return rewardId
-end
-
-local function getRewardAmountText(amount)
-    local numeric = tonumber(amount)
-    if numeric and numeric == numeric and numeric ~= math.huge and numeric ~= -math.huge then
-        return tostring(math.max(0, math.floor(numeric)))
-    end
-
-    local configured = trimString(amount)
-    return configured ~= "" and configured or "unknown"
-end
-
-local function resolveItemRewardName(itemRef)
-    local normalizedRef = trimString(itemRef)
-    if normalizedRef == "" then
-        return "Unknown item"
-    end
-
-    if type(Registry.ResolveItemReference) == "function" then
-        local callOk, _, item = pcall(Registry.ResolveItemReference, Registry, normalizedRef)
-        if callOk and type(item) == "table" then
-            local name = trimString(item.name)
-            if name ~= "" then
-                return name
-            end
-        end
-    end
-
-    return normalizedRef .. " (unavailable)"
-end
-
-local function resolveCurrencyRewardName(currencyRef)
-    local normalizedRef = trimString(currencyRef)
-    if normalizedRef == "" then
-        return "Unknown currency"
-    end
-
-    local currencyKey = normalizedRef
-    if type(Profile.NormalizeCurrencyKey) == "function" then
-        local normalizeOk, normalized = pcall(Profile.NormalizeCurrencyKey, normalizedRef)
-        if normalizeOk and trimString(normalized) ~= "" then
-            currencyKey = trimString(normalized)
-        end
-    end
-
-    if type(Profile.ResolveCurrencyDefinition) == "function" then
-        local resolveOk, definition = pcall(Profile.ResolveCurrencyDefinition, currencyKey)
-        if resolveOk and type(definition) == "table" then
-            local name = trimString(definition.name)
-            if name ~= "" then
-                return name
-            end
-        end
-    end
-
-    return currencyKey .. " (unavailable)"
-end
-
-local function getRewardEntry(state, rewardId)
-    local entries = state and state.entries
-    local entry = type(entries) == "table" and entries[rewardId] or nil
-    return type(entry) == "table" and entry or nil
-end
-
-local function buildRewardLines(row)
-    local rewards = getRewardDefinitions(row)
-    local rewardState = getRewardState(row)
-    local lines = {}
-    local usedIds = {}
-
-    for index = 1, #rewards do
-        local reward = rewards[index]
-        local rewardId = getRewardEntryId(reward, index, usedIds)
-        local rewardType = type(reward) == "table" and string.lower(trimString(reward.type)) or ""
-        local rewardRef = type(reward) == "table" and trimString(reward.ref) or ""
-        local entry = getRewardEntry(rewardState, rewardId)
-
-        if rewardType == "item" then
-            local name = resolveItemRewardName(rewardRef)
-            local line = ("Item: %s x%s"):format(name, getRewardAmountText(reward.amount))
-            local appliedAmount = tonumber(entry and entry.appliedAmount)
-            if appliedAmount and appliedAmount == appliedAmount and appliedAmount >= 0 then
-                line = ("%s (applied %d)"):format(line, math.floor(appliedAmount))
-            end
-            local appliedAt = getTimestampText(entry and entry.appliedAt)
-            if appliedAt then
-                line = ("%s on %s"):format(line, appliedAt)
-            end
-            local entryReason = trimString(entry and entry.reason)
-            if entryReason ~= "" then
-                line = ("%s; reason: %s"):format(line, entryReason)
-            end
-            lines[#lines + 1] = line
-        elseif rewardType == "currency" then
-            local name = resolveCurrencyRewardName(rewardRef)
-            local line = ("Currency: %s x%s"):format(name, getRewardAmountText(reward.amount))
-            local appliedAmount = tonumber(entry and entry.appliedAmount)
-            if appliedAmount and appliedAmount == appliedAmount and appliedAmount >= 0 then
-                line = ("%s (applied %d)"):format(line, math.floor(appliedAmount))
-            end
-            local appliedAt = getTimestampText(entry and entry.appliedAt)
-            if appliedAt then
-                line = ("%s on %s"):format(line, appliedAt)
-            end
-            local entryReason = trimString(entry and entry.reason)
-            if entryReason ~= "" then
-                line = ("%s; reason: %s"):format(line, entryReason)
-            end
-            lines[#lines + 1] = line
-        else
-            local unsupported = "Unsupported reward data"
-            if rewardType ~= "" then
-                unsupported = ("Unsupported reward: %s"):format(rewardType)
-            end
-            if rewardRef ~= "" then
-                unsupported = ("%s (%s)"):format(unsupported, rewardRef)
-            end
-            lines[#lines + 1] = unsupported
-        end
-    end
-
-    return lines
-end
-
-local function hasUnsupportedRewardData(row)
-    local rewards = getRewardDefinitions(row)
-    for index = 1, #rewards do
-        local reward = rewards[index]
-        local rewardType = type(reward) == "table" and string.lower(trimString(reward.type)) or ""
-        if rewardType ~= "item" and rewardType ~= "currency" then
-            return true
-        end
-    end
-
-    local rewardState = getRewardState(row)
-    if rewardState and rewardState.reason == "unsupported-reward-record" then
-        return true
-    end
-
-    local entries = rewardState and rewardState.entries
-    if type(entries) == "table" then
-        for _, entry in pairs(entries) do
-            if type(entry) == "table" and entry.status == "unsupported" then
-                return true
-            end
-        end
-    end
-
-    return false
-end
-
-local function getRewardStatusText(row)
-    local rewards = getRewardDefinitions(row)
-    local rewardState = getRewardState(row)
-    local completedAt = row and row.state and row.state.completedAt
-    local hasRewards = #rewards > 0
-
-    if not rewardState then
-        if completedAt ~= nil and hasRewards then
-            return "Rewards: Not retroactively granted (legacy completion)"
-        end
-        if hasUnsupportedRewardData(row) and hasRewards then
-            return "Rewards: Contains unsupported legacy reward data"
-        end
-        if hasRewards then
-            return "Rewards: Pending"
-        end
-        return ""
-    end
-
-    local status = string.lower(trimString(rewardState.status))
-    if status == "complete" then
-        if hasUnsupportedRewardData(row) then
-            return "Rewards: Contains unsupported legacy reward data"
-        end
-        return "Rewards: Received"
-    elseif status == "failed" then
-        return "Rewards: Delivery failed"
-    elseif status == "recovery-required" then
-        return "Rewards: Recovery required"
-    elseif status == "in-progress" then
-        return "Rewards: Delivery in progress"
-    elseif status == "pending" then
-        return "Rewards: Pending"
-    elseif status == "legacy-skipped" then
-        return "Rewards: Not retroactively granted (legacy completion)"
-    end
-
-    if status ~= "" then
-        return ("Rewards: %s"):format(status)
-    end
-
-    return hasRewards and "Rewards: Pending" or ""
-end
-
-local function getRewardTimestampLines(row)
-    local rewardState = getRewardState(row)
-    if not rewardState then
-        return {}
-    end
-
-    local lines = {}
-    local startedAt = getTimestampText(rewardState.startedAt)
-    local completedAt = getTimestampText(rewardState.completedAt)
-    local failedAt = getTimestampText(rewardState.failedAt)
-    if startedAt then
-        lines[#lines + 1] = "Reward started: " .. startedAt
-    end
-    if completedAt then
-        lines[#lines + 1] = "Rewards delivered: " .. completedAt
-    end
-    if failedAt then
-        lines[#lines + 1] = "Reward delivery failed: " .. failedAt
-    end
-
-    local reason = trimString(rewardState.reason)
-    if reason ~= "" then
-        lines[#lines + 1] = "Reward reason: " .. reason
-    end
-
-    return lines
 end
 
 local function findAchievementRow(rows, achievementRef)
@@ -689,39 +429,6 @@ end
 local function canRetryRewards(row)
     local rewardState = getRewardState(row)
     return rewardState and string.lower(trimString(rewardState.status)) == "failed"
-end
-
-local function getTooltipLines(row)
-    local achievement = row and row.achievement or {}
-    local lines = {}
-    local description = trimString(achievement.description)
-    local criterionProgress = buildCriterionProgress(achievement, row and row.state)
-    local completionDate = getCompletionDate(row and row.state and row.state.completedAt)
-
-    if description ~= "" then
-        lines[#lines + 1] = description
-    end
-    if criterionProgress ~= "" then
-        lines[#lines + 1] = criterionProgress
-    end
-    if completionDate then
-        lines[#lines + 1] = "Completed: " .. completionDate
-    end
-    local rewardStatus = getRewardStatusText(row)
-    if rewardStatus ~= "" then
-        lines[#lines + 1] = rewardStatus
-    end
-    for index, rewardLine in ipairs(buildRewardLines(row)) do
-        lines[#lines + 1] = rewardLine
-    end
-    for index, rewardTimestampLine in ipairs(getRewardTimestampLines(row)) do
-        lines[#lines + 1] = rewardTimestampLine
-    end
-    if #lines == 0 then
-        lines[1] = "No additional achievement details."
-    end
-
-    return lines
 end
 
 function AchievementsPage:EnsureCategorySelection(categories)
@@ -957,6 +664,7 @@ function AchievementsPage:Build(parent, owner)
         local achievement = achievementRow and achievementRow.achievement or {}
         local achievementRef = achievementRow and achievementRow.achievementRef or ""
         local completionTimestamp = getCompletionTimestamp(achievementRow)
+        local detail = buildAchievementTooltipDetail(achievementRow)
 
         row:SetOnClick(function(_, button)
             if button == "LeftButton" and achievementRef ~= "" then
@@ -971,14 +679,16 @@ function AchievementsPage:Build(parent, owner)
             progress = buildCriterionPresentation(achievement, achievementRow and achievementRow.state),
             completed = completionTimestamp ~= nil,
             completionDate = getCompletionDate(completionTimestamp),
-            rewardStatus = getRewardStatusText(achievementRow),
+            rewardStatus = type(AchievementTooltip.GetRewardStatus) == "function"
+                and AchievementTooltip:GetRewardStatus(detail)
+                or "",
         })
-        row:SetTooltip(function()
-            return {
-                type = "custom",
-                title = getAchievementName(achievement),
-                lines = getTooltipLines(achievementRow),
-            }
+        row:SetTooltip(function(owner)
+            if type(AchievementTooltip.Build) ~= "function" then
+                return nil
+            end
+
+            return AchievementTooltip:Build(detail, owner)
         end)
     end)
     self.EntryScroll:Create()
