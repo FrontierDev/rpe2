@@ -1659,153 +1659,6 @@ function Spellcasting.GetUnitPageIndex(eventState, casterEventId)
     return nil
 end
 
--- Event-step continuations use this small resumable lookup so each cast,
--- cooldown, or aura entry does not rescan the whole roster.  It is a turn-page
--- cache only; the later sparse due-index task still owns the cast/cooldown/aura
--- indexes themselves.
-function Spellcasting.CreateTurnPageIndexContinuation(client, eventState)
-    if type(client) ~= "table"
-        or type(eventState) ~= "table"
-        or eventState.active ~= true
-        or type(eventState.units) ~= "table"
-    then
-        return nil
-    end
-
-    return {
-        client = client,
-        eventState = eventState,
-        units = eventState.units,
-        pageSize = Spellcasting.GetMaxEventUnits(),
-        localPlayerName = Spellcasting.GetLocalPlayerName(),
-        phase = "index-units",
-        unitIndex = 0,
-        activeIndex = 0,
-        unitsByEventId = {},
-        playerUnitsByName = {},
-        pageByEventId = {},
-        sharedPetEventIds = {},
-        sharedPetIndex = 0,
-    }
-end
-
-function Spellcasting.StepTurnPageIndexContinuation(continuation, deadlineMs)
-    if type(continuation) ~= "table" then
-        return nil, "error"
-    end
-    if continuation.phase == "done" then
-        return true, "complete"
-    end
-
-    local client = continuation.client
-    local currentEventState = type(client) == "table"
-        and type(client.GetEventState) == "function"
-        and client:GetEventState()
-        or type(client) == "table" and client.EventState
-    if currentEventState ~= continuation.eventState
-        or type(currentEventState) ~= "table"
-        or currentEventState.active ~= true
-        or currentEventState.units ~= continuation.units
-    then
-        return nil, "stale"
-    end
-
-    local tasks = getTasks()
-    local function shouldYield()
-        return type(tasks) == "table"
-            and type(tasks.ShouldYield) == "function"
-            and tasks:ShouldYield(deadlineMs) == true
-    end
-
-    local eventClass = getEventClass()
-    while true do
-        if continuation.phase == "index-units" then
-            continuation.unitIndex = continuation.unitIndex + 1
-            local unit = continuation.units[continuation.unitIndex]
-            if unit == nil then
-                continuation.phase = "assign-pages"
-                continuation.unitIndex = 0
-            else
-                local numericEventId = tonumber(unit.eventID) or 0
-                if numericEventId > 0 and continuation.unitsByEventId[numericEventId] == nil then
-                    continuation.unitsByEventId[numericEventId] = unit
-                end
-                if unit.isPlayer == true then
-                    local ownerName = Spellcasting.NormalizeName(
-                        unit.ownerID or unit.controllerID or unit.name
-                    )
-                    if ownerName ~= "" and ownerName == continuation.localPlayerName then
-                        continuation.localEventUnit = continuation.localEventUnit or unit
-                    end
-                    if ownerName ~= "" and continuation.playerUnitsByName[ownerName] == nil then
-                        continuation.playerUnitsByName[ownerName] = unit
-                    end
-                end
-                if shouldYield() then
-                    return false, "incomplete"
-                end
-            end
-        elseif continuation.phase == "assign-pages" then
-            continuation.unitIndex = continuation.unitIndex + 1
-            local unit = continuation.units[continuation.unitIndex]
-            if unit == nil then
-                continuation.phase = "link-shared-pets"
-                continuation.sharedPetIndex = 0
-            else
-                local numericEventId = tonumber(unit.eventID) or 0
-                local active = eventClass and type(eventClass.IsUnitActive) == "function"
-                    and eventClass.IsUnitActive(unit)
-                    or type(unit) == "table" and (unit.isPlayer == true or unit.active ~= false)
-                local isSharedPet = false
-                if active
-                    and unit.isPlayer ~= true
-                    and tostring(unit.petRef or "") ~= ""
-                then
-                    local summonerId = tonumber(unit.summonedByEventID) or 0
-                    local controllerId = tonumber(unit.controllerID) or 0
-                    local summoner = summonerId > 0 and continuation.unitsByEventId[summonerId] or nil
-                    local controller = controllerId > 0 and continuation.unitsByEventId[controllerId] or nil
-                    isSharedPet = (type(summoner) == "table" and summoner.isPlayer == true)
-                        or (type(controller) == "table" and controller.isPlayer == true)
-                end
-                if active and not isSharedPet then
-                    continuation.activeIndex = continuation.activeIndex + 1
-                    if numericEventId > 0 then
-                        continuation.pageByEventId[numericEventId] = math.max(
-                            1,
-                            math.ceil(continuation.activeIndex / math.max(1, continuation.pageSize))
-                        )
-                    end
-                elseif isSharedPet and numericEventId > 0 then
-                    continuation.sharedPetEventIds[#continuation.sharedPetEventIds + 1] = numericEventId
-                end
-                if shouldYield() then
-                    return false, "incomplete"
-                end
-            end
-        elseif continuation.phase == "link-shared-pets" then
-            continuation.sharedPetIndex = continuation.sharedPetIndex + 1
-            local petEventId = continuation.sharedPetEventIds[continuation.sharedPetIndex]
-            if petEventId == nil then
-                continuation.phase = "done"
-                return true, "complete"
-            end
-            local pet = continuation.unitsByEventId[petEventId]
-            local summonerId = tonumber(pet and pet.summonedByEventID) or 0
-            local controllerId = tonumber(pet and pet.controllerID) or 0
-            local sharedTurnOwnerId = summonerId > 0 and summonerId or controllerId
-            if sharedTurnOwnerId > 0 then
-                continuation.pageByEventId[petEventId] = continuation.pageByEventId[sharedTurnOwnerId]
-            end
-            if shouldYield() then
-                return false, "incomplete"
-            end
-        else
-            return nil, "error"
-        end
-    end
-end
-
 function Spellcasting.IsCasterTurnOnTick(eventState, casterEventId)
     local currentTick = math.max(1, math.floor(tonumber(eventState and eventState.tickNumber) or 0))
     local casterTick = Spellcasting.GetUnitPageIndex(eventState, casterEventId)
@@ -2982,16 +2835,13 @@ function Spellcasting.ShouldSuppressLoopbackLog(self, eventId, casterEventId, sp
     return false
 end
 
-function Spellcasting.IsLocalCasterEntry(self, eventId, casterEventId, localEventUnitOverride, unitsByEventId, playerUnitsByName)
+function Spellcasting.IsLocalCasterEntry(self, eventId, casterEventId)
     local eventState = self.GetEventState and self:GetEventState() or nil
     if not eventState or eventState.active ~= true or eventState.id ~= eventId then
         return false
     end
 
-    local localUnit = localEventUnitOverride
-    if type(localUnit) ~= "table" and type(unitsByEventId) ~= "table" then
-        localUnit = self.ResolveLocalEventUnit and self:ResolveLocalEventUnit(eventState) or nil
-    end
+    local localUnit = self.ResolveLocalEventUnit and self:ResolveLocalEventUnit(eventState) or nil
     if type(localUnit) ~= "table" then
         return false
     end
@@ -3005,12 +2855,7 @@ function Spellcasting.IsLocalCasterEntry(self, eventId, casterEventId, localEven
         return true
     end
 
-    local casterUnit
-    if type(unitsByEventId) == "table" then
-        casterUnit = unitsByEventId[numericCasterEventId]
-    elseif Lookup.FindEventUnitById then
-        casterUnit = Lookup.FindEventUnitById(eventState.units, numericCasterEventId)
-    end
+    local casterUnit = Lookup.FindEventUnitById and Lookup.FindEventUnitById(eventState.units, numericCasterEventId) or nil
     if type(casterUnit) ~= "table" then
         return false
     end
@@ -3021,16 +2866,7 @@ function Spellcasting.IsLocalCasterEntry(self, eventId, casterEventId, localEven
         return localPlayerName ~= "" and casterPlayerName ~= "" and casterPlayerName == localPlayerName
     end
 
-    local controllerUnit
-    if type(unitsByEventId) == "table" then
-        local controllerId = tonumber(casterUnit.controllerID) or 0
-        local controllerName = Spellcasting.NormalizeName(casterUnit.controllerID)
-        controllerUnit = controllerId > 0 and unitsByEventId[controllerId]
-            or type(playerUnitsByName) == "table" and playerUnitsByName[controllerName]
-            or nil
-    elseif type(Spellcasting.ResolveControllerPlayerUnit) == "function" then
-        controllerUnit = Spellcasting.ResolveControllerPlayerUnit(eventState, casterUnit)
-    end
+    local controllerUnit = Spellcasting.ResolveControllerPlayerUnit(eventState, casterUnit)
     if type(controllerUnit) == "table" and tonumber(controllerUnit.eventID) == tonumber(localUnit.eventID) then
         return true
     end

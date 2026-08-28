@@ -582,8 +582,7 @@ end
 local function createSortedNumericKeyContinuation(values)
     return {
         values = type(values) == "table" and values or {},
-        scanCursorInitialized = false,
-        nextScanKey = nil,
+        scanKey = nil,
         keys = {},
         phase = "scan",
         sortIndex = 2,
@@ -1337,11 +1336,7 @@ mergeDerivedStateImpact = function(targetImpact, impact)
 end
 
 function AuraManager:CreateLocalPlayerDerivedStateContinuation(client, eventState, options)
-    options = type(options) == "table" and options or {}
-    local localUnit = options.localEventUnit
-    if type(localUnit) ~= "table" and type(options.unitsByEventId) ~= "table" then
-        localUnit = resolveLocalEventUnit(eventState)
-    end
+    local localUnit = resolveLocalEventUnit(eventState)
     local localEventId = math.floor(tonumber(localUnit and localUnit.eventID) or 0)
     if type(client) ~= "table"
         or type(eventState) ~= "table"
@@ -1365,7 +1360,6 @@ function AuraManager:CreateLocalPlayerDerivedStateContinuation(client, eventStat
         eventId = tostring(eventState.id or ""),
         localEventId = localEventId,
         localUnit = localUnit,
-        units = eventState.units,
         options = options,
         profileContinuation = profileContinuation,
         phase = "resolve",
@@ -1403,10 +1397,9 @@ function AuraManager:StepLocalPlayerDerivedStateContinuation(continuation, deadl
     local eventState = type(client) == "table" and type(client.GetEventState) == "function"
         and client:GetEventState()
         or nil
-    local localUnit = continuation.localUnit
+    local localUnit = resolveLocalEventUnit(eventState)
     if type(eventState) ~= "table"
         or eventState.active ~= true
-        or eventState.units ~= continuation.units
         or tostring(eventState.id or "") ~= tostring(continuation.eventId or "")
         or tonumber(localUnit and localUnit.eventID) ~= tonumber(continuation.localEventId)
         or localUnit ~= continuation.localUnit
@@ -1507,16 +1500,9 @@ function AuraManager:StepLocalPlayerDerivedStateContinuation(continuation, deadl
 end
 
 function AuraManager:QueueLocalPlayerDerivedStateRefresh(eventState, options)
-    options = type(options) == "table" and options or {}
-    local client = options.client or Client
+    local client = type(options) == "table" and options.client or Client
     local eventId = tostring(eventState and eventState.id or "")
-    local localEventUnit = options.localEventUnit
-    local localEventId = type(localEventUnit) == "table"
-        and tonumber(localEventUnit.eventID) or 0
-    if localEventId <= 0 and type(options.unitsByEventId) ~= "table" then
-        localEventId = resolveLocalEventId(eventState)
-        localEventUnit = resolveLocalEventUnit(eventState)
-    end
+    local localEventId = resolveLocalEventId(eventState)
     if type(client) ~= "table"
         or type(eventState) ~= "table"
         or eventState.active ~= true
@@ -1541,7 +1527,6 @@ function AuraManager:QueueLocalPlayerDerivedStateRefresh(eventState, options)
         client = client,
         eventId = eventId,
         localEventId = localEventId,
-        localEventUnit = localEventUnit,
         options = options,
         continuation = continuation,
     }
@@ -1554,7 +1539,7 @@ function AuraManager:QueueLocalPlayerDerivedStateRefresh(eventState, options)
             local currentEventState = type(targetClient) == "table" and type(targetClient.GetEventState) == "function"
                 and targetClient:GetEventState()
                 or nil
-            local currentLocalEventId = tonumber(state and state.localEventUnit and state.localEventUnit.eventID) or 0
+            local currentLocalEventId = currentEventState and resolveLocalEventId(currentEventState) or 0
             return type(currentEventState) ~= "table"
                 or currentEventState.active ~= true
                 or tostring(currentEventState.id or "") ~= tostring(state and state.eventId or "")
@@ -1570,9 +1555,9 @@ function AuraManager:QueueLocalPlayerDerivedStateRefresh(eventState, options)
             local completed, reason = manager:StepLocalPlayerDerivedStateContinuation(state.continuation, deadlineMs)
             if completed == nil then
                 state.staleReason = reason
-                return nil, "stale"
+                return true
             end
-            return completed == true, completed == true and "complete" or "incomplete"
+            return completed == true
         end,
         onCancel = function(state, cancelReason)
             local targetClient = state and state.client or nil
@@ -1617,12 +1602,8 @@ function AuraManager:QueueLocalPlayerDerivedStateRefresh(eventState, options)
 end
 
 local function queueLocalPlayerAuraDerivedStateRefresh(eventState, targetEventId, impact, options)
-    options = type(options) == "table" and options or {}
     local numericTargetEventId = tonumber(targetEventId) or 0
-    local localUnit = options.localEventUnit
-    if type(localUnit) ~= "table" and type(options.unitsByEventId) ~= "table" then
-        localUnit = resolveLocalEventUnit(eventState)
-    end
+    local localUnit = resolveLocalEventUnit(eventState)
     if numericTargetEventId <= 0
         or type(eventState) ~= "table"
         or eventState.active ~= true
@@ -1640,10 +1621,7 @@ local function queueLocalPlayerAuraDerivedStateRefresh(eventState, targetEventId
     return AuraManager:QueueLocalPlayerDerivedStateRefresh(eventState, options)
 end
 
-local function findEventUnit(eventState, eventId, unitsByEventId)
-    if type(unitsByEventId) == "table" then
-        return unitsByEventId[tonumber(eventId) or 0]
-    end
+local function findEventUnit(eventState, eventId)
     if type(Lookup.FindEventUnitById) == "function" then
         return Lookup.FindEventUnitById(eventState and eventState.units, eventId)
     end
@@ -1753,7 +1731,7 @@ local function publishAuraCombatLog(client, eventState, previousEntry, nextEntry
     })
 end
 
-local function resolveExpectedSender(eventState, casterUnit, unitsByEventId, playerUnitsByName)
+local function resolveExpectedSender(eventState, casterUnit)
     local normalizedCaster = type(Spellcasting.NormalizeName) == "function"
         and Spellcasting.NormalizeName(casterUnit and (casterUnit.ownerID or casterUnit.controllerID or casterUnit.name) or nil)
         or tostring(casterUnit and (casterUnit.ownerID or casterUnit.controllerID or casterUnit.name) or "")
@@ -1762,18 +1740,9 @@ local function resolveExpectedSender(eventState, casterUnit, unitsByEventId, pla
         return normalizedCaster
     end
 
-    local controllerId = tonumber(casterUnit and casterUnit.controllerID) or 0
-    local controllerName = type(Spellcasting.NormalizeName) == "function"
-        and Spellcasting.NormalizeName(casterUnit and casterUnit.controllerID or nil)
-        or tostring(casterUnit and casterUnit.controllerID or "")
-    local controllerUnit
-    if type(unitsByEventId) == "table" then
-        controllerUnit = controllerId > 0 and unitsByEventId[controllerId]
-            or type(playerUnitsByName) == "table" and playerUnitsByName[controllerName]
-            or nil
-    elseif type(Spellcasting.ResolveControllerPlayerUnit) == "function" then
-        controllerUnit = Spellcasting.ResolveControllerPlayerUnit(eventState, casterUnit)
-    end
+    local controllerUnit = type(Spellcasting.ResolveControllerPlayerUnit) == "function"
+        and Spellcasting.ResolveControllerPlayerUnit(eventState, casterUnit)
+        or nil
 
     if type(Spellcasting.NormalizeName) == "function" then
         return Spellcasting.NormalizeName(controllerUnit and (controllerUnit.ownerID or controllerUnit.controllerID or controllerUnit.name) or nil)
@@ -1782,7 +1751,7 @@ local function resolveExpectedSender(eventState, casterUnit, unitsByEventId, pla
     return tostring(controllerUnit and (controllerUnit.ownerID or controllerUnit.controllerID or controllerUnit.name) or "")
 end
 
-local function resolveAuraTurnOwnerEventId(eventState, casterUnit, fallbackEventId, unitsByEventId, playerUnitsByName)
+local function resolveAuraTurnOwnerEventId(eventState, casterUnit, fallbackEventId)
     local numericFallbackEventId = tonumber(fallbackEventId) or 0
     if type(casterUnit) ~= "table" then
         return numericFallbackEventId > 0 and numericFallbackEventId or nil
@@ -1796,18 +1765,9 @@ local function resolveAuraTurnOwnerEventId(eventState, casterUnit, fallbackEvent
         return numericFallbackEventId > 0 and numericFallbackEventId or nil
     end
 
-    local controllerId = tonumber(casterUnit.controllerID) or 0
-    local controllerName = type(Spellcasting.NormalizeName) == "function"
-        and Spellcasting.NormalizeName(casterUnit.controllerID)
-        or tostring(casterUnit.controllerID or "")
-    local controllerUnit
-    if type(unitsByEventId) == "table" then
-        controllerUnit = controllerId > 0 and unitsByEventId[controllerId]
-            or type(playerUnitsByName) == "table" and playerUnitsByName[controllerName]
-            or nil
-    elseif type(Spellcasting.ResolveControllerPlayerUnit) == "function" then
-        controllerUnit = Spellcasting.ResolveControllerPlayerUnit(eventState, casterUnit)
-    end
+    local controllerUnit = type(Spellcasting.ResolveControllerPlayerUnit) == "function"
+        and Spellcasting.ResolveControllerPlayerUnit(eventState, casterUnit)
+        or nil
     local numericControllerEventId = tonumber(controllerUnit and controllerUnit.eventID) or 0
     if numericControllerEventId > 0 then
         return numericControllerEventId
@@ -1816,13 +1776,13 @@ local function resolveAuraTurnOwnerEventId(eventState, casterUnit, fallbackEvent
     return numericFallbackEventId > 0 and numericFallbackEventId or nil
 end
 
-local function shouldExecuteLocalAuraTick(client, eventState, casterUnit, unitsByEventId, playerUnitsByName)
+local function shouldExecuteLocalAuraTick(client, eventState, casterUnit)
     local localPlayerName = type(Spellcasting.GetLocalPlayerName) == "function" and Spellcasting.GetLocalPlayerName() or ""
     if localPlayerName == "" then
         return false
     end
 
-    return resolveExpectedSender(eventState, casterUnit, unitsByEventId, playerUnitsByName) == localPlayerName
+    return resolveExpectedSender(eventState, casterUnit) == localPlayerName
 end
 
 local function resolveTriggeredAuraTarget(auraEvent, auraCasterUnit, auraTargetUnit, eventSourceUnit, eventOtherUnit)
@@ -3785,8 +3745,7 @@ function AuraManager:AdvanceAuraDurations(entry)
     return false
 end
 
-function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber, targetTickNumber, targetStepNumber, options)
-    options = type(options) == "table" and options or {}
+function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber, targetTickNumber, targetStepNumber)
     local eventState = client.GetEventState and client:GetEventState() or nil
     if type(eventState) ~= "table" or eventState.active ~= true or tostring(eventState.id or "") ~= tostring(eventId or "") then
         return false
@@ -3820,16 +3779,9 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
         return false
     end
 
-    local unitsByEventId = options.unitsByEventId
-    local playerUnitsByName = options.playerUnitsByName
-    local casterUnit = findEventUnit(eventState, entry.casterEventId, unitsByEventId)
-    local targetUnit = findEventUnit(eventState, entry.targetEventId, unitsByEventId)
-    local localPlayerEventId
-    if type(options.localEventUnit) == "table" or type(unitsByEventId) == "table" then
-        localPlayerEventId = tonumber(options.localEventUnit and options.localEventUnit.eventID) or 0
-    else
-        localPlayerEventId = resolveLocalEventId(eventState)
-    end
+    local casterUnit = findEventUnit(eventState, entry.casterEventId)
+    local targetUnit = findEventUnit(eventState, entry.targetEventId)
+    local localPlayerEventId = resolveLocalEventId(eventState)
     local localPlayerDerivedStateImpact = nil
     local changed = false
 
@@ -3840,31 +3792,15 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
         self:RemoveAura(client, eventState, entry.auraRef, entry.casterEventId, entry.targetEventId)
         changed = true
     else
-        local turnOwnerEventId = resolveAuraTurnOwnerEventId(
-            eventState,
-            casterUnit,
-            entry.casterEventId,
-            unitsByEventId,
-            playerUnitsByName
-        )
-        local turnOwnerTick
-        if turnOwnerEventId ~= nil then
-            if type(options.turnPageIndex) == "table" then
-                turnOwnerTick = tonumber(options.turnPageIndex[tonumber(turnOwnerEventId) or 0])
-            elseif Spellcasting.GetUnitPageIndex then
-                turnOwnerTick = Spellcasting.GetUnitPageIndex(eventState, turnOwnerEventId)
-            end
-        end
-        local shouldExecuteTick = turnOwnerTick ~= nil
-            and shouldExecuteLocalAuraTick(client, eventState, casterUnit, unitsByEventId, playerUnitsByName)
+        local turnOwnerEventId = resolveAuraTurnOwnerEventId(eventState, casterUnit, entry.casterEventId)
+        local turnOwnerTick = turnOwnerEventId ~= nil
+            and Spellcasting.GetUnitPageIndex
+            and Spellcasting.GetUnitPageIndex(eventState, turnOwnerEventId)
+            or nil
+        local shouldExecuteTick = turnOwnerTick ~= nil and shouldExecuteLocalAuraTick(client, eventState, casterUnit)
         local totalTicks = math.max(1, math.floor(tonumber(eventState.totalTicks) or 1))
 
         if turnOwnerTick ~= nil then
-            -- The authored aura-effect loop inside TickAura remains an
-            -- intentionally indivisible effect boundary for the later spell
-            -- component/effect continuation work (#69).  #67 slices between
-            -- aura entries and keeps this deferred boundary isolated from the
-            -- packet handler and the other event-step phases.
             for step = lastAdvancedStep + 1, currentStepNumber do
                 local stepTick = ((step - 1) % totalTicks) + 1
                 if stepTick == turnOwnerTick then
@@ -3899,19 +3835,9 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
             bumpAuraBucketRevision(activeBucket)
         end
         if localPlayerDerivedStateImpact and localPlayerEventId > 0 then
-            queueLocalPlayerAuraDerivedStateRefresh(
-                eventState,
-                localPlayerEventId,
-                localPlayerDerivedStateImpact,
-                options
-            )
+            queueLocalPlayerAuraDerivedStateRefresh(eventState, localPlayerEventId, localPlayerDerivedStateImpact)
         end
-        -- Event-step orchestration owns the final dirty/presentation flush.  The
-        -- legacy compatibility path still refreshes here, but an advancing
-        -- continuation must not enqueue one visible refresh per aura entry.
-        if options.deferPresentation ~= true then
-            refreshAuraDisplays("aura-advance", eventState, localPlayerEventId, localPlayerDerivedStateImpact)
-        end
+        refreshAuraDisplays("aura-advance", eventState, localPlayerEventId, localPlayerDerivedStateImpact)
     end
 
     if timer then
@@ -3924,169 +3850,78 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
     return changed
 end
 
-local function isAuraContinuationCurrent(continuation)
-    local client = continuation and continuation.client or nil
-    local eventState = continuation and continuation.eventState or nil
-    if type(client) ~= "table"
-        or type(eventState) ~= "table"
-        or eventState.active ~= true
-        or eventState.ending == true
-    then
+function AuraManager:AdvanceAuraState(client, previousTurnNumber, previousTickNumber)
+    local eventState = client.GetEventState and client:GetEventState() or nil
+    if not eventState or eventState.active ~= true then
         return false
-    end
-    local currentEventState = client.GetEventState and client:GetEventState() or client.EventState
-    return currentEventState == eventState
-        and tostring(currentEventState.id or "") == tostring(continuation.eventId or "")
-end
-
--- The dense aura bucket remains the source of truth until the later sparse
--- due-index task.  Each aura entry is an explicit resumable unit here; the
--- entry implementation remains the existing indivisible tick/duration unit.
-function AuraManager:CreateAuraAdvanceContinuation(client, previousTurnNumber, previousTickNumber, options)
-    local eventState = client and client.GetEventState and client:GetEventState() or nil
-    if type(eventState) ~= "table" or eventState.active ~= true then
-        return nil
     end
 
     local eventId = tostring(eventState.id or "")
     if eventId == "" then
-        return nil
+        return false
     end
+
+    local timer = startTiming("Aura advancement", 8, eventId)
 
     local currentTurnNumber = math.max(1, math.floor(tonumber(eventState.turnNumber) or 1))
     local currentTickNumber = math.max(1, math.floor(tonumber(eventState.tickNumber) or 1))
+    local currentStepNumber = resolveEventProgressStep(currentTurnNumber, currentTickNumber, eventState.totalTicks)
     local previousTurn = math.max(0, math.floor(tonumber(previousTurnNumber) or 0))
     local previousTick = math.max(0, math.floor(tonumber(previousTickNumber) or 0))
-    local currentStepNumber = resolveEventProgressStep(currentTurnNumber, currentTickNumber, eventState.totalTicks)
+    if previousTurn == currentTurnNumber and previousTick == currentTickNumber then
+        if timer then
+            stopTiming(timer, { activeAuras = 0, dueAuras = 0, queuedAuras = 0, eventUnits = type(eventState.units) == "table" and #eventState.units or 0 })
+        end
+        return false
+    end
+
     local bucket = self:GetEventAuraBucket(client, eventId, false)
-    return {
-        manager = self,
-        client = client,
-        eventState = eventState,
-        eventId = eventId,
-        previousTurn = previousTurn,
-        previousTick = previousTick,
-        currentTurn = currentTurnNumber,
-        currentTick = currentTickNumber,
-        currentStep = currentStepNumber,
-        bucket = bucket,
-        options = type(options) == "table" and options or {},
-        phase = previousTurn == currentTurnNumber and previousTick == currentTickNumber and "done" or "scan",
-        scanKey = nil,
-        inspected = 0,
-        due = 0,
-        processed = 0,
-        changed = false,
-        affectedEventUnitIds = {},
-        affectedEventUnitList = {},
-    }
-end
-
-function AuraManager:StepAuraAdvanceContinuation(continuation, deadlineMs)
-    if type(continuation) ~= "table" then
-        return nil, "error"
-    end
-    if continuation.phase == "done" then
-        return true, "complete"
-    end
-    if not isAuraContinuationCurrent(continuation) then
-        return nil, "stale"
-    end
-    if continuation.previousTurn == continuation.currentTurn and continuation.previousTick == continuation.currentTick then
-        continuation.phase = "done"
-        return true, "complete"
+    if not bucket then
+        if timer then
+            stopTiming(timer, { activeAuras = 0, dueAuras = 0, queuedAuras = 0, eventUnits = type(eventState.units) == "table" and #eventState.units or 0 })
+        end
+        return false
     end
 
-    local bucket = continuation.bucket
-    local auraEntries = bucket and bucket.byKey or nil
-    if type(auraEntries) ~= "table" then
-        continuation.phase = "done"
-        return true, "complete"
-    end
+    local queued = false
+    local dueAuras = 0
 
-    local auraKey, entry
-    if continuation.scanCursorInitialized then
-        auraKey = continuation.nextScanKey
-        entry = auraKey ~= nil and auraEntries[auraKey] or nil
-    else
-        auraKey, entry = next(auraEntries, nil)
-        continuation.scanCursorInitialized = true
-    end
-    if auraKey == nil then
-        continuation.phase = "done"
-        return true, "complete"
-    end
-
-    -- Capture the next cursor before AdvanceAuraEntry can remove this entry.
-    continuation.nextScanKey = next(auraEntries, auraKey)
-    continuation.inspected = continuation.inspected + 1
-    if type(entry) == "table" then
-        local lastAdvancedStep = math.max(
-            1,
-            math.floor(
-                tonumber(entry.lastAdvancedStep)
-                or resolveEventProgressStep(entry.lastAdvancedTurnNumber, continuation.currentTick, continuation.eventState.totalTicks)
-            )
-        )
-        if continuation.currentStep > lastAdvancedStep then
-            continuation.due = continuation.due + 1
-            local pendingAdvancedStep = math.floor(tonumber(entry.pendingAdvancedStep) or 0)
-            if pendingAdvancedStep < continuation.currentStep then
-                entry.pendingAdvancedStep = continuation.currentStep
-                local changed = self:AdvanceAuraEntry(
-                    continuation.client,
-                    continuation.eventId,
-                    auraKey,
-                    continuation.currentTurn,
-                    continuation.currentTick,
-                    continuation.currentStep,
-                    continuation.options
+    for auraKey, entry in pairs(bucket.byKey or {}) do
+        if type(entry) == "table" then
+            local lastAdvancedStep = math.max(
+                1,
+                math.floor(
+                    tonumber(entry.lastAdvancedStep)
+                    or resolveEventProgressStep(entry.lastAdvancedTurnNumber, currentTickNumber, eventState.totalTicks)
                 )
-                entry = (bucket.byKey and bucket.byKey[auraKey]) or entry
-                if changed then
-                    continuation.changed = true
-                end
-                continuation.processed = continuation.processed + 1
-                local targetEventId = tonumber(entry and entry.targetEventId) or 0
-                local casterEventId = tonumber(entry and entry.casterEventId) or 0
-                if targetEventId > 0 then
-                    if not continuation.affectedEventUnitIds[targetEventId] then
-                        continuation.affectedEventUnitIds[targetEventId] = true
-                        continuation.affectedEventUnitList[#continuation.affectedEventUnitList + 1] = targetEventId
-                    end
-                end
-                if casterEventId > 0 then
-                    if not continuation.affectedEventUnitIds[casterEventId] then
-                        continuation.affectedEventUnitIds[casterEventId] = true
-                        continuation.affectedEventUnitList[#continuation.affectedEventUnitList + 1] = casterEventId
+            )
+            if currentStepNumber > lastAdvancedStep then
+                dueAuras = dueAuras + 1
+                local pendingAdvancedStep = math.floor(tonumber(entry.pendingAdvancedStep) or 0)
+                if pendingAdvancedStep < currentStepNumber then
+                    entry.pendingAdvancedStep = currentStepNumber
+                    local enqueued = enqueueAuraWork(function(manager, targetClient, targetEventId, targetAuraKey, turnNumber, tickNumber, stepNumber)
+                        manager:AdvanceAuraEntry(targetClient, targetEventId, targetAuraKey, turnNumber, tickNumber, stepNumber)
+                    end, self, client, eventId, auraKey, currentTurnNumber, currentTickNumber, currentStepNumber)
+                    if enqueued then
+                        queued = true
+                    else
+                        entry.pendingAdvancedStep = pendingAdvancedStep > 0 and pendingAdvancedStep or nil
                     end
                 end
             end
         end
     end
 
-    local tasks = Addon.Internal and Addon.Internal.Tasks or nil
-    if type(tasks) == "table" and type(tasks.ShouldYield) == "function" and tasks:ShouldYield(deadlineMs) then
-        return false, "incomplete"
+    if timer then
+        stopTiming(timer, {
+            activeAuras = countAuraEntries(bucket),
+            dueAuras = dueAuras,
+            queuedAuras = queued and dueAuras or 0,
+            eventUnits = type(eventState.units) == "table" and #eventState.units or 0,
+        })
     end
-    return false, "incomplete"
-end
-
-function AuraManager:AdvanceAuraState(client, previousTurnNumber, previousTickNumber)
-    local continuation = self:CreateAuraAdvanceContinuation(client, previousTurnNumber, previousTickNumber)
-    if not continuation then
-        return false
-    end
-    while continuation.phase ~= "done" do
-        local complete, status = self:StepAuraAdvanceContinuation(continuation, nil)
-        if complete == nil or (complete ~= true and status ~= "incomplete") then
-            return false
-        end
-        if complete == true then
-            break
-        end
-    end
-    return continuation.changed == true
+    return queued
 end
 
 local function getAuraConfigurationRevision()
@@ -4858,16 +4693,6 @@ Spellcasting.ResetAuraState = function(client, eventId)
 end
 Spellcasting.AdvanceAuraState = function(client, previousTurnNumber, previousTickNumber)
     return AuraManager:AdvanceAuraState(client, previousTurnNumber, previousTickNumber)
-end
-Spellcasting.CreateAuraAdvanceContinuation = function(client, previousTurnNumber, previousTickNumber, options)
-    return AuraManager:CreateAuraAdvanceContinuation(client, previousTurnNumber, previousTickNumber, options)
-end
-Spellcasting.StepAuraAdvanceContinuation = function(continuation, deadlineMs)
-    local manager = continuation and continuation.manager or AuraManager
-    if type(manager) ~= "table" or type(manager.StepAuraAdvanceContinuation) ~= "function" then
-        return nil, "error"
-    end
-    return manager:StepAuraAdvanceContinuation(continuation, deadlineMs)
 end
 
 Client.ActiveAurasByEventId = Client.ActiveAurasByEventId or {}

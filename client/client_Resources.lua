@@ -1402,7 +1402,6 @@ end
 function Client:ApplyLocalTurnStartResourceRegeneration(stateOverride, eventStateOverride, options)
     local state = stateOverride or self.State
     local eventState = eventStateOverride or (self.GetEventState and self:GetEventState() or nil)
-    options = type(options) == "table" and options or {}
     if type(state) ~= "table"
         or state.active ~= true
         or type(eventState) ~= "table"
@@ -1413,10 +1412,7 @@ function Client:ApplyLocalTurnStartResourceRegeneration(stateOverride, eventStat
     end
 
     local activeEventUnit, controlContext = nil, nil
-    if type(options.activeEventUnit) == "table" then
-        activeEventUnit = options.activeEventUnit
-        controlContext = options.controlContext
-    elseif type(self.ResolveActiveSpellcasterUnit) == "function" then
+    if type(self.ResolveActiveSpellcasterUnit) == "function" then
         activeEventUnit, _, controlContext = self:ResolveActiveSpellcasterUnit(eventState)
     end
     local activeEventId = tonumber(activeEventUnit and activeEventUnit.eventID) or 0
@@ -1481,7 +1477,7 @@ function Client:ApplyLocalTurnStartResourceRegeneration(stateOverride, eventStat
         {
             allowLocalEchoApply = true,
             scope = "turn",
-            suppressLocalVisualRefresh = options.suppressLocalVisualRefresh == true,
+            suppressLocalVisualRefresh = type(options) == "table" and options.suppressLocalVisualRefresh == true,
         }
     )
     if queued then

@@ -260,7 +260,6 @@ local function runSliceableJob(self, job, flushDeadlineMs)
     end, formatError) }
     local ok = results[1]
     local completed = results[2] == true
-    local outcome = results[3]
     local elapsedMs = sliceStartedAt and math.max(0, getNowMilliseconds() - sliceStartedAt) or 0
     self.LastSliceElapsedMs = elapsedMs
     self.MaxSliceElapsedMs = math.max(tonumber(self.MaxSliceElapsedMs) or 0, elapsedMs)
@@ -276,20 +275,6 @@ local function runSliceableJob(self, job, flushDeadlineMs)
                 scope = job.scope or "",
             },
         })
-    end
-
-    -- Sliceable continuations may distinguish a terminal stale/error result
-    -- from ordinary incomplete work.  Preserve that result here instead of
-    -- putting stale state back into the deferred queue as if it were pending.
-    if ok and outcome == "stale" then
-        cancelSliceableJob(job, "stale", true)
-        return "cancelled", elapsedMs
-    end
-    if ok and outcome == "error" then
-        logError("Task queue sliceable job '%s' returned an error outcome.", tostring(job.label or job.id))
-        job.failed = true
-        releaseSliceableJob(job, "failed", "error")
-        return "failed", elapsedMs
     end
 
     if not ok then

@@ -966,359 +966,101 @@ function Spellcasting.PruneCooldownState(self, eventState)
     return changed
 end
 
-local function isCooldownContinuationCurrent(continuation)
-    local client = continuation and continuation.client or nil
-    local eventState = continuation and continuation.eventState or nil
-    if type(client) ~= "table"
-        or type(eventState) ~= "table"
-        or eventState.active ~= true
-        or eventState.ending == true
-    then
-        return false
-    end
-    local currentEventState = client.GetEventState and client:GetEventState() or client.EventState
-    return currentEventState == eventState
-        and tostring(currentEventState.id or "") == tostring(continuation.eventId or "")
-end
-
-local function isCooldownCasterTurnOnTick(continuation, eventState, casterEventId)
-    local turnPageIndex = continuation
-        and continuation.options
-        and continuation.options.turnPageIndex
-        or nil
-    if type(turnPageIndex) == "table" then
-        local currentTick = math.max(1, math.floor(tonumber(eventState and eventState.tickNumber) or 0))
-        local numericCasterEventId = tonumber(casterEventId) or 0
-        return numericCasterEventId > 0
-            and tonumber(turnPageIndex[numericCasterEventId]) == currentTick
-    end
-
-    return Spellcasting.IsCasterTurnOnTick
-        and Spellcasting.IsCasterTurnOnTick(eventState, casterEventId)
-        or false
-end
-
--- Cooldown advancement keeps the existing dense bucket representation until
--- the sparse-index task replaces it.  The roster prune and bucket traversal
--- are stateful so each event-step slice can stop at a deadline without
--- changing cooldown semantics.
-function Spellcasting.CreateCooldownAdvanceContinuation(self, previousTurnNumber, previousTickNumber, options)
+function Spellcasting.AdvanceCooldownState(self, previousTurnNumber, previousTickNumber)
     local eventState = self.GetEventState and self:GetEventState() or nil
     if not eventState or eventState.active ~= true then
-        return nil
+        return false
     end
 
     local eventId = normalizeEventId(eventState.id)
     if eventId == "" then
-        return nil
+        return false
     end
+
+    local timer = startTiming("Cooldown advancement", 8, eventId)
 
     local currentTurnNumber = math.max(1, math.floor(tonumber(eventState.turnNumber) or 1))
     local currentTickNumber = math.max(1, math.floor(tonumber(eventState.tickNumber) or 1))
     local previousTurn = math.max(0, math.floor(tonumber(previousTurnNumber) or 0))
     local previousTick = math.max(0, math.floor(tonumber(previousTickNumber) or 0))
-    local bucket = Spellcasting.GetEventCooldownBucket(self, eventId, false)
-    return {
-        client = self,
-        eventState = eventState,
-        eventId = eventId,
-        previousTurn = previousTurn,
-        previousTick = previousTick,
-        currentTurn = currentTurnNumber,
-        currentTick = currentTickNumber,
-        bucket = bucket,
-        options = type(options) == "table" and options or {},
-        localEventUnit = type(options) == "table" and options.localEventUnit or nil,
-        phase = previousTurn == currentTurnNumber and previousTick == currentTickNumber and "done" or "build-tracked",
-        rosterIndex = 0,
-        tracked = {},
-        localUnitTracked = false,
-        pruneCursorInitialized = false,
-        nextPruneKey = nil,
-        unitCursorInitialized = false,
-        nextUnitKey = nil,
-        currentUnitEventId = nil,
-        currentUnitState = nil,
-        unitPrepared = false,
-        spellCursorInitialized = false,
-        nextSpellKey = nil,
-        spellScanStarted = false,
-        changed = false,
-        inspectedUnits = 0,
-        inspectedSpells = 0,
-        processedUnits = 0,
-        processedSpells = 0,
-        affectedEventUnitIds = {},
-        affectedEventUnitList = {},
-    end
-end
-
-local function cooldownContinuationShouldYield(deadlineMs)
-    local tasks = Addon.Internal and Addon.Internal.Tasks or nil
-    return type(tasks) == "table"
-        and type(tasks.ShouldYield) == "function"
-        and tasks:ShouldYield(deadlineMs) == true
-end
-
-local function markCooldownAffected(continuation, unitEventId)
-    local numericUnitEventId = tonumber(unitEventId) or 0
-    if numericUnitEventId > 0 then
-        if not continuation.affectedEventUnitIds[numericUnitEventId] then
-            continuation.affectedEventUnitIds[numericUnitEventId] = true
-            continuation.affectedEventUnitList[#continuation.affectedEventUnitList + 1] = numericUnitEventId
+    if previousTurn == currentTurnNumber and previousTick == currentTickNumber then
+        if timer then
+            stopTiming(timer, { activeCooldowns = 0, activeCooldownUnits = 0, eventUnits = type(eventState.units) == "table" and #eventState.units or 0 })
         end
-    end
-end
-
-function Spellcasting.StepCooldownAdvanceContinuation(continuation, deadlineMs)
-    if type(continuation) ~= "table" then
-        return nil, "error"
-    end
-    if continuation.phase == "done" then
-        return true, "complete"
-    end
-    if not isCooldownContinuationCurrent(continuation) then
-        return nil, "stale"
-    end
-    if continuation.previousTurn == continuation.currentTurn and continuation.previousTick == continuation.currentTick then
-        continuation.phase = "done"
-        return true, "complete"
-    end
-
-    local client = continuation.client
-    local eventState = continuation.eventState
-    local bucket = continuation.bucket
-
-    if continuation.phase == "build-tracked" then
-        if not continuation.localUnitTracked then
-            local localUnit = continuation.localEventUnit
-            local localUnitEventId = normalizeUnitEventId(localUnit and localUnit.eventID)
-            if localUnitEventId then
-                continuation.tracked[localUnitEventId] = true
-            end
-            continuation.localUnitTracked = true
-        end
-
-        continuation.rosterIndex = continuation.rosterIndex + 1
-        local unit = eventState.units and eventState.units[continuation.rosterIndex] or nil
-        if unit ~= nil then
-            local unitEventId = normalizeUnitEventId(unit and unit.eventID)
-            local eventClass = getEventClass()
-            if unitEventId
-                and unit
-                and unit.isPlayer ~= true
-                and (not eventClass or not eventClass.IsUnitActive or eventClass.IsUnitActive(unit))
-                and client.CanControlEventUnit
-                and client:CanControlEventUnit(unit, eventState, continuation.localEventUnit)
-            then
-                continuation.tracked[unitEventId] = true
-            end
-            if cooldownContinuationShouldYield(deadlineMs) then
-                return false, "incomplete"
-            end
-        else
-            continuation.phase = "prune"
-            continuation.pruneCursorInitialized = false
-            continuation.nextPruneKey = nil
-        end
-    end
-
-    if continuation.phase == "prune" then
-        if type(bucket) ~= "table" then
-            continuation.phase = "finish"
-        else
-            local unitEventId, unitState
-            if continuation.pruneCursorInitialized then
-                unitEventId = continuation.nextPruneKey
-                unitState = unitEventId ~= nil and bucket[unitEventId] or nil
-            else
-                unitEventId, unitState = next(bucket, nil)
-                continuation.pruneCursorInitialized = true
-            end
-            if unitEventId == nil then
-                continuation.phase = "units"
-                continuation.unitCursorInitialized = false
-                continuation.nextUnitKey = nil
-            else
-                -- Capture the next cursor before this entry can be removed.
-                continuation.nextPruneKey = next(bucket, unitEventId)
-                continuation.inspectedUnits = continuation.inspectedUnits + 1
-                local trackedKey = tonumber(unitEventId) or unitEventId
-                if continuation.tracked[trackedKey] ~= true and continuation.tracked[unitEventId] ~= true then
-                    bucket[unitEventId] = nil
-                    continuation.changed = true
-                    markCooldownAffected(continuation, unitEventId)
-                end
-                if cooldownContinuationShouldYield(deadlineMs) then
-                    return false, "incomplete"
-                end
-            end
-        end
-    end
-
-    if continuation.phase == "units" then
-        if continuation.currentUnitEventId == nil then
-            local unitEventId, unitState
-            if continuation.unitCursorInitialized then
-                unitEventId = continuation.nextUnitKey
-                unitState = unitEventId ~= nil and bucket and bucket[unitEventId] or nil
-            else
-                unitEventId, unitState = next(bucket or {}, nil)
-                continuation.unitCursorInitialized = true
-            end
-            if unitEventId == nil then
-                continuation.phase = "finish"
-            else
-                -- Capture the next cursor before this unit can be removed by
-                -- cleanupUnitState at the end of its spell scan.
-                continuation.nextUnitKey = next(bucket, unitEventId)
-                continuation.currentUnitEventId = unitEventId
-                continuation.currentUnitState = unitState
-                continuation.unitPrepared = false
-                continuation.spellCursorInitialized = false
-                continuation.nextSpellKey = nil
-                continuation.spellScanStarted = false
-            end
-        end
-
-        if continuation.phase == "units" and not continuation.unitPrepared then
-            local unitEventId = continuation.currentUnitEventId
-            local unitState = continuation.currentUnitState
-            continuation.inspectedUnits = continuation.inspectedUnits + 1
-            continuation.unitPrepared = true
-            if type(unitState) == "table"
-                and isCooldownCasterTurnOnTick(continuation, eventState, unitEventId)
-            then
-                local lastAdvancedTurnNumber = math.max(0, math.floor(tonumber(unitState.lastAdvancedTurnNumber) or 0))
-                if continuation.currentTurn > lastAdvancedTurnNumber then
-                    local advancedTurns = continuation.currentTurn - lastAdvancedTurnNumber
-                    unitState.lastAdvancedTurnNumber = continuation.currentTurn
-                    continuation.processedUnits = continuation.processedUnits + 1
-                    markCooldownAffected(continuation, unitEventId)
-                    if math.max(0, math.floor(tonumber(unitState.globalCooldownRemaining) or 0)) > 0 then
-                        local nextGlobalCooldownRemaining = math.max(
-                            0,
-                            math.floor(tonumber(unitState.globalCooldownRemaining) or 0) - advancedTurns
-                        )
-                        if nextGlobalCooldownRemaining ~= unitState.globalCooldownRemaining then
-                            unitState.globalCooldownRemaining = nextGlobalCooldownRemaining
-                            continuation.changed = true
-                        end
-                    end
-                    continuation.advancedTurns = advancedTurns
-                    continuation.spellScanStarted = true
-                end
-            end
-            if cooldownContinuationShouldYield(deadlineMs) then
-                return false, "incomplete"
-            end
-        end
-
-        if continuation.phase == "units" and continuation.spellScanStarted then
-            local unitState = continuation.currentUnitState
-            local spells = type(unitState) == "table" and unitState.spells or nil
-            local spellRef, spellState
-            if continuation.spellCursorInitialized then
-                spellRef = continuation.nextSpellKey
-                spellState = spellRef ~= nil and spells and spells[spellRef] or nil
-            else
-                spellRef, spellState = next(spells or {}, nil)
-                continuation.spellCursorInitialized = true
-            end
-            if spellRef == nil then
-                if cleanupUnitState(unitState) then
-                    bucket[continuation.currentUnitEventId] = nil
-                    continuation.changed = true
-                end
-                continuation.currentUnitEventId = nil
-                continuation.currentUnitState = nil
-                continuation.spellScanStarted = false
-                continuation.spellCursorInitialized = false
-                continuation.nextSpellKey = nil
-            else
-                -- Advance the cursor before mutating the current spell entry.
-                -- This keeps next() valid when the entry expires and is removed.
-                continuation.nextSpellKey = next(spells, spellRef)
-                continuation.inspectedSpells = continuation.inspectedSpells + 1
-                continuation.processedSpells = continuation.processedSpells + 1
-                local entryChanged, nextSpellState
-                if spellState and spellState.usesCharges == true then
-                    entryChanged, nextSpellState = advanceChargeState(spellState, continuation.advancedTurns)
-                else
-                    entryChanged, nextSpellState = advanceStandardCooldownState(spellState, continuation.advancedTurns)
-                end
-                if entryChanged then
-                    continuation.changed = true
-                end
-                local lockoutChanged
-                lockoutChanged, nextSpellState = advanceSpellLockoutState(nextSpellState, continuation.advancedTurns)
-                if lockoutChanged then
-                    continuation.changed = true
-                end
-                if nextSpellState and not shouldClearSpellState(nextSpellState) then
-                    spells[spellRef] = nextSpellState
-                else
-                    spells[spellRef] = nil
-                end
-                if cooldownContinuationShouldYield(deadlineMs) then
-                    return false, "incomplete"
-                end
-            end
-        elseif continuation.phase == "units" and continuation.unitPrepared then
-            if cleanupUnitState(continuation.currentUnitState) then
-                bucket[continuation.currentUnitEventId] = nil
-                continuation.changed = true
-            end
-            continuation.currentUnitEventId = nil
-            continuation.currentUnitState = nil
-        end
-    end
-
-    if continuation.phase == "finish" then
-        cleanupEventBucket(client, continuation.eventId, bucket)
-        if continuation.changed and continuation.options.deferPresentation ~= true then
-            local hasAffectedUnit = false
-            for unitEventId in pairs(continuation.affectedEventUnitIds) do
-                hasAffectedUnit = true
-                bumpEventTooltipContextRevision(continuation.eventId, unitEventId)
-            end
-            if not hasAffectedUnit then
-                bumpEventTooltipContextRevision(continuation.eventId, nil)
-            end
-            if type(client.QueueActionBarRefresh) == "function" then
-                client:QueueActionBarRefresh("cooldown-advance")
-            end
-        end
-        continuation.phase = "done"
-        return true, "complete"
-    end
-
-    return false, "incomplete"
-end
-
-function Spellcasting.AdvanceCooldownState(self, previousTurnNumber, previousTickNumber)
-    local localEventUnit = self.ResolveLocalEventUnit and self:ResolveLocalEventUnit(self:GetEventState()) or nil
-    local continuation = Spellcasting.CreateCooldownAdvanceContinuation(
-        self,
-        previousTurnNumber,
-        previousTickNumber,
-        { localEventUnit = localEventUnit }
-    )
-    if not continuation then
         return false
     end
 
-    while continuation.phase ~= "done" do
-        local complete, status = Spellcasting.StepCooldownAdvanceContinuation(continuation, nil)
-        if complete == nil or (complete ~= true and status ~= "incomplete") then
-            return false
+    local bucket = Spellcasting.GetEventCooldownBucket(self, eventId, false)
+    local changed = Spellcasting.PruneCooldownState(self, eventState)
+    if type(bucket) ~= "table" then
+        if timer then
+            stopTiming(timer, { activeCooldowns = 0, activeCooldownUnits = 0, eventUnits = type(eventState.units) == "table" and #eventState.units or 0 })
         end
-        if complete == true then
-            break
+        return changed
+    end
+
+    for unitEventId, unitState in pairs(bucket) do
+        if type(unitState) == "table" and Spellcasting.IsCasterTurnOnTick and Spellcasting.IsCasterTurnOnTick(eventState, unitEventId) then
+            local lastAdvancedTurnNumber = math.max(0, math.floor(tonumber(unitState.lastAdvancedTurnNumber) or 0))
+            if currentTurnNumber > lastAdvancedTurnNumber then
+                local advancedTurns = currentTurnNumber - lastAdvancedTurnNumber
+                unitState.lastAdvancedTurnNumber = currentTurnNumber
+                if math.max(0, math.floor(tonumber(unitState.globalCooldownRemaining) or 0)) > 0 then
+                    local nextGlobalCooldownRemaining = math.max(0, math.floor(tonumber(unitState.globalCooldownRemaining) or 0) - advancedTurns)
+                    if nextGlobalCooldownRemaining ~= unitState.globalCooldownRemaining then
+                        unitState.globalCooldownRemaining = nextGlobalCooldownRemaining
+                        changed = true
+                    end
+                end
+
+                for spellRef, spellState in pairs(unitState.spells or {}) do
+                    local entryChanged, nextSpellState
+                    if spellState and spellState.usesCharges == true then
+                        entryChanged, nextSpellState = advanceChargeState(spellState, advancedTurns)
+                    else
+                        entryChanged, nextSpellState = advanceStandardCooldownState(spellState, advancedTurns)
+                    end
+
+                    if entryChanged then
+                        changed = true
+                    end
+
+                    local lockoutChanged
+                    lockoutChanged, nextSpellState = advanceSpellLockoutState(nextSpellState, advancedTurns)
+                    if lockoutChanged then
+                        changed = true
+                    end
+
+                    if nextSpellState and not shouldClearSpellState(nextSpellState) then
+                        unitState.spells[spellRef] = nextSpellState
+                    else
+                        unitState.spells[spellRef] = nil
+                    end
+                end
+            end
+        end
+
+        if cleanupUnitState(unitState) then
+            bucket[unitEventId] = nil
+            changed = true
         end
     end
 
-    return continuation.changed == true
+    cleanupEventBucket(self, eventId, bucket)
+    if changed and type(self.QueueActionBarRefresh) == "function" then
+        bumpEventTooltipContextRevision(eventId, nil)
+        self:QueueActionBarRefresh("cooldown-advance")
+    end
+
+    if timer then
+        local activeCooldownUnits, activeCooldowns = countCooldownEntries(bucket)
+        stopTiming(timer, {
+            activeCooldowns = activeCooldowns,
+            activeCooldownUnits = activeCooldownUnits,
+            eventUnits = type(eventState.units) == "table" and #eventState.units or 0,
+        })
+    end
+    return changed
 end
 
 function Spellcasting.ApplyLocalSpellCooldown(self, eventState, casterUnit, spellRef, spell)
@@ -1930,19 +1672,6 @@ end
 
 function Client:AdvanceCooldownState(previousTurnNumber, previousTickNumber)
     return Spellcasting.AdvanceCooldownState and Spellcasting.AdvanceCooldownState(self, previousTurnNumber, previousTickNumber) or false
-end
-
-function Client:CreateCooldownAdvanceContinuation(previousTurnNumber, previousTickNumber, options)
-    return Spellcasting.CreateCooldownAdvanceContinuation
-        and Spellcasting.CreateCooldownAdvanceContinuation(self, previousTurnNumber, previousTickNumber, options)
-        or nil
-end
-
-function Client:StepCooldownAdvanceContinuation(continuation, deadlineMs)
-    if type(Spellcasting.StepCooldownAdvanceContinuation) ~= "function" then
-        return nil, "error"
-    end
-    return Spellcasting.StepCooldownAdvanceContinuation(continuation, deadlineMs)
 end
 
 function Client:PruneCooldownState(eventState)
