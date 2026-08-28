@@ -1710,6 +1710,23 @@ function Server:AdvanceEventStep()
         return false
     end
 
+    -- The server-side host loop is also a client in the event protocol.  Keep
+    -- the authoritative mutation behind the same call-time readiness gate as
+    -- widget and Event Manager callers.
+    if type(Client) ~= "table"
+        or type(Client.GetEventState) ~= "function"
+        or type(Client.CanPerformEventAction) ~= "function"
+    then
+        return false
+    end
+    local clientEventState = Client:GetEventState()
+    if type(clientEventState) ~= "table"
+        or tostring(clientEventState.id or "") ~= tostring(eventState.id or "")
+        or Client:CanPerformEventAction(clientEventState, "advance-event-step") ~= true
+    then
+        return false
+    end
+
     if Client and type(Client.IsLocalEventHost) == "function" and Client:IsLocalEventHost(eventState) and type(Client.FlushPendingTurnChanges) == "function" then
         Client:FlushPendingTurnChanges(Client.GetState and Client:GetState() or nil, eventState)
     end

@@ -95,6 +95,19 @@ local function getTimingNowMilliseconds()
         or 0
 end
 
+local function getEventStepNowMilliseconds()
+    if type(debugprofilestop) == "function" then
+        return tonumber(debugprofilestop()) or 0
+    end
+    if type(GetTimePreciseSec) == "function" then
+        return (tonumber(GetTimePreciseSec()) or 0) * 1000
+    end
+    if type(GetTime) == "function" then
+        return (tonumber(GetTime()) or 0) * 1000
+    end
+    return 0
+end
+
 local function logTimingParts(label, context, parts, totalElapsedMs, thresholdMs)
     local timings = getTimings()
     if type(timings) == "table" and type(timings.LogParts) == "function" then
@@ -144,7 +157,7 @@ local function recordTransitionSlice(transition, startedAtMs, label)
         return nil
     end
 
-    local elapsedMs = math.max(0, getTimingNowMilliseconds() - startedAtMs)
+    local elapsedMs = math.max(0, getEventStepNowMilliseconds() - startedAtMs)
     transition.lastSliceElapsedMs = elapsedMs
     transition.maxSliceElapsedMs = math.max(tonumber(transition.maxSliceElapsedMs) or 0, elapsedMs)
     transition.maxSliceLabel = label or transition.maxSliceLabel
@@ -202,6 +215,9 @@ end
 Client.EventState = Client.EventState or nil
 Client.EventTransition = Client.EventTransition or nil
 Client.EventTransitionGeneration = tonumber(Client.EventTransitionGeneration) or 0
+Client.EventStepWork = Client.EventStepWork or nil
+Client.PendingEventStatePackets = Client.PendingEventStatePackets or {}
+Client.LastEventStepDiagnostics = Client.LastEventStepDiagnostics or nil
 Client.LastEventEndReason = Client.LastEventEndReason or nil
 Client.EventWidgetRefreshQueued = Client.EventWidgetRefreshQueued or false
 Client.EventStartupRuntimeByEventId = Client.EventStartupRuntimeByEventId or {}
@@ -238,6 +254,8 @@ function Client:BeginEventTransition(kind, eventId, transaction)
     local normalizedEventId = tostring(eventId or "")
     local totalLabel = normalizedKind == "ending"
         and "Event end total transition"
+        or normalizedKind == "advancing"
+        and "Event-step total transition"
         or "Event start total transition"
     local transition = {
         kind = normalizedKind,
@@ -248,18 +266,41 @@ function Client:BeginEventTransition(kind, eventId, transaction)
         generation = self.EventTransitionGeneration,
         revision = self.EventTransitionGeneration,
         eventState = self.EventState,
-        startedAtMs = getTimingNowMilliseconds(),
+        startedAtMs = getEventStepNowMilliseconds(),
         totalTimer = startTiming(totalLabel, 16, normalizedEventId),
         phaseTimings = {},
         lastSliceElapsedMs = 0,
         maxSliceElapsedMs = 0,
         maxSliceLabel = nil,
+        contextId = ("event:%s:%s:%d"):format(normalizedKind, normalizedEventId, self.EventTransitionGeneration),
+        transactionContextId = ("event:%s:%s:%d"):format(normalizedKind, normalizedEventId, self.EventTransitionGeneration),
+        stepDiagnostics = normalizedKind == "advancing" and {
+            immediateElapsedMs = 0,
+            phaseTimings = {},
+            sliceTimings = {},
+            castsInspected = 0,
+            castsProcessed = 0,
+            cooldownsInspected = 0,
+            cooldownsProcessed = 0,
+            aurasInspected = 0,
+            aurasProcessed = 0,
+            dirtyScopes = {},
+            maxPhaseElapsedMs = 0,
+            maxPhase = nil,
+            maxSliceElapsedMs = 0,
+            maxSlicePhase = nil,
+        } or nil,
     }
     if type(transition.eventState) == "table" then
         transition.eventState.transitionPhase = transition.phase
     end
     self.EventTransition = transition
-    refreshEventManageDashboard()
+    -- Advancing is packet-driven and must keep its immediate path limited to
+    -- state/transition setup.  The dashboard is refreshed when the transition
+    -- reaches its release point (and call-time guards cover the interval).
+    if normalizedKind ~= "advancing" then
+        refreshEventManageDashboard()
+    end
     return transition
 end
 
@@ -303,14 +344,43 @@ function Client:EndEventTransition(eventId, generation, eventState, reason)
     if not self:IsEventTransitionCurrent(eventId, generation, nil, eventState) then
         return false
     end
+    transition.totalElapsedMs = 0
+    if tonumber(transition.startedAtMs) and tonumber(transition.startedAtMs) > 0 then
+        transition.totalElapsedMs = math.max(0, getEventStepNowMilliseconds() - transition.startedAtMs)
+    end
     if transition.totalTimer then
-        stopEventTiming(transition.totalTimer, eventState, {
+        local totalCardinality = {
             transitionKind = transition.kind,
             transitionPhase = transition.phase,
             transitionGeneration = transition.generation,
             transitionReason = reason,
-        })
+            transitionElapsedMs = transition.totalElapsedMs,
+        }
+        if type(transition.stepDiagnostics) == "table" then
+            totalCardinality.eventStepImmediateMs = transition.stepDiagnostics.immediateElapsedMs or 0
+            totalCardinality.eventStepPhaseTimings = transition.stepDiagnostics.phaseTimings
+            totalCardinality.eventStepSliceTimings = transition.stepDiagnostics.sliceTimings
+            totalCardinality.castsInspected = transition.stepDiagnostics.castsInspected or 0
+            totalCardinality.castsProcessed = transition.stepDiagnostics.castsProcessed or 0
+            totalCardinality.cooldownsInspected = transition.stepDiagnostics.cooldownsInspected or 0
+            totalCardinality.cooldownsProcessed = transition.stepDiagnostics.cooldownsProcessed or 0
+            totalCardinality.aurasInspected = transition.stepDiagnostics.aurasInspected or 0
+            totalCardinality.aurasProcessed = transition.stepDiagnostics.aurasProcessed or 0
+            totalCardinality.dirtyScopes = transition.stepDiagnostics.dirtyScopes
+            transition.stepDiagnostics.dirtyScopeCount = countMap(transition.stepDiagnostics.dirtyScopes)
+            totalCardinality.dirtyScopeCount = transition.stepDiagnostics.dirtyScopeCount
+            totalCardinality.maxPhaseElapsedMs = transition.stepDiagnostics.maxPhaseElapsedMs or 0
+            totalCardinality.maxSliceElapsedMs = transition.stepDiagnostics.maxSliceElapsedMs or 0
+            totalCardinality.maxSlicePhase = transition.stepDiagnostics.maxSlicePhase
+        end
+        stopEventTiming(transition.totalTimer, eventState, totalCardinality)
         transition.totalTimer = nil
+    end
+    if transition.kind == "advancing" then
+        self.LastEventStepDiagnostics = transition.stepDiagnostics
+        if type(self.LastEventStepDiagnostics) == "table" then
+            self.LastEventStepDiagnostics.transitionElapsedMs = transition.totalElapsedMs or 0
+        end
     end
     if type(transition.eventState) == "table" then
         transition.eventState.transitionPhase = nil
@@ -332,7 +402,20 @@ function Client:CanPerformEventAction(eventState, actionKind)
     if type(transition) == "table"
         and (transition.eventState == state or tostring(transition.eventId or "") == tostring(state.id or ""))
     then
-        return false, transition.kind == "ending" and "event-ending" or "event-starting"
+        if transition.kind == "advancing" and self.EventStepInternal == true then
+            return true
+        end
+        return false, transition.kind == "ending" and "event-ending"
+            or transition.kind == "advancing" and "event-advancing"
+            or "event-starting"
+    end
+    local auraManager = self.Spellcasting and self.Spellcasting.AuraManager or nil
+    if type(auraManager) == "table"
+        and type(self.PendingFullAuraDerivedStateRefreshByEventId) == "table"
+        and self.PendingFullAuraDerivedStateRefreshByEventId[tostring(state.id or "")] ~= nil
+        and self.EventStepInternal ~= true
+    then
+        return false, "event-derived-state"
     end
     if state.startupReady ~= true then
         return false, "event-startup"
@@ -518,8 +601,15 @@ local function queueSharedEventVisualRefresh(client, reason, options)
     local normalizedReason = tostring(reason or "event")
 
     local eventStartTime = timingParts and getTimingNowMilliseconds() or nil
-    if options.eventWidget ~= false and type(client.QueueEventWidgetRefresh) == "function" then
-        refreshed = client:QueueEventWidgetRefresh(normalizedReason) or refreshed
+    if options.eventWidget ~= false then
+        if type(options.eventIds) == "table"
+            and #options.eventIds > 0
+            and type(client.QueueEventWidgetTargetedRefresh) == "function"
+        then
+            refreshed = client:QueueEventWidgetTargetedRefresh(normalizedReason, options.eventIds) or refreshed
+        elseif type(client.QueueEventWidgetRefresh) == "function" then
+            refreshed = client:QueueEventWidgetRefresh(normalizedReason) or refreshed
+        end
     end
     appendTimingPart(timingParts, "event-widget", eventStartTime, 10)
 
@@ -674,13 +764,15 @@ local function bumpAllEventTooltipContextRevisions(eventState)
     end
 end
 
-local function syncMovementTracking(client, wasLocalTurn, eventState, previousTurnNumber, previousTickNumber)
+local function syncMovementTracking(client, wasLocalTurn, eventState, previousTurnNumber, previousTickNumber, turnOptions)
     local tracker = getMovementTracker()
     if not tracker then
         return false
     end
 
-    local isLocalTurn = client.IsLocalTurnActive and client:IsLocalTurnActive(eventState) or false
+    local isLocalTurn = client.IsLocalTurnActive
+        and client:IsLocalTurnActive(eventState, turnOptions)
+        or false
     if isLocalTurn and wasLocalTurn ~= true then
         if type(tracker.OnPlayerTurnStart) == "function" then
             tracker:OnPlayerTurnStart()
@@ -781,7 +873,7 @@ local function enqueueClientSliceable(options)
     end
 
     if Debug and Debug.Error then
-        Debug.Error("Event startup sliceable queue unavailable: Addon.Internal.Tasks is missing EnqueueSliceable.")
+        Debug.Error("Event transition sliceable queue unavailable: Addon.Internal.Tasks is missing EnqueueSliceable.")
     end
     return nil
 end
@@ -812,13 +904,13 @@ local function cancelEventSliceableWork(client, eventId, reason)
     return tasks:CancelScope("event:" .. normalizedEventId, reason or "event-reset")
 end
 
-local function queueDeferredMovementSync(client, wasLocalTurn, eventState, previousTurnNumber, previousTickNumber, reason)
+local function queueDeferredMovementSync(client, wasLocalTurn, eventState, previousTurnNumber, previousTickNumber, reason, turnOptions)
     local expectedEventId = tostring(type(eventState) == "table" and eventState.id or "")
     if expectedEventId == "" then
         return false
     end
 
-    return enqueueClientTask(function(targetClient, queuedEventId, queuedEventState, queuedTransitionGeneration, queuedWasLocalTurn, queuedPreviousTurnNumber, queuedPreviousTickNumber)
+    return enqueueClientTask(function(targetClient, queuedEventId, queuedEventState, queuedTransitionGeneration, queuedWasLocalTurn, queuedPreviousTurnNumber, queuedPreviousTickNumber, queuedReason, queuedTurnOptions)
         if type(targetClient) ~= "table" then
             return
         end
@@ -826,8 +918,17 @@ local function queueDeferredMovementSync(client, wasLocalTurn, eventState, previ
         local currentEventState = targetClient.GetEventState and targetClient:GetEventState() or targetClient.EventState
         if type(currentEventState) ~= "table"
             or currentEventState.active ~= true
+            or currentEventState.ending == true
             or tostring(currentEventState.id or "") ~= queuedEventId
             or (queuedEventState ~= nil and currentEventState ~= queuedEventState)
+        then
+            return
+        end
+
+        local currentTransition = targetClient.EventTransition
+        if type(currentTransition) == "table"
+            and queuedTransitionGeneration ~= nil
+            and tonumber(currentTransition.generation) ~= tonumber(queuedTransitionGeneration)
         then
             return
         end
@@ -837,12 +938,14 @@ local function queueDeferredMovementSync(client, wasLocalTurn, eventState, previ
             queuedWasLocalTurn == true,
             currentEventState,
             queuedPreviousTurnNumber,
-            queuedPreviousTickNumber
+            queuedPreviousTickNumber,
+            queuedTurnOptions
         )
-    end, client, expectedEventId, eventState, getTransitionGeneration(client), wasLocalTurn == true, previousTurnNumber, previousTickNumber, reason)
+    end, client, expectedEventId, eventState, getTransitionGeneration(client), wasLocalTurn == true, previousTurnNumber, previousTickNumber, reason, turnOptions)
 end
 
 local tryQueueInitialLocalResourceSync
+local queueNextEventStatePacket
 
 local function runEventStartupStep(targetClient, queuedEventId, queuedGeneration, queuedEventState, deadlineMs)
     if type(targetClient) ~= "table" then
@@ -1306,6 +1409,9 @@ local function queueEventStartupWork(client, eventState, reason)
                     if type(targetClient.QueueTargetingWidgetRefresh) == "function" then
                         targetClient:QueueTargetingWidgetRefresh("startup-ready-transition-complete")
                     end
+                    if type(queueNextEventStatePacket) == "function" then
+                        queueNextEventStatePacket(targetClient, work and work.eventState)
+                    end
                 end
             end
         end,
@@ -1357,6 +1463,803 @@ local function queueEventTraitRuntimeRefresh(client, eventState, reason)
         client:CancelDeferredConsumablePrompt(eventState, "event_start")
     end
     return queueEventStartupWork(client, eventState, reason or "event-units-changed")
+end
+
+-- The order below is the order observed in the pre-refactor
+-- HandleEventState() call graph:
+--   apply state -> AdvanceSpellcastState (including local completion) ->
+--   AdvanceCooldownState -> AdvanceAuraState (aura work was queued FIFO) ->
+--   turn announcement -> local-turn cue -> local turn-start regeneration ->
+--   deferred movement/ownership sync -> tooltip context/targeting invalidation
+--   -> shared event/targeting visual queue -> startup queue.
+-- The phase names make that dependency explicit without moving any gameplay
+-- effect to a different semantic position.
+local EVENT_ADVANCE_PHASES = {
+    "advance-casts",
+    "complete-casts",
+    "advance-cooldowns",
+    "advance-auras",
+    "turn-effects",
+    "tooltip-invalidation",
+    "network-resource-flush",
+    "commit-runtime",
+    "presentation",
+}
+
+local function compareEventStep(leftTurn, leftTick, rightTurn, rightTick)
+    local normalizedLeftTurn = tonumber(leftTurn) or 0
+    local normalizedRightTurn = tonumber(rightTurn) or 0
+    if normalizedLeftTurn ~= normalizedRightTurn then
+        return normalizedLeftTurn < normalizedRightTurn and -1 or 1
+    end
+
+    local normalizedLeftTick = tonumber(leftTick) or 0
+    local normalizedRightTick = tonumber(rightTick) or 0
+    if normalizedLeftTick == normalizedRightTick then
+        return 0
+    end
+    return normalizedLeftTick < normalizedRightTick and -1 or 1
+end
+
+local function getEventStatePacketStep(arguments, eventState)
+    local usesLevelField = type(arguments) == "table" and #arguments >= 6
+    local fallbackTurn = tonumber(eventState and eventState.turnNumber) or 0
+    local fallbackTick = tonumber(eventState and eventState.tickNumber) or 0
+    local fallbackTotalTicks = tonumber(eventState and eventState.totalTicks) or 0
+    return tonumber(arguments and arguments[usesLevelField and 4 or 3]) or fallbackTurn,
+        tonumber(arguments and arguments[usesLevelField and 5 or 4]) or fallbackTick,
+        tonumber(arguments and arguments[usesLevelField and 6 or 5]) or fallbackTotalTicks
+end
+
+local function copyEventStateArguments(arguments)
+    if type(arguments) ~= "table" then
+        return nil
+    end
+
+    local copy = {}
+    for key, value in pairs(arguments) do
+        copy[key] = value
+    end
+    return copy
+end
+
+local function stageEventStatePacket(client, eventId, arguments, turnNumber, tickNumber, totalTicks)
+    if type(client) ~= "table" or tostring(eventId or "") == "" then
+        return false
+    end
+
+    client.PendingEventStatePackets = client.PendingEventStatePackets or {}
+    local normalizedEventId = tostring(eventId)
+    local packets = client.PendingEventStatePackets[normalizedEventId]
+    if type(packets) ~= "table" then
+        packets = {}
+        client.PendingEventStatePackets[normalizedEventId] = packets
+    end
+
+    for index = 1, #packets do
+        local pending = packets[index]
+        if compareEventStep(turnNumber, tickNumber, pending.turnNumber, pending.tickNumber) == 0 then
+            return false
+        end
+    end
+
+    packets[#packets + 1] = {
+        arguments = copyEventStateArguments(arguments),
+        turnNumber = tonumber(turnNumber) or 0,
+        tickNumber = tonumber(tickNumber) or 0,
+        totalTicks = tonumber(totalTicks) or 0,
+    }
+    return true
+end
+
+local function takeNextEventStatePacket(client, eventState)
+    local eventId = tostring(eventState and eventState.id or "")
+    local packets = client and client.PendingEventStatePackets and client.PendingEventStatePackets[eventId] or nil
+    if type(packets) ~= "table" then
+        return nil
+    end
+
+    local currentTurn = tonumber(eventState and eventState.turnNumber) or 0
+    local currentTick = tonumber(eventState and eventState.tickNumber) or 0
+    local candidateIndex = nil
+    for index = 1, #packets do
+        local pending = packets[index]
+        if compareEventStep(pending.turnNumber, pending.tickNumber, currentTurn, currentTick) > 0
+            and (candidateIndex == nil
+                or compareEventStep(
+                    pending.turnNumber,
+                    pending.tickNumber,
+                    packets[candidateIndex].turnNumber,
+                    packets[candidateIndex].tickNumber
+                ) < 0)
+        then
+            candidateIndex = index
+        end
+    end
+
+    if candidateIndex == nil then
+        return nil
+    end
+    local pending = table.remove(packets, candidateIndex)
+    if #packets == 0 then
+        client.PendingEventStatePackets[eventId] = nil
+    end
+    return pending
+end
+
+queueNextEventStatePacket = function(client, eventState)
+    local pending = takeNextEventStatePacket(client, eventState)
+    if not pending or type(pending.arguments) ~= "table" then
+        return false
+    end
+
+    return enqueueClientTask(function(targetClient, queuedArguments)
+        if type(targetClient) == "table" and type(targetClient.HandleEventState) == "function" then
+            targetClient:HandleEventState(queuedArguments)
+        end
+    end, client, pending.arguments)
+end
+
+local function markEventStepDirty(work, scope)
+    local diagnostics = work and work.diagnostics or nil
+    if type(diagnostics) ~= "table" then
+        return
+    end
+    diagnostics.dirtyScopes = diagnostics.dirtyScopes or {}
+    diagnostics.dirtyScopes[tostring(scope or "event")] = true
+end
+
+local function getEventStepAffectedEventIds(work)
+    local result = {}
+    if type(work and work.affectedEventUnitList) == "table" then
+        for index = 1, #work.affectedEventUnitList do
+            result[index] = work.affectedEventUnitList[index]
+        end
+        return result
+    end
+    local seen = {}
+    for eventUnitId in pairs(work and work.affectedEventUnitIds or {}) do
+        local numericEventUnitId = tonumber(eventUnitId) or 0
+        if numericEventUnitId > 0 and not seen[numericEventUnitId] then
+            seen[numericEventUnitId] = true
+            result[#result + 1] = numericEventUnitId
+        end
+    end
+    return result
+end
+
+local function recordEventStepContinuationDiagnostics(work, continuation, scope, inspected, processed)
+    local diagnostics = work and work.diagnostics or nil
+    if type(diagnostics) ~= "table" or type(continuation) ~= "table" then
+        return
+    end
+
+    work.continuationDiagnosticCursors = work.continuationDiagnosticCursors or {}
+    local cursor = work.continuationDiagnosticCursors[scope]
+    if type(cursor) ~= "table" then
+        cursor = { inspected = 0, processed = 0 }
+        work.continuationDiagnosticCursors[scope] = cursor
+    end
+
+    local inspectedTotal = math.max(0, math.floor(tonumber(inspected and inspected(continuation)) or 0))
+    local processedTotal = math.max(0, math.floor(tonumber(processed and processed(continuation)) or 0))
+    diagnostics[scope .. "Inspected"] = (tonumber(diagnostics[scope .. "Inspected"]) or 0)
+        + math.max(0, inspectedTotal - cursor.inspected)
+    diagnostics[scope .. "Processed"] = (tonumber(diagnostics[scope .. "Processed"]) or 0)
+        + math.max(0, processedTotal - cursor.processed)
+    cursor.inspected = inspectedTotal
+    cursor.processed = processedTotal
+
+    local affectedList = continuation.affectedEventUnitList
+    if type(affectedList) == "table" then
+        for index = 1, #affectedList do
+            local eventUnitId = tonumber(affectedList[index]) or 0
+            if eventUnitId > 0 and not work.affectedEventUnitIds[eventUnitId] then
+                work.affectedEventUnitIds[eventUnitId] = true
+                work.affectedEventUnitList[#work.affectedEventUnitList + 1] = eventUnitId
+            end
+        end
+    else
+        for eventUnitId in pairs(continuation.affectedEventUnitIds or {}) do
+            local numericEventUnitId = tonumber(eventUnitId) or 0
+            if numericEventUnitId > 0 and not work.affectedEventUnitIds[numericEventUnitId] then
+                work.affectedEventUnitIds[numericEventUnitId] = true
+                work.affectedEventUnitList[#work.affectedEventUnitList + 1] = numericEventUnitId
+            end
+        end
+    end
+end
+
+local function beginEventStepPhase(work, phase)
+    local transition = work and work.client and work.client.EventTransition or nil
+    work.phase = phase
+    work.phaseStartedAtMs = getEventStepNowMilliseconds()
+    if type(transition) == "table" then
+        transition.phase = phase
+        transition.continuation = work
+        if type(work.eventState) == "table" then
+            work.eventState.transitionPhase = phase
+        end
+    end
+end
+
+local function finishEventStepPhase(work, phase)
+    local transition = work and work.client and work.client.EventTransition or nil
+    local elapsedMs = 0
+    if tonumber(work and work.phaseStartedAtMs) and tonumber(work.phaseStartedAtMs) > 0 then
+        elapsedMs = math.max(0, getEventStepNowMilliseconds() - work.phaseStartedAtMs)
+    end
+
+    local diagnostics = work and work.diagnostics or nil
+    if type(diagnostics) == "table" then
+        diagnostics.phaseTimings = diagnostics.phaseTimings or {}
+        local phaseTiming = diagnostics.phaseTimings[phase]
+        if type(phaseTiming) ~= "table" then
+            phaseTiming = { elapsedMs = 0, slices = 0 }
+            diagnostics.phaseTimings[phase] = phaseTiming
+        end
+        phaseTiming.elapsedMs = (tonumber(phaseTiming.elapsedMs) or 0) + elapsedMs
+        phaseTiming.slices = (tonumber(phaseTiming.slices) or 0) + 1
+        if elapsedMs > (tonumber(diagnostics.maxPhaseElapsedMs) or 0) then
+            diagnostics.maxPhaseElapsedMs = elapsedMs
+            diagnostics.maxPhase = phase
+        end
+    end
+    if type(transition) == "table" then
+        transition.phaseTimings[#transition.phaseTimings + 1] = {
+            label = phase,
+            elapsedMs = elapsedMs,
+            thresholdMs = 8,
+        }
+    end
+    work.phaseStartedAtMs = nil
+end
+
+local function runEventStepTransaction(work, phase, callback)
+    local client = work and work.client or nil
+    local transition = client and client.EventTransition or nil
+    local reason = (transition and transition.contextId or "event-step") .. ":" .. tostring(phase or "phase")
+    local options = {
+        eventId = work and work.eventId,
+        transitionGeneration = work and work.transitionGeneration,
+        contextId = transition and transition.contextId or nil,
+    }
+
+    if type(Runtime) ~= "table" or type(Runtime.RunTransaction) ~= "function" then
+        return callback()
+    end
+
+    -- Runtime keeps one global current transaction.  Event-step continuations
+    -- may span frames, but their transactions may not: never join unrelated
+    -- work that happens to be current when this slice is resumed.
+    if type(Runtime.GetCurrentTransaction) == "function"
+        and Runtime:GetCurrentTransaction() ~= nil
+    then
+        return false, "incomplete"
+    end
+
+    local results = { pcall(function()
+        return Runtime:RunTransaction(reason, callback, options)
+    end) }
+    if results[1] ~= true then
+        if Debug and Debug.Error then
+            Debug.Error("Event-step phase failed: phase=%s error=%s", tostring(phase or ""), tostring(results[2] or ""))
+        end
+        return nil, "error"
+    end
+
+    local summary = type(Runtime.GetLastCommittedSummary) == "function" and Runtime.GetLastCommittedSummary() or nil
+    if type(transition) == "table" then
+        transition.lastTransactionId = summary and summary.id or transition.lastTransactionId
+        transition.transactionId = nil
+    end
+    return results[2], results[3]
+end
+
+local function shouldYieldEventStep(deadlineMs)
+    local tasks = Addon.Internal and Addon.Internal.Tasks or nil
+    return type(tasks) == "table"
+        and type(tasks.ShouldYield) == "function"
+        and tasks:ShouldYield(deadlineMs) == true
+end
+
+local function eventStepContinuationIsCurrent(work)
+    local client = work and work.client or nil
+    if type(client) ~= "table"
+        or type(work.eventState) ~= "table"
+        or work.eventState.ending == true
+        or type(client.GetEventState) ~= "function"
+        or client:GetEventState() ~= work.eventState
+        or tostring(work.eventState.id or "") ~= tostring(work.eventId or "")
+        or type(client.IsEventTransitionCurrent) ~= "function"
+        or not client:IsEventTransitionCurrent(work.eventId, work.transitionGeneration, "advancing", work.eventState)
+    then
+        return false
+    end
+    return true
+end
+
+local function ensureEventStepTurnPageIndex(work, deadlineMs)
+    if type(work) ~= "table" then
+        return nil, "error"
+    end
+    if type(work.turnPageIndex) == "table" then
+        return true, "complete"
+    end
+
+    local spellcasting = work.client and work.client.Spellcasting or Addon.Client and Addon.Client.Spellcasting or nil
+    if type(spellcasting) ~= "table"
+        or type(spellcasting.CreateTurnPageIndexContinuation) ~= "function"
+        or type(spellcasting.StepTurnPageIndexContinuation) ~= "function"
+    then
+        return nil, "error"
+    end
+
+    work.turnPageContinuation = work.turnPageContinuation
+        or spellcasting.CreateTurnPageIndexContinuation(work.client, work.eventState)
+    if type(work.turnPageContinuation) ~= "table" then
+        return nil, "error"
+    end
+
+    local complete, status = spellcasting.StepTurnPageIndexContinuation(work.turnPageContinuation, deadlineMs)
+    if complete == nil then
+        return nil, status or "stale"
+    end
+    if complete ~= true then
+        return false, status or "incomplete"
+    end
+
+    work.turnPageIndex = work.turnPageContinuation.pageByEventId or {}
+    work.turnPageUnitsByEventId = work.turnPageContinuation.unitsByEventId or {}
+    work.turnPagePlayerUnitsByName = work.turnPageContinuation.playerUnitsByName or {}
+    work.localEventUnit = work.turnPageContinuation.localEventUnit
+    return true, "complete"
+end
+
+local function runEventAdvanceStep(work, deadlineMs)
+    if not eventStepContinuationIsCurrent(work) then
+        return nil, "stale"
+    end
+
+    local turnPageReady, turnPageStatus = ensureEventStepTurnPageIndex(work, deadlineMs)
+    if turnPageReady == nil then
+        return nil, turnPageStatus or "error"
+    end
+    if turnPageReady ~= true then
+        return false, "incomplete"
+    end
+
+    local client = work.client
+    local transition = client.EventTransition
+    local completed = false
+    while not completed do
+        if not eventStepContinuationIsCurrent(work) then
+            return nil, "stale"
+        end
+        if shouldYieldEventStep(deadlineMs) then
+            return false, "incomplete"
+        end
+        local phase = work.phase
+        if not phase then
+            beginEventStepPhase(work, EVENT_ADVANCE_PHASES[1])
+            phase = work.phase
+        elseif work.phaseStartedAtMs == nil then
+            beginEventStepPhase(work, phase)
+        end
+
+        if phase == "advance-casts" then
+            if not work.spellcastContinuation then
+                work.spellcastContinuation = client:CreateSpellcastAdvanceContinuation(
+                    work.previousTurnNumber,
+                    work.previousTickNumber,
+                    {
+                        deferPresentation = true,
+                        turnPageIndex = work.turnPageIndex,
+                        unitsByEventId = work.turnPageUnitsByEventId,
+                        playerUnitsByName = work.turnPagePlayerUnitsByName,
+                        localEventUnit = work.localEventUnit,
+                    }
+                )
+            end
+            local continuation = work.spellcastContinuation
+            if not continuation or continuation.phase == "done" then
+                finishEventStepPhase(work, phase)
+                beginEventStepPhase(work, "complete-casts")
+            else
+                local advanced, status = runEventStepTransaction(work, phase, function()
+                    return client:StepSpellcastAdvanceContinuation(continuation, deadlineMs)
+                end)
+                if advanced == nil then
+                    return nil, status or "error"
+                end
+                if advanced ~= true then
+                    if continuation.phase == "complete" then
+                        finishEventStepPhase(work, phase)
+                        beginEventStepPhase(work, "complete-casts")
+                    end
+                    return false, "incomplete"
+                end
+                finishEventStepPhase(work, phase)
+                beginEventStepPhase(work, "complete-casts")
+            end
+        elseif phase == "complete-casts" then
+            local continuation = work.spellcastContinuation
+            if not continuation or continuation.phase == "done" then
+                finishEventStepPhase(work, phase)
+                beginEventStepPhase(work, "advance-cooldowns")
+            else
+                local completedCasts, status = runEventStepTransaction(work, phase, function()
+                    return client:StepSpellcastAdvanceContinuation(continuation, deadlineMs)
+                end)
+                if completedCasts == nil then
+                    return nil, status or "error"
+                end
+                if completedCasts ~= true then
+                    return false, "incomplete"
+                end
+                finishEventStepPhase(work, phase)
+                beginEventStepPhase(work, "advance-cooldowns")
+            end
+            recordEventStepContinuationDiagnostics(
+                work,
+                continuation,
+                "casts",
+                function(value) return value.inspected end,
+                function(value) return value.processed end
+            )
+            if continuation and continuation.changed then
+                markEventStepDirty(work, "casts")
+            end
+        elseif phase == "advance-cooldowns" then
+            if not work.cooldownContinuation then
+                work.cooldownContinuation = client:CreateCooldownAdvanceContinuation(
+                    work.previousTurnNumber,
+                    work.previousTickNumber,
+                    {
+                        deferPresentation = true,
+                        turnPageIndex = work.turnPageIndex,
+                        localEventUnit = work.localEventUnit,
+                    }
+                )
+            end
+            local continuation = work.cooldownContinuation
+            if not continuation or continuation.phase == "done" then
+                finishEventStepPhase(work, phase)
+                beginEventStepPhase(work, "advance-auras")
+            else
+                local advanced, status = runEventStepTransaction(work, phase, function()
+                    return client:StepCooldownAdvanceContinuation(continuation, deadlineMs)
+                end)
+                if advanced == nil then
+                    return nil, status or "error"
+                end
+                if advanced ~= true then
+                    return false, "incomplete"
+                end
+                finishEventStepPhase(work, phase)
+                beginEventStepPhase(work, "advance-auras")
+            end
+            recordEventStepContinuationDiagnostics(
+                work,
+                continuation,
+                "cooldowns",
+                function(value) return (value.inspectedUnits or 0) + (value.inspectedSpells or 0) end,
+                function(value) return (value.processedUnits or 0) + (value.processedSpells or 0) end
+            )
+            if continuation and continuation.changed then
+                markEventStepDirty(work, "cooldowns")
+            end
+        elseif phase == "advance-auras" then
+            if not work.auraContinuation then
+                work.auraContinuation = client:CreateAuraAdvanceContinuation(
+                    work.previousTurnNumber,
+                    work.previousTickNumber,
+                    {
+                        client = client,
+                        deferPresentation = true,
+                        turnPageIndex = work.turnPageIndex,
+                        unitsByEventId = work.turnPageUnitsByEventId,
+                        playerUnitsByName = work.turnPagePlayerUnitsByName,
+                        localEventUnit = work.localEventUnit,
+                    }
+                )
+            end
+            local continuation = work.auraContinuation
+            if not continuation or continuation.phase == "done" then
+                finishEventStepPhase(work, phase)
+                beginEventStepPhase(work, "turn-effects")
+            else
+                local advanced, status = runEventStepTransaction(work, phase, function()
+                    return client:StepAuraAdvanceContinuation(continuation, deadlineMs)
+                end)
+                if advanced == nil then
+                    return nil, status or "error"
+                end
+                if advanced ~= true then
+                    return false, "incomplete"
+                end
+                finishEventStepPhase(work, phase)
+                beginEventStepPhase(work, "turn-effects")
+            end
+            recordEventStepContinuationDiagnostics(
+                work,
+                continuation,
+                "auras",
+                function(value) return value.inspected end,
+                function(value) return value.processed end
+            )
+            if continuation and continuation.changed then
+                markEventStepDirty(work, "auras")
+            end
+        elseif phase == "turn-effects" then
+            local turnEffectsComplete, turnEffectsStatus = runEventStepTransaction(work, phase, function()
+                if not work.turnEffectsApplied then
+                    local eventState = work.eventState
+                    local activeTurnUnit = work.localEventUnit
+                    local controlledEventId = tonumber(client.ControlledEventUnitId) or 0
+                    local controlledUnit = controlledEventId > 0
+                        and work.turnPageUnitsByEventId[controlledEventId]
+                        or nil
+                    if controlledUnit
+                        and controlledUnit.isPlayer ~= true
+                        and client:CanControlEventUnit(controlledUnit, eventState, work.localEventUnit)
+                    then
+                        activeTurnUnit = controlledUnit
+                    end
+                    local currentTurnOptions = {
+                        turnPageIndex = work.turnPageIndex,
+                        unitsByEventId = work.turnPageUnitsByEventId,
+                        localEventUnit = work.localEventUnit,
+                        activeEventUnit = activeTurnUnit,
+                        controlContext = { isControlled = activeTurnUnit ~= work.localEventUnit },
+                        tickNumber = eventState.tickNumber,
+                        turnEndPending = false,
+                    }
+                    local previousTurnOptions = {
+                        turnPageIndex = work.turnPageIndex,
+                        unitsByEventId = work.turnPageUnitsByEventId,
+                        localEventUnit = work.localEventUnit,
+                        tickNumber = work.previousTickNumber,
+                        turnEndPending = work.wasTurnEndPending == true,
+                    }
+                    local isLocalTurn = client.IsLocalTurnActive
+                        and client:IsLocalTurnActive(eventState, currentTurnOptions)
+                        or false
+                    local wasLocalTurn = client.IsLocalTurnActive
+                        and client:IsLocalTurnActive(eventState, previousTurnOptions)
+                        or false
+                    local isLocalPlayerTurn = isLocalPlayerTurnActive(
+                        client,
+                        eventState,
+                        work.turnPageIndex,
+                        work.localEventUnit,
+                        eventState.tickNumber
+                    )
+                    local wasLocalPlayerTurn = isLocalPlayerTurnActive(
+                        client,
+                        eventState,
+                        work.turnPageIndex,
+                        work.localEventUnit,
+                        work.previousTickNumber
+                    )
+                    if work.previousTurnNumber ~= (tonumber(eventState.turnNumber) or 0) then
+                        local eventName = getEventDisplayName(eventState)
+                        local turnNumber = math.max(1, tonumber(eventState.turnNumber) or 1)
+                        deferEventPresentation(function(name, announcedTurnNumber)
+                            emitTurnStartAnnouncement({ name = name, turnNumber = announcedTurnNumber })
+                        end, eventName, turnNumber)
+                        markEventStepDirty(work, "turn-cues")
+                    end
+                    if work.stepAdvanced and not work.wasLocalPlayerTurn and isLocalPlayerTurn then
+                        deferEventPresentation(function()
+                            playLocalTurnStartSound()
+                            emitLocalTurnStartAnnouncement()
+                        end)
+                        markEventStepDirty(work, "turn-cues")
+                    end
+                    if work.previousTurnNumber ~= (tonumber(eventState.turnNumber) or 0)
+                        and isLocalTurn
+                        and type(client.ApplyLocalTurnStartResourceRegeneration) == "function"
+                    then
+                        client:ApplyLocalTurnStartResourceRegeneration(client:GetState(), eventState, {
+                            suppressLocalVisualRefresh = true,
+                            activeEventUnit = activeTurnUnit,
+                            controlContext = currentTurnOptions.controlContext,
+                        })
+                        markEventStepDirty(work, "resources")
+                        markEventStepDirty(work, "network")
+                    end
+                    queueDeferredMovementSync(
+                        client,
+                        work.wasLocalTurn,
+                        eventState,
+                        work.previousTurnNumber,
+                        work.previousTickNumber,
+                        "event-state",
+                        currentTurnOptions
+                    )
+                    markEventStepDirty(work, "movement")
+                    work.turnEffectsApplied = true
+                end
+                return true, "complete"
+            end)
+            if turnEffectsComplete == nil then
+                return nil, turnEffectsStatus or "error"
+            end
+            finishEventStepPhase(work, phase)
+            beginEventStepPhase(work, "tooltip-invalidation")
+        elseif phase == "tooltip-invalidation" then
+            work.tooltipEventIds = work.tooltipEventIds or getEventStepAffectedEventIds(work)
+            work.tooltipIndex = (tonumber(work.tooltipIndex) or 1)
+            local tooltipEventId = work.tooltipEventIds[work.tooltipIndex]
+            if tooltipEventId ~= nil then
+                bumpEventTooltipContextRevision(work.eventState, tooltipEventId)
+                work.tooltipIndex = work.tooltipIndex + 1
+                if shouldYieldEventStep(deadlineMs) then
+                    return false, "incomplete"
+                end
+            else
+                if work.tooltipInvalidationFinalized ~= true then
+                    if #work.tooltipEventIds == 0 then
+                        bumpAllEventTooltipContextRevisions(work.eventState)
+                    end
+                    if type(client.InvalidatePendingSpellTargetingDisplayState) == "function" then
+                        client:InvalidatePendingSpellTargetingDisplayState()
+                    end
+                    markEventStepDirty(work, "tooltips")
+                    markEventStepDirty(work, "targeting")
+                    work.tooltipInvalidationFinalized = true
+                end
+                finishEventStepPhase(work, phase)
+                beginEventStepPhase(work, "network-resource-flush")
+            end
+        elseif phase == "network-resource-flush" then
+            -- Resource regeneration queues protocol work in the existing
+            -- ResourceSync path.  This phase is an ordering boundary only; it
+            -- intentionally adds no packet and changes no protocol meaning.
+            work.networkResourceBoundaryReached = true
+            finishEventStepPhase(work, phase)
+            beginEventStepPhase(work, "commit-runtime")
+        elseif phase == "commit-runtime" then
+            -- Every mutation slice above ran in a short Runtime transaction.
+            -- Never commit or retain a transaction across a TaskQueue yield.
+            if type(Runtime) == "table" and type(Runtime.GetCurrentTransaction) == "function"
+                and Runtime.GetCurrentTransaction() ~= nil
+            then
+                return nil, "error"
+            end
+            finishEventStepPhase(work, phase)
+            beginEventStepPhase(work, "presentation")
+        elseif phase == "presentation" then
+            local affectedEventIds = getEventStepAffectedEventIds(work)
+            local localEventId = tonumber(work.localEventUnit and work.localEventUnit.eventID) or 0
+            local localEventStateAffected = localEventId > 0 and work.affectedEventUnitIds[localEventId] == true
+            local actionBarDirty = work.diagnostics.dirtyScopes["resources"] == true
+                or work.diagnostics.dirtyScopes["cooldowns"] == true
+                or localEventStateAffected
+            if localEventStateAffected and type(client.MarkActionBarCompanionBarsDirty) == "function" then
+                client:MarkActionBarCompanionBarsDirty("event-state-step")
+            end
+            if work.diagnostics.dirtyScopes["auras"] == true
+                and type(client.MarkVisiblePlayerTooltipDirty) == "function"
+            then
+                client:MarkVisiblePlayerTooltipDirty("event-state-step")
+            end
+            queueSharedEventVisualRefresh(client, "event-state-step", {
+                eventWidget = true,
+                eventIds = #affectedEventIds > 0 and affectedEventIds or nil,
+                targeting = true,
+                actionBar = actionBarDirty,
+            })
+            markEventStepDirty(work, "event-widget")
+            markEventStepDirty(work, "presentation")
+            finishEventStepPhase(work, phase)
+            beginEventStepPhase(work, "release")
+            completed = true
+        else
+            return nil, "error"
+        end
+
+        if completed or shouldYieldEventStep(deadlineMs) then
+            break
+        end
+    end
+
+    return completed and true or false, completed and "complete" or "incomplete"
+end
+
+local function queueEventAdvanceWork(client, eventState, transition, work)
+    local eventId = tostring(eventState and eventState.id or "")
+    if type(client) ~= "table" or type(eventState) ~= "table" or eventId == "" then
+        return false
+    end
+
+    local sliceJob = enqueueClientSliceable({
+        label = "event-step",
+        scope = "event:" .. eventId,
+        state = work,
+        isStale = function(currentWork)
+            return not eventStepContinuationIsCurrent(currentWork)
+        end,
+        step = function(currentWork, deadlineMs)
+            local targetClient = currentWork and currentWork.client or nil
+            local currentTransition = targetClient and targetClient.EventTransition or nil
+            local sliceStartedAtMs = getEventStepNowMilliseconds()
+            local completed, status = runEventAdvanceStep(currentWork, deadlineMs)
+            local elapsedMs = 0
+            if sliceStartedAtMs > 0 then
+                elapsedMs = math.max(0, getEventStepNowMilliseconds() - sliceStartedAtMs)
+            end
+            local diagnostics = currentWork and currentWork.diagnostics or nil
+            if type(diagnostics) == "table" then
+                diagnostics.sliceTimings[#diagnostics.sliceTimings + 1] = {
+                    phase = currentWork.phase,
+                    elapsedMs = elapsedMs,
+                }
+                diagnostics.maxSliceElapsedMs = math.max(tonumber(diagnostics.maxSliceElapsedMs) or 0, elapsedMs)
+                if elapsedMs >= (tonumber(diagnostics.maxSliceElapsedMs) or 0) then
+                    diagnostics.maxSlicePhase = currentWork.phase
+                end
+            end
+            recordTransitionSlice(currentTransition, sliceStartedAtMs, "event-step:" .. tostring(currentWork and currentWork.phase or "unknown"))
+            if completed == nil then
+                return nil, status or "error"
+            end
+            return completed == true, status or (completed and "complete" or "incomplete")
+        end,
+        onCancel = function(currentWork, cancelReason)
+            local targetClient = currentWork and currentWork.client or nil
+            if type(targetClient) ~= "table" then
+                return
+            end
+            if targetClient.EventStepWork == currentWork then
+                targetClient.EventStepWork = nil
+            end
+            if cancelReason == "error" then
+                local currentTransition = targetClient.EventTransition
+                if targetClient:IsEventTransitionCurrent(currentWork.eventId, currentWork.transitionGeneration, "advancing", currentWork.eventState) then
+                    currentTransition.phase = "error"
+                    currentTransition.failed = true
+                    currentWork.eventState.transitionPhase = "error"
+                end
+            elseif cancelReason ~= "stale"
+                and targetClient:IsEventTransitionCurrent(currentWork.eventId, currentWork.transitionGeneration, "advancing", currentWork.eventState)
+            then
+                targetClient:EndEventTransition(currentWork.eventId, currentWork.transitionGeneration, currentWork.eventState, cancelReason)
+            end
+        end,
+        onComplete = function(currentWork)
+            local targetClient = currentWork and currentWork.client or nil
+            if type(targetClient) ~= "table" then
+                return
+            end
+            local currentTransition = targetClient.EventTransition
+            if not targetClient:IsEventTransitionCurrent(currentWork.eventId, currentWork.transitionGeneration, "advancing", currentWork.eventState) then
+                return
+            end
+            targetClient:SetEventTransitionPhase("release", currentWork.eventState)
+            if type(currentTransition) == "table" then
+                currentTransition.continuation = nil
+                currentTransition.stepDiagnostics = currentWork.diagnostics
+            end
+            if targetClient.EventStepWork == currentWork then
+                targetClient.EventStepWork = nil
+            end
+            targetClient:EndEventTransition(
+                currentWork.eventId,
+                currentWork.transitionGeneration,
+                currentWork.eventState,
+                "advance-complete"
+            )
+            queueNextEventStatePacket(targetClient, currentWork.eventState)
+        end,
+    })
+    if sliceJob then
+        work.sliceJob = sliceJob
+        transition.continuation = work
+        return true
+    end
+    return false
 end
 
 function Client:QueueEventTraitRuntimeRefresh(eventState, reason)
@@ -1661,12 +2564,19 @@ local function isControlEligibleEventUnit(controlledUnit, localEventUnit)
     return controllerName ~= "" and localName ~= "" and controllerName == localName
 end
 
-local function isLocalPlayerTurnActive(client, eventState)
+local function isLocalPlayerTurnActive(client, eventState, turnPageIndex, localEventUnit, tickNumber)
     if type(client) ~= "table" or type(eventState) ~= "table" or eventState.active ~= true then
         return false
     end
 
-    local localEventUnit = client.ResolveLocalEventUnit and client:ResolveLocalEventUnit(eventState) or nil
+    if type(turnPageIndex) == "table" then
+        local localEventId = tonumber(localEventUnit and localEventUnit.eventID) or 0
+        local currentTick = math.max(1, math.floor(tonumber(tickNumber or eventState.tickNumber) or 0))
+        return localEventId > 0 and tonumber(turnPageIndex[localEventId]) == currentTick
+    end
+
+    localEventUnit = localEventUnit
+        or (client.ResolveLocalEventUnit and client:ResolveLocalEventUnit(eventState) or nil)
     local localEventId = tonumber(localEventUnit and localEventUnit.eventID) or 0
     if localEventId <= 0 then
         return false
@@ -1695,8 +2605,8 @@ function Client:ResolveLocalEventUnit(eventState)
     return findPlayerEventUnit(state.units, playerName)
 end
 
-function Client:CanControlEventUnit(controlledUnit, eventState)
-    local localEventUnit = self:ResolveLocalEventUnit(eventState)
+function Client:CanControlEventUnit(controlledUnit, eventState, localEventUnitOverride)
+    local localEventUnit = localEventUnitOverride or self:ResolveLocalEventUnit(eventState)
     if not localEventUnit then
         return false
     end
@@ -1773,9 +2683,41 @@ function Client:ResolveActiveSpellcasterUnit(eventState)
     return context.activeEventUnit, context.eventState, context
 end
 
-function Client:IsLocalTurnActive(eventState)
-    if self.TurnEndPending == true then
+function Client:IsLocalTurnActive(eventState, options)
+    options = type(options) == "table" and options or {}
+    local turnEndPending = options.turnEndPending
+    if turnEndPending == nil then
+        turnEndPending = self.TurnEndPending
+    end
+    if turnEndPending == true then
         return false
+    end
+
+    if type(options.turnPageIndex) == "table" then
+        local state = eventState or self:GetEventState()
+        local localEventUnit = options.localEventUnit
+        if type(state) ~= "table" or state.active ~= true or type(localEventUnit) ~= "table" then
+            return false
+        end
+
+        local activeUnit = localEventUnit
+        local controlledEventId = tonumber(self.ControlledEventUnitId) or 0
+        local unitsByEventId = options.unitsByEventId
+        local controlledUnit = controlledEventId > 0
+            and type(unitsByEventId) == "table"
+            and unitsByEventId[controlledEventId]
+            or nil
+        if controlledUnit
+            and controlledUnit.isPlayer ~= true
+            and self:CanControlEventUnit(controlledUnit, state, localEventUnit)
+        then
+            activeUnit = controlledUnit
+        end
+
+        local activeEventId = tonumber(activeUnit.eventID) or 0
+        local currentTick = math.max(1, math.floor(tonumber(options.tickNumber or state.tickNumber) or 0))
+        return activeEventId > 0
+            and tonumber(options.turnPageIndex[activeEventId]) == currentTick
     end
 
     local activeUnit, state = self:ResolveActiveSpellcasterUnit(eventState)
@@ -2057,6 +2999,8 @@ local function clearEventStateNow(client, state, reason, options)
     local transition = client.EventTransition
     local eventState = type(state) == "table" and state or (transition and transition.eventState)
     local eventId = eventState and eventState.id or nil
+    client.PendingEventStatePackets = client.PendingEventStatePackets or {}
+    client.PendingEventStatePackets[tostring(eventId or "")] = nil
     if options.skipCancel ~= true then
         cancelEventSliceableWork(client, eventId, options.cancelReason or "event-reset")
     end
@@ -2449,6 +3393,8 @@ function Client:HandleEventStart(arguments, sender)
     appendTimingPart(timingParts, "hydrate-resources", hydrateStartTime, 10)
 
     self.EventState = nextState
+    self.PendingEventStatePackets = self.PendingEventStatePackets or {}
+    self.PendingEventStatePackets[tostring(nextState.id or "")] = nil
     local transition = self:BeginEventTransition("starting", nextState.id)
     transition.eventState = nextState
     local startupRuntime = getEventStartupRuntime(self, nextState.id, true)
@@ -2553,6 +3499,8 @@ function Client:HandleEventEnd(arguments)
     end
 
     local reason = arguments and arguments[3] or "ended"
+    self.PendingEventStatePackets = self.PendingEventStatePackets or {}
+    self.PendingEventStatePackets[tostring(state.id or "")] = nil
     local activeTransition = self.EventTransition
     if state.ending == true
         and type(activeTransition) == "table"
@@ -2810,6 +3758,7 @@ end
 
 function Client:HandleEventState(arguments)
     local totalStartTime = getTimingNowMilliseconds()
+    local immediateStartTime = getEventStepNowMilliseconds()
     local timingParts = totalStartTime > 0 and {} or nil
     local sessionState = self:GetState()
     local eventState = self.EventState
@@ -2827,12 +3776,84 @@ function Client:HandleEventState(arguments)
         return false
     end
 
+    local usesLevelField = type(arguments) == "table" and #arguments >= 6
+    local turnIndex = usesLevelField and 4 or 3
+    local tickIndex = usesLevelField and 5 or 4
+    if type(arguments) ~= "table"
+        or tonumber(arguments[turnIndex]) == nil
+        or tonumber(arguments[tickIndex]) == nil
+    then
+        return false
+    end
+
     local timer = startTiming("Event-state immediate handler", 8, eventState.id or "event-state")
+
+    local incomingTurnNumber, incomingTickNumber, incomingTotalTicks = getEventStatePacketStep(arguments, eventState)
+    local activeTransition = self.EventTransition
+    if type(activeTransition) == "table"
+        and activeTransition.eventState == eventState
+        and (activeTransition.kind == "advancing" or activeTransition.kind == "starting")
+    then
+        local referenceTurn = activeTransition.newTurnNumber or eventState.turnNumber
+        local referenceTick = activeTransition.newTickNumber or eventState.tickNumber
+        local packetOrder = compareEventStep(incomingTurnNumber, incomingTickNumber, referenceTurn, referenceTick)
+        if packetOrder > 0 then
+            stageEventStatePacket(self, eventState.id, arguments, incomingTurnNumber, incomingTickNumber, incomingTotalTicks)
+            if timer then
+                stopEventTiming(timer, eventState, {
+                    duplicateOrQueued = 1,
+                    queuedLaterStep = 1,
+                    turnNumber = incomingTurnNumber,
+                    tickNumber = incomingTickNumber,
+                    transitionGeneration = activeTransition.generation,
+                })
+            end
+            return true
+        end
+        if activeTransition.kind == "advancing" then
+            if timer then
+                stopEventTiming(timer, eventState, {
+                    duplicateOrStale = 1,
+                    turnNumber = incomingTurnNumber,
+                    tickNumber = incomingTickNumber,
+                    transitionGeneration = activeTransition.generation,
+                })
+            end
+            return packetOrder == 0
+        end
+        if packetOrder < 0 then
+            if timer then
+                stopEventTiming(timer, eventState, {
+                    duplicateOrStale = 1,
+                    turnNumber = incomingTurnNumber,
+                    tickNumber = incomingTickNumber,
+                    transitionGeneration = activeTransition.generation,
+                })
+            end
+            return false
+        end
+    end
+
+    local currentOrder = compareEventStep(
+        incomingTurnNumber,
+        incomingTickNumber,
+        tonumber(eventState.turnNumber) or 0,
+        tonumber(eventState.tickNumber) or 0
+    )
+    if currentOrder < 0 then
+        if timer then
+            stopEventTiming(timer, eventState, {
+                duplicateOrStale = 1,
+                turnNumber = incomingTurnNumber,
+                tickNumber = incomingTickNumber,
+            })
+        end
+        return false
+    end
 
     local previousTurnNumber = tonumber(eventState.turnNumber) or 0
     local previousTickNumber = tonumber(eventState.tickNumber) or 0
-    local wasLocalTurn = self.IsLocalTurnActive and self:IsLocalTurnActive(eventState) or false
-    local wasLocalPlayerTurn = isLocalPlayerTurnActive(self, eventState)
+    local wasTurnEndPending = self.TurnEndPending == true
     local startupRuntime = getEventStartupRuntime(self, eventState.id, true)
 
     local stateApplyStartTime = timingParts and getTimingNowMilliseconds() or nil
@@ -2855,98 +3876,81 @@ function Client:HandleEventState(arguments)
         self.TurnEndPending = false
     end
 
-    local advanceStateStartTime = timingParts and getTimingNowMilliseconds() or nil
-    if self.AdvanceSpellcastState then
-        self:AdvanceSpellcastState(previousTurnNumber, previousTickNumber)
-    end
-    if self.AdvanceCooldownState then
-        self:AdvanceCooldownState(previousTurnNumber, previousTickNumber)
-    end
-    if self.AdvanceAuraState then
-        self:AdvanceAuraState(previousTurnNumber, previousTickNumber)
-    end
-    appendTimingPart(timingParts, "advance-state", advanceStateStartTime, 15)
-
-    local turnEffectsStartTime = timingParts and getTimingNowMilliseconds() or nil
-    local turnEffectParts = turnEffectsStartTime and {} or nil
-    local isLocalTurn = self.IsLocalTurnActive and self:IsLocalTurnActive(eventState) or false
-    local isLocalPlayerTurn = isLocalPlayerTurnActive(self, eventState)
     local stepAdvanced = previousTurnNumber ~= (tonumber(eventState.turnNumber) or 0)
         or previousTickNumber ~= (tonumber(eventState.tickNumber) or 0)
-    local turnAnnouncementStartTime = turnEffectParts and getTimingNowMilliseconds() or nil
-    if previousTurnNumber ~= (tonumber(eventState.turnNumber) or 0) then
-        local eventName = getEventDisplayName(eventState)
-        local turnNumber = math.max(1, tonumber(eventState.turnNumber) or 1)
-        deferEventPresentation(function(name, announcedTurnNumber)
-            emitTurnStartAnnouncement({
-                name = name,
-                turnNumber = announcedTurnNumber,
+    if not stepAdvanced then
+        if timingParts then
+            logTimingParts("HandleEventState", "event-state-handler", timingParts, getTimingNowMilliseconds() - totalStartTime, 25)
+        end
+        if timer then
+            stopEventTiming(timer, eventState, {
+                stepChanged = 0,
+                turnNumber = tonumber(eventState.turnNumber) or 0,
+                tickNumber = tonumber(eventState.tickNumber) or 0,
             })
-        end, eventName, turnNumber)
+        end
+        return true
     end
-    appendTimingPart(turnEffectParts, "announcements", turnAnnouncementStartTime, 10)
-    local turnCueStartTime = turnEffectParts and getTimingNowMilliseconds() or nil
-    if stepAdvanced and not wasLocalPlayerTurn and isLocalPlayerTurn then
-        deferEventPresentation(function()
-            playLocalTurnStartSound()
-            emitLocalTurnStartAnnouncement()
-        end)
-    end
-    appendTimingPart(turnEffectParts, "local-turn-cue", turnCueStartTime, 10)
-    local regenStartTime = turnEffectParts and getTimingNowMilliseconds() or nil
-    if previousTurnNumber ~= (tonumber(eventState.turnNumber) or 0)
-        and isLocalTurn
-        and type(self.ApplyLocalTurnStartResourceRegeneration) == "function"
-    then
-        self:ApplyLocalTurnStartResourceRegeneration(sessionState, eventState, {
-            suppressLocalVisualRefresh = true,
-        })
-    end
-    appendTimingPart(turnEffectParts, "resource-regen", regenStartTime, 15)
-    local movementStartTime = turnEffectParts and getTimingNowMilliseconds() or nil
-    queueDeferredMovementSync(self, wasLocalTurn, eventState, previousTurnNumber, previousTickNumber, "event-state")
-    appendTimingPart(turnEffectParts, "movement", movementStartTime, 10)
-    if turnEffectParts then
-        logTimingParts(
-            "HandleEventState turn-effects",
-            "event-state-turn-effects",
-            turnEffectParts,
-            getTimingNowMilliseconds() - turnEffectsStartTime,
-            15
-        )
-    end
-    appendTimingPart(timingParts, "turn-effects", turnEffectsStartTime, 15)
 
-    local tooltipStartTime = timingParts and getTimingNowMilliseconds() or nil
-    bumpAllEventTooltipContextRevisions(eventState)
-    if self.InvalidatePendingSpellTargetingDisplayState then
-        self:InvalidatePendingSpellTargetingDisplayState()
+    local transition = self:BeginEventTransition("advancing", eventState.id)
+    transition.eventState = eventState
+    transition.previousTurnNumber = previousTurnNumber
+    transition.previousTickNumber = previousTickNumber
+    transition.newTurnNumber = tonumber(eventState.turnNumber) or 0
+    transition.newTickNumber = tonumber(eventState.tickNumber) or 0
+    transition.newTotalTicks = tonumber(eventState.totalTicks) or 0
+    transition.phase = EVENT_ADVANCE_PHASES[1]
+    transition.continuation = nil
+
+    local work = {
+        client = self,
+        eventId = tostring(eventState.id or ""),
+        eventState = eventState,
+        transitionGeneration = transition.generation,
+        contextId = transition.contextId,
+        previousTurnNumber = previousTurnNumber,
+        previousTickNumber = previousTickNumber,
+        newTurnNumber = tonumber(eventState.turnNumber) or 0,
+        newTickNumber = tonumber(eventState.tickNumber) or 0,
+        stepAdvanced = stepAdvanced,
+        wasTurnEndPending = wasTurnEndPending,
+        phase = EVENT_ADVANCE_PHASES[1],
+        affectedEventUnitIds = {},
+        affectedEventUnitList = {},
+        diagnostics = transition.stepDiagnostics,
+    }
+    transition.continuation = work
+    self.EventStepWork = work
+
+    local queueStartTime = timingParts and getTimingNowMilliseconds() or nil
+    local queued = queueEventAdvanceWork(self, eventState, transition, work)
+    appendTimingPart(timingParts, "advance-queue", queueStartTime, 10)
+    if not queued then
+        self.EventStepWork = nil
+        transition.phase = "error"
+        transition.failed = true
+        eventState.transitionPhase = "error"
+        if Debug and Debug.Error then
+            Debug.Error("Unable to queue event-step transition: event=%s", tostring(eventState.id or ""))
+        end
     end
-    appendTimingPart(timingParts, "tooltip-context", tooltipStartTime, 10)
 
-    local visualsStartTime = timingParts and getTimingNowMilliseconds() or nil
-    queueSharedEventVisualRefresh(self, "event-state", {
-        eventWidget = true,
-        targeting = true,
-        actionBar = false,
-    })
-    appendTimingPart(timingParts, "visual-queue", visualsStartTime, 10)
-
-    local startupQueueStartTime = timingParts and getTimingNowMilliseconds() or nil
-    queueEventStartupWork(self, eventState, "event-state")
-    appendTimingPart(timingParts, "startup-queue", startupQueueStartTime, 10)
+    if type(transition.stepDiagnostics) == "table" then
+        transition.stepDiagnostics.immediateElapsedMs = math.max(0, getEventStepNowMilliseconds() - immediateStartTime)
+    end
 
     if timingParts then
         logTimingParts("HandleEventState", "event-state-handler", timingParts, getTimingNowMilliseconds() - totalStartTime, 25)
     end
     if timer then
-        local activeCasts, activeAuras = getActiveEventCardinality(self, eventState)
         stopEventTiming(timer, eventState, {
-            activeCasts = activeCasts,
-            activeAuras = activeAuras,
+            stepChanged = 1,
+            advancingQueued = queued and 1 or 0,
+            immediateElapsedMs = transition.stepDiagnostics and transition.stepDiagnostics.immediateElapsedMs or 0,
             turnNumber = tonumber(eventState.turnNumber) or 0,
             tickNumber = tonumber(eventState.tickNumber) or 0,
+            transitionGeneration = transition.generation,
         })
     end
-    return true
+    return queued == true
 end
