@@ -1070,7 +1070,6 @@ function Combat:BuildReactionActions(entry)
                             allowedAttackTypes = {},
                         }
                         actionsByStatRef[statRef] = existing
-                        applyShieldEligibility(existing)
                         appendAction(existing)
                     end
 
@@ -1079,6 +1078,7 @@ function Combat:BuildReactionActions(entry)
                         existing.enabled = true
                         existing.icon = display.icon or existing.icon
                     end
+                    applyShieldEligibility(existing)
                 end
             end
         end

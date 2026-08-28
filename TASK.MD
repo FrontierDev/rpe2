@@ -1,118 +1,63 @@
-## Validation result: FAIL — corrected NPC requirement
+## Validation result: FAIL — rev 1
 
-This comment supersedes the previous validation interpretation.
+Rev 1 correctly fixes the two major behaviors from the previous validation:
 
-### Product requirement clarification
+- NPC defenders no longer consult or consume the player defensive-reaction ledger in `Combat:BeginHitCheck(...)`.
+- `Combat:ChooseAutomaticReactionAction(entry)` now evaluates eligible actions for the active defence system and selects the one with the highest resolved defensive value instead of blindly taking the first configured action.
 
-NPCs are **always exempt** from the defensive-reaction-per-turn limit.
+The player-only reaction-limit behavior remains intact.
 
-The limit applies to player defenders only. NPCs must never consume or check the defensive-reaction-use ledger, regardless of whether the Ruleset toggle is enabled or whether a defensive stat is in the bypass list.
+### Remaining blocking defect: shield-gated grouped defences can be re-enabled
 
-NPC automatic defence behavior should instead be:
-
-```text
-NPC defender
--> inspect all valid defensive reactions for the active defence system / attack type
--> choose the strongest available defensive reaction
--> resolve it normally
--> do not call CanUseDefensiveReaction for turn-limit purposes
--> do not call ConsumeDefensiveReactionUse
-```
-
-This clarification supersedes the issue body's current text/acceptance criterion saying NPC automatic defenses should obey the same limit.
-
-### What is already correct
-
-Current `main` (`a39e184`) correctly implements the player-facing portions:
-
-- Ruleset toggle exists and defaults to `false`.
-- Bypass list stores stat references and defaults empty.
-- Player ledger is transient and keyed by Event / turn / defender / reaction stat.
-- Tick/page changes do not reset it.
-- Different defensive stats have independent uses.
-- Failed attempts consume the player use.
-- Pass does not consume a use.
-- Bypass stats remain unlimited.
-- Player UI marks a spent reaction unavailable.
-- Player resolution re-checks availability rather than trusting UI state.
-- Turn rollover/Event teardown prevents stale player uses leaking into later turns/Events.
-
-### Blocking defect 1: NPCs are currently subjected to the player limit
-
-`Combat:BeginHitCheck(...)` in `client/combat/effects/Damage.lua` handles non-player defenders by selecting an automatic action and then explicitly checking/consuming the reaction-limit helpers:
+`Combat:BuildReactionActions(entry)` currently applies shield eligibility to a newly-created grouped Complex/Percent action **before** it marks that action enabled for the current attack type:
 
 ```lua
-if entry.defenderUnit.isPlayer ~= true then
+existing = {
     ...
-    Combat:CanUseDefensiveReaction(entry, action)
-    ...
-    Combat:ConsumeDefensiveReactionUse(entry, action)
+    enabled = false,
+}
+applyShieldEligibility(existing)
+...
+if attackType == tostring(entry.attackType or "spell") then
+    existing.enabled = true
 end
 ```
 
-That must be removed/bypassed for NPC defenders. NPCs should be able to use the same defensive stat on every incoming attack in the turn.
+When `allow_block_without_shield == false` and the defender has no shield, `applyShieldEligibility(existing)` correctly sets `enabled = false`, but the later attack-type branch unconditionally sets it back to `true`.
 
-The player path must continue using the current ledger exactly as intended.
+Because rev 1's strongest-NPC-defence selector trusts `action.enabled ~= false`, this can cause an NPC with no shield to select Block as its strongest defence when Block is configured as a grouped Complex or Percent reaction.
 
-### Blocking defect 2: NPCs do not reliably choose their best defence
+This violates the clarified requirement that NPCs choose the strongest **valid** defence and must respect existing eligibility such as shield requirements.
 
-`Combat:ChooseAutomaticReactionAction(entry)` currently tends to return the first eligible configured action:
+### Required fix
 
-- shared preview path: first enabled action matching the defence system;
-- complex path: first configured `statRef`;
-- percent path: first configured resistance `statRef`.
+Ensure grouped-action attack-type enabling cannot overwrite an existing eligibility failure.
 
-That is configuration-order selection, not "best defence" selection.
+For example, either:
 
-Update NPC automatic selection so it evaluates all valid defensive reactions for the active defence system and attack type and chooses the strongest one.
+1. set attack-type applicability first, then run `applyShieldEligibility(existing)` after grouped actions are fully built; or
+2. track attack-type applicability separately and set final `enabled` only after all eligibility checks have run.
 
-For the current combat systems this should mean, at minimum:
-
-```text
-AC
--> only the configured AC defence applies
-
-Simple
--> only the configured simple defence applies
-
-Complex
--> among valid/enabled configured defence stats for this attack type, choose the stat with the highest resolved defender stat value
-
-Percent
--> among valid/enabled resistance stats for this attack type, choose the stat with the highest resolved resistance value / resulting defence threshold
-```
-
-Respect existing eligibility such as shield requirements. Do not choose a disabled defence merely because its raw Stat value is highest.
-
-If two reactions are mechanically equal, deterministic configured order is an acceptable tie-breaker.
-
-Do not alter hit-check formulas; only automatic reaction choice changes.
+Do not special-case NPCs here: the shared reaction action should accurately represent validity for both player UI and NPC automatic selection.
 
 ### Required validation
 
 ```text
-rule enabled; player defender
--> first Dodge resolves/consumes
--> second Dodge same turn unavailable
--> Parry remains independently available
+allow_block_without_shield = false
+NPC has no shield
+Complex defences: Dodge=8, Block=20
+-> Block action remains disabled
+-> NPC chooses Dodge
 
-rule enabled; NPC defender
--> NPC may use Dodge repeatedly against multiple attacks in the same turn
--> no NPC defensive-use ledger entry is created/consulted
-
-NPC has valid Complex defences:
-Dodge = 8
-Parry = 12
-Block = 10
--> NPC chooses Parry
-
-NPC has Percent resistances:
-Dodge = 15
-Block = 25
+same setup, NPC equips shield
+-> Block becomes valid
 -> NPC chooses Block
 
-highest-valued defence is disabled by an existing eligibility rule
--> NPC chooses the strongest remaining valid defence
+Percent defences with Block configured similarly
+-> same shield gating behavior
+
+player defender without shield
+-> Block remains unavailable exactly as before
 ```
 
-Keep #79 open until both NPC exemption and strongest-defence selection are implemented.
+All other rev 1 behavior can remain unchanged.
