@@ -9,6 +9,10 @@ local UI = Addon.UI or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
+local AchievementClass = Addon.Internal
+    and Addon.Internal.Database
+    and Addon.Internal.Database.Classes
+    and Addon.Internal.Database.Classes.Achievement
 
 local AchievementsPage = ProfileUI.AchievementsPage or {}
 ProfileUI.AchievementsPage = AchievementsPage
@@ -64,6 +68,30 @@ end
 
 local function trimString(value)
     return ensureString(value):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function getAchievementCategoryDefinitions()
+    if AchievementClass and type(AchievementClass.GetCategoryDefinitions) == "function" then
+        return AchievementClass.GetCategoryDefinitions()
+    end
+
+    return {}
+end
+
+local function normalizeAchievementCategory(value)
+    if AchievementClass and type(AchievementClass.NormalizeCategory) == "function" then
+        return AchievementClass.NormalizeCategory(value)
+    end
+
+    return "general"
+end
+
+local function normalizeAchievementSubcategory(value)
+    if AchievementClass and type(AchievementClass.NormalizeSubcategory) == "function" then
+        return AchievementClass.NormalizeSubcategory(value)
+    end
+
+    return trimString(value)
 end
 
 local function composeAchievementRef(datasetId, achievementId)
@@ -179,17 +207,6 @@ local function buildAchievementRows()
                 local achievementId = trimString(achievement and achievement.id)
                 local achievementRef = composeAchievementRef(datasetId, achievementId)
                 if type(achievement) == "table" and achievementRef ~= "" then
-                    local tags = {}
-                    local tagSet = {}
-                    local achievementTags = type(achievement.tags) == "table" and achievement.tags or {}
-                    for tagIndex = 1, #achievementTags do
-                        local tag = trimString(achievementTags[tagIndex])
-                        if tag ~= "" and not tagSet[tag] then
-                            tagSet[tag] = true
-                            tags[#tags + 1] = tag
-                        end
-                    end
-
                     rows[#rows + 1] = {
                         achievement = achievement,
                         achievementId = achievementId,
@@ -197,7 +214,8 @@ local function buildAchievementRows()
                         dataset = dataset,
                         datasetId = datasetId,
                         state = states[achievementRef],
-                        tags = tags,
+                        category = normalizeAchievementCategory(achievement.category),
+                        subcategory = normalizeAchievementSubcategory(achievement.subcategory),
                     }
                 end
             end
@@ -212,54 +230,78 @@ local function buildCategoryRows(achievementRows)
         {
             key = "all",
             label = "All",
+            title = "All",
             count = #achievementRows,
         },
     }
-    local counts = {}
-    local labels = {}
 
-    for index = 1, #achievementRows do
-        local achievementRow = achievementRows[index]
-        for tagIndex = 1, #(achievementRow.tags or {}) do
-            local tag = achievementRow.tags[tagIndex]
-            counts[tag] = (counts[tag] or 0) + 1
-            labels[tag] = tag
+    local definitions = getAchievementCategoryDefinitions()
+    for definitionIndex = 1, #definitions do
+        local definition = definitions[definitionIndex]
+        local categoryKey = definition.key
+        local categoryCount = 0
+        local subcategoryCounts = {}
+
+        for achievementIndex = 1, #achievementRows do
+            local achievementRow = achievementRows[achievementIndex]
+            if achievementRow.category == categoryKey then
+                categoryCount = categoryCount + 1
+                local subcategory = achievementRow.subcategory
+                if subcategory ~= "" then
+                    subcategoryCounts[subcategory] = (subcategoryCounts[subcategory] or 0) + 1
+                end
+            end
         end
-    end
 
-    local tags = {}
-    for tag in pairs(counts) do
-        tags[#tags + 1] = tag
-    end
-    table.sort(tags, function(left, right)
-        return string.lower(tostring(left)) < string.lower(tostring(right))
-    end)
-
-    for index = 1, #tags do
-        local tag = tags[index]
         rows[#rows + 1] = {
-            key = tag,
-            label = labels[tag] or tag,
-            count = counts[tag] or 0,
+            key = categoryKey,
+            label = definition.label,
+            title = definition.label,
+            categoryKey = categoryKey,
+            count = categoryCount,
         }
+
+        local subcategories = {}
+        for subcategory in pairs(subcategoryCounts) do
+            subcategories[#subcategories + 1] = subcategory
+        end
+        table.sort(subcategories, function(left, right)
+            local leftLower = string.lower(tostring(left))
+            local rightLower = string.lower(tostring(right))
+            if leftLower == rightLower then
+                return tostring(left) < tostring(right)
+            end
+            return leftLower < rightLower
+        end)
+
+        for subcategoryIndex = 1, #subcategories do
+            local subcategory = subcategories[subcategoryIndex]
+            rows[#rows + 1] = {
+                key = ("%s::%s"):format(categoryKey, subcategory),
+                label = ("    %s"):format(subcategory),
+                title = ("%s / %s"):format(definition.label, subcategory),
+                categoryKey = categoryKey,
+                subcategory = subcategory,
+                count = subcategoryCounts[subcategory],
+            }
+        end
     end
 
     return rows
 end
 
-local function filterAchievementRows(rows, selectedCategoryKey)
-    if not selectedCategoryKey or selectedCategoryKey == "all" then
+local function filterAchievementRows(rows, selectedCategory)
+    if type(selectedCategory) ~= "table" or selectedCategory.key == "all" then
         return rows
     end
 
     local filtered = {}
     for index = 1, #rows do
         local row = rows[index]
-        for tagIndex = 1, #(row.tags or {}) do
-            if tostring(row.tags[tagIndex]) == tostring(selectedCategoryKey) then
-                filtered[#filtered + 1] = row
-                break
-            end
+        if row.category == selectedCategory.categoryKey
+            and (selectedCategory.subcategory == nil or row.subcategory == selectedCategory.subcategory)
+        then
+            filtered[#filtered + 1] = row
         end
     end
 
@@ -636,7 +678,8 @@ function AchievementsPage:EnsureCategorySelection(categories)
 end
 
 function AchievementsPage:GetSelectedAchievementRows()
-    return filterAchievementRows(self.AllAchievementRows or {}, self.SelectedCategoryKey)
+    local selectedCategory = findCategory(self.CategoryRows or {}, self.SelectedCategoryKey)
+    return filterAchievementRows(self.AllAchievementRows or {}, selectedCategory)
 end
 
 function AchievementsPage:UpdateRetryButton(selectedRows)
@@ -932,11 +975,11 @@ function AchievementsPage:Refresh()
         self.CategoryList:SetItems(self.CategoryRows)
     end
     if self.CategoryEmptyText and self.CategoryEmptyText.SetText then
-        self.CategoryEmptyText:SetText(#self.CategoryRows > 1 and "" or "No achievement tags available.")
+        self.CategoryEmptyText:SetText(#self.CategoryRows > 0 and "" or "No achievement categories available.")
     end
 
     if self.GridTitle and self.GridTitle.SetText then
-        self.GridTitle:SetText(selectedCategory and selectedCategory.label or "Achievements")
+        self.GridTitle:SetText(selectedCategory and (selectedCategory.title or selectedCategory.label) or "Achievements")
     end
     if self.GridHintText and self.GridHintText.SetText then
         self.GridHintText:SetText(("%d achievement%s"):format(#selectedRows, #selectedRows == 1 and "" or "s"))
@@ -949,7 +992,7 @@ function AchievementsPage:Refresh()
         if #self.AllAchievementRows == 0 then
             self.GridEmptyText:SetText("No Achievements are available in active datasets.")
         elseif #selectedRows == 0 then
-            self.GridEmptyText:SetText("No Achievements match this tag.")
+            self.GridEmptyText:SetText("No Achievements match this category.")
         else
             self.GridEmptyText:SetText("")
         end

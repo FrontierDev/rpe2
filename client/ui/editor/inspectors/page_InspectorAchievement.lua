@@ -79,6 +79,32 @@ local function trim(value)
     return tostring(value or ""):match("^%s*(.-)%s*$")
 end
 
+local function buildAchievementCategoryItems()
+    local items = {}
+    local definitions = AchievementClass
+        and type(AchievementClass.GetCategoryDefinitions) == "function"
+        and AchievementClass.GetCategoryDefinitions()
+        or {}
+
+    for index = 1, #definitions do
+        local definition = definitions[index]
+        items[#items + 1] = {
+            label = definition.label,
+            value = definition.key,
+        }
+    end
+
+    return items
+end
+
+local function normalizeAchievementCategory(value)
+    if AchievementClass and type(AchievementClass.NormalizeCategory) == "function" then
+        return AchievementClass.NormalizeCategory(value)
+    end
+
+    return "general"
+end
+
 local function parseDatasetQualifiedRef(value)
     local datasetId, entryId = trim(value):match("^([^:]+):(.+)$")
     return datasetId, entryId
@@ -660,7 +686,38 @@ function DataEditor:BuildAchievementInspectorGeneralPage(parent)
     end
     root:AddChild(self.AchievementInspectorIconField)
 
-    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorTagsLabel", "Tags"))
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorCategoryLabel", "Category"))
+    self.AchievementInspectorCategoryDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorAchievementInspectorCategoryDropdown", {
+        width = FIELD_WIDTH,
+        height = CONTROL_HEIGHT,
+        items = buildAchievementCategoryItems(),
+        onValueChanged = function(value)
+            if self._refreshingAchievementInspectorPage then
+                return
+            end
+
+            self:CommitSelectedAchievement(function(achievement)
+                achievement.category = value
+            end)
+            self:RefreshAchievementInspectorPage()
+        end,
+    })
+    root:AddChild(self.AchievementInspectorCategoryDropdown)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorSubcategoryLabel", "Subcategory"))
+    self.AchievementInspectorSubcategoryInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAchievementInspectorSubcategoryInput", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitSubcategory = function()
+        self:CommitSelectedAchievement(function(achievement)
+            achievement.subcategory = self.AchievementInspectorSubcategoryInput:GetText()
+        end)
+    end
+    self.AchievementInspectorSubcategoryInput:SetScript("OnEnterPressed", commitSubcategory)
+    self.AchievementInspectorSubcategoryInput:SetScript("OnEditFocusLost", commitSubcategory)
+    root:AddChild(self.AchievementInspectorSubcategoryInput)
+
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorAchievementInspectorTagsLabel", "Tags (metadata only)"))
     self.AchievementInspectorTagsInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAchievementInspectorTagsInput", {
         width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "", borderColor = UI.ResolveColor(nil, "panel.border"),
     })
@@ -1589,6 +1646,15 @@ function DataEditor:RefreshAchievementInspectorPage()
         self.AchievementInspectorIconField:SetIcon(icon ~= "" and icon or DEFAULT_ICON)
         self.AchievementInspectorIconField:SetLabelText(icon ~= "" and icon or "-")
         self.AchievementInspectorIconField:SetEnabled(hasAchievement)
+    end
+    if self.AchievementInspectorCategoryDropdown then
+        local category = normalizeAchievementCategory(achievement and achievement.category or "general")
+        self.AchievementInspectorCategoryDropdown:SetSelectedValue(category, true)
+        setDropdownEnabled(self.AchievementInspectorCategoryDropdown, hasAchievement)
+    end
+    if self.AchievementInspectorSubcategoryInput then
+        self.AchievementInspectorSubcategoryInput:SetText(achievement and (achievement.subcategory or "") or "")
+        setTextElementEnabled(self.AchievementInspectorSubcategoryInput, hasAchievement)
     end
     if self.AchievementInspectorTagsInput then
         self.AchievementInspectorTagsInput:SetText(achievement and UI.Utils.JoinCommaSeparatedList(achievement.tags or {}) or "")

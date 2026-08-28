@@ -69,6 +69,8 @@ Achievement {
     icon
     criteria
     rewards
+    category
+    subcategory
     tags
 }
 ```
@@ -80,6 +82,8 @@ Addon.Internal.Database.Classes.Achievement
 ```
 
 Achievement criteria are normalized, use stable criterion IDs and are authorable through the Data Editor.
+
+Each Achievement uses one built-in category key (`general`, `character`, `combat`, `events`, `player_vs_player`, `reputation`, `feats_of_strength`, or `legacy`; default `general`) and may have a trimmed, freeform `subcategory` display value, including blank. `tags` remain independent metadata and do not define Profile navigation.
 
 Achievements are a first-class dataset collection and have a read-only Profile page backed by character Profile state.
 
@@ -297,6 +301,8 @@ Achievement {
     icon = "...",
     criteria = { ... },
     rewards = {},
+    category = "general",
+    subcategory = "",
     tags = {},
 }
 ```
@@ -569,7 +575,7 @@ The page displays:
 - Achievement icon;
 - name;
 - description;
-- tag-based filters;
+- built-in category and freeform subcategory navigation, in the fixed order General, Character, Combat, Events, Player vs. Player, Reputation, Feats of Strength, Legacy;
 - criterion progress;
 - complete/incomplete state;
 - completion date.
@@ -589,7 +595,9 @@ General
   Name
   Description
   Icon
-  Tags
+  Category
+  Subcategory
+  Tags (independent metadata)
 
 Criteria
   Add/Delete Criterion

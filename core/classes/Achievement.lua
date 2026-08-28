@@ -7,6 +7,22 @@ Addon.Internal.Database.Classes = Addon.Internal.Database.Classes or {}
 local Achievement = {}
 Achievement.__index = Achievement
 
+local CATEGORY_DEFINITIONS = {
+    { key = "general", label = "General" },
+    { key = "character", label = "Character" },
+    { key = "combat", label = "Combat" },
+    { key = "events", label = "Events" },
+    { key = "player_vs_player", label = "Player vs. Player" },
+    { key = "reputation", label = "Reputation" },
+    { key = "feats_of_strength", label = "Feats of Strength" },
+    { key = "legacy", label = "Legacy" },
+}
+
+local VALID_CATEGORY_KEYS = {}
+for index = 1, #CATEGORY_DEFINITIONS do
+    VALID_CATEGORY_KEYS[CATEGORY_DEFINITIONS[index].key] = true
+end
+
 local SUPPORTED_TRIGGERS = {
     manual = true,
     currency_gain = true,
@@ -190,6 +206,27 @@ local function normalizeTags(value)
     return tags
 end
 
+local function normalizeCategory(value)
+    local category = string.lower(trimText(value))
+    return VALID_CATEGORY_KEYS[category] and category or "general"
+end
+
+local function normalizeSubcategory(value)
+    return trimText(value)
+end
+
+function Achievement.GetCategoryDefinitions()
+    return CATEGORY_DEFINITIONS
+end
+
+function Achievement.NormalizeCategory(value)
+    return normalizeCategory(value)
+end
+
+function Achievement.NormalizeSubcategory(value)
+    return normalizeSubcategory(value)
+end
+
 function Achievement:New(data)
     return setmetatable({
         id = nil,
@@ -198,6 +235,8 @@ function Achievement:New(data)
         icon = "",
         criteria = {},
         rewards = {},
+        category = "general",
+        subcategory = "",
         tags = {},
     }, Achievement):Merge(data)
 end
@@ -216,6 +255,8 @@ function Achievement:Merge(data)
     self.icon = ensureString(self.icon)
     self.criteria = normalizeCriteria(self.criteria)
     self.rewards = normalizeRewards(self.rewards)
+    self.category = normalizeCategory(self.category)
+    self.subcategory = normalizeSubcategory(self.subcategory)
     self.tags = normalizeTags(self.tags)
 
     return self
@@ -229,6 +270,8 @@ function Achievement:ToTable()
         icon = ensureString(self.icon),
         criteria = normalizeCriteria(self.criteria),
         rewards = normalizeRewards(self.rewards),
+        category = normalizeCategory(self.category),
+        subcategory = normalizeSubcategory(self.subcategory),
         tags = normalizeTags(self.tags),
     }
 end
