@@ -3076,6 +3076,10 @@ function Client:HandleEventUnitDeltaBatch(arguments)
         actionBar = true,
     })
     queueEventTraitRuntimeRefresh(self, eventState, "event-unit-delta-batch")
+    local auraManager = self.Spellcasting and self.Spellcasting.AuraManager or nil
+    if type(auraManager) == "table" and type(auraManager.RecheckAuraOwnerOccurrences) == "function" then
+        auraManager:RecheckAuraOwnerOccurrences(self)
+    end
     return true
 end
 

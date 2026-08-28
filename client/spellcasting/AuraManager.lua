@@ -2162,8 +2162,10 @@ function AuraManager:ResetAuraState(client, eventId)
     if normalizedEventId ~= nil then
         local tasks = getTasks()
         local derivedJobs = client.PendingFullAuraDerivedStateRefreshByEventId or {}
+        local topologyJobs = client.PendingAuraTopologyRecheckJobsByEventId or {}
         if type(tasks) == "table" and type(tasks.Cancel) == "function" then
             tasks:Cancel(derivedJobs[normalizedEventId], "event-aura-reset")
+            tasks:Cancel(topologyJobs[normalizedEventId], "event-aura-reset")
             local outboundJobs = {}
             for _, job in pairs(client.PendingOutboundAuraFlushJobsByScope or {}) do
                 local jobState = type(job) == "table" and job.state or nil
@@ -2202,6 +2204,8 @@ function AuraManager:ResetAuraState(client, eventId)
         client.PendingOutboundAuraFlushStatusByScope = client.PendingOutboundAuraFlushStatusByScope or {}
         client.PendingOutboundAuraFlushStatusByScope.turn = "cancelled"
         client.PendingOutboundAuraFlushStatusByScope.reaction = "cancelled"
+        client.PendingAuraTopologyRecheckJobsByEventId = client.PendingAuraTopologyRecheckJobsByEventId or {}
+        client.PendingAuraTopologyRecheckJobsByEventId[normalizedEventId] = nil
         client.PendingOutboundAuraOperationOrder = {}
         if type(client.PendingFullAuraDerivedStateRefreshByEventId) == "table" then
             client.PendingFullAuraDerivedStateRefreshByEventId[normalizedEventId] = nil
@@ -2226,6 +2230,13 @@ function AuraManager:ResetAuraState(client, eventId)
         for index = 1, #derivedJobs do
             tasks:Cancel(derivedJobs[index], "aura-reset")
         end
+        local topologyJobs = {}
+        for _, job in pairs(client.PendingAuraTopologyRecheckJobsByEventId or {}) do
+            topologyJobs[#topologyJobs + 1] = job
+        end
+        for index = 1, #topologyJobs do
+            tasks:Cancel(topologyJobs[index], "aura-reset")
+        end
     end
 
     client.ActiveAurasByEventId = {}
@@ -2242,6 +2253,7 @@ function AuraManager:ResetAuraState(client, eventId)
     client.PendingOutboundAuraOperationOrderByScope = {}
     client.PendingOutboundAuraOperationCountsByScope = {}
     client.PendingFullAuraDerivedStateRefreshByEventId = {}
+    client.PendingAuraTopologyRecheckJobsByEventId = {}
     client.PendingAuraDisplayRefreshQueued = false
     client.PendingAuraDisplayRefreshReason = nil
 
@@ -4105,6 +4117,179 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
     return changed
 end
 
+local function clearAuraTopologyRecheckJob(state, job)
+    local client = state and state.client or nil
+    local eventId = state and state.eventId or nil
+    local jobsByEventId = type(client) == "table" and client.PendingAuraTopologyRecheckJobsByEventId or nil
+    if type(jobsByEventId) ~= "table" or eventId == nil then
+        return
+    end
+
+    if job == nil or jobsByEventId[eventId] == job then
+        jobsByEventId[eventId] = nil
+    end
+end
+
+local function rerunAuraTopologyRecheckIfRequested(state)
+    if type(state) ~= "table" or state.rerunRequested ~= true then
+        return
+    end
+
+    local client = state.client
+    local currentEventState = type(client) == "table"
+        and client.GetEventState
+        and client:GetEventState()
+        or nil
+    if currentEventState ~= state.eventState
+        or type(currentEventState) ~= "table"
+        or currentEventState.active ~= true
+        or currentEventState.ending == true
+        or tonumber(currentEventState.turnNumber) ~= tonumber(state.turnNumber)
+        or tonumber(currentEventState.tickNumber) ~= tonumber(state.tickNumber)
+    then
+        return
+    end
+
+    local manager = state.manager
+    if type(manager) == "table" and type(manager.RecheckAuraOwnerOccurrences) == "function" then
+        manager:RecheckAuraOwnerOccurrences(client)
+    end
+end
+
+local function stepAuraTopologyRecheck(state, deadlineMs)
+    local client = state and state.client or nil
+    local eventState = state and state.eventState or nil
+    local bucket = state and state.bucket or nil
+    if type(client) ~= "table"
+        or type(eventState) ~= "table"
+        or type(bucket) ~= "table"
+        or type(bucket.byKey) ~= "table"
+    then
+        return true
+    end
+
+    while state.auraKeyIndex <= #state.auraKeys do
+        local auraKey = state.auraKeys[state.auraKeyIndex]
+        state.auraKeyIndex = state.auraKeyIndex + 1
+        local entry = bucket.byKey[auraKey]
+
+        if type(entry) == "table"
+            and isAuraOwnerOccurrenceDue(eventState, entry, state.turnNumber, state.tickNumber)
+        then
+            local pendingOwnerTurn = math.floor(tonumber(entry.pendingAdvancedOwnerTurnNumber) or 0)
+            if pendingOwnerTurn < state.turnNumber then
+                entry.pendingAdvancedOwnerTurnNumber = state.turnNumber
+                local enqueued = enqueueAuraWork(function(manager, targetClient, targetEventId, targetAuraKey, turnNumber, tickNumber)
+                    manager:AdvanceAuraEntry(targetClient, targetEventId, targetAuraKey, turnNumber, tickNumber)
+                end, state.manager, client, state.eventId, auraKey, state.turnNumber, state.tickNumber)
+                if not enqueued then
+                    entry.pendingAdvancedOwnerTurnNumber = pendingOwnerTurn > 0 and pendingOwnerTurn or nil
+                end
+            end
+        end
+
+        if shouldYieldAuraSlice(deadlineMs) then
+            return false
+        end
+    end
+
+    return true
+end
+
+function AuraManager:RecheckAuraOwnerOccurrences(client)
+    if type(client) ~= "table" then
+        return false
+    end
+
+    local eventState = client.GetEventState and client:GetEventState() or nil
+    if type(eventState) ~= "table" or eventState.active ~= true or eventState.ending == true then
+        return false
+    end
+
+    local eventId = tostring(eventState.id or "")
+    if eventId == "" then
+        return false
+    end
+
+    local bucket = self:GetEventAuraBucket(client, eventId, true)
+    if type(bucket) ~= "table" or type(bucket.byKey) ~= "table" then
+        return false
+    end
+
+    client.PendingAuraTopologyRecheckJobsByEventId = client.PendingAuraTopologyRecheckJobsByEventId or {}
+    local existingJob = client.PendingAuraTopologyRecheckJobsByEventId[eventId]
+    if type(existingJob) == "table" and existingJob.finalized ~= true and existingJob.cancelled ~= true then
+        local existingState = existingJob.state
+        if type(existingState) == "table"
+            and existingState.eventState == eventState
+            and tonumber(existingState.turnNumber) == tonumber(eventState.turnNumber)
+            and tonumber(existingState.tickNumber) == tonumber(eventState.tickNumber)
+        then
+            existingState.rerunRequested = true
+            return true
+        end
+
+        local tasks = getTasks()
+        if type(tasks) ~= "table" or type(tasks.Cancel) ~= "function" then
+            return false
+        end
+        tasks:Cancel(existingJob, "superseded-topology-recheck")
+        if client.PendingAuraTopologyRecheckJobsByEventId[eventId] == existingJob then
+            client.PendingAuraTopologyRecheckJobsByEventId[eventId] = nil
+        end
+    end
+    client.PendingAuraTopologyRecheckJobsByEventId[eventId] = nil
+
+    local turnNumber = math.max(1, math.floor(tonumber(eventState.turnNumber) or 1))
+    local tickNumber = math.max(1, math.floor(tonumber(eventState.tickNumber) or 1))
+    local auraKeys = {}
+    for auraKey in pairs(bucket.byKey) do
+        auraKeys[#auraKeys + 1] = auraKey
+    end
+    local state = {
+        manager = self,
+        client = client,
+        eventState = eventState,
+        eventId = eventId,
+        bucket = bucket,
+        turnNumber = turnNumber,
+        tickNumber = tickNumber,
+        auraKeys = auraKeys,
+        auraKeyIndex = 1,
+    }
+    local job = enqueueAuraSliceable({
+        label = "aura-topology-owner-recheck",
+        scope = "aura-topology:" .. eventId,
+        state = state,
+        isStale = function(work)
+            local currentEventState = work.client.GetEventState and work.client:GetEventState() or nil
+            return currentEventState ~= work.eventState
+                or type(currentEventState) ~= "table"
+                or currentEventState.active ~= true
+                or currentEventState.ending == true
+                or tonumber(currentEventState.turnNumber) ~= tonumber(work.turnNumber)
+                or tonumber(currentEventState.tickNumber) ~= tonumber(work.tickNumber)
+        end,
+        step = stepAuraTopologyRecheck,
+        onCancel = function(work, _, cancelledJob)
+            clearAuraTopologyRecheckJob(work, cancelledJob)
+        end,
+        onComplete = function(work, completedJob)
+            local rerunRequested = work and work.rerunRequested == true
+            clearAuraTopologyRecheckJob(work, completedJob)
+            if rerunRequested then
+                rerunAuraTopologyRecheckIfRequested(work)
+            end
+        end,
+    })
+    if not job then
+        return false
+    end
+
+    client.PendingAuraTopologyRecheckJobsByEventId[eventId] = job
+    return true
+end
+
 function AuraManager:AdvanceAuraState(client, previousTurnNumber, previousTickNumber)
     local eventState = client.GetEventState and client:GetEventState() or nil
     if not eventState or eventState.active ~= true then
@@ -4947,6 +5132,7 @@ Client.PendingOutboundAuraFlushQueued = Client.PendingOutboundAuraFlushQueued or
 Client.PendingOutboundAuraFlushQueuedByScope = Client.PendingOutboundAuraFlushQueuedByScope or {}
 Client.PendingOutboundAuraFlushJobsByScope = Client.PendingOutboundAuraFlushJobsByScope or {}
 Client.PendingOutboundAuraFlushStatusByScope = Client.PendingOutboundAuraFlushStatusByScope or {}
+Client.PendingAuraTopologyRecheckJobsByEventId = Client.PendingAuraTopologyRecheckJobsByEventId or {}
 Client.PendingOutboundAuraOperations = Client.PendingOutboundAuraOperations or {}
 Client.PendingOutboundAuraOperationOrder = Client.PendingOutboundAuraOperationOrder or {}
 Client.PendingOutboundAuraOperationOrderByScope = Client.PendingOutboundAuraOperationOrderByScope or {}
