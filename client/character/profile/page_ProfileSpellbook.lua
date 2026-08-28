@@ -116,50 +116,42 @@ local function buildNavigationRows(knownSpells)
         local dataset = datasets[index]
         if dataset and dataset.id then
             local datasetId = tostring(dataset.id)
-            local datasetDisplayName = Database.GetDatasetDisplayName and Database.GetDatasetDisplayName(dataset) or tostring(dataset.name or dataset.id)
-            rows[#rows + 1] = {
-                rowType = "dataset",
-                dataset = dataset,
-                datasetId = dataset.id,
-                name = datasetDisplayName,
-                displayName = datasetDisplayName,
-                count = spellCountsByDataset[datasetId] or 0,
-            }
-
-            local categories = {}
-            local seenCategories = {}
-            local categoryCounts = spellCountsByDatasetAndCategory[datasetId] or {}
-            for spellIndex = 1, #(dataset.spells or {}) do
-                local spell = dataset.spells[spellIndex]
-                local category = normalizeSpellbookCategory(spell and spell.spellbookCategory)
-                if category and not seenCategories[category] then
-                    seenCategories[category] = true
-                    categories[#categories + 1] = category
-                end
-            end
-
-            for category in pairs(categoryCounts) do
-                if category and not seenCategories[category] then
-                    seenCategories[category] = true
-                    categories[#categories + 1] = category
-                end
-            end
-
-            table.sort(categories, function(left, right)
-                return tostring(left) < tostring(right)
-            end)
-
-            for categoryIndex = 1, #categories do
-                local category = categories[categoryIndex]
+            local datasetCount = spellCountsByDataset[datasetId] or 0
+            if datasetCount > 0 then
+                local datasetDisplayName = Database.GetDatasetDisplayName and Database.GetDatasetDisplayName(dataset) or tostring(dataset.name or dataset.id)
                 rows[#rows + 1] = {
-                    rowType = "category",
+                    rowType = "dataset",
                     dataset = dataset,
                     datasetId = dataset.id,
-                    category = category,
-                    name = ("    %s"):format(category),
-                    displayName = category,
-                    count = categoryCounts[category] or 0,
+                    name = datasetDisplayName,
+                    displayName = datasetDisplayName,
+                    count = datasetCount,
                 }
+
+                local categories = {}
+                local categoryCounts = spellCountsByDatasetAndCategory[datasetId] or {}
+                for category, count in pairs(categoryCounts) do
+                    if category and (tonumber(count) or 0) > 0 then
+                        categories[#categories + 1] = category
+                    end
+                end
+
+                table.sort(categories, function(left, right)
+                    return tostring(left) < tostring(right)
+                end)
+
+                for categoryIndex = 1, #categories do
+                    local category = categories[categoryIndex]
+                    rows[#rows + 1] = {
+                        rowType = "category",
+                        dataset = dataset,
+                        datasetId = dataset.id,
+                        category = category,
+                        name = ("    %s"):format(category),
+                        displayName = category,
+                        count = categoryCounts[category],
+                    }
+                end
             end
         end
     end
@@ -284,7 +276,6 @@ end
 function SpellbookPage:EnsureDatasetSelection(rows)
     local navigationRows = rows or {}
     local datasetSelections = {}
-    local firstDatasetWithSpells = nil
     local firstDatasetId = nil
 
     for index = 1, #navigationRows do
@@ -299,9 +290,6 @@ function SpellbookPage:EnsureDatasetSelection(rows)
                     row = row,
                     categories = {},
                 }
-                if not firstDatasetWithSpells and (tonumber(row.count) or 0) > 0 then
-                    firstDatasetWithSpells = row.datasetId
-                end
             end
         elseif row and row.rowType == "category" then
             local datasetId = tostring(row.datasetId or "")
@@ -315,10 +303,18 @@ function SpellbookPage:EnsureDatasetSelection(rows)
         end
     end
 
+    if not firstDatasetId then
+        self.SelectedDatasetId = nil
+        self.SelectedSpellbookCategory = nil
+        self.CurrentSpellPage = 1
+        return
+    end
+
     local selectedDatasetKey = tostring(self.SelectedDatasetId or "")
     if selectedDatasetKey == "" or not datasetSelections[selectedDatasetKey] then
-        self.SelectedDatasetId = firstDatasetWithSpells or firstDatasetId
+        self.SelectedDatasetId = firstDatasetId
         self.SelectedSpellbookCategory = nil
+        self.CurrentSpellPage = 1
         return
     end
 
@@ -330,6 +326,7 @@ function SpellbookPage:EnsureDatasetSelection(rows)
 
     if not datasetSelections[selectedDatasetKey].categories[selectedCategory] then
         self.SelectedSpellbookCategory = nil
+        self.CurrentSpellPage = 1
     end
 end
 
