@@ -27,6 +27,7 @@ core/internal/runtime/RuntimeTransaction.lua
 core/internal/Runtime.lua
 core/internal/database/Dependecies.lua
 core/internal/database/Database.lua
+core/internal/database/DatasetSchema21.lua
 core/internal/profile/Definitions.lua
 core/internal/profile/Modifications.lua
 core/internal/profile/Equipment.lua
@@ -74,7 +75,9 @@ server/server_Commands.lua
 
 core/classes/EventUnit.lua
 core/classes/Unit.lua
+core/classes/UnitPresetSpellEquipment.lua
 core/classes/EventUnitVariantIdentity.lua
+core/classes/EventUnitVariantSpellEquipment.lua
 core/classes/EventUnitResourcePipeline.lua
 core/classes/Mount.lua
 core/classes/Pet.lua
@@ -99,12 +102,14 @@ core/classes/GuildSetting.lua
 core/classes/Currency.lua
 core/classes/Event.lua
 core/classes/EventVariantNetwork.lua
+core/classes/EventVariantSpellEquipmentNetwork.lua
 
 client/client_Event.lua
 client/client_CombatLog.lua
 server/server_Event.lua
 server/server_EventVariants.lua
 server/server_EventResourceIntegration.lua
+server/server_EventSpellEquipmentVariants.lua
 client/client_Spellcasting.lua
 client/spellcasting/Helpers.lua
 client/spellcasting/Core.lua
@@ -271,6 +276,7 @@ client/ui/editor/inspectors/unit/page_InspectorUnitResources.lua
 client/ui/editor/inspectors/page_InspectorUnit.lua
 client/ui/editor/inspectors/unit/page_InspectorUnitPresets.lua
 client/ui/editor/inspectors/unit/page_InspectorUnitPresetAppearances.lua
+client/ui/editor/inspectors/unit/page_InspectorUnitPresetSpellEquipment.lua
 client/ui/editor/inspectors/mount/page_InspectorMountShared.lua
 client/ui/editor/inspectors/mount/page_InspectorMountGeneral.lua
 client/ui/editor/inspectors/mount/page_InspectorMountSpells.lua
