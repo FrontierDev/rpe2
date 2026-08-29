@@ -13,12 +13,15 @@ LauncherMenu.__index = LauncherMenu
 local HEADER_ICON = "Interface\\AddOns\\RPEngine_Dev\\data\\textures\\ui\\rpe.png"
 
 local WINDOW_WIDTH = 172
-local WINDOW_HEIGHT = 252
 local BUTTON_WIDTH = 136
 local BUTTON_HEIGHT = 14
 local GROUP_SPACING = 6
 local BUTTON_SPACING = 2
 local HEADER_HEIGHT = 10
+local CONTENT_INSET_LEFT = 10
+local CONTENT_INSET_RIGHT = 10
+local CONTENT_INSET_TOP = 28
+local CONTENT_INSET_BOTTOM = 10
 
 local GROUPS = {
     {
@@ -53,6 +56,25 @@ local GROUPS = {
     },
 }
 
+local function calculateWindowHeight()
+    local contentHeight = 0
+
+    for groupIndex = 1, #GROUPS do
+        local group = GROUPS[groupIndex]
+        local entryCount = #(group.entries or {})
+
+        contentHeight = contentHeight + HEADER_HEIGHT
+        contentHeight = contentHeight + (entryCount * BUTTON_HEIGHT)
+        contentHeight = contentHeight + (entryCount * BUTTON_SPACING)
+    end
+
+    if #GROUPS > 1 then
+        contentHeight = contentHeight + ((#GROUPS - 1) * GROUP_SPACING)
+    end
+
+    return CONTENT_INSET_TOP + contentHeight + CONTENT_INSET_BOTTOM
+end
+
 local function createInstance()
     return setmetatable({
         window = nil,
@@ -82,7 +104,7 @@ function LauncherMenu:BuildWindow()
     local window = UI.Window:New({
         name = "RPELauncherMenuWindow",
         width = WINDOW_WIDTH,
-        height = WINDOW_HEIGHT,
+        height = calculateWindowHeight(),
         point = "CENTER",
         relativeTo = UIParent,
         relativePoint = "CENTER",
@@ -92,10 +114,10 @@ function LauncherMenu:BuildWindow()
         clampedToScreen = true,
         toplevel = true,
         hidden = true,
-        contentInsetLeft = 10,
-        contentInsetRight = 10,
-        contentInsetTop = 28,
-        contentInsetBottom = 10,
+        contentInsetLeft = CONTENT_INSET_LEFT,
+        contentInsetRight = CONTENT_INSET_RIGHT,
+        contentInsetTop = CONTENT_INSET_TOP,
+        contentInsetBottom = CONTENT_INSET_BOTTOM,
     })
     window:SetTitle(("|T%s:12:12:0:0|t RPE"):format(HEADER_ICON))
     window:Create()
