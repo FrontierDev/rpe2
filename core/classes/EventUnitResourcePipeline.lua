@@ -15,6 +15,7 @@ if type(EventUnit) ~= "table" or type(UnitClass) ~= "table" then
 end
 
 local DEFAULT_SCALING_LEVELS = { "minor", "normal", "elite" }
+local DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT = 20
 local DEFAULT_HEALTH_PERCENT = {
     normal = 0,
     heroic = 10,
@@ -47,6 +48,14 @@ end
 
 local function normalizePlayerCount(value)
     return math.max(0, math.floor(tonumber(value) or 0))
+end
+
+local function normalizeFiniteNumber(value, fallback)
+    local numeric = tonumber(value)
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        return tonumber(fallback) or 0
+    end
+    return numeric
 end
 
 local function normalizeDifficulty(value)
@@ -96,6 +105,28 @@ local function buildScalingChallengeLookup(options)
     return lookup
 end
 
+local function resolveHealthBonusPerPlayerPercent(options)
+    if type(options) == "table" and options.healthBonusPerPlayerPercent ~= nil then
+        return normalizeFiniteNumber(options.healthBonusPerPlayerPercent, DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT)
+    end
+
+    if type(Ruleset.GetNpcHealthBonusPerPlayerPercent) == "function" then
+        return normalizeFiniteNumber(
+            Ruleset.GetNpcHealthBonusPerPlayerPercent(),
+            DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT
+        )
+    end
+
+    return normalizeFiniteNumber(
+        getActiveRuleValue(
+            "event",
+            "npc_health_bonus_per_player_percent",
+            tostring(DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT)
+        ),
+        DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT
+    )
+end
+
 local function resolveDifficultyHealthPercent(difficulty, options)
     if type(options) == "table" and options.healthPercent ~= nil then
         return tonumber(options.healthPercent) or 0
@@ -143,7 +174,7 @@ local function applyPresetResourceModifiers(values, preset)
     return UnitClass.ApplyResourceModifiers(values, preset)
 end
 
-local function buildSeedValues(baseUnit, preset, playerCount, applyPerPlayerScaling)
+local function buildSeedValues(baseUnit, preset, policy)
     local values = {}
     local ratioByRef = {}
     local seen = {}
@@ -169,8 +200,13 @@ local function buildSeedValues(baseUnit, preset, playerCount, applyPerPlayerScal
             end
 
             local scaledValue = baseValue
-            if applyPerPlayerScaling then
-                scaledValue = scaledValue + ((tonumber(entry.perPlayer) or 0) * playerCount)
+            if policy.applyPerPlayerScaling
+                and policy.healthResourceRef ~= nil
+                and resourceRef == policy.healthResourceRef
+                and policy.healthBonusPerPlayerPercent ~= 0
+            then
+                local multiplier = 1 + (policy.playerCount * policy.healthBonusPerPlayerPercent / 100)
+                scaledValue = baseValue * multiplier
             end
 
             values[#values + 1] = {
@@ -213,14 +249,16 @@ function EventUnit.ResolveNpcResourcePolicy(baseUnit, playerCount, options)
 
     local difficulty = normalizeDifficulty(resolvedOptions.difficulty)
     local healthResourceRef = resolveHealthResourceRef(resolvedOptions)
+    local healthBonusPerPlayerPercent = resolveHealthBonusPerPlayerPercent(resolvedOptions)
     local healthPercent = resolveDifficultyHealthPercent(difficulty, resolvedOptions)
 
     return {
         playerCount = normalizedPlayerCount,
         challengeLevel = challengeLevel,
         applyPerPlayerScaling = applyPerPlayerScaling,
-        difficulty = difficulty,
         healthResourceRef = healthResourceRef,
+        healthBonusPerPlayerPercent = healthBonusPerPlayerPercent,
+        difficulty = difficulty,
         healthPercent = healthPercent,
     }
 end
@@ -232,12 +270,7 @@ function EventUnit.BuildUnitDerivedResources(baseUnit, presetIndex, playerCount,
 
     local preset, normalizedPresetIndex = resolvePreset(baseUnit, presetIndex)
     local policy = EventUnit.ResolveNpcResourcePolicy(baseUnit, playerCount, options)
-    local seedValues, ratioByRef = buildSeedValues(
-        baseUnit,
-        preset,
-        policy.playerCount,
-        policy.applyPerPlayerScaling
-    )
+    local seedValues, ratioByRef = buildSeedValues(baseUnit, preset, policy)
     local modifiedValues = applyPresetResourceModifiers(seedValues, preset)
     local resources = {}
 
