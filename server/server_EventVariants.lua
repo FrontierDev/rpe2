@@ -114,56 +114,16 @@ local function resolveCurrentPlayerCount(server, options)
     return countPlayerUnits(eventState and eventState.units or {})
 end
 
-local function buildPlayerScaledResourceValues(baseUnit, playerCount, preset)
-    local values = {}
-    local seen = {}
-
-    for index = 1, #((baseUnit and baseUnit.resources) or {}) do
-        local entry = baseUnit.resources[index]
-        local resourceRef = type(entry) == "table" and tostring(entry.resourceRef or "") or ""
-        if resourceRef ~= "" then
-            local baseValue = tonumber(entry.value) or 0
-            local scaledValue = baseValue
-                + ((tonumber(entry.perPlayer) or 0) * math.max(0, tonumber(playerCount) or 0))
-            values[#values + 1] = {
-                resourceRef = resourceRef,
-                value = scaledValue,
-            }
-            seen[resourceRef] = true
-        end
+local function buildPlayerScaledResourceValues(baseUnit, playerCount, presetIndex)
+    if not EventUnit or type(EventUnit.BuildUnitDerivedResources) ~= "function" then
+        return {}
     end
 
-    for index = 1, #((preset and preset.resourceModifiers) or {}) do
-        local modifier = preset.resourceModifiers[index]
-        local resourceRef = type(modifier) == "table" and tostring(modifier.resourceRef or "") or ""
-        if resourceRef ~= "" and not seen[resourceRef] then
-            seen[resourceRef] = true
-            values[#values + 1] = {
-                resourceRef = resourceRef,
-                value = 0,
-            }
-        end
-    end
-
-    local resolvedValues = UnitClass and UnitClass.ApplyResourceModifiers
-        and UnitClass.ApplyResourceModifiers(values, preset)
-        or deepCopy(values)
-    local resources = {}
-
-    for index = 1, #(resolvedValues or {}) do
-        local entry = resolvedValues[index]
-        local resourceRef = type(entry) == "table" and tostring(entry.resourceRef or "") or ""
-        if resourceRef ~= "" then
-            local value = math.max(0, tonumber(entry.value) or 0)
-            resources[#resources + 1] = {
-                resourceRef = resourceRef,
-                currentValue = value,
-                maxValue = value,
-            }
-        end
-    end
-
-    return resources
+    local resources = EventUnit.BuildUnitDerivedResources(baseUnit, presetIndex, playerCount, {
+        difficulty = "normal",
+        healthPercent = 0,
+    })
+    return resources or {}
 end
 
 local function findEventUnitById(units, eventId)
@@ -210,7 +170,7 @@ function Server:BuildResolvedNpcVariant(registryId, options)
     local preset = UnitClass.ResolvePreset(baseUnit, presetIndex)
     local playerCount = resolveCurrentPlayerCount(self, resolvedOptions)
     local stats = UnitClass.ApplyStatModifiers(baseUnit.stats or {}, preset)
-    local resources = buildPlayerScaledResourceValues(baseUnit, playerCount, preset)
+    local resources = buildPlayerScaledResourceValues(baseUnit, playerCount, presetIndex)
     local effectiveAppearances = UnitClass.ResolveEffectiveAppearances(baseUnit, presetIndex)
 
     local appearanceIndex = 0
