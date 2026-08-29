@@ -259,6 +259,7 @@ client/ui/editor/inspectors/unit/page_InspectorUnitStats.lua
 client/ui/editor/inspectors/unit/page_InspectorUnitResources.lua
 client/ui/editor/inspectors/page_InspectorUnit.lua
 client/ui/editor/inspectors/unit/page_InspectorUnitPresets.lua
+client/ui/editor/inspectors/unit/page_InspectorUnitPresetAppearances.lua
 client/ui/editor/inspectors/mount/page_InspectorMountShared.lua
 client/ui/editor/inspectors/mount/page_InspectorMountGeneral.lua
 client/ui/editor/inspectors/mount/page_InspectorMountSpells.lua
