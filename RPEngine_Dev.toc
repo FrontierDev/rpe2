@@ -203,6 +203,7 @@ core/ui/prefabs/TableRow.lua
 core/ui/prefabs/Table.lua
 client/ui/CombatText.lua
 client/ui/widgets/widget_Event.lua
+client/ui/widgets/widget_Event_CombatLogHistory.lua
 client/ui/widgets/widget_ActionBar.lua
 client/ui/widgets/widget_ActionBar_Resources.lua
 client/ui/widgets/widget_ActionBar_Casting.lua
