@@ -150,7 +150,6 @@ local function normalizeUnitResources(values)
             normalized[#normalized + 1] = {
                 resourceRef = resourceRef,
                 value = tonumber(entry.value) or 0,
-                perPlayer = tonumber(entry.perPlayer) or 0,
             }
         end
     end
