@@ -35,7 +35,7 @@ end
 local SCHEMA = {
     profiles = 7,
     rulesets = 1,
-    datasets = 18,
+    datasets = 19,
     globalSettings = 1,
 }
 

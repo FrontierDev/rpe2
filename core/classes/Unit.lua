@@ -7,6 +7,19 @@ Addon.Internal.Database.Classes = Addon.Internal.Database.Classes or {}
 local Unit = {}
 Unit.__index = Unit
 
+local CHALLENGE_LEVEL_DEFINITIONS = {
+    { label = "Swarm", value = "swarm" },
+    { label = "Minor", value = "minor" },
+    { label = "Normal", value = "normal" },
+    { label = "Elite", value = "elite" },
+    { label = "Boss", value = "boss" },
+}
+
+local VALID_CHALLENGE_LEVELS = {}
+for index = 1, #CHALLENGE_LEVEL_DEFINITIONS do
+    VALID_CHALLENGE_LEVELS[CHALLENGE_LEVEL_DEFINITIONS[index].value] = true
+end
+
 local function ensureTable(value)
     if type(value) == "table" then
         return value
@@ -138,12 +151,34 @@ local function normalizeUnitResistances(values)
     return normalized
 end
 
+function Unit.GetChallengeLevelDefinitions()
+    local definitions = {}
+    for index = 1, #CHALLENGE_LEVEL_DEFINITIONS do
+        local definition = CHALLENGE_LEVEL_DEFINITIONS[index]
+        definitions[index] = {
+            label = definition.label,
+            value = definition.value,
+        }
+    end
+    return definitions
+end
+
+function Unit.NormalizeChallengeLevel(value)
+    local candidate = ensureString(value):gsub("^%s+", ""):gsub("%s+$", ""):lower()
+    if VALID_CHALLENGE_LEVELS[candidate] then
+        return candidate
+    end
+
+    return "normal"
+end
+
 function Unit:New(data)
     local instance = setmetatable({
         id = nil,
         name = "",
         creatureType = "humanoid",
         creatureSize = "medium",
+        challengeLevel = "normal",
         displayId = nil,
         fileDataId = nil,
         cam = 1,
@@ -177,6 +212,7 @@ function Unit:Merge(data)
     self.name = ensureString(self.name)
     self.creatureType = ensureString(self.creatureType ~= "" and self.creatureType or "humanoid")
     self.creatureSize = ensureString(self.creatureSize ~= "" and self.creatureSize or "medium")
+    self.challengeLevel = Unit.NormalizeChallengeLevel(self.challengeLevel)
     self.displayId = tonumber(self.displayId) or nil
     self.fileDataId = tonumber(self.fileDataId) or nil
     self.cam = tonumber(self.cam) or 1
@@ -202,6 +238,7 @@ function Unit:ToTable()
         name = self.name,
         creatureType = self.creatureType,
         creatureSize = self.creatureSize,
+        challengeLevel = Unit.NormalizeChallengeLevel(self.challengeLevel),
         displayId = self.displayId,
         fileDataId = self.fileDataId,
         cam = self.cam,

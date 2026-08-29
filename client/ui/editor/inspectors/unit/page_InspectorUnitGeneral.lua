@@ -6,6 +6,23 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
+local UnitClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Unit or nil
+
+function DataEditor:GetUnitInspectorChallengeLevelItems()
+    if UnitClass and type(UnitClass.GetChallengeLevelDefinitions) == "function" then
+        return UnitClass.GetChallengeLevelDefinitions()
+    end
+
+    return {}
+end
+
+function DataEditor:NormalizeUnitInspectorChallengeLevel(value)
+    if UnitClass and type(UnitClass.NormalizeChallengeLevel) == "function" then
+        return UnitClass.NormalizeChallengeLevel(value)
+    end
+
+    return "normal"
+end
 
 function DataEditor:BuildUnitInspectorGeneralPage(page)
     local root = UI.CreateLayout(UI.VerticalLayoutGroup, page, "RPEDataEditorUnitInspectorGeneralLayout", {
@@ -105,6 +122,23 @@ function DataEditor:BuildUnitInspectorGeneralPage(page)
         end,
     })
     root:AddChild(self.UnitInspectorCreatureSizeDropdown)
+
+    root:AddChild(self:BuildUnitInspectorLabel(root:GetFrame(), "RPEDataEditorUnitInspectorChallengeLevelLabel", "Challenge Level"))
+    self.UnitInspectorChallengeLevelDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorUnitInspectorChallengeLevelDropdown", {
+        width = self.UnitInspectorFieldWidth,
+        height = 18,
+        items = self:GetUnitInspectorChallengeLevelItems(),
+        onValueChanged = function(value)
+            if self._refreshingUnitInspector then
+                return
+            end
+
+            self:CommitSelectedUnit(function(unit)
+                unit.challengeLevel = self:NormalizeUnitInspectorChallengeLevel(value)
+            end)
+        end,
+    })
+    root:AddChild(self.UnitInspectorChallengeLevelDropdown)
 
     root:AddChild(self:BuildUnitInspectorLabel(root:GetFrame(), "RPEDataEditorUnitInspectorAttributesLabel", "Attributes"))
     self.UnitInspectorAttributesDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorUnitInspectorAttributesDropdown", {

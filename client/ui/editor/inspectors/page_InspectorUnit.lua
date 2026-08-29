@@ -126,6 +126,11 @@ function DataEditor:RefreshUnitInspectorPage()
         self.UnitInspectorCreatureSizeDropdown:SetSelectedValue(unit and unit.creatureSize or "medium", true)
         self:SetUnitInspectorDropdownEnabled(self.UnitInspectorCreatureSizeDropdown, hasUnit)
     end
+    if self.UnitInspectorChallengeLevelDropdown then
+        self.UnitInspectorChallengeLevelDropdown:SetItems(self:GetUnitInspectorChallengeLevelItems())
+        self.UnitInspectorChallengeLevelDropdown:SetSelectedValue(self:NormalizeUnitInspectorChallengeLevel(unit and unit.challengeLevel or nil), true)
+        self:SetUnitInspectorDropdownEnabled(self.UnitInspectorChallengeLevelDropdown, hasUnit)
+    end
     if self.UnitInspectorAttributesDropdown then
         self.UnitInspectorAttributesDropdown:SetItems(self:GetUnitInspectorAttributeItems())
         self.UnitInspectorAttributesDropdown:SetSelectedValues(unit and unit.attributes or {}, true)
