@@ -74,6 +74,7 @@ server/server_Commands.lua
 core/classes/EventUnit.lua
 core/classes/Unit.lua
 core/classes/EventUnitVariantIdentity.lua
+core/classes/EventUnitResourcePipeline.lua
 core/classes/Mount.lua
 core/classes/Pet.lua
 core/classes/Spell.lua
@@ -102,6 +103,7 @@ client/client_Event.lua
 client/client_CombatLog.lua
 server/server_Event.lua
 server/server_EventVariants.lua
+server/server_EventResourceIntegration.lua
 client/client_Spellcasting.lua
 client/spellcasting/Helpers.lua
 client/spellcasting/Core.lua
