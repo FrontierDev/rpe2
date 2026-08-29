@@ -6,7 +6,6 @@ Addon.UI = UI
 local BaseElement = UI.BaseElement
 local Image = UI.Image
 local Text = UI.Text
-local ProgressBar = UI.ProgressBar
 local Constants = UI.Constants or {}
 
 UI.AchievementEntry = UI.AchievementEntry or {}
@@ -16,15 +15,15 @@ setmetatable(AchievementEntry, { __index = BaseElement })
 
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local DEFAULT_WIDTH = 324
-local DEFAULT_HEIGHT = 78
-local DEFAULT_ICON_SIZE = 44
-local DEFAULT_ICON_GAP = 8
-local DEFAULT_PADDING = 5
-local DEFAULT_NAME_HEIGHT = 15
-local DEFAULT_DESCRIPTION_HEIGHT = 22
-local DEFAULT_PROGRESS_HEIGHT = 14
-local DEFAULT_STATUS_HEIGHT = 13
-local DEFAULT_SPACING = 1
+local DEFAULT_HEIGHT = 34
+local DEFAULT_ICON_SIZE = 26
+local DEFAULT_ICON_GAP = 5
+local DEFAULT_PADDING = 2
+local DEFAULT_NAME_HEIGHT = 10
+local DEFAULT_DESCRIPTION_HEIGHT = 8
+local DEFAULT_STATUS_HEIGHT = 7
+local DEFAULT_REWARD_HEIGHT = 7
+local DEFAULT_SPACING = 0
 
 local function createBorderTexture(frame, pointA, pointB, size, isVertical)
     local texture = frame:CreateTexture(nil, "OVERLAY")
@@ -88,8 +87,6 @@ function AchievementEntry:New(options)
     instance.iconTexture = nil
     instance.nameElement = nil
     instance.descriptionElement = nil
-    instance.progressBar = nil
-    instance.criterionElement = nil
     instance.completionElement = nil
     instance.rewardElement = nil
     instance.iconBorderTop = nil
@@ -131,34 +128,6 @@ function AchievementEntry:SetDescription(description)
     return value
 end
 
-function AchievementEntry:SetProgressPresentation(presentation)
-    local progress = type(presentation) == "table" and presentation or {}
-    local kind = progress.kind
-
-    if self.progressBar then
-        if kind == "bar" then
-            local goal = math.max(1, math.floor(tonumber(progress.goal) or 1))
-            local current = math.max(0, math.floor(tonumber(progress.current) or 0))
-            self.progressBar:SetMinMax(0, goal)
-            self.progressBar:SetValue(current)
-            self.progressBar:SetText(tostring(progress.text or ("%d / %d"):format(current, goal)))
-            showElement(self.progressBar, true)
-        else
-            showElement(self.progressBar, false)
-        end
-    end
-
-    if self.criterionElement then
-        if kind == "summary" then
-            self.criterionElement:SetText(tostring(progress.text or ""))
-            showElement(self.criterionElement, true)
-        else
-            self.criterionElement:SetText("")
-            showElement(self.criterionElement, false)
-        end
-    end
-end
-
 function AchievementEntry:SetCompletionDate(completionDate, completed)
     if not self.completionElement then
         return
@@ -175,7 +144,9 @@ end
 
 function AchievementEntry:SetRewardStatus(status)
     if self.rewardElement then
-        self.rewardElement:SetText(tostring(status or ""))
+        local value = tostring(status or "")
+        self.rewardElement:SetText(value)
+        showElement(self.rewardElement, value ~= "")
     end
 end
 
@@ -216,7 +187,6 @@ function AchievementEntry:SetCompleted(completed)
 
     setTextColor(self.nameElement, nameColor)
     setTextColor(self.descriptionElement, descriptionColor)
-    setTextColor(self.criterionElement, descriptionColor)
     setTextColor(self.completionElement, statusColor)
     setTextColor(self.rewardElement, statusColor)
 
@@ -239,7 +209,6 @@ function AchievementEntry:SetAchievementData(data)
     self:SetIcon(value.icon)
     self:SetAchievementName(value.name)
     self:SetDescription(value.description)
-    self:SetProgressPresentation(value.progress)
     self:SetCompletionDate(value.completionDate, value.completed == true)
     self:SetRewardStatus(value.rewardStatus)
     self:SetCompleted(value.completed == true)
@@ -265,15 +234,13 @@ function AchievementEntry:SetLayoutMetrics(width, height)
     local contentWidth = math.max(1, resolvedWidth - contentLeft - padding)
     local nameHeight = tonumber(self.options.nameHeight) or DEFAULT_NAME_HEIGHT
     local descriptionHeight = tonumber(self.options.descriptionHeight) or DEFAULT_DESCRIPTION_HEIGHT
-    local progressHeight = tonumber(self.options.progressHeight) or DEFAULT_PROGRESS_HEIGHT
-    local statusHeight = tonumber(self.options.statusHeight) or DEFAULT_STATUS_HEIGHT
+    local completionHeight = tonumber(self.options.completionHeight) or DEFAULT_STATUS_HEIGHT
+    local rewardHeight = tonumber(self.options.rewardHeight) or DEFAULT_REWARD_HEIGHT
     local spacing = tonumber(self.options.spacing) or DEFAULT_SPACING
-    local statusWidth = math.max(1, math.floor(contentWidth * 0.48))
-    local rewardWidth = math.max(1, contentWidth - statusWidth - spacing)
     local contentTop = padding
     local descriptionTop = contentTop + nameHeight + spacing
-    local progressTop = descriptionTop + descriptionHeight + spacing
-    local statusTop = progressTop + progressHeight + spacing
+    local completionTop = descriptionTop + descriptionHeight + spacing
+    local rewardTop = math.max(completionTop + completionHeight + spacing, resolvedHeight - rewardHeight)
 
     self.options.width = resolvedWidth
     self.options.height = resolvedHeight
@@ -301,32 +268,18 @@ function AchievementEntry:SetLayoutMetrics(width, height)
         self.descriptionElement:SetSize(contentWidth, descriptionHeight)
     end
 
-    local progressFrame = self.progressBar and self.progressBar:GetFrame() or nil
-    if progressFrame then
-        progressFrame:ClearAllPoints()
-        progressFrame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", contentLeft, -progressTop)
-        self.progressBar:SetSize(contentWidth, progressHeight)
-    end
-
-    local criterionFrame = self.criterionElement and self.criterionElement:GetFrame() or nil
-    if criterionFrame then
-        criterionFrame:ClearAllPoints()
-        criterionFrame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", contentLeft, -progressTop)
-        self.criterionElement:SetSize(contentWidth, progressHeight)
-    end
-
     local completionFrame = self.completionElement and self.completionElement:GetFrame() or nil
     if completionFrame then
         completionFrame:ClearAllPoints()
-        completionFrame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", contentLeft, -statusTop)
-        self.completionElement:SetSize(statusWidth, statusHeight)
+        completionFrame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", contentLeft, -completionTop)
+        self.completionElement:SetSize(contentWidth, completionHeight)
     end
 
     local rewardFrame = self.rewardElement and self.rewardElement:GetFrame() or nil
     if rewardFrame then
         rewardFrame:ClearAllPoints()
-        rewardFrame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", contentLeft + statusWidth + spacing, -statusTop)
-        self.rewardElement:SetSize(rewardWidth, statusHeight)
+        rewardFrame:SetPoint("TOPLEFT", self.frame, "TOPLEFT", padding, -rewardTop)
+        self.rewardElement:SetSize(math.max(1, resolvedWidth - (padding * 2)), rewardHeight)
     end
 
     return resolvedWidth, resolvedHeight
@@ -440,45 +393,7 @@ function AchievementEntry:Create()
     })
     self.descriptionElement:SetParent(frame)
     self.descriptionElement:Create()
-    setTextMaxLines(self.descriptionElement, 2, true)
-
-    self.progressBar = ProgressBar:New({
-        name = (self.name or "AchievementEntry") .. "Progress",
-        width = width,
-        height = DEFAULT_PROGRESS_HEIGHT,
-        border = false,
-        minValue = 0,
-        maxValue = 1,
-        value = 0,
-        text = "",
-        textColor = UI.ResolveColor(nil, "progress.text"),
-        primaryColor = UI.ResolveColor(nil, "progress.barPrimary"),
-    })
-    self.progressBar:SetParent(frame)
-    self.progressBar:Create()
-    showElement(self.progressBar, false)
-
-    self.criterionElement = Text:New({
-        name = (self.name or "AchievementEntry") .. "CriterionSummary",
-        width = width,
-        height = DEFAULT_PROGRESS_HEIGHT,
-        text = "",
-        fontFile = fontFile,
-        fontSize = (Constants.FontSizes and Constants.FontSizes.Body) or 8,
-        textColor = UI.ResolveColor(nil, "text.secondary"),
-        justifyH = "LEFT",
-        justifyV = "MIDDLE",
-        wordWrap = false,
-        border = false,
-        textInsetLeft = 0,
-        textInsetTop = 0,
-        textInsetRight = 0,
-        textInsetBottom = 0,
-    })
-    self.criterionElement:SetParent(frame)
-    self.criterionElement:Create()
-    setTextMaxLines(self.criterionElement, 1, false)
-    showElement(self.criterionElement, false)
+    setTextMaxLines(self.descriptionElement, 1, true)
 
     self.completionElement = Text:New({
         name = (self.name or "AchievementEntry") .. "Completion",
@@ -504,12 +419,12 @@ function AchievementEntry:Create()
     self.rewardElement = Text:New({
         name = (self.name or "AchievementEntry") .. "RewardStatus",
         width = width,
-        height = DEFAULT_STATUS_HEIGHT,
+        height = DEFAULT_REWARD_HEIGHT,
         text = "",
         fontFile = fontFile,
         fontSize = (Constants.FontSizes and Constants.FontSizes.Small) or 6,
         textColor = UI.ResolveColor(nil, "text.muted"),
-        justifyH = "RIGHT",
+        justifyH = "CENTER",
         justifyV = "MIDDLE",
         wordWrap = false,
         border = false,

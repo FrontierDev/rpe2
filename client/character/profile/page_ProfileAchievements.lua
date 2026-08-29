@@ -22,9 +22,12 @@ ProfileUI.AchievementsPage = AchievementsPage
 local NAV_PANEL_WIDTH = 168
 local CONTENT_PANEL_WIDTH = 340
 local CONTENT_PADDING = 8
-local ENTRY_HEIGHT = 78
-local ENTRY_SPACING = 4
-local ENTRY_ROWS = 3
+local ENTRY_HEIGHT = 34
+local ENTRY_SPACING = 0
+local ENTRY_ROWS = 8
+local CONTENT_LAYOUT_SPACING = 2
+local GRID_TITLE_HEIGHT = 15
+local GRID_HINT_HEIGHT = 13
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local RETRY_BUTTON_WIDTH = 100
 local RETRY_BUTTON_HEIGHT = 18
@@ -106,24 +109,6 @@ local function composeAchievementRef(datasetId, achievementId)
     return ("%s:%s"):format(normalizedDatasetId, normalizedAchievementId)
 end
 
-local function normalizeProgress(value)
-    local numeric = tonumber(value)
-    if not numeric or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
-        return 0
-    end
-
-    return math.max(0, math.floor(numeric))
-end
-
-local function normalizeGoal(value)
-    local numeric = tonumber(value)
-    if not numeric or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
-        return 1
-    end
-
-    return math.max(1, math.floor(numeric))
-end
-
 local function getAchievementName(achievement)
     local name = trimString(achievement and achievement.name)
     if name ~= "" then
@@ -150,68 +135,6 @@ local function getCompletionDate(completedAt)
     end
 
     return tostring(math.floor(timestamp))
-end
-
-local function getCriterionCurrent(stateCriteria, criterionId, goal)
-    local value = stateCriteria and stateCriteria[criterionId] or 0
-    if value == true then
-        return goal
-    end
-
-    return math.min(goal, normalizeProgress(value))
-end
-
-local function buildCriterionPresentation(achievement, state)
-    local criteria = achievement and achievement.criteria or {}
-    if type(criteria) ~= "table" then
-        return { kind = "none" }
-    end
-
-    local validCriteria = {}
-    for index = 1, #criteria do
-        if type(criteria[index]) == "table" then
-            validCriteria[#validCriteria + 1] = criteria[index]
-        end
-    end
-
-    if #validCriteria == 0 then
-        return { kind = "none" }
-    end
-
-    local stateCriteria = state and type(state.criteria) == "table" and state.criteria or {}
-    if #validCriteria == 1 then
-        local criterion = validCriteria[1]
-        local goal = normalizeGoal(criterion.goal)
-        local current = getCriterionCurrent(stateCriteria, trimString(criterion.id), goal)
-        if goal > 1 then
-            return {
-                kind = "bar",
-                current = current,
-                goal = goal,
-                text = ("%d / %d"):format(current, goal),
-            }
-        end
-
-        return {
-            kind = "summary",
-            text = current >= goal and "Criterion: Complete" or "Criterion: Incomplete",
-        }
-    end
-
-    local completed = 0
-    for index = 1, #validCriteria do
-        local criterion = validCriteria[index]
-        local goal = normalizeGoal(criterion.goal)
-        local current = getCriterionCurrent(stateCriteria, trimString(criterion.id), goal)
-        if current >= goal then
-            completed = completed + 1
-        end
-    end
-
-    return {
-        kind = "summary",
-        text = ("Criteria: %d / %d complete"):format(completed, #validCriteria),
-    }
 end
 
 local function buildAchievementTooltipDetail(achievementRow)
@@ -590,7 +513,7 @@ function AchievementsPage:Build(parent, owner)
     self.CategoryEmptyText:GetFrame():SetPoint("CENTER", self.CategoryPanel:GetContentFrame(), "CENTER", 0, 0)
 
     self.ContentLayout = UI.CreateLayout(UI.VerticalLayoutGroup, self.ContentPanel:GetContentFrame(), "RPEProfileAchievementsContentLayout", {
-        spacing = 4,
+        spacing = CONTENT_LAYOUT_SPACING,
         fitChildrenWidth = true,
         fitChildrenHeight = true,
     })
@@ -624,14 +547,14 @@ function AchievementsPage:Build(parent, owner)
 
     self.GridTitle = UI.CreateText(self.ContentLayout:GetFrame(), "RPEProfileAchievementsGridTitle", "Achievements", {
         width = CONTENT_PANEL_WIDTH - (CONTENT_PADDING * 2) - RETRY_BUTTON_WIDTH - 4,
-        height = 18,
+        height = GRID_TITLE_HEIGHT,
         justifyH = "LEFT",
     })
     self.ContentLayout:AddChild(self.GridTitle)
 
     self.GridHintText = UI.CreateText(self.ContentLayout:GetFrame(), "RPEProfileAchievementsGridHintText", "", {
         width = CONTENT_PANEL_WIDTH - (CONTENT_PADDING * 2),
-        height = 18,
+        height = GRID_HINT_HEIGHT,
         justifyH = "LEFT",
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
@@ -676,7 +599,6 @@ function AchievementsPage:Build(parent, owner)
             icon = getAchievementIcon(achievement),
             name = getAchievementName(achievement),
             description = trimString(achievement.description),
-            progress = buildCriterionPresentation(achievement, achievementRow and achievementRow.state),
             completed = completionTimestamp ~= nil,
             completionDate = getCompletionDate(completionTimestamp),
             rewardStatus = type(AchievementTooltip.GetRewardStatus) == "function"
