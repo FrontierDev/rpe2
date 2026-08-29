@@ -99,6 +99,7 @@ core/classes/Event.lua
 client/client_Event.lua
 client/client_CombatLog.lua
 server/server_Event.lua
+server/server_EventVariants.lua
 client/client_Spellcasting.lua
 client/spellcasting/Helpers.lua
 client/spellcasting/Core.lua
@@ -221,6 +222,7 @@ client/character/guild/page_GuildAdmin.lua
 client/character/guild/window_Guild.lua
 core/debug/Clipboard.lua
 server/ui/window_EventUnit.lua
+server/ui/window_EventUnitPresets.lua
 server/ui/eventmanage/page_EventManageShared.lua
 server/ui/eventmanage/page_EventManageDashboard.lua
 server/ui/eventmanage/page_EventManageUnits.lua
