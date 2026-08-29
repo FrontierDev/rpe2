@@ -8,18 +8,10 @@ local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
 local Client = Addon.Client or {}
 
-local PRESET_SECTION_MODIFIERS = "modifiers"
-local PRESET_SECTION_APPEARANCES = "appearances"
-
 local APPEARANCE_DEFAULT_CAM = 1
 local APPEARANCE_DEFAULT_ROT = 0
 local APPEARANCE_DEFAULT_Z = -0.35
-
-local APPEARANCE_SLIDER_FIELDS = {
-    { key = "cam", label = "Camera Distance", minValue = 0.1, maxValue = 5, step = 0.05, defaultValue = APPEARANCE_DEFAULT_CAM, valueFormat = "%.2f" },
-    { key = "rot", label = "Rotation", minValue = -3.14, maxValue = 3.14, step = 0.05, defaultValue = APPEARANCE_DEFAULT_ROT, valueFormat = "%.2f" },
-    { key = "z", label = "Vertical Offset", minValue = -2, maxValue = 2, step = 0.01, defaultValue = APPEARANCE_DEFAULT_Z, valueFormat = "%.2f" },
-}
+local APPEARANCE_EDITOR_SPACING = 3
 
 local function setButtonEnabled(button, enabled)
     if button and button.SetEnabled then
@@ -43,113 +35,6 @@ local function getPresetAppearanceList(unit, presetIndex, create)
     end
 
     return type(preset.appearances) == "table" and preset.appearances or nil
-end
-
--- Shared Model Finder bridge for any authored Appearance list. #85 already owns
--- normalization/list mutation; this helper only supplies the target-list resolver
--- and keeps all writes behind CommitSelectedUnit(...).
-function DataEditor:OpenUnitAppearanceModelFinderForTarget(options)
-    options = type(options) == "table" and options or {}
-    if type(Client.OpenModelFinder) ~= "function" or type(options.resolveTargetList) ~= "function" then
-        return
-    end
-
-    local dataset, unit = self:GetSelectedUnitAndDataset()
-    if not dataset or not unit then
-        return
-    end
-
-    local mode = options.mode == "edit" and "edit" or "add"
-    local selectedIndex = tonumber(options.selectedIndex)
-    if mode == "edit" and (not selectedIndex or selectedIndex < 1 or math.floor(selectedIndex) ~= selectedIndex) then
-        return
-    end
-
-    local datasetAtOpen = dataset
-    local unitAtOpen = unit
-
-    Client:OpenModelFinder(function(displayId, fileDataId)
-        local currentDataset, currentUnit = self:GetSelectedUnitAndDataset()
-        if currentDataset ~= datasetAtOpen or currentUnit ~= unitAtOpen then
-            return
-        end
-        if type(options.isContextValid) == "function" and not options.isContextValid(self, currentUnit) then
-            return
-        end
-
-        local committedIndex = nil
-        self:CommitSelectedUnit(function(targetUnit)
-            local targetList = options.resolveTargetList(targetUnit, mode == "add")
-            if type(targetList) ~= "table" then
-                return
-            end
-
-            if mode == "add" then
-                committedIndex = self:AddUnitAppearance(targetList, {
-                    displayId = displayId,
-                    fileDataId = fileDataId,
-                    cam = APPEARANCE_DEFAULT_CAM,
-                    rot = APPEARANCE_DEFAULT_ROT,
-                    z = APPEARANCE_DEFAULT_Z,
-                })
-            else
-                local edited = self:EditUnitAppearance(targetList, selectedIndex, function(appearance)
-                    appearance.displayId = displayId
-                    appearance.fileDataId = fileDataId
-                end)
-                if edited then
-                    committedIndex = selectedIndex
-                end
-            end
-        end)
-
-        if committedIndex and type(options.onCommitted) == "function" then
-            options.onCommitted(self, committedIndex)
-        end
-    end, {
-        filter = tostring(options.filter or ""),
-    })
-end
-
--- Route the Base Appearance page through the same Model Finder bridge used by
--- Presets. The #85 list/edit helpers remain the single Appearance mutation API.
-function DataEditor:OpenUnitInspectorAppearanceModelFinderForAdd()
-    return self:OpenUnitAppearanceModelFinderForTarget({
-        mode = "add",
-        resolveTargetList = function(unit, create)
-            if create and type(unit.appearances) ~= "table" then
-                unit.appearances = {}
-            end
-            return unit.appearances
-        end,
-        onCommitted = function(editor, index)
-            editor.SelectedUnitInspectorAppearanceIndex = index
-            editor:RefreshUnitInspectorAppearancesTable()
-        end,
-    })
-end
-
-function DataEditor:OpenUnitInspectorAppearanceModelFinderForSelected()
-    local _, selectedIndex = self:GetSelectedUnitInspectorAppearance()
-    if not selectedIndex then
-        return
-    end
-
-    return self:OpenUnitAppearanceModelFinderForTarget({
-        mode = "edit",
-        selectedIndex = selectedIndex,
-        resolveTargetList = function(unit)
-            return unit.appearances
-        end,
-        isContextValid = function(editor)
-            local _, currentIndex = editor:GetSelectedUnitInspectorAppearance()
-            return currentIndex == selectedIndex
-        end,
-        onCommitted = function(editor, index)
-            editor.SelectedUnitInspectorAppearanceIndex = index
-            editor:RefreshUnitInspectorAppearancesTable()
-        end,
-    })
 end
 
 function DataEditor:ResetUnitInspectorPresetAppearanceSelection()
@@ -325,44 +210,13 @@ function DataEditor:CommitSelectedUnitInspectorPresetAppearanceTransform(key, va
     end
 end
 
-function DataEditor:SetUnitInspectorPresetEditorSection(sectionKey)
-    if sectionKey ~= PRESET_SECTION_APPEARANCES then
-        sectionKey = PRESET_SECTION_MODIFIERS
-    end
-
-    self.ActiveUnitInspectorPresetEditorSection = sectionKey
-
-    if self.UnitInspectorPresetModifiersView then
-        if sectionKey == PRESET_SECTION_MODIFIERS then
-            self.UnitInspectorPresetModifiersView:Show()
-        else
-            self.UnitInspectorPresetModifiersView:Hide()
-        end
-    end
-
-    if self.UnitInspectorPresetAppearancesView then
-        if sectionKey == PRESET_SECTION_APPEARANCES then
-            self.UnitInspectorPresetAppearancesView:Show()
-        else
-            self.UnitInspectorPresetAppearancesView:Hide()
-        end
-    end
-
-    if self.UnitInspectorPresetSectionDropdown and self.UnitInspectorPresetSectionDropdown.SetSelectedValue then
-        self._refreshingUnitInspectorPresetSection = true
-        self.UnitInspectorPresetSectionDropdown:SetSelectedValue(sectionKey, true)
-        self._refreshingUnitInspectorPresetSection = false
-    end
-end
-
 function DataEditor:RefreshUnitInspectorPresetAppearanceView()
     local _, unit = self:GetSelectedUnitAndDataset()
     local preset, presetIndex = self:GetSelectedUnitInspectorPreset()
-    local hasUnit = unit ~= nil
     local hasPreset = preset ~= nil
     local appearances = preset and preset.appearances or {}
 
-    self:ValidateUnitInspectorPresetAppearanceSelection(unit, preset, presetIndex)
+    local selectedIndex = self:ValidateUnitInspectorPresetAppearanceSelection(unit, preset, presetIndex)
     local appearance, appearanceIndex = self:GetSelectedUnitInspectorPresetAppearance()
     local hasPresetAppearance = appearance ~= nil
     local inheritsBase = hasPreset and #appearances == 0
@@ -374,15 +228,6 @@ function DataEditor:RefreshUnitInspectorPresetAppearanceView()
 
     self._refreshingUnitInspectorPresetAppearances = true
 
-    if self.UnitInspectorPresetAppearancePresetDropdown then
-        self.UnitInspectorPresetAppearancePresetDropdown:SetItems(self:BuildUnitInspectorPresetSelectorItems(unit))
-        self.UnitInspectorPresetAppearancePresetDropdown:SetSelectedValue(presetIndex and tostring(presetIndex) or "", true)
-        self:SetUnitInspectorDropdownEnabled(
-            self.UnitInspectorPresetAppearancePresetDropdown,
-            hasUnit and #(unit and unit.presets or {}) > 0
-        )
-    end
-
     if self.UnitInspectorPresetAppearanceStatusText then
         if not hasPreset then
             self.UnitInspectorPresetAppearanceStatusText:SetText("Select a Preset to edit appearance overrides.")
@@ -393,8 +238,13 @@ function DataEditor:RefreshUnitInspectorPresetAppearanceView()
         end
     end
 
-    if self.UnitInspectorPresetAppearancesScroll and self.UnitInspectorPresetAppearancesScroll.SetItems then
-        self.UnitInspectorPresetAppearancesScroll:SetItems(self:BuildUnitAppearanceRows(appearances))
+    if self.UnitInspectorPresetAppearanceDropdown then
+        self.UnitInspectorPresetAppearanceDropdown:SetItems(self:BuildUnitAppearanceSelectorItems(appearances))
+        self.UnitInspectorPresetAppearanceDropdown:SetSelectedValue(selectedIndex and tostring(selectedIndex) or "", true)
+        self:SetUnitInspectorDropdownEnabled(
+            self.UnitInspectorPresetAppearanceDropdown,
+            hasPreset and #appearances > 0
+        )
     end
 
     if self.UnitInspectorPresetAppearanceModelField then
@@ -417,8 +267,8 @@ function DataEditor:RefreshUnitInspectorPresetAppearanceView()
         self.UnitInspectorPresetAppearanceModelField:SetEnabled(hasPresetAppearance)
     end
 
-    for index = 1, #APPEARANCE_SLIDER_FIELDS do
-        local field = APPEARANCE_SLIDER_FIELDS[index]
+    for index = 1, #(self.GetUnitAppearanceSliderFields and self:GetUnitAppearanceSliderFields() or {}) do
+        local field = self:GetUnitAppearanceSliderFields()[index]
         local slider = self["UnitInspectorPresetAppearanceSlider" .. field.key]
         if slider then
             slider:SetValue(previewAppearance and previewAppearance[field.key] or field.defaultValue, true)
@@ -442,48 +292,11 @@ end
 
 function DataEditor:BuildUnitInspectorPresetAppearanceView(page)
     local root = UI.CreateLayout(UI.VerticalLayoutGroup, page, "RPEDataEditorUnitInspectorPresetAppearancesLayout", {
-        spacing = 5,
+        spacing = APPEARANCE_EDITOR_SPACING,
         fitChildrenWidth = true,
         fitChildrenHeight = false,
     })
     UI.Utils.AnchorFill(root, page, 0, 0, 0, 0)
-
-    local presetRow = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorUnitInspectorPresetAppearancePresetRow", {
-        width = 132,
-        height = 18,
-        spacing = 4,
-        fitChildrenWidth = false,
-        fitChildrenHeight = false,
-    })
-    root:AddChild(presetRow)
-
-    presetRow:AddChild(UI.CreateText(presetRow:GetFrame(), "RPEDataEditorUnitInspectorPresetAppearancePresetLabel", "Preset", {
-        width = 34,
-        height = 18,
-        justifyH = "LEFT",
-        textColor = UI.ResolveColor(nil, "text.secondary"),
-    }))
-
-    self.UnitInspectorPresetAppearancePresetDropdown = UI.CreateDropdown(
-        presetRow:GetFrame(),
-        "RPEDataEditorUnitInspectorPresetAppearancePresetDropdown",
-        {
-            width = 94,
-            height = 18,
-            items = {},
-            onValueChanged = function(value)
-                if self._refreshingUnitInspector
-                    or self._refreshingUnitInspectorPresets
-                    or self._refreshingUnitInspectorPresetAppearances then
-                    return
-                end
-
-                self:SetSelectedUnitInspectorPresetIndex(tonumber(value))
-                self:RefreshUnitInspectorPresetsPage()
-            end,
-        }
-    )
-    presetRow:AddChild(self.UnitInspectorPresetAppearancePresetDropdown)
 
     self.UnitInspectorPresetAppearanceStatusText = UI.CreateText(
         root:GetFrame(),
@@ -491,77 +304,28 @@ function DataEditor:BuildUnitInspectorPresetAppearanceView(page)
         "Select a Preset to edit appearance overrides.",
         {
             width = self.UnitInspectorFieldWidth,
-            height = 16,
+            height = 14,
             justifyH = "LEFT",
             textColor = UI.ResolveColor(nil, "text.secondary"),
         }
     )
     root:AddChild(self.UnitInspectorPresetAppearanceStatusText)
 
-    self.UnitInspectorPresetAppearancesPanel = UI.CreatePanel(
-        root:GetFrame(),
-        "RPEDataEditorUnitInspectorPresetAppearancesPanel",
-        {
-            width = self.UnitInspectorFieldWidth,
-            height = 74,
-            contentInset = 1,
-            showBorder = true,
-        }
-    )
-    root:AddChild(self.UnitInspectorPresetAppearancesPanel)
-
-    self.UnitInspectorPresetAppearancesScroll = UI.ScrollLayout:New({
-        name = "RPEDataEditorUnitInspectorPresetAppearancesScroll",
+    self.UnitInspectorPresetAppearanceDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorUnitInspectorPresetAppearanceDropdown", {
         width = self.UnitInspectorFieldWidth,
-        height = 72,
-        visibleRows = 4,
-        rowHeight = 18,
-        rowSpacing = 0,
-        border = false,
-        rowElementClass = UI.TableRow,
+        height = 18,
+        items = {},
+        onValueChanged = function(value)
+            if self._refreshingUnitInspector
+                or self._refreshingUnitInspectorPresets
+                or self._refreshingUnitInspectorPresetAppearances then
+                return
+            end
+            self:SetSelectedUnitInspectorPresetAppearanceIndex(tonumber(value))
+            self:RefreshUnitInspectorPresetAppearanceView()
+        end,
     })
-    self.UnitInspectorPresetAppearancesScroll:SetParent(self.UnitInspectorPresetAppearancesPanel:GetContentFrame())
-    self.UnitInspectorPresetAppearancesScroll:SetRowRenderer(function(row, item, itemIndex)
-        if row.SetColumns then
-            row:SetColumns({
-                { key = "indexText", width = 22, justifyH = "RIGHT" },
-                { key = "modelText", width = 122, justifyH = "LEFT" },
-                { key = "identityText", width = 88, justifyH = "RIGHT" },
-            })
-        end
-        if row.SetRowData then
-            row:SetRowData(item, itemIndex or 0)
-        end
-        if row.background and row.background.SetColorTexture then
-            local selected = item
-                and tonumber(item.rowIndex) == tonumber(self.SelectedUnitInspectorPresetAppearanceIndex)
-            local color = UI.ResolveColor(nil, selected and "list.rowHover" or "list.rowBackground")
-            row.background:SetColorTexture(
-                color.r or 0.08,
-                color.g or 0.09,
-                color.b or 0.11,
-                color.a or 0.85
-            )
-        end
-        if row.SetRowMouseUpHandler then
-            row:SetRowMouseUpHandler(function(_, button, rowData)
-                if button ~= "LeftButton" then
-                    return
-                end
-                self:SetSelectedUnitInspectorPresetAppearanceIndex(rowData and rowData.rowIndex or nil)
-                self:RefreshUnitInspectorPresetAppearanceView()
-            end)
-        end
-    end)
-    self.UnitInspectorPresetAppearancesScroll:Create()
-    UI.Utils.AnchorFill(
-        self.UnitInspectorPresetAppearancesScroll,
-        self.UnitInspectorPresetAppearancesPanel:GetContentFrame(),
-        0,
-        0,
-        0,
-        0
-    )
+    root:AddChild(self.UnitInspectorPresetAppearanceDropdown)
 
     self.UnitInspectorPresetAppearanceToolbar = UI.CreateLayout(
         UI.HorizontalLayoutGroup,
@@ -637,55 +401,26 @@ function DataEditor:BuildUnitInspectorPresetAppearanceView(page)
     )
     self.UnitInspectorPresetAppearanceToolbar:AddChild(self.UnitInspectorPresetMoveAppearanceDownButton)
 
-    self.UnitInspectorPresetAppearanceModelField = UI.EditorModelField:New({
-        name = "RPEDataEditorUnitInspectorPresetAppearanceModelField",
-        width = self.UnitInspectorFieldWidth,
-        height = 150,
-        previewHeight = 82,
-        buttonText = "Select Model",
-    })
-    self.UnitInspectorPresetAppearanceModelField:SetParent(root:GetFrame())
-    self.UnitInspectorPresetAppearanceModelField:Create()
-
-    local selectButton = self.UnitInspectorPresetAppearanceModelField:GetButton()
-    if selectButton and selectButton.SetScript then
-        selectButton:SetScript("OnClick", function()
+    self.UnitInspectorPresetAppearanceModelField = self:CreateCompactUnitAppearanceModelField(
+        root:GetFrame(),
+        "RPEDataEditorUnitInspectorPresetAppearanceModelField",
+        function()
             if self._refreshingUnitInspector or self._refreshingUnitInspectorPresetAppearances then
                 return
             end
             self:OpenUnitInspectorPresetAppearanceModelFinderForSelected()
-        end)
-    end
-
-    local clearButton = self.UnitInspectorPresetAppearanceModelField:GetClearButton()
-    local clearFrame = clearButton and clearButton.GetFrame and clearButton:GetFrame() or nil
-    if clearFrame and clearFrame.Hide then
-        clearFrame:Hide()
-    end
-
+        end
+    )
     root:AddChild(self.UnitInspectorPresetAppearanceModelField)
 
-    for index = 1, #APPEARANCE_SLIDER_FIELDS do
-        local field = APPEARANCE_SLIDER_FIELDS[index]
-        root:AddChild(
-            self:BuildUnitInspectorLabel(
-                root:GetFrame(),
-                "RPEDataEditorUnitInspectorPresetAppearanceLabel" .. field.key,
-                field.label
-            )
-        )
-
-        local slider = UI.SliderBar:New({
-            name = "RPEDataEditorUnitInspectorPresetAppearanceSlider" .. field.key,
-            width = self.UnitInspectorFieldWidth,
-            height = 18,
-            minValue = field.minValue,
-            maxValue = field.maxValue,
-            step = field.step,
-            value = field.defaultValue,
-            valueFormat = field.valueFormat,
-            resetValue = field.defaultValue,
-            onValueChanged = function(value)
+    local sliderFields = self:GetUnitAppearanceSliderFields()
+    for index = 1, #sliderFields do
+        local field = sliderFields[index]
+        local row, slider = self:CreateUnitAppearanceTransformRow(
+            root:GetFrame(),
+            "RPEDataEditorUnitInspectorPresetAppearanceTransform" .. field.key,
+            field,
+            function(value)
                 if self._refreshingUnitInspector or self._refreshingUnitInspectorPresetAppearances then
                     return
                 end
@@ -693,75 +428,482 @@ function DataEditor:BuildUnitInspectorPresetAppearanceView(page)
                     field.key,
                     tonumber(value) or field.defaultValue
                 )
-            end,
-        })
-        slider:SetParent(root:GetFrame())
-        slider:Create()
-        root:AddChild(slider)
+            end
+        )
+        root:AddChild(row)
         self["UnitInspectorPresetAppearanceSlider" .. field.key] = slider
     end
 
     self:RefreshUnitInspectorPresetAppearanceView()
 end
+local SECTION_MODIFIERS = "modifiers"
+local SECTION_APPEARANCE = "appearances"
+local SECTION_EQUIPMENT = "equipment"
+local SECTION_SPELLS = "spells"
+local PRESET_HEADER_HEIGHT = 64
+local PRESET_BODY_OFFSET = 68
 
-local baseRefreshUnitInspectorPresetsPage = DataEditor.RefreshUnitInspectorPresetsPage
-function DataEditor:RefreshUnitInspectorPresetsPage()
-    if baseRefreshUnitInspectorPresetsPage then
-        baseRefreshUnitInspectorPresetsPage(self)
-    end
-    self:RefreshUnitInspectorPresetAppearanceView()
+local SECTION_ITEMS = {
+    { label = "Modifiers", value = SECTION_MODIFIERS },
+    { label = "Appearance", value = SECTION_APPEARANCE },
+    { label = "Equipment", value = SECTION_EQUIPMENT },
+    { label = "Spells", value = SECTION_SPELLS },
+}
+
+local function buildModifierHeader(parent, name, referenceLabel)
+    local row = UI.CreateLayout(UI.HorizontalLayoutGroup, parent, name, {
+        width = 236,
+        height = 12,
+        spacing = 0,
+        fitChildrenWidth = false,
+        fitChildrenHeight = false,
+    })
+
+    row:AddChild(UI.CreateText(row:GetFrame(), name .. "Reference", referenceLabel, {
+        width = 132,
+        height = 12,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    }))
+    row:AddChild(UI.CreateText(row:GetFrame(), name .. "Percent", "%", {
+        width = 42,
+        height = 12,
+        justifyH = "RIGHT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    }))
+    row:AddChild(UI.CreateText(row:GetFrame(), name .. "Flat", "Flat", {
+        width = 42,
+        height = 12,
+        justifyH = "RIGHT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    }))
+
+    return row
 end
 
-local baseBuildUnitInspectorPresetsPage = DataEditor.BuildUnitInspectorPresetsPage
+local function isValidSection(sectionKey)
+    return sectionKey == SECTION_MODIFIERS
+        or sectionKey == SECTION_APPEARANCE
+        or sectionKey == SECTION_EQUIPMENT
+        or sectionKey == SECTION_SPELLS
+end
+
+function DataEditor:SetUnitInspectorPresetEditorSection(sectionKey)
+    if not isValidSection(sectionKey) then
+        sectionKey = SECTION_MODIFIERS
+    end
+
+    self.ActiveUnitInspectorPresetEditorSection = sectionKey
+
+    local views = {
+        [SECTION_MODIFIERS] = self.UnitInspectorPresetModifiersView,
+        [SECTION_APPEARANCE] = self.UnitInspectorPresetAppearancesView,
+        [SECTION_EQUIPMENT] = self.UnitInspectorPresetEquipmentView,
+        [SECTION_SPELLS] = self.UnitInspectorPresetSpellsView,
+    }
+    for key, view in pairs(views) do
+        if view then
+            if key == sectionKey then
+                view:Show()
+            else
+                view:Hide()
+            end
+        end
+    end
+
+    if self.UnitInspectorPresetSectionDropdown and self.UnitInspectorPresetSectionDropdown.SetSelectedValue then
+        self._refreshingUnitInspectorPresetSection = true
+        self.UnitInspectorPresetSectionDropdown:SetSelectedValue(sectionKey, true)
+        self._refreshingUnitInspectorPresetSection = false
+    end
+end
+
+function DataEditor:RefreshUnitInspectorPresetsPage()
+    local _, unit = self:GetSelectedUnitAndDataset()
+    local hasUnit = unit ~= nil
+    self:ValidateUnitInspectorPresetSelection(unit)
+    local preset, presetIndex = self:GetSelectedUnitInspectorPreset()
+    local hasPreset = preset ~= nil
+
+    self._refreshingUnitInspectorPresets = true
+
+    if self.UnitInspectorPresetDropdown then
+        self.UnitInspectorPresetDropdown:SetItems(self:BuildUnitInspectorPresetSelectorItems(unit))
+        self.UnitInspectorPresetDropdown:SetSelectedValue(presetIndex and tostring(presetIndex) or "", true)
+        self:SetUnitInspectorDropdownEnabled(self.UnitInspectorPresetDropdown, hasUnit and #(unit and unit.presets or {}) > 0)
+    end
+
+    if self.UnitInspectorPresetSectionDropdown then
+        self.UnitInspectorPresetSectionDropdown:SetItems(SECTION_ITEMS)
+    end
+
+    setButtonEnabled(self.UnitInspectorPresetAddButton, hasUnit)
+    setButtonEnabled(self.UnitInspectorPresetDuplicateButton, hasPreset)
+    setButtonEnabled(self.UnitInspectorPresetDeleteButton, hasPreset)
+    setButtonEnabled(self.UnitInspectorPresetMoveUpButton, hasPreset and presetIndex > 1)
+    setButtonEnabled(self.UnitInspectorPresetMoveDownButton, hasPreset and presetIndex < #(unit and unit.presets or {}))
+
+    if self.UnitInspectorPresetNameInput then
+        self.UnitInspectorPresetNameEditingIndex = presetIndex
+        self.UnitInspectorPresetNameInput:SetText(preset and preset.name or "")
+        self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPresetNameInput, hasPreset)
+    end
+
+    if self.UnitInspectorPresetStatDropdown then
+        self.UnitInspectorPresetStatDropdown:SetItems(self:BuildUnitInspectorReferencesAcrossDatasets("stats"))
+    end
+    if self.UnitInspectorPresetResourceDropdown then
+        self.UnitInspectorPresetResourceDropdown:SetItems(self:BuildUnitInspectorReferencesAcrossDatasets("resources"))
+    end
+
+    self:RefreshUnitInspectorPresetModifierTables()
+    self._refreshingUnitInspectorPresets = false
+
+    if self.RefreshUnitInspectorPresetAppearanceView then
+        self:RefreshUnitInspectorPresetAppearanceView()
+    end
+    if self.RefreshUnitInspectorPresetEquipmentView then
+        self:RefreshUnitInspectorPresetEquipmentView()
+    end
+    if self.RefreshUnitInspectorPresetSpellsView then
+        self:RefreshUnitInspectorPresetSpellsView()
+    end
+
+    self:SetUnitInspectorPresetEditorSection(self.ActiveUnitInspectorPresetEditorSection or SECTION_MODIFIERS)
+end
+
+function DataEditor:BuildUnitInspectorPresetModifiersView(page)
+    local root = UI.CreateLayout(UI.VerticalLayoutGroup, page, "RPEDataEditorUnitInspectorPresetModifiersLayout95", {
+        spacing = 3,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    UI.Utils.AnchorFill(root, page, 0, 0, 0, 0)
+
+    root:AddChild(self:BuildUnitInspectorLabel(root:GetFrame(), "RPEDataEditorUnitInspectorPresetStatLabel95", "Stat Modifiers"))
+    root:AddChild(buildModifierHeader(root:GetFrame(), "RPEDataEditorUnitInspectorPresetStatHeader95", "Stat"))
+
+    local statPanel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorUnitInspectorPresetStatPanel95", {
+        width = self.UnitInspectorFieldWidth,
+        height = 38,
+        contentInset = 1,
+        showBorder = true,
+    })
+    root:AddChild(statPanel)
+
+    self.UnitInspectorPresetStatScroll = UI.ScrollLayout:New({
+        name = "RPEDataEditorUnitInspectorPresetStatScroll95",
+        width = self.UnitInspectorFieldWidth,
+        height = 36,
+        visibleRows = 2,
+        rowHeight = 18,
+        rowSpacing = 0,
+        border = false,
+        rowElementClass = UI.TableRow,
+    })
+    self.UnitInspectorPresetStatScroll:SetParent(statPanel:GetContentFrame())
+    self.UnitInspectorPresetStatScroll:SetRowRenderer(function(row, item, itemIndex)
+        if row.SetColumns then
+            row:SetColumns({
+                { key = "referenceText", width = 132, justifyH = "LEFT" },
+                { key = "percentText", width = 42, justifyH = "RIGHT" },
+                { key = "flatText", width = 42, justifyH = "RIGHT" },
+            })
+        end
+        if row.SetRowData then
+            row:SetRowData(item, itemIndex or 0)
+        end
+        if row.SetRowMouseUpHandler then
+            row:SetRowMouseUpHandler(function(tableRow, button, rowData)
+                if button == "LeftButton" then
+                    self:SetSelectedUnitInspectorPresetStatModifierIndex(rowData and rowData.rowIndex or nil)
+                    self:RefreshUnitInspectorPresetStatModifierEditor()
+                elseif button == "RightButton" then
+                    local anchor = tableRow and tableRow.GetFrame and tableRow:GetFrame() or nil
+                    self:ShowUnitInspectorPresetStatContextMenu(anchor, rowData)
+                end
+            end)
+        end
+    end)
+    self.UnitInspectorPresetStatScroll:Create()
+    UI.Utils.AnchorFill(self.UnitInspectorPresetStatScroll, statPanel:GetContentFrame(), 0, 0, 0, 0)
+
+    local statEditorRow = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorUnitInspectorPresetStatEditorRow95", {
+        width = self.UnitInspectorFieldWidth,
+        height = 18,
+        spacing = 2,
+        fitChildrenWidth = false,
+        fitChildrenHeight = false,
+    })
+    root:AddChild(statEditorRow)
+
+    self.UnitInspectorPresetStatDropdown = UI.CreateDropdown(statEditorRow:GetFrame(), "RPEDataEditorUnitInspectorPresetStatDropdown95", {
+        width = 116,
+        height = 18,
+        items = { { label = "None", value = "" } },
+    })
+    statEditorRow:AddChild(self.UnitInspectorPresetStatDropdown)
+
+    self.UnitInspectorPresetStatPercentInput = UI.CreateTextInput(statEditorRow:GetFrame(), "RPEDataEditorUnitInspectorPresetStatPercentInput95", {
+        width = 36,
+        height = 18,
+        text = "0",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    statEditorRow:AddChild(self.UnitInspectorPresetStatPercentInput)
+
+    self.UnitInspectorPresetStatFlatInput = UI.CreateTextInput(statEditorRow:GetFrame(), "RPEDataEditorUnitInspectorPresetStatFlatInput95", {
+        width = 36,
+        height = 18,
+        text = "0",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    statEditorRow:AddChild(self.UnitInspectorPresetStatFlatInput)
+
+    self.UnitInspectorPresetStatApplyButton = UI.CreateButton(statEditorRow:GetFrame(), "RPEDataEditorUnitInspectorPresetStatApplyButton95", "Add", 40, function()
+        self:ApplyUnitInspectorPresetStatModifier()
+    end, { height = 18, fontSize = 7 })
+    statEditorRow:AddChild(self.UnitInspectorPresetStatApplyButton)
+
+    root:AddChild(self:BuildUnitInspectorLabel(root:GetFrame(), "RPEDataEditorUnitInspectorPresetResourceLabel95", "Resource Modifiers"))
+    root:AddChild(buildModifierHeader(root:GetFrame(), "RPEDataEditorUnitInspectorPresetResourceHeader95", "Resource"))
+
+    local resourcePanel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorUnitInspectorPresetResourcePanel95", {
+        width = self.UnitInspectorFieldWidth,
+        height = 38,
+        contentInset = 1,
+        showBorder = true,
+    })
+    root:AddChild(resourcePanel)
+
+    self.UnitInspectorPresetResourceScroll = UI.ScrollLayout:New({
+        name = "RPEDataEditorUnitInspectorPresetResourceScroll95",
+        width = self.UnitInspectorFieldWidth,
+        height = 36,
+        visibleRows = 2,
+        rowHeight = 18,
+        rowSpacing = 0,
+        border = false,
+        rowElementClass = UI.TableRow,
+    })
+    self.UnitInspectorPresetResourceScroll:SetParent(resourcePanel:GetContentFrame())
+    self.UnitInspectorPresetResourceScroll:SetRowRenderer(function(row, item, itemIndex)
+        if row.SetColumns then
+            row:SetColumns({
+                { key = "referenceText", width = 132, justifyH = "LEFT" },
+                { key = "percentText", width = 42, justifyH = "RIGHT" },
+                { key = "flatText", width = 42, justifyH = "RIGHT" },
+            })
+        end
+        if row.SetRowData then
+            row:SetRowData(item, itemIndex or 0)
+        end
+        if row.SetRowMouseUpHandler then
+            row:SetRowMouseUpHandler(function(tableRow, button, rowData)
+                if button == "LeftButton" then
+                    self:SetSelectedUnitInspectorPresetResourceModifierIndex(rowData and rowData.rowIndex or nil)
+                    self:RefreshUnitInspectorPresetResourceModifierEditor()
+                elseif button == "RightButton" then
+                    local anchor = tableRow and tableRow.GetFrame and tableRow:GetFrame() or nil
+                    self:ShowUnitInspectorPresetResourceContextMenu(anchor, rowData)
+                end
+            end)
+        end
+    end)
+    self.UnitInspectorPresetResourceScroll:Create()
+    UI.Utils.AnchorFill(self.UnitInspectorPresetResourceScroll, resourcePanel:GetContentFrame(), 0, 0, 0, 0)
+
+    local resourceEditorRow = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorUnitInspectorPresetResourceEditorRow95", {
+        width = self.UnitInspectorFieldWidth,
+        height = 18,
+        spacing = 2,
+        fitChildrenWidth = false,
+        fitChildrenHeight = false,
+    })
+    root:AddChild(resourceEditorRow)
+
+    self.UnitInspectorPresetResourceDropdown = UI.CreateDropdown(resourceEditorRow:GetFrame(), "RPEDataEditorUnitInspectorPresetResourceDropdown95", {
+        width = 116,
+        height = 18,
+        items = { { label = "None", value = "" } },
+    })
+    resourceEditorRow:AddChild(self.UnitInspectorPresetResourceDropdown)
+
+    self.UnitInspectorPresetResourcePercentInput = UI.CreateTextInput(resourceEditorRow:GetFrame(), "RPEDataEditorUnitInspectorPresetResourcePercentInput95", {
+        width = 36,
+        height = 18,
+        text = "0",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    resourceEditorRow:AddChild(self.UnitInspectorPresetResourcePercentInput)
+
+    self.UnitInspectorPresetResourceFlatInput = UI.CreateTextInput(resourceEditorRow:GetFrame(), "RPEDataEditorUnitInspectorPresetResourceFlatInput95", {
+        width = 36,
+        height = 18,
+        text = "0",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    resourceEditorRow:AddChild(self.UnitInspectorPresetResourceFlatInput)
+
+    self.UnitInspectorPresetResourceApplyButton = UI.CreateButton(resourceEditorRow:GetFrame(), "RPEDataEditorUnitInspectorPresetResourceApplyButton95", "Add", 40, function()
+        self:ApplyUnitInspectorPresetResourceModifier()
+    end, { height = 18, fontSize = 7 })
+    resourceEditorRow:AddChild(self.UnitInspectorPresetResourceApplyButton)
+end
+
 function DataEditor:BuildUnitInspectorPresetsPage(page)
-    if self.UnitInspectorPresetModifiersView or self.UnitInspectorPresetAppearancesView then
+    if self.UnitInspectorPresetStableHeader then
         self:RefreshUnitInspectorPresetsPage()
-        self:SetUnitInspectorPresetEditorSection(self.ActiveUnitInspectorPresetEditorSection)
         return
     end
 
-    self.UnitInspectorPresetModifiersView = CreateFrame(
-        "Frame",
-        "RPEDataEditorUnitInspectorPresetModifiersView",
-        page
-    )
-    self.UnitInspectorPresetModifiersView:SetAllPoints(page)
+    self.UnitInspectorPresetStableHeader = UI.CreateLayout(UI.VerticalLayoutGroup, page, "RPEDataEditorUnitInspectorPresetStableHeader95", {
+        width = self.UnitInspectorFieldWidth,
+        height = PRESET_HEADER_HEIGHT,
+        spacing = 4,
+        fitChildrenWidth = false,
+        fitChildrenHeight = false,
+    })
+    local headerFrame = self.UnitInspectorPresetStableHeader:GetFrame()
+    headerFrame:SetPoint("TOPLEFT", page, "TOPLEFT", 0, 0)
+    headerFrame:SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, 0)
 
-    if baseBuildUnitInspectorPresetsPage then
-        baseBuildUnitInspectorPresetsPage(self, self.UnitInspectorPresetModifiersView)
-    end
+    local selectorRow = UI.CreateLayout(UI.HorizontalLayoutGroup, headerFrame, "RPEDataEditorUnitInspectorPresetSelectorRow95", {
+        width = self.UnitInspectorFieldWidth,
+        height = 18,
+        spacing = 2,
+        fitChildrenWidth = false,
+        fitChildrenHeight = false,
+    })
+    self.UnitInspectorPresetStableHeader:AddChild(selectorRow)
 
-    self.UnitInspectorPresetAppearancesView = CreateFrame(
-        "Frame",
-        "RPEDataEditorUnitInspectorPresetAppearancesView",
-        page
-    )
-    self.UnitInspectorPresetAppearancesView:SetAllPoints(page)
+    selectorRow:AddChild(UI.CreateText(selectorRow:GetFrame(), "RPEDataEditorUnitInspectorPresetSelectorLabel95", "Preset", {
+        width = 32,
+        height = 18,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    }))
+
+    self.UnitInspectorPresetDropdown = UI.CreateDropdown(selectorRow:GetFrame(), "RPEDataEditorUnitInspectorPresetDropdown95", {
+        width = 100,
+        height = 18,
+        items = {},
+        onValueChanged = function(value)
+            if self._refreshingUnitInspector or self._refreshingUnitInspectorPresets then
+                return
+            end
+            self:SetSelectedUnitInspectorPresetIndex(tonumber(value))
+            self:RefreshUnitInspectorPresetsPage()
+        end,
+    })
+    selectorRow:AddChild(self.UnitInspectorPresetDropdown)
+
+    self.UnitInspectorPresetSectionDropdown = UI.CreateDropdown(selectorRow:GetFrame(), "RPEDataEditorUnitInspectorPresetSectionDropdown95", {
+        width = 100,
+        height = 18,
+        items = SECTION_ITEMS,
+        selectedValue = self.ActiveUnitInspectorPresetEditorSection or SECTION_MODIFIERS,
+        onValueChanged = function(value)
+            if self._refreshingUnitInspectorPresetSection then
+                return
+            end
+            self:SetUnitInspectorPresetEditorSection(value)
+        end,
+    })
+    selectorRow:AddChild(self.UnitInspectorPresetSectionDropdown)
+
+    local lifecycleRow = UI.CreateLayout(UI.HorizontalLayoutGroup, headerFrame, "RPEDataEditorUnitInspectorPresetLifecycleRow95", {
+        width = self.UnitInspectorFieldWidth,
+        height = 18,
+        spacing = 2,
+        fitChildrenWidth = false,
+        fitChildrenHeight = false,
+    })
+    self.UnitInspectorPresetStableHeader:AddChild(lifecycleRow)
+
+    self.UnitInspectorPresetAddButton = UI.CreateButton(lifecycleRow:GetFrame(), "RPEDataEditorUnitInspectorPresetAddButton95", "Add", 34, function()
+        self:AddUnitInspectorPreset()
+    end, { height = 18, fontSize = 7 })
+    lifecycleRow:AddChild(self.UnitInspectorPresetAddButton)
+
+    self.UnitInspectorPresetDuplicateButton = UI.CreateButton(lifecycleRow:GetFrame(), "RPEDataEditorUnitInspectorPresetDuplicateButton95", "Duplicate", 50, function()
+        self:DuplicateUnitInspectorPreset()
+    end, { height = 18, fontSize = 7 })
+    lifecycleRow:AddChild(self.UnitInspectorPresetDuplicateButton)
+
+    self.UnitInspectorPresetDeleteButton = UI.CreateButton(lifecycleRow:GetFrame(), "RPEDataEditorUnitInspectorPresetDeleteButton95", "Delete", 40, function()
+        self:DeleteUnitInspectorPreset()
+    end, { height = 18, fontSize = 7 })
+    lifecycleRow:AddChild(self.UnitInspectorPresetDeleteButton)
+
+    self.UnitInspectorPresetMoveUpButton = UI.CreateButton(lifecycleRow:GetFrame(), "RPEDataEditorUnitInspectorPresetMoveUpButton95", "Move Up", 48, function()
+        self:MoveUnitInspectorPreset(-1)
+    end, { height = 18, fontSize = 7 })
+    lifecycleRow:AddChild(self.UnitInspectorPresetMoveUpButton)
+
+    self.UnitInspectorPresetMoveDownButton = UI.CreateButton(lifecycleRow:GetFrame(), "RPEDataEditorUnitInspectorPresetMoveDownButton95", "Move Down", 50, function()
+        self:MoveUnitInspectorPreset(1)
+    end, { height = 18, fontSize = 7 })
+    lifecycleRow:AddChild(self.UnitInspectorPresetMoveDownButton)
+
+    local nameRow = UI.CreateLayout(UI.HorizontalLayoutGroup, headerFrame, "RPEDataEditorUnitInspectorPresetNameRow95", {
+        width = self.UnitInspectorFieldWidth,
+        height = 20,
+        spacing = 4,
+        fitChildrenWidth = false,
+        fitChildrenHeight = false,
+    })
+    self.UnitInspectorPresetStableHeader:AddChild(nameRow)
+
+    nameRow:AddChild(UI.CreateText(nameRow:GetFrame(), "RPEDataEditorUnitInspectorPresetNameLabel95", "Name", {
+        width = 32,
+        height = 20,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    }))
+
+    self.UnitInspectorPresetNameInput = UI.CreateTextInput(nameRow:GetFrame(), "RPEDataEditorUnitInspectorPresetNameInput95", {
+        width = 200,
+        height = 20,
+        text = "",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.UnitInspectorPresetNameInput:SetScript("OnEnterPressed", function()
+        self:CommitUnitInspectorPresetName()
+    end)
+    self.UnitInspectorPresetNameInput:SetScript("OnEditFocusLost", function()
+        self:CommitUnitInspectorPresetName()
+    end)
+    nameRow:AddChild(self.UnitInspectorPresetNameInput)
+
+    self.UnitInspectorPresetSectionBody = CreateFrame("Frame", "RPEDataEditorUnitInspectorPresetSectionBody95", page)
+    self.UnitInspectorPresetSectionBody:SetPoint("TOPLEFT", page, "TOPLEFT", 0, -PRESET_BODY_OFFSET)
+    self.UnitInspectorPresetSectionBody:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, 0)
+
+    self.UnitInspectorPresetModifiersView = CreateFrame("Frame", "RPEDataEditorUnitInspectorPresetModifiersView95", self.UnitInspectorPresetSectionBody)
+    self.UnitInspectorPresetModifiersView:SetAllPoints(self.UnitInspectorPresetSectionBody)
+    self:BuildUnitInspectorPresetModifiersView(self.UnitInspectorPresetModifiersView)
+
+    self.UnitInspectorPresetAppearancesView = CreateFrame("Frame", "RPEDataEditorUnitInspectorPresetAppearancesView95", self.UnitInspectorPresetSectionBody)
+    self.UnitInspectorPresetAppearancesView:SetAllPoints(self.UnitInspectorPresetSectionBody)
     self:BuildUnitInspectorPresetAppearanceView(self.UnitInspectorPresetAppearancesView)
 
-    self.UnitInspectorPresetSectionDropdown = UI.CreateDropdown(
-        page,
-        "RPEDataEditorUnitInspectorPresetSectionDropdown",
-        {
-            width = 102,
-            height = 18,
-            items = {
-                { label = "Modifiers", value = PRESET_SECTION_MODIFIERS },
-                { label = "Appearance", value = PRESET_SECTION_APPEARANCES },
-            },
-            selectedValue = self.ActiveUnitInspectorPresetEditorSection or PRESET_SECTION_MODIFIERS,
-            onValueChanged = function(value)
-                if self._refreshingUnitInspectorPresetSection then
-                    return
-                end
-                self:SetUnitInspectorPresetEditorSection(value)
-            end,
-        }
-    )
-    self.UnitInspectorPresetSectionDropdown:GetFrame():SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, 0)
+    self.UnitInspectorPresetEquipmentView = CreateFrame("Frame", "RPEDataEditorUnitInspectorPresetEquipmentView95", self.UnitInspectorPresetSectionBody)
+    self.UnitInspectorPresetEquipmentView:SetAllPoints(self.UnitInspectorPresetSectionBody)
+    if self.BuildUnitInspectorPresetEquipmentView then
+        self:BuildUnitInspectorPresetEquipmentView(self.UnitInspectorPresetEquipmentView)
+    end
 
-    self:SetUnitInspectorPresetEditorSection(
-        self.ActiveUnitInspectorPresetEditorSection or PRESET_SECTION_MODIFIERS
-    )
+    self.UnitInspectorPresetSpellsView = CreateFrame("Frame", "RPEDataEditorUnitInspectorPresetSpellsView95", self.UnitInspectorPresetSectionBody)
+    self.UnitInspectorPresetSpellsView:SetAllPoints(self.UnitInspectorPresetSectionBody)
+    if self.BuildUnitInspectorPresetSpellsView then
+        self:BuildUnitInspectorPresetSpellsView(self.UnitInspectorPresetSpellsView)
+    end
+
+    -- #95 has exactly one Preset selector. The old Appearance-local selector is
+    -- not constructed by this stable shell.
+    self.UnitInspectorPresetAppearancePresetDropdown = nil
+
+    self:SetUnitInspectorPresetEditorSection(self.ActiveUnitInspectorPresetEditorSection or SECTION_MODIFIERS)
     self:RefreshUnitInspectorPresetsPage()
 end

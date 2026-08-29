@@ -12,6 +12,11 @@ local UnitClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.
 local APPEARANCE_DEFAULT_CAM = 1
 local APPEARANCE_DEFAULT_ROT = 0
 local APPEARANCE_DEFAULT_Z = -0.35
+local APPEARANCE_EDITOR_MODEL_HEIGHT = 78
+local APPEARANCE_EDITOR_PREVIEW_HEIGHT = 54
+local APPEARANCE_EDITOR_SPACING = 3
+local APPEARANCE_TRANSFORM_LABEL_WIDTH = 78
+local APPEARANCE_TRANSFORM_SLIDER_WIDTH = 154
 
 local APPEARANCE_SLIDER_FIELDS = {
     { key = "cam", label = "Camera Distance", minValue = 0.1, maxValue = 5, step = 0.05, defaultValue = APPEARANCE_DEFAULT_CAM, valueFormat = "%.2f" },
@@ -42,22 +47,6 @@ local function getModelLabel(filePath, appearance)
     return "Unknown"
 end
 
-local function getModelIdentityLabel(appearance)
-    if type(appearance) ~= "table" then
-        return "-"
-    end
-
-    local parts = {}
-    if appearance.displayId ~= nil then
-        parts[#parts + 1] = "D:" .. tostring(appearance.displayId)
-    end
-    if appearance.fileDataId ~= nil then
-        parts[#parts + 1] = "F:" .. tostring(appearance.fileDataId)
-    end
-
-    return #parts > 0 and table.concat(parts, " ") or "-"
-end
-
 local function normalizeAppearance(value)
     if UnitClass and type(UnitClass.NormalizeAppearance) == "function" then
         return UnitClass.NormalizeAppearance(value)
@@ -66,26 +55,32 @@ local function normalizeAppearance(value)
     return nil
 end
 
--- Reusable appearance-list helpers. These deliberately operate on a supplied
--- target list so the Preset editor can reuse the same authoring operations.
-function DataEditor:BuildUnitAppearanceRows(appearances)
-    local rows = {}
+local function hideElementFrame(element)
+    local frame = element and element.GetFrame and element:GetFrame() or nil
+    if frame and frame.Hide then
+        frame:Hide()
+    end
+end
+
+function DataEditor:GetUnitAppearanceSliderFields()
+    return APPEARANCE_SLIDER_FIELDS
+end
+
+function DataEditor:BuildUnitAppearanceSelectorItems(appearances)
+    local items = {}
 
     for index = 1, #(appearances or {}) do
         local appearance = appearances[index]
         local filePath = self.Database and self.Database.ResolveModelFilePath
             and self.Database.ResolveModelFilePath(appearance and appearance.displayId or nil, appearance and appearance.fileDataId or nil)
             or nil
-
-        rows[#rows + 1] = {
-            rowIndex = index,
-            indexText = tostring(index),
-            modelText = getModelLabel(filePath, appearance),
-            identityText = getModelIdentityLabel(appearance),
+        items[#items + 1] = {
+            label = ("%d - %s"):format(index, getModelLabel(filePath, appearance)),
+            value = tostring(index),
         }
     end
 
-    return rows
+    return items
 end
 
 function DataEditor:AddUnitAppearance(targetList, appearance)
@@ -213,6 +208,170 @@ function DataEditor:GetSelectedUnitInspectorAppearance()
     return appearances[index], index
 end
 
+function DataEditor:CreateCompactUnitAppearanceModelField(parent, name, onSelect)
+    local modelField = UI.EditorModelField:New({
+        name = name,
+        width = self.UnitInspectorFieldWidth,
+        height = APPEARANCE_EDITOR_MODEL_HEIGHT,
+        previewHeight = APPEARANCE_EDITOR_PREVIEW_HEIGHT,
+        spacing = APPEARANCE_EDITOR_SPACING,
+        buttonText = "Select Model",
+    })
+    modelField:SetParent(parent)
+    modelField:Create()
+
+    local selectButton = modelField:GetButton()
+    if selectButton and selectButton.SetScript then
+        selectButton:SetScript("OnClick", onSelect)
+    end
+
+    hideElementFrame(modelField:GetClearButton())
+    hideElementFrame(modelField.displayIdElement)
+    hideElementFrame(modelField.fileDataIdElement)
+    hideElementFrame(modelField.pathElement)
+
+    return modelField
+end
+
+function DataEditor:CreateUnitAppearanceTransformRow(parent, name, field, onValueChanged)
+    local row = UI.CreateLayout(UI.HorizontalLayoutGroup, parent, name, {
+        width = self.UnitInspectorFieldWidth,
+        height = 18,
+        spacing = 4,
+        fitChildrenWidth = false,
+        fitChildrenHeight = false,
+    })
+
+    row:AddChild(UI.CreateText(row:GetFrame(), name .. "Label", field.label, {
+        width = APPEARANCE_TRANSFORM_LABEL_WIDTH,
+        height = 18,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    }))
+
+    local slider = UI.SliderBar:New({
+        name = name .. "Slider",
+        width = APPEARANCE_TRANSFORM_SLIDER_WIDTH,
+        height = 18,
+        minValue = field.minValue,
+        maxValue = field.maxValue,
+        step = field.step,
+        value = field.defaultValue,
+        valueFormat = field.valueFormat,
+        resetValue = field.defaultValue,
+        onValueChanged = onValueChanged,
+    })
+    slider:SetParent(row:GetFrame())
+    slider:Create()
+    row:AddChild(slider)
+
+    return row, slider
+end
+
+-- Shared Model Finder bridge for Base and Preset Appearance arrays. All writes
+-- remain behind CommitSelectedUnit(...), and stale finder contexts are ignored.
+function DataEditor:OpenUnitAppearanceModelFinderForTarget(options)
+    options = type(options) == "table" and options or {}
+    if type(Client.OpenModelFinder) ~= "function" or type(options.resolveTargetList) ~= "function" then
+        return
+    end
+
+    local dataset, unit = self:GetSelectedUnitAndDataset()
+    if not dataset or not unit then
+        return
+    end
+
+    local mode = options.mode == "edit" and "edit" or "add"
+    local selectedIndex = tonumber(options.selectedIndex)
+    if mode == "edit" and (not selectedIndex or selectedIndex < 1 or math.floor(selectedIndex) ~= selectedIndex) then
+        return
+    end
+
+    local datasetAtOpen = dataset
+    local unitAtOpen = unit
+
+    Client:OpenModelFinder(function(displayId, fileDataId)
+        local currentDataset, currentUnit = self:GetSelectedUnitAndDataset()
+        if currentDataset ~= datasetAtOpen or currentUnit ~= unitAtOpen then
+            return
+        end
+        if type(options.isContextValid) == "function" and not options.isContextValid(self, currentUnit) then
+            return
+        end
+
+        local committedIndex = nil
+        self:CommitSelectedUnit(function(targetUnit)
+            local targetList = options.resolveTargetList(targetUnit, mode == "add")
+            if type(targetList) ~= "table" then
+                return
+            end
+
+            if mode == "add" then
+                committedIndex = self:AddUnitAppearance(targetList, {
+                    displayId = displayId,
+                    fileDataId = fileDataId,
+                    cam = APPEARANCE_DEFAULT_CAM,
+                    rot = APPEARANCE_DEFAULT_ROT,
+                    z = APPEARANCE_DEFAULT_Z,
+                })
+            else
+                local edited = self:EditUnitAppearance(targetList, selectedIndex, function(appearance)
+                    appearance.displayId = displayId
+                    appearance.fileDataId = fileDataId
+                end)
+                if edited then
+                    committedIndex = selectedIndex
+                end
+            end
+        end)
+
+        if committedIndex and type(options.onCommitted) == "function" then
+            options.onCommitted(self, committedIndex)
+        end
+    end, {
+        filter = tostring(options.filter or ""),
+    })
+end
+
+function DataEditor:OpenUnitInspectorAppearanceModelFinderForAdd()
+    return self:OpenUnitAppearanceModelFinderForTarget({
+        mode = "add",
+        resolveTargetList = function(unit, create)
+            if create and type(unit.appearances) ~= "table" then
+                unit.appearances = {}
+            end
+            return unit.appearances
+        end,
+        onCommitted = function(editor, index)
+            editor.SelectedUnitInspectorAppearanceIndex = index
+            editor:RefreshUnitInspectorAppearancesTable()
+        end,
+    })
+end
+
+function DataEditor:OpenUnitInspectorAppearanceModelFinderForSelected()
+    local _, selectedIndex = self:GetSelectedUnitInspectorAppearance()
+    if not selectedIndex then
+        return
+    end
+
+    return self:OpenUnitAppearanceModelFinderForTarget({
+        mode = "edit",
+        selectedIndex = selectedIndex,
+        resolveTargetList = function(unit)
+            return unit.appearances
+        end,
+        isContextValid = function(editor)
+            local _, currentIndex = editor:GetSelectedUnitInspectorAppearance()
+            return currentIndex == selectedIndex
+        end,
+        onCommitted = function(editor, index)
+            editor.SelectedUnitInspectorAppearanceIndex = index
+            editor:RefreshUnitInspectorAppearancesTable()
+        end,
+    })
+end
+
 function DataEditor:RefreshUnitInspectorAppearanceEditor()
     local _, unit = self:GetSelectedUnitAndDataset()
     local appearance, index = self:GetSelectedUnitInspectorAppearance()
@@ -253,81 +412,16 @@ end
 
 function DataEditor:RefreshUnitInspectorAppearancesTable()
     local _, unit = self:GetSelectedUnitAndDataset()
-    self:ValidateUnitInspectorAppearanceSelection(unit)
+    local appearances = unit and unit.appearances or {}
+    local selectedIndex = self:ValidateUnitInspectorAppearanceSelection(unit)
 
-    if self.UnitInspectorAppearancesScroll and self.UnitInspectorAppearancesScroll.SetItems then
-        self.UnitInspectorAppearancesScroll:SetItems(self:BuildUnitAppearanceRows(unit and unit.appearances or {}))
+    if self.UnitInspectorAppearanceDropdown then
+        self.UnitInspectorAppearanceDropdown:SetItems(self:BuildUnitAppearanceSelectorItems(appearances))
+        self.UnitInspectorAppearanceDropdown:SetSelectedValue(selectedIndex and tostring(selectedIndex) or "", true)
+        self:SetUnitInspectorDropdownEnabled(self.UnitInspectorAppearanceDropdown, unit ~= nil and #appearances > 0)
     end
 
     self:RefreshUnitInspectorAppearanceEditor()
-end
-
-function DataEditor:OpenUnitInspectorAppearanceModelFinderForAdd()
-    local dataset, unit = self:GetSelectedUnitAndDataset()
-    if not dataset or not unit or type(Client.OpenModelFinder) ~= "function" then
-        return
-    end
-
-    local datasetAtOpen = dataset
-    local unitAtOpen = unit
-    Client:OpenModelFinder(function(displayId, fileDataId)
-        local currentDataset, currentUnit = self:GetSelectedUnitAndDataset()
-        if currentDataset ~= datasetAtOpen or currentUnit ~= unitAtOpen then
-            return
-        end
-
-        local newIndex = nil
-        self:CommitSelectedUnit(function(targetUnit)
-            targetUnit.appearances = type(targetUnit.appearances) == "table" and targetUnit.appearances or {}
-            newIndex = self:AddUnitAppearance(targetUnit.appearances, {
-                displayId = displayId,
-                fileDataId = fileDataId,
-                cam = APPEARANCE_DEFAULT_CAM,
-                rot = APPEARANCE_DEFAULT_ROT,
-                z = APPEARANCE_DEFAULT_Z,
-            })
-        end)
-
-        if newIndex then
-            self.SelectedUnitInspectorAppearanceIndex = newIndex
-            self:RefreshUnitInspectorAppearancesTable()
-        end
-    end, {
-        filter = "",
-    })
-end
-
-function DataEditor:OpenUnitInspectorAppearanceModelFinderForSelected()
-    local dataset, unit = self:GetSelectedUnitAndDataset()
-    local _, selectedIndex = self:GetSelectedUnitInspectorAppearance()
-    if not dataset or not unit or not selectedIndex or type(Client.OpenModelFinder) ~= "function" then
-        return
-    end
-
-    local datasetAtOpen = dataset
-    local unitAtOpen = unit
-    local indexAtOpen = selectedIndex
-    Client:OpenModelFinder(function(displayId, fileDataId)
-        local currentDataset, currentUnit = self:GetSelectedUnitAndDataset()
-        if currentDataset ~= datasetAtOpen or currentUnit ~= unitAtOpen then
-            return
-        end
-
-        local edited = false
-        self:CommitSelectedUnit(function(targetUnit)
-            edited = self:EditUnitAppearance(targetUnit.appearances, indexAtOpen, function(appearance)
-                appearance.displayId = displayId
-                appearance.fileDataId = fileDataId
-            end)
-        end)
-
-        if edited then
-            self.SelectedUnitInspectorAppearanceIndex = indexAtOpen
-            self:RefreshUnitInspectorAppearancesTable()
-        end
-    end, {
-        filter = "",
-    })
 end
 
 function DataEditor:RemoveSelectedUnitInspectorAppearance()
@@ -360,62 +454,27 @@ end
 
 function DataEditor:BuildUnitInspectorAppearancesPage(page)
     local root = UI.CreateLayout(UI.VerticalLayoutGroup, page, "RPEDataEditorUnitInspectorAppearancesLayout", {
-        spacing = 6,
+        spacing = APPEARANCE_EDITOR_SPACING,
         fitChildrenWidth = true,
         fitChildrenHeight = false,
     })
     UI.Utils.AnchorFill(root, page, 0, 0, 0, 0)
 
-    root:AddChild(self:BuildUnitInspectorLabel(root:GetFrame(), "RPEDataEditorUnitInspectorAppearancesLabel", "Appearances"))
+    root:AddChild(self:BuildUnitInspectorLabel(root:GetFrame(), "RPEDataEditorUnitInspectorAppearancesLabel", "Appearance"))
 
-    self.UnitInspectorAppearancesPanel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorUnitInspectorAppearancesPanel", {
+    self.UnitInspectorAppearanceDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorUnitInspectorAppearanceDropdown", {
         width = self.UnitInspectorFieldWidth,
-        height = 92,
-        contentInset = 1,
-        showBorder = true,
+        height = 18,
+        items = {},
+        onValueChanged = function(value)
+            if self._refreshingUnitInspector then
+                return
+            end
+            self:SetSelectedUnitInspectorAppearanceIndex(tonumber(value))
+            self:RefreshUnitInspectorAppearancesTable()
+        end,
     })
-    root:AddChild(self.UnitInspectorAppearancesPanel)
-
-    self.UnitInspectorAppearancesScroll = UI.ScrollLayout:New({
-        name = "RPEDataEditorUnitInspectorAppearancesScroll",
-        width = self.UnitInspectorFieldWidth,
-        height = 90,
-        visibleRows = 5,
-        rowHeight = 18,
-        rowSpacing = 0,
-        border = false,
-        rowElementClass = UI.TableRow,
-    })
-    self.UnitInspectorAppearancesScroll:SetParent(self.UnitInspectorAppearancesPanel:GetContentFrame())
-    self.UnitInspectorAppearancesScroll:SetRowRenderer(function(row, item, itemIndex)
-        if row.SetColumns then
-            row:SetColumns({
-                { key = "indexText", width = 22, justifyH = "RIGHT" },
-                { key = "modelText", width = 122, justifyH = "LEFT" },
-                { key = "identityText", width = 88, justifyH = "RIGHT" },
-            })
-        end
-        if row.SetRowData then
-            row:SetRowData(item, itemIndex or 0)
-        end
-        if row.background and row.background.SetColorTexture then
-            local selected = item and tonumber(item.rowIndex) == tonumber(self.SelectedUnitInspectorAppearanceIndex)
-            local color = UI.ResolveColor(nil, selected and "list.rowHover" or "list.rowBackground")
-            row.background:SetColorTexture(color.r or 0.08, color.g or 0.09, color.b or 0.11, color.a or 0.85)
-        end
-        if row.SetRowMouseUpHandler then
-            row:SetRowMouseUpHandler(function(_, button, rowData)
-                if button ~= "LeftButton" then
-                    return
-                end
-
-                self:SetSelectedUnitInspectorAppearanceIndex(rowData and rowData.rowIndex or nil)
-                self:RefreshUnitInspectorAppearancesTable()
-            end)
-        end
-    end)
-    self.UnitInspectorAppearancesScroll:Create()
-    UI.Utils.AnchorFill(self.UnitInspectorAppearancesScroll, self.UnitInspectorAppearancesPanel:GetContentFrame(), 0, 0, 0, 0)
+    root:AddChild(self.UnitInspectorAppearanceDropdown)
 
     self.UnitInspectorAppearanceToolbar = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorUnitInspectorAppearanceToolbar", {
         width = self.UnitInspectorFieldWidth,
@@ -458,49 +517,25 @@ function DataEditor:BuildUnitInspectorAppearancesPage(page)
     end, { height = 18, fontSize = 7 })
     self.UnitInspectorAppearanceToolbar:AddChild(self.UnitInspectorMoveAppearanceDownButton)
 
-    self.UnitInspectorAppearanceModelField = UI.EditorModelField:New({
-        name = "RPEDataEditorUnitInspectorAppearanceModelField",
-        width = self.UnitInspectorFieldWidth,
-        height = 154,
-        previewHeight = 86,
-        buttonText = "Select Model",
-    })
-    self.UnitInspectorAppearanceModelField:SetParent(root:GetFrame())
-    self.UnitInspectorAppearanceModelField:Create()
-
-    local selectButton = self.UnitInspectorAppearanceModelField:GetButton()
-    if selectButton and selectButton.SetScript then
-        selectButton:SetScript("OnClick", function()
+    self.UnitInspectorAppearanceModelField = self:CreateCompactUnitAppearanceModelField(
+        root:GetFrame(),
+        "RPEDataEditorUnitInspectorAppearanceModelField",
+        function()
             if self._refreshingUnitInspector then
                 return
             end
             self:OpenUnitInspectorAppearanceModelFinderForSelected()
-        end)
-    end
-
-    local clearButton = self.UnitInspectorAppearanceModelField:GetClearButton()
-    local clearFrame = clearButton and clearButton.GetFrame and clearButton:GetFrame() or nil
-    if clearFrame and clearFrame.Hide then
-        clearFrame:Hide()
-    end
-
+        end
+    )
     root:AddChild(self.UnitInspectorAppearanceModelField)
 
     for index = 1, #APPEARANCE_SLIDER_FIELDS do
         local field = APPEARANCE_SLIDER_FIELDS[index]
-        root:AddChild(self:BuildUnitInspectorLabel(root:GetFrame(), "RPEDataEditorUnitInspectorAppearanceLabel" .. field.key, field.label))
-
-        local slider = UI.SliderBar:New({
-            name = "RPEDataEditorUnitInspectorAppearanceSlider" .. field.key,
-            width = self.UnitInspectorFieldWidth,
-            height = 18,
-            minValue = field.minValue,
-            maxValue = field.maxValue,
-            step = field.step,
-            value = field.defaultValue,
-            valueFormat = field.valueFormat,
-            resetValue = field.defaultValue,
-            onValueChanged = function(value)
+        local row, slider = self:CreateUnitAppearanceTransformRow(
+            root:GetFrame(),
+            "RPEDataEditorUnitInspectorAppearanceTransform" .. field.key,
+            field,
+            function(value)
                 if self._refreshingUnitInspector then
                     return
                 end
@@ -520,13 +555,11 @@ function DataEditor:BuildUnitInspectorAppearancesPage(page)
                 if edited then
                     self:RefreshUnitInspectorAppearanceEditor()
                 end
-            end,
-        })
-        slider:SetParent(root:GetFrame())
-        slider:Create()
-        root:AddChild(slider)
+            end
+        )
+        root:AddChild(row)
         self["UnitInspectorAppearanceSlider" .. field.key] = slider
     end
 
-    self:RefreshUnitInspectorAppearanceEditor()
+    self:RefreshUnitInspectorAppearancesTable()
 end
