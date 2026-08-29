@@ -4,7 +4,7 @@ Addon.Internal = Addon.Internal or {}
 Addon.Internal.Database = Addon.Internal.Database or {}
 
 local Database = Addon.Internal.Database
-local DATASET_SCHEMA_VERSION = 22
+local DATASET_SCHEMA_VERSION = 21
 
 if type(Database) ~= "table" or Database._datasetSchema21Installed == true then
     return
@@ -17,9 +17,8 @@ local function advanceDatasetSchema(root)
     return root
 end
 
--- This loaded Dataset schema extension now advances through schema 22. Schema
--- 21 added Preset spell/equipment persistence; schema 22 removes canonical
--- Unit Resource.perPlayer data through Unit normalization.
+-- Database.lua initializes once while it is loading. Advance that already-loaded
+-- root immediately, then keep the same monotonic marker on all later calls.
 advanceDatasetSchema(rawget(_G, "RPEngineDatasetDB"))
 
 local baseEnsureDatasets = Database.EnsureDatasets
