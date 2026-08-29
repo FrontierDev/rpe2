@@ -7,6 +7,16 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
 
+local function buildUnitInspectorPageSelectorItems(editor)
+    local items = editor:BuildUnitInspectorPageSelectorItems()
+    for index = 1, #items do
+        if items[index].value == "model" then
+            items[index].label = "Appearances"
+        end
+    end
+    return items
+end
+
 function DataEditor:BuildUnitInspectorPage(parent)
     if self.UnitInspectorPage then
         self:RefreshUnitInspectorPage()
@@ -37,7 +47,7 @@ function DataEditor:BuildUnitInspectorPage(parent)
         height = 18,
         expandWidth = true,
         weight = 1,
-        items = self:BuildUnitInspectorPageSelectorItems(),
+        items = buildUnitInspectorPageSelectorItems(self),
         onValueChanged = function(value)
             if self._refreshingUnitInspectorPageSelector then
                 return
@@ -68,8 +78,8 @@ function DataEditor:BuildUnitInspectorPage(parent)
     self.UnitInspectorGeneralPage = createPage("RPEDataEditorUnitInspectorGeneralPage")
     self:BuildUnitInspectorGeneralPage(self.UnitInspectorGeneralPage)
 
-    self.UnitInspectorModelPage = createPage("RPEDataEditorUnitInspectorModelPage")
-    self:BuildUnitInspectorModelPage(self.UnitInspectorModelPage)
+    self.UnitInspectorModelPage = createPage("RPEDataEditorUnitInspectorAppearancesPage")
+    self:BuildUnitInspectorAppearancesPage(self.UnitInspectorModelPage)
 
     self.UnitInspectorEquipmentPage = createPage("RPEDataEditorUnitInspectorEquipmentPage")
     self:BuildUnitInspectorEquipmentPage(self.UnitInspectorEquipmentPage)
@@ -147,22 +157,8 @@ function DataEditor:RefreshUnitInspectorPage()
         end
     end
 
-    if self.UnitInspectorModelField then
-        local filePath = self.Database and self.Database.ResolveModelFilePath and self.Database.ResolveModelFilePath(unit and unit.displayId or nil, unit and unit.fileDataId or nil) or nil
-        self.UnitInspectorModelField:SetModel(unit and unit.displayId or nil, unit and unit.fileDataId or nil, filePath)
-        self.UnitInspectorModelField:SetPreviewTransforms(unit and unit.cam or nil, unit and unit.rot or nil, unit and unit.z or nil)
-        self.UnitInspectorModelField:SetEnabled(hasUnit)
-    end
-
-    local modelKeys = { "cam", "rot", "z" }
-    for index = 1, #modelKeys do
-        local key = modelKeys[index]
-        local slider = self["UnitInspectorModelSlider" .. key]
-        if slider then
-            local value = unit and unit[key] or nil
-            slider:SetValue(value ~= nil and value or (key == "cam" and 1 or key == "z" and -0.35 or 0), true)
-            self:SetUnitInspectorSliderEnabled(slider, hasUnit)
-        end
+    if self.RefreshUnitInspectorAppearancesTable then
+        self:RefreshUnitInspectorAppearancesTable()
     end
 
     if self.UnitInspectorPendingSpellDropdown then
