@@ -15,6 +15,7 @@ local Equipment = Addon.Internal and Addon.Internal.Profile and Addon.Internal.P
 local Inventory = Addon.Client and Addon.Client.Inventory or {}
 local TooltipBuilders = Addon.Client and Addon.Client.UI and Addon.Client.UI.Tooltips or {}
 local ItemClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Item or {}
+local Timings = Addon.Debug and Addon.Debug.Timings or {}
 
 SetupWizard.__index = SetupWizard
 
@@ -45,6 +46,7 @@ local ACTIONBAR_SPELLBOOK_NAV_HEIGHT = 20
 local ACTIONBAR_SPELLBOOK_ENTRIES_PER_PAGE = ACTIONBAR_SPELLBOOK_COLUMNS * ACTIONBAR_SPELLBOOK_ROWS
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local COPPER_CURRENCY_KEY = "copper"
+local SETUP_WIZARD_TIMING_THRESHOLD_MS = 16
 
 local DEFAULT_SLOT_BORDER = { r = 0.42, g = 0.46, b = 0.52, a = 1 }
 local SELECTED_SLOT_BORDER = { r = 0.64, g = 0.82, b = 0.38, a = 1 }
@@ -102,6 +104,36 @@ local function applyTextureColor(texture, color)
     if texture and texture.SetColorTexture then
         texture:SetColorTexture(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
     end
+end
+
+local function startSetupTiming(label, context)
+    if type(Timings) == "table" and type(Timings.Start) == "function" then
+        return Timings:Start(label, {
+            context = context,
+            thresholdMs = SETUP_WIZARD_TIMING_THRESHOLD_MS,
+        })
+    end
+
+    return nil
+end
+
+local function stopSetupTiming(timer, cardinality)
+    if timer and type(Timings) == "table" and type(Timings.Stop) == "function" then
+        Timings:Stop(timer, {
+            cardinality = cardinality,
+        })
+    end
+end
+
+local function measureSetupTiming(label, context, fn)
+    if type(Timings) == "table" and type(Timings.Measure) == "function" then
+        return Timings:Measure(label, fn, {
+            context = context,
+            thresholdMs = SETUP_WIZARD_TIMING_THRESHOLD_MS,
+        })
+    end
+
+    return fn()
 end
 
 local function selectionLookupFromArray(items)
@@ -225,6 +257,9 @@ local function createInstance()
         selectedActionBarSpellbookCategory = nil,
         finalizeLines = {},
         hasDraftSelectionState = false,
+        refreshRequestId = 0,
+        needsDatasetPolicyRefresh = false,
+        tabRefreshHooksInstalled = false,
     }, SetupWizard)
 end
 
@@ -1444,6 +1479,7 @@ function SetupWizard:BuildWindow()
         return self.window
     end
 
+    local timing = startSetupTiming("SetupWizard.BuildWindow", "create")
     local window = UI.Window:New({
         name = "RPESetupWizardWindow",
         width = WINDOW_WIDTH,
@@ -1468,7 +1504,9 @@ function SetupWizard:BuildWindow()
                 label = "Identity",
                 width = 68,
                 builder = function(page)
-                    self:BuildIdentityPage(page)
+                    measureSetupTiming("SetupWizard.BuildPage", "identity", function()
+                        self:BuildIdentityPage(page)
+                    end)
                 end,
             },
             {
@@ -1476,7 +1514,9 @@ function SetupWizard:BuildWindow()
                 label = "Items",
                 width = 56,
                 builder = function(page)
-                    self:BuildStartingItemsPage(page)
+                    measureSetupTiming("SetupWizard.BuildPage", "items", function()
+                        self:BuildStartingItemsPage(page)
+                    end)
                 end,
             },
             {
@@ -1484,7 +1524,9 @@ function SetupWizard:BuildWindow()
                 label = "Action Bar",
                 width = 72,
                 builder = function(page)
-                    self:BuildActionBarPage(page)
+                    measureSetupTiming("SetupWizard.BuildPage", "actionbar", function()
+                        self:BuildActionBarPage(page)
+                    end)
                 end,
             },
             {
@@ -1492,7 +1534,9 @@ function SetupWizard:BuildWindow()
                 label = "Finalize",
                 width = 64,
                 builder = function(page)
-                    self:BuildFinalizePage(page)
+                    measureSetupTiming("SetupWizard.BuildPage", "finalize", function()
+                        self:BuildFinalizePage(page)
+                    end)
                 end,
             },
         },
@@ -1500,14 +1544,6 @@ function SetupWizard:BuildWindow()
     window:SetTitle("Setup Wizard")
     window:Create()
     self.window = window
-
-    if window and window.SetActiveTab then
-        window:SetActiveTab(1)
-        window:SetActiveTab(2)
-        window:SetActiveTab(3)
-        window:SetActiveTab(4)
-        window:SetActiveTab(1)
-    end
 
     local outerContent = window.contentFrame or (window.GetContentFrame and window:GetContentFrame()) or nil
     local footerHost = window.GetFrame and window:GetFrame() or outerContent
@@ -1554,7 +1590,109 @@ function SetupWizard:BuildWindow()
         statusFrame:SetFrameLevel((footerHost and footerHost.GetFrameLevel and footerHost:GetFrameLevel() or 1) + 20)
     end
 
+    self:InstallTabRefreshHooks()
+    stopSetupTiming(timing, {
+        builtTabs = 1,
+    })
     return window
+end
+
+function SetupWizard:GetActiveTabIndex()
+    local tabContainer = self.window and self.window.tabContainer or nil
+    return math.max(1, math.floor(tonumber(tabContainer and tabContainer.activeTabIndex) or 1))
+end
+
+function SetupWizard:InstallTabRefreshHooks()
+    if self.tabRefreshHooksInstalled == true then
+        return
+    end
+
+    local tabContainer = self.window and self.window.tabContainer or nil
+    if type(tabContainer) ~= "table" then
+        return
+    end
+
+    for index = 1, #(tabContainer.tabButtons or {}) do
+        local button = tabContainer.tabButtons[index]
+        local frame = button and button.GetFrame and button:GetFrame() or nil
+        if frame and frame.HookScript then
+            local tabIndex = index
+            frame:HookScript("OnClick", function()
+                self:QueuePageRefresh(tabIndex)
+            end)
+        end
+    end
+
+    self.tabRefreshHooksInstalled = true
+end
+
+function SetupWizard:RefreshPage(tabIndex, state)
+    local index = math.max(1, math.floor(tonumber(tabIndex) or 1))
+    local context = ({ "identity", "items", "actionbar", "finalize" })[index] or tostring(index)
+    return measureSetupTiming("SetupWizard.RefreshPage", context, function()
+        if index == 1 then
+            self:RefreshIdentityPage(state)
+        elseif index == 2 then
+            self:RefreshStartingItemsPage(state)
+        elseif index == 3 then
+            if not self.ActionBarPageRoot then
+                local page = self.window and self.window.tabContainer and self.window.tabContainer.pageFrames and self.window.tabContainer.pageFrames[3] or nil
+                if page then
+                    self:BuildActionBarPage(page)
+                end
+            end
+            self:RefreshActionBarPage(state)
+        elseif index == 4 then
+            if not self.FinalizePageBuilt then
+                local page = self.window and self.window.tabContainer and self.window.tabContainer.pageFrames and self.window.tabContainer.pageFrames[4] or nil
+                if page then
+                    self:BuildFinalizePage(page)
+                end
+            end
+            self:RefreshFinalizePage()
+        end
+    end)
+end
+
+function SetupWizard:QueuePageRefresh(tabIndex)
+    local requestedTab = math.max(1, math.floor(tonumber(tabIndex) or self:GetActiveTabIndex()))
+    self.refreshRequestId = math.max(0, math.floor(tonumber(self.refreshRequestId) or 0)) + 1
+    local requestId = self.refreshRequestId
+
+    local function runRefresh()
+        if requestId ~= self.refreshRequestId then
+            return
+        end
+
+        local windowFrame = self.window and self.window.GetFrame and self.window:GetFrame() or nil
+        if windowFrame and windowFrame.IsShown and not windowFrame:IsShown() then
+            return
+        end
+        if self:GetActiveTabIndex() ~= requestedTab then
+            return
+        end
+
+        if self.needsDatasetPolicyRefresh == true then
+            local policyTiming = startSetupTiming("SetupWizard.ApplyDatasetPolicy", "show")
+            self:ApplyDatasetPolicy()
+            stopSetupTiming(policyTiming)
+            self.needsDatasetPolicyRefresh = false
+        end
+
+        local state = self:CaptureSelectionState()
+        self.cachedState = state
+        if self.hasDraftSelectionState ~= true then
+            self:SyncSelectionState(state)
+        end
+        self:RefreshPage(requestedTab, state)
+        self:RefreshStatus()
+    end
+
+    if C_Timer and C_Timer.After then
+        C_Timer.After(0, runRefresh)
+    else
+        runRefresh()
+    end
 end
 
 function SetupWizard:RefreshChoiceGrid(collectionKey, layout, items, selectedValue, setter)
@@ -2264,6 +2402,7 @@ function SetupWizard:RefreshStatus()
 end
 
 function SetupWizard:Refresh()
+    local timing = startSetupTiming("SetupWizard.Refresh", "full")
     self:ApplyDatasetPolicy()
     local state = self:CaptureSelectionState()
     self.cachedState = state
@@ -2285,6 +2424,12 @@ function SetupWizard:Refresh()
     end
 
     self:RefreshStatus()
+    stopSetupTiming(timing, {
+        identity = self.IdentityPageBuilt and 1 or 0,
+        items = self.StartingItemsPageBuilt and 1 or 0,
+        actionbar = self.ActionBarPageRoot and 1 or 0,
+        finalize = self.FinalizePageBuilt and 1 or 0,
+    })
     return state
 end
 
@@ -2420,15 +2565,21 @@ function SetupWizard:Show()
     local state = self:CaptureSelectionState()
     self.cachedState = state
     self:SyncSelectionState(state)
-    self:Refresh()
+    self.needsDatasetPolicyRefresh = true
+
     if window and window.Show then
         window:Show()
     end
+
+    self:RefreshStatus()
+    self:QueuePageRefresh(self:GetActiveTabIndex())
     return window
 end
 
 function SetupWizard:Hide()
     self.hasDraftSelectionState = false
+    self.needsDatasetPolicyRefresh = false
+    self.refreshRequestId = math.max(0, math.floor(tonumber(self.refreshRequestId) or 0)) + 1
     if self.window and self.window.Hide then
         self.window:Hide()
     end
