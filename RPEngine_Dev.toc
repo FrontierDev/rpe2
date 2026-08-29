@@ -221,6 +221,7 @@ client/ui/windows/window_IconFinder.lua
 client/ui/windows/window_ModelFinder.lua
 client/ui/windows/window_LauncherMenu.lua
 client/ui/windows/window_SetupWizard.lua
+client/ui/windows/window_SetupWizard_ChoiceTooltips.lua
 client/character/inventory/page_Inventory.lua
 client/character/inventory/page_Consumables.lua
 client/character/inventory/page_Reagents.lua
