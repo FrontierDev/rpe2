@@ -174,6 +174,7 @@ core/ui/elements/ProgressBar.lua
 core/ui/elements/SliderBar.lua
 core/ui/Popup.lua
 core/ui/prefabs/UnitPortrait.lua
+core/ui/prefabs/UnitPortraitVariantPresentation.lua
 core/ui/prefabs/ObjectSlot.lua
 core/ui/prefabs/SpellbookEntry.lua
 core/ui/prefabs/ShopEntry.lua
@@ -225,9 +226,11 @@ client/character/guild/window_Guild.lua
 core/debug/Clipboard.lua
 server/ui/window_EventUnit.lua
 server/ui/window_EventUnitPresets.lua
+server/ui/window_EventUnitVariantPresentation.lua
 server/ui/eventmanage/page_EventManageShared.lua
 server/ui/eventmanage/page_EventManageDashboard.lua
 server/ui/eventmanage/page_EventManageUnits.lua
+server/ui/eventmanage/page_EventManageVariantPresentation.lua
 server/ui/eventmanage/page_EventManageActions.lua
 server/ui/eventmanage/page_EventManageSettings.lua
 server/ui/window_EventManage.lua
