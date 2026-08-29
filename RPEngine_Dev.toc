@@ -28,6 +28,7 @@ core/internal/Runtime.lua
 core/internal/database/Dependecies.lua
 core/internal/database/Database.lua
 core/internal/database/DatasetSchema21.lua
+core/internal/database/DatasetSchema22.lua
 core/internal/profile/Definitions.lua
 core/internal/profile/Modifications.lua
 core/internal/profile/Equipment.lua
