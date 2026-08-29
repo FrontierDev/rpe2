@@ -292,11 +292,10 @@ local function buildResolvedResources(eventUnit, playerCount)
                 }
             else
                 local baseValue = tonumber(entry and entry.value) or 0
-                local scaledValue = baseValue + ((tonumber(entry and entry.perPlayer) or 0) * math.max(0, tonumber(playerCount) or 0))
                 resolvedResources[#resolvedResources + 1] = {
                     resourceRef = resourceRef,
-                    currentValue = scaledValue,
-                    maxValue = scaledValue,
+                    currentValue = baseValue,
+                    maxValue = baseValue,
                 }
             end
         end

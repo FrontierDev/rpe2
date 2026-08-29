@@ -630,11 +630,10 @@ local function normalizeNpcResourceEntry(entry, playerCount)
     end
 
     local baseValue = tonumber(entry.value) or 0
-    local scaledValue = baseValue + ((tonumber(entry.perPlayer) or 0) * math.max(0, tonumber(playerCount) or 0))
     return {
         resourceRef = resourceRef,
-        currentValue = scaledValue,
-        maxValue = scaledValue,
+        currentValue = baseValue,
+        maxValue = baseValue,
     }
 end
 

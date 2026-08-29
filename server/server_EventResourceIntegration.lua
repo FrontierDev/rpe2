@@ -19,7 +19,9 @@ if type(Server) ~= "table" or type(EventUnit) ~= "table" then
 end
 
 local PLAYER_SCALING_RULE_KEY = "player_scaling_challenge_levels"
+local HEALTH_BONUS_PER_PLAYER_RULE_KEY = "npc_health_bonus_per_player_percent"
 local DEFAULT_PLAYER_SCALING_CHALLENGE_LEVELS = { "minor", "normal", "elite" }
+local DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT = 20
 
 local function deepCopy(value)
     if type(value) ~= "table" then
@@ -31,6 +33,14 @@ local function deepCopy(value)
         copy[key] = deepCopy(nestedValue)
     end
     return copy
+end
+
+local function normalizeFiniteNumber(value, fallback)
+    local numeric = tonumber(value)
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        return tonumber(fallback) or 0
+    end
+    return numeric
 end
 
 local function getChallengeLevelDefinitions()
@@ -91,40 +101,78 @@ local function normalizePlayerScalingChallengeLevels(values, useDefaultsWhenMiss
     return normalized
 end
 
-local function ensurePlayerScalingRuleDefinition()
+local function isDifficultyRuleKey(key)
+    local normalized = tostring(key or "")
+    return string.match(normalized, "^heroic_npc_") ~= nil
+        or string.match(normalized, "^mythic_npc_") ~= nil
+end
+
+local function ensurePlayerScalingRuleDefinitions()
     local definitions = type(Rules) == "table" and Rules.Definitions or nil
     if type(definitions) ~= "table" then
-        return nil
+        return nil, nil
     end
 
+    local eventCategory = nil
     for categoryIndex = 1, #definitions do
         local category = definitions[categoryIndex]
         if category and category.key == "event" then
-            category.rules = type(category.rules) == "table" and category.rules or {}
-            for ruleIndex = 1, #category.rules do
-                if category.rules[ruleIndex] and category.rules[ruleIndex].key == PLAYER_SCALING_RULE_KEY then
-                    return category.rules[ruleIndex]
-                end
-            end
+            eventCategory = category
+            break
+        end
+    end
+    if type(eventCategory) ~= "table" then
+        return nil, nil
+    end
 
-            local rule = {
-                key = PLAYER_SCALING_RULE_KEY,
-                label = "Player-Count Scaling Challenge Levels",
-                type = "dropdown",
-                default = deepCopy(DEFAULT_PLAYER_SCALING_CHALLENGE_LEVELS),
-                multiSelect = true,
-                description = "Choose which NPC challenge levels apply configured per-player resource scaling.",
-                options = getChallengeLevelDefinitions(),
-            }
-            category.rules[#category.rules + 1] = rule
-            return rule
+    eventCategory.rules = type(eventCategory.rules) == "table" and eventCategory.rules or {}
+
+    local challengeRule = nil
+    local healthBonusRule = nil
+    local retained = {}
+    for ruleIndex = 1, #eventCategory.rules do
+        local rule = eventCategory.rules[ruleIndex]
+        local key = type(rule) == "table" and tostring(rule.key or "") or ""
+        if key == PLAYER_SCALING_RULE_KEY then
+            challengeRule = rule
+        elseif key == HEALTH_BONUS_PER_PLAYER_RULE_KEY then
+            healthBonusRule = rule
+        else
+            retained[#retained + 1] = rule
         end
     end
 
-    return nil
+    challengeRule = challengeRule or {}
+    challengeRule.key = PLAYER_SCALING_RULE_KEY
+    challengeRule.label = "Player-Count Scaling Challenge Levels"
+    challengeRule.type = "dropdown"
+    challengeRule.default = deepCopy(DEFAULT_PLAYER_SCALING_CHALLENGE_LEVELS)
+    challengeRule.multiSelect = true
+    challengeRule.description = "Choose which NPC challenge levels receive Ruleset NPC Health scaling from the current Event player count."
+    challengeRule.options = getChallengeLevelDefinitions()
+
+    healthBonusRule = healthBonusRule or {}
+    healthBonusRule.key = HEALTH_BONUS_PER_PLAYER_RULE_KEY
+    healthBonusRule.label = "NPC Health Bonus Per Player (%)"
+    healthBonusRule.type = "text"
+    healthBonusRule.default = tostring(DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT)
+    healthBonusRule.description = "Percentage of Base NPC Health added for each current Event player when the NPC challenge level is selected above. Negative values are supported but final Health cannot fall below zero."
+
+    local insertionIndex = #retained + 1
+    for index = 1, #retained do
+        if retained[index] and isDifficultyRuleKey(retained[index].key) then
+            insertionIndex = index
+            break
+        end
+    end
+
+    table.insert(retained, insertionIndex, challengeRule)
+    table.insert(retained, insertionIndex + 1, healthBonusRule)
+    eventCategory.rules = retained
+    return challengeRule, healthBonusRule
 end
 
-local playerScalingRuleDefinition = ensurePlayerScalingRuleDefinition()
+local playerScalingRuleDefinition, healthBonusPerPlayerRuleDefinition = ensurePlayerScalingRuleDefinitions()
 
 function Ruleset.GetPlayerScalingChallengeLevels(ruleset)
     local resolvedRuleset = ruleset
@@ -145,6 +193,23 @@ function Ruleset.GetPlayerScalingChallengeLevels(ruleset)
     end
 
     return normalizePlayerScalingChallengeLevels(configured, true)
+end
+
+function Ruleset.GetNpcHealthBonusPerPlayerPercent(ruleset)
+    local resolvedRuleset = ruleset
+    if resolvedRuleset == nil and type(Ruleset.GetActiveRuleset) == "function" then
+        resolvedRuleset = Ruleset.GetActiveRuleset()
+    end
+
+    local ruleDefinition = type(Ruleset.GetRulesetRuleDefinition) == "function"
+        and Ruleset.GetRulesetRuleDefinition("event", HEALTH_BONUS_PER_PLAYER_RULE_KEY)
+        or healthBonusPerPlayerRuleDefinition
+    local configured = nil
+    if ruleDefinition and type(Ruleset.GetRulesetRuleValue) == "function" then
+        configured = Ruleset.GetRulesetRuleValue(resolvedRuleset, "event", ruleDefinition)
+    end
+
+    return normalizeFiniteNumber(configured, DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT)
 end
 
 function Ruleset.IsPlayerScalingChallengeLevelEnabled(challengeLevel, selectedLevels)
@@ -184,6 +249,9 @@ then
                 selectedLevels
             )
         end
+        if resolvedOptions.healthBonusPerPlayerPercent == nil then
+            policy.healthBonusPerPlayerPercent = Ruleset.GetNpcHealthBonusPerPlayerPercent()
+        end
 
         return policy
     end
@@ -213,6 +281,7 @@ local function buildResourceOptions(options, difficulty)
         difficulty = source.difficulty ~= nil and source.difficulty or difficulty,
         playerScalingChallengeLevels = source.playerScalingChallengeLevels,
         applyPerPlayerScaling = source.applyPerPlayerScaling,
+        healthBonusPerPlayerPercent = source.healthBonusPerPlayerPercent,
         healthResourceRef = source.healthResourceRef,
         healthPercent = source.healthPercent,
         difficultyModifiers = source.difficultyModifiers,

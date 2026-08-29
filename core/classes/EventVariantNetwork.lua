@@ -102,7 +102,7 @@ local function resolveIdentity(unit)
 end
 
 local function makePresetMechanicsExplicit(fields, sourceUnit, presetIndex)
-    if presetIndex <= 0 or type(fields) ~= "table" or type(sourceUnit) ~= "table" then
+    if type(fields) ~= "table" or type(sourceUnit) ~= "table" then
         return fields
     end
 
@@ -111,26 +111,32 @@ local function makePresetMechanicsExplicit(fields, sourceUnit, presetIndex)
         return fields
     end
 
+    -- Resources are always host-materialized. In particular, Ruleset-owned
+    -- player-count Health scaling cannot be reconstructed from the Unit
+    -- definition on a receiving client, including for Base (preset 0) summons.
     if type(EventUnit.SerializeResourcesForNetwork) == "function" then
         fields[11] = EventUnit.SerializeResourcesForNetwork(runtimeUnit.resources or {})
-    end
-    if type(EventUnit.SerializeStatsForNetwork) == "function" then
-        fields[15] = EventUnit.SerializeStatsForNetwork(runtimeUnit.stats or {})
+        fields[18] = ""
     end
 
-    -- Preset resources and stats are host-materialized. Do not let compact
-    -- inherit/bonus modes reconstruct Base-only mechanics on the receiver.
-    fields[18] = ""
-    fields[20] = ""
-    fields[21] = ""
+    if presetIndex > 0 then
+        if type(EventUnit.SerializeStatsForNetwork) == "function" then
+            fields[15] = EventUnit.SerializeStatsForNetwork(runtimeUnit.stats or {})
+        end
 
-    -- Preserve the existing compact spell-inheritance contract unless the
-    -- summon/runtime unit carries an explicit non-empty spell override.
-    if type(runtimeUnit.spells) == "table" and #runtimeUnit.spells > 0
-        and type(EventUnit.SerializeSpellRefsForNetwork) == "function"
-    then
-        fields[14] = EventUnit.SerializeSpellRefsForNetwork(runtimeUnit.spells)
-        fields[19] = ""
+        -- Preset stats are host-materialized. Do not let compact bonus mode
+        -- reconstruct Base-only mechanics on the receiver.
+        fields[20] = ""
+        fields[21] = ""
+
+        -- Preserve the existing compact spell-inheritance contract unless the
+        -- summon/runtime unit carries an explicit non-empty spell override.
+        if type(runtimeUnit.spells) == "table" and #runtimeUnit.spells > 0
+            and type(EventUnit.SerializeSpellRefsForNetwork) == "function"
+        then
+            fields[14] = EventUnit.SerializeSpellRefsForNetwork(runtimeUnit.spells)
+            fields[19] = ""
+        end
     end
 
     return fields
