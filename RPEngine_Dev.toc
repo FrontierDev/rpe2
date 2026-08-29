@@ -73,6 +73,7 @@ server/server_Commands.lua
 
 core/classes/EventUnit.lua
 core/classes/Unit.lua
+core/classes/EventUnitVariantIdentity.lua
 core/classes/Mount.lua
 core/classes/Pet.lua
 core/classes/Spell.lua
@@ -95,6 +96,7 @@ core/classes/Achievement.lua
 core/classes/GuildSetting.lua
 core/classes/Currency.lua
 core/classes/Event.lua
+core/classes/EventVariantNetwork.lua
 
 client/client_Event.lua
 client/client_CombatLog.lua

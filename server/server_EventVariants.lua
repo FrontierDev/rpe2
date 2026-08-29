@@ -7,7 +7,9 @@ Addon.Internal.Database.Classes = Addon.Internal.Database.Classes or {}
 
 local Server = Addon.Server
 local Registry = Addon.Internal.Registry or {}
-local UnitClass = Addon.Internal.Database.Classes.Unit
+local Classes = Addon.Internal.Database.Classes
+local UnitClass = Classes.Unit
+local EventUnit = Classes.EventUnit
 
 local function deepCopy(value)
     if type(value) ~= "table" then
@@ -21,14 +23,16 @@ local function deepCopy(value)
     return copy
 end
 
-local function normalizeNonNegativeInteger(value)
+local function normalizeVariantIndex(value)
+    if EventUnit and type(EventUnit.NormalizeVariantIndex) == "function" then
+        return EventUnit.NormalizeVariantIndex(value)
+    end
+
     local numericValue = tonumber(value)
     if numericValue == nil or numericValue ~= numericValue or numericValue == math.huge or numericValue == -math.huge then
         return 0
     end
-
-    numericValue = math.floor(numericValue)
-    return numericValue > 0 and numericValue or 0
+    return math.max(0, math.floor(numericValue))
 end
 
 local function resolveActivatedUnitDefinition(registryId)
@@ -91,8 +95,7 @@ local function clampTeamIndex(eventState, value)
 end
 
 local function coerceBoolean(value, defaultValue)
-    local EventUnit = Addon.Internal.Database.Classes.EventUnit
-    if EventUnit and EventUnit.CoerceBoolean then
+    if EventUnit and type(EventUnit.CoerceBoolean) == "function" then
         return EventUnit.CoerceBoolean(value, defaultValue)
     end
 
@@ -130,9 +133,6 @@ local function buildPlayerScaledResourceValues(baseUnit, playerCount, preset)
         end
     end
 
-    -- Unit.ApplyResourceModifiers() deliberately modifies an already-materialized
-    -- resource set. Seed missing Preset targets at zero so flat Preset bonuses can
-    -- introduce a Resource without moving player-count policy into Unit.lua.
     for index = 1, #((preset and preset.resourceModifiers) or {}) do
         local modifier = preset.resourceModifiers[index]
         local resourceRef = type(modifier) == "table" and tostring(modifier.resourceRef or "") or ""
@@ -164,6 +164,39 @@ local function buildPlayerScaledResourceValues(baseUnit, playerCount, preset)
     end
 
     return resources
+end
+
+local function findEventUnitById(units, eventId)
+    local numericEventId = tonumber(eventId) or 0
+    if numericEventId <= 0 then
+        return nil
+    end
+
+    for index = 1, #((units) or {}) do
+        local unit = units[index]
+        if tonumber(unit and unit.eventID) == numericEventId then
+            return unit
+        end
+    end
+    return nil
+end
+
+local function applyRuntimeVariantIdentity(unit, presetIndex, appearanceIndex)
+    if type(unit) ~= "table" then
+        return unit
+    end
+
+    unit.presetIndex = normalizeVariantIndex(presetIndex)
+    unit.appearanceIndex = normalizeVariantIndex(appearanceIndex)
+    return unit
+end
+
+local function applyIdentityToDraftCopy(server, eventId, presetIndex, appearanceIndex)
+    local draftUnit = findEventUnitById(server and server.EventDraftState and server.EventDraftState.units or nil, eventId)
+    if draftUnit then
+        applyRuntimeVariantIdentity(draftUnit, presetIndex, appearanceIndex)
+    end
+    return draftUnit
 end
 
 function Server:BuildResolvedNpcVariant(registryId, options)
@@ -216,13 +249,29 @@ function Server:BuildEventNpcUnitDataFromDefinition(registryId, options)
         team = options,
     }
     local eventState = self.GetEditableEventState and self:GetEditableEventState() or nil
+    local summonRequest = type(self.PendingNpcSummonPresetRequest) == "table" and self.PendingNpcSummonPresetRequest or nil
+    local isSummonMaterialization = summonRequest ~= nil
+        and tostring(summonRequest.registryID or "") == tostring(registryId or "")
+        and resolvedOptions.presetIndex == nil
+    local requestedPresetIndex = isSummonMaterialization and summonRequest.presetIndex or resolvedOptions.presetIndex
+
     local variant = self:BuildResolvedNpcVariant(registryId, {
-        presetIndex = resolvedOptions.presetIndex,
+        presetIndex = requestedPresetIndex,
         playerCount = countPlayerUnits(eventState and eventState.units or {}),
-        selectRandomAppearance = resolvedOptions.selectRandomAppearance == true,
+        selectRandomAppearance = resolvedOptions.selectRandomAppearance == true or isSummonMaterialization,
     })
     if not variant then
         return nil
+    end
+
+    if isSummonMaterialization then
+        summonRequest.presetIndex = variant.presetIndex
+        summonRequest.appearanceIndex = variant.appearanceIndex
+        self.PendingNpcVariantMaterialization = {
+            registryID = variant.registryID,
+            presetIndex = variant.presetIndex,
+            appearanceIndex = variant.appearanceIndex,
+        }
     end
 
     return {
@@ -242,102 +291,26 @@ function Server:BuildEventNpcUnitDataFromDefinition(registryId, options)
     }
 end
 
-local function applyRuntimeVariantIdentity(unit, presetIndex, appearanceIndex)
-    if type(unit) ~= "table" then
-        return unit
+local baseAddEventNpcUnit = Server.AddEventNpcUnit
+function Server:AddEventNpcUnit(data)
+    local previousPending = self.PendingNpcVariantMaterialization
+    local hasVariantIdentity = type(data) == "table" and (data.presetIndex ~= nil or data.appearanceIndex ~= nil)
+    if hasVariantIdentity then
+        self.PendingNpcVariantMaterialization = {
+            registryID = tostring(data.registryID or ""),
+            presetIndex = normalizeVariantIndex(data.presetIndex),
+            appearanceIndex = normalizeVariantIndex(data.appearanceIndex),
+        }
     end
 
-    unit.presetIndex = normalizeNonNegativeInteger(presetIndex)
-    unit.appearanceIndex = normalizeNonNegativeInteger(appearanceIndex)
+    local unit = baseAddEventNpcUnit and baseAddEventNpcUnit(self, data) or nil
+    if unit and hasVariantIdentity then
+        applyRuntimeVariantIdentity(unit, data.presetIndex, data.appearanceIndex)
+        applyIdentityToDraftCopy(self, unit.eventID, data.presetIndex, data.appearanceIndex)
+    end
+
+    self.PendingNpcVariantMaterialization = previousPending
     return unit
-end
-
-local function applyIdentityToDraftCopy(server, eventId, presetIndex, appearanceIndex)
-    local draft = server and server.EventDraftState or nil
-    for index = 1, #((draft and draft.units) or {}) do
-        local unit = draft.units[index]
-        if tonumber(unit and unit.eventID) == tonumber(eventId) then
-            applyRuntimeVariantIdentity(unit, presetIndex, appearanceIndex)
-            return unit
-        end
-    end
-    return nil
-end
-
-local function collectNpcVariantIdentities(units)
-    local identities = {}
-    for index = 1, #((units) or {}) do
-        local unit = units[index]
-        if unit and unit.isPlayer ~= true then
-            identities[#identities + 1] = {
-                presetIndex = normalizeNonNegativeInteger(unit.presetIndex),
-                appearanceIndex = normalizeNonNegativeInteger(unit.appearanceIndex),
-            }
-        end
-    end
-    return identities
-end
-
-local function collectNpcUnitsByEventId(units)
-    local npcs = {}
-    for index = 1, #((units) or {}) do
-        local unit = units[index]
-        if unit and unit.isPlayer ~= true then
-            npcs[#npcs + 1] = unit
-        end
-    end
-    table.sort(npcs, function(left, right)
-        return (tonumber(left and left.eventID) or 0) < (tonumber(right and right.eventID) or 0)
-    end)
-    return npcs
-end
-
-local function restoreNpcVariantIdentitiesByEventOrder(units, identities)
-    local npcs = collectNpcUnitsByEventId(units)
-    for index = 1, math.min(#npcs, #(identities or {})) do
-        local identity = identities[index]
-        applyRuntimeVariantIdentity(npcs[index], identity.presetIndex, identity.appearanceIndex)
-    end
-    return npcs
-end
-
-local function syncLiveNpcVariantIdentitiesToDraft(server)
-    local live = server and server.EventState or nil
-    local draft = server and server.EventDraftState or nil
-    if not live or not draft then
-        return false
-    end
-
-    local identityByEventId = {}
-    for index = 1, #((live and live.units) or {}) do
-        local unit = live.units[index]
-        local eventId = tonumber(unit and unit.eventID) or 0
-        if unit and unit.isPlayer ~= true and eventId > 0 then
-            identityByEventId[eventId] = {
-                presetIndex = normalizeNonNegativeInteger(unit.presetIndex),
-                appearanceIndex = normalizeNonNegativeInteger(unit.appearanceIndex),
-            }
-        end
-    end
-
-    for index = 1, #((draft and draft.units) or {}) do
-        local unit = draft.units[index]
-        local identity = identityByEventId[tonumber(unit and unit.eventID) or 0]
-        if identity then
-            applyRuntimeVariantIdentity(unit, identity.presetIndex, identity.appearanceIndex)
-        end
-    end
-    return true
-end
-
-local baseGetEventDraftState = Server.GetEventDraftState
-function Server:GetEventDraftState()
-    local previousIdentities = collectNpcVariantIdentities(self.EventDraftState and self.EventDraftState.units or nil)
-    local draftState = baseGetEventDraftState and baseGetEventDraftState(self) or nil
-    if draftState and #previousIdentities > 0 then
-        restoreNpcVariantIdentitiesByEventOrder(draftState.units, previousIdentities)
-    end
-    return draftState
 end
 
 function Server:AddEventNpcUnitFromDefinition(registryId, options)
@@ -351,65 +324,34 @@ function Server:AddEventNpcUnitFromDefinition(registryId, options)
         return nil
     end
 
-    local unit = self:AddEventNpcUnit(unitData)
-    if not unit then
+    return self:AddEventNpcUnit(unitData)
+end
+
+local baseSummonEventPetUnit = Server.SummonEventPetUnit
+function Server:SummonEventPetUnit(casterUnit, registryId, options)
+    if type(baseSummonEventPetUnit) ~= "function" then
         return nil
     end
 
-    applyRuntimeVariantIdentity(unit, unitData.presetIndex, unitData.appearanceIndex)
-    applyIdentityToDraftCopy(self, unit.eventID, unitData.presetIndex, unitData.appearanceIndex)
+    local resolvedOptions = type(options) == "table" and options or {}
+    local previousRequest = self.PendingNpcSummonPresetRequest
+    local previousPending = self.PendingNpcVariantMaterialization
+    local summonRequest = {
+        registryID = tostring(registryId or ""),
+        presetIndex = normalizeVariantIndex(resolvedOptions.presetIndex),
+        appearanceIndex = 0,
+    }
+    self.PendingNpcSummonPresetRequest = summonRequest
+
+    local unit = baseSummonEventPetUnit(self, casterUnit, registryId, options)
+
+    self.PendingNpcSummonPresetRequest = previousRequest
+    self.PendingNpcVariantMaterialization = previousPending
+
+    if unit then
+        applyRuntimeVariantIdentity(unit, summonRequest.presetIndex, summonRequest.appearanceIndex)
+        applyIdentityToDraftCopy(self, unit.eventID, summonRequest.presetIndex, summonRequest.appearanceIndex)
+    end
+
     return unit
 end
-
-local baseStartEvent = Server.StartEvent
-function Server:StartEvent(data)
-    local draft = self.GetEventDraftState and self:GetEventDraftState() or self.EventDraftState
-    local sourceUnits = type(data) == "table" and type(data.units) == "table" and #data.units > 0
-        and data.units
-        or (draft and draft.units or nil)
-    local identities = collectNpcVariantIdentities(sourceUnits)
-
-    local eventState = baseStartEvent and baseStartEvent(self, data) or nil
-    if not eventState then
-        return eventState
-    end
-
-    restoreNpcVariantIdentitiesByEventOrder(eventState.units, identities)
-    restoreNpcVariantIdentitiesByEventOrder(self.EventDraftState and self.EventDraftState.units or nil, identities)
-    return eventState
-end
-
-local baseCopyLiveEventToDraftState = Server.CopyLiveEventToDraftState
-function Server:CopyLiveEventToDraftState()
-    local copied = baseCopyLiveEventToDraftState and baseCopyLiveEventToDraftState(self) or false
-    if copied then
-        syncLiveNpcVariantIdentitiesToDraft(self)
-    end
-    return copied
-end
-
-local baseReconcileClientEventSession = Server.ReconcileClientEventSession
-function Server:ReconcileClientEventSession(clientName)
-    local result = baseReconcileClientEventSession and baseReconcileClientEventSession(self, clientName) or false
-    syncLiveNpcVariantIdentitiesToDraft(self)
-    return result
-end
-
-local function wrapEventUnitMutation(methodName)
-    local baseMethod = Server[methodName]
-    if type(baseMethod) ~= "function" then
-        return
-    end
-
-    Server[methodName] = function(self, ...)
-        local result = baseMethod(self, ...)
-        syncLiveNpcVariantIdentitiesToDraft(self)
-        return result
-    end
-end
-
-wrapEventUnitMutation("SetEventUnitActive")
-wrapEventUnitMutation("SetEventUnitHidden")
-wrapEventUnitMutation("SetEventUnitBoss")
-wrapEventUnitMutation("SetEventUnitTeam")
-wrapEventUnitMutation("SetEventUnitRaidMarker")
