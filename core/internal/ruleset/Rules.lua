@@ -38,6 +38,7 @@ Rules.Definitions = {
             { key = "health_stat", label = "Health Resource", type = "dropdown", default = "", description = "Select the resource reference used for maximum health calculations.", optionsSource = "resourceReference" },
             { key = "use_base_resource_fallback", label = "Use Base Resource Fallback", type = "checkbox", default = true, description = "Use a fallback fraction of resolved max resource when race/class data does not define a base resource." },
             { key = "base_resource_fallback", label = "Base Resource Fallback", type = "text", default = "1.0", description = "Fallback fraction from 0 to 1 used to derive base resources from resolved max values." },
+            { key = "enable_resource_regeneration_per_turn", label = "Enable Resource Regeneration Per Turn", type = "checkbox", default = true, description = "Automatically apply configured resource regeneration when an eligible unit's turn begins." },
         },
     },
     {

@@ -601,8 +601,8 @@ function AchievementsPage:Build(parent, owner)
             description = trimString(achievement.description),
             completed = completionTimestamp ~= nil,
             completionDate = getCompletionDate(completionTimestamp),
-            rewardStatus = type(AchievementTooltip.GetRewardStatus) == "function"
-                and AchievementTooltip:GetRewardStatus(detail)
+            rewardStatus = type(AchievementTooltip.GetRewardSummary) == "function"
+                and AchievementTooltip:GetRewardSummary(detail)
                 or "",
         })
         row:SetTooltip(function(owner)

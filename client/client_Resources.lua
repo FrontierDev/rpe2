@@ -9,6 +9,7 @@ local Debug = Addon.Debug
 local Common = Addon.Utils.Common or {}
 local Comms = Addon.Internal.Comms or {}
 local Profile = Addon.Internal.Profile or {}
+local Ruleset = Addon.Internal.Ruleset or {}
 local Operations = Comms.Operations or {}
 local ResourceSync = Comms.ResourceSync or {}
 
@@ -26,6 +27,19 @@ Client.PendingResourceDeltaFlushQueued = Client.PendingResourceDeltaFlushQueued 
 Client.PendingResourceDeltaFlushQueuedByScope = Client.PendingResourceDeltaFlushQueuedByScope or {}
 Client.PendingResourceDeltaBatches = Client.PendingResourceDeltaBatches or {}
 Client.LastAppliedTurnRegenKey = Client.LastAppliedTurnRegenKey or nil
+
+local function isTurnResourceRegenerationEnabled()
+    local activeRuleset = Ruleset and Ruleset.GetActiveRuleset and Ruleset.GetActiveRuleset() or nil
+    local ruleDefinition = Ruleset
+        and Ruleset.GetRulesetRuleDefinition
+        and Ruleset.GetRulesetRuleDefinition("resources", "enable_resource_regeneration_per_turn")
+        or nil
+    if not ruleDefinition or type(Ruleset.GetRulesetRuleValue) ~= "function" then
+        return true
+    end
+
+    return Ruleset.GetRulesetRuleValue(activeRuleset, "resources", ruleDefinition) ~= false
+end
 
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
@@ -1560,6 +1574,11 @@ function Client:ApplyLocalTurnStartResourceRegeneration(stateOverride, eventStat
         tostring(activeEventId),
     }, "\31")
     if self.LastAppliedTurnRegenKey == regenKey then
+        return false
+    end
+
+    if not isTurnResourceRegenerationEnabled() then
+        self.LastAppliedTurnRegenKey = regenKey
         return false
     end
 
