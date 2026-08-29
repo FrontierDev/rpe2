@@ -11,6 +11,8 @@ if type(EventWidget) ~= "table" or EventWidget._portraitReadinessExtensionInstal
     return true
 end
 
+local EVENT_LOG_BUTTON_ROW_BOTTOM_SPACING = 10
+
 local function getFrame(element)
     if type(element) == "table" and type(element.GetFrame) == "function" then
         return element:GetFrame()
@@ -34,11 +36,41 @@ local function arePortraitsReady(state)
         and state.startupReady == true
 end
 
+local function applyEventLogButtonRowSpacing(widget, state)
+    if type(widget) ~= "table" or type(state) ~= "table" or state.active ~= true then
+        return false
+    end
+
+    local buttonRowFrame = getFrame(widget.combatLogHistoryButtonRow)
+    if not buttonRowFrame then
+        return false
+    end
+
+    local contentFrame = arePortraitsReady(state)
+        and getFrame(widget.portraitPanel)
+        or getFrame(widget.waitingPanel)
+    if not contentFrame then
+        return false
+    end
+
+    contentFrame:ClearAllPoints()
+    contentFrame:SetPoint(
+        "TOP",
+        buttonRowFrame,
+        "BOTTOM",
+        0,
+        -EVENT_LOG_BUTTON_ROW_BOTTOM_SPACING
+    )
+    return true
+end
+
 function EventWidget:ApplyPortraitStartupVisibility(state, context)
     local ready = arePortraitsReady(state)
     local portraitHostFrame = getFrame(self.portraitPanel)
     local bossHostFrame = getFrame(self.bossPortraitPanel)
     local initiativeHostFrame = getFrame(self.initiativePortraitPanel)
+
+    applyEventLogButtonRowSpacing(self, state)
 
     if not ready then
         if portraitHostFrame and portraitHostFrame.Hide then
