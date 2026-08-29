@@ -45,10 +45,6 @@ function DataEditor:RefreshUnitInspectorResourceEditor()
         self.UnitInspectorPendingResourceValueInput:SetText(tostring(resource and resource.value or 0))
     end
 
-    if self.UnitInspectorPendingResourcePerPlayerInput then
-        self.UnitInspectorPendingResourcePerPlayerInput:SetText(tostring(resource and resource.perPlayer or 0))
-    end
-
     if self.UnitInspectorAddResourceButton and self.UnitInspectorAddResourceButton.SetText then
         self.UnitInspectorAddResourceButton:SetText(index and "Apply" or "Add")
     end
@@ -126,7 +122,6 @@ function DataEditor:BuildUnitInspectorResourceRows(unit)
             rowIndex = index,
             resourceText = self:ResolveUnitInspectorReferenceLabel("resources", entry and entry.resourceRef or ""),
             valueText = tostring(entry and entry.value or 0),
-            perPlayerText = tostring(entry and entry.perPlayer or 0),
         }
     end
 
@@ -174,9 +169,8 @@ function DataEditor:BuildUnitInspectorResourcesPage(page)
     self.UnitInspectorResourcesScroll:SetRowRenderer(function(row, item, itemIndex)
         if row.SetColumns then
             row:SetColumns({
-                { key = "resourceText", width = 148, justifyH = "LEFT" },
+                { key = "resourceText", width = 184, justifyH = "LEFT" },
                 { key = "valueText", width = 32, justifyH = "RIGHT" },
-                { key = "perPlayerText", width = 36, justifyH = "RIGHT" },
             })
         end
         if row.SetRowData then
@@ -207,7 +201,7 @@ function DataEditor:BuildUnitInspectorResourcesPage(page)
     root:AddChild(self.UnitInspectorPendingResourceRow)
 
     self.UnitInspectorPendingResourceDropdown = UI.CreateDropdown(self.UnitInspectorPendingResourceRow:GetFrame(), "RPEDataEditorUnitInspectorPendingResourceDropdown", {
-        width = 126,
+        width = 164,
         height = 18,
         items = {
             { label = "None", value = "" },
@@ -216,20 +210,12 @@ function DataEditor:BuildUnitInspectorResourcesPage(page)
     self.UnitInspectorPendingResourceRow:AddChild(self.UnitInspectorPendingResourceDropdown)
 
     self.UnitInspectorPendingResourceValueInput = UI.CreateTextInput(self.UnitInspectorPendingResourceRow:GetFrame(), "RPEDataEditorUnitInspectorPendingResourceValueInput", {
-        width = 30,
+        width = 32,
         height = 18,
         text = "0",
         borderColor = UI.ResolveColor(nil, "panel.border"),
     })
     self.UnitInspectorPendingResourceRow:AddChild(self.UnitInspectorPendingResourceValueInput)
-
-    self.UnitInspectorPendingResourcePerPlayerInput = UI.CreateTextInput(self.UnitInspectorPendingResourceRow:GetFrame(), "RPEDataEditorUnitInspectorPendingResourcePerPlayerInput", {
-        width = 30,
-        height = 18,
-        text = "0",
-        borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    self.UnitInspectorPendingResourceRow:AddChild(self.UnitInspectorPendingResourcePerPlayerInput)
 
     self.UnitInspectorAddResourceButton = UI.CreateButton(self.UnitInspectorPendingResourceRow:GetFrame(), "RPEDataEditorUnitInspectorAddResourceButton", "Add", 36, function()
         if self._refreshingUnitInspector then
@@ -247,18 +233,15 @@ function DataEditor:BuildUnitInspectorResourcesPage(page)
         end
 
         local value = tonumber(self.UnitInspectorPendingResourceValueInput and self.UnitInspectorPendingResourceValueInput:GetText()) or 0
-        local perPlayer = tonumber(self.UnitInspectorPendingResourcePerPlayerInput and self.UnitInspectorPendingResourcePerPlayerInput:GetText()) or 0
         self:CommitSelectedUnit(function(unit)
             unit.resources = unit.resources or {}
             if selectedIndex and unit.resources[selectedIndex] then
                 unit.resources[selectedIndex].resourceRef = resourceRef
                 unit.resources[selectedIndex].value = value
-                unit.resources[selectedIndex].perPlayer = perPlayer
             else
                 unit.resources[#unit.resources + 1] = {
                     resourceRef = resourceRef,
                     value = value,
-                    perPlayer = perPlayer,
                 }
             end
         end)
