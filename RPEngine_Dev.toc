@@ -37,6 +37,7 @@ core/internal/profile/Guild.lua
 core/internal/profile/Profile.lua
 core/internal/ruleset/Rules.lua
 core/internal/ruleset/Ruleset.lua
+core/internal/ruleset/NpcDifficulty.lua
 core/internal/Registry.lua
 core/internal/comms/ResourceSync.lua
 core/internal/Movement.lua
@@ -125,6 +126,7 @@ client/combat/Helpers.lua
 client/combat/Reaction.lua
 client/combat/Handles.lua
 client/combat/effects/Damage.lua
+client/combat/effects/NpcDifficulty.lua
 client/combat/effects/Heal.lua
 client/combat/effects/Aura.lua
 client/combat/effects/RemoveAura.lua
