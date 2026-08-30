@@ -115,8 +115,10 @@ server/server_EventAutopilot.lua
 server/server_EventVariants.lua
 server/server_EventResourceIntegration.lua
 server/server_EventSpellEquipmentVariants.lua
+server/server_EventAutopilotSchedule.lua
 client/client_Spellcasting.lua
 client/spellcasting/Helpers.lua
+client/spellcasting/HelpersAutopilotSchedule.lua
 client/spellcasting/Core.lua
 client/spellcasting/Cooldowns.lua
 client/spellcasting/Lifecycle.lua
@@ -207,6 +209,7 @@ core/ui/prefabs/TableRow.lua
 core/ui/prefabs/Table.lua
 client/ui/CombatText.lua
 client/ui/widgets/widget_Event.lua
+client/ui/widgets/widget_EventAutopilotSchedule.lua
 client/ui/widgets/widget_Event_CombatLogHistory.lua
 client/ui/widgets/widget_Event_PortraitReadiness.lua
 client/ui/widgets/widget_ActionBar.lua
