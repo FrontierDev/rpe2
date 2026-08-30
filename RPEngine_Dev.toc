@@ -43,6 +43,7 @@ core/internal/ruleset/NpcDifficulty.lua
 core/internal/Registry.lua
 core/internal/comms/ResourceSync.lua
 core/internal/Movement.lua
+core/internal/Autopilot.lua
 core/classes/Condition.lua
 
 client/client_Session.lua
@@ -102,6 +103,7 @@ core/classes/Achievement.lua
 core/classes/GuildSetting.lua
 core/classes/Currency.lua
 core/classes/Event.lua
+core/classes/EventAutopilotMode.lua
 core/classes/EventVariantNetwork.lua
 core/classes/EventVariantSpellEquipmentNetwork.lua
 
@@ -109,6 +111,7 @@ client/client_Event.lua
 client/client_CombatLog.lua
 client/client_Skills.lua
 server/server_Event.lua
+server/server_EventAutopilot.lua
 server/server_EventVariants.lua
 server/server_EventResourceIntegration.lua
 server/server_EventSpellEquipmentVariants.lua
@@ -249,6 +252,7 @@ server/ui/eventmanage/page_EventManageUnits.lua
 server/ui/eventmanage/page_EventManageVariantPresentation.lua
 server/ui/eventmanage/page_EventManageActions.lua
 server/ui/eventmanage/page_EventManageSettings.lua
+server/ui/eventmanage/page_EventManageAutopilot.lua
 server/ui/window_EventManage.lua
 client/ui/editor/pages/page_Datasets.lua
 client/ui/editor/pages/page_Units.lua
