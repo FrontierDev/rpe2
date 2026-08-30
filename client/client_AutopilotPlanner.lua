@@ -246,6 +246,10 @@ function Client:MarkAutopilotPlannerStepAwaitingClientSync(eventStateOverride)
     end
 
     runtime.pendingPlannerClientSync = identity
+    runtime.plannerStatus = "waiting-client-sync"
+    if type(self.QueueAutopilotDMHelperRefresh) == "function" then
+        self:QueueAutopilotDMHelperRefresh()
+    end
     return true
 end
 
@@ -559,6 +563,7 @@ if type(baseAdvanceEventStepAfterCommit) == "function" then
 
         if results[2] == true and isHostAutopilotEvent(self.EventState) then
             Client:MarkAutopilotPlannerStepAwaitingClientSync(self.EventState)
+            Client:EnsureAutopilotPlanAfterClientSync(Client.EventState)
         end
         return unpack(results, 2, results.n)
     end
