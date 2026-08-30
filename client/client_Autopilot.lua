@@ -423,6 +423,9 @@ local function seedPlayerPositions(runtime, eventState, options)
     local initialHostSample = type(options) == "table" and options.initialHostSample or nil
 
     for index = 1, #((eventState and eventState.units) or {}) do
+        if runtime.status ~= "ready" then
+            break
+        end
         local unit = eventState.units[index]
         if type(unit) == "table" and unit.isPlayer == true then
             local eventId = tonumber(unit.eventID) or 0
@@ -484,6 +487,9 @@ local function refreshPlayerUnits(runtime, eventState, players, turnNumber, tick
     local api = resolveApi(options)
 
     for index = 1, #(players or {}) do
+        if runtime.status ~= "ready" then
+            break
+        end
         local unit = players[index]
         local eventId = tonumber(unit and unit.eventID) or 0
         if eventId > 0 then
@@ -670,12 +676,13 @@ if type(baseGetNpcAutopilotCapability) == "function" then
     function Server:GetNpcAutopilotCapability(...)
         local results = pack(baseGetNpcAutopilotCapability(self, ...))
         if captureStartCapability == true then
-            if results[1] == true and type(results[3]) == "table" then
+            if results[1] == true then
+                local details = type(results[3]) == "table" and results[3] or {}
                 capturedStartCapabilityDetails = {
-                    x = results[3].x,
-                    y = results[3].y,
-                    z = results[3].z,
-                    instanceID = results[3].instanceID,
+                    x = details.x,
+                    y = details.y,
+                    z = details.z,
+                    instanceID = details.instanceID,
                 }
             else
                 capturedStartCapabilityDetails = nil
@@ -715,12 +722,12 @@ if type(baseEndEvent) == "function" then
     function Server:EndEvent(...)
         local eventId = getEventId(self.EventState)
         local results = pack(pcall(baseEndEvent, self, ...))
-        if eventId ~= "" then
-            Client:ClearAutopilotSpatialRuntime(eventId)
-        end
-
         if results[1] ~= true then
             error(results[2], 0)
+        end
+
+        if eventId ~= "" then
+            Client:ClearAutopilotSpatialRuntime(eventId)
         end
         return unpack(results, 2, results.n)
     end
