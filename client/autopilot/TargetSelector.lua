@@ -88,13 +88,13 @@ local function resolveCanonicalGroup(snapshot, groupKey)
         if type(candidates) ~= "table" and group == groups[1] then
             candidates = snapshot.targetCandidates
         end
-        return key, normalizePolicy(group.policy), copyArray(candidates), nil
+        return key, normalizePolicy(group.policy), type(candidates) == "table" and candidates or {}, nil
     end
 
     if groupKey ~= nil and tostring(groupKey) ~= "" then
         return nil, nil, nil, "target-group-unavailable"
     end
-    return nil, normalizePolicy(snapshot and snapshot.policy), copyArray(snapshot and snapshot.targetCandidates), nil
+    return nil, normalizePolicy(snapshot and snapshot.policy), type(snapshot and snapshot.targetCandidates) == "table" and snapshot.targetCandidates or {}, nil
 end
 
 local function getThreat(casterUnit, targetUnit)
