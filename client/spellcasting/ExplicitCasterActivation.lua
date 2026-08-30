@@ -13,7 +13,6 @@ local Event = Addon.Internal
     or nil
 
 local baseBuildSpellActivationSnapshot = Spellcasting.BuildSpellActivationSnapshot
-local baseResolveSpellActivationState = Spellcasting.ResolveSpellActivationState
 
 if type(baseBuildSpellActivationSnapshot) ~= "function"
     or type(Client.ResolveSpellActivation) ~= "function"
@@ -147,20 +146,20 @@ end
 local function resolveExplicitCasterContext(client, options)
     local casterEventId = normalizeEventUnitId(type(options) == "table" and options.casterEventId or nil)
     if not casterEventId then
-        return nil, nil, "missing-caster"
+        return nil, nil
     end
 
     local eventState = client.GetEventState and client:GetEventState() or nil
     if type(eventState) ~= "table" or eventState.active ~= true then
-        return nil, nil, "inactive"
+        return nil, nil
     end
 
     local casterUnit = findEventUnitById(eventState.units, casterEventId)
     if not isActiveNpcUnit(casterUnit) then
-        return eventState, nil, "invalid-caster"
+        return eventState, nil
     end
 
-    return eventState, casterUnit, nil
+    return eventState, casterUnit
 end
 
 function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
@@ -176,31 +175,6 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
 
     local proxy = buildExplicitCasterProxy(self, eventState, casterUnit)
     return baseBuildSpellActivationSnapshot(proxy, spellRef, resolvedOptions)
-end
-
-if type(baseResolveSpellActivationState) == "function" then
-    function Spellcasting.ResolveSpellActivationState(self, spellRef, options)
-        local resolvedOptions = type(options) == "table" and options or nil
-        if normalizeEventUnitId(resolvedOptions and resolvedOptions.casterEventId) == nil then
-            return baseResolveSpellActivationState(self, spellRef, options)
-        end
-
-        local snapshot = Spellcasting.BuildSpellActivationSnapshot(self, spellRef, resolvedOptions)
-        if type(snapshot) ~= "table" then
-            return baseResolveSpellActivationState(self, spellRef, {
-                includeText = resolvedOptions.includeText,
-                includeTargetCandidates = resolvedOptions.includeTargetCandidates,
-                snapshot = nil,
-            })
-        end
-
-        local stateOptions = {}
-        for key, value in pairs(resolvedOptions) do
-            stateOptions[key] = value
-        end
-        stateOptions.snapshot = snapshot
-        return baseResolveSpellActivationState(self, spellRef, stateOptions)
-    end
 end
 
 return Spellcasting
