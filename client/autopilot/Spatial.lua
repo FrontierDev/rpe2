@@ -23,7 +23,7 @@ end
 
 local function sameInstance(left, right)
     if left == nil or right == nil then
-        return true
+        return left == nil and right == nil
     end
     return tostring(left) == tostring(right)
 end
@@ -105,6 +105,9 @@ end
 function Spatial.DistanceBetweenPositions(leftPosition, rightPosition)
     if not Spatial.IsPositionAvailable(leftPosition) or not Spatial.IsPositionAvailable(rightPosition) then
         return nil, "position-unavailable"
+    end
+    if leftPosition.instanceID == nil or rightPosition.instanceID == nil then
+        return nil, "instance-unavailable"
     end
     if not sameInstance(leftPosition.instanceID, rightPosition.instanceID) then
         return nil, "instance-mismatch"
@@ -219,10 +222,13 @@ function Spatial.SetActorPosition(runtime, eventState, actorKey, position)
     if instanceID == nil then
         instanceID = runtime.instanceID
     end
-    if runtime.instanceID ~= nil and instanceID ~= nil and not sameInstance(runtime.instanceID, instanceID) then
+    if instanceID == nil then
+        return false, "instance-unavailable"
+    end
+    if runtime.instanceID ~= nil and not sameInstance(runtime.instanceID, instanceID) then
         return false, "instance-mismatch"
     end
-    if runtime.instanceID == nil and instanceID ~= nil then
+    if runtime.instanceID == nil then
         runtime.instanceID = instanceID
     end
 
