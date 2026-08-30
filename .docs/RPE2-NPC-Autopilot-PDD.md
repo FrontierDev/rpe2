@@ -3,9 +3,9 @@
 
 **Status:** Proposed  
 **Target:** RPEngine 2.0 (`FrontierDev/rpe2`)  
-**Scope:** Host-authoritative NPC planning, raid-marker cohort turns, cached player positions, host-side spatial simulation, spell/target selection, pending-action authorization, DM Helper UI, sliceable planning work  
+**Scope:** Host-authoritative NPC planning, raid-marker cohort turns, cached player positions, host-side spatial simulation, movement/control constraints, spell/target selection, pending-action authorization, DM Helper UI, sliceable planning work  
 **Primary objective:** Let RPE automatically determine sensible NPC actions while keeping every gameplay action under explicit DM authorization  
-**Related issues:** #100 Combat Log history, #101 host-only DM Helper  
+**Related issues:** #100 Combat Log history, #101 host-only DM Helper, #113–#123 NPC Autopilot implementation sequence  
 **Out of scope:** Blizzard instance support, automatic NPC action execution without DM authorization, pathfinding, collision/obstacle simulation, exact WoW hitboxes, player autopilot, LLM decision-making, authored behavior trees
 
 ---
@@ -29,7 +29,9 @@ NPC cohort turn becomes active
         ↓
 Sliceable autopilot planning job starts
         ↓
-Planner chooses movement recommendations, spells and targets
+Planner resolves movement/control constraints
+        ↓
+Planner jointly chooses one shared cohort position + NPC actions
         ↓
 Plan is published to DM Helper
         ↓
@@ -37,7 +39,7 @@ Every executable NPC action enters Pending Authorization
         ↓
 DM reviews each action
         ↓
-DM authorizes or rejects actions
+DM confirms movement and/or authorizes or rejects actions
         ↓
 Only authorized actions execute through normal RPE spellcasting
         ↓
@@ -53,6 +55,14 @@ Move {cross} near Player A, Player B.              [Confirm Moved] [Skip]
 [NPC 3] heals [NPC 1] with [Mend].                 [Authorize] [Reject]
 ```
 
+Pinned-marker example:
+
+```text
+{cross} cannot move because [NPC 2] is immobilized.
+[NPC 1] casts [Fire Bolt] at Player A.              [Authorize] [Reject]
+[NPC 2] attacks Player B with [Strike].             [Authorize] [Reject]
+```
+
 The planner should make common NPC decisions predictable:
 
 - urgent healing outranks damage;
@@ -60,7 +70,10 @@ The planner should make common NPC decisions predictable:
 - hostile targets are primarily selected by threat;
 - AoE spells begin with the highest-threat target and select nearby secondary targets;
 - melee planning uses a 5-yard spatial rule inferred from existing spell components;
-- NPCs sharing a raid marker act as one cohort;
+- NPCs sharing a raid marker act as one atomic, spatially indivisible cohort;
+- one raid marker always corresponds to one virtual cohort position;
+- the least-mobile active member constrains the entire marked cohort's movement;
+- a movement-control aura which reduces one marked member's movement to zero pins the entire marked cohort;
 - every cohort is planned from one frozen pre-action snapshot;
 - no planned spell action executes until the DM explicitly authorizes it.
 
@@ -76,6 +89,7 @@ Autopilot may automatically:
 - build a planning snapshot;
 - evaluate legal NPC spells;
 - choose targets;
+- resolve movement/control constraints;
 - propose shared raid-marker movement;
 - populate the DM Helper.
 
@@ -91,7 +105,7 @@ Autopilot must **not** automatically:
 - update threat as the result of a planned action;
 - commit a virtual marker move which the DM has not confirmed.
 
-Canonical gameplay state changes only after explicit DM authorization.
+Canonical gameplay state changes only after explicit DM authorization or explicit DM movement confirmation.
 
 ---
 
@@ -110,12 +124,11 @@ DM Helper is not merely a filtered combat log. It is the host's current-turn ope
 
 - autopilot planning status;
 - movement recommendations;
+- movement-blocked explanations;
 - pending NPC actions;
 - authorization controls;
 - rejected/stale/completed action state;
 - current-turn combat history where useful.
-
-Issue #101 should use this name and responsibility.
 
 ---
 
@@ -128,6 +141,7 @@ Participant clients must not independently:
 - evaluate NPC spell utility;
 - select NPC targets;
 - solve virtual marker positions;
+- resolve cohort movement constraints;
 - construct pending-autopilot actions;
 - authorize NPC actions;
 - receive DM-only movement instructions.
@@ -143,6 +157,26 @@ Autopilot is an explicit event mode because it changes NPC turn grouping and add
 Manual mode must retain the current event scheduling and NPC-control behavior.
 
 For the initial implementation, the mode is fixed when the event starts. Live conversion between manual and autopilot scheduling is out of scope because it can invalidate turn/tick, cast, aura and cooldown state.
+
+---
+
+## 2.5 A shared raid marker is one physical/spatial actor
+
+A non-zero raid marker is not merely a display label in Autopilot mode. It is the physical proxy for all active NPCs assigned to that marker.
+
+Therefore:
+
+```text
+one raid marker
+→ one TurnActor
+→ one virtual coordinate
+→ one movement allowance
+→ at most one proposed destination
+```
+
+A marked cohort **must never split** while its members share that marker.
+
+Autopilot may not solve movement conflicts by giving marked members separate hidden positions. If a group is represented by `{cross}`, every active member of `{cross}` remains mathematically co-located before and after any movement.
 
 ---
 
@@ -276,6 +310,30 @@ onCancel
 The queue currently defaults to an approximately 2 ms task/slice time budget.
 
 NPC planning must use this sliceable path directly. A normal `Tasks:Enqueue(function() planWholeCohort() end)` job is not sufficient because a deferred but indivisible planner can still hitch the frame.
+
+---
+
+## 4.7 Existing aura control state already models movement overrides
+
+`client/spellcasting/AuraManager.lua` already reduces active control effects into per-unit control state through:
+
+```lua
+AuraManager:BuildControlState(eventState, unitEventId)
+```
+
+That state includes:
+
+```lua
+movementRangeOverride
+```
+
+When several active control auras provide movement overrides, AuraManager already keeps the most restrictive override.
+
+The local-player movement path also resolves a normal movement-range value and then applies the aura movement-range override when present.
+
+Autopilot must reuse these semantics. It must not add a second `rooted`, `snared`, or movement-lock database.
+
+For NPCs, the spatial runtime needs an EventUnit-aware equivalent of the existing effective movement-range resolution.
 
 ---
 
@@ -490,7 +548,9 @@ raidMarker > 0 → marker:<raidMarker>
 raidMarker == 0 → unit:<eventID>
 ```
 
-All members of one marker cohort therefore share one virtual coordinate.
+All active members of one marker cohort share **exactly one** virtual coordinate.
+
+The runtime must not maintain a second marked-member coordinate which can diverge from the marker coordinate.
 
 Example runtime:
 
@@ -511,7 +571,108 @@ The model intentionally does not attempt pathfinding, obstacles, terrain or line
 
 ---
 
-# 9. Planning Snapshot
+## 8.1 No-split invariant
+
+For a cohort represented by `{cross}`:
+
+```text
+position(NPC A)
+= position(NPC B)
+= position(NPC C)
+= position(marker:cross)
+```
+
+A movement decision updates the marker coordinate once for the entire active cohort.
+
+Autopilot must never:
+
+- move only the mobile members;
+- leave an immobilized marked member behind while moving the marker;
+- create hidden individual coordinates to represent a split;
+- produce two movement instructions for the same marker in one plan.
+
+If independent movement is required, the units must no longer be represented by the same raid-marker cohort. Splitting a cohort is not a movement-resolver operation.
+
+---
+
+# 9. Movement Allowance and Control Effects
+
+Movement is constrained by the existing RPE movement system and current aura-control state.
+
+Autopilot should expose one reusable EventUnit-aware helper conceptually equivalent to:
+
+```lua
+Spatial.ResolveEffectiveMovementAllowance(eventState, eventUnit)
+```
+
+It should reuse existing RPE semantics rather than add Autopilot-specific movement rules.
+
+---
+
+## 9.1 Per-member effective movement allowance
+
+For an EventUnit, resolve:
+
+1. the existing configured/base movement-range value applicable to that unit;
+2. the unit's current aura control state;
+3. `movementRangeOverride` when present.
+
+`AuraManager:BuildControlState(eventState, unitEventId)` is the source of active aura movement-control state.
+
+Do not introduce a separate `rooted` boolean.
+
+The resolver should preserve canonical semantics for an unavailable/unconfigured base movement range rather than inventing an Autopilot-only fallback.
+
+---
+
+## 9.2 Cohort movement allowance
+
+For a marked cohort:
+
+```lua
+cohortMovementAllowance = minimum effective allowance of all active cohort members
+```
+
+The least-mobile active member constrains everyone sharing the marker.
+
+Critical behavior:
+
+```text
+NPC A movement = 20
+NPC B movement = 8
+NPC C movement = 15
+→ {cross} may move at most 8 yards
+```
+
+and:
+
+```text
+NPC A movement = 20
+NPC B movement = 0   -- e.g. movementRangeOverride = 0
+NPC C movement = 15
+→ {cross} is pinned
+→ no member of {cross} moves
+```
+
+This is a direct consequence of the no-split invariant.
+
+Only active cohort members constrain the active TurnActor.
+
+---
+
+## 9.3 Positive and zero control overrides
+
+A zero effective movement allowance means the current position is the only legal anchor.
+
+A positive restrictive override limits the maximum proposed displacement from the current marker position.
+
+Candidate destinations outside the effective cohort allowance are discarded before tactical scoring.
+
+If the cohort is pinned, the planner does not fail. It simply evaluates the cohort's best legal actions from the current marker position.
+
+---
+
+# 10. Planning Snapshot
 
 When an NPC actor/cohort becomes active, planning begins from one frozen logical snapshot.
 
@@ -530,6 +691,9 @@ resolved NPC spell refs
 cooldown/charge state
 conditions and affordability required by activation snapshots
 active auras relevant to legality
+per-member aura control state
+per-member effective movement allowance
+cohort movement allowance
 cached player positions
 virtual NPC/marker positions
 ```
@@ -540,7 +704,7 @@ Same-marker members are evaluated against this same baseline.
 
 ---
 
-# 10. Sliceable Planning Architecture
+# 11. Sliceable Planning Architecture
 
 Planning is always performed through `Tasks:EnqueueSliceable`.
 
@@ -548,7 +712,7 @@ No complete cohort planner may run synchronously from the EVENT_STATE handler or
 
 ---
 
-## 10.1 Minimal synchronous work
+## 11.1 Minimal synchronous work
 
 When a new NPC step becomes active, synchronous work should be limited to:
 
@@ -561,11 +725,11 @@ enqueue one sliceable planning job
 return
 ```
 
-Do not resolve every spell or target synchronously before enqueueing the job.
+Do not resolve every spell, target, movement control state, or marker anchor synchronously before enqueueing the job.
 
 ---
 
-## 10.2 Job identity and scope
+## 11.2 Job identity and scope
 
 Recommended identity:
 
@@ -579,8 +743,6 @@ Recommended scope:
 autopilot:<eventId>
 ```
 
-or a narrower plan-specific scope where useful.
-
 The job state holds cursors rather than relying on one long loop:
 
 ```lua
@@ -593,16 +755,18 @@ The job state holds cursors rather than relying on one long loop:
     npcIndex,
     spellIndex,
     targetIndex,
+    anchorIndex,
     phase,
     snapshot,
     scratch,
-    provisionalActions,
+    actionCandidates,
+    anchorCandidates,
 }
 ```
 
 ---
 
-## 10.3 Planning phases
+## 11.3 Planning phases
 
 A planning job should advance incrementally through phases such as:
 
@@ -613,9 +777,11 @@ resolve candidate spell refs
 resolve canonical activation snapshots
 classify spell intent
 evaluate targets
-score provisional actions
-solve shared marker position
-re-evaluate infeasible melee actions
+resolve per-member movement/control state
+resolve indivisible cohort movement allowance
+generate reachable shared-marker candidates
+evaluate whole-cohort action utility per anchor
+select shared marker position + member actions
 build pending authorization records
 finalize
 ```
@@ -624,7 +790,7 @@ Each phase must be resumable.
 
 ---
 
-## 10.4 Yield discipline
+## 11.4 Yield discipline
 
 Inside potentially repeated loops, use the supplied slice deadline:
 
@@ -643,13 +809,15 @@ step = function(state, deadlineMs, job)
 end
 ```
 
+The same rule applies to target loops, anchor generation, pairwise geometry and per-anchor cohort evaluation.
+
 The planner should normally stay within the queue's existing ~2 ms slice budget.
 
 Do not raise the global TaskQueue time budget to make autopilot fit.
 
 ---
 
-## 10.5 Stale checks
+## 11.5 Stale checks
 
 Use `isStale`/`staleCheck` to cancel work when:
 
@@ -667,11 +835,11 @@ schedule revision changed
 
 `onComplete` publishes the complete frozen plan to DM Helper and creates pending authorization records.
 
-**onComplete must not execute the actions.**
+**onComplete must not execute the actions or commit movement.**
 
 ---
 
-## 10.6 Cancellation lifecycle
+## 11.6 Cancellation lifecycle
 
 On event end:
 
@@ -685,7 +853,7 @@ A new plan replacing an obsolete plan should cancel the old plan before queueing
 
 ---
 
-# 11. Spell Candidate Resolution
+# 12. Spell Candidate Resolution
 
 Autopilot evaluates only spell refs resolved for the active NPC.
 
@@ -716,11 +884,11 @@ A spell with `canCast ~= true` is not a candidate.
 
 ---
 
-# 12. Spell Intent Classification
+# 13. Spell Intent Classification
 
 The initial planner should infer intent from existing spell components rather than adding AI metadata to Unit datasets.
 
-Required Phase 1 intents:
+Required initial intents:
 
 ```text
 damage
@@ -733,7 +901,7 @@ Unsupported pure-utility effects may be ignored by the tactical scorer in the fi
 
 ---
 
-## 12.1 Damage
+## 13.1 Damage
 
 A `damage` effect contributes offensive utility.
 
@@ -745,7 +913,7 @@ Actual hit, critical and variance behavior remains part of authorized spell exec
 
 ---
 
-## 12.2 Healing
+## 13.2 Healing
 
 A `heal` effect contributes healing utility.
 
@@ -759,11 +927,11 @@ This prevents large overheals from dominating the planner.
 
 ---
 
-# 13. Lightweight Decision Policy
+# 14. Lightweight Decision Policy
 
 The policy should be deterministic and intentionally small.
 
-## 13.1 Urgent healing
+## 14.1 Urgent healing
 
 If a living ally is at or below 50% health and a meaningful legal heal exists, healing outranks damage.
 
@@ -773,7 +941,7 @@ The 50% threshold is initially an internal constant.
 
 ---
 
-## 13.2 Useful healing
+## 14.2 Useful healing
 
 Outside the urgent tier, healing may still be selected when it produces meaningful effective healing rather than mostly overheal.
 
@@ -792,7 +960,7 @@ This ledger does not alter actual resources or health.
 
 ---
 
-## 13.3 Damage
+## 14.3 Damage
 
 If no higher-priority healing action is warranted, choose a legal damage action.
 
@@ -806,7 +974,7 @@ stable spellRef tie-break
 
 ---
 
-# 14. Hostile Target Selection
+# 15. Hostile Target Selection
 
 For each legal hostile target candidate:
 
@@ -833,7 +1001,7 @@ No separate aggro state is introduced.
 
 ---
 
-# 15. Healing Target Selection
+# 16. Healing Target Selection
 
 Healing does not use threat.
 
@@ -858,7 +1026,7 @@ Dead-target behavior remains controlled by existing spell policy and `allowDeadT
 
 ---
 
-# 16. Multi-Target / AoE Selection
+# 17. Multi-Target / AoE Selection
 
 Use the spell's existing target policy:
 
@@ -870,7 +1038,7 @@ requiresTarget
 allowDeadTargets
 ```
 
-## 16.1 Offensive AoE
+## 17.1 Offensive AoE
 
 ```text
 1. choose highest-threat valid primary enemy;
@@ -882,7 +1050,7 @@ allowDeadTargets
 
 If some secondary positions are unavailable, use resolvable nearest candidates first and stable threat/eventID fallback for remaining legal slots.
 
-## 16.2 Multi-target healing
+## 17.2 Multi-target healing
 
 Choose the most injured ally first, then additional allies by projected healing need until required/valuable target slots are filled.
 
@@ -890,7 +1058,7 @@ Do not fill optional slots with full-health units merely to reach `maxTargets` u
 
 ---
 
-# 17. Range and Melee Planning
+# 18. Range and Melee Planning
 
 No new spell range taxonomy is required.
 
@@ -908,48 +1076,159 @@ damageType = ranged → no melee-position requirement
 damageType = spell  → no melee-position requirement
 ```
 
-Healing receives no new range rule in Phase 1.
+Healing receives no new spell-range rule in the initial implementation.
 
 Do not add an `autopilotRange` field or require Dataset authors to duplicate the component damage type.
 
+Movement allowance and melee attack range are separate concepts:
+
+- movement allowance limits how far the shared marker may relocate this turn;
+- melee range determines whether a target is attackable from a candidate marker location.
+
 ---
 
-# 18. Shared Raid-Marker Movement Planning
+# 19. Joint Shared Raid-Marker Movement Planning
 
-A marked cohort has one shared virtual position, so individual NPCs cannot independently teleport beside different targets.
+A marked cohort has one shared virtual position. The resolver must choose a location which benefits the **whole cohort**, not simply satisfy the first NPC's preferred melee target.
 
-The planner first creates provisional actions, then collects targets required by melee actions.
+The old approach of choosing provisional actions first, selecting an anchor for those actions, then repairing incompatible NPCs is insufficient because the first set of provisional actions can bias the marker location.
 
-Candidate anchor points can include:
+The movement resolver should instead jointly evaluate marker position and member actions.
+
+---
+
+## 19.1 Generate member action candidates
+
+For each active cohort member, build a small deterministic set of plausible legal action/target candidates using the normal spell and target evaluators.
+
+Examples:
+
+```text
+highest-threat melee attack
+another legal melee target
+ranged/spell damage
+urgent heal
+other useful heal
+no action
+```
+
+The set should be bounded. This is not a general behavior tree search.
+
+---
+
+## 19.2 Generate candidate marker anchors
+
+Candidate shared positions may include:
 
 ```text
 current marker position
-each required melee target position
-centroid of required melee targets
-pairwise midpoints
+positions of relevant melee targets
+centroid of relevant melee targets
+pairwise midpoints / bounded pairwise points that can serve multiple targets
+other deterministic combat-relevant points derived from the same small target set
 ```
 
-Score candidates by:
+Do not search arbitrary free space exhaustively.
+
+Before tactical scoring, discard candidate anchors whose displacement from the current marker exceeds the resolved cohort movement allowance.
+
+If the cohort movement allowance is zero, the candidate set is exactly:
 
 ```text
-1. number of planned melee actions satisfied within 5 yards
-2. total utility of satisfied actions
-3. lower summed distance to required targets
-4. stable coordinate tie-break
-```
-
-If a chosen anchor leaves a provisional melee action infeasible, re-evaluate that NPC at the selected marker position:
-
-```text
-another melee target in range
-→ ranged/spell damage
-→ heal
-→ no action
+current marker position
 ```
 
 ---
 
-# 19. Movement Is Also DM-Controlled
+## 19.3 Evaluate the entire cohort at each anchor
+
+For each reachable candidate anchor:
+
+```text
+for each active NPC in the cohort:
+    determine that NPC's best feasible action from this same anchor
+
+aggregate all selected member actions
+score the resulting whole-cohort plan
+```
+
+Melee actions are feasible only when the target is within 5 yards of that candidate anchor.
+
+Ranged/spell/heal candidates remain subject to their normal legality/priority rules.
+
+A member whose preferred melee target is unreachable may therefore choose a different melee target, ranged/spell damage, a useful heal, or no action.
+
+The marker does **not** move again for that member.
+
+---
+
+## 19.4 Whole-cohort scoring heuristic
+
+The heuristic should favor the tactical utility available to the whole marker group.
+
+Conceptually:
+
+```text
+anchorScore =
+    sum(best feasible member action utility at anchor)
+    + useful-action coverage preference
+    + existing urgent-healing priority
+    - small movement/stability penalty
+```
+
+The exact numeric weights are implementation details, but deterministic comparison should prefer:
+
+```text
+1. higher aggregate cohort tactical utility
+2. more cohort members receiving a useful action
+3. current marker position when results are effectively equivalent
+4. lower movement distance
+5. stable coordinate/target tie-break
+```
+
+This prevents unnecessary marker churn and prevents one high-priority NPC from dictating an otherwise poor location for several companions.
+
+---
+
+## 19.5 Immobilized cohorts
+
+If any active marked member has effective movement allowance zero:
+
+```text
+cohort movement allowance = 0
+shared marker remains in place
+all members remain co-located
+```
+
+The planner then chooses each member's best action from the current marker position.
+
+The correct fallback is tactical action substitution, **not group splitting**.
+
+For example:
+
+```text
+NPC A cannot reach its melee target
+→ choose another melee target already within 5 yards
+→ otherwise ranged/spell damage
+→ otherwise useful heal
+→ otherwise no action
+```
+
+---
+
+## 19.6 Sliceability
+
+Candidate generation, movement-allowance resolution, pairwise geometry, per-anchor member evaluation and aggregate scoring must all be resumable planning work.
+
+Large cohorts/candidate sets must yield through:
+
+```lua
+Tasks:ShouldYield(deadlineMs)
+```
+
+---
+
+# 20. Movement Is Also DM-Controlled
 
 Autopilot cannot physically move a raid marker or NPC in the game world. It can only recommend a position.
 
@@ -969,6 +1248,7 @@ A movement record may contain:
     raidMarker = 4,
     objectiveTargetEventIds = { ... },
     proposedPosition = { x = ..., y = ... },
+    movementAllowance = ...,
     status = "pending",
 }
 ```
@@ -979,11 +1259,13 @@ The virtual marker position is **not committed** when planning finishes.
 
 It is committed only when the DM confirms that the marker has been moved.
 
+Confirmation commits one coordinate for the entire marker cohort.
+
 If the DM skips/rejects the movement, dependent melee spell proposals must not execute as though the move occurred.
 
 ---
 
-## 19.1 Movement dependencies
+## 20.1 Movement dependencies
 
 A planned spell action can declare:
 
@@ -998,10 +1280,11 @@ movement pending
     → spell remains pending but cannot be authorized yet
 
 movement confirmed
-    → commit virtual marker position
+    → revalidate shared cohort movement
+    → commit one virtual marker position
     → spell can be authorized after normal revalidation
 
-movement skipped/rejected
+movement skipped/rejected/blocked
     → dependent action becomes blocked/stale
     → DM may request Replan
 ```
@@ -1010,7 +1293,34 @@ This prevents the internal spatial model from claiming that a physical movement 
 
 ---
 
-# 20. Pending Authorization Model
+## 20.2 Confirm Moved revalidation
+
+Before committing a pending shared-marker movement, revalidate:
+
+```text
+same event/turn/tick/actor?
+same expected marker cohort?
+current active cohort members?
+current per-member movement/control state?
+current cohort movement allowance?
+proposed destination still reachable from committed marker position?
+```
+
+If a member becomes immobilized or another control effect reduces the cohort movement allowance below the proposed displacement:
+
+```text
+do not commit movement
+keep current shared marker coordinate
+mark movement blocked/stale
+block/stale dependent actions
+offer explicit Replan Pending
+```
+
+If a movement restriction is removed after the plan was generated, do not silently improve or extend the pending movement. The DM may explicitly replan.
+
+---
+
+# 21. Pending Authorization Model
 
 Every executable NPC action generated by Autopilot becomes a structured pending action.
 
@@ -1031,6 +1341,8 @@ PendingAutopilotAction {
     targetSelectionOrder,
     targetEventIds,
     requiresMovementActionId,
+    proposedPosition,
+    movementAllowance,
     explanation,
     status,
 }
@@ -1055,12 +1367,13 @@ Movement action status values:
 pending
 confirmed
 skipped
+blocked
 stale
 ```
 
 ---
 
-## 20.1 Planning completion does not mutate gameplay
+## 21.1 Planning completion does not mutate gameplay
 
 `onComplete` of the sliceable planner:
 
@@ -1072,11 +1385,11 @@ refreshes DM Helper
 returns
 ```
 
-It must not call the spell lifecycle.
+It must not call the spell lifecycle or commit virtual movement.
 
 ---
 
-## 20.2 Individual authorization
+## 21.2 Individual authorization
 
 The DM may authorize a pending spell action.
 
@@ -1091,7 +1404,7 @@ verify action still pending
         ↓
 verify event/turn/tick/actor identity
         ↓
-verify required movement confirmed
+verify required shared movement confirmed
         ↓
 revalidate caster/spell/targets through canonical spell rules
         ↓
@@ -1104,7 +1417,7 @@ If revalidation fails, the action becomes `stale` or `failed`; it is not silentl
 
 ---
 
-## 20.3 Reject
+## 21.3 Reject
 
 Rejecting a proposed action:
 
@@ -1120,14 +1433,14 @@ Automatic replanning after every rejection would make suggestions move underneat
 
 ---
 
-## 20.4 Authorize All
+## 21.4 Authorize All
 
 A cohort-level **Authorize All** control is useful, but it remains explicit DM authorization.
 
 It should:
 
 - authorize only currently pending executable actions;
-- respect unresolved movement dependencies;
+- respect unresolved shared movement dependencies;
 - process authorized spells in stable cohort member order;
 - revalidate each action before execution;
 - skip/mark stale any action invalidated by an earlier authorized action.
@@ -1136,7 +1449,7 @@ The existence of Authorize All must not cause automatic execution when a plan is
 
 ---
 
-# 21. Frozen Plan Semantics
+# 22. Frozen Plan Semantics
 
 Same-marker NPCs are planned from one pre-action snapshot.
 
@@ -1149,6 +1462,8 @@ same TurnStep
 +
 same frozen planning snapshot
 +
+one shared marker position
++
 one planned action per cohort member
 ```
 
@@ -1160,7 +1475,7 @@ The DM can explicitly request a new plan.
 
 ---
 
-# 22. Explicit-Caster Authorized Execution API
+# 23. Explicit-Caster Authorized Execution API
 
 Autopilot must not simulate action-bar clicks or targeting-widget interaction.
 
@@ -1197,7 +1512,7 @@ Autopilot must not directly call Damage/Heal effect contracts.
 
 ---
 
-# 23. NPC Spellcast Authority
+# 24. NPC Spellcast Authority
 
 Authorized autopilot actions remain ordinary:
 
@@ -1213,7 +1528,7 @@ Planning and authorization metadata remain host-local.
 
 ---
 
-# 24. DM Helper
+# 25. DM Helper
 
 DM Helper is the host-only companion panel opened from the event widget.
 
@@ -1229,7 +1544,7 @@ Only one companion-panel mode is open at a time.
 
 ---
 
-## 24.1 DM Helper contents
+## 25.1 DM Helper contents
 
 For the active turn, DM Helper can show:
 
@@ -1238,6 +1553,9 @@ Autopilot status: Planning / Ready / Suspended
 
 Movement Recommendations
   Move {cross} near Player A, Player B.     [Confirm Moved] [Skip]
+
+Movement Constraints
+  {skull} cannot move because Ogre Mage is immobilized.
 
 Pending NPC Actions
   [NPC 1] attacks Player A with Cleave.     [Authorize] [Reject]
@@ -1250,11 +1568,11 @@ Current-turn combat history
   ...normal resolved entries...
 ```
 
-The exact visual hierarchy may follow the existing companion-panel primitives, but authorization state must be obvious.
+The exact visual hierarchy may follow the existing companion-panel primitives, but authorization state and blocked movement must be obvious.
 
 ---
 
-## 24.2 Host-only data
+## 25.2 Host-only data
 
 Do not send planning rows or movement instructions through `COMBAT_LOG`.
 
@@ -1275,7 +1593,7 @@ NPC 3 should heal NPC 1.
 
 ---
 
-## 24.3 Combat Log interaction
+## 25.3 Combat Log interaction
 
 Once an action is authorized and executes, it produces ordinary combat-log entries.
 
@@ -1293,7 +1611,7 @@ The first is the DM decision record; the second is the actual game result.
 
 ---
 
-# 25. Plan and Action Idempotence
+# 26. Plan and Action Idempotence
 
 Key a plan by stable step identity, for example:
 
@@ -1321,9 +1639,11 @@ A `ready` plan is not regenerated unless:
 - the underlying step/schedule identity changes;
 - the plan becomes invalid before any action is authorized and the runtime intentionally replaces it.
 
+Movement/control changes while the DM is reviewing a ready plan should normally mark affected movement/actions stale or blocked rather than silently regenerating suggestions.
+
 ---
 
-# 26. Stale Action Guards
+# 27. Stale Action Guards
 
 Before authorization/execution, check:
 
@@ -1339,6 +1659,16 @@ targets still legal/alive as required?
 required movement confirmed?
 ```
 
+Before **movement confirmation**, additionally check:
+
+```text
+same marker cohort?
+current active cohort membership?
+current per-member movement/control state?
+current cohort movement allowance?
+proposed shared destination still reachable?
+```
+
 If the host advances the event while pending actions remain:
 
 ```text
@@ -1351,9 +1681,9 @@ Normal stale cancellation should not produce noisy error popups.
 
 ---
 
-# 27. Cooldowns, Cast Times, Auras and Resources
+# 28. Cooldowns, Cast Times, Auras and Resources
 
-Planning reads these systems through canonical activation state.
+Planning reads these systems through canonical activation state and aura/control state.
 
 Authorization/execution uses the normal lifecycle.
 
@@ -1361,11 +1691,13 @@ If a spell has a cast time, authorization starts the cast; existing turn advance
 
 If a pending action becomes unaffordable, loses a charge, becomes condition-blocked, or its target becomes invalid before authorization, revalidation prevents execution and marks the action stale/failed.
 
-No special autopilot versions of cooldown, aura, cost or resource systems are required.
+If a pending movement becomes illegal because movement-control state changed, movement confirmation fails and dependent actions become blocked/stale.
+
+No special autopilot versions of cooldown, aura, cost, resource or control systems are required.
 
 ---
 
-# 28. Performance Requirements
+# 29. Performance Requirements
 
 Autopilot must not add visible hitching to turn transitions.
 
@@ -1388,11 +1720,11 @@ no planner slice intentionally exceeds deadline
 DM Helper publish/refresh: small deferred/dirty refresh
 ```
 
-The planner should scale with the spells and valid targets of active NPCs, not all RPE datasets.
+The planner should scale with the spells, valid targets and bounded anchor candidates of active NPCs, not all RPE datasets or arbitrary world coordinates.
 
 ---
 
-## 28.1 Per-plan caches
+## 29.1 Per-plan caches
 
 Within one planning job cache:
 
@@ -1400,10 +1732,16 @@ Within one planning job cache:
 spell definition by spellRef
 activation state by caster+spell
 health by eventID
+aura/control movement state by eventID
+effective movement allowance by eventID
+cohort movement allowance
 position by eventID/actor key
 distance pairs
 expected effect magnitude by caster+spell
 candidate target ordering
+candidate marker anchors
+per-anchor member action results
+per-anchor aggregate score
 ```
 
 Discard scratch caches when the plan completes/cancels.
@@ -1412,9 +1750,9 @@ Do not create a long-lived global tactical cache unless profiling later proves i
 
 ---
 
-# 29. Runtime Lifecycle
+# 30. Runtime Lifecycle
 
-## 29.1 Event start
+## 30.1 Event start
 
 ```text
 start Autopilot event
@@ -1430,7 +1768,7 @@ build synchronized TurnSchedule
 clear old plans/actions
 ```
 
-## 29.2 Player turn end
+## 30.2 Player turn end
 
 ```text
 player ends turn
@@ -1444,7 +1782,7 @@ update cached stable position
 normal event transition continues
 ```
 
-## 29.3 NPC step begins
+## 30.3 NPC step begins
 
 ```text
 NPC actor/cohort becomes active
@@ -1453,7 +1791,9 @@ use existing cached player positions
         ↓
 queue sliceable planner
         ↓
-planner yields across frames as needed
+resolve cohort movement/control constraints
+        ↓
+evaluate reachable shared anchors + member actions across slices
         ↓
 complete frozen plan published
         ↓
@@ -1462,7 +1802,21 @@ DM Helper shows pending authorization
 NO action executes automatically
 ```
 
-## 29.4 Authorization
+## 30.4 Movement confirmation
+
+```text
+DM confirms movement
+        ↓
+revalidate cohort identity + movement/control state
+        ↓
+verify destination still reachable for least-mobile active member
+        ↓
+commit one shared marker coordinate
+        ↓
+unblock dependent actions
+```
+
+## 30.5 Authorization
 
 ```text
 DM authorizes action
@@ -1476,7 +1830,7 @@ update action status
 refresh DM Helper
 ```
 
-## 29.5 Event end
+## 30.6 Event end
 
 Clear/cancel:
 
@@ -1492,7 +1846,7 @@ TaskQueue autopilot scope
 
 ---
 
-# 30. Failure and Status Model
+# 31. Failure and Status Model
 
 Runtime status values can include:
 
@@ -1518,7 +1872,11 @@ NPC Autopilot unavailable in instanced content. Use Manual mode.
 
 Could not resolve Player A's cached position.
 
-[NPC 1] has no usable spell or valid target.
+{cross} cannot move because NPC 2 is immobilized.
+
+{cross} can move only 6 yards because NPC 3 is movement-limited.
+
+[NPC 1] has no usable spell or valid target from the shared marker position.
 
 [NPC 2] action became stale because its target is no longer valid.
 ```
@@ -1527,7 +1885,7 @@ Detailed scoring data belongs in debug logging, not normal DM text.
 
 ---
 
-# 31. Debugging and Instrumentation
+# 32. Debugging and Instrumentation
 
 A reproducible planning trace should include:
 
@@ -1542,13 +1900,20 @@ candidate targets
 threat values
 healing need
 expected damage/healing
-movement anchor candidates
-selected actions
+per-member movement allowance
+cohort movement allowance
+movement-control override source/value where relevant
+marker anchor candidates
+anchors rejected as unreachable
+per-anchor selected member actions
+per-anchor aggregate utility
+selected shared anchor
 yield count
 slice count
 max slice time
 plan total elapsed wall time
 authorization result
+movement-confirmation revalidation result
 execution revalidation result
 ```
 
@@ -1562,14 +1927,18 @@ This makes slow plans visible in existing timing diagnostics.
 
 ---
 
-# 32. Proposed Module Layout
+# 33. Proposed Module Layout
 
 ```text
 core/
   classes/
-    Event.lua
+    Event.lua / EventAutopilotMode.lua
       turnMode normalization/networking
       mode-aware TurnActor/TurnStep schedule
+
+core/internal/
+  Autopilot.lua
+      shared mode/capability helpers
 
 client/
   client_Autopilot.lua
@@ -1585,12 +1954,15 @@ client/
       player position cache updates
       vector/distance helpers
       virtual actor positions
-      marker anchor solver
+      EventUnit-aware movement allowance
+      indivisible cohort movement allowance
+      shared marker candidate generation/scoring
 
     Planner.lua
       sliceable planning state machine
       snapshot construction
       cohort planning
+      joint action/anchor evaluation
       frozen plan output
 
     SpellEvaluator.lua
@@ -1605,6 +1977,7 @@ client/
 
     Authorization.lua
       pending action lifecycle
+      movement revalidation
       dependency checks
       individual/bulk authorization
       rejection/replan
@@ -1625,6 +1998,9 @@ client/
     Cooldowns.lua
       explicit-caster activation snapshot support
 
+    AuraManager.lua
+      existing BuildControlState/movementRangeOverride source of truth
+
     Lifecycle.lua
       shared lower-level explicit-caster execution API
 
@@ -1638,12 +2014,12 @@ client/
       authorization controls
 
 server/
-  server_Event.lua
-      mode-aware turn/tick schedule state
+  server_Event.lua / server_EventAutopilot.lua
+      mode-aware event start and later turn/tick schedule state
 
   ui/eventmanage/
-    page_EventManageSettings.lua
-      Autopilot toggle
+    page_EventManageSettings.lua / page_EventManageAutopilot.lua
+      Autopilot control
       explicit no-instance warning
 
 core/internal/tasks/TaskQueue.lua
@@ -1653,7 +2029,7 @@ core/internal/tasks/TaskQueue.lua
 
 ---
 
-# 33. Implementation Phases
+# 34. Implementation Phases
 
 ## Phase 1 — Turn mode, scheduling and position cache
 
@@ -1661,13 +2037,14 @@ Implement:
 
 - `Event.turnMode`;
 - backward-tolerant network state;
-- Event Manager toggle;
+- Event Manager Autopilot control;
 - explicit instance warning;
 - raid-marker TurnActor/TurnStep scheduling;
 - mode-aware spellcaster eligibility;
 - initial player coordinate seed;
 - **one-player coordinate refresh on that player's turn end only**;
 - host virtual marker/NPC positions;
+- explicit one-coordinate/no-split invariant for marked cohorts;
 - event teardown.
 
 Acceptance:
@@ -1675,6 +2052,7 @@ Acceptance:
 ```text
 Manual events are unchanged.
 Same-marker NPCs are never split across turns.
+Same-marker NPCs share exactly one virtual coordinate.
 Unmarked NPCs remain independent actors.
 Autopilot does not continuously poll positions.
 NPC-step planning does not rescan player coordinates.
@@ -1684,7 +2062,7 @@ Autopilot is explicitly unavailable in instances.
 
 ---
 
-## Phase 2 — Sliceable planner
+## Phase 2 — Sliceable planner and shared movement resolver
 
 Implement:
 
@@ -1697,7 +2075,13 @@ Implement:
 - healing priorities;
 - AoE nearest-target ordering;
 - 5-yard melee planning;
-- shared marker anchor solver;
+- EventUnit-aware effective movement allowance;
+- reuse of AuraManager `movementRangeOverride` control state;
+- least-mobile marked-cohort movement allowance;
+- zero-movement pinning for the entire marked cohort;
+- bounded reachable shared marker anchors;
+- **joint whole-cohort action + anchor scoring**;
+- stability/movement penalty to avoid unnecessary marker movement;
 - frozen plan;
 - projected healing reservation.
 
@@ -1708,7 +2092,10 @@ No full cohort plan runs synchronously from a turn-transition handler.
 Planning can span multiple frames.
 Each planner slice respects the supplied deadline.
 Event/turn change cancels stale planning.
-Planner completion mutates no combat state.
+One immobilized marked member pins the whole marked cohort.
+The resolver never creates split positions for one marker.
+The chosen anchor maximizes aggregate cohort usefulness rather than one NPC's preferred target.
+Planner completion mutates no combat or spatial state.
 ```
 
 ---
@@ -1717,9 +2104,9 @@ Planner completion mutates no combat state.
 
 Implement:
 
-- rename Turn Summary → DM Helper;
 - host-only DM Helper companion-panel mode;
 - pending movement recommendations;
+- movement-blocked explanations;
 - pending spell-action records;
 - Authorize / Reject controls;
 - Confirm Moved / Skip controls;
@@ -1727,6 +2114,7 @@ Implement:
 - explicit Replan Pending;
 - action status rendering;
 - movement dependency blocking;
+- movement-confirmation revalidation against current cohort control state;
 - current-turn combat history integration where appropriate.
 
 Acceptance:
@@ -1736,6 +2124,8 @@ A generated plan produces pending actions only.
 No spell starts when planning completes.
 Every executable NPC spell requires explicit DM authorization.
 Movement recommendations do not commit virtual positions until confirmed.
+Confirm Moved commits one shared marker position for the whole cohort.
+A newly immobilized marked member prevents an obsolete movement proposal from being confirmed.
 Participants never receive DM Helper planning data.
 ```
 
@@ -1766,7 +2156,7 @@ An invalidated target causes stale/skip rather than silent retargeting.
 
 ---
 
-# 34. Test Matrix
+# 35. Test Matrix
 
 ## Turn scheduling
 
@@ -1794,11 +2184,36 @@ An invalidated target causes stale/skip rather than silent retargeting.
 - instance start rejected;
 - capability becomes unavailable mid-event.
 
+## Spatial cohort invariants
+
+- one marked NPC uses marker coordinate;
+- three marked NPCs all resolve to exactly the same coordinate;
+- no hidden per-member marked coordinates are created;
+- one shared movement updates every marked member through the actor coordinate;
+- no plan contains two movement destinations for the same marker;
+- resolver never moves some members and leaves others behind.
+
+## Movement/control resolution
+
+- no control aura;
+- positive movement-range override on one member;
+- several positive overrides, least-mobile member wins;
+- `movementRangeOverride = 0` on one member pins the whole marker;
+- several control auras on one member use existing AuraManager-most-restrictive behavior;
+- pinned cohort still chooses ranged/heal/melee-in-place actions;
+- ideal tactical anchor outside movement allowance is rejected;
+- best reachable anchor is selected;
+- current anchor wins when movement adds negligible value;
+- movement restriction appears after planning but before Confirm Moved;
+- movement restriction is removed after planning and requires explicit Replan to exploit.
+
 ## Sliceable planning
 
 - tiny single-NPC plan completes in one slice;
 - large cohort requires several slices;
 - repeated spell/target loops yield at deadline;
+- anchor-generation loops yield at deadline;
+- per-anchor cohort scoring yields/resumes correctly;
 - event ends mid-plan;
 - turn advances mid-plan;
 - replacement plan cancels old job;
@@ -1821,7 +2236,10 @@ An invalidated target causes stale/skip rather than silent retargeting.
 - offensive AoE;
 - multi-target heal;
 - melee target requiring marker movement;
-- shared marker with incompatible melee targets.
+- two compatible melee targets served from one anchor;
+- incompatible melee targets cause whole-cohort anchor comparison;
+- one NPC's highest-value melee target does not dictate a worse group location when another anchor has greater aggregate utility;
+- pinned member causes mobile companions to choose viable fallback actions rather than splitting.
 
 ## Authorization
 
@@ -1832,7 +2250,9 @@ An invalidated target causes stale/skip rather than silent retargeting.
 - Authorize All;
 - repeated click cannot double-execute;
 - movement required before melee authorization;
-- Confirm Moved commits virtual position;
+- Confirm Moved revalidates current cohort movement allowance;
+- Confirm Moved commits one shared marker coordinate;
+- newly rooted member blocks stale movement confirmation;
 - Skip movement blocks dependent melee action;
 - target dies before authorization;
 - resource becomes insufficient before authorization;
@@ -1845,6 +2265,7 @@ An invalidated target causes stale/skip rather than silent retargeting.
 - participant does not;
 - DM Helper shows Planning state while sliceable job runs;
 - completed planner populates pending action rows;
+- pinned/limited marker explanation is understandable;
 - authorization status updates immediately;
 - rejected/stale rows are distinguishable;
 - current-turn combat entries remain available;
@@ -1853,7 +2274,7 @@ An invalidated target causes stale/skip rather than silent retargeting.
 
 ---
 
-# 35. Explicit Non-Goals
+# 36. Explicit Non-Goals
 
 This design does not implement:
 
@@ -1867,7 +2288,9 @@ pathfinding
 navmesh generation
 terrain collision
 line-of-sight simulation
-NPC movement-speed budgets
+movement path simulation or terrain-aware travel cost
+splitting a marked cohort into multiple virtual positions
+hidden per-member positions for NPCs sharing one marker
 exact Blizzard hitboxes
 autopilot inside restricted instances
 distributed client AI
@@ -1882,9 +2305,11 @@ automatic replanning whenever the DM rejects one suggestion
 network synchronization of DM-only plans or virtual NPC coordinates
 ```
 
+Autopilot **does** respect the existing RPE one-turn movement-range/control state needed to determine whether a shared marker destination is reachable. That is distinct from simulating movement speed, paths, obstacles or travel time.
+
 ---
 
-# 36. Principal Architectural Decisions
+# 37. Principal Architectural Decisions
 
 **Autopilot is a host-authoritative planner, not an automatic executor.**
 
@@ -1892,9 +2317,23 @@ network synchronization of DM-only plans or virtual NPC coordinates
 
 **No planned spell changes gameplay state until the DM explicitly authorizes it.**
 
-**Turn Summary is renamed DM Helper and becomes the host's planning/authorization surface.**
+**DM Helper is the host's planning/authorization surface.**
 
-**Movement proposals are also DM-controlled; virtual marker positions are committed only when the DM confirms the physical move.**
+**Movement proposals are DM-controlled; virtual marker positions are committed only when the DM confirms the physical move.**
+
+**A non-zero raid marker represents one spatially indivisible actor. Marked members may never split into separate virtual positions while they share that marker.**
+
+**All active NPCs sharing one raid marker occupy exactly one virtual coordinate.**
+
+**The marker's movement allowance is constrained by its least-mobile active member.**
+
+**Existing RPE movement-range and AuraManager control state are authoritative; Autopilot does not add a second rooted/snare system.**
+
+**A movement-control aura which reduces any active marked member's effective movement allowance to zero pins the entire marker cohort.**
+
+**The shared-marker resolver jointly chooses the marker anchor and each member's action by aggregate whole-cohort utility. One NPC's preferred target does not dictate the marker location.**
+
+**When movement is impossible or limited, NPCs change actions before the group is ever allowed to split.**
 
 **Player positions are initialized at event start and recalculated only when that player ends their turn.**
 
@@ -1906,11 +2345,9 @@ network synchronization of DM-only plans or virtual NPC coordinates
 
 **Planning jobs use stale checks and scoped cancellation so obsolete event/turn work cannot publish actions.**
 
-**NPCs sharing a non-zero raid marker form one atomic TurnActor and share one virtual position.**
+**NPCs sharing a non-zero raid marker form one atomic TurnActor and share one frozen pre-action snapshot.**
 
 **Unmarked NPCs remain singleton actors.**
-
-**Same-marker decisions are generated from one frozen pre-action snapshot.**
 
 **The existing NPC threat table is the hostile targeting source of truth.**
 
@@ -1930,7 +2367,7 @@ network synchronization of DM-only plans or virtual NPC coordinates
 
 ---
 
-# 37. External WoW API Constraint
+# 38. External WoW API Constraint
 
 The spatial portion of the design relies on the current WoW API behavior of `UnitPosition(unit)` and the current instance state exposed through `IsInInstance()`.
 
