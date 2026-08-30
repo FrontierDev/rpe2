@@ -129,6 +129,9 @@ client/spellcasting/Core.lua
 client/spellcasting/Cooldowns.lua
 client/spellcasting/Lifecycle.lua
 client/spellcasting/AuraManager.lua
+client/autopilot/MovementAllowance.lua
+client/autopilot/MovementSolver.lua
+client/autopilot/PlannerMovement.lua
 client/spellcasting/effects/Damage.lua
 client/spellcasting/effects/Heal.lua
 client/spellcasting/effects/Aura.lua
