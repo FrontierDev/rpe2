@@ -18,7 +18,6 @@ end
 
 local HELPER_BUTTON_HEIGHT = 20
 local HELPER_CONTROL_HEIGHT = 50
-local HELPER_VISIBLE_ROWS = 6
 
 local function getFrame(element)
     if type(element) == "table" and type(element.GetFrame) == "function" then
@@ -240,84 +239,28 @@ function EventWidget:EnsureAutopilotHelperUI()
         function()
             if type(Client.ReplanPendingAutopilotPlan) == "function" then
                 Client:ReplanPendingAutopilotPlan(getActiveEventState())
-                self.selectedDMHelperActionId = nil
+                if type(self.ClearDMHelperSelection) == "function" then
+                    self:ClearDMHelperSelection()
+                else
+                    self.selectedDMHelperActionId = nil
+                end
                 self:RefreshCombatLogHistoryPanel()
             end
         end
     )
     getFrame(self.autopilotHelperReplanButton):SetPoint("LEFT", getFrame(self.autopilotHelperAuthorizeAllButton), "RIGHT", 4, 0)
 
-    self._autopilotHelperBaseDMRenderer = self._dmHelperRowRenderer
-    self._autopilotHelperBaseVisibleRows = self.combatLogHistoryScroll.visibleRows or 8
-    self._autopilotHelperRenderer = function(row, item)
-        if type(self._autopilotHelperBaseDMRenderer) == "function" then
-            self._autopilotHelperBaseDMRenderer(row, item)
-        elseif row and type(row.SetText) == "function" then
-            row:SetText(tostring(item and item.text or ""))
-        end
-
-        local actionId = tostring(item and item.actionId or "")
-        local selected = actionId ~= "" and actionId == tostring(self.selectedDMHelperActionId or "")
-        if selected and row and type(row.SetText) == "function" then
-            row:SetText("> " .. tostring(item and item.text or ""))
-        end
-
-        local rowFrame = getFrame(row)
-        if rowFrame and type(rowFrame.EnableMouse) == "function" then
-            rowFrame:EnableMouse(actionId ~= "")
-        end
-        if rowFrame and type(rowFrame.SetScript) == "function" then
-            if actionId ~= "" then
-                rowFrame:SetScript("OnMouseUp", function(_, button)
-                    if button == "LeftButton" and isHostAutopilotEvent(getActiveEventState()) then
-                        self.selectedDMHelperActionId = actionId
-                        if self.combatLogHistoryScroll and type(self.combatLogHistoryScroll.RefreshRows) == "function" then
-                            self.combatLogHistoryScroll:RefreshRows()
-                        end
-                        self:RefreshAutopilotHelperControls()
-                    end
-                end)
-            else
-                rowFrame:SetScript("OnMouseUp", nil)
-            end
-        end
-    end
-
     setShown(self.autopilotHelperControlFrame, false)
     return true
 end
 
 local function configureAutopilotControlsForMode(self)
-    local scroll = self.combatLogHistoryScroll
-    local scrollFrame = getFrame(scroll)
-    local titleFrame = getFrame(self.combatLogHistoryTitle)
-    local contentFrame = self.combatLogHistoryPanel and self.combatLogHistoryPanel:GetContentFrame() or nil
-    if not scroll or not scrollFrame or not titleFrame or not contentFrame then
-        return false
-    end
-
     local active = tostring(self.combatLogHistoryMode or "") == "dm-helper"
         and isHostAutopilotEvent(getActiveEventState())
-    if active then
-        scroll.visibleRows = HELPER_VISIBLE_ROWS
-        scrollFrame:ClearAllPoints()
-        scrollFrame:SetPoint("TOPLEFT", titleFrame, "BOTTOMLEFT", 0, -4)
-        scrollFrame:SetPoint("BOTTOMRIGHT", contentFrame, "BOTTOMRIGHT", 0, HELPER_CONTROL_HEIGHT + 2)
-        if scroll.rowRenderer ~= self._autopilotHelperRenderer then
-            scroll:SetRowRenderer(self._autopilotHelperRenderer)
-        end
-    else
-        scroll.visibleRows = self._autopilotHelperBaseVisibleRows or 8
-        scrollFrame:ClearAllPoints()
-        scrollFrame:SetPoint("TOPLEFT", titleFrame, "BOTTOMLEFT", 0, -4)
-        scrollFrame:SetPoint("BOTTOMRIGHT", contentFrame, "BOTTOMRIGHT", 0, 0)
-    end
 
-    if type(scroll.EnsureVisibleRowCount) == "function" then
-        scroll:EnsureVisibleRowCount()
-    end
-    if type(scroll.UpdateGeometry) == "function" then
-        scroll:UpdateGeometry()
+    setShown(self.autopilotHelperControlFrame, active)
+    if type(self.ConfigureDMHelperLayout) == "function" then
+        self:ConfigureDMHelperLayout(active and (HELPER_CONTROL_HEIGHT + 2) or 0)
     end
     self:RefreshAutopilotHelperControls()
     return active
@@ -350,6 +293,11 @@ function EventWidget:RefreshCombatLogHistoryPanel(...)
         and type(self.combatLogHistoryScroll.RefreshRows) == "function"
     then
         self.combatLogHistoryScroll:RefreshRows()
+    end
+    if tostring(self.combatLogHistoryMode or "") == "dm-helper"
+        and type(self.RefreshDMHelperDetail) == "function"
+    then
+        self:RefreshDMHelperDetail()
     end
     return result
 end
