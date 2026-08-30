@@ -21,7 +21,6 @@ if type(Event) ~= "table" or type(Planner) ~= "table" then
 end
 
 local DEFAULT_MAX_EVENT_UNITS = 5
-local advanceEventStepDepth = 0
 
 local function pack(...)
     return { n = select("#", ...), ... }
@@ -156,6 +155,16 @@ local function updateRuntimeAfterCancellation(runtime, plan, reason)
     end
 end
 
+local function hasCurrentBatch(runtime)
+    if type(runtime) ~= "table" then
+        return false
+    end
+    return tostring(runtime.activePlanId or "") ~= ""
+        or next(type(runtime.planByStepKey) == "table" and runtime.planByStepKey or {}) ~= nil
+        or tostring(runtime.activeAuthorizationPlanId or "") ~= ""
+        or next(type(runtime.authorizationByPlanId) == "table" and runtime.authorizationByPlanId or {}) ~= nil
+end
+
 function Client:GetAutopilotPlannerRuntime(eventState)
     return getPlannerRuntime(eventState)
 end
@@ -215,7 +224,7 @@ function Client:CancelAutopilotPlannerScope(eventId, reason)
     return Tasks:CancelScope("autopilot:" .. normalizedEventId, reason or "event-cancelled")
 end
 
-function Client:ResetAutopilotBatchState(eventId, reason)
+function Client:ClearAutopilotBatch(eventId, reason)
     local normalizedEventId = tostring(eventId or "")
     if normalizedEventId == "" then
         return false
@@ -230,61 +239,47 @@ function Client:ResetAutopilotBatchState(eventId, reason)
 
     ensurePlannerRuntimeFields(runtime)
 
-    -- Detach the active pointer before cancellation callbacks run so obsolete
-    -- planner callbacks cannot republish status into the reset batch. Keep the
-    -- records alive until the scope has been cancelled, then dispose them.
+    -- The plan/authorization batch is disposable. Spatial/runtime state on the
+    -- same table intentionally survives until the event itself ends.
     runtime.activePlanId = nil
     runtime.lastCompletedPlanId = nil
     runtime.currentPlannerActorKey = nil
     runtime.currentPlannerScheduleRevision = nil
 
+    -- Cancel live planner work while its records are still present so terminal
+    -- callbacks can release their scratch state safely, then discard the batch.
     self:CancelAutopilotPlannerScope(normalizedEventId, reason or "batch-reset")
     runtime.planByStepKey = {}
+
+    if type(self.ResetAutopilotAuthorizationBatch) == "function" then
+        self:ResetAutopilotAuthorizationBatch(normalizedEventId, reason or "batch-reset")
+    else
+        runtime.authorizationByPlanId = {}
+        runtime.activeAuthorizationPlanId = nil
+        runtime.authorizationStatus = "ready"
+    end
 
     if runtime.status == "ready" then
         runtime.plannerStatus = "ready"
     end
 
-    -- Clear legacy #127/#133/#135 transient fields if this session was already
-    -- running when the addon code changed. They are not part of the new model.
+    -- Remove transient state from earlier planner lifecycle designs if an addon
+    -- reload preserved it on the event-scoped runtime.
     runtime.pendingPlannerClientSync = nil
     runtime.pendingCombatSettlementsByCastId = nil
     runtime.postSettlementPlanId = nil
     runtime.postSettlementReplanUsed = nil
     runtime.plannerFailureReason = nil
-
-    if type(self.ResetAutopilotAuthorizationBatch) == "function" then
-        self:ResetAutopilotAuthorizationBatch(normalizedEventId, reason or "batch-reset")
-    end
     return true
 end
 
-local function cancelObsoleteActivePlan(runtime, nextPlanId, reason)
-    if type(runtime) ~= "table" then
-        return false
-    end
-
-    local activePlanId = tostring(runtime.activePlanId or "")
-    if activePlanId == "" or activePlanId == tostring(nextPlanId or "") then
-        return false
-    end
-
-    local activePlan = runtime.planByStepKey and runtime.planByStepKey[activePlanId] or nil
-    if type(activePlan) == "table"
-        and (activePlan.status == "queued" or activePlan.status == "planning")
-        and activePlan.job
-        and type(Tasks.Cancel) == "function"
-    then
-        Tasks:Cancel(activePlan.job, reason or "replaced")
-    end
-
-    if tostring(runtime.activePlanId or "") == activePlanId then
-        runtime.activePlanId = nil
-    end
-    return true
+-- Compatibility for callers from the #136 implementation. New code should use
+-- ClearAutopilotBatch so the ownership boundary is explicit.
+function Client:ResetAutopilotBatchState(eventId, reason)
+    return self:ClearAutopilotBatch(eventId, reason)
 end
 
-function Client:EnsureAutopilotPlanForCurrentStep(eventStateOverride)
+function Client:StartAutopilotStep(eventStateOverride)
     local eventState = eventStateOverride or Server.EventState
     local runtime, runtimeReason = getPlannerRuntime(eventState)
     if type(runtime) ~= "table" then
@@ -303,23 +298,35 @@ function Client:EnsureAutopilotPlanForCurrentStep(eventStateOverride)
     local stepCapacity = getMaxEventUnits()
     local descriptor, descriptorReason = Planner.ResolveActiveNpcStep(eventState, stepCapacity)
     if type(descriptor) ~= "table" then
+        if hasCurrentBatch(runtime) then
+            self:ClearAutopilotBatch(getEventId(eventState), descriptorReason or "step-without-npc")
+            runtime = select(1, getPlannerRuntime(eventState)) or runtime
+        end
         runtime.currentPlannerActorKey = nil
         runtime.currentPlannerScheduleRevision = nil
-        if descriptorReason == "no-npc-actor" then
-            cancelObsoleteActivePlan(runtime, nil, "actor-changed")
+        if runtime.status == "ready" then
             runtime.plannerStatus = "ready"
         end
         return nil, false, descriptorReason
     end
-
-    runtime.currentPlannerActorKey = tostring(descriptor.actorKey or "")
-    runtime.currentPlannerScheduleRevision = tostring(descriptor.scheduleRevision or "")
 
     local planId = Planner.BuildPlanIdentity(eventState, descriptor, descriptor.scheduleRevision)
     if type(planId) ~= "string" or planId == "" then
         runtime.plannerStatus = "failed"
         return nil, false, "plan-identity-unavailable"
     end
+
+    local activePlanId = tostring(runtime.activePlanId or "")
+    if activePlanId ~= "" and activePlanId ~= planId then
+        self:ClearAutopilotBatch(getEventId(eventState), "step-replaced")
+        runtime, runtimeReason = getPlannerRuntime(eventState)
+        if type(runtime) ~= "table" then
+            return nil, false, runtimeReason
+        end
+    end
+
+    runtime.currentPlannerActorKey = tostring(descriptor.actorKey or "")
+    runtime.currentPlannerScheduleRevision = tostring(descriptor.scheduleRevision or "")
 
     local existing = runtime.planByStepKey[planId]
     if type(existing) == "table"
@@ -328,8 +335,6 @@ function Client:EnsureAutopilotPlanForCurrentStep(eventStateOverride)
         runtime.activePlanId = planId
         return existing, false
     end
-
-    cancelObsoleteActivePlan(runtime, planId, "replaced")
 
     local state = Planner.CreateState(eventState, descriptor, descriptor.scheduleRevision, planId)
     if type(state) ~= "table" then
@@ -427,55 +432,73 @@ function Client:EnsureAutopilotPlanForCurrentStep(eventStateOverride)
     return plan, true
 end
 
+-- Compatibility for current callers. This is now only an idempotent alias for
+-- the single start-of-step entry point; it does not own transition lifecycle.
+function Client:EnsureAutopilotPlanForCurrentStep(eventStateOverride)
+    return self:StartAutopilotStep(eventStateOverride)
+end
+
+-- Replan is deliberately destructive only to the disposable batch. Any game
+-- state already committed by earlier actions (casts, movement, resources, etc.)
+-- remains and is read by the replacement plan.
 function Client:ReplaceAutopilotPlanForCurrentStep(eventStateOverride)
     local eventState = eventStateOverride or Server.EventState
-    local runtime, reason = getPlannerRuntime(eventState)
-    if type(runtime) ~= "table" then
-        return nil, false, reason
+    if not isHostAutopilotEvent(eventState) then
+        return nil, false, "not-host-autopilot"
+    end
+    local eventId = getEventId(eventState)
+    if eventId == "" then
+        return nil, false, "event-unavailable"
+    end
+    self:ClearAutopilotBatch(eventId, "dm-replan")
+    return self:StartAutopilotStep(eventState)
+end
+
+function Client:ReplanAutopilotCurrentStep(eventStateOverride)
+    return self:ReplaceAutopilotPlanForCurrentStep(eventStateOverride)
+end
+
+local function queueAutopilotStepStart(eventState, reason)
+    if not isHostAutopilotEvent(eventState) then
+        return false
     end
 
-    if type(Planner.ResolveActiveNpcStep) ~= "function"
-        or type(Planner.BuildPlanIdentity) ~= "function"
-    then
-        return nil, false, "planner-api-unavailable"
+    local expectedEventId = getEventId(eventState)
+    local expectedTurnNumber = tonumber(eventState.turnNumber)
+    local expectedTickNumber = tonumber(eventState.tickNumber)
+    if expectedEventId == "" or expectedTurnNumber == nil or expectedTickNumber == nil then
+        return false
     end
 
-    local descriptor, descriptorReason = Planner.ResolveActiveNpcStep(eventState, getMaxEventUnits())
-    if type(descriptor) ~= "table" then
-        return nil, false, descriptorReason
-    end
-
-    local planId = Planner.BuildPlanIdentity(eventState, descriptor, descriptor.scheduleRevision)
-    local existing = planId and runtime.planByStepKey[planId] or nil
-    if type(existing) == "table" then
-        if existing.job and type(Tasks.Cancel) == "function" then
-            Tasks:Cancel(existing.job, "replan")
-        else
-            markPlanCancelled(existing, "replan")
+    local function startIfCurrent()
+        local serverState = Server.EventState
+        local clientState = type(Client.GetEventState) == "function" and Client:GetEventState() or Client.EventState
+        if not isHostAutopilotEvent(serverState)
+            or getEventId(serverState) ~= expectedEventId
+            or tonumber(serverState.turnNumber) ~= expectedTurnNumber
+            or tonumber(serverState.tickNumber) ~= expectedTickNumber
+            or not sameEventStep(clientState, serverState)
+        then
+            return
         end
-        runtime.planByStepKey[planId] = nil
-        if runtime.activePlanId == planId then
-            runtime.activePlanId = nil
-        end
+        Client:StartAutopilotStep(serverState)
     end
 
-    return self:EnsureAutopilotPlanForCurrentStep(eventState)
+    if type(Tasks.Enqueue) == "function" then
+        Tasks:Enqueue(startIfCurrent)
+        return true
+    end
+
+    startIfCurrent()
+    return true
 end
 
 local function ensureAfterScheduleMutation(server)
-    if advanceEventStepDepth > 0 then
-        return
-    end
-
     local eventState = server and server.EventState or nil
     if not isHostAutopilotEvent(eventState) then
         return
     end
-    if not sameEventStep(Client.EventState, eventState) then
-        return
-    end
-
-    Client:EnsureAutopilotPlanForCurrentStep(eventState)
+    queueAutopilotStepStart(eventState, "schedule-mutated")
 end
 
 local function wrapScheduleMutation(methodName)
@@ -495,25 +518,6 @@ local function wrapScheduleMutation(methodName)
     return true
 end
 
-local baseHandleEventState = Client.HandleEventState
-if type(baseHandleEventState) == "function" then
-    function Client:HandleEventState(arguments, ...)
-        local results = pack(pcall(baseHandleEventState, self, arguments, ...))
-        if results[1] ~= true then
-            error(results[2], 0)
-        end
-
-        if results[2] == true
-            and advanceEventStepDepth == 0
-            and isHostAutopilotEvent(Server.EventState)
-            and sameEventStep(self.EventState, Server.EventState)
-        then
-            self:EnsureAutopilotPlanForCurrentStep(Server.EventState)
-        end
-        return unpack(results, 2, results.n)
-    end
-end
-
 local baseStartEvent = Server.StartEvent
 if type(baseStartEvent) == "function" then
     function Server:StartEvent(...)
@@ -524,7 +528,7 @@ if type(baseStartEvent) == "function" then
 
         local eventState = results[2]
         if isHostAutopilotEvent(eventState) then
-            Client:EnsureAutopilotPlanForCurrentStep(eventState)
+            queueAutopilotStepStart(eventState, "event-started")
         end
         return unpack(results, 2, results.n)
     end
@@ -538,10 +542,7 @@ if type(baseAdvanceEventStepAfterCommit) == "function" then
         local sourceTurn = tonumber(type(sourceState) == "table" and sourceState.turnNumber or nil)
         local sourceTick = tonumber(type(sourceState) == "table" and sourceState.tickNumber or nil)
 
-        advanceEventStepDepth = advanceEventStepDepth + 1
         local results = pack(pcall(baseAdvanceEventStepAfterCommit, self, commit, completed, ...))
-        advanceEventStepDepth = math.max(0, advanceEventStepDepth - 1)
-
         if results[1] ~= true then
             error(results[2], 0)
         end
@@ -553,14 +554,12 @@ if type(baseAdvanceEventStepAfterCommit) == "function" then
                 or tonumber(nextState.tickNumber) ~= sourceTick)
 
         if changedStep and sourceEventId ~= "" then
-            Client:ResetAutopilotBatchState(sourceEventId, "step-advanced")
+            Client:ClearAutopilotBatch(sourceEventId, "step-advanced")
         end
-
-        if changedStep
-            and isHostAutopilotEvent(nextState)
-            and sameEventStep(Client.EventState, nextState)
-        then
-            Client:EnsureAutopilotPlanForCurrentStep(nextState)
+        if changedStep and isHostAutopilotEvent(nextState) then
+            -- EVENT_STATE local echo and the spatial wrapper have already run.
+            -- Queue the planner behind the normal deferred event-state work.
+            queueAutopilotStepStart(nextState, "step-started")
         end
         return unpack(results, 2, results.n)
     end
@@ -570,13 +569,13 @@ local baseEndEvent = Server.EndEvent
 if type(baseEndEvent) == "function" then
     function Server:EndEvent(...)
         local eventId = getEventId(self.EventState)
+        if eventId ~= "" then
+            Client:ClearAutopilotBatch(eventId, "event-ended")
+        end
+
         local results = pack(pcall(baseEndEvent, self, ...))
         if results[1] ~= true then
             error(results[2], 0)
-        end
-
-        if eventId ~= "" then
-            Client:CancelAutopilotPlannerScope(eventId, "event-ended")
         end
         return unpack(results, 2, results.n)
     end
