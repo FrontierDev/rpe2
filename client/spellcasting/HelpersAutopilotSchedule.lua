@@ -11,10 +11,14 @@ local Event = Addon.Internal
     and Addon.Internal.Database.Classes.Event
     or nil
 
-if type(Event) ~= "table" or type(Spellcasting.IsCasterTurnOnTick) ~= "function" then
+if type(Event) ~= "table"
+    or type(Spellcasting.GetUnitPageIndex) ~= "function"
+    or type(Spellcasting.IsCasterTurnOnTick) ~= "function"
+then
     return
 end
 
+local baseGetUnitPageIndex = Spellcasting.GetUnitPageIndex
 local baseIsCasterTurnOnTick = Spellcasting.IsCasterTurnOnTick
 
 local function normalizeTurnMode(value)
@@ -24,17 +28,25 @@ local function normalizeTurnMode(value)
     return tostring(value or "") == "autopilot" and "autopilot" or "manual"
 end
 
-function Spellcasting.IsCasterTurnOnTick(eventState, casterEventId)
+function Spellcasting.GetUnitPageIndex(eventState, casterEventId)
     if normalizeTurnMode(eventState and eventState.turnMode) ~= "autopilot"
         or type(Event.GetUnitTurnStepIndex) ~= "function"
     then
+        return baseGetUnitPageIndex(eventState, casterEventId)
+    end
+
+    local pageSize = type(Spellcasting.GetMaxEventUnits) == "function"
+        and Spellcasting.GetMaxEventUnits()
+        or 5
+    return Event.GetUnitTurnStepIndex(eventState, casterEventId, pageSize)
+end
+
+function Spellcasting.IsCasterTurnOnTick(eventState, casterEventId)
+    if normalizeTurnMode(eventState and eventState.turnMode) ~= "autopilot" then
         return baseIsCasterTurnOnTick(eventState, casterEventId)
     end
 
     local currentTick = math.max(1, math.floor(tonumber(eventState and eventState.tickNumber) or 0))
-    local pageSize = type(Spellcasting.GetMaxEventUnits) == "function"
-        and Spellcasting.GetMaxEventUnits()
-        or 5
-    local casterTick = Event.GetUnitTurnStepIndex(eventState, casterEventId, pageSize)
+    local casterTick = Spellcasting.GetUnitPageIndex(eventState, casterEventId)
     return casterTick ~= nil and currentTick == casterTick
 end
