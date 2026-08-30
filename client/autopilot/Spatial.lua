@@ -202,6 +202,54 @@ function Spatial.GetNpcPosition(runtime, eventState, unit)
     return Spatial.GetActorPosition(runtime, eventState, actorKey)
 end
 
+function Spatial.GetCachedUnitPosition(runtime, eventState, unit)
+    if type(runtime) ~= "table" or type(unit) ~= "table" then
+        return nil, "unit-unavailable"
+    end
+
+    local position = nil
+    if unit.isPlayer == true then
+        local eventId = math.floor(tonumber(unit.eventID) or 0)
+        if eventId <= 0 then
+            return nil, "unit-unavailable"
+        end
+        position = type(runtime.playerPositionByEventId) == "table"
+            and runtime.playerPositionByEventId[eventId]
+            or nil
+    else
+        local actorKey = Spatial.GetNpcActorKey(unit)
+        if not actorKey then
+            return nil, "actor-unavailable"
+        end
+        position = type(runtime.positionByActorKey) == "table"
+            and runtime.positionByActorKey[actorKey]
+            or nil
+    end
+
+    if type(position) ~= "table" then
+        return nil, "position-unavailable"
+    end
+    if not Spatial.IsPositionAvailable(position) then
+        return nil, tostring(position.reason or "position-unavailable")
+    end
+
+    return position
+end
+
+function Spatial.DistanceBetweenCachedUnits(runtime, eventState, leftUnit, rightUnit)
+    local leftPosition, leftReason = Spatial.GetCachedUnitPosition(runtime, eventState, leftUnit)
+    if not leftPosition then
+        return nil, leftReason
+    end
+
+    local rightPosition, rightReason = Spatial.GetCachedUnitPosition(runtime, eventState, rightUnit)
+    if not rightPosition then
+        return nil, rightReason
+    end
+
+    return Spatial.DistanceBetweenPositions(leftPosition, rightPosition)
+end
+
 function Spatial.SetActorPosition(runtime, eventState, actorKey, position)
     if type(runtime) ~= "table" or type(actorKey) ~= "string" or actorKey == "" then
         return false, "actor-unavailable"
