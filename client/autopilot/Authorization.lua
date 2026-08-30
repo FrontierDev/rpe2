@@ -814,52 +814,32 @@ function Client:ReplanPendingAutopilotPlan(eventStateOverride)
     return self:ReplanAutopilotCurrentStep(eventState)
 end
 
-function Client:MarkAutopilotPendingPlanStaleForStep(eventId, turnNumber, tickNumber, reason)
+function Client:ResetAutopilotAuthorizationBatch(eventId, reason)
     local normalizedEventId = tostring(eventId or "")
     local runtime = normalizedEventId ~= ""
         and type(self.AutopilotRuntimeByEventId) == "table"
         and self.AutopilotRuntimeByEventId[normalizedEventId]
         or nil
     if type(runtime) ~= "table" then
-        return 0
+        return false
     end
+
     ensureRuntimeFields(runtime)
-    local changed = 0
-    for _, plan in pairs(runtime.authorizationByPlanId) do
-        if type(plan) == "table"
-            and tonumber(plan.turnNumber) == tonumber(turnNumber)
-            and tonumber(plan.tickNumber) == tonumber(tickNumber)
-            and tostring(plan.status or "") ~= "stale"
-        then
-            if Authorization.MarkPlanStale(plan, reason or "step-advanced") then
-                changed = changed + 1
-            end
-        end
+    local hadState = next(runtime.authorizationByPlanId) ~= nil
+        or tostring(runtime.activeAuthorizationPlanId or "") ~= ""
+        or runtime.authorizationStatus ~= "ready"
+
+    runtime.authorizationByPlanId = {}
+    runtime.activeAuthorizationPlanId = nil
+    runtime.authorizationStatus = "ready"
+    if runtime.plannerStatus == "awaiting-authorization" then
+        runtime.plannerStatus = "ready"
     end
 
-    local activeId = tostring(runtime.activeAuthorizationPlanId or "")
-    local activePlan = activeId ~= "" and runtime.authorizationByPlanId[activeId] or nil
-    local retiredActive = type(activePlan) == "table"
-        and tostring(activePlan.eventId or "") == normalizedEventId
-        and tonumber(activePlan.turnNumber) == tonumber(turnNumber)
-        and tonumber(activePlan.tickNumber) == tonumber(tickNumber)
-
-    if retiredActive then
-        -- Keep the stale plan for diagnostics/history, but it is no longer the
-        -- current authorization context once the authoritative step has moved.
-        runtime.activeAuthorizationPlanId = nil
-        runtime.authorizationStatus = "ready"
-        if runtime.plannerStatus == "awaiting-authorization" then
-            runtime.plannerStatus = "ready"
-        end
-    else
-        refreshAuthorizationStatus(runtime, activePlan)
-    end
-
-    if changed > 0 or retiredActive then
+    if hadState then
         notifyHelperRefresh()
     end
-    return changed
+    return true
 end
 
 -- Publish only completed coordinator-owned plans. On cancel the plan record is not ready,
@@ -881,30 +861,6 @@ if type(baseReleaseScratch) == "function" then
             end
         end
         return baseReleaseScratch(state)
-    end
-end
-
--- Stale unresolved old-step state only after the authoritative transition succeeds.
-local baseAdvanceEventStepAfterCommit = Server._AdvanceEventStepAfterCommit
-if type(baseAdvanceEventStepAfterCommit) == "function" then
-    function Server:_AdvanceEventStepAfterCommit(commit, completed, ...)
-        local sourceState = self.EventState
-        local sourceEventId = tostring(type(sourceState) == "table" and sourceState.id or "")
-        local sourceTurn = tonumber(type(sourceState) == "table" and sourceState.turnNumber or nil)
-        local sourceTick = tonumber(type(sourceState) == "table" and sourceState.tickNumber or nil)
-        local results = pack(pcall(baseAdvanceEventStepAfterCommit, self, commit, completed, ...))
-        if results[1] ~= true then
-            error(results[2], 0)
-        end
-        local nextState = self.EventState
-        local changedStep = results[2] == true and type(nextState) == "table"
-            and (tostring(nextState.id or "") ~= sourceEventId
-                or tonumber(nextState.turnNumber) ~= sourceTurn
-                or tonumber(nextState.tickNumber) ~= sourceTick)
-        if changedStep and sourceEventId ~= "" then
-            Client:MarkAutopilotPendingPlanStaleForStep(sourceEventId, sourceTurn, sourceTick, "step-advanced")
-        end
-        return unpack(results, 2, results.n)
     end
 end
 
