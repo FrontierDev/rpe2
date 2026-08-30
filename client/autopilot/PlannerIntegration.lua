@@ -1118,41 +1118,41 @@ local function phaseSolveActors(state, deadlineMs)
                 end
                 state.cursors.actor = state.cursors.actor + 1
             else
-                local solveState = state.scratch.movementSolveByActorKey[actor.key]
-                if type(solveState) ~= "table" then
-                    local members = {}
-                    for index = 1, #actor.members do
-                        local unit = actor.members[index]
-                        members[index] = {
-                            unit = unit,
-                            actionCandidates = state.scratch.actionCandidatesByEventId[normalizeEventId(unit.eventID)] or {},
-                        }
-                    end
-                    solveState = type(MovementSolver.CreateState) == "function"
-                        and select(1, MovementSolver.CreateState({
-                            eventState = state.snapshot.eventState,
-                            spatialRuntime = state.snapshot.spatialRuntime,
-                            actorKey = actor.key,
-                            raidMarker = actor.raidMarker,
-                            members = members,
-                        }))
-                        or nil
-                    state.scratch.movementSolveByActorKey[actor.key] = solveState or false
+            local solveState = state.scratch.movementSolveByActorKey[actor.key]
+            if type(solveState) ~= "table" then
+                local members = {}
+                for index = 1, #actor.members do
+                    local unit = actor.members[index]
+                    members[index] = {
+                        unit = unit,
+                        actionCandidates = state.scratch.actionCandidatesByEventId[normalizeEventId(unit.eventID)] or {},
+                    }
                 end
+                solveState = type(MovementSolver.CreateState) == "function"
+                    and select(1, MovementSolver.CreateState({
+                        eventState = state.snapshot.eventState,
+                        spatialRuntime = state.snapshot.spatialRuntime,
+                        actorKey = actor.key,
+                        raidMarker = actor.raidMarker,
+                        members = members,
+                    }))
+                    or nil
+                state.scratch.movementSolveByActorKey[actor.key] = solveState or false
+            end
 
-                if type(solveState) ~= "table" then
-                    for index = 1, #actor.members do
-                        appendNoAction(state, actor.key, actor.members[index], "movement-solve-unavailable")
-                    end
-                    state.cursors.actor = state.cursors.actor + 1
-                else
-                    local complete = MovementSolver.Step(solveState, deadlineMs) == true
-                    if not complete then
-                        return false
-                    end
-                    finalizeMarkedActor(state, actor, solveState)
-                    state.cursors.actor = state.cursors.actor + 1
+            if type(solveState) ~= "table" then
+                for index = 1, #actor.members do
+                    appendNoAction(state, actor.key, actor.members[index], "movement-solve-unavailable")
                 end
+                state.cursors.actor = state.cursors.actor + 1
+            else
+                local complete = MovementSolver.Step(solveState, deadlineMs) == true
+                if not complete then
+                    return false
+                end
+                finalizeMarkedActor(state, actor, solveState)
+                state.cursors.actor = state.cursors.actor + 1
+            end
             end
         else
             solveSingletonActor(state, actor)
