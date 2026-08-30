@@ -71,6 +71,8 @@ local function ensurePlannerRuntimeFields(runtime)
     runtime.planByStepKey = type(runtime.planByStepKey) == "table" and runtime.planByStepKey or {}
     runtime.activePlanId = runtime.activePlanId
     runtime.lastCompletedPlanId = runtime.lastCompletedPlanId
+    runtime.currentPlannerActorKey = runtime.currentPlannerActorKey
+    runtime.currentPlannerScheduleRevision = runtime.currentPlannerScheduleRevision
     runtime.plannerStatus = tostring(runtime.plannerStatus or "ready")
     return runtime
 end
@@ -182,17 +184,10 @@ function Client:IsAutopilotPlanStateStale(state)
     if type(runtime) ~= "table" or runtime ~= state.runtimeRef or runtime.status ~= "ready" then
         return true
     end
-
-    local descriptor = type(Planner.ResolveActiveNpcStep) == "function"
-        and Planner.ResolveActiveNpcStep(eventState, state.stepCapacity)
-        or nil
-    if type(descriptor) ~= "table" then
+    if tostring(runtime.currentPlannerActorKey or "") ~= tostring(state.actorKey or "") then
         return true
     end
-    if tostring(descriptor.actorKey or "") ~= tostring(state.actorKey or "") then
-        return true
-    end
-    if tostring(descriptor.scheduleRevision or "") ~= tostring(state.scheduleRevision or "") then
+    if tostring(runtime.currentPlannerScheduleRevision or "") ~= tostring(state.scheduleRevision or "") then
         return true
     end
 
@@ -249,12 +244,17 @@ function Client:EnsureAutopilotPlanForCurrentStep(eventStateOverride)
     local stepCapacity = getMaxEventUnits()
     local descriptor, descriptorReason = Planner.ResolveActiveNpcStep(eventState, stepCapacity)
     if type(descriptor) ~= "table" then
+        runtime.currentPlannerActorKey = nil
+        runtime.currentPlannerScheduleRevision = nil
         if descriptorReason == "no-npc-actor" then
             cancelObsoleteActivePlan(runtime, nil, "actor-changed")
             runtime.plannerStatus = "ready"
         end
         return nil, false, descriptorReason
     end
+
+    runtime.currentPlannerActorKey = tostring(descriptor.actorKey or "")
+    runtime.currentPlannerScheduleRevision = tostring(descriptor.scheduleRevision or "")
 
     local planId = Planner.BuildPlanIdentity(eventState, descriptor, descriptor.scheduleRevision)
     if type(planId) ~= "string" or planId == "" then
