@@ -318,6 +318,7 @@ function Evaluator.ResolveProjectedHealth(targetUnit, eventState, ledger)
         missingHealth = math.max(0, maxValue - currentValue),
         reservedHealing = reserved,
         projectedCurrentValue = projectedCurrent,
+        projectedHealthFraction = projectedCurrent / maxValue,
         projectedMissingHealth = math.max(0, maxValue - projectedCurrent),
         isLiving = currentValue > 0,
     }
@@ -361,7 +362,7 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
     local urgentHealing = profile.hasHeal
         and type(health) == "table"
         and health.isLiving == true
-        and health.healthFraction <= Evaluator.URGENT_HEALTH_FRACTION
+        and health.projectedHealthFraction <= Evaluator.URGENT_HEALTH_FRACTION
         and effectiveHealing > 0
 
     local damageUtility = profile.hasDamage and profile.expectedDamage or 0
