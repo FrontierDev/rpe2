@@ -109,6 +109,7 @@ core/classes/EventVariantSpellEquipmentNetwork.lua
 
 client/client_Event.lua
 client/client_CombatLog.lua
+client/client_CombatLogTurnIdentity.lua
 client/client_Skills.lua
 server/server_Event.lua
 server/server_EventAutopilot.lua
@@ -223,6 +224,7 @@ client/ui/CombatText.lua
 client/ui/widgets/widget_Event.lua
 client/ui/widgets/widget_EventAutopilotSchedule.lua
 client/ui/widgets/widget_Event_CombatLogHistory.lua
+client/ui/widgets/widget_Event_DMHelper.lua
 client/ui/widgets/widget_Event_PortraitReadiness.lua
 client/ui/widgets/widget_ActionBar.lua
 client/ui/widgets/widget_ActionBar_Resources.lua
