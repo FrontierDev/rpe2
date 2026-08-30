@@ -116,6 +116,8 @@ server/server_EventVariants.lua
 server/server_EventResourceIntegration.lua
 server/server_EventSpellEquipmentVariants.lua
 server/server_EventAutopilotSchedule.lua
+client/autopilot/Spatial.lua
+client/client_Autopilot.lua
 client/client_Spellcasting.lua
 client/spellcasting/Helpers.lua
 client/spellcasting/HelpersAutopilotSchedule.lua
