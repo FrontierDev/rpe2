@@ -10,12 +10,12 @@ local EventWidget = ClientUI.EventWidget
 
 if type(EventWidget) ~= "table"
     or EventWidget._autopilotHelperExtensionInstalled == true
-    or type(EventWidget.ShowCombatLogHistoryPanel) ~= "function"
+    or type(EventWidget.EnsureDMHelperUI) ~= "function"
+    or type(EventWidget.RefreshCombatLogHistoryPanel) ~= "function"
 then
     return true
 end
 
-local HELPER_BUTTON_WIDTH = 90
 local HELPER_BUTTON_HEIGHT = 20
 local HELPER_CONTROL_HEIGHT = 50
 local HELPER_VISIBLE_ROWS = 6
@@ -30,13 +30,14 @@ end
 local function setShown(element, shown)
     local frame = getFrame(element)
     if not frame then
-        return
+        return false
     end
-    if shown and frame.Show then
+    if shown and type(frame.Show) == "function" then
         frame:Show()
-    elseif not shown and frame.Hide then
+    elseif not shown and type(frame.Hide) == "function" then
         frame:Hide()
     end
+    return true
 end
 
 local function getActiveEventState()
@@ -46,9 +47,10 @@ local function getActiveEventState()
     return Client.EventState
 end
 
-local function isLocalHost(state)
+local function isHostAutopilotEvent(state)
     return type(state) == "table"
         and state.active == true
+        and tostring(state.turnMode or "manual") == "autopilot"
         and type(Client.IsLocalEventHost) == "function"
         and Client:IsLocalEventHost(state) == true
 end
@@ -56,7 +58,7 @@ end
 local function buildButton(parentFrame, name, text, width, onClick)
     local button = UI.TextButton:New({
         name = name,
-        width = width or HELPER_BUTTON_WIDTH,
+        width = width,
         height = HELPER_BUTTON_HEIGHT,
         text = text,
         fontSize = 9,
@@ -97,11 +99,12 @@ function EventWidget:RefreshAutopilotHelperControls()
     if not self.autopilotHelperControlFrame then
         return false
     end
+
     local state = getActiveEventState()
-    local host = isLocalHost(state)
-    local helperMode = tostring(self.combatLogHistoryMode or "") == "dm-helper"
-    setShown(self.autopilotHelperControlFrame, host and helperMode)
-    if not host or not helperMode then
+    local active = isHostAutopilotEvent(state)
+        and tostring(self.combatLogHistoryMode or "") == "dm-helper"
+    setShown(self.autopilotHelperControlFrame, active)
+    if not active then
         return false
     end
 
@@ -114,52 +117,28 @@ function EventWidget:RefreshAutopilotHelperControls()
     local pending = type(Client.GetAutopilotPendingPlan) == "function"
         and select(1, Client:GetAutopilotPendingPlan(state))
         or nil
-    setShown(self.autopilotHelperAuthorizeAllButton, type(pending) == "table")
-    setShown(self.autopilotHelperReplanButton, type(pending) == "table")
+    local currentPending = type(pending) == "table" and tostring(pending.status or "") ~= "stale"
+    setShown(self.autopilotHelperAuthorizeAllButton, currentPending)
+    setShown(self.autopilotHelperReplanButton, currentPending)
     return true
 end
 
 function EventWidget:EnsureAutopilotHelperUI()
-    if self.autopilotHelperButton then
+    if self.autopilotHelperControlFrame then
         return true
     end
-    if type(self.EnsureCombatLogHistoryUI) ~= "function" then
-        return false
-    end
-    self:EnsureCombatLogHistoryUI()
-    if not self.combatLogHistoryButtonRow or not self.combatLogHistoryPanel then
-        return false
-    end
 
-    local buttonRowFrame = getFrame(self.combatLogHistoryButtonRow)
-    if not buttonRowFrame then
+    self:EnsureDMHelperUI()
+    if not self.combatLogHistoryPanel or not self.combatLogHistoryScroll then
         return false
     end
-    self.autopilotHelperButton = buildButton(
-        buttonRowFrame,
-        "RPEClientEventWidgetDMHelperButton",
-        "DM Helper",
-        HELPER_BUTTON_WIDTH,
-        function()
-            local state = getActiveEventState()
-            if not isLocalHost(state) then
-                return
-            end
-            if type(self.IsCombatLogHistoryPanelShown) == "function"
-                and self:IsCombatLogHistoryPanelShown()
-                and tostring(self.combatLogHistoryMode or "") == "dm-helper"
-            then
-                self:HideCombatLogHistoryPanel()
-                return
-            end
-            self.selectedDMHelperActionId = nil
-            self:ShowCombatLogHistoryPanel("dm-helper")
-        end
-    )
-    self.combatLogHistoryButtonRow:AddChild(self.autopilotHelperButton)
 
     local contentFrame = self.combatLogHistoryPanel:GetContentFrame()
-    self.autopilotHelperControlFrame = CreateFrame("Frame", "RPEClientEventWidgetDMHelperControls", contentFrame)
+    if not contentFrame then
+        return false
+    end
+
+    self.autopilotHelperControlFrame = CreateFrame("Frame", "RPEClientEventWidgetDMAutopilotControls", contentFrame)
     self.autopilotHelperControlFrame:SetPoint("BOTTOMLEFT", contentFrame, "BOTTOMLEFT", 0, 0)
     self.autopilotHelperControlFrame:SetPoint("BOTTOMRIGHT", contentFrame, "BOTTOMRIGHT", 0, 0)
     self.autopilotHelperControlFrame:SetHeight(HELPER_CONTROL_HEIGHT)
@@ -249,33 +228,31 @@ function EventWidget:EnsureAutopilotHelperUI()
     )
     getFrame(self.autopilotHelperReplanButton):SetPoint("LEFT", getFrame(self.autopilotHelperAuthorizeAllButton), "RIGHT", 4, 0)
 
-    self._autopilotHelperBaseRowRenderer = self.combatLogHistoryScroll and self.combatLogHistoryScroll.rowRenderer or nil
-    self._autopilotHelperBaseVisibleRows = self.combatLogHistoryScroll and self.combatLogHistoryScroll.visibleRows or 8
+    self._autopilotHelperBaseDMRenderer = self._dmHelperRowRenderer
+    self._autopilotHelperBaseVisibleRows = self.combatLogHistoryScroll.visibleRows or 8
     self._autopilotHelperRenderer = function(row, item)
-        local selected = tostring(item and item.actionId or "") ~= ""
-            and tostring(item.actionId) == tostring(self.selectedDMHelperActionId or "")
-        if row and row.SetText then
-            row:SetText((selected and "> " or "") .. tostring(item and item.text or ""))
+        if type(self._autopilotHelperBaseDMRenderer) == "function" then
+            self._autopilotHelperBaseDMRenderer(row, item)
+        elseif row and type(row.SetText) == "function" then
+            row:SetText(tostring(item and item.text or ""))
         end
-        if row and row.SetJustifyH then
-            row:SetJustifyH("LEFT")
+
+        local actionId = tostring(item and item.actionId or "")
+        local selected = actionId ~= "" and actionId == tostring(self.selectedDMHelperActionId or "")
+        if selected and row and type(row.SetText) == "function" then
+            row:SetText("> " .. tostring(item and item.text or ""))
         end
-        if row and row.SetJustifyV then
-            row:SetJustifyV("MIDDLE")
-        end
-        if row and row.SetWordWrap then
-            row:SetWordWrap(false)
-        end
+
         local rowFrame = getFrame(row)
-        if rowFrame and rowFrame.EnableMouse then
-            rowFrame:EnableMouse(true)
+        if rowFrame and type(rowFrame.EnableMouse) == "function" then
+            rowFrame:EnableMouse(actionId ~= "")
         end
-        if rowFrame and rowFrame.SetScript then
-            if type(item) == "table" and tostring(item.actionId or "") ~= "" then
+        if rowFrame and type(rowFrame.SetScript) == "function" then
+            if actionId ~= "" then
                 rowFrame:SetScript("OnMouseUp", function(_, button)
-                    if button == "LeftButton" and isLocalHost(getActiveEventState()) then
-                        self.selectedDMHelperActionId = item.actionId
-                        if self.combatLogHistoryScroll and self.combatLogHistoryScroll.RefreshRows then
+                    if button == "LeftButton" and isHostAutopilotEvent(getActiveEventState()) then
+                        self.selectedDMHelperActionId = actionId
+                        if self.combatLogHistoryScroll and type(self.combatLogHistoryScroll.RefreshRows) == "function" then
                             self.combatLogHistoryScroll:RefreshRows()
                         end
                         self:RefreshAutopilotHelperControls()
@@ -291,123 +268,75 @@ function EventWidget:EnsureAutopilotHelperUI()
     return true
 end
 
-function EventWidget:RefreshAutopilotHelperHostVisibility()
-    self:EnsureAutopilotHelperUI()
-    local state = getActiveEventState()
-    local host = isLocalHost(state)
-    setShown(self.autopilotHelperButton, host)
-    if not host and tostring(self.combatLogHistoryMode or "") == "dm-helper" then
-        self:HideCombatLogHistoryPanel()
+local function configureAutopilotControlsForMode(self)
+    local scroll = self.combatLogHistoryScroll
+    local scrollFrame = getFrame(scroll)
+    local titleFrame = getFrame(self.combatLogHistoryTitle)
+    local contentFrame = self.combatLogHistoryPanel and self.combatLogHistoryPanel:GetContentFrame() or nil
+    if not scroll or not scrollFrame or not titleFrame or not contentFrame then
+        return false
     end
-    return host
+
+    local active = tostring(self.combatLogHistoryMode or "") == "dm-helper"
+        and isHostAutopilotEvent(getActiveEventState())
+    if active then
+        scroll.visibleRows = HELPER_VISIBLE_ROWS
+        scrollFrame:ClearAllPoints()
+        scrollFrame:SetPoint("TOPLEFT", titleFrame, "BOTTOMLEFT", 0, -4)
+        scrollFrame:SetPoint("BOTTOMRIGHT", contentFrame, "BOTTOMRIGHT", 0, HELPER_CONTROL_HEIGHT + 2)
+        if scroll.rowRenderer ~= self._autopilotHelperRenderer then
+            scroll:SetRowRenderer(self._autopilotHelperRenderer)
+        end
+    else
+        scroll.visibleRows = self._autopilotHelperBaseVisibleRows or 8
+        scrollFrame:ClearAllPoints()
+        scrollFrame:SetPoint("TOPLEFT", titleFrame, "BOTTOMLEFT", 0, -4)
+        scrollFrame:SetPoint("BOTTOMRIGHT", contentFrame, "BOTTOMRIGHT", 0, 0)
+    end
+
+    if type(scroll.EnsureVisibleRowCount) == "function" then
+        scroll:EnsureVisibleRowCount()
+    end
+    if type(scroll.UpdateGeometry) == "function" then
+        scroll:UpdateGeometry()
+    end
+    self:RefreshAutopilotHelperControls()
+    return active
 end
 
 local originalBuild = EventWidget.Build
 local originalRefresh = EventWidget.Refresh
-local originalGetViewEntries = EventWidget.GetCombatLogHistoryViewEntries
-local originalGetViewTitle = EventWidget.GetCombatLogHistoryViewTitle
 local originalRefreshPanel = EventWidget.RefreshCombatLogHistoryPanel
 
 function EventWidget:Build(...)
     local result = originalBuild(self, ...)
     self:EnsureAutopilotHelperUI()
-    self:RefreshAutopilotHelperHostVisibility()
     return result
 end
 
 function EventWidget:Refresh(...)
     local result = originalRefresh(self, ...)
     self:EnsureAutopilotHelperUI()
-    self:RefreshAutopilotHelperHostVisibility()
+    if tostring(self.combatLogHistoryMode or "") == "dm-helper" then
+        self:RefreshCombatLogHistoryPanel()
+    else
+        configureAutopilotControlsForMode(self)
+    end
     return result
 end
 
-function EventWidget:GetCombatLogHistoryViewEntries()
-    if tostring(self.combatLogHistoryMode or "") == "dm-helper" then
-        local state = getActiveEventState()
-        if not isLocalHost(state) or type(Client.GetDMHelperEntries) ~= "function" then
-            return {}
-        end
-        return Client:GetDMHelperEntries(state)
-    end
-    return originalGetViewEntries(self)
-end
-
-function EventWidget:GetCombatLogHistoryViewTitle()
-    if tostring(self.combatLogHistoryMode or "") == "dm-helper" then
-        return "DM Helper"
-    end
-    return originalGetViewTitle(self)
-end
-
-local function configureScrollForMode(self, helperMode)
-    local scroll = self.combatLogHistoryScroll
-    local scrollFrame = getFrame(scroll)
-    local titleFrame = getFrame(self.combatLogHistoryTitle)
-    local contentFrame = self.combatLogHistoryPanel and self.combatLogHistoryPanel:GetContentFrame() or nil
-    if not scroll or not scrollFrame or not titleFrame or not contentFrame then
-        return
-    end
-
-    if helperMode then
-        if scroll.rowRenderer ~= self._autopilotHelperRenderer then
-            scroll:SetRowRenderer(self._autopilotHelperRenderer)
-        end
-        scroll.visibleRows = HELPER_VISIBLE_ROWS
-        scrollFrame:ClearAllPoints()
-        scrollFrame:SetPoint("TOPLEFT", titleFrame, "BOTTOMLEFT", 0, -4)
-        scrollFrame:SetPoint("BOTTOMRIGHT", contentFrame, "BOTTOMRIGHT", 0, HELPER_CONTROL_HEIGHT + 2)
-        setShown(self.autopilotHelperControlFrame, true)
-    else
-        if scroll.rowRenderer ~= self._autopilotHelperBaseRowRenderer then
-            scroll:SetRowRenderer(self._autopilotHelperBaseRowRenderer)
-        end
-        scroll.visibleRows = self._autopilotHelperBaseVisibleRows or 8
-        scrollFrame:ClearAllPoints()
-        scrollFrame:SetPoint("TOPLEFT", titleFrame, "BOTTOMLEFT", 0, -4)
-        scrollFrame:SetPoint("BOTTOMRIGHT", contentFrame, "BOTTOMRIGHT", 0, 0)
-        setShown(self.autopilotHelperControlFrame, false)
-    end
-    if scroll.EnsureVisibleRowCount then
-        scroll:EnsureVisibleRowCount()
-    end
-    if scroll.UpdateGeometry then
-        scroll:UpdateGeometry()
-    end
-end
-
-function EventWidget:RefreshCombatLogHistoryPanel()
+function EventWidget:RefreshCombatLogHistoryPanel(...)
     self:EnsureAutopilotHelperUI()
-    local helperMode = tostring(self.combatLogHistoryMode or "") == "dm-helper"
-    if not helperMode then
-        configureScrollForMode(self, false)
-        return originalRefreshPanel(self)
+    local result = originalRefreshPanel(self, ...)
+    configureAutopilotControlsForMode(self)
+    if tostring(self.combatLogHistoryMode or "") == "dm-helper"
+        and isHostAutopilotEvent(getActiveEventState())
+        and self.combatLogHistoryScroll
+        and type(self.combatLogHistoryScroll.RefreshRows) == "function"
+    then
+        self.combatLogHistoryScroll:RefreshRows()
     end
-
-    local state = getActiveEventState()
-    if not isLocalHost(state) then
-        self:HideCombatLogHistoryPanel()
-        return false
-    end
-
-    configureScrollForMode(self, true)
-    local entries = type(Client.GetDMHelperEntries) == "function" and Client:GetDMHelperEntries(state) or {}
-    if self.combatLogHistoryTitle and self.combatLogHistoryTitle.SetText then
-        self.combatLogHistoryTitle:SetText("DM Helper")
-    end
-    if self.combatLogHistoryScroll and self.combatLogHistoryScroll.SetItems then
-        self.combatLogHistoryScroll:SetItems(entries)
-    end
-    local emptyFrame = getFrame(self.combatLogHistoryEmptyText)
-    if emptyFrame then
-        if #entries == 0 and emptyFrame.Show then
-            emptyFrame:Show()
-        elseif #entries > 0 and emptyFrame.Hide then
-            emptyFrame:Hide()
-        end
-    end
-    self:RefreshAutopilotHelperControls()
-    return true
+    return result
 end
 
 EventWidget._autopilotHelperExtensionInstalled = true
