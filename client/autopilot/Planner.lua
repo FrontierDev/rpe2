@@ -11,6 +11,7 @@ local Event = Addon.Internal
     or nil
 local Tasks = Addon.Internal.Tasks or {}
 local SpellEvaluator = Client.AutopilotSpellEvaluator or {}
+local TargetSelector = Client.AutopilotTargetSelector or {}
 
 Client.AutopilotPlanner = Client.AutopilotPlanner or {}
 local Planner = Client.AutopilotPlanner
@@ -41,6 +42,14 @@ local function copyArray(values)
     return copied
 end
 
+local function copyOptions(options)
+    local copied = {}
+    for key, value in pairs(type(options) == "table" and options or {}) do
+        copied[key] = value
+    end
+    return copied
+end
+
 local function createProjectedHealingLedger()
     if type(SpellEvaluator.CreateProjectedHealingLedger) == "function" then
         return SpellEvaluator.CreateProjectedHealingLedger()
@@ -48,6 +57,10 @@ local function createProjectedHealingLedger()
     return {
         reservedByEventId = {},
     }
+end
+
+local function createTargetSelectionMap()
+    return {}
 end
 
 local function isNpcActor(actor)
@@ -187,12 +200,94 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
         scratch = {
             visitedNpcCount = 0,
             projectedHealingLedger = createProjectedHealingLedger(),
+            targetSelectionByKey = createTargetSelectionMap(),
         },
         provisionalActions = {},
         actionCandidates = {},
         anchorCandidates = {},
         result = nil,
     }
+end
+
+local function ensureTargetSelectionScratch(state)
+    if type(state) ~= "table" then
+        return nil
+    end
+
+    state.scratch = type(state.scratch) == "table" and state.scratch or {}
+    if type(state.scratch.projectedHealingLedger) ~= "table" then
+        state.scratch.projectedHealingLedger = createProjectedHealingLedger()
+    end
+    if type(state.scratch.targetSelectionByKey) ~= "table" then
+        state.scratch.targetSelectionByKey = createTargetSelectionMap()
+    end
+    return state.scratch
+end
+
+function Planner.CreateTargetSelectionState(state, selectionKey, activationSnapshot, options)
+    if type(TargetSelector.CreateState) ~= "function" then
+        return nil, "target-selector-unavailable"
+    end
+
+    local key = tostring(selectionKey or "")
+    if key == "" then
+        return nil, "selection-key-unavailable"
+    end
+
+    local scratch = ensureTargetSelectionScratch(state)
+    if type(scratch) ~= "table" then
+        return nil, "planner-state-unavailable"
+    end
+
+    local resolvedOptions = copyOptions(options)
+    if resolvedOptions.projectedHealingLedger == nil then
+        resolvedOptions.projectedHealingLedger = scratch.projectedHealingLedger
+    end
+    if resolvedOptions.spatialRuntime == nil then
+        resolvedOptions.spatialRuntime = state.runtimeRef
+    end
+
+    local selectionState, reason = TargetSelector.CreateState(activationSnapshot, resolvedOptions)
+    if type(selectionState) ~= "table" then
+        return nil, reason or "target-selection-unavailable"
+    end
+
+    scratch.targetSelectionByKey[key] = selectionState
+    return selectionState
+end
+
+function Planner.StepTargetSelection(state, selectionKey, deadlineMs)
+    if type(TargetSelector.Step) ~= "function" then
+        return false, nil, "target-selector-unavailable"
+    end
+
+    local key = tostring(selectionKey or "")
+    local scratch = ensureTargetSelectionScratch(state)
+    local selectionState = type(scratch) == "table" and scratch.targetSelectionByKey[key] or nil
+    if type(selectionState) ~= "table" then
+        return false, nil, "target-selection-unavailable"
+    end
+
+    local complete = TargetSelector.Step(selectionState, deadlineMs) == true
+    if not complete then
+        return false, nil
+    end
+
+    local result = type(TargetSelector.CopyResult) == "function" and TargetSelector.CopyResult(selectionState) or nil
+    return true, result
+end
+
+function Planner.GetTargetSelectionResult(state, selectionKey)
+    local key = tostring(selectionKey or "")
+    local scratch = type(state) == "table" and state.scratch or nil
+    local selectionState = type(scratch) == "table"
+        and type(scratch.targetSelectionByKey) == "table"
+        and scratch.targetSelectionByKey[key]
+        or nil
+    if type(selectionState) ~= "table" or type(TargetSelector.CopyResult) ~= "function" then
+        return nil
+    end
+    return TargetSelector.CopyResult(selectionState)
 end
 
 function Planner.ReleaseScratch(state)
@@ -227,9 +322,13 @@ function Planner.Step(state, deadlineMs)
         state.scratch = type(state.scratch) == "table" and state.scratch or {
             visitedNpcCount = 0,
             projectedHealingLedger = createProjectedHealingLedger(),
+            targetSelectionByKey = createTargetSelectionMap(),
         }
         if type(state.scratch.projectedHealingLedger) ~= "table" then
             state.scratch.projectedHealingLedger = createProjectedHealingLedger()
+        end
+        if type(state.scratch.targetSelectionByKey) ~= "table" then
+            state.scratch.targetSelectionByKey = createTargetSelectionMap()
         end
 
         while state.npcIndex <= #(state.npcEventIds or {}) do
