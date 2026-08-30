@@ -6,7 +6,9 @@ Addon.Client.UI = Addon.Client.UI or {}
 local SetupWizard = Addon.Client.UI.SetupWizard
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
+local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local TooltipBuilders = Addon.Client and Addon.Client.UI and Addon.Client.UI.Tooltips or {}
+local Timings = Addon.Debug and Addon.Debug.Timings or {}
 
 if type(SetupWizard) ~= "table" then
     return true
@@ -14,6 +16,7 @@ end
 
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local STARTING_ITEM_ROWS = 5
+local SETUP_WIZARD_TIMING_THRESHOLD_MS = 16
 local DEFAULT_SLOT_BORDER = { r = 0.42, g = 0.46, b = 0.52, a = 1 }
 local SELECTED_SLOT_BORDER = { r = 0.64, g = 0.82, b = 0.38, a = 1 }
 
@@ -34,6 +37,29 @@ local function setFrameShown(target, shown)
     if frame and frame.SetShown then
         frame:SetShown(shown == true)
     end
+end
+
+local function startSetupTiming(label, context)
+    if type(Timings) == "table" and type(Timings.Start) == "function" then
+        return Timings:Start(label, {
+            context = context,
+            thresholdMs = SETUP_WIZARD_TIMING_THRESHOLD_MS,
+        })
+    end
+
+    return nil
+end
+
+local function stopSetupTiming(timer, cardinality)
+    if timer and type(Timings) == "table" and type(Timings.Stop) == "function" then
+        Timings:Stop(timer, {
+            cardinality = cardinality,
+        })
+    end
+end
+
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
 end
 
 local function getDatasetDisplayName(dataset)
@@ -335,6 +361,239 @@ if SetupWizard._startingItemGridWidthExtensionInstalled ~= true then
     end
 
     SetupWizard._startingItemGridWidthExtensionInstalled = true
+end
+
+local function appendRow(bucket, row)
+    bucket[#bucket + 1] = row
+end
+
+local function isAlwaysLearnedSpellRow(row)
+    return type(row) == "table"
+        and type(row.spell) == "table"
+        and tostring(row.spell.learnMode or "") == "always_learned"
+end
+
+local function buildActionBarNavigationRows(alwaysLearnedRows)
+    local datasets = type(Registry.GetActivatedDatasets) == "function"
+        and Registry:GetActivatedDatasets()
+        or {}
+    local spellCountsByDataset = {}
+    local spellCountsByDatasetAndCategory = {}
+    local rows = {}
+
+    for index = 1, #(alwaysLearnedRows or {}) do
+        local row = alwaysLearnedRows[index]
+        local dataset = row and row.dataset or nil
+        local datasetId = trimString(dataset and dataset.id)
+        if datasetId ~= "" then
+            spellCountsByDataset[datasetId] = (spellCountsByDataset[datasetId] or 0) + 1
+            local category = trimString(row and row.spellbookCategory)
+            if category ~= "" then
+                spellCountsByDatasetAndCategory[datasetId] = spellCountsByDatasetAndCategory[datasetId] or {}
+                spellCountsByDatasetAndCategory[datasetId][category] = (spellCountsByDatasetAndCategory[datasetId][category] or 0) + 1
+            end
+        end
+    end
+
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local datasetId = trimString(dataset and dataset.id)
+        if datasetId ~= "" then
+            local datasetName = getDatasetDisplayName(dataset)
+            rows[#rows + 1] = {
+                rowType = "dataset",
+                dataset = dataset,
+                datasetId = dataset.id,
+                name = datasetName,
+                displayName = datasetName,
+                count = spellCountsByDataset[datasetId] or 0,
+            }
+
+            local categories = {}
+            local seenCategories = {}
+            local categoryCounts = spellCountsByDatasetAndCategory[datasetId] or {}
+            for spellIndex = 1, #(dataset.spells or {}) do
+                local spell = dataset.spells[spellIndex]
+                if tostring(spell and spell.learnMode or "") == "always_learned" then
+                    local category = trimString(spell and spell.spellbookCategory)
+                    if category ~= "" and not seenCategories[category] then
+                        seenCategories[category] = true
+                        categories[#categories + 1] = category
+                    end
+                end
+            end
+
+            for category, count in pairs(categoryCounts) do
+                if category ~= "" and (tonumber(count) or 0) > 0 and not seenCategories[category] then
+                    seenCategories[category] = true
+                    categories[#categories + 1] = category
+                end
+            end
+
+            table.sort(categories, function(left, right)
+                return tostring(left) < tostring(right)
+            end)
+
+            for categoryIndex = 1, #categories do
+                local category = categories[categoryIndex]
+                rows[#rows + 1] = {
+                    rowType = "category",
+                    dataset = dataset,
+                    datasetId = dataset.id,
+                    category = category,
+                    name = ("    %s"):format(category),
+                    displayName = category,
+                    count = categoryCounts[category] or 0,
+                }
+            end
+        end
+    end
+
+    return rows
+end
+
+local function buildActionBarSpellCache(wizard)
+    local revision = getConfigurationRevision()
+    local cached = wizard and wizard.actionBarSpellLightweightCache or nil
+    if type(cached) == "table" and tonumber(cached.revision) == revision then
+        return cached
+    end
+
+    local acquireTiming = startSetupTiming("SetupWizard.ActionBar.SpellRows", "lightweight")
+    local knownRows = type(Profile.ListKnownSpells) == "function"
+        and Profile.ListKnownSpells({ lightweight = true })
+        or {}
+    stopSetupTiming(acquireTiming, {
+        knownRows = #knownRows,
+    })
+
+    local indexTiming = startSetupTiming("SetupWizard.ActionBar.NavigationIndex", "configuration")
+    local alwaysLearnedRows = {}
+    local rowsByDataset = {}
+    local rowsByDatasetAndCategory = {}
+
+    for index = 1, #knownRows do
+        local row = knownRows[index]
+        if isAlwaysLearnedSpellRow(row) then
+            alwaysLearnedRows[#alwaysLearnedRows + 1] = row
+            local datasetId = trimString(row and row.dataset and row.dataset.id)
+            if datasetId ~= "" then
+                rowsByDataset[datasetId] = rowsByDataset[datasetId] or {}
+                appendRow(rowsByDataset[datasetId], row)
+
+                local category = trimString(row and row.spellbookCategory)
+                if category ~= "" then
+                    rowsByDatasetAndCategory[datasetId] = rowsByDatasetAndCategory[datasetId] or {}
+                    rowsByDatasetAndCategory[datasetId][category] = rowsByDatasetAndCategory[datasetId][category] or {}
+                    appendRow(rowsByDatasetAndCategory[datasetId][category], row)
+                end
+            end
+        end
+    end
+
+    cached = {
+        revision = revision,
+        knownRows = knownRows,
+        alwaysLearnedRows = alwaysLearnedRows,
+        navigationRows = buildActionBarNavigationRows(alwaysLearnedRows),
+        rowsByDataset = rowsByDataset,
+        rowsByDatasetAndCategory = rowsByDatasetAndCategory,
+    }
+    wizard.actionBarSpellLightweightCache = cached
+    stopSetupTiming(indexTiming, {
+        alwaysLearnedRows = #alwaysLearnedRows,
+        navigationRows = #cached.navigationRows,
+    })
+    return cached
+end
+
+if SetupWizard._actionBarSpellLightweightExtensionInstalled ~= true then
+    function SetupWizard:GetActionBarSpellLightweightCache()
+        return buildActionBarSpellCache(self)
+    end
+
+    function SetupWizard:BuildActionBarSpellNavigationRows()
+        local cache = buildActionBarSpellCache(self)
+        return cache.navigationRows
+    end
+
+    function SetupWizard:GetSelectedActionBarSpellRows()
+        local timing = startSetupTiming("SetupWizard.ActionBar.SelectedFilter", "cached")
+        local cache = buildActionBarSpellCache(self)
+        local datasetId = trimString(self.selectedActionBarDatasetId)
+        local category = trimString(self.selectedActionBarSpellbookCategory)
+        local rows = {}
+
+        if datasetId ~= "" then
+            if category ~= "" then
+                rows = cache.rowsByDatasetAndCategory[datasetId]
+                    and cache.rowsByDatasetAndCategory[datasetId][category]
+                    or {}
+            else
+                rows = cache.rowsByDataset[datasetId] or {}
+            end
+        end
+
+        stopSetupTiming(timing, {
+            selectedRows = #rows,
+        })
+        return rows
+    end
+
+    function SetupWizard:BuildAllowedActionBarSpellItems()
+        local items = {
+            { label = "None", value = "" },
+        }
+        local seen = {
+            [""] = true,
+        }
+        local rows = buildActionBarSpellCache(self).alwaysLearnedRows
+
+        for index = 1, #rows do
+            local row = rows[index]
+            local spellRef = trimString(row and row.spellRef)
+            if spellRef ~= "" and not seen[spellRef] then
+                seen[spellRef] = true
+                local datasetName = getDatasetDisplayName(row and row.dataset)
+                items[#items + 1] = {
+                    label = ("%s%s"):format(
+                        tostring(row and row.name or spellRef),
+                        datasetName ~= "" and (" (" .. datasetName .. ")") or ""
+                    ),
+                    value = spellRef,
+                }
+            end
+        end
+
+        return items
+    end
+
+    local originalRefreshActionBarPage = SetupWizard.RefreshActionBarPage
+    if type(originalRefreshActionBarPage) == "function" then
+        function SetupWizard:RefreshActionBarPage(...)
+            local timing = startSetupTiming("SetupWizard.ActionBar.Refresh", "complete")
+            local result = originalRefreshActionBarPage(self, ...)
+            stopSetupTiming(timing, {
+                visibleEntries = #(self.actionBarSpellEntries or {}),
+                configurationRevision = getConfigurationRevision(),
+            })
+            return result
+        end
+    end
+
+    local originalLayoutActionBarSpellEntries = SetupWizard.LayoutActionBarSpellEntries
+    if type(originalLayoutActionBarSpellEntries) == "function" then
+        function SetupWizard:LayoutActionBarSpellEntries(...)
+            local timing = startSetupTiming("SetupWizard.ActionBar.VisibleEntryRender", "page")
+            local result = originalLayoutActionBarSpellEntries(self, ...)
+            stopSetupTiming(timing, {
+                visibleEntries = #(self.actionBarSpellEntries or {}),
+            })
+            return result
+        end
+    end
+
+    SetupWizard._actionBarSpellLightweightExtensionInstalled = true
 end
 
 return true
