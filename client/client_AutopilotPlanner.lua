@@ -73,6 +73,9 @@ local function ensurePlannerRuntimeFields(runtime)
     runtime.lastCompletedPlanId = runtime.lastCompletedPlanId
     runtime.currentPlannerActorKey = runtime.currentPlannerActorKey
     runtime.currentPlannerScheduleRevision = runtime.currentPlannerScheduleRevision
+    runtime.pendingPlannerClientSync = type(runtime.pendingPlannerClientSync) == "table"
+        and runtime.pendingPlannerClientSync
+        or nil
     runtime.plannerStatus = tostring(runtime.plannerStatus or "ready")
     return runtime
 end
@@ -125,13 +128,16 @@ local function markPlanCancelled(plan, reason)
 end
 
 local function updateRuntimeAfterCancellation(runtime, plan, reason)
-    if type(runtime) ~= "table" then
+    if type(runtime) ~= "table" or type(plan) ~= "table" then
         return
     end
 
-    if type(plan) == "table" and runtime.activePlanId == plan.id then
-        runtime.activePlanId = nil
+    local planId = tostring(plan.id or "")
+    if planId == "" or tostring(runtime.activePlanId or "") ~= planId then
+        return
     end
+
+    runtime.activePlanId = nil
 
     local normalizedReason = tostring(reason or "cancelled")
     if normalizedReason == "stale" or string.find(normalizedReason, "stale", 1, true) then
@@ -141,6 +147,31 @@ local function updateRuntimeAfterCancellation(runtime, plan, reason)
     elseif runtime.status == "ready" then
         runtime.plannerStatus = "ready"
     end
+end
+
+local function buildPlannerClientSyncIdentity(eventState)
+    if type(eventState) ~= "table" then
+        return nil
+    end
+
+    local eventId = getEventId(eventState)
+    if eventId == "" then
+        return nil
+    end
+
+    return {
+        eventId = eventId,
+        turnNumber = math.max(0, math.floor(tonumber(eventState.turnNumber) or 0)),
+        tickNumber = math.max(0, math.floor(tonumber(eventState.tickNumber) or 0)),
+    }
+end
+
+local function plannerClientSyncIdentityMatches(identity, eventState)
+    return type(identity) == "table"
+        and type(eventState) == "table"
+        and tostring(identity.eventId or "") == getEventId(eventState)
+        and tonumber(identity.turnNumber) == tonumber(eventState.turnNumber)
+        and tonumber(identity.tickNumber) == tonumber(eventState.tickNumber)
 end
 
 function Client:GetAutopilotPlannerRuntime(eventState)
@@ -202,6 +233,52 @@ function Client:CancelAutopilotPlannerScope(eventId, reason)
     return Tasks:CancelScope("autopilot:" .. normalizedEventId, reason or "event-cancelled")
 end
 
+function Client:MarkAutopilotPlannerStepAwaitingClientSync(eventStateOverride)
+    local eventState = eventStateOverride or Server.EventState
+    local runtime, reason = getPlannerRuntime(eventState)
+    if type(runtime) ~= "table" then
+        return false, reason
+    end
+
+    local identity = buildPlannerClientSyncIdentity(eventState)
+    if type(identity) ~= "table" then
+        return false, "event-identity-unavailable"
+    end
+
+    runtime.pendingPlannerClientSync = identity
+    return true
+end
+
+function Client:EnsureAutopilotPlanAfterClientSync(eventStateOverride)
+    local clientEventState = eventStateOverride or self.EventState
+    if not isHostAutopilotEvent(clientEventState) then
+        return nil, false, "not-host-autopilot"
+    end
+
+    local runtime, reason = getPlannerRuntime(clientEventState)
+    if type(runtime) ~= "table" then
+        return nil, false, reason
+    end
+
+    local pending = runtime.pendingPlannerClientSync
+    if type(pending) ~= "table" then
+        return nil, false, "client-sync-not-pending"
+    end
+    if not plannerClientSyncIdentityMatches(pending, clientEventState) then
+        return nil, false, "client-state-not-synchronized"
+    end
+
+    local serverEventState = Server.EventState
+    if not isHostAutopilotEvent(serverEventState)
+        or not plannerClientSyncIdentityMatches(pending, serverEventState)
+    then
+        return nil, false, "server-state-changed"
+    end
+
+    runtime.pendingPlannerClientSync = nil
+    return self:EnsureAutopilotPlanForCurrentStep(serverEventState)
+end
+
 local function cancelObsoleteActivePlan(runtime, nextPlanId, reason)
     if type(runtime) ~= "table" then
         return false
@@ -221,7 +298,9 @@ local function cancelObsoleteActivePlan(runtime, nextPlanId, reason)
         Tasks:Cancel(activePlan.job, reason or "replaced")
     end
 
-    runtime.activePlanId = nil
+    if tostring(runtime.activePlanId or "") == activePlanId then
+        runtime.activePlanId = nil
+    end
     return true
 end
 
@@ -316,7 +395,7 @@ function Client:EnsureAutopilotPlanForCurrentStep(eventStateOverride)
             if type(jobPlan) == "table" and jobPlan.status == "queued" then
                 jobPlan.status = "planning"
             end
-            if type(jobRuntime) == "table" then
+            if type(jobRuntime) == "table" and tostring(jobRuntime.activePlanId or "") == tostring(jobPlan and jobPlan.id or "") then
                 jobRuntime.plannerStatus = "planning"
             end
             return Planner.Step(jobState, deadlineMs)
@@ -346,7 +425,9 @@ function Client:EnsureAutopilotPlanForCurrentStep(eventStateOverride)
                 jobPlan.job = nil
             end
 
-            if type(jobRuntime) == "table" then
+            if type(jobRuntime) == "table"
+                and tostring(jobRuntime.activePlanId or "") == tostring(jobPlan and jobPlan.id or "")
+            then
                 if type(completedPlan) == "table" then
                     jobRuntime.plannerStatus = "ready"
                     jobRuntime.lastCompletedPlanId = tostring(jobState and jobState.planId or "")
@@ -403,9 +484,21 @@ end
 
 local function ensureAfterScheduleMutation(server)
     local eventState = server and server.EventState or nil
-    if isHostAutopilotEvent(eventState) then
-        Client:EnsureAutopilotPlanForCurrentStep(eventState)
+    if not isHostAutopilotEvent(eventState) then
+        return
     end
+
+    local runtime = type(Client.AutopilotRuntimeByEventId) == "table"
+        and Client.AutopilotRuntimeByEventId[getEventId(eventState)]
+        or nil
+    if type(runtime) == "table" and type(runtime.pendingPlannerClientSync) == "table" then
+        -- A schedule mutation that happens after the authoritative step moved but before
+        -- the host processed EVENT_STATE must not reopen the same pre-sync planning race.
+        Client:MarkAutopilotPlannerStepAwaitingClientSync(eventState)
+        return
+    end
+
+    Client:EnsureAutopilotPlanForCurrentStep(eventState)
 end
 
 local function wrapScheduleMutation(methodName)
@@ -423,6 +516,21 @@ local function wrapScheduleMutation(methodName)
         return unpack(results, 2, results.n)
     end
     return true
+end
+
+local baseHandleEventState = Client.HandleEventState
+if type(baseHandleEventState) == "function" then
+    function Client:HandleEventState(arguments, ...)
+        local results = pack(pcall(baseHandleEventState, self, arguments, ...))
+        if results[1] ~= true then
+            error(results[2], 0)
+        end
+
+        if results[2] == true then
+            self:EnsureAutopilotPlanAfterClientSync(self.EventState)
+        end
+        return unpack(results, 2, results.n)
+    end
 end
 
 local baseStartEvent = Server.StartEvent
@@ -449,8 +557,8 @@ if type(baseAdvanceEventStepAfterCommit) == "function" then
             error(results[2], 0)
         end
 
-        if results[2] == true then
-            ensureAfterScheduleMutation(self)
+        if results[2] == true and isHostAutopilotEvent(self.EventState) then
+            Client:MarkAutopilotPlannerStepAwaitingClientSync(self.EventState)
         end
         return unpack(results, 2, results.n)
     end
@@ -466,6 +574,12 @@ if type(baseEndEvent) == "function" then
         end
 
         if eventId ~= "" then
+            local runtime = type(Client.AutopilotRuntimeByEventId) == "table"
+                and Client.AutopilotRuntimeByEventId[eventId]
+                or nil
+            if type(runtime) == "table" then
+                runtime.pendingPlannerClientSync = nil
+            end
             Client:CancelAutopilotPlannerScope(eventId, "event-ended")
         end
         return unpack(results, 2, results.n)
