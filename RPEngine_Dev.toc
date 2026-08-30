@@ -165,6 +165,7 @@ client/spellcasting/ExplicitCasterActivation.lua
 client/autopilot/MovementAllowanceFrozen.lua
 client/autopilot/PlannerIntegration.lua
 client/autopilot/Authorization.lua
+client/autopilot/Execution.lua
 client/client_PendingChanges.lua
 server/server_Spellcasting.lua
 
