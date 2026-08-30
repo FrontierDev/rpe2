@@ -155,6 +155,7 @@ client/spellcasting/AuraDescriptionBuilder.lua
 client/spellcasting/DescriptionBuilder.lua
 client/traits/DescriptionBuilder.lua
 client/client_Targeting.lua
+client/spellcasting/ExplicitCasterActivation.lua
 client/client_PendingChanges.lua
 server/server_Spellcasting.lua
 
