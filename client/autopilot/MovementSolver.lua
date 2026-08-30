@@ -88,7 +88,7 @@ local function getCandidateTargetCount(candidate)
     if type(candidate) ~= "table" then
         return 0
     end
-    if type(candidate.targetUnits) == "table" then
+    if type(candidate.targetUnits) == "table" and #candidate.targetUnits > 0 then
         return #candidate.targetUnits
     end
     if type(candidate.targetUnit) == "table" or type(candidate.primaryTargetUnit) == "table" then
@@ -101,7 +101,7 @@ local function getCandidateTargetAt(candidate, index)
     if type(candidate) ~= "table" then
         return nil
     end
-    if type(candidate.targetUnits) == "table" then
+    if type(candidate.targetUnits) == "table" and #candidate.targetUnits > 0 then
         return candidate.targetUnits[index]
     end
     if index == 1 then
@@ -175,11 +175,6 @@ local function getCachedPosition(runtime, eventState, unit)
     return type(position) == "table" and position or nil
 end
 
-local function positionsEqual(left, right)
-    local distance = distanceBetween(left, right)
-    return distance ~= nil and distance <= EPSILON
-end
-
 local function makeCoordinateKey(position)
     if type(position) ~= "table" then
         return nil
@@ -212,6 +207,12 @@ local function compareAnchorTarget(left, right)
     return 0
 end
 
+local function sortAnchorTargets(state)
+    table.sort(state.anchorTargets, function(left, right)
+        return compareAnchorTarget(left, right) > 0
+    end)
+end
+
 local function insertBoundedAnchorTarget(state, unit, position, relevanceUtility)
     local eventId = normalizeEventId(unit and unit.eventID)
     if eventId <= 0 or type(position) ~= "table" then
@@ -224,6 +225,7 @@ local function insertBoundedAnchorTarget(state, unit, position, relevanceUtility
             normalizeNonNegative(existing.relevanceUtility),
             normalizeNonNegative(relevanceUtility)
         )
+        sortAnchorTargets(state)
         return true
     end
 
@@ -235,12 +237,7 @@ local function insertBoundedAnchorTarget(state, unit, position, relevanceUtility
     }
     state.anchorTargets[#state.anchorTargets + 1] = entry
     state.anchorTargetByEventId[eventId] = entry
-
-    local index = #state.anchorTargets
-    while index > 1 and compareAnchorTarget(state.anchorTargets[index], state.anchorTargets[index - 1]) > 0 do
-        state.anchorTargets[index], state.anchorTargets[index - 1] = state.anchorTargets[index - 1], state.anchorTargets[index]
-        index = index - 1
-    end
+    sortAnchorTargets(state)
 
     if #state.anchorTargets > Solver.MAX_ANCHOR_TARGETS then
         local removed = table.remove(state.anchorTargets)
@@ -626,10 +623,10 @@ local function compareAnchorEvaluations(left, right)
         return 1
     end
 
-    local leftScore = tonumber(left.adjustedUtility) or 0
-    local rightScore = tonumber(right.adjustedUtility) or 0
-    if math.abs(leftScore - rightScore) > EPSILON then
-        return leftScore > rightScore and 1 or -1
+    local leftUtility = tonumber(left.aggregateUtility) or 0
+    local rightUtility = tonumber(right.aggregateUtility) or 0
+    if math.abs(leftUtility - rightUtility) > EPSILON then
+        return leftUtility > rightUtility and 1 or -1
     end
 
     if left.usefulCoverage ~= right.usefulCoverage then
@@ -640,6 +637,12 @@ local function compareAnchorEvaluations(left, right)
     local rightCurrent = right.anchor and right.anchor.isCurrent == true
     if leftCurrent ~= rightCurrent then
         return leftCurrent and 1 or -1
+    end
+
+    local leftScore = tonumber(left.adjustedUtility) or leftUtility
+    local rightScore = tonumber(right.adjustedUtility) or rightUtility
+    if math.abs(leftScore - rightScore) > EPSILON then
+        return leftScore > rightScore and 1 or -1
     end
 
     local leftDistance = normalizeNonNegative(left.anchor and left.anchor.movementDistance)
@@ -727,7 +730,8 @@ local function collectTargetEventIds(candidate)
     local seen = {}
     local targetCount = getCandidateTargetCount(candidate)
     for index = 1, targetCount do
-        local eventId = normalizeEventId(getCandidateTargetAt(candidate, index) and getCandidateTargetAt(candidate, index).eventID)
+        local targetUnit = getCandidateTargetAt(candidate, index)
+        local eventId = normalizeEventId(targetUnit and targetUnit.eventID)
         if eventId > 0 and not seen[eventId] then
             seen[eventId] = true
             ids[#ids + 1] = eventId
@@ -893,6 +897,23 @@ function Solver.Step(state, deadlineMs)
     return true
 end
 
+local function copyMovementDetailsByMember(source)
+    local copied = {}
+    for eventId, details in pairs(type(source) == "table" and source or {}) do
+        if type(details) == "table" then
+            copied[eventId] = {
+                available = details.available == true,
+                reason = details.reason,
+                statRef = details.statRef,
+                baseValue = details.baseValue,
+                movementRangeOverride = details.movementRangeOverride,
+                effectiveValue = details.effectiveValue,
+            }
+        end
+    end
+    return copied
+end
+
 function Solver.CopyResult(state)
     if type(state) ~= "table" or state.phase ~= "complete" or type(state.result) ~= "table" then
         return nil
@@ -963,6 +984,7 @@ function Solver.CopyResult(state)
         currentPosition = copyPosition(result.currentPosition),
         selectedPosition = copyPosition(result.selectedPosition),
         movementAllowance = result.movementAllowance,
+        movementByMemberEventId = copyMovementDetailsByMember(result.movementByMemberEventId),
         aggregateUtility = result.aggregateUtility,
         adjustedUtility = result.adjustedUtility,
         usefulCoverage = result.usefulCoverage,
