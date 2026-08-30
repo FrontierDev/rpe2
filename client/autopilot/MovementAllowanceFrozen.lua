@@ -11,11 +11,17 @@ function Movement:ResolveEventUnitMovementAllowance(eventState, eventUnit)
     local frozen = type(eventUnit) == "table" and eventUnit.__autopilotMovementSnapshot or nil
     if type(frozen) == "table" and frozen.effectiveValue ~= nil then
         local controlState = type(frozen.controlState) == "table" and frozen.controlState or nil
+        local reason = tostring(frozen.reason or "")
+        local statRef = tostring(frozen.statRef or "")
+        local baseStatFound = frozen.baseStatFound
+        if baseStatFound == nil then
+            baseStatFound = statRef ~= "" and reason ~= "movement-range-stat-missing"
+        end
         return math.max(0, tonumber(frozen.effectiveValue) or 0), {
             available = frozen.available ~= false,
             reason = frozen.reason,
             statRef = frozen.statRef,
-            baseStatFound = frozen.baseStatFound == true,
+            baseStatFound = baseStatFound == true,
             baseValue = frozen.baseValue,
             movementRangeOverride = frozen.movementRangeOverride,
             effectiveValue = math.max(0, tonumber(frozen.effectiveValue) or 0),
