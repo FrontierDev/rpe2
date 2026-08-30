@@ -15,6 +15,7 @@ function Movement:ResolveEventUnitMovementAllowance(eventState, eventUnit)
             available = frozen.available ~= false,
             reason = frozen.reason,
             statRef = frozen.statRef,
+            baseStatFound = frozen.baseStatFound == true,
             baseValue = frozen.baseValue,
             movementRangeOverride = frozen.movementRangeOverride,
             effectiveValue = math.max(0, tonumber(frozen.effectiveValue) or 0),
