@@ -166,7 +166,9 @@ function Server:ApplyEventManagerHealthAction(eventId, action, amount)
             end
         end
         if not replaced then return false, "missing-health-entry" end
-        queued = Client:SendClientResources(ctx.clientState, "event-manager-resurrect", Common.GetPlayerName and Common.GetPlayerName() or nil, resources, targetId) == true
+        local resourceOwner = su.isPlayer == true and normName(su.controllerID or su.ownerID or su.name) or ""
+        if resourceOwner == "" then resourceOwner = Common.GetPlayerName and Common.GetPlayerName() or nil end
+        queued = Client:SendClientResources(ctx.clientState, "event-manager-resurrect", resourceOwner, resources, targetId) == true
     else
         if type(Client.QueueClientResourceDeltas) ~= "function" then return false, "resource-sync-unavailable" end
         queued = Client:QueueClientResourceDeltas(ctx.clientState, "event-manager-" .. key, {{ resourceRef = hs.resourceRef, delta = delta, maxValue = hs.maxValue, currentValue = math.max(0, math.min(hs.maxValue, hs.currentValue + delta)) }}, targetId, { allowLocalEchoApply = true, immediate = true, scope = "reaction" }) == true
