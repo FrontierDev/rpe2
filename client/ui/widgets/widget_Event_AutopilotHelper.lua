@@ -113,6 +113,7 @@ function EventWidget:RefreshAutopilotHelperControls()
     setShown(self.autopilotHelperRejectButton, selected and selected.canReject == true)
     setShown(self.autopilotHelperConfirmButton, selected and selected.canConfirm == true)
     setShown(self.autopilotHelperSkipButton, selected and selected.canSkip == true)
+    setShown(self.autopilotHelperSetPositionButton, selected and selected.canSetPosition == true)
 
     local pending = type(Client.GetAutopilotPendingPlan) == "function"
         and select(1, Client:GetAutopilotPendingPlan(state))
@@ -198,6 +199,24 @@ function EventWidget:EnsureAutopilotHelperUI()
         end
     )
     getFrame(self.autopilotHelperSkipButton):SetPoint("LEFT", getFrame(self.autopilotHelperConfirmButton), "RIGHT", 4, 0)
+
+    self.autopilotHelperSetPositionButton = buildButton(
+        self.autopilotHelperControlFrame,
+        "RPEClientEventWidgetDMSetMarkerPositionButton",
+        "Set Position Here",
+        108,
+        function()
+            local selected = findHelperEntryByActionId(self.selectedDMHelperActionId)
+            if type(selected) == "table"
+                and selected.canSetPosition == true
+                and type(Client.SetAutopilotMarkerPositionHere) == "function"
+            then
+                Client:SetAutopilotMarkerPositionHere(getActiveEventState(), selected.raidMarker)
+                self:RefreshCombatLogHistoryPanel()
+            end
+        end
+    )
+    getFrame(self.autopilotHelperSetPositionButton):SetPoint("TOPLEFT", self.autopilotHelperControlFrame, "TOPLEFT", 0, 0)
 
     self.autopilotHelperAuthorizeAllButton = buildButton(
         self.autopilotHelperControlFrame,
