@@ -85,6 +85,50 @@ local function copyTargetSelections(values)
     return copied
 end
 
+local function copyMovementDetails(details, fallbackAllowance)
+    local source = type(details) == "table" and details or {}
+    local reason = tostring(source.reason or "")
+    local statRef = tostring(source.statRef or "")
+    local baseStatFound = source.baseStatFound
+    if baseStatFound == nil then
+        baseStatFound = statRef ~= "" and reason ~= "movement-range-stat-missing"
+    end
+    return {
+        available = source.available ~= false,
+        reason = source.reason,
+        statRef = source.statRef,
+        baseStatFound = baseStatFound == true,
+        baseValue = source.baseValue,
+        movementRangeOverride = source.movementRangeOverride,
+        effectiveValue = tonumber(source.effectiveValue) or tonumber(fallbackAllowance),
+    }
+end
+
+local function copyMovementDetailsByMember(source)
+    local copied = {}
+    for eventId, details in pairs(type(source) == "table" and source or {}) do
+        local normalizedId = normalizeEventId(eventId)
+        if normalizedId > 0 and type(details) == "table" then
+            copied[normalizedId] = copyMovementDetails(details, details.effectiveValue)
+        end
+    end
+    return copied
+end
+
+local function findLimitingMemberEventIds(movementByMemberEventId, movementAllowance)
+    local minimum = math.max(0, tonumber(movementAllowance) or 0)
+    local ids = {}
+    for eventId, details in pairs(type(movementByMemberEventId) == "table" and movementByMemberEventId or {}) do
+        local normalizedId = normalizeEventId(eventId)
+        local effectiveValue = type(details) == "table" and tonumber(details.effectiveValue) or nil
+        if normalizedId > 0 and effectiveValue ~= nil and math.abs(math.max(0, effectiveValue) - minimum) <= EPSILON then
+            ids[#ids + 1] = normalizedId
+        end
+    end
+    table.sort(ids)
+    return ids
+end
+
 local function normalizeTurnMode(value)
     if type(Event.NormalizeTurnMode) == "function" then
         return Event.NormalizeTurnMode(value)
@@ -225,6 +269,25 @@ local function copyPendingMovement(source, completedPlan)
     action.expectedMemberEventIds = expectedMarkerMembers(completedPlan, action.raidMarker)
     action.movementAllowance = math.max(0, tonumber(source and source.movementAllowance) or 0)
     action.movementDistance = math.max(0, tonumber(source and source.movementDistance) or 0)
+    action.plannedMovementAllowance = math.max(
+        0,
+        tonumber(source and source.plannedMovementAllowance) or action.movementAllowance
+    )
+    action.plannedMovementDistance = math.max(
+        0,
+        tonumber(source and source.plannedMovementDistance) or action.movementDistance
+    )
+    action.movementByMemberEventId = copyMovementDetailsByMember(source and source.movementByMemberEventId)
+    action.limitingMemberEventIds = copyArray(source and source.limitingMemberEventIds)
+    if #action.limitingMemberEventIds == 0 then
+        action.limitingMemberEventIds = findLimitingMemberEventIds(
+            action.movementByMemberEventId,
+            action.plannedMovementAllowance
+        )
+    end
+    action.plannedLimitingMemberEventIds = copyArray(
+        source and source.plannedLimitingMemberEventIds or action.limitingMemberEventIds
+    )
     action.status = "pending"
     action.reason = nil
     return action
@@ -606,21 +669,41 @@ function Client:ConfirmAutopilotPendingMovement(actionId, eventStateOverride)
         return blockMovement(plan, action, runtime, "movement-allowance-api-unavailable")
     end
     local cohortAllowance = nil
+    local currentMovementByMemberEventId = {}
     for index = 1, #(actor.units or {}) do
         local unit = actor.units[index]
         if type(unit) == "table" and (type(Event.IsUnitActive) ~= "function" or Event.IsUnitActive(unit) == true) then
-            local resolvedAllowance = movement:ResolveEventUnitMovementAllowance(eventState, unit)
+            local resolvedAllowance, details = movement:ResolveEventUnitMovementAllowance(eventState, unit)
             local allowance = tonumber(resolvedAllowance)
+            local eventId = normalizeEventId(unit.eventID)
+            if eventId > 0 then
+                currentMovementByMemberEventId[eventId] = copyMovementDetails(details, allowance)
+            end
             if allowance == nil then
+                action.currentMovementByMemberEventId = currentMovementByMemberEventId
+                action.currentMovementAllowance = cohortAllowance
+                action.limitingMemberEventIds = findLimitingMemberEventIds(
+                    currentMovementByMemberEventId,
+                    cohortAllowance
+                )
                 return blockMovement(plan, action, runtime, "movement-allowance-unavailable")
             end
             allowance = math.max(0, allowance)
+            if eventId > 0 then
+                currentMovementByMemberEventId[eventId].effectiveValue = allowance
+            end
             if cohortAllowance == nil or allowance < cohortAllowance then
                 cohortAllowance = allowance
             end
         end
     end
     cohortAllowance = math.max(0, tonumber(cohortAllowance) or 0)
+    action.currentMovementAllowance = cohortAllowance
+    action.currentMovementByMemberEventId = currentMovementByMemberEventId
+    action.limitingMemberEventIds = findLimitingMemberEventIds(
+        currentMovementByMemberEventId,
+        cohortAllowance
+    )
 
     local committedPosition, positionReason = nil, "position-unavailable"
     if type(Spatial.GetActorPosition) == "function" then
@@ -640,6 +723,7 @@ function Client:ConfirmAutopilotPendingMovement(actionId, eventStateOverride)
     if tonumber(distance) == nil then
         return blockMovement(plan, action, runtime, distanceReason or "distance-unavailable")
     end
+    action.currentMovementDistance = math.max(0, tonumber(distance) or 0)
     if tonumber(distance) > cohortAllowance + EPSILON then
         return blockMovement(plan, action, runtime, cohortAllowance <= 0 and "cohort-immobilized" or "movement-allowance-reduced")
     end
