@@ -636,6 +636,79 @@ function Client:GetAutopilotNpcPosition(eventState, eventUnit)
     return Spatial.GetNpcPosition(runtime, eventState, eventUnit)
 end
 
+function Client:SetAutopilotMarkerPositionHere(eventState, raidMarker, options)
+    local runtime, reason = self:GetAutopilotSpatialRuntime(eventState)
+    if type(runtime) ~= "table" then
+        return false, reason
+    end
+    if runtime.status ~= "ready" then
+        return false, tostring(runtime.unavailableReason or "position-unavailable")
+    end
+    if type(Spatial.BuildNpcActorKeySet) ~= "function" or type(Spatial.SetActorPosition) ~= "function" then
+        return false, "spatial-api-unavailable"
+    end
+
+    local marker = math.max(0, math.floor(tonumber(raidMarker) or 0))
+    if marker <= 0 then
+        return false, "marker-unavailable"
+    end
+    local actorKey = "marker:" .. tostring(marker)
+    local actorKeys = Spatial.BuildNpcActorKeySet(eventState)
+    if type(actorKeys) ~= "table" or actorKeys[actorKey] ~= true then
+        return false, "actor-unavailable"
+    end
+
+    if type(Autopilot.EvaluateCoordinateCapability) ~= "function" then
+        return false, "position-api-unavailable"
+    end
+    local api = resolveApi(options)
+    local isInInstance = api.isInInstance
+    if type(isInInstance) ~= "function" then
+        isInInstance = IsInInstance
+    end
+    local unitPosition = api.unitPosition
+    if type(unitPosition) ~= "function" then
+        unitPosition = UnitPosition
+    end
+
+    local available, capabilityReason, details = Autopilot.EvaluateCoordinateCapability(isInInstance, unitPosition)
+    if available ~= true then
+        return false, tostring(capabilityReason or "position-unavailable"), details
+    end
+
+    local x = type(details) == "table" and normalizeFiniteNumber(details.x) or nil
+    local y = type(details) == "table" and normalizeFiniteNumber(details.y) or nil
+    local instanceID = type(details) == "table" and details.instanceID or nil
+    if x == nil or y == nil then
+        return false, "position-unavailable"
+    end
+    if instanceID == nil then
+        return false, "instance-unavailable"
+    end
+    if runtime.instanceID ~= nil then
+        local same = type(Spatial.AreInstancesEqual) == "function"
+            and Spatial.AreInstancesEqual(runtime.instanceID, instanceID) == true
+            or tostring(runtime.instanceID) == tostring(instanceID)
+        if not same then
+            return false, "instance-mismatch"
+        end
+    end
+
+    local stored, position = Spatial.SetActorPosition(runtime, eventState, actorKey, {
+        x = x,
+        y = y,
+        instanceID = instanceID,
+    })
+    if stored ~= true then
+        return false, position
+    end
+
+    if type(self.QueueAutopilotDMHelperRefresh) == "function" then
+        self:QueueAutopilotDMHelperRefresh()
+    end
+    return true, position
+end
+
 function Client:SetAutopilotNpcPosition(eventState, eventUnit, position)
     local runtime, reason = self:GetAutopilotSpatialRuntime(eventState)
     if type(runtime) ~= "table" then
