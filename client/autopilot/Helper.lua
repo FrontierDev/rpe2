@@ -43,7 +43,7 @@ local REASON_TEXT = {
     ["position-unset"] = "The marker's virtual position has not been initialized.",
     ["marker-position-unavailable"] = "The marker's current virtual position is not available.",
     ["proposed-position-unavailable"] = "The planned destination is no longer available.",
-    ["distance-api-unavailable"] = "The distance to the planned destination could not be calculated.",
+    ["distance-api-unavailable"] = "The distance calculation API is unavailable.",
     ["distance-unavailable"] = "The distance to the planned destination could not be calculated.",
     ["no-useful-action"] = "No useful legal action was found for this NPC.",
     ["dm-rejected"] = "This action was rejected by the DM.",
@@ -325,6 +325,7 @@ function Helper.GetMarkerStates(eventState)
             and Spatial.IsPositionAvailable(position) == true
             or false
         local lines = {}
+        local reasonCode, reasonText = nil, nil
         appendDetail(lines, "Marker", marker)
         appendDetail(lines, "Active NPCs", usage[marker] or 0)
         if used then
@@ -332,7 +333,7 @@ function Helper.GetMarkerStates(eventState)
             appendDetail(lines, "Status", positionAvailable and "Position set" or "Position not set")
             appendDetail(lines, "Position", positionText(position))
             if not positionAvailable then
-                appendReason(lines, position and position.reason or "position-unset")
+                reasonCode, reasonText = appendReason(lines, position and position.reason or "position-unset")
             end
         else
             lines[#lines + 1] = "No active NPCs currently use this raid marker."
@@ -360,6 +361,8 @@ function Helper.GetMarkerStates(eventState)
             ),
             details = table.concat(lines, "\n"),
             status = used and (positionAvailable and "ready" or "position-unset") or "unused",
+            reasonCode = reasonCode,
+            reasonText = reasonText,
         }
     end
 
@@ -571,6 +574,7 @@ function Helper.RecordHitCheckOutcome(entry, landed)
             targetName = unitName(eventState, entry and entry.defenderEventId),
             spellRef = tostring(entry and entry.spellRef or ""),
             componentKey = tostring(entry and entry.componentKey or ""),
+            attackType = tostring(entry and entry.attackType or ""),
             landed = landed == true,
             defended = landed ~= true,
             critical = false,
@@ -642,7 +646,19 @@ function Helper.GetTurnOutcomes(eventState)
             if outcome.killed == true then
                 labels[#labels + 1] = "Killed"
             end
-            local actionName = spellName(outcome.spellRef)
+            local actionName = tostring(outcome.spellRef or "") ~= "" and spellName(outcome.spellRef) or nil
+            if not actionName or actionName == "" then
+                local attackType = string.lower(tostring(outcome.attackType or ""))
+                if attackType == "melee" then
+                    actionName = "Melee attack"
+                elseif attackType == "ranged" then
+                    actionName = "Ranged attack"
+                elseif attackType == "spell" then
+                    actionName = "Spell attack"
+                else
+                    actionName = "Attack"
+                end
+            end
             local summary = ("%s -> %s — %s — %s"):format(
                 tostring(outcome.sourceName or "Unknown"),
                 tostring(outcome.targetName or "Unknown"),
@@ -718,54 +734,74 @@ function Helper.BuildEntries(eventState)
 
     local entries = {}
     local runtime = getRuntime(eventState)
-    local pendingRows, pending = Helper.GetPendingActionRows(eventState)
-    entries[#entries + 1] = buildStatusRow(eventState, runtime, pending)
+    local pending = type(Client.GetAutopilotPendingPlan) == "function"
+        and select(1, Client:GetAutopilotPendingPlan(eventState))
+        or nil
 
+    entries[#entries + 1] = buildStatusRow(eventState, runtime, pending)
     local markers = Helper.GetMarkerStates(eventState)
     for index = 1, #markers do
-        entries[#entries + 1] = markers[index]
+        if markers[index] and markers[index].used == true then
+            entries[#entries + 1] = markers[index]
+        end
     end
-    for index = 1, #pendingRows do
-        entries[#entries + 1] = pendingRows[index]
+    if type(pending) ~= "table" then
+        return entries
     end
 
-    if type(pending) == "table" and tostring(pending.status or "") ~= "stale" then
-        for index = 1, #(pending.warnings or {}) do
-            local warning = pending.warnings[index]
-            local reason = tostring(warning and warning.reason or "")
-            local fullText = tostring(warning and (warning.text or warning.reason) or "Autopilot warning")
-            local lines = { fullText }
-            local reasonCode, reasonText = appendReason(lines, reason)
-            entries[#entries + 1] = {
-                kind = "warning",
-                entryId = ("autopilot-warning:%s:%d"):format(tostring(pending.planId or ""), index),
-                summary = "Autopilot warning — Warning",
-                details = table.concat(lines, "\n"),
-                text = fullText,
-                status = "warning",
-                reasonCode = reasonCode,
-                reasonText = reasonText,
-            }
+    for index = 1, #(pending.movementActionIds or {}) do
+        local action = type(pending.actionsById) == "table"
+            and pending.actionsById[pending.movementActionIds[index]]
+            or nil
+        if type(action) == "table" then
+            entries[#entries + 1] = buildMovementRow(eventState, action)
         end
-        for index = 1, #(pending.noActions or {}) do
-            local noAction = pending.noActions[index]
-            local caster = unitName(eventState, noAction and noAction.casterEventId)
-            local reason = tostring(noAction and noAction.reason or "no-useful-action")
-            local lines = {}
-            appendDetail(lines, "NPC", caster)
-            appendDetail(lines, "Status", "No Action")
-            local reasonCode, reasonText = appendReason(lines, reason)
-            entries[#entries + 1] = {
-                kind = "no-action",
-                entryId = ("autopilot-no-action:%s:%d"):format(tostring(pending.planId or ""), index),
-                casterEventId = noAction and noAction.casterEventId,
-                summary = ("NPC: %s — No Action"):format(caster),
-                details = table.concat(lines, "\n"),
-                status = "no-action",
-                reasonCode = reasonCode,
-                reasonText = reasonText,
-            }
+    end
+    for index = 1, #(pending.warnings or {}) do
+        local warning = pending.warnings[index]
+        local reason = tostring(warning and warning.reason or "")
+        local fullText = tostring(warning and (warning.text or warning.reason) or "Autopilot warning")
+        local lines = { fullText }
+        local reasonCode, reasonText = appendReason(lines, reason)
+        entries[#entries + 1] = {
+            kind = "warning",
+            entryId = ("autopilot-warning:%s:%d"):format(tostring(pending.planId or ""), index),
+            summary = "Autopilot warning — Warning",
+            details = table.concat(lines, "\n"),
+            text = fullText,
+            status = "warning",
+            reasonCode = reasonCode,
+            reasonText = reasonText,
+        }
+    end
+    for index = 1, #(pending.spellActionIds or {}) do
+        local action = type(pending.actionsById) == "table"
+            and pending.actionsById[pending.spellActionIds[index]]
+            or nil
+        if type(action) == "table" then
+            entries[#entries + 1] = buildSpellRow(eventState, action)
         end
+    end
+    for index = 1, #(pending.noActions or {}) do
+        local noAction = pending.noActions[index]
+        local caster = unitName(eventState, noAction and noAction.casterEventId)
+        local reason = tostring(noAction and noAction.reason or "no-useful-action")
+        local text = ("[%s] has no viable action: %s"):format(caster, reason)
+        local lines = {}
+        appendDetail(lines, "NPC", caster)
+        appendDetail(lines, "Status", "No Action")
+        local reasonCode, reasonText = appendReason(lines, reason)
+        entries[#entries + 1] = {
+            kind = "no-action",
+            entryId = ("autopilot-no-action:%s:%d"):format(tostring(pending.planId or ""), index),
+            casterEventId = noAction and noAction.casterEventId,
+            summary = ("NPC: %s — No Action"):format(caster),
+            details = table.concat(lines, "\n"),
+            text = text,
+            status = "no-action",
+            reasonCode = reasonCode,
+            reasonText = reasonText,
+        }
     end
     return entries
 end
