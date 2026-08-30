@@ -197,6 +197,12 @@ function Client:GetDMHelperEntries(eventStateOverride)
         if type(entry) == "table" and tonumber(entry.turnNumber) == turnNumber then
             local copied = shallowCopy(entry)
             copied.dmHelperSource = "combat-log"
+            copied.entryId = ("combat-log:%s:%d:%d:%s"):format(
+                tostring(eventState.id or ""),
+                turnNumber,
+                index,
+                buildDMHelperText(copied)
+            )
             entries[#entries + 1] = copied
         end
     end
@@ -435,7 +441,7 @@ function EventWidget:EnsureDMHelperUI()
         showBorder = true,
         panelBorderSize = 1,
         panelBorderColor = UI.ResolveColor(nil, "panel.border"),
-        panelBackgroundColor = UI.ResolveColor(nil, "window.contentBackground"),
+        panelBackgroundColor = UI.ResolveColor(nil, "panel.background"),
     })
     local detailPanelFrame = getFrame(self.dmHelperDetailPanel)
     detailPanelFrame:Hide()
