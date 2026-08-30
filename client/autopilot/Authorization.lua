@@ -752,9 +752,27 @@ function Client:MarkAutopilotPendingPlanStaleForStep(eventId, turnNumber, tickNu
             end
         end
     end
+
     local activeId = tostring(runtime.activeAuthorizationPlanId or "")
-    refreshAuthorizationStatus(runtime, activeId ~= "" and runtime.authorizationByPlanId[activeId] or nil)
-    if changed > 0 then
+    local activePlan = activeId ~= "" and runtime.authorizationByPlanId[activeId] or nil
+    local retiredActive = type(activePlan) == "table"
+        and tostring(activePlan.eventId or "") == normalizedEventId
+        and tonumber(activePlan.turnNumber) == tonumber(turnNumber)
+        and tonumber(activePlan.tickNumber) == tonumber(tickNumber)
+
+    if retiredActive then
+        -- Keep the stale plan for diagnostics/history, but it is no longer the
+        -- current authorization context once the authoritative step has moved.
+        runtime.activeAuthorizationPlanId = nil
+        runtime.authorizationStatus = "ready"
+        if runtime.plannerStatus == "awaiting-authorization" then
+            runtime.plannerStatus = "ready"
+        end
+    else
+        refreshAuthorizationStatus(runtime, activePlan)
+    end
+
+    if changed > 0 or retiredActive then
         notifyHelperRefresh()
     end
     return changed
