@@ -23,9 +23,6 @@ then
     return Execution
 end
 
-local baseOnSpellcastComplete = Client.OnSpellcastComplete
-local baseOnSpellcastInterrupted = Client.OnSpellcastInterrupted
-local baseInterruptUnitSpellcast = Spellcasting.InterruptUnitSpellcast
 local baseAuthorizePendingAction = Client.AuthorizeAutopilotPendingAction
 local baseAuthorizeAllPendingActions = Client.AuthorizeAllAutopilotPendingActions
 
@@ -329,72 +326,13 @@ local function buildValidatedTargetSelection(action, snapshot)
     return selections, order
 end
 
-local function buildExecutionIdentity(action, plan)
-    return {
-        actionId = tostring(action and action.actionId or ""),
-        planId = tostring(plan and plan.planId or action and action.planId or ""),
-        eventId = tostring(action and action.eventId or plan and plan.eventId or ""),
-        casterEventId = normalizeEventId(action and action.casterEventId),
-    }
-end
-
-local function attachExecutionIdentity(castEntry, identity)
-    if type(castEntry) ~= "table" or type(identity) ~= "table" then
-        return castEntry
-    end
-    castEntry.autopilotActionId = identity.actionId
-    castEntry.autopilotPlanId = identity.planId
-    castEntry.autopilotEventId = identity.eventId
-    castEntry.autopilotCasterEventId = identity.casterEventId
-    castEntry.autopilotSource = "autopilot-authorized"
-    return castEntry
-end
-
-local function resolvePendingActionFromCastEntry(castEntry)
-    if type(castEntry) ~= "table" or tostring(castEntry.autopilotSource or "") ~= "autopilot-authorized" then
-        return nil, nil
-    end
-    local eventId = tostring(castEntry.autopilotEventId or "")
-    local planId = tostring(castEntry.autopilotPlanId or "")
-    local actionId = tostring(castEntry.autopilotActionId or "")
-    local runtime = eventId ~= "" and type(Client.AutopilotRuntimeByEventId) == "table"
-        and Client.AutopilotRuntimeByEventId[eventId]
-        or nil
-    local plan = type(runtime) == "table" and type(runtime.authorizationByPlanId) == "table"
-        and runtime.authorizationByPlanId[planId]
-        or nil
-    local action = type(plan) == "table" and type(plan.actionsById) == "table"
-        and plan.actionsById[actionId]
-        or nil
-    return action, plan
-end
-
 local function refreshHelper()
     if type(Client.QueueAutopilotDMHelperRefresh) == "function" then
         Client:QueueAutopilotDMHelperRefresh()
     end
 end
 
-local function finalizeActionFromCastEntry(castEntry, success, reason)
-    local action = resolvePendingActionFromCastEntry(castEntry)
-    if type(action) ~= "table" then
-        return false
-    end
-    if action.status ~= "executing" and action.status ~= "authorized" then
-        return false
-    end
-    if success == true then
-        action.status = "completed"
-        action.reason = nil
-    else
-        action.status = "failed"
-        action.reason = tostring(reason or "spell-lifecycle-failed")
-    end
-    refreshHelper()
-    return true
-end
-
-local function createExecutionProxy(casterUnit, eventState, identity)
+local function createExecutionProxy(casterUnit, eventState)
     local proxy = {
         QueuedSpellTargetSelection = false,
         ResolveActiveSpellcasterUnit = function(_, requestedEventState)
@@ -404,11 +342,6 @@ local function createExecutionProxy(casterUnit, eventState, identity)
             return casterUnit, eventState
         end,
     }
-
-    proxy.OnSpellcastComplete = function(self, spellRef, castEntry)
-        attachExecutionIdentity(castEntry, identity)
-        return Client.OnSpellcastComplete(self, spellRef, castEntry)
-    end
 
     return setmetatable(proxy, {
         __index = Client,
@@ -515,8 +448,7 @@ function Client:ExecuteEventUnitSpell(request)
         return false, targetReason, "stale"
     end
 
-    local identity = buildExecutionIdentity(action or request, plan)
-    local proxy = createExecutionProxy(casterUnit, eventState, identity)
+    local proxy = createExecutionProxy(casterUnit, eventState)
     Spellcasting.QueueLocalSpellTargetSelection(proxy, spellRef, targetSelections, targetSelectionOrder)
 
     local castTime = tonumber(snapshot.spell and snapshot.spell.totalTicks) or (snapshot.spell and snapshot.spell.castTime)
@@ -538,9 +470,6 @@ function Client:ExecuteEventUnitSpell(request)
     local castEntry = type(Spellcasting.GetCastEntry) == "function"
         and Spellcasting.GetCastEntry(Client, tostring(eventState.id or ""), casterEventId)
         or nil
-    if type(castEntry) == "table" then
-        attachExecutionIdentity(castEntry, identity)
-    end
     return true, {
         casterEventId = casterEventId,
         spellRef = spellRef,
@@ -578,6 +507,10 @@ function Client:OnAutopilotPendingActionAuthorized(action, plan, eventState)
         refreshHelper()
         return false, action.reason
     end
+
+    action.status = "completed"
+    action.reason = nil
+    refreshHelper()
     return true, resultOrReason
 end
 
@@ -625,57 +558,6 @@ if type(baseAuthorizeAllPendingActions) == "function" then
     end
 end
 
-function Client:OnSpellcastComplete(spellRef, castEntryOverride)
-    local entry = castEntryOverride
-    if type(entry) ~= "table" and type(Spellcasting.GetCastEntry) == "function" then
-        local eventState = self.GetEventState and self:GetEventState() or nil
-        local activeCaster = self.ResolveActiveSpellcasterUnit and self:ResolveActiveSpellcasterUnit(eventState) or nil
-        if type(eventState) == "table" and type(activeCaster) == "table" then
-            entry = Spellcasting.GetCastEntry(self, eventState.id, activeCaster.eventID)
-        end
-    end
-    local results = pack(pcall(baseOnSpellcastComplete, self, spellRef, castEntryOverride))
-    if results[1] ~= true then
-        finalizeActionFromCastEntry(entry, false, "spell-complete-error")
-        error(results[2], 0)
-    end
-    finalizeActionFromCastEntry(entry, results[2] == true, results[2] == true and nil or "spell-complete-failed")
-    return unpack(results, 2, results.n)
-end
-
-if type(baseOnSpellcastInterrupted) == "function" then
-    function Client:OnSpellcastInterrupted(spellRef, castEntryOverride)
-        local entry = castEntryOverride
-        local results = pack(pcall(baseOnSpellcastInterrupted, self, spellRef, castEntryOverride))
-        if results[1] ~= true then
-            finalizeActionFromCastEntry(entry, false, "spell-interrupt-error")
-            error(results[2], 0)
-        end
-        if results[2] == true then
-            finalizeActionFromCastEntry(entry, false, "spell-interrupted")
-        end
-        return unpack(results, 2, results.n)
-    end
-end
-
-if type(baseInterruptUnitSpellcast) == "function" then
-    function Spellcasting.InterruptUnitSpellcast(self, eventState, targetUnit, options)
-        local entry = type(Spellcasting.GetCastEntry) == "function"
-            and Spellcasting.GetCastEntry(self, eventState and eventState.id, targetUnit and targetUnit.eventID)
-            or nil
-        local results = pack(pcall(baseInterruptUnitSpellcast, self, eventState, targetUnit, options))
-        if results[1] ~= true then
-            finalizeActionFromCastEntry(entry, false, "spell-interrupt-error")
-            error(results[2], 0)
-        end
-        if results[2] == true then
-            finalizeActionFromCastEntry(entry, false, "spell-interrupted")
-        end
-        return unpack(results, 2, results.n)
-    end
-end
-
 Execution.ValidatePlanIdentity = validatePlanIdentity
 Execution.BuildValidatedTargetSelection = buildValidatedTargetSelection
-Execution.ResolvePendingActionFromCastEntry = resolvePendingActionFromCastEntry
 return Execution
