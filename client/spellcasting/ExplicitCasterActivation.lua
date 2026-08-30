@@ -100,6 +100,21 @@ local function listResolvedSpellRefs(casterUnit)
     return refs
 end
 
+local function hasResolvedSpellRef(casterUnit, spellRef)
+    local normalizedSpellRef = normalizeSpellRef(spellRef)
+    if not normalizedSpellRef then
+        return false
+    end
+
+    local refs = listResolvedSpellRefs(casterUnit)
+    for index = 1, #refs do
+        if refs[index] == normalizedSpellRef then
+            return true
+        end
+    end
+    return false
+end
+
 function Spellcasting.ListEventUnitResolvedSpellRefs(self, eventState, casterEventId)
     if type(eventState) ~= "table" or eventState.active ~= true then
         return {}
@@ -164,12 +179,20 @@ end
 
 function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
     local resolvedOptions = type(options) == "table" and options or nil
-    if normalizeEventUnitId(resolvedOptions and resolvedOptions.casterEventId) == nil then
+    local hasExplicitCaster = resolvedOptions ~= nil and resolvedOptions.casterEventId ~= nil
+    if not hasExplicitCaster then
         return baseBuildSpellActivationSnapshot(self, spellRef, options)
+    end
+
+    if normalizeEventUnitId(resolvedOptions.casterEventId) == nil then
+        return nil
     end
 
     local eventState, casterUnit = resolveExplicitCasterContext(self, resolvedOptions)
     if type(eventState) ~= "table" or type(casterUnit) ~= "table" then
+        return nil
+    end
+    if not hasResolvedSpellRef(casterUnit, spellRef) then
         return nil
     end
 
