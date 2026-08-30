@@ -5,16 +5,25 @@ Addon.Internal = Addon.Internal or {}
 
 local Client = Addon.Client
 local Registry = Addon.Internal.Registry or {}
+local Event = Addon.Internal
+    and Addon.Internal.Database
+    and Addon.Internal.Database.Classes
+    and Addon.Internal.Database.Classes.Event
+    or nil
 
 Client.AutopilotHelper = Client.AutopilotHelper or {}
 local Helper = Client.AutopilotHelper
 
-Client.DMHelperProviders = Client.DMHelperProviders or {}
-Client.DMHelperProviderOrder = Client.DMHelperProviderOrder or {}
-
 local function normalizeEventId(value)
     local eventId = math.floor(tonumber(value) or 0)
     return eventId > 0 and eventId or 0
+end
+
+local function normalizeTurnMode(value)
+    if type(Event) == "table" and type(Event.NormalizeTurnMode) == "function" then
+        return Event.NormalizeTurnMode(value)
+    end
+    return tostring(value or "") == "autopilot" and "autopilot" or "manual"
 end
 
 local function findUnit(eventState, eventId)
@@ -93,20 +102,24 @@ local function getRuntime(eventState)
     return Client.AutopilotRuntimeByEventId[eventId]
 end
 
-local function isHost(eventState)
+local function isHostAutopilotEvent(eventState)
     return type(eventState) == "table"
         and eventState.active == true
+        and normalizeTurnMode(eventState.turnMode) == "autopilot"
         and type(Client.IsLocalEventHost) == "function"
         and Client:IsLocalEventHost(eventState) == true
 end
 
 local function buildStatusRow(eventState, runtime, pending)
-    local status = type(runtime) == "table" and tostring(runtime.plannerStatus or "ready") or "ready"
+    local status = type(runtime) == "table" and tostring(runtime.plannerStatus or "ready") or "planning"
     local text = "Autopilot: " .. statusLabel(status)
-    if type(runtime) == "table" and runtime.status ~= "ready" then
+    if type(runtime) ~= "table" then
+        text = "Autopilot: Initializing"
+    elseif runtime.status ~= "ready" then
         text = "Autopilot unavailable: " .. tostring(runtime.unavailableReason or "position unavailable")
     elseif type(pending) == "table" and tostring(pending.status or "") ~= "stale" then
-        if type(pending.spellActionIds) == "table" or type(pending.movementActionIds) == "table" then
+        local actionCount = #(pending.spellActionIds or {}) + #(pending.movementActionIds or {})
+        if actionCount > 0 then
             text = "Autopilot: Ready — pending authorization"
         end
     end
@@ -118,7 +131,7 @@ local function buildStatusRow(eventState, runtime, pending)
     }
 end
 
-local function buildMovementRow(eventState, action)
+local function buildMovementRow(_, action)
     local marker = math.max(0, math.floor(tonumber(action and action.raidMarker) or 0))
     local proposed = type(action) == "table" and action.proposedPosition or nil
     local destination = "the proposed location"
@@ -155,9 +168,9 @@ local function buildSpellRow(eventState, action)
     local targets = targetNames(eventState, action and action.targetEventIds)
     local status = tostring(action and action.status or "pending")
     local text = ("[%s] casts %s at %s. [%s]"):format(caster, spell, targets, statusLabel(status))
-    if status == "blocked" and tostring(action.reason or "") ~= "" then
-        text = text .. " " .. tostring(action.reason)
-    elseif status == "stale" and tostring(action.reason or "") ~= "" then
+    if (status == "blocked" or status == "stale" or status == "failed")
+        and tostring(action.reason or "") ~= ""
+    then
         text = text .. " " .. tostring(action.reason)
     end
     return {
@@ -173,9 +186,10 @@ local function buildSpellRow(eventState, action)
 end
 
 function Helper.BuildEntries(eventState)
-    if not isHost(eventState) then
+    if not isHostAutopilotEvent(eventState) then
         return {}
     end
+
     local entries = {}
     local runtime = getRuntime(eventState)
     local pending = type(Client.GetAutopilotPendingPlan) == "function"
@@ -221,48 +235,12 @@ function Helper.BuildEntries(eventState)
     return entries
 end
 
-function Client:RegisterDMHelperProvider(key, provider)
-    local normalizedKey = tostring(key or "")
-    if normalizedKey == "" or type(provider) ~= "function" then
-        return false
-    end
-    if self.DMHelperProviders[normalizedKey] == nil then
-        self.DMHelperProviderOrder[#self.DMHelperProviderOrder + 1] = normalizedKey
-    end
-    self.DMHelperProviders[normalizedKey] = provider
-    return true
-end
-
-local baseGetDMHelperEntries = Client.GetDMHelperEntries
-function Client:GetDMHelperEntries(eventStateOverride)
-    local eventState = type(eventStateOverride) == "table"
-        and eventStateOverride
-        or (type(self.GetEventState) == "function" and self:GetEventState() or self.EventState)
-    if not isHost(eventState) then
-        return {}
-    end
-
-    local entries = {}
-    if type(baseGetDMHelperEntries) == "function" then
-        local baseEntries = baseGetDMHelperEntries(self, eventState)
-        for index = 1, #(baseEntries or {}) do
-            entries[#entries + 1] = baseEntries[index]
-        end
-    end
-    for index = 1, #(self.DMHelperProviderOrder or {}) do
-        local provider = self.DMHelperProviders[self.DMHelperProviderOrder[index]]
-        if type(provider) == "function" then
-            local provided = provider(self, eventState)
-            for entryIndex = 1, #(provided or {}) do
-                entries[#entries + 1] = provided[entryIndex]
-            end
-        end
-    end
-    return entries
-end
-
 function Client:QueueAutopilotDMHelperRefresh()
-    local widget = self.UI and self.UI.EventWidget or nil
+    local widgetNamespace = self.UI and self.UI.EventWidget or nil
+    local widget = type(widgetNamespace) == "table"
+        and type(widgetNamespace.Get) == "function"
+        and widgetNamespace:Get()
+        or widgetNamespace
     if type(widget) ~= "table"
         or tostring(widget.combatLogHistoryMode or "") ~= "dm-helper"
         or type(widget.IsCombatLogHistoryPanelShown) ~= "function"
@@ -275,8 +253,10 @@ function Client:QueueAutopilotDMHelperRefresh()
     return true
 end
 
-Client:RegisterDMHelperProvider("autopilot", function(_, eventState)
-    return Helper.BuildEntries(eventState)
-end)
+if type(Client.RegisterDMHelperProvider) == "function" then
+    Client:RegisterDMHelperProvider("autopilot", function(_, eventState)
+        return Helper.BuildEntries(eventState)
+    end)
+end
 
 return Helper
