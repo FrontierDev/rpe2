@@ -67,7 +67,11 @@ function Autopilot.GetCapabilityMessage(reason, details)
 end
 
 function Autopilot.SetEventStartTurnModeContext(value)
-    Autopilot.EventStartTurnModeContext = value == nil and nil or Autopilot.NormalizeTurnMode(value)
+    if value == nil then
+        Autopilot.EventStartTurnModeContext = nil
+    else
+        Autopilot.EventStartTurnModeContext = Autopilot.NormalizeTurnMode(value)
+    end
     return Autopilot.EventStartTurnModeContext
 end
 
