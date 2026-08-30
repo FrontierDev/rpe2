@@ -55,6 +55,29 @@ local function buildCompositeActorKey(actorKeys)
     return "step:" .. table.concat(actorKeys, "+")
 end
 
+local function buildScheduleRevision(schedule)
+    local parts = {}
+
+    for stepIndex = 1, #(schedule or {}) do
+        local step = schedule[stepIndex]
+        parts[#parts + 1] = "step=" .. tostring(stepIndex)
+        for actorIndex = 1, #(step and step.actors or {}) do
+            local actor = step.actors[actorIndex]
+            local memberIds = {}
+            for memberIndex = 1, #(actor and actor.unitEventIds or {}) do
+                memberIds[#memberIds + 1] = tostring(tonumber(actor.unitEventIds[memberIndex]) or 0)
+            end
+            parts[#parts + 1] = table.concat({
+                tostring(actor and actor.key or ""),
+                tostring(tonumber(actor and actor.initiative) or 0),
+                table.concat(memberIds, ","),
+            }, "@")
+        end
+    end
+
+    return table.concat(parts, "|")
+end
+
 function Planner.ResolveActiveNpcStep(eventState, stepCapacity)
     if type(Event) ~= "table" or type(Event.BuildTurnSchedule) ~= "function" then
         return nil, "schedule-api-unavailable"
@@ -101,6 +124,7 @@ function Planner.ResolveActiveNpcStep(eventState, stepCapacity)
         npcEventIds = npcEventIds,
         npcCount = #npcEventIds,
         oversized = step.oversized == true,
+        scheduleRevision = buildScheduleRevision(schedule),
     }
 end
 
@@ -113,8 +137,8 @@ function Planner.BuildPlanIdentity(eventState, descriptor, scheduleRevision)
     local turnNumber = math.max(0, math.floor(tonumber(eventState.turnNumber) or 0))
     local tickNumber = math.max(0, math.floor(tonumber(eventState.tickNumber) or 0))
     local actorKey = tostring(descriptor.actorKey or "")
-    local revision = math.max(0, math.floor(tonumber(scheduleRevision) or 0))
-    if eventId == "" or turnNumber <= 0 or tickNumber <= 0 or actorKey == "" then
+    local revision = tostring(scheduleRevision or descriptor.scheduleRevision or "")
+    if eventId == "" or turnNumber <= 0 or tickNumber <= 0 or actorKey == "" or revision == "" then
         return nil
     end
 
@@ -123,7 +147,7 @@ function Planner.BuildPlanIdentity(eventState, descriptor, scheduleRevision)
         tostring(turnNumber),
         tostring(tickNumber),
         actorKey,
-        tostring(revision),
+        revision,
     }, ":")
 end
 
@@ -140,7 +164,7 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
         actorKey = tostring(descriptor.actorKey or ""),
         actorKeys = copyArray(descriptor.actorKeys),
         npcEventIds = copyArray(descriptor.npcEventIds),
-        scheduleRevision = math.max(0, math.floor(tonumber(scheduleRevision) or 0)),
+        scheduleRevision = tostring(scheduleRevision or descriptor.scheduleRevision or ""),
         phase = "validate",
         actorIndex = 1,
         npcIndex = 1,
@@ -219,7 +243,7 @@ function Planner.Step(state, deadlineMs)
             actorKey = tostring(state.actorKey or ""),
             actorKeys = copyArray(state.actorKeys),
             npcEventIds = copyArray(state.snapshot and state.snapshot.npcEventIds or {}),
-            scheduleRevision = math.max(0, math.floor(tonumber(state.scheduleRevision) or 0)),
+            scheduleRevision = tostring(state.scheduleRevision or ""),
             actions = {},
             movement = nil,
             status = "ready",
@@ -245,7 +269,7 @@ function Planner.CopyCompletedPlan(state)
         actorKey = tostring(source.actorKey or ""),
         actorKeys = copyArray(source.actorKeys),
         npcEventIds = copyArray(source.npcEventIds),
-        scheduleRevision = math.max(0, math.floor(tonumber(source.scheduleRevision) or 0)),
+        scheduleRevision = tostring(source.scheduleRevision or ""),
         actions = {},
         movement = nil,
         status = tostring(source.status or "ready"),
