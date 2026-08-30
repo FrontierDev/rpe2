@@ -230,15 +230,16 @@ function Client:ResetAutopilotBatchState(eventId, reason)
 
     ensurePlannerRuntimeFields(runtime)
 
-    -- Detach the current batch before cancellation callbacks run so obsolete
-    -- planner callbacks cannot republish status into the reset batch.
+    -- Detach the active pointer before cancellation callbacks run so obsolete
+    -- planner callbacks cannot republish status into the reset batch. Keep the
+    -- records alive until the scope has been cancelled, then dispose them.
     runtime.activePlanId = nil
     runtime.lastCompletedPlanId = nil
     runtime.currentPlannerActorKey = nil
     runtime.currentPlannerScheduleRevision = nil
-    runtime.planByStepKey = {}
 
     self:CancelAutopilotPlannerScope(normalizedEventId, reason or "batch-reset")
+    runtime.planByStepKey = {}
 
     if runtime.status == "ready" then
         runtime.plannerStatus = "ready"
