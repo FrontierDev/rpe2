@@ -142,6 +142,7 @@ local function statusLabel(status)
         ["no-action"] = "No Action",
         ["position-unset"] = "Position Not Set",
         ["awaiting-authorization"] = "Awaiting Authorization",
+        ["waiting-client-sync"] = "Waiting for event state",
         ["suspended-instance"] = "Suspended (Instance)",
         ["suspended-position"] = "Suspended (Position)",
         ["cancelled-stale"] = "Cancelled (Stale)",
