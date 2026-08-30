@@ -432,10 +432,13 @@ local function seedPlayerPositions(runtime, eventState, options)
                 runtime.playerTokenByEventId[eventId] = unitToken
             end
 
-            local usedProvidedSample = playerName ~= ""
+            local hasProvidedHostSample = playerName ~= ""
                 and playerName == hostName
                 and unitToken == "player"
-                and applyProvidedHostSample(
+                and type(initialHostSample) == "table"
+
+            if hasProvidedHostSample then
+                applyProvidedHostSample(
                     runtime,
                     eventState,
                     unit,
@@ -444,8 +447,7 @@ local function seedPlayerPositions(runtime, eventState, options)
                     turnNumber,
                     tickNumber
                 )
-
-            if not usedProvidedSample then
+            else
                 samplePlayerByToken(
                     runtime,
                     eventState,
