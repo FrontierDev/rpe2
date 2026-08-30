@@ -317,11 +317,7 @@ end
 function EventWidget:Refresh(...)
     local result = originalRefresh(self, ...)
     self:EnsureAutopilotHelperUI()
-    if tostring(self.combatLogHistoryMode or "") == "dm-helper" then
-        self:RefreshCombatLogHistoryPanel()
-    else
-        configureAutopilotControlsForMode(self)
-    end
+    configureAutopilotControlsForMode(self)
     return result
 end
 
