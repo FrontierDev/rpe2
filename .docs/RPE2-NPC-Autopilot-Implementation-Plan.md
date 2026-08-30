@@ -4,7 +4,7 @@
 **Status:** Proposed implementation sequence  
 **Target:** RPEngine 2.0 (`FrontierDev/rpe2`)  
 **Source design:** `.docs/RPE2-NPC-Autopilot-PDD.md`  
-**Related existing issues:** #100 Combat Log history, #101 DM Helper  
+**Related existing issues:** #100 Combat Log history, #101 DM Helper, #113–#123 NPC Autopilot implementation tasks  
 
 ---
 
@@ -12,13 +12,19 @@
 
 Implement NPC Autopilot as a host-authoritative, sliceable **planning** system which:
 
-- groups NPCs sharing a raid marker into one atomic turn actor;
+- groups NPCs sharing a raid marker into one atomic TurnActor;
+- treats one raid marker as one spatially indivisible virtual actor;
+- never gives marked cohort members divergent hidden positions;
 - caches player positions at event start and refreshes one player's position only when that player ends their turn;
 - evaluates existing NPC spells and legal targets without duplicating spell legality rules;
-- chooses healing, damage, threat targets, AoE targets and shared-marker melee positioning using lightweight deterministic logic;
+- reuses existing RPE movement-range and AuraManager control state;
+- constrains a marked cohort by its least-mobile active member;
+- pins the entire marked cohort if any active member has effective movement allowance zero;
+- jointly chooses one reachable shared marker anchor and one useful action per cohort member;
 - publishes proposed movement and spell actions to the host-only DM Helper;
-- places every executable NPC action into a Pending Authorization state;
+- places every executable NPC action into Pending Authorization;
 - executes nothing until explicitly authorized by the DM;
+- commits no virtual movement until the DM explicitly confirms it;
 - routes authorized actions through the existing NPC spell lifecycle;
 - uses `Tasks:EnqueueSliceable()` and `Tasks:ShouldYield(deadlineMs)` for all non-trivial planning work;
 - does not support Autopilot inside Blizzard instances.
@@ -29,30 +35,28 @@ Manual events must remain behaviorally unchanged.
 
 # 2. Non-Negotiable Architectural Constraints
 
-The implementation must preserve the following constraints from the PDD.
-
 1. **Planning is not execution.** Planner completion may create pending records and refresh DM Helper, but may not cast spells, spend resources, consume charges, start cooldowns, apply effects or commit proposed movement.
 2. **Every NPC spell requires explicit DM authorization.** Bulk authorization is permitted only as an explicit DM action.
 3. **Movement is also DM-controlled.** A proposed virtual marker position is committed only after `Confirm Moved`.
-4. **Player positions are cached.** Seed once when the event starts; subsequently sample only the player whose turn has just ended.
-5. **NPC planning never performs a full party/raid coordinate rescan.** Missing cached coordinates are handled explicitly rather than silently refreshed or guessed.
-6. **All planner work is sliceable.** Do not use a normal deferred task containing an indivisible full-cohort planner.
-7. **Planner loops honor the queue deadline.** Candidate-spell, candidate-target, AoE and marker-solver loops must call `Tasks:ShouldYield(deadlineMs)` at resumable boundaries.
-8. **Canonical spell activation remains authoritative.** Cooldown, charges, GCD, resources, conditions and target legality must come from the existing spellcasting runtime.
-9. **Autopilot does not duplicate combat execution.** Authorized actions converge on the normal NPC spell lifecycle.
-10. **Same-marker NPCs plan from one frozen snapshot.** Later actions are not tactically re-scored because an earlier authorized action happened to resolve first.
-11. **No automatic retargeting on authorization failure.** Invalidated pending actions become stale/failed; the DM explicitly requests a replan.
-12. **Autopilot is unavailable in restricted instances.** Never fabricate coordinates.
+4. **Marked cohorts never split.** One non-zero raid marker maps to one TurnActor and one virtual coordinate. No hidden member positions may diverge while members share the marker.
+5. **The least-mobile member constrains the marker.** Resolve effective movement allowance for every active marked member and use the most restrictive result for the shared movement.
+6. **Existing movement/control state is authoritative.** Reuse the existing movement-range source and `AuraManager:BuildControlState(...).movementRangeOverride`; do not create a second root/snare model.
+7. **Zero movement pins the whole marker.** If any active marked member has effective movement allowance zero, the current marker position is the only legal anchor.
+8. **Player positions are cached.** Seed once when the event starts; subsequently sample only the player whose turn has just ended.
+9. **NPC planning never performs a full party/raid coordinate rescan.** Missing cached coordinates are handled explicitly rather than silently refreshed or guessed.
+10. **All planner work is sliceable.** Do not use a normal deferred task containing an indivisible full-cohort planner.
+11. **Planner loops honor the queue deadline.** Candidate-spell, target, AoE, movement-control, anchor-generation and per-anchor cohort-scoring loops must call `Tasks:ShouldYield(deadlineMs)` at resumable boundaries.
+12. **Canonical spell activation remains authoritative.** Cooldowns, charges, GCD, resources, conditions and target legality must come from the existing spellcasting runtime.
+13. **Autopilot does not duplicate combat execution.** Authorized actions converge on the normal NPC spell lifecycle.
+14. **Same-marker NPCs plan from one frozen snapshot.** Later actions are not tactically re-scored because an earlier authorized action happened to resolve first.
+15. **No automatic retargeting or replanning on authorization failure.** Invalidated pending actions become stale/failed; the DM explicitly requests a replan.
+16. **Autopilot is unavailable in restricted instances.** Never fabricate coordinates.
 
 ---
 
 # 3. Existing Code Paths to Reuse
 
-Implementation should extend existing systems rather than create parallel infrastructure.
-
 ## Event state and turn lifecycle
-
-Primary files:
 
 ```text
 core/classes/Event.lua
@@ -62,19 +66,11 @@ client/client_Event.lua
 client/spellcasting/Helpers.lua
 ```
 
-Reuse synchronized:
-
-```text
-turnNumber
-tickNumber
-totalTicks
-```
-
-and existing stale-work/turn-commit patterns in `client_Event.lua`.
+Reuse synchronized `turnNumber`, `tickNumber`, `totalTicks` and existing stale-work/turn-commit patterns.
 
 ## Task scheduling
 
-Use:
+Use the existing queue:
 
 ```lua
 Tasks:EnqueueSliceable(options)
@@ -83,13 +79,9 @@ Tasks:Cancel(jobOrId, reason)
 Tasks:CancelScope(scope, reason)
 ```
 
-from `core/internal/tasks/TaskQueue.lua`.
-
 Do not increase the global TaskQueue budget to accommodate Autopilot.
 
 ## Spell legality and lifecycle
-
-Primary files:
 
 ```text
 client/spellcasting/Cooldowns.lua
@@ -99,7 +91,21 @@ client/client_Targeting.lua
 client/client_Spellcasting.lua
 ```
 
-Extend existing activation snapshots to support explicit NPC casters rather than implementing separate cooldown/resource/condition checks.
+Extend activation snapshots to support explicit NPC casters rather than implementing separate cooldown/resource/condition checks.
+
+## Movement and control state
+
+Reuse:
+
+```text
+core/internal/Movement.lua
+core/internal/profile/Profile.lua
+client/spellcasting/AuraManager.lua
+```
+
+The existing movement system already resolves a configured movement range and applies the active aura `movementRangeOverride` where present. `AuraManager:BuildControlState(eventState, unitEventId)` is the per-EventUnit control-state source of truth.
+
+Autopilot may add an EventUnit-aware effective movement allowance helper, but it must be a reuse/generalization of these semantics rather than a separate movement ruleset.
 
 ## Threat and health
 
@@ -118,563 +124,487 @@ and existing issue #101 for the host-only **DM Helper** companion-panel mode.
 
 ---
 
-# 4. Delivery Strategy
-
-The implementation is divided into eleven bounded work items. The ordering deliberately establishes deterministic event semantics and read-only planner inputs before adding tactical scoring or any execution path.
+# 4. Delivery Sequence
 
 ```text
-A. Event mode + capability UI
+#113 Event mode + capability UI
         ↓
-B. TurnActor / TurnStep scheduling
+#114 TurnActor / TurnStep scheduling
         ↓
-C. Host position cache + virtual spatial runtime
+#115 Host position cache + one-coordinate spatial runtime
         ↓
-D. Autopilot runtime + sliceable planner skeleton
+#116 Autopilot runtime + sliceable planner skeleton
         ↓
-E. Explicit-caster activation snapshots
+#117 Explicit-caster activation snapshots
         ↓
-F. Spell utility evaluator
+#118 Spell utility evaluator
         ↓
-G. Target selectors
+#119 Target selectors
         ↓
-H. Melee / shared-marker spatial planner
+#120 Shared-marker movement/control solver
         ↓
-I. Full frozen-plan integration
+#121 Full frozen-plan integration
         ↓
-J. Pending authorization + DM Helper controls
+#122 Pending authorization + DM Helper controls
         ↓
-K. Authorized execution + integration hardening
+#123 Authorized execution + integration hardening
 ```
 
-Issue #101 is a prerequisite for the final DM Helper authorization presentation, but most planner/runtime work can proceed independently once its provider seam is understood.
+Issue #101 is a prerequisite for the final DM Helper authorization presentation, but planner/runtime work can proceed independently once its provider seam is understood.
 
 ---
 
-# 5. Task A — Event Autopilot Mode and Instance Capability
+# 5. Task A — Issue #113: Event Autopilot Mode and Instance Capability
 
 ## Goal
 
 Add synchronized Event-level Autopilot mode without changing manual event semantics.
 
-## Primary files
-
-```text
-core/classes/Event.lua
-server/server_Event.lua
-server/ui/eventmanage/page_EventManageSettings.lua
-client/client_Event.lua
-```
-
 ## Work
 
-- Add normalized `turnMode` with allowed values `manual` and `autopilot`.
-- Default all legacy/missing values to `manual`.
+- Add normalized `turnMode` with `manual` and `autopilot`.
+- Default legacy/missing values to `manual`.
 - Add backward-tolerant network serialization/deserialization.
-- Add Event Manager `Enable NPC Autopilot` control.
-- Display the explicit no-instance warning whenever selected.
-- On event start, block Autopilot when coordinate capability is unavailable or the host is in restricted instanced content.
+- Add Event Manager Autopilot control and explicit no-instance warning.
+- Block Autopilot start when coordinate capability is unavailable or restricted.
 - Preserve manual start behavior.
-- Expose a small capability helper usable by later runtime code.
+- Expose reusable capability helpers for later runtime code.
 
 ## Acceptance
 
 - Old events/network payloads remain manual.
 - Manual events are unchanged.
-- Every client receives the same `turnMode`.
-- Autopilot cannot silently start in a restricted instance.
-- The warning is visible without requiring a tooltip.
+- Every client receives the same mode.
+- Autopilot cannot silently start in restricted instances.
 
 ---
 
-# 6. Task B — Mode-Aware TurnActor and TurnStep Scheduling
+# 6. Task B — Issue #114: Mode-Aware TurnActor and TurnStep Scheduling
 
 ## Goal
 
 Create deterministic raid-marker cohort scheduling without coupling Autopilot eligibility to fixed visual pages.
 
-## Primary files
-
-```text
-core/classes/Event.lua
-server/server_Event.lua
-client/spellcasting/Helpers.lua
-client/ui/widgets/widget_Event.lua
-```
-
 ## Work
 
-- Implement `TurnActor` construction.
 - Players remain singleton actors; shared-turn pets retain existing semantics.
 - NPCs with the same non-zero `raidMarker` form one actor.
 - `raidMarker == 0` NPCs remain singleton actors.
-- Cohort initiative is the maximum member initiative.
-- Internal member order is initiative descending, eventID ascending.
-- Pack actors into `TurnStep` values without splitting an actor.
-- Permit a marker cohort larger than visible page capacity to occupy one oversized step.
-- Add mode-aware helpers such as `BuildTurnSchedule`, `GetUnitTurnStepIndex`, `GetUnitsForTurnStep`.
-- Make spellcaster tick eligibility use the new schedule only in Autopilot mode.
-- Keep visual pagination independent from eligibility where required.
+- Cohort initiative is the maximum active-member initiative.
+- Pack actors into TurnSteps without splitting an actor.
+- Permit oversized marker cohorts to occupy one oversized step.
+- Add mode-aware schedule/eligibility helpers.
+- Keep visual pagination independent from Autopilot eligibility.
 
 ## Acceptance
 
 - Same-marker NPCs are always eligible together.
 - Unmarked NPCs do not collapse into one cohort.
 - Oversized cohorts are never split.
-- Manual mode retains existing page/tick behavior.
-- All clients derive the same eligibility.
+- Manual mode retains existing behavior.
 
 ---
 
-# 7. Task C — Host Player-Position Cache and Virtual Spatial Runtime
+# 7. Task C — Issue #115: Host Position Cache and Indivisible Spatial Runtime
 
 ## Goal
 
 Provide stable event-local coordinates without polling or rescanning at NPC planning time.
 
-## Primary files
-
-```text
-client/client_Autopilot.lua (new)
-client/autopilot/Spatial.lua (new)
-client/client_Event.lua
-core/internal/Movement.lua (shared pure helpers where appropriate)
-RPEngine_Dev.toc
-```
-
 ## Work
 
 - Add host-only event runtime container.
-- Resolve player names to `player` / `partyN` / `raidN` tokens.
+- Resolve player names to group unit tokens.
 - Seed player positions once on Autopilot event start.
-- Integrate with authoritative player turn-end lifecycle.
-- On a completed player turn, call `UnitPosition()` once for that player and replace only that cache entry.
-- Do not sample all players on NPC turn start.
-- Store `x`, `y`, `instanceID`, sampled turn/tick identity.
+- On completed player turn, update only that player's cache entry.
 - Add virtual positions keyed by `marker:<raidMarker>` or `unit:<eventID>`.
+- For marked NPCs, store **only the marker actor coordinate**; do not create divergent member coordinates.
 - Add pure 2D distance/vector helpers.
-- Add missing-coordinate and capability status handling.
-- Clear all spatial state at event teardown.
+- Handle missing coordinates/capability loss explicitly.
+- Clear spatial state on event teardown.
 
 ## Acceptance
 
-- Event start seeds resolvable players once.
 - One completed player turn modifies only that player's coordinate record.
-- NPC turns call no full player-position rescan.
-- No continuous/per-frame coordinate polling exists.
-- Missing positions are explicit and never guessed.
+- NPC turns do not rescan all player positions.
+- One marked cohort has exactly one coordinate.
+- The runtime provides no mechanism for marked members to split spatially.
 
 ---
 
-# 8. Task D — Autopilot Runtime Coordinator and Sliceable Planner Skeleton
+# 8. Task D — Issue #116: Runtime Coordinator and Sliceable Planner Skeleton
 
 ## Goal
 
 Establish lifecycle, idempotence and resumable planning infrastructure before tactical logic is added.
 
-## Primary files
-
-```text
-client/client_Autopilot.lua
-client/autopilot/Planner.lua (new)
-client/client_Event.lua
-core/internal/tasks/TaskQueue.lua (consumer only; no new queue system)
-RPEngine_Dev.toc
-```
-
 ## Work
 
-- Detect an active Autopilot NPC actor/step on the host.
+- Detect active Autopilot NPC actor/step on the host.
 - Build stable plan identity from event/turn/tick/actor/schedule revision.
 - Prevent duplicate planning from repeated state/UI refreshes.
-- Allocate lightweight planning state synchronously and immediately enqueue `Tasks:EnqueueSliceable()`.
-- Implement resumable phases/cursors without tactical scoring yet.
-- Add `Tasks:ShouldYield(deadlineMs)` checks to all loops in the skeleton.
-- Add job scope `autopilot:<eventId>` or narrower equivalent.
-- Add `isStale` checks for event/turn/tick/actor/schedule changes.
-- Add `onCancel` cleanup which publishes no partial plan.
-- Add `onComplete` seam which may publish an empty/test plan but executes nothing.
-- Cancel scope on event end and cancel replaced planning jobs.
-- Add runtime statuses (`ready`, `planning`, `awaiting-authorization`, suspended/failed variants).
+- Allocate lightweight state synchronously and immediately enqueue `Tasks:EnqueueSliceable()`.
+- Implement resumable phases/cursors.
+- Add deadline checks to repeated work.
+- Add scoped cancellation and stale checks.
+- Ensure `onCancel` publishes nothing partial.
+- Ensure `onComplete` can publish data but executes nothing.
 
 ## Acceptance
 
-- Turn transition performs only small synchronous setup.
-- A representative multi-step dummy planner visibly spans slices when forced large.
-- Deadline checks yield correctly.
-- Stale jobs cancel without publishing partial data.
-- Planner completion cannot execute combat actions.
+- Turn transitions perform only small synchronous setup.
+- Forced-large dummy planning spans slices.
+- Stale jobs cancel cleanly.
+- Planner completion cannot execute combat or commit movement.
 
 ---
 
-# 9. Task E — Explicit-Caster Canonical Spell Activation Snapshots
+# 9. Task E — Issue #117: Explicit-Caster Canonical Activation Snapshots
 
 ## Goal
 
-Allow the planner to query the exact existing spell legality rules for an arbitrary NPC without manipulating Action Bar/controlled-unit UI state.
-
-## Primary files
-
-```text
-client/spellcasting/Cooldowns.lua
-client/spellcasting/Helpers.lua
-client/client_Spellcasting.lua
-client/client_Targeting.lua (if candidate resolution lives there)
-```
+Allow the planner to query canonical spell legality for any active NPC without manipulating Action Bar/controlled-unit UI state.
 
 ## Work
 
-- Extend activation snapshot APIs with an explicit `casterEventId` or equivalent internal caster option.
-- Resolve the NPC's effective spell list.
-- Preserve canonical cooldown, charge, GCD, condition, resource and target-policy evaluation.
-- Support `includeTargetCandidates = true` for planner calls.
-- Ensure this read-only activation path does not mutate `ControlledEventUnitId`, targeting UI state, cooldown state, costs or queued selections.
-- Add tests comparing manual/controlled NPC activation results with explicit-caster results for the same caster/spell.
+- Add explicit `casterEventId` or equivalent internal caster option.
+- Preserve cooldown, charge, GCD, condition, resource and target-policy evaluation.
+- Support target-candidate retrieval for planner calls.
+- Keep the activation query read-only.
+- Compare explicit-caster results against existing manual/controlled NPC results.
 
 ## Acceptance
 
-- Planner can query any active NPC's spell legality directly.
-- Read-only evaluation has no gameplay/UI side effects.
-- Invalid/expensive/cooldown/condition-blocked spells are excluded by canonical logic.
-- Manual spell activation behavior remains unchanged.
+- Planner can query arbitrary active NPC legality.
+- Evaluation mutates no gameplay/UI state.
+- Manual activation behavior remains unchanged.
 
 ---
 
-# 10. Task F — Damage/Healing Intent and Utility Evaluation
+# 10. Task F — Issue #118: Damage/Healing Intent and Utility
 
 ## Goal
 
-Implement the lightweight deterministic spell cost-benefit layer independently of target-selection and movement code.
-
-## Primary files
-
-```text
-client/autopilot/SpellEvaluator.lua (new)
-client/autopilot/Planner.lua
-```
+Implement the deterministic tactical utility layer independently of movement placement.
 
 ## Work
 
-- Inspect only spells resolved for the active NPC.
-- Classify `damage` and `heal` intent from existing components/effects.
-- Detect melee/ranged/spell damage type from damage components.
-- Compute deterministic expected damage/healing without consuming combat RNG.
+- Inspect only resolved NPC spells.
+- Classify damage/heal intent from existing components.
+- Detect melee/ranged/spell damage type from existing damage components.
+- Compute deterministic expected damage/healing without combat RNG.
 - Cap useful healing by missing health.
-- Add projected-healing scratch ledger for same-cohort planning.
-- Implement priority tiers:
-  - ally <= 50% HP + meaningful legal heal → urgent healing outranks damage;
-  - useful non-urgent healing may outrank low-value damage where appropriate;
-  - otherwise choose damage.
-- Add simple commitment tie-breaks for resource/cooldown/charge use.
-- End comparisons with stable deterministic spellRef tie-breaking.
-- Ignore unsupported pure-utility spells in the first tactical model unless attached to a selected damage/heal spell.
+- Implement urgent healing and normal damage/heal priority.
+- Add projected-healing scratch reservations.
+- Add stable commitment/tie-break logic.
 
 ## Acceptance
 
-- Critical injured ally selects healing when legal.
-- Large overheal has reduced utility.
+- Critical injured allies select legal healing.
+- Overheal is discounted.
 - Healthy combat defaults toward damage.
-- Scoring is deterministic and does not mutate combat RNG/state.
+- Scoring is deterministic and read-only.
 
 ---
 
-# 11. Task G — Threat, Healing and AoE Target Selection
+# 11. Task G — Issue #119: Threat, Healing and AoE Target Selection
 
 ## Goal
 
-Implement target selection against canonical candidate lists and cached event state.
-
-## Primary files
-
-```text
-client/autopilot/TargetSelector.lua (new)
-client/autopilot/Planner.lua
-client/autopilot/Spatial.lua
-```
+Implement deterministic target selection against canonical candidate lists and cached event state.
 
 ## Work
 
-- Single hostile target: threat descending, then relevant proximity, then eventID.
-- All-zero threat fallback: nearest valid target where cached coordinates exist, otherwise eventID.
-- Healing target: health fraction ascending, missing health descending, eventID.
-- Incorporate projected-healing reservations when selecting later cohort heals.
-- Offensive multi-target/AoE:
-  - highest-threat legal primary;
-  - remaining legal targets ordered by distance from primary;
-  - stable fallback when some cached positions are unavailable;
-  - obey existing `minTargets` / `maxTargets` / disposition policies.
-- Multi-target healing ordered by projected need; avoid filling optional slots with full-health allies unless required.
-- Structure all candidate loops so Planner can yield between target evaluations.
+- Hostile single target: threat descending, then relevant proximity, then eventID.
+- All-zero threat fallback: nearest where coordinates exist, otherwise eventID.
+- Healing: health fraction, missing health, eventID.
+- Apply projected-healing reservations for later same-cohort heals.
+- Offensive AoE: highest-threat primary, then nearest legal secondary targets.
+- Multi-heal: projected need; avoid optional full-health targets.
+- Keep loops resumable/yieldable.
 
 ## Acceptance
 
-- Clear highest-threat enemy is selected as primary.
-- Equal/zero-threat ties are deterministic.
-- AoE secondaries are nearest to the primary when coordinates exist.
-- Most injured ally is the default healing target.
-- Existing target policy counts/dispositions are never bypassed.
+- Threat, healing and AoE choices are stable and deterministic.
+- Existing target policies are never bypassed.
 
 ---
 
-# 12. Task H — Five-Yard Melee and Shared Raid-Marker Movement Solver
+# 12. Task H — Issue #120: Joint Shared-Marker Movement and Control Solver
 
 ## Goal
 
-Turn chosen melee intent into one feasible shared marker recommendation without committing movement automatically.
-
-## Primary files
-
-```text
-client/autopilot/Spatial.lua
-client/autopilot/Planner.lua
-client/autopilot/SpellEvaluator.lua
-client/autopilot/TargetSelector.lua
-```
+Choose one reachable marker destination and one useful action per marked cohort member without allowing the group to split.
 
 ## Work
+
+### Melee geometry
 
 - Define `MELEE_RANGE_YARDS = 5`.
-- Treat `damageType = melee` as requiring <= 5-yard virtual distance.
-- Create provisional actions before movement is finalized.
-- Collect melee target positions for one marker cohort.
-- Generate bounded anchor candidates: current marker, each target, centroid, pairwise midpoints.
-- Score anchors by number/utility of feasible melee actions, summed distance, deterministic tie-break.
-- Yield during candidate generation/scoring when needed.
-- Re-evaluate only infeasible provisional melee actions at the selected anchor using the PDD fallback order.
-- Produce a **movement proposal**, not a committed virtual position.
-- Attach movement dependency IDs to spell actions requiring the proposal.
+- `damageType = melee` requires target distance <= 5 yards.
+- Ranged/spell damage does not require melee placement.
+
+### Effective movement allowance
+
+- Resolve the existing movement-range value for each active EventUnit.
+- Apply current AuraManager control state, including `movementRangeOverride`.
+- Do not add an Autopilot-only rooted/snare flag.
+- Resolve:
+
+```text
+cohortMovementAllowance = minimum(active member effective movement allowances)
+```
+
+- If any active member resolves to zero movement, pin the entire marker to its current position.
+- Positive restrictive movement values limit the shared marker's maximum displacement.
+
+### Joint action + anchor solver
+
+Do **not** let one provisional melee action choose the marker location and repair everyone else afterwards.
+
+Instead:
+
+1. generate a bounded set of plausible legal actions/targets for each member;
+2. generate bounded combat-relevant marker anchors;
+3. reject anchors outside cohort movement allowance;
+4. at each anchor, choose every member's best feasible action from that same position;
+5. aggregate whole-cohort utility;
+6. select one anchor and one action per member.
+
+Candidate anchors may include current position, relevant target positions, centroids and bounded pairwise midpoint/intersection-like candidates.
+
+### Heuristic
+
+Prefer:
+
+1. higher aggregate cohort utility;
+2. more members receiving useful actions;
+3. current position when tactically equivalent;
+4. lower movement distance;
+5. stable coordinate/target tie-break.
+
+Use a small movement/stability penalty to avoid needless marker churn.
+
+### No-split fallback
+
+If movement is impossible or an ideal target is unreachable, change the affected NPC's action:
+
+```text
+another in-range melee target
+→ ranged/spell damage
+→ useful heal
+→ no action
+```
+
+Never move part of the marked cohort separately.
+
+### Sliceability
+
+Anchor generation, movement-state resolution and per-anchor cohort scoring must yield/resume inside the sliceable planner.
+
+### Output
+
+Produce at most one **pending movement proposal** for the marker. Do not commit it. Attach dependency IDs to actions requiring that destination.
 
 ## Acceptance
 
-- One cohort produces at most one marker movement proposal per plan.
-- Compatible melee targets can be satisfied by one shared anchor.
-- Incompatible targets cause deterministic fallback/re-evaluation.
-- Proposed movement changes no virtual position until the DM confirms it.
+- Marked members always share one coordinate.
+- One immobilized member pins the entire marker.
+- Positive restrictions constrain the whole marker to the least-mobile member.
+- No split solution can be generated.
+- The chosen anchor maximizes aggregate cohort usefulness rather than one member's preferred target.
+- Current position wins near-ties where movement adds no material benefit.
+- Solver is fully sliceable.
+- Planning commits no movement.
 
 ---
 
-# 13. Task I — Full Frozen Cohort Planner Integration
+# 13. Task I — Issue #121: Full Frozen Cohort Planner Integration
 
 ## Goal
 
-Combine Tasks E-H into the production sliceable state machine and publish complete frozen plans without executing them.
-
-## Primary files
-
-```text
-client/autopilot/Planner.lua
-client/client_Autopilot.lua
-client/autopilot/SpellEvaluator.lua
-client/autopilot/TargetSelector.lua
-client/autopilot/Spatial.lua
-```
+Combine Tasks E–H into the production sliceable planner and atomically publish complete frozen plans.
 
 ## Work
 
-- Implement planning phases:
-  - validate;
-  - snapshot relevant units;
-  - resolve spell refs;
-  - canonical activation snapshots;
-  - intent classification;
-  - target evaluation;
-  - provisional scoring;
-  - shared-marker solve;
-  - infeasible-melee fallback;
-  - pending-record construction;
-  - finalize.
-- Cache per-plan spell definitions, activation state, health, distances, expected magnitudes and candidate ordering.
-- Preserve one frozen pre-action snapshot for all cohort members.
-- Produce one planned action per eligible cohort member where possible.
-- Generate no-action/warning helper records when no viable decision exists.
-- Ensure `onComplete` atomically publishes only the complete plan.
-- Add explicit Replan API which cancels/replaces pending unexecuted plans only when requested by the DM.
-- Add timing/debug labels and plan slice/yield metrics.
+Implement phases such as:
+
+```text
+validate
+snapshot relevant units
+resolve spell refs
+resolve canonical activation snapshots
+classify utility
+evaluate target candidates
+resolve per-member movement/control state
+resolve cohort movement allowance
+generate reachable marker anchors
+evaluate whole-cohort actions per anchor
+select shared anchor + member actions
+build pending records
+finalize
+```
+
+The frozen snapshot must contain current aura/control movement state, effective per-member movement allowance, cohort movement allowance, cached player positions and committed actor positions.
+
+Per-plan caches should cover spells, activation state, health, movement/control state, distances, target ordering, anchors and per-anchor scores.
+
+Final output contains:
+
+- zero or one movement proposal for a marked actor;
+- one planned spell action per useful eligible NPC;
+- dependency links;
+- no-action/warning records;
+- blocked-movement explanation where useful;
+- stable identity.
+
+`onComplete` publishes the plan and returns. It does not cast or commit movement.
 
 ## Acceptance
 
-- Large plans span frames without exceeding the supplied TaskQueue deadline by design.
-- No partial pending actions appear before finalization.
-- Cohort members use one baseline snapshot.
-- Planner completion mutates no canonical combat state.
-- Repeated state/UI refreshes do not duplicate a plan.
+- Same-marker NPCs share one snapshot and one spatial coordinate.
+- Pinned/restricted movement is reflected in anchor feasibility.
+- Whole-cohort utility determines marker placement.
+- Large plans span queue slices cleanly.
+- No partial plan is published.
+- Planner completion mutates no combat/spatial state.
 
 ---
 
-# 14. Task J — Pending Authorization Store and DM Helper Autopilot Controls
+# 14. Task J — Issue #122: Pending Authorization and DM Helper Controls
 
 ## Goal
 
-Expose frozen plans as host-only operational controls in DM Helper.
-
-## Dependency
-
-Build on issue #101's DM Helper companion panel/provider seam.
-
-## Primary files
-
-```text
-client/autopilot/Authorization.lua (new)
-client/autopilot/Helper.lua (new)
-client/client_Autopilot.lua
-client/ui/widgets/widget_Event.lua
-RPEngine_Dev.toc
-```
+Expose frozen plans to the host and keep both movement and spell execution explicitly DM-controlled.
 
 ## Work
 
-- Add `PendingAutopilotAction` model/state store.
-- Add stable action IDs and plan IDs.
-- Spell statuses: pending, authorized, executing, completed, rejected, blocked, stale, failed.
-- Movement statuses: pending, confirmed, skipped, stale.
-- DM Helper displays planning status and pending rows.
-- Add `Authorize`, `Reject`, `Authorize All`, `Replan Pending`.
-- Add `Confirm Moved` and `Skip` for movement.
-- On Confirm Moved, commit the proposed virtual marker position.
-- Keep dependent melee spells blocked until movement is confirmed.
-- On movement skip, mark dependent actions blocked/stale rather than pretending movement occurred.
-- Keep planning/action metadata host-local; never send via `COMBAT_LOG`.
-- Include current-turn resolved combat history through #101's provider model where appropriate.
-- Mark old-step pending actions stale on turn/tick advance.
+- Add stable pending spell/movement records.
+- Render planning status, movement recommendations, blocked-movement explanations and spell rows in DM Helper.
+- Add `Authorize`, `Reject`, `Authorize All`, `Replan Pending`, `Confirm Moved`, `Skip`.
+- Movement proposal remains uncommitted while pending.
+- A movement-dependent spell cannot be authorized until movement is confirmed.
+- `Confirm Moved` must revalidate current event/turn/actor identity and **current effective movement allowance for every active marked member**.
+- Recompute the least-mobile cohort allowance before committing.
+- If a member is newly immobilized or the destination is no longer reachable, do not commit; mark movement/dependent actions blocked/stale.
+- Confirming movement commits exactly one marker coordinate for the whole cohort.
+- Removing a movement restriction does not silently improve an existing proposal; DM may explicitly replan.
+- Planning/authorization data remains host-only.
 
 ## Acceptance
 
-- A completed plan creates pending rows only.
-- No spell executes merely because the panel opens/refreshes.
-- Every executable spell requires an explicit authorization action.
-- Participants never receive planning/authorization rows.
-- Movement position commits only after explicit confirmation.
-- `Authorize All` remains a user-triggered operation and respects movement dependencies.
+- No generated action executes automatically.
+- Marked cohorts cannot split during movement confirmation.
+- Newly applied zero-movement control prevents stale movement confirmation.
+- Skip/reject executes nothing.
+- Replan is explicit.
 
 ---
 
-# 15. Task K — Explicit-Caster Authorized Execution and Integration Hardening
+# 15. Task K — Issue #123: Authorized NPC Spell Execution
 
 ## Goal
 
-Execute authorized pending actions exactly once through normal NPC spellcasting, with canonical revalidation and complete stale handling.
-
-## Primary files
-
-```text
-client/autopilot/Authorization.lua
-client/client_Autopilot.lua
-client/spellcasting/Lifecycle.lua
-client/spellcasting/Cooldowns.lua
-client/client_Targeting.lua
-client/client_Spellcasting.lua
-server/server_Spellcasting.lua (only if lower-level reuse needs validation changes)
-```
+Add the only Autopilot path allowed to mutate combat state: explicit-DM-authorized execution through normal NPC spellcasting.
 
 ## Work
 
-- Add shared lower-level explicit-caster execution API.
-- Carry caster and target selections directly; do not rely on several outstanding `QueuedSpellTargetSelection` values.
-- On authorization, revalidate:
-  - event/turn/tick/schedule identity;
-  - host permission;
-  - caster alive/active/eligible;
-  - movement dependency;
-  - spell activation/cost/cooldown/conditions;
-  - target legality/alive state.
-- Mark `authorized` / `executing` before entering lifecycle to prevent double execution.
-- Execute as ordinary `authorityType = npc` through existing start/complete/cast-time flow.
-- Preserve normal resource costs, cooldowns, charges, auras, damage/healing, threat synchronization and combat log.
-- Do not silently retarget invalidated actions.
-- Make repeated clicks, UI refreshes and duplicate state delivery idempotent.
-- `Authorize All` executes in stable cohort order and revalidates each action independently.
-- Cancel/stale all remaining pending work on event/step change.
-- Add end-to-end test coverage and timing/debug instrumentation.
+- Add shared explicit-caster execution facade.
+- Revalidate event/turn/tick/caster/spell/targets/resources/charges/cooldowns/conditions at authorization time.
+- Require confirmed movement dependency where applicable.
+- Carry explicit target selections rather than relying on the single mutable manual targeting queue.
+- Transition pending action to executing atomically before lifecycle entry.
+- Reject repeated authorization clicks.
+- Reuse normal NPC authority, costs, cooldowns, effects, auras, threat, resource sync and combat log.
+- Authorize All processes stable member order and revalidates every action independently.
+- Do not silently retarget or replan an invalid action.
 
 ## Acceptance
 
-- Authorizing one action executes exactly once.
-- Rejecting executes nothing.
-- Two NPCs can use the same spell with different target selections safely.
-- Invalidated actions become stale/failed, not silently retargeted.
-- Authorized actions behave identically to manually controlled NPC casts after they enter the normal lifecycle.
-- Manual casting and manual events remain unchanged.
+- One authorization executes exactly once.
+- Two NPCs can use the same spellRef against different targets safely.
+- Invalidated targets become stale rather than retargeted.
+- Manual NPC spellcasting remains unchanged.
 
 ---
 
-# 16. Cross-Cutting Test Requirements
+# 16. Required Deterministic Validation
 
-Each task should add focused tests where the repository's current test structure allows it. Before declaring the full feature complete, exercise the PDD test matrix across these groups:
+Each implementation issue should include focused pure/mock tests where possible before moving to the next issue.
 
 ## Scheduling
 
-- unmarked NPCs;
-- marker cohorts;
-- mixed player/NPC actors;
-- oversized cohort;
-- equal initiative;
-- inactive/dead members;
-- player shared-turn pets.
+- marked cohorts remain atomic;
+- oversized cohort remains one step;
+- manual mode unchanged.
 
-## Coordinates
+## Position cache
 
-- initial seed;
-- local and remote player turn-end refresh;
-- only one cache record changes;
-- missing token/coordinate;
-- token remapping;
-- different instanceID;
-- restricted instance.
+- only completed player position changes;
+- no NPC-step rescan;
+- marked cohort has one position only.
 
-## Sliceable planning
+## Movement/control
 
-- one-slice small plan;
-- multi-slice large plan;
-- deadline yielding in spell and target loops;
-- cancellation on event/turn change;
+- no control aura;
+- positive movement restriction;
+- least-mobile member constrains cohort;
+- `movementRangeOverride = 0` pins whole marked cohort;
+- no hidden split positions;
+- unreachable anchor rejected;
+- stay-put near-tie preference;
+- whole-cohort anchor beats a one-NPC-biased anchor;
+- candidate/anchor loops yield correctly.
+
+## Planner
+
+- small plan one slice;
+- large plan several slices;
+- stale cancellation;
 - no partial publication;
-- no combat mutation on completion.
-
-## Decision policy
-
-- urgent healing;
-- useful healing/overheal;
-- damage fallback;
-- cooldown/resource/condition invalidity;
-- threat targeting;
-- zero/equal threat;
-- AoE proximity;
-- melee marker solve;
-- incompatible marker targets.
+- no mutation on completion.
 
 ## Authorization
 
-- individual authorize/reject;
-- Authorize All;
-- movement confirm/skip;
-- blocked movement-dependent action;
-- target dies before authorization;
-- resource/cooldown state changes before authorization;
-- repeated click/idempotence;
-- Replan Pending;
-- step advances with pending actions.
-
-## UI/security
-
-- host-only DM Helper;
-- participant-safe Combat Log;
-- no DM planning data sent over combat-log traffic;
-- visible instance warning;
-- manual event has no Autopilot side effects.
+- movement confirmation revalidates current control state;
+- newly rooted member blocks movement;
+- Confirm Moved changes one marker coordinate only;
+- Skip blocks dependencies;
+- repeated authorize cannot double execute.
 
 ---
 
-# 17. Completion Definition
+# 17. Live WoW Validation Gates
 
-NPC Autopilot is complete when:
+Some behavior cannot be fully proven outside WoW. After relevant implementation tasks, perform concise live checks for:
 
-1. Autopilot mode can be selected for an outdoor event and is explicitly rejected in restricted instances.
-2. Same-marker NPCs form atomic scheduled cohorts while manual events remain unchanged.
-3. Player coordinates are seeded once and refreshed only for the player whose turn ends.
-4. NPC planning uses only cached coordinates and the existing sliceable TaskQueue.
-5. Planner output is deterministic, frozen and combat-state-free.
-6. The host receives movement and spell proposals in DM Helper.
-7. Every proposed spell remains pending until explicit authorization.
-8. Proposed movement is not committed until explicitly confirmed.
-9. Authorized actions are revalidated and execute exactly once through the normal NPC spell lifecycle.
-10. Participant clients never receive DM-only planning data.
-11. Representative large cohorts produce no visible planning hitch and planner slices respect the existing queue deadline.
+- group token/`UnitPosition` behavior outdoors;
+- Event Manager warning and mode UI;
+- actual player turn-end coordinate refresh;
+- DM Helper layout/interaction;
+- movement-control aura behavior with a marked cohort;
+- authorized NPC spell lifecycle and participant synchronization.
+
+Do not use live-only uncertainty as a reason to skip deterministic repository/mock validation first.
+
+---
+
+# 18. Definition of Done for the Full Feature
+
+The Autopilot sequence is complete only when:
+
+- manual events remain behaviorally unchanged;
+- restricted instance start is blocked clearly;
+- player coordinates update only at initial seed and that player's turn end;
+- marked cohorts are atomic in scheduling and **spatially indivisible**;
+- one marked cohort has exactly one virtual coordinate;
+- existing movement/control state constrains shared movement;
+- one immobilized marked member pins the whole cohort;
+- the marker solver jointly optimizes the whole cohort's actions and location;
+- no planner work introduces visible synchronous hitching;
+- all non-trivial planner work is sliceable;
+- planning creates pending actions only;
+- movement commits only after explicit, revalidated DM confirmation;
+- spells execute only after explicit DM authorization;
+- authorized spells use the ordinary RPE NPC lifecycle;
+- participants never receive DM-only planning metadata.
