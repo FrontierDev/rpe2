@@ -12,6 +12,27 @@ ServerUI.EventManage = ServerUI.EventManage or {}
 local EventManage = ServerUI.EventManage
 EventManage.__index = EventManage
 
+local function anchorPageRoot(root, page)
+    if not root or not page then
+        return root
+    end
+
+    if root.ClearAllPoints then
+        root:ClearAllPoints()
+    end
+    if root.SetPoint then
+        root:SetPoint("TOPLEFT", page, "TOPLEFT", 0, 0)
+        root:SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, 0)
+        root:SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 0, 0)
+        root:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, 0)
+    end
+    if root.RefreshLayout then
+        root:RefreshLayout()
+    end
+
+    return root
+end
+
 function EventManage:IsWindowVisible()
     local window = self.Window
     local frame = window and window.GetFrame and window:GetFrame() or nil
@@ -92,7 +113,8 @@ function EventManage:BuildWindow()
                 label = "Actions",
                 width = 60,
                 builder = function(page)
-                    EventManage:BuildActionsPage(page)
+                    local root = EventManage:BuildActionsPage(page)
+                    anchorPageRoot(root, page)
                 end,
             },
             {

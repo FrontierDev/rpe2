@@ -1071,6 +1071,7 @@ local function buildResolvedResourceRow(entry, resolvedStatsByRef, progressionCo
         datasetId = entry.dataset and entry.dataset.id or nil,
         resourceId = resource.id,
         name = resourceName,
+        description = ensureString(resource.description),
         icon = ensureString(resource.icon),
         color = cloneColor(resource.color),
         definitionBaseValue = definitionBaseValue,

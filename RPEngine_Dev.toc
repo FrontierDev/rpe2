@@ -107,6 +107,7 @@ core/classes/EventVariantSpellEquipmentNetwork.lua
 
 client/client_Event.lua
 client/client_CombatLog.lua
+client/client_Skills.lua
 server/server_Event.lua
 server/server_EventVariants.lua
 server/server_EventResourceIntegration.lua
@@ -203,10 +204,13 @@ core/ui/prefabs/TableRow.lua
 core/ui/prefabs/Table.lua
 client/ui/CombatText.lua
 client/ui/widgets/widget_Event.lua
+client/ui/widgets/widget_Event_CombatLogHistory.lua
+client/ui/widgets/widget_Event_PortraitReadiness.lua
 client/ui/widgets/widget_ActionBar.lua
 client/ui/widgets/widget_ActionBar_Resources.lua
 client/ui/widgets/widget_ActionBar_Casting.lua
 client/ui/widgets/widget_ActionBar_Control.lua
+client/ui/widgets/widget_ActionBar_Skills.lua
 client/ui/widgets/widget_Targeting.lua
 client/ui/widgets/widget_Reaction.lua
 client/ui/tooltips/tooltip_Spell.lua
@@ -219,6 +223,8 @@ client/ui/windows/window_IconFinder.lua
 client/ui/windows/window_ModelFinder.lua
 client/ui/windows/window_LauncherMenu.lua
 client/ui/windows/window_SetupWizard.lua
+client/ui/windows/window_SetupWizard_ChoiceTooltips.lua
+client/ui/windows/window_SetupWizard_ActionBarCategories.lua
 client/character/inventory/page_Inventory.lua
 client/character/inventory/page_Consumables.lua
 client/character/inventory/page_Reagents.lua
