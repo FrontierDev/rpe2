@@ -373,9 +373,13 @@ function Client:ReplaceAutopilotPlanForCurrentStep(eventStateOverride)
         return nil, false, reason
     end
 
-    local descriptor, descriptorReason = type(Planner.ResolveActiveNpcStep) == "function"
-        and Planner.ResolveActiveNpcStep(eventState, getMaxEventUnits())
-        or nil, "planner-api-unavailable"
+    if type(Planner.ResolveActiveNpcStep) ~= "function"
+        or type(Planner.BuildPlanIdentity) ~= "function"
+    then
+        return nil, false, "planner-api-unavailable"
+    end
+
+    local descriptor, descriptorReason = Planner.ResolveActiveNpcStep(eventState, getMaxEventUnits())
     if type(descriptor) ~= "table" then
         return nil, false, descriptorReason
     end
