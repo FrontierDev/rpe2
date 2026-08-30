@@ -10,6 +10,7 @@ local Event = Addon.Internal
     and Addon.Internal.Database.Classes
     and Addon.Internal.Database.Classes.Event
     or nil
+local Spatial = Client.AutopilotSpatial or {}
 
 Client.AutopilotHelper = Client.AutopilotHelper or {}
 local Helper = Client.AutopilotHelper
@@ -131,6 +132,51 @@ local function buildStatusRow(eventState, runtime, pending)
     }
 end
 
+local function buildMarkerPositionRows(eventState, runtime)
+    if type(Spatial.BuildNpcActorKeySet) ~= "function" then
+        return {}
+    end
+
+    local actorKeys = Spatial.BuildNpcActorKeySet(eventState) or {}
+    local actorKeyByMarker = {}
+    local markers = {}
+    for actorKey in pairs(actorKeys) do
+        local marker = tonumber(string.match(tostring(actorKey or ""), "^marker:(%d+)$"))
+        if marker and marker > 0 and actorKeyByMarker[marker] == nil then
+            actorKeyByMarker[marker] = actorKey
+            markers[#markers + 1] = marker
+        end
+    end
+    table.sort(markers)
+
+    local rows = {}
+    for index = 1, #markers do
+        local marker = markers[index]
+        local actorKey = actorKeyByMarker[marker]
+        local position = type(runtime) == "table"
+            and type(runtime.positionByActorKey) == "table"
+            and runtime.positionByActorKey[actorKey]
+            or nil
+        local available = type(Spatial.IsPositionAvailable) == "function"
+            and Spatial.IsPositionAvailable(position) == true
+        local text = ("Marker %d: Position not set"):format(marker)
+        if available then
+            text = ("Marker %d: (%.1f, %.1f)"):format(marker, tonumber(position.x), tonumber(position.y))
+        end
+        rows[#rows + 1] = {
+            kind = "marker-position",
+            actionType = "marker-position",
+            actionId = "marker-position:" .. tostring(marker),
+            actorKey = actorKey,
+            raidMarker = marker,
+            text = text,
+            status = available and "ready" or "position-unset",
+            canSetPosition = type(runtime) == "table" and runtime.status == "ready",
+        }
+    end
+    return rows
+end
+
 local function buildMovementRow(_, action)
     local marker = math.max(0, math.floor(tonumber(action and action.raidMarker) or 0))
     local proposed = type(action) == "table" and action.proposedPosition or nil
@@ -197,6 +243,10 @@ function Helper.BuildEntries(eventState)
         or nil
 
     entries[#entries + 1] = buildStatusRow(eventState, runtime, pending)
+    local markerRows = buildMarkerPositionRows(eventState, runtime)
+    for index = 1, #markerRows do
+        entries[#entries + 1] = markerRows[index]
+    end
     if type(pending) ~= "table" then
         return entries
     end
