@@ -33,11 +33,17 @@ local function copyMovementDetailsByMember(source)
     local copied = {}
     for eventId, details in pairs(type(source) == "table" and source or {}) do
         if type(details) == "table" then
+            local reason = tostring(details.reason or "")
+            local statRef = tostring(details.statRef or "")
+            local baseStatFound = details.baseStatFound
+            if baseStatFound == nil then
+                baseStatFound = statRef ~= "" and reason ~= "movement-range-stat-missing"
+            end
             copied[eventId] = {
                 available = details.available ~= false,
                 reason = details.reason,
                 statRef = details.statRef,
-                baseStatFound = details.baseStatFound == true,
+                baseStatFound = baseStatFound == true,
                 baseValue = details.baseValue,
                 movementRangeOverride = details.movementRangeOverride,
                 effectiveValue = details.effectiveValue,
@@ -74,7 +80,7 @@ local function findLimitingMemberEventIds(movementByMemberEventId, movementAllow
     return ids
 end
 
-local function appendDiagnosticWarning(result, state, reason, memberEventIds, text)
+local function appendDiagnosticWarning(result, reason, memberEventIds, text)
     if type(result) ~= "table" or #(memberEventIds or {}) == 0 then
         return
     end
@@ -119,7 +125,6 @@ local function appendMovementConfigurationWarnings(result, state)
     if #unconfiguredIds > 0 then
         appendDiagnosticWarning(
             result,
-            state,
             "movement-range-unconfigured",
             unconfiguredIds,
             ("Marker %d has no Movement Range Stat configured; affected NPCs: %s."):format(
@@ -133,7 +138,6 @@ local function appendMovementConfigurationWarnings(result, state)
         local statText = missingStatRef ~= "" and (" " .. missingStatRef) or ""
         appendDiagnosticWarning(
             result,
-            state,
             "movement-range-stat-missing",
             missingIds,
             ("Marker %d NPCs are missing the configured Movement Range Stat%s: %s."):format(
