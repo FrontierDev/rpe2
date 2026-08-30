@@ -10,6 +10,7 @@ local Event = Addon.Internal
     and Addon.Internal.Database.Classes.Event
     or nil
 local Tasks = Addon.Internal.Tasks or {}
+local SpellEvaluator = Client.AutopilotSpellEvaluator or {}
 
 Client.AutopilotPlanner = Client.AutopilotPlanner or {}
 local Planner = Client.AutopilotPlanner
@@ -38,6 +39,15 @@ local function copyArray(values)
         copied[index] = values[index]
     end
     return copied
+end
+
+local function createProjectedHealingLedger()
+    if type(SpellEvaluator.CreateProjectedHealingLedger) == "function" then
+        return SpellEvaluator.CreateProjectedHealingLedger()
+    end
+    return {
+        reservedByEventId = {},
+    }
 end
 
 local function isNpcActor(actor)
@@ -176,6 +186,7 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
         },
         scratch = {
             visitedNpcCount = 0,
+            projectedHealingLedger = createProjectedHealingLedger(),
         },
         provisionalActions = {},
         actionCandidates = {},
@@ -213,7 +224,13 @@ function Planner.Step(state, deadlineMs)
     if state.phase == "snapshot" then
         state.snapshot = type(state.snapshot) == "table" and state.snapshot or { npcEventIds = {} }
         state.snapshot.npcEventIds = type(state.snapshot.npcEventIds) == "table" and state.snapshot.npcEventIds or {}
-        state.scratch = type(state.scratch) == "table" and state.scratch or { visitedNpcCount = 0 }
+        state.scratch = type(state.scratch) == "table" and state.scratch or {
+            visitedNpcCount = 0,
+            projectedHealingLedger = createProjectedHealingLedger(),
+        }
+        if type(state.scratch.projectedHealingLedger) ~= "table" then
+            state.scratch.projectedHealingLedger = createProjectedHealingLedger()
+        end
 
         while state.npcIndex <= #(state.npcEventIds or {}) do
             local eventId = tonumber(state.npcEventIds[state.npcIndex]) or 0
