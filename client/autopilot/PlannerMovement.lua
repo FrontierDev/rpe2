@@ -6,12 +6,176 @@ local Client = Addon.Client
 local Planner = Client.AutopilotPlanner or {}
 local MovementSolver = Client.AutopilotMovementSolver or {}
 
+local EPSILON = 0.0001
+
 local function copyOptions(options)
     local copied = {}
     for key, value in pairs(type(options) == "table" and options or {}) do
         copied[key] = value
     end
     return copied
+end
+
+local function copyArray(values)
+    local copied = {}
+    for index = 1, #(values or {}) do
+        copied[index] = values[index]
+    end
+    return copied
+end
+
+local function normalizeEventId(value)
+    local eventId = math.floor(tonumber(value) or 0)
+    return eventId > 0 and eventId or 0
+end
+
+local function copyMovementDetailsByMember(source)
+    local copied = {}
+    for eventId, details in pairs(type(source) == "table" and source or {}) do
+        if type(details) == "table" then
+            copied[eventId] = {
+                available = details.available ~= false,
+                reason = details.reason,
+                statRef = details.statRef,
+                baseStatFound = details.baseStatFound == true,
+                baseValue = details.baseValue,
+                movementRangeOverride = details.movementRangeOverride,
+                effectiveValue = details.effectiveValue,
+            }
+        end
+    end
+    return copied
+end
+
+local function getMemberNameByEventId(state, eventId)
+    local wanted = normalizeEventId(eventId)
+    for index = 1, #(type(state) == "table" and state.members or {}) do
+        local member = state.members[index]
+        local unit = type(member) == "table" and (member.unit or member.eventUnit) or nil
+        if normalizeEventId(unit and unit.eventID) == wanted then
+            local name = tostring(unit and unit.name or "")
+            return name ~= "" and name or ("NPC " .. tostring(wanted))
+        end
+    end
+    return wanted > 0 and ("NPC " .. tostring(wanted)) or "Unknown NPC"
+end
+
+local function findLimitingMemberEventIds(movementByMemberEventId, movementAllowance)
+    local minimum = math.max(0, tonumber(movementAllowance) or 0)
+    local ids = {}
+    for eventId, details in pairs(type(movementByMemberEventId) == "table" and movementByMemberEventId or {}) do
+        local normalizedId = normalizeEventId(eventId)
+        local effectiveValue = type(details) == "table" and tonumber(details.effectiveValue) or nil
+        if normalizedId > 0 and effectiveValue ~= nil and math.abs(math.max(0, effectiveValue) - minimum) <= EPSILON then
+            ids[#ids + 1] = normalizedId
+        end
+    end
+    table.sort(ids)
+    return ids
+end
+
+local function appendDiagnosticWarning(result, state, reason, memberEventIds, text)
+    if type(result) ~= "table" or #(memberEventIds or {}) == 0 then
+        return
+    end
+    result.warnings = type(result.warnings) == "table" and result.warnings or {}
+    result.warnings[#result.warnings + 1] = {
+        warningType = tostring(reason or "movement-diagnostic"),
+        reason = tostring(reason or "movement-diagnostic"),
+        actorKey = tostring(result.actorKey or ""),
+        raidMarker = math.max(0, math.floor(tonumber(result.raidMarker) or 0)),
+        memberEventIds = copyArray(memberEventIds),
+        text = tostring(text or "Movement configuration warning."),
+    }
+end
+
+local function appendMovementConfigurationWarnings(result, state)
+    local unconfiguredIds = {}
+    local unconfiguredNames = {}
+    local missingIds = {}
+    local missingNames = {}
+    local missingStatRef = ""
+
+    for eventId, details in pairs(type(result.movementByMemberEventId) == "table" and result.movementByMemberEventId or {}) do
+        local normalizedId = normalizeEventId(eventId)
+        local reason = type(details) == "table" and tostring(details.reason or "") or ""
+        if normalizedId > 0 and reason == "movement-range-unconfigured" then
+            unconfiguredIds[#unconfiguredIds + 1] = normalizedId
+            unconfiguredNames[#unconfiguredNames + 1] = getMemberNameByEventId(state, normalizedId)
+        elseif normalizedId > 0 and reason == "movement-range-stat-missing" then
+            missingIds[#missingIds + 1] = normalizedId
+            missingNames[#missingNames + 1] = getMemberNameByEventId(state, normalizedId)
+            if missingStatRef == "" then
+                missingStatRef = tostring(details.statRef or "")
+            end
+        end
+    end
+
+    table.sort(unconfiguredIds)
+    table.sort(unconfiguredNames)
+    table.sort(missingIds)
+    table.sort(missingNames)
+
+    if #unconfiguredIds > 0 then
+        appendDiagnosticWarning(
+            result,
+            state,
+            "movement-range-unconfigured",
+            unconfiguredIds,
+            ("Marker %d has no Movement Range Stat configured; affected NPCs: %s."):format(
+                math.max(0, math.floor(tonumber(result.raidMarker) or 0)),
+                table.concat(unconfiguredNames, ", ")
+            )
+        )
+    end
+
+    if #missingIds > 0 then
+        local statText = missingStatRef ~= "" and (" " .. missingStatRef) or ""
+        appendDiagnosticWarning(
+            result,
+            state,
+            "movement-range-stat-missing",
+            missingIds,
+            ("Marker %d NPCs are missing the configured Movement Range Stat%s: %s."):format(
+                math.max(0, math.floor(tonumber(result.raidMarker) or 0)),
+                statText,
+                table.concat(missingNames, ", ")
+            )
+        )
+    end
+end
+
+local baseCopyMovementSolveResult = MovementSolver.CopyResult
+if type(baseCopyMovementSolveResult) == "function" then
+    function MovementSolver.CopyResult(state)
+        local result = baseCopyMovementSolveResult(state)
+        if type(result) ~= "table" then
+            return result
+        end
+
+        result.movementByMemberEventId = copyMovementDetailsByMember(result.movementByMemberEventId)
+        local limitingMemberEventIds = findLimitingMemberEventIds(
+            result.movementByMemberEventId,
+            result.movementAllowance
+        )
+
+        if type(result.movement) == "table" then
+            result.movement.plannedMovementAllowance = math.max(
+                0,
+                tonumber(result.movement.movementAllowance) or tonumber(result.movementAllowance) or 0
+            )
+            result.movement.plannedMovementDistance = math.max(
+                0,
+                tonumber(result.movement.movementDistance) or 0
+            )
+            result.movement.movementByMemberEventId = copyMovementDetailsByMember(result.movementByMemberEventId)
+            result.movement.limitingMemberEventIds = copyArray(limitingMemberEventIds)
+            result.movement.plannedLimitingMemberEventIds = copyArray(limitingMemberEventIds)
+        end
+
+        appendMovementConfigurationWarnings(result, state)
+        return result
+    end
 end
 
 local function ensureMovementSolveScratch(state)
