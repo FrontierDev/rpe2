@@ -11,6 +11,9 @@ Client.AutopilotSpellEvaluator = Client.AutopilotSpellEvaluator or {}
 local Evaluator = Client.AutopilotSpellEvaluator
 
 Evaluator.URGENT_HEALTH_FRACTION = 0.50
+Evaluator.MOVEMENT_CONTROL_UTILITY_CAP = 10
+Evaluator.FRAGILE_CONTROL_MULTIPLIER = 0.5
+Evaluator.CASTING_PREVENTION_UTILITY = 8
 
 local function normalizeNonNegative(value)
     return math.max(0, tonumber(value) or 0)
@@ -148,10 +151,12 @@ function Evaluator.ClassifySpell(spell)
     local result = {
         hasDamage = false,
         hasHeal = false,
+        hasInterrupt = false,
         damageTypes = {},
         damageTypeList = {},
         damageComponentCount = 0,
         healComponentCount = 0,
+        interruptComponentCount = 0,
     }
 
     for index = 1, #(spell and spell.components or {}) do
@@ -165,6 +170,9 @@ function Evaluator.ClassifySpell(spell)
         elseif effectType == "heal" then
             result.hasHeal = true
             result.healComponentCount = result.healComponentCount + 1
+        elseif effectType == "interrupt" then
+            result.hasInterrupt = true
+            result.interruptComponentCount = result.interruptComponentCount + 1
         end
     end
 
@@ -229,6 +237,11 @@ local function buildDamageTypeList(damageTypes)
     return list
 end
 
+local function isSupportedControl(control)
+    return type(control) == "table"
+        and (control.movementRangeOverride ~= nil or control.preventCasting == true)
+end
+
 function Evaluator.BuildSpellProfile(activationSnapshot, options)
     if type(activationSnapshot) ~= "table" or activationSnapshot.canCast ~= true then
         return nil
@@ -272,10 +285,18 @@ function Evaluator.BuildSpellProfile(activationSnapshot, options)
 
     local hasPeriodicDamage = false
     local hasPeriodicHealing = false
+    local hasControl = false
+    local controlApplications = {}
     for index = 1, #auraApplications do
-        local auraProfile = auraApplications[index] and auraApplications[index].profile or nil
+        local application = auraApplications[index]
+        local auraProfile = application and application.profile or nil
         hasPeriodicDamage = hasPeriodicDamage or (type(auraProfile) == "table" and auraProfile.hasPeriodicDamage == true)
         hasPeriodicHealing = hasPeriodicHealing or (type(auraProfile) == "table" and auraProfile.hasPeriodicHealing == true)
+        local control = type(auraProfile) == "table" and auraProfile.control or nil
+        if isSupportedControl(control) then
+            hasControl = true
+            controlApplications[#controlApplications + 1] = application
+        end
     end
 
     local damageTypes = {}
@@ -296,6 +317,8 @@ function Evaluator.BuildSpellProfile(activationSnapshot, options)
         eventState = activationSnapshot.eventState,
         hasDamage = classification.hasDamage or hasPeriodicDamage,
         hasHeal = classification.hasHeal or hasPeriodicHealing,
+        hasInterrupt = classification.hasInterrupt == true,
+        hasControl = hasControl,
         hasImmediateDamage = classification.hasDamage,
         hasImmediateHeal = classification.hasHeal,
         hasPeriodicDamage = hasPeriodicDamage,
@@ -304,6 +327,7 @@ function Evaluator.BuildSpellProfile(activationSnapshot, options)
         damageTypeList = buildDamageTypeList(damageTypes),
         damageComponentCount = classification.damageComponentCount,
         healComponentCount = classification.healComponentCount,
+        interruptComponentCount = classification.interruptComponentCount,
         immediateDamage = immediateDamage,
         immediateHealing = immediateHealing,
         periodicDamage = 0,
@@ -315,7 +339,10 @@ function Evaluator.BuildSpellProfile(activationSnapshot, options)
         auraApplications = auraApplications,
         appliedAuras = auraApplications,
         hasAuraApplication = #auraApplications > 0,
+        controlApplications = controlApplications,
         activeAurasByTargetEventId = options.activeAurasByTargetEventId,
+        controlStateByTargetEventId = options.controlStateByTargetEventId,
+        activeCastsByEventId = options.activeCastsByEventId,
         resourceBurden = resolveResourceBurden(casterUnit, spell, activationSnapshot.eventState),
         cooldownCommitment = resolveCooldownCommitment(spell),
         chargeCommitment = resolveChargeCommitment(activationSnapshot, spell),
@@ -456,6 +483,151 @@ local function resolvePeriodicApplicationUtility(profile, targetUnit, options)
     return periodicDamage, periodicHealing, ledger
 end
 
+function Evaluator.ResolveMovementControlSeverity(override)
+    if override == nil then
+        return 0
+    end
+    local numericOverride = tonumber(override)
+    if numericOverride == nil then
+        return 0
+    end
+    if numericOverride <= 0 then
+        return 1
+    end
+    return 1 / (1 + numericOverride)
+end
+
+local function copyControlState(state)
+    return {
+        cancelOnDamage = type(state) == "table" and state.cancelOnDamage == true or false,
+        preventCasting = type(state) == "table" and state.preventCasting == true or false,
+        movementRangeOverride = type(state) == "table" and tonumber(state.movementRangeOverride) or nil,
+        forceAutoHitAgainstTarget = type(state) == "table" and state.forceAutoHitAgainstTarget == true or false,
+    }
+end
+
+local function getTargetMapEntry(options, profile, fieldName, targetEventId)
+    local source = type(options) == "table" and options[fieldName] or nil
+    if type(source) ~= "table" and type(profile) == "table" then
+        source = profile[fieldName]
+    end
+    return type(source) == "table" and source[targetEventId] or nil
+end
+
+function Evaluator.ResolveControlUtility(profile, targetUnit, options)
+    options = type(options) == "table" and options or {}
+    local result = {
+        movementControlUtility = 0,
+        castingPreventionUtility = 0,
+        controlUtility = 0,
+    }
+    if type(profile) ~= "table" or profile.hasControl ~= true or options.isHostileTarget ~= true then
+        return result
+    end
+
+    local targetEventId = math.floor(tonumber(targetUnit and targetUnit.eventID) or 0)
+    if targetEventId <= 0 then
+        return result
+    end
+
+    local projectedControl = copyControlState(getTargetMapEntry(
+        options,
+        profile,
+        "controlStateByTargetEventId",
+        targetEventId
+    ))
+    local activeCast = getTargetMapEntry(options, profile, "activeCastsByEventId", targetEventId)
+
+    for index = 1, #(profile.controlApplications or {}) do
+        local application = profile.controlApplications[index]
+        local auraProfile = type(application) == "table" and application.profile or nil
+        local proposedControl = type(auraProfile) == "table" and auraProfile.control or nil
+        if isSupportedControl(proposedControl) then
+            local movementUtility = 0
+            local proposedOverride = tonumber(proposedControl.movementRangeOverride)
+            if proposedOverride ~= nil then
+                local existingOverride = projectedControl.movementRangeOverride
+                local effectiveOverride = existingOverride ~= nil
+                    and math.min(existingOverride, proposedOverride)
+                    or proposedOverride
+                local increment = math.max(
+                    0,
+                    Evaluator.ResolveMovementControlSeverity(effectiveOverride)
+                        - Evaluator.ResolveMovementControlSeverity(existingOverride)
+                )
+                movementUtility = Evaluator.MOVEMENT_CONTROL_UTILITY_CAP * increment
+                projectedControl.movementRangeOverride = effectiveOverride
+            end
+
+            local castingUtility = 0
+            if proposedControl.preventCasting == true
+                and type(activeCast) == "table"
+                and projectedControl.preventCasting ~= true
+            then
+                castingUtility = Evaluator.CASTING_PREVENTION_UTILITY
+                projectedControl.preventCasting = true
+            end
+
+            if proposedControl.cancelOnDamage == true then
+                movementUtility = movementUtility * Evaluator.FRAGILE_CONTROL_MULTIPLIER
+                castingUtility = castingUtility * Evaluator.FRAGILE_CONTROL_MULTIPLIER
+            end
+
+            result.movementControlUtility = result.movementControlUtility + movementUtility
+            result.castingPreventionUtility = result.castingPreventionUtility + castingUtility
+        end
+    end
+
+    result.controlUtility = result.movementControlUtility + result.castingPreventionUtility
+    return result
+end
+
+local function resolveCastRemainingTurns(activeCast)
+    if type(activeCast) ~= "table" then
+        return nil
+    end
+    local remaining = activeCast.turnsRemaining
+    if remaining == nil then
+        remaining = activeCast.remainingTurns
+    end
+    if remaining == nil then
+        remaining = activeCast.castRemainingTurns
+    end
+    if tonumber(remaining) == nil then
+        return nil
+    end
+    return math.max(0, math.floor(tonumber(remaining) or 0))
+end
+
+function Evaluator.ResolveInterruptUtility(profile, targetUnit, options)
+    options = type(options) == "table" and options or {}
+    local targetEventId = math.floor(tonumber(targetUnit and targetUnit.eventID) or 0)
+    local result = {
+        hasUsefulInterrupt = false,
+        urgentInterrupt = false,
+        interruptTargetEventId = 0,
+        interruptRemainingTurns = nil,
+    }
+    if type(profile) ~= "table"
+        or profile.hasInterrupt ~= true
+        or options.isHostileTarget ~= true
+        or targetEventId <= 0
+    then
+        return result
+    end
+
+    local activeCast = getTargetMapEntry(options, profile, "activeCastsByEventId", targetEventId)
+    if type(activeCast) ~= "table" then
+        return result
+    end
+
+    result.hasUsefulInterrupt = true
+    result.urgentInterrupt = true
+    result.interruptTargetEventId = targetEventId
+    result.interruptRemainingTurns = resolveCastRemainingTurns(activeCast)
+    return result
+end
+
 function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
     options = type(options) == "table" and options or {}
     local profile = type(options.profile) == "table"
@@ -491,9 +663,12 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
         usefulPeriodicHealing = math.min(periodicHealing, remainingMissingHealth)
     end
 
+    local control = Evaluator.ResolveControlUtility(profile, targetUnit, options)
+    local interrupt = Evaluator.ResolveInterruptUtility(profile, targetUnit, options)
     local damageUtility = immediateDamage + usefulPeriodicDamage
     local healingUtility = math.max(0, immediateEffectiveHealing + usefulPeriodicHealing)
-    local totalUtility = damageUtility + healingUtility
+    local controlUtility = tonumber(control.controlUtility) or 0
+    local totalUtility = damageUtility + healingUtility + controlUtility
     local urgentHealing = profile.hasHeal
         and type(health) == "table"
         and health.isLiving == true
@@ -503,10 +678,14 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
     local preferredIntent = nil
     if urgentHealing then
         preferredIntent = "heal"
-    elseif healingUtility > damageUtility then
+    elseif interrupt.urgentInterrupt == true then
+        preferredIntent = "interrupt"
+    elseif healingUtility > damageUtility + controlUtility then
         preferredIntent = "heal"
     elseif damageUtility > 0 then
         preferredIntent = "damage"
+    elseif controlUtility > 0 then
+        preferredIntent = "control"
     elseif healingUtility > 0 then
         preferredIntent = "heal"
     end
@@ -517,6 +696,8 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
         targetEventId = math.floor(tonumber(targetUnit and targetUnit.eventID) or 0),
         hasDamage = profile.hasDamage,
         hasHeal = profile.hasHeal,
+        hasControl = profile.hasControl == true,
+        hasInterrupt = profile.hasInterrupt == true,
         hasImmediateDamage = profile.hasImmediateDamage == true,
         hasImmediateHeal = profile.hasImmediateHeal == true,
         hasPeriodicDamage = profile.hasPeriodicDamage == true,
@@ -537,8 +718,15 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
         effectiveHealing = healingUtility,
         damageUtility = damageUtility,
         healingUtility = healingUtility,
+        movementControlUtility = tonumber(control.movementControlUtility) or 0,
+        castingPreventionUtility = tonumber(control.castingPreventionUtility) or 0,
+        controlUtility = controlUtility,
         totalUtility = totalUtility,
         urgentHealing = urgentHealing == true,
+        hasUsefulInterrupt = interrupt.hasUsefulInterrupt == true,
+        urgentInterrupt = interrupt.urgentInterrupt == true,
+        interruptTargetEventId = math.floor(tonumber(interrupt.interruptTargetEventId) or 0),
+        interruptRemainingTurns = interrupt.interruptRemainingTurns,
         preferredIntent = preferredIntent,
         resourceBurden = profile.resourceBurden,
         cooldownCommitment = profile.cooldownCommitment,
@@ -559,6 +747,10 @@ function Evaluator.CompareCandidates(left, right)
 
     if left.urgentHealing ~= right.urgentHealing then
         return left.urgentHealing == true and 1 or -1
+    end
+
+    if left.urgentInterrupt ~= right.urgentInterrupt then
+        return left.urgentInterrupt == true and 1 or -1
     end
 
     local leftUtility = normalizeNonNegative(left.totalUtility)
