@@ -139,6 +139,7 @@ function SequencePlanning.ReevaluateCandidate(candidate, tacticalLedger, context
     local periodicHealing = 0
     local expectedDamage = 0
     local expectedHealing = 0
+    local projectedHealingByTargetEventId = {}
     local urgentHealing = false
     local hasUsefulInterrupt = false
     local urgentInterrupt = false
@@ -168,6 +169,10 @@ function SequencePlanning.ReevaluateCandidate(candidate, tacticalLedger, context
             periodicHealing = periodicHealing + (tonumber(evaluated.usefulPeriodicHealing) or 0)
             expectedDamage = expectedDamage + (tonumber(evaluated.expectedDamage) or 0)
             expectedHealing = expectedHealing + (tonumber(evaluated.expectedHealing) or 0)
+            local targetEventId = normalizeEventId(targets[index] and targets[index].eventID)
+            if targetEventId > 0 then
+                projectedHealingByTargetEventId[targetEventId] = normalizeNonNegative(evaluated.healingUtility)
+            end
             urgentHealing = urgentHealing or evaluated.urgentHealing == true
             if evaluateInterrupt and evaluated.hasUsefulInterrupt == true and hasUsefulInterrupt ~= true then
                 hasUsefulInterrupt = true
@@ -196,6 +201,7 @@ function SequencePlanning.ReevaluateCandidate(candidate, tacticalLedger, context
     result.periodicHealing = periodicHealing
     result.expectedDamage = expectedDamage
     result.expectedHealing = expectedHealing
+    result.projectedHealingByTargetEventId = projectedHealingByTargetEventId
     result.urgentHealing = urgentHealing
     result.hasUsefulInterrupt = hasUsefulInterrupt
     result.urgentInterrupt = urgentInterrupt
@@ -222,14 +228,15 @@ end
 
 local function appendResolvedCosts(target, costs, result)
     local Spellcasting = getSpellcasting()
-    if type(Spellcasting.ResolveSpellResourceCostAmounts) ~= "function" then
+    if type(Spellcasting.ResolveSpellResourceCostAmount) ~= "function" then
         return
     end
-    local _, byRef = Spellcasting.ResolveSpellResourceCostAmounts(target, costs)
-    for resourceRef, amount in pairs(type(byRef) == "table" and byRef or {}) do
-        local ref = tostring(resourceRef or "")
-        if ref ~= "" and normalizeNonNegative(amount) > 0 then
-            result[ref] = normalizeNonNegative(result[ref]) + normalizeNonNegative(amount)
+    for index = 1, #(costs or {}) do
+        local cost = costs[index]
+        local resourceRef = type(cost) == "table" and tostring(cost.resourceRef or "") or ""
+        local amount = Spellcasting.ResolveSpellResourceCostAmount(target, cost)
+        if resourceRef ~= "" and normalizeNonNegative(amount) > 0 then
+            result[resourceRef] = normalizeNonNegative(result[resourceRef]) + normalizeNonNegative(amount)
         end
     end
 end
@@ -309,19 +316,21 @@ local function reserveCandidateHealing(ledger, candidate, context)
     if type(SpellEvaluator.ReserveProjectedHealing) ~= "function" then
         return
     end
-    local amount = normalizeNonNegative(candidate and candidate.healingUtility)
-    if amount <= 0 then
-        return
-    end
     local targets = candidateTargets(candidate)
-    local amountPerTarget = amount / math.max(1, #targets)
+    local byTarget = type(candidate) == "table" and candidate.projectedHealingByTargetEventId or nil
+    local fallbackTotal = normalizeNonNegative(candidate and candidate.healingUtility)
+    local fallbackPerTarget = fallbackTotal / math.max(1, #targets)
     for index = 1, #targets do
-        SpellEvaluator.ReserveProjectedHealing(
-            ledger.projectedHealingLedger,
-            targets[index],
-            context.eventState,
-            amountPerTarget
-        )
+        local targetEventId = normalizeEventId(targets[index] and targets[index].eventID)
+        local amount = type(byTarget) == "table" and normalizeNonNegative(byTarget[targetEventId]) or fallbackPerTarget
+        if amount > 0 then
+            SpellEvaluator.ReserveProjectedHealing(
+                ledger.projectedHealingLedger,
+                targets[index],
+                context.eventState,
+                amount
+            )
+        end
     end
 end
 
