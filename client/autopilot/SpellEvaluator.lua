@@ -217,6 +217,18 @@ local function resolveChargeCommitment(snapshot, spell)
     return 1
 end
 
+local function buildDamageTypeList(damageTypes)
+    local list = {}
+    local stableDamageTypeOrder = { "melee", "ranged", "spell" }
+    for index = 1, #stableDamageTypeOrder do
+        local damageType = stableDamageTypeOrder[index]
+        if type(damageTypes) == "table" and damageTypes[damageType] == true then
+            list[#list + 1] = damageType
+        end
+    end
+    return list
+end
+
 function Evaluator.BuildSpellProfile(activationSnapshot, options)
     if type(activationSnapshot) ~= "table" or activationSnapshot.canCast ~= true then
         return nil
@@ -231,17 +243,17 @@ function Evaluator.BuildSpellProfile(activationSnapshot, options)
     end
 
     local classification = Evaluator.ClassifySpell(spell)
-    local expectedDamage = 0
-    local expectedHealing = 0
+    local immediateDamage = 0
+    local immediateHealing = 0
 
     for index = 1, #(spell.components or {}) do
         local component = spell.components[index]
         local effect = type(component) == "table" and component.effect or nil
         local effectType = tostring(type(effect) == "table" and effect.type or "")
         if effectType == "damage" then
-            expectedDamage = expectedDamage + Evaluator.ResolveExpectedDamage(casterUnit, effect)
+            immediateDamage = immediateDamage + Evaluator.ResolveExpectedDamage(casterUnit, effect)
         elseif effectType == "heal" then
-            expectedHealing = expectedHealing + Evaluator.ResolveExpectedHealing(casterUnit, effect)
+            immediateHealing = immediateHealing + Evaluator.ResolveExpectedHealing(casterUnit, effect)
         end
     end
 
@@ -258,23 +270,52 @@ function Evaluator.BuildSpellProfile(activationSnapshot, options)
         }, options.auraDefinitionCache)
     end
 
+    local hasPeriodicDamage = false
+    local hasPeriodicHealing = false
+    for index = 1, #auraApplications do
+        local auraProfile = auraApplications[index] and auraApplications[index].profile or nil
+        hasPeriodicDamage = hasPeriodicDamage or (type(auraProfile) == "table" and auraProfile.hasPeriodicDamage == true)
+        hasPeriodicHealing = hasPeriodicHealing or (type(auraProfile) == "table" and auraProfile.hasPeriodicHealing == true)
+    end
+
+    local damageTypes = {}
+    for key, value in pairs(classification.damageTypes or {}) do
+        damageTypes[key] = value
+    end
+    if hasPeriodicDamage then
+        -- Periodic Aura damage is not a melee movement requirement. Treating it
+        -- as spell damage allows pure DoTs to use the existing hostile intent.
+        damageTypes.spell = true
+    end
+
     return {
         spellRef = tostring(activationSnapshot.spellRef or ""),
         spell = spell,
         casterUnit = casterUnit,
         casterEventId = tonumber(casterUnit.eventID) or 0,
         eventState = activationSnapshot.eventState,
-        hasDamage = classification.hasDamage,
-        hasHeal = classification.hasHeal,
-        damageTypes = classification.damageTypes,
-        damageTypeList = classification.damageTypeList,
+        hasDamage = classification.hasDamage or hasPeriodicDamage,
+        hasHeal = classification.hasHeal or hasPeriodicHealing,
+        hasImmediateDamage = classification.hasDamage,
+        hasImmediateHeal = classification.hasHeal,
+        hasPeriodicDamage = hasPeriodicDamage,
+        hasPeriodicHealing = hasPeriodicHealing,
+        damageTypes = damageTypes,
+        damageTypeList = buildDamageTypeList(damageTypes),
         damageComponentCount = classification.damageComponentCount,
         healComponentCount = classification.healComponentCount,
-        expectedDamage = expectedDamage,
-        expectedHealing = expectedHealing,
+        immediateDamage = immediateDamage,
+        immediateHealing = immediateHealing,
+        periodicDamage = 0,
+        periodicHealing = 0,
+        -- Profile-level compatibility fields remain immediate-only because
+        -- periodic value is target- and existing-Aura-state-dependent.
+        expectedDamage = immediateDamage,
+        expectedHealing = immediateHealing,
         auraApplications = auraApplications,
         appliedAuras = auraApplications,
         hasAuraApplication = #auraApplications > 0,
+        activeAurasByTargetEventId = options.activeAurasByTargetEventId,
         resourceBurden = resolveResourceBurden(casterUnit, spell, activationSnapshot.eventState),
         cooldownCommitment = resolveCooldownCommitment(spell),
         chargeCommitment = resolveChargeCommitment(activationSnapshot, spell),
@@ -366,6 +407,55 @@ function Evaluator.ReserveProjectedHealing(ledger, targetUnit, eventState, expec
     return effectiveHealing
 end
 
+local function resolvePeriodicApplicationUtility(profile, targetUnit, options)
+    local auraEvaluator = getAuraEvaluator()
+    if type(auraEvaluator) ~= "table"
+        or type(auraEvaluator.CreateProjectedAuraLedger) ~= "function"
+        or type(auraEvaluator.EvaluateProjectedAuraApplication) ~= "function"
+    then
+        return 0, 0, nil
+    end
+
+    local targetEventId = math.floor(tonumber(targetUnit and targetUnit.eventID) or 0)
+    local recordsByTarget = options.activeAurasByTargetEventId
+        or profile.activeAurasByTargetEventId
+        or {}
+    local activeAuraRecords = targetEventId > 0 and recordsByTarget[targetEventId] or nil
+    if type(options.activeAuraRecords) == "table" then
+        activeAuraRecords = options.activeAuraRecords
+    end
+
+    local ledger = type(options.projectedAuraLedger) == "table"
+        and auraEvaluator.CloneProjectedAuraLedger(options.projectedAuraLedger)
+        or auraEvaluator.CreateProjectedAuraLedger(activeAuraRecords)
+    local periodicDamage = 0
+    local periodicHealing = 0
+
+    for index = 1, #(profile.auraApplications or {}) do
+        local application = profile.auraApplications[index]
+        local projection = auraEvaluator.EvaluateProjectedAuraApplication(
+            ledger,
+            application,
+            profile.casterUnit,
+            targetUnit,
+            {
+                datasetId = application and application.datasetId,
+                auraDefinitionCache = options.auraDefinitionCache,
+            },
+            options.auraDefinitionCache
+        )
+        if type(projection) == "table" then
+            periodicDamage = periodicDamage + (tonumber(projection.periodicDamage) or 0)
+            periodicHealing = periodicHealing + (tonumber(projection.periodicHealing) or 0)
+            if type(projection.ledger) == "table" then
+                ledger = projection.ledger
+            end
+        end
+    end
+
+    return periodicDamage, periodicHealing, ledger
+end
+
 function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
     options = type(options) == "table" and options or {}
     local profile = type(options.profile) == "table"
@@ -378,20 +468,37 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
     local health = type(targetUnit) == "table"
         and Evaluator.ResolveProjectedHealth(targetUnit, profile.eventState, options.projectedHealingLedger)
         or nil
-    local effectiveHealing = 0
-    if profile.hasHeal and type(health) == "table" and health.isLiving == true then
-        effectiveHealing = math.min(profile.expectedHealing, health.projectedMissingHealth)
+
+    local immediateDamage = normalizeNonNegative(profile.immediateDamage ~= nil and profile.immediateDamage or profile.expectedDamage)
+    local immediateHealing = normalizeNonNegative(profile.immediateHealing ~= nil and profile.immediateHealing or profile.expectedHealing)
+    local immediateEffectiveHealing = 0
+    if profile.hasImmediateHeal and type(health) == "table" and health.isLiving == true then
+        immediateEffectiveHealing = math.min(immediateHealing, health.projectedMissingHealth)
+    elseif profile.hasImmediateHeal and health == nil then
+        immediateEffectiveHealing = immediateHealing
     end
 
+    local periodicDamage, periodicHealing, projectedAuraLedger = resolvePeriodicApplicationUtility(profile, targetUnit, options)
+    local usefulPeriodicDamage = periodicDamage
+    if periodicDamage > 0 and type(health) == "table" then
+        usefulPeriodicDamage = math.min(periodicDamage, math.max(0, health.currentValue))
+    end
+
+    local usefulPeriodicHealing = periodicHealing
+    if periodicHealing > 0 and type(health) == "table" then
+        local remainingMissingHealth = math.max(0, health.projectedMissingHealth - immediateEffectiveHealing)
+        usefulPeriodicHealing = math.min(periodicHealing, remainingMissingHealth)
+    end
+
+    local damageUtility = immediateDamage + usefulPeriodicDamage
+    local healingUtility = math.max(0, immediateEffectiveHealing + usefulPeriodicHealing)
+    local totalUtility = damageUtility + healingUtility
     local urgentHealing = profile.hasHeal
         and type(health) == "table"
         and health.isLiving == true
         and health.projectedHealthFraction <= Evaluator.URGENT_HEALTH_FRACTION
-        and effectiveHealing > 0
+        and healingUtility > 0
 
-    local damageUtility = profile.hasDamage and profile.expectedDamage or 0
-    local healingUtility = effectiveHealing
-    local totalUtility = damageUtility + healingUtility
     local preferredIntent = nil
     if urgentHealing then
         preferredIntent = "heal"
@@ -409,14 +516,24 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
         targetEventId = math.floor(tonumber(targetUnit and targetUnit.eventID) or 0),
         hasDamage = profile.hasDamage,
         hasHeal = profile.hasHeal,
+        hasImmediateDamage = profile.hasImmediateDamage == true,
+        hasImmediateHeal = profile.hasImmediateHeal == true,
+        hasPeriodicDamage = profile.hasPeriodicDamage == true,
+        hasPeriodicHealing = profile.hasPeriodicHealing == true,
         damageTypes = profile.damageTypes,
         damageTypeList = profile.damageTypeList,
-        expectedDamage = profile.expectedDamage,
-        expectedHealing = profile.expectedHealing,
+        immediateDamage = immediateDamage,
+        immediateHealing = immediateHealing,
+        periodicDamage = periodicDamage,
+        periodicHealing = periodicHealing,
+        usefulPeriodicDamage = usefulPeriodicDamage,
+        usefulPeriodicHealing = usefulPeriodicHealing,
+        expectedDamage = immediateDamage + usefulPeriodicDamage,
+        expectedHealing = immediateHealing + usefulPeriodicHealing,
         auraApplications = profile.auraApplications,
         appliedAuras = profile.appliedAuras,
         hasAuraApplication = profile.hasAuraApplication == true,
-        effectiveHealing = effectiveHealing,
+        effectiveHealing = healingUtility,
         damageUtility = damageUtility,
         healingUtility = healingUtility,
         totalUtility = totalUtility,
@@ -426,6 +543,7 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
         cooldownCommitment = profile.cooldownCommitment,
         chargeCommitment = profile.chargeCommitment,
         targetHealth = health,
+        projectedAuraLedger = projectedAuraLedger,
         activationSnapshot = activationSnapshot,
     }
 end
