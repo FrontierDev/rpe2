@@ -474,8 +474,6 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
     local immediateEffectiveHealing = 0
     if profile.hasImmediateHeal and type(health) == "table" and health.isLiving == true then
         immediateEffectiveHealing = math.min(immediateHealing, health.projectedMissingHealth)
-    elseif profile.hasImmediateHeal and health == nil then
-        immediateEffectiveHealing = immediateHealing
     end
 
     local periodicDamage, periodicHealing, projectedAuraLedger = resolvePeriodicApplicationUtility(profile, targetUnit, options)
