@@ -40,6 +40,10 @@ local function getSpellcasting()
     return Addon.Client and Addon.Client.Spellcasting or nil
 end
 
+local function getAuraEvaluator()
+    return Addon.Client and Addon.Client.AutopilotAuraEvaluator or nil
+end
+
 local function getStatValue(unit, statRef)
     if type(unit) ~= "table" or type(statRef) ~= "string" or statRef == "" then
         return 0
@@ -213,10 +217,12 @@ local function resolveChargeCommitment(snapshot, spell)
     return 1
 end
 
-function Evaluator.BuildSpellProfile(activationSnapshot)
+function Evaluator.BuildSpellProfile(activationSnapshot, options)
     if type(activationSnapshot) ~= "table" or activationSnapshot.canCast ~= true then
         return nil
     end
+
+    options = type(options) == "table" and options or {}
 
     local spell = activationSnapshot.spell
     local casterUnit = activationSnapshot.casterUnit
@@ -239,6 +245,19 @@ function Evaluator.BuildSpellProfile(activationSnapshot)
         end
     end
 
+    local auraApplications = {}
+    local auraEvaluator = getAuraEvaluator()
+    if type(auraEvaluator) == "table" and type(auraEvaluator.CollectSpellAuraApplications) == "function" then
+        auraApplications = auraEvaluator.CollectSpellAuraApplications(spell, {
+            dataset = activationSnapshot.dataset,
+            datasetId = activationSnapshot.datasetId
+                or (activationSnapshot.dataset and activationSnapshot.dataset.id)
+                or activationSnapshot.spellDatasetId,
+            spellDatasetId = activationSnapshot.spellDatasetId
+                or (activationSnapshot.dataset and activationSnapshot.dataset.id),
+        }, options.auraDefinitionCache)
+    end
+
     return {
         spellRef = tostring(activationSnapshot.spellRef or ""),
         spell = spell,
@@ -253,6 +272,9 @@ function Evaluator.BuildSpellProfile(activationSnapshot)
         healComponentCount = classification.healComponentCount,
         expectedDamage = expectedDamage,
         expectedHealing = expectedHealing,
+        auraApplications = auraApplications,
+        appliedAuras = auraApplications,
+        hasAuraApplication = #auraApplications > 0,
         resourceBurden = resolveResourceBurden(casterUnit, spell, activationSnapshot.eventState),
         cooldownCommitment = resolveCooldownCommitment(spell),
         chargeCommitment = resolveChargeCommitment(activationSnapshot, spell),
@@ -346,7 +368,9 @@ end
 
 function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
     options = type(options) == "table" and options or {}
-    local profile = Evaluator.BuildSpellProfile(activationSnapshot)
+    local profile = type(options.profile) == "table"
+        and options.profile
+        or Evaluator.BuildSpellProfile(activationSnapshot, options)
     if type(profile) ~= "table" then
         return nil
     end
@@ -389,6 +413,9 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
         damageTypeList = profile.damageTypeList,
         expectedDamage = profile.expectedDamage,
         expectedHealing = profile.expectedHealing,
+        auraApplications = profile.auraApplications,
+        appliedAuras = profile.appliedAuras,
+        hasAuraApplication = profile.hasAuraApplication == true,
         effectiveHealing = effectiveHealing,
         damageUtility = damageUtility,
         healingUtility = healingUtility,

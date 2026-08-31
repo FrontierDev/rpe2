@@ -7,6 +7,7 @@ Addon.Utils = Addon.Utils or {}
 local Client = Addon.Client
 local Planner = Client.AutopilotPlanner or {}
 local SpellEvaluator = Client.AutopilotSpellEvaluator or {}
+local AuraEvaluator = Client.AutopilotAuraEvaluator or {}
 local TargetSelector = Client.AutopilotTargetSelector or {}
 local MovementSolver = Client.AutopilotMovementSolver or {}
 local Spatial = Client.AutopilotSpatial or {}
@@ -252,6 +253,25 @@ local function getSpellcasting()
     return Addon.Client and Addon.Client.Spellcasting or nil
 end
 
+local function getAuraEvaluator()
+    return Addon.Client and Addon.Client.AutopilotAuraEvaluator or AuraEvaluator
+end
+
+local function copyDeep(value)
+    local evaluator = getAuraEvaluator()
+    if type(evaluator) == "table" and type(evaluator.CopyValue) == "function" then
+        return evaluator.CopyValue(value)
+    end
+    if type(value) ~= "table" then
+        return value
+    end
+    local copied = {}
+    for key, child in pairs(value) do
+        copied[key] = type(child) == "table" and copyDeep(child) or child
+    end
+    return copied
+end
+
 local function getMovement()
     return RPE and RPE.Core and RPE.Core.Movement or nil
 end
@@ -494,6 +514,28 @@ local function buildSnapshotResult(state)
         actorPositions[actorKey] = copyPosition(position)
     end
 
+    local activeAuraRecords = {}
+    for index = 1, #(state.snapshot.activeAuraRecords or {}) do
+        activeAuraRecords[index] = copyDeep(state.snapshot.activeAuraRecords[index])
+    end
+    local activeAurasByTargetEventId = {}
+    for targetEventId, records in pairs(state.snapshot.activeAurasByTargetEventId or {}) do
+        activeAurasByTargetEventId[targetEventId] = {}
+        for index = 1, #(records or {}) do
+            activeAurasByTargetEventId[targetEventId][index] = copyDeep(records[index])
+        end
+    end
+    local controlStateByTargetEventId = copyDeep(state.snapshot.controlStateByTargetEventId or {})
+    local activeCastSummaries = {}
+    local activeCastsByEventId = {}
+    for index = 1, #(state.snapshot.activeCastSummaries or {}) do
+        local summary = copyDeep(state.snapshot.activeCastSummaries[index])
+        activeCastSummaries[index] = summary
+        if type(summary) == "table" and normalizeEventId(summary.casterEventId) > 0 then
+            activeCastsByEventId[normalizeEventId(summary.casterEventId)] = copyDeep(summary)
+        end
+    end
+
     return {
         eventId = state.eventId,
         turnNumber = state.turnNumber,
@@ -504,6 +546,14 @@ local function buildSnapshotResult(state)
         members = members,
         playerPositions = playerPositions,
         actorPositions = actorPositions,
+        activeAuraRecords = activeAuraRecords,
+        activeAurasByTargetEventId = activeAurasByTargetEventId,
+        controlStateByTargetEventId = controlStateByTargetEventId,
+        auraRecords = activeAuraRecords,
+        auraRecordsByTargetEventId = activeAurasByTargetEventId,
+        activeCastSummaries = activeCastSummaries,
+        activeCastsByEventId = activeCastsByEventId,
+        activeCastByEventId = activeCastsByEventId,
     }
 end
 
@@ -714,6 +764,175 @@ local function phaseSnapshotPositions(state, deadlineMs)
             return false
         end
     end
+    state.phase = "snapshot-auras"
+    return true
+end
+
+local function getEventAuraBucket(eventId)
+    local buckets = type(Client.ActiveAurasByEventId) == "table" and Client.ActiveAurasByEventId or nil
+    return type(buckets) == "table" and buckets[tostring(eventId or "")] or nil
+end
+
+local function appendFrozenAuraRecord(state, record)
+    if type(record) ~= "table" or (tonumber(record.stacks) or 0) <= 0 then
+        return
+    end
+
+    state.snapshot.activeAuraRecords[#state.snapshot.activeAuraRecords + 1] = record
+    local targetEventId = normalizeEventId(record.targetEventId)
+    if targetEventId > 0 then
+        local byTarget = state.snapshot.activeAurasByTargetEventId[targetEventId]
+        if type(byTarget) ~= "table" then
+            byTarget = {}
+            state.snapshot.activeAurasByTargetEventId[targetEventId] = byTarget
+        end
+        byTarget[#byTarget + 1] = record
+    end
+end
+
+local function phaseSnapshotAuras(state, deadlineMs)
+    local bucket = state.scratch.auraSourceBucket
+    if type(bucket) ~= "table" or type(bucket.byKey) ~= "table" then
+        state.phase = "snapshot-casts"
+        return true
+    end
+
+    if state.cursors.auraScanComplete ~= true then
+        while true do
+            local auraKey = next(bucket.byKey, state.cursors.auraKeyScan)
+            state.cursors.auraKeyScan = auraKey
+            if auraKey == nil then
+                table.sort(state.scratch.auraKeys, function(left, right)
+                    return tostring(left) < tostring(right)
+                end)
+                state.cursors.auraScanComplete = true
+                state.cursors.auraCopyIndex = 1
+                break
+            end
+            state.scratch.auraKeys[#state.scratch.auraKeys + 1] = auraKey
+            if shouldYield(deadlineMs) then
+                return false
+            end
+        end
+    end
+
+    local auraEvaluator = getAuraEvaluator()
+    while state.cursors.auraCopyIndex <= #state.scratch.auraKeys do
+        local auraKey = state.scratch.auraKeys[state.cursors.auraCopyIndex]
+        local entry = bucket.byKey[auraKey]
+
+        if type(entry) == "table" and type(auraEvaluator) == "table" and type(auraEvaluator.CopyAuraEntry) == "function" then
+            local copied = auraEvaluator.CopyAuraEntry(entry, {
+                datasetId = entry and entry.datasetId,
+                auraDefinitionCache = state.scratch.auraDefinitionCache,
+            }, state.scratch.auraDefinitionCache)
+            appendFrozenAuraRecord(state, copied)
+        elseif type(entry) == "table" then
+            appendFrozenAuraRecord(state, copyDeep(entry))
+        end
+
+        state.cursors.auraCopyIndex = state.cursors.auraCopyIndex + 1
+        if shouldYield(deadlineMs) then
+            return false
+        end
+    end
+
+    state.phase = "snapshot-casts"
+    state.cursors.castKeyScan = nil
+    local controlBuilder = type(auraEvaluator) == "table" and auraEvaluator.BuildControlState or nil
+    if type(controlBuilder) == "function" then
+        for targetEventId, records in pairs(state.snapshot.activeAurasByTargetEventId) do
+            state.snapshot.controlStateByTargetEventId[targetEventId] = controlBuilder(records)
+        end
+    end
+    return true
+end
+
+local function copyActiveCastSummary(entry, casterEventId, turnNumber)
+    if type(entry) ~= "table" then
+        return nil
+    end
+
+    local turnsTotal = math.max(0, math.floor(tonumber(entry.turnsTotal) or 0))
+    local turnsElapsed = math.max(0, math.floor(tonumber(entry.turnsElapsed) or 0))
+    local turnsRemaining = math.max(0, math.floor(tonumber(entry.turnsRemaining) or (turnsTotal - turnsElapsed)))
+    local currentTurnNumber = math.max(0, math.floor(tonumber(turnNumber) or 0))
+    local completeOnTurnNumber = math.max(0, math.floor(tonumber(entry.completeOnTurnNumber) or 0))
+    local copied = {
+        spellRef = entry.spellRef,
+        spellName = entry.spellName,
+        authorityType = entry.authorityType,
+        casterEventId = normalizeEventId(entry.casterEventId or casterEventId),
+        turnsTotal = turnsTotal,
+        turnsElapsed = turnsElapsed,
+        turnsRemaining = turnsRemaining,
+        remainingTurns = turnsRemaining,
+        castRemainingTurns = turnsRemaining,
+        startedOnTurnNumber = math.max(0, math.floor(tonumber(entry.startedOnTurnNumber) or 0)),
+        completeOnTurnNumber = completeOnTurnNumber,
+        lastAdvancedTurnNumber = math.max(0, math.floor(tonumber(entry.lastAdvancedTurnNumber) or 0)),
+        currentTurnNumber = currentTurnNumber,
+        targetEventIds = copyArray(entry.targetEventIds),
+        focusedTargetEventId = normalizeEventId(entry.focusedTargetEventId),
+        targetPolicy = copyDeep(entry.targetPolicy),
+    }
+    if type(entry.targetSelectionOrder) == "table" then
+        copied.targetSelectionOrder = copyArray(entry.targetSelectionOrder)
+    end
+    if type(entry.targetSelections) == "table" then
+        copied.targetSelections = {}
+        for key, values in pairs(entry.targetSelections) do
+            copied.targetSelections[key] = copyDeep(values)
+        end
+    end
+    return copied
+end
+
+local function phaseSnapshotCasts(state, deadlineMs)
+    local bucket = state.scratch.castSourceBucket
+    if type(bucket) ~= "table" then
+        state.phase = "snapshot-spells"
+        state.cursors.member = 1
+        return true
+    end
+
+    if state.cursors.castScanComplete ~= true then
+        while true do
+            local casterEventId = next(bucket, state.cursors.castKeyScan)
+            state.cursors.castKeyScan = casterEventId
+            if casterEventId == nil then
+                table.sort(state.scratch.castKeys, function(left, right)
+                    return tonumber(left) and tonumber(right)
+                        and tonumber(left) < tonumber(right)
+                        or tostring(left) < tostring(right)
+                end)
+                state.cursors.castScanComplete = true
+                state.cursors.castCopyIndex = 1
+                break
+            end
+            state.scratch.castKeys[#state.scratch.castKeys + 1] = casterEventId
+            if shouldYield(deadlineMs) then
+                return false
+            end
+        end
+    end
+
+    while state.cursors.castCopyIndex <= #state.scratch.castKeys do
+        local casterEventId = state.scratch.castKeys[state.cursors.castCopyIndex]
+        local entry = bucket[casterEventId]
+
+        local summary = copyActiveCastSummary(entry, casterEventId, state.turnNumber)
+        if summary and summary.casterEventId > 0 then
+            state.snapshot.activeCastSummaries[#state.snapshot.activeCastSummaries + 1] = summary
+            state.snapshot.activeCastsByEventId[summary.casterEventId] = summary
+        end
+
+        state.cursors.castCopyIndex = state.cursors.castCopyIndex + 1
+        if shouldYield(deadlineMs) then
+            return false
+        end
+    end
+
     state.phase = "snapshot-spells"
     state.cursors.member = 1
     return true
@@ -799,7 +1018,9 @@ local function phaseActivation(state, deadlineMs)
                 state.metrics.candidateTargetCount = state.metrics.candidateTargetCount + #(activation.targetCandidates or {})
                 state.scratch.spellDefinitionByRef[spellRef] = activation.spell
                 local profile = type(SpellEvaluator.BuildSpellProfile) == "function"
-                    and SpellEvaluator.BuildSpellProfile(activation)
+                    and SpellEvaluator.BuildSpellProfile(activation, {
+                        auraDefinitionCache = state.scratch.auraDefinitionCache,
+                    })
                     or nil
                 state.scratch.profileByKey[cacheKey] = profile or false
             end
@@ -835,6 +1056,9 @@ local function buildCandidateFromSelection(state, activation, profile, selection
             targetGroupKey = selection.targetGroupKey,
             hasDamage = profile.hasDamage,
             hasHeal = profile.hasHeal,
+            auraApplications = profile.auraApplications,
+            appliedAuras = profile.appliedAuras,
+            hasAuraApplication = profile.hasAuraApplication == true,
             damageTypes = profile.damageTypes,
             damageTypeList = profile.damageTypeList,
             expectedDamage = profile.expectedDamage,
@@ -859,6 +1083,8 @@ local function buildCandidateFromSelection(state, activation, profile, selection
         local evaluated = type(SpellEvaluator.EvaluateCandidate) == "function"
             and SpellEvaluator.EvaluateCandidate(activation, target, {
                 projectedHealingLedger = state.scratch.projectedHealingLedger,
+                auraDefinitionCache = state.scratch.auraDefinitionCache,
+                profile = profile,
             })
             or nil
         if type(evaluated) == "table" then
@@ -889,6 +1115,9 @@ local function buildCandidateFromSelection(state, activation, profile, selection
         targetGroupKey = selection.targetGroupKey,
         hasDamage = profile.hasDamage,
         hasHeal = profile.hasHeal,
+        auraApplications = profile.auraApplications,
+        appliedAuras = profile.appliedAuras,
+        hasAuraApplication = profile.hasAuraApplication == true,
         damageTypes = profile.damageTypes,
         damageTypeList = profile.damageTypeList,
         expectedDamage = profile.expectedDamage,
@@ -1276,6 +1505,11 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
         actorMembers = {},
         spellRefsByEventId = {},
         movementByEventId = {},
+        activeAuraRecords = {},
+        activeAurasByTargetEventId = {},
+        controlStateByTargetEventId = {},
+        activeCastSummaries = {},
+        activeCastsByEventId = {},
         configurationRevision = getConfigurationRevision(),
         auraRevision = getAuraRevision(eventState.id),
         spatialRuntime = {
@@ -1286,12 +1520,24 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
             positionByActorKey = {},
         },
     }
+    state.snapshot.auraRecords = state.snapshot.activeAuraRecords
+    state.snapshot.auraRecordsByTargetEventId = state.snapshot.activeAurasByTargetEventId
+    state.snapshot.activeCastByEventId = state.snapshot.activeCastsByEventId
     state.snapshot.clientProxy = buildFrozenClientProxy(state.snapshot.eventState)
     state.scratch = {
         projectedHealingLedger = type(SpellEvaluator.CreateProjectedHealingLedger) == "function"
             and SpellEvaluator.CreateProjectedHealingLedger()
             or { reservedByEventId = {} },
         spellDefinitionByRef = {},
+        auraDefinitionCache = type(AuraEvaluator.CreatePlanCache) == "function"
+            and AuraEvaluator.CreatePlanCache()
+            or { definitionsByKey = {} },
+        auraSourceBucket = getEventAuraBucket(eventState.id),
+        auraKeys = {},
+        castKeys = {},
+        castSourceBucket = type(Client.ActiveSpellcastsByEventId) == "table"
+            and Client.ActiveSpellcastsByEventId[tostring(eventState.id or "")]
+            or nil,
         activationByKey = {},
         activationKeys = {},
         profileByKey = {},
@@ -1304,6 +1550,12 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
     }
     state.cursors = {
         unit = 1,
+        auraKeyScan = nil,
+        auraScanComplete = false,
+        auraCopyIndex = 1,
+        castKeyScan = nil,
+        castScanComplete = false,
+        castCopyIndex = 1,
         member = 1,
         spell = 1,
         intent = 1,
@@ -1344,6 +1596,10 @@ local function runPlannerStep(state, deadlineMs)
             if phaseSnapshotUnits(state, deadlineMs) == false then return false end
         elseif state.phase == "snapshot-positions" then
             if phaseSnapshotPositions(state, deadlineMs) == false then return false end
+        elseif state.phase == "snapshot-auras" then
+            if phaseSnapshotAuras(state, deadlineMs) == false then return false end
+        elseif state.phase == "snapshot-casts" then
+            if phaseSnapshotCasts(state, deadlineMs) == false then return false end
         elseif state.phase == "snapshot-spells" then
             if phaseSnapshotSpells(state, deadlineMs) == false then return false end
         elseif state.phase == "snapshot-movement" then
@@ -1412,7 +1668,7 @@ function Planner.CopyCompletedPlan(state)
         actorKeys = copyArray(source.actorKeys),
         npcEventIds = copyArray(source.npcEventIds),
         scheduleRevision = tostring(source.scheduleRevision or ""),
-        snapshot = source.snapshot,
+        snapshot = copyDeep(source.snapshot),
         movements = {},
         movement = nil,
         actions = {},
