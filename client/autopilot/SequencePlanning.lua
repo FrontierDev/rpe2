@@ -309,7 +309,7 @@ local function reserveCandidateHealing(ledger, candidate, context)
     if type(SpellEvaluator.ReserveProjectedHealing) ~= "function" then
         return
     end
-    local amount = normalizeNonNegative(candidate and candidate.immediateHealing)
+    local amount = normalizeNonNegative(candidate and candidate.healingUtility)
     if amount <= 0 then
         return
     end
