@@ -477,12 +477,15 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
     end
 
     local periodicDamage, periodicHealing, projectedAuraLedger = resolvePeriodicApplicationUtility(profile, targetUnit, options)
-    local usefulPeriodicDamage = periodicDamage
+    local usefulPeriodicDamage = periodicDamage <= 0 and periodicDamage or 0
     if periodicDamage > 0 and type(health) == "table" then
-        usefulPeriodicDamage = math.min(periodicDamage, math.max(0, health.currentValue))
+        usefulPeriodicDamage = math.min(
+            periodicDamage,
+            math.max(0, tonumber(health.projectedCurrentValue) or tonumber(health.currentValue) or 0)
+        )
     end
 
-    local usefulPeriodicHealing = periodicHealing
+    local usefulPeriodicHealing = periodicHealing <= 0 and periodicHealing or 0
     if periodicHealing > 0 and type(health) == "table" then
         local remainingMissingHealth = math.max(0, health.projectedMissingHealth - immediateEffectiveHealing)
         usefulPeriodicHealing = math.min(periodicHealing, remainingMissingHealth)
