@@ -19,6 +19,7 @@ local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Registry = Addon.Internal.Registry or {}
 local ResourceSync = Comms.ResourceSync or {}
 local Ruleset = Addon.Internal.Ruleset or {}
+Client.ActiveSpellcastRevisionByEventId = Client.ActiveSpellcastRevisionByEventId or {}
 Client.VisiblePlayerTooltipRefreshQueued = Client.VisiblePlayerTooltipRefreshQueued or false
 Client.VisualRefreshFlushQueued = Client.VisualRefreshFlushQueued or false
 Client.PendingEventWidgetRefreshTargetEventIds = Client.PendingEventWidgetRefreshTargetEventIds or {}
@@ -1045,13 +1046,44 @@ function Spellcasting.GetEventCastBucket(self, eventId, createIfMissing)
     return bucket
 end
 
+function Spellcasting.GetEventCastRevision(self, eventId)
+    local normalizedEventId = type(eventId) == "string" and eventId or ""
+    if normalizedEventId == "" then
+        return 0
+    end
+
+    local revisions = self.ActiveSpellcastRevisionByEventId
+    if type(revisions) ~= "table" then
+        return 0
+    end
+
+    return math.max(0, math.floor(tonumber(revisions[normalizedEventId]) or 0))
+end
+
+function Spellcasting.BumpEventCastRevision(self, eventId)
+    local normalizedEventId = type(eventId) == "string" and eventId or ""
+    if normalizedEventId == "" then
+        return 0
+    end
+
+    self.ActiveSpellcastRevisionByEventId = self.ActiveSpellcastRevisionByEventId or {}
+    local nextRevision = math.max(0, math.floor(tonumber(self.ActiveSpellcastRevisionByEventId[normalizedEventId]) or 0)) + 1
+    self.ActiveSpellcastRevisionByEventId[normalizedEventId] = nextRevision
+    return nextRevision
+end
+
 function Spellcasting.ClearEventCastBucket(self, eventId)
     local normalizedEventId = type(eventId) == "string" and eventId or ""
     if normalizedEventId == "" or type(self.ActiveSpellcastsByEventId) ~= "table" then
         return
     end
 
-    self.ActiveSpellcastsByEventId[normalizedEventId] = nil
+    if self.ActiveSpellcastsByEventId[normalizedEventId] ~= nil then
+        self.ActiveSpellcastsByEventId[normalizedEventId] = nil
+        if Spellcasting.BumpEventCastRevision then
+            Spellcasting.BumpEventCastRevision(self, normalizedEventId)
+        end
+    end
 end
 
 function Spellcasting.GetCastEntry(self, eventId, casterEventId)
@@ -1075,6 +1107,9 @@ function Spellcasting.SetCastEntry(self, eventId, casterEventId, value)
     end
 
     bucket[numericCasterEventId] = value
+    if Spellcasting.BumpEventCastRevision then
+        Spellcasting.BumpEventCastRevision(self, tostring(eventId or ""))
+    end
     return value
 end
 
@@ -1090,9 +1125,18 @@ function Spellcasting.RemoveCastEntry(self, eventId, casterEventId)
     end
 
     local previous = bucket[numericCasterEventId]
+    if previous == nil then
+        if next(bucket) == nil then
+            Spellcasting.ClearEventCastBucket(self, eventId)
+        end
+        return nil
+    end
+
     bucket[numericCasterEventId] = nil
     if next(bucket) == nil then
         Spellcasting.ClearEventCastBucket(self, eventId)
+    elseif Spellcasting.BumpEventCastRevision then
+        Spellcasting.BumpEventCastRevision(self, tostring(eventId or ""))
     end
 
     return previous

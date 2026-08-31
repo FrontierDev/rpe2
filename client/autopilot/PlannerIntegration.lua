@@ -276,11 +276,149 @@ local function getMovement()
     return RPE and RPE.Core and RPE.Core.Movement or nil
 end
 
+local function getEventAuraBucket(eventId)
+    local buckets = type(Client.ActiveAurasByEventId) == "table" and Client.ActiveAurasByEventId or nil
+    return type(buckets) == "table" and buckets[tostring(eventId or "")] or nil
+end
+
 local function getAuraRevision(eventId)
     local bucket = type(Client.ActiveAurasByEventId) == "table"
         and Client.ActiveAurasByEventId[tostring(eventId or "")]
         or nil
     return math.max(0, math.floor(tonumber(type(bucket) == "table" and bucket.revision or 0) or 0))
+end
+
+local MAX_SNAPSHOT_GENERATION_RETRIES = 3
+
+local function getAuraBucketRevision(bucket)
+    return math.max(0, math.floor(tonumber(type(bucket) == "table" and bucket.revision or 0) or 0))
+end
+
+local function getEventCastBucket(eventId)
+    local buckets = type(Client.ActiveSpellcastsByEventId) == "table" and Client.ActiveSpellcastsByEventId or nil
+    return type(buckets) == "table" and buckets[tostring(eventId or "")] or nil
+end
+
+local function getEventCastRevision(eventId, bucket)
+    local spellcasting = getSpellcasting()
+    if type(spellcasting) == "table" and type(spellcasting.GetEventCastRevision) == "function" then
+        return math.max(0, math.floor(tonumber(spellcasting.GetEventCastRevision(Client, tostring(eventId or ""))) or 0))
+    end
+    return math.max(0, math.floor(tonumber(type(bucket) == "table" and bucket.revision or 0) or 0))
+end
+
+local function clearArray(values)
+    if type(values) ~= "table" then
+        return
+    end
+    for index = #values, 1, -1 do
+        values[index] = nil
+    end
+end
+
+local function clearMap(values)
+    if type(values) ~= "table" then
+        return
+    end
+    for key in pairs(values) do
+        values[key] = nil
+    end
+end
+
+local function clearAuraSnapshot(state)
+    clearArray(state.snapshot.activeAuraRecords)
+    clearMap(state.snapshot.activeAurasByTargetEventId)
+    clearMap(state.snapshot.controlStateByTargetEventId)
+    clearArray(state.scratch.auraKeys)
+    state.cursors.auraKeyScan = nil
+    state.cursors.auraScanComplete = false
+    state.cursors.auraCopyIndex = 1
+end
+
+local function clearCastSnapshot(state)
+    clearArray(state.snapshot.activeCastSummaries)
+    clearMap(state.snapshot.activeCastsByEventId)
+    clearArray(state.scratch.castKeys)
+    state.cursors.castKeyScan = nil
+    state.cursors.castScanComplete = false
+    state.cursors.castCopyIndex = 1
+end
+
+local function captureAuraGeneration(state)
+    local bucket = getEventAuraBucket(state.eventId)
+    state.scratch.auraSourceBucket = bucket
+    state.scratch.auraSourceRevision = getAuraBucketRevision(bucket)
+    state.scratch.auraGenerationCaptured = true
+    state.snapshot.auraRevision = state.scratch.auraSourceRevision
+    clearAuraSnapshot(state)
+end
+
+local function auraGenerationIsCurrent(state)
+    local bucket = state.scratch.auraSourceBucket
+    return bucket == getEventAuraBucket(state.eventId)
+        and getAuraBucketRevision(bucket) == state.scratch.auraSourceRevision
+end
+
+local function restartAuraGeneration(state)
+    local retries = (tonumber(state.scratch.auraGenerationRetries) or 0) + 1
+    state.scratch.auraGenerationRetries = retries
+    if retries > MAX_SNAPSHOT_GENERATION_RETRIES then
+        clearAuraSnapshot(state)
+        state.failureReason = "aura-snapshot-stale"
+        state.phase = "finalize"
+        return false
+    end
+    captureAuraGeneration(state)
+    return false
+end
+
+local function ensureAuraGeneration(state)
+    if state.scratch.auraGenerationCaptured ~= true then
+        captureAuraGeneration(state)
+        return true
+    end
+    if not auraGenerationIsCurrent(state) then
+        return restartAuraGeneration(state)
+    end
+    return true
+end
+
+local function captureCastGeneration(state)
+    local bucket = getEventCastBucket(state.eventId)
+    state.scratch.castSourceBucket = bucket
+    state.scratch.castSourceRevision = getEventCastRevision(state.eventId, bucket)
+    state.scratch.castGenerationCaptured = true
+    clearCastSnapshot(state)
+end
+
+local function castGenerationIsCurrent(state)
+    local bucket = state.scratch.castSourceBucket
+    return bucket == getEventCastBucket(state.eventId)
+        and getEventCastRevision(state.eventId, bucket) == state.scratch.castSourceRevision
+end
+
+local function restartCastGeneration(state)
+    local retries = (tonumber(state.scratch.castGenerationRetries) or 0) + 1
+    state.scratch.castGenerationRetries = retries
+    if retries > MAX_SNAPSHOT_GENERATION_RETRIES then
+        clearCastSnapshot(state)
+        state.failureReason = "cast-snapshot-stale"
+        state.phase = "finalize"
+        return false
+    end
+    captureCastGeneration(state)
+    return false
+end
+
+local function ensureCastGeneration(state)
+    if state.scratch.castGenerationCaptured ~= true then
+        captureCastGeneration(state)
+        return true
+    end
+    if not castGenerationIsCurrent(state) then
+        return restartCastGeneration(state)
+    end
+    return true
 end
 
 local function getConfigurationRevision()
@@ -768,11 +906,6 @@ local function phaseSnapshotPositions(state, deadlineMs)
     return true
 end
 
-local function getEventAuraBucket(eventId)
-    local buckets = type(Client.ActiveAurasByEventId) == "table" and Client.ActiveAurasByEventId or nil
-    return type(buckets) == "table" and buckets[tostring(eventId or "")] or nil
-end
-
 local function appendFrozenAuraRecord(state, record)
     if type(record) ~= "table" or (tonumber(record.stacks) or 0) <= 0 then
         return
@@ -787,21 +920,63 @@ local function appendFrozenAuraRecord(state, record)
             state.snapshot.activeAurasByTargetEventId[targetEventId] = byTarget
         end
         byTarget[#byTarget + 1] = record
+
+        local controlState = state.snapshot.controlStateByTargetEventId[targetEventId]
+        if type(controlState) ~= "table" then
+            controlState = {
+                cancelOnDamage = false,
+                preventCasting = false,
+                movementRangeOverride = nil,
+                forceAutoHitAgainstTarget = false,
+            }
+            state.snapshot.controlStateByTargetEventId[targetEventId] = controlState
+        end
+        local control = record.control
+        if type(control) ~= "table" and type(record.profile) == "table" then
+            control = record.profile.control
+        end
+        if type(control) == "table" then
+            controlState.cancelOnDamage = controlState.cancelOnDamage or control.cancelOnDamage == true
+            controlState.preventCasting = controlState.preventCasting or control.preventCasting == true
+            controlState.forceAutoHitAgainstTarget = controlState.forceAutoHitAgainstTarget
+                or control.forceAutoHitAgainstTarget == true
+            if control.movementRangeOverride ~= nil then
+                local override = tonumber(control.movementRangeOverride)
+                if override ~= nil then
+                    controlState.movementRangeOverride = controlState.movementRangeOverride ~= nil
+                        and math.min(controlState.movementRangeOverride, override)
+                        or override
+                end
+            end
+        end
     end
 end
 
 local function phaseSnapshotAuras(state, deadlineMs)
+    if not ensureAuraGeneration(state) then
+        return false
+    end
+
     local bucket = state.scratch.auraSourceBucket
     if type(bucket) ~= "table" or type(bucket.byKey) ~= "table" then
+        if not auraGenerationIsCurrent(state) then
+            return restartAuraGeneration(state)
+        end
         state.phase = "snapshot-casts"
         return true
     end
 
     if state.cursors.auraScanComplete ~= true then
         while true do
+            if not auraGenerationIsCurrent(state) then
+                return restartAuraGeneration(state)
+            end
             local auraKey = next(bucket.byKey, state.cursors.auraKeyScan)
             state.cursors.auraKeyScan = auraKey
             if auraKey == nil then
+                if not auraGenerationIsCurrent(state) then
+                    return restartAuraGeneration(state)
+                end
                 table.sort(state.scratch.auraKeys, function(left, right)
                     return tostring(left) < tostring(right)
                 end)
@@ -818,6 +993,9 @@ local function phaseSnapshotAuras(state, deadlineMs)
 
     local auraEvaluator = getAuraEvaluator()
     while state.cursors.auraCopyIndex <= #state.scratch.auraKeys do
+        if not auraGenerationIsCurrent(state) then
+            return restartAuraGeneration(state)
+        end
         local auraKey = state.scratch.auraKeys[state.cursors.auraCopyIndex]
         local entry = bucket.byKey[auraKey]
 
@@ -837,14 +1015,11 @@ local function phaseSnapshotAuras(state, deadlineMs)
         end
     end
 
+    if not auraGenerationIsCurrent(state) then
+        return restartAuraGeneration(state)
+    end
     state.phase = "snapshot-casts"
     state.cursors.castKeyScan = nil
-    local controlBuilder = type(auraEvaluator) == "table" and auraEvaluator.BuildControlState or nil
-    if type(controlBuilder) == "function" then
-        for targetEventId, records in pairs(state.snapshot.activeAurasByTargetEventId) do
-            state.snapshot.controlStateByTargetEventId[targetEventId] = controlBuilder(records)
-        end
-    end
     return true
 end
 
@@ -889,8 +1064,15 @@ local function copyActiveCastSummary(entry, casterEventId, turnNumber)
 end
 
 local function phaseSnapshotCasts(state, deadlineMs)
+    if not ensureCastGeneration(state) then
+        return false
+    end
+
     local bucket = state.scratch.castSourceBucket
     if type(bucket) ~= "table" then
+        if not castGenerationIsCurrent(state) then
+            return restartCastGeneration(state)
+        end
         state.phase = "snapshot-spells"
         state.cursors.member = 1
         return true
@@ -898,9 +1080,15 @@ local function phaseSnapshotCasts(state, deadlineMs)
 
     if state.cursors.castScanComplete ~= true then
         while true do
+            if not castGenerationIsCurrent(state) then
+                return restartCastGeneration(state)
+            end
             local casterEventId = next(bucket, state.cursors.castKeyScan)
             state.cursors.castKeyScan = casterEventId
             if casterEventId == nil then
+                if not castGenerationIsCurrent(state) then
+                    return restartCastGeneration(state)
+                end
                 table.sort(state.scratch.castKeys, function(left, right)
                     return tonumber(left) and tonumber(right)
                         and tonumber(left) < tonumber(right)
@@ -918,6 +1106,9 @@ local function phaseSnapshotCasts(state, deadlineMs)
     end
 
     while state.cursors.castCopyIndex <= #state.scratch.castKeys do
+        if not castGenerationIsCurrent(state) then
+            return restartCastGeneration(state)
+        end
         local casterEventId = state.scratch.castKeys[state.cursors.castCopyIndex]
         local entry = bucket[casterEventId]
 
@@ -933,6 +1124,9 @@ local function phaseSnapshotCasts(state, deadlineMs)
         end
     end
 
+    if not castGenerationIsCurrent(state) then
+        return restartCastGeneration(state)
+    end
     state.phase = "snapshot-spells"
     state.cursors.member = 1
     return true
@@ -1532,12 +1726,16 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
         auraDefinitionCache = type(AuraEvaluator.CreatePlanCache) == "function"
             and AuraEvaluator.CreatePlanCache()
             or { definitionsByKey = {} },
-        auraSourceBucket = getEventAuraBucket(eventState.id),
+        auraSourceBucket = nil,
+        auraSourceRevision = nil,
+        auraGenerationCaptured = false,
+        auraGenerationRetries = 0,
         auraKeys = {},
         castKeys = {},
-        castSourceBucket = type(Client.ActiveSpellcastsByEventId) == "table"
-            and Client.ActiveSpellcastsByEventId[tostring(eventState.id or "")]
-            or nil,
+        castSourceBucket = nil,
+        castSourceRevision = nil,
+        castGenerationCaptured = false,
+        castGenerationRetries = 0,
         activationByKey = {},
         activationKeys = {},
         profileByKey = {},
