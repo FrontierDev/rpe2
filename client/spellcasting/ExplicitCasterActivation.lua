@@ -197,7 +197,11 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
     end
 
     local proxy = buildExplicitCasterProxy(self, eventState, casterUnit)
-    return baseBuildSpellActivationSnapshot(proxy, spellRef, resolvedOptions)
+    local snapshot = baseBuildSpellActivationSnapshot(proxy, spellRef, resolvedOptions)
+    if self ~= Client and type(snapshot) == "table" and snapshot.canCast ~= true then
+        return nil
+    end
+    return snapshot
 end
 
 return Spellcasting
