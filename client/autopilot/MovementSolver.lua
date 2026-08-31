@@ -11,7 +11,7 @@ local Event = Addon.Internal
     and Addon.Internal.Database.Classes.Event
     or nil
 local Spatial = Client.AutopilotSpatial or {}
-local SpellEvaluator = Client.AutopilotSpellEvaluator or {}
+local SequencePlanning = Client.AutopilotSequencePlanning or {}
 local Movement = RPE and RPE.Core and RPE.Core.Movement or nil
 
 Client.AutopilotMovementSolver = Client.AutopilotMovementSolver or {}
@@ -108,41 +108,6 @@ local function getCandidateTargetAt(candidate, index)
         return candidate.targetUnit or candidate.primaryTargetUnit
     end
     return nil
-end
-
-local function compareCandidates(left, right)
-    if type(left) ~= "table" then
-        return type(right) == "table" and -1 or 0
-    end
-    if type(right) ~= "table" then
-        return 1
-    end
-
-    if type(SpellEvaluator.CompareCandidates) == "function" then
-        local compared = tonumber(SpellEvaluator.CompareCandidates(left, right))
-        if compared and compared ~= 0 then
-            return compared > 0 and 1 or -1
-        end
-    end
-
-    local leftUtility = getCandidateUtility(left)
-    local rightUtility = getCandidateUtility(right)
-    if leftUtility ~= rightUtility then
-        return leftUtility > rightUtility and 1 or -1
-    end
-
-    local leftRef = tostring(left.spellRef or "")
-    local rightRef = tostring(right.spellRef or "")
-    if leftRef ~= rightRef then
-        return leftRef < rightRef and 1 or -1
-    end
-
-    local leftTarget = normalizeEventId(left.targetEventId)
-    local rightTarget = normalizeEventId(right.targetEventId)
-    if leftTarget ~= rightTarget then
-        return leftTarget < rightTarget and 1 or -1
-    end
-    return 0
 end
 
 local function copyPosition(position)
@@ -317,6 +282,14 @@ function Solver.CreateState(options)
     if type(options.members) ~= "table" then
         return nil, "cohort-members-unavailable"
     end
+    if type(SequencePlanning.CloneTacticalLedger) ~= "function"
+        or type(SequencePlanning.ReevaluateCandidate) ~= "function"
+        or type(SequencePlanning.BuildSequence) ~= "function"
+        or type(SequencePlanning.ReserveSequence) ~= "function"
+        or type(SequencePlanning.SummarizeSequence) ~= "function"
+    then
+        return nil, "sequence-planning-unavailable"
+    end
 
     local currentPosition = type(runtime.positionByActorKey) == "table"
         and runtime.positionByActorKey[actorKey]
@@ -335,6 +308,8 @@ function Solver.CreateState(options)
         actorKey = actorKey,
         raidMarker = raidMarker,
         members = options.members,
+        initialTacticalLedger = SequencePlanning.CloneTacticalLedger(options.initialTacticalLedger),
+        tacticalContext = type(options.tacticalContext) == "table" and options.tacticalContext or {},
         currentPosition = copyPosition(currentPosition),
         activeMembers = {},
         movementByMemberEventId = {},
@@ -361,7 +336,7 @@ function Solver.CreateState(options)
         evalCandidateIndex = 1,
         evalTargetIndex = 1,
         evalCandidateFeasible = true,
-        evalBestCandidate = nil,
+        evalCandidates = {},
         currentAnchorEvaluation = nil,
         bestAnchorEvaluation = nil,
         result = nil,
@@ -554,8 +529,13 @@ end
 
 local function finishCandidateEvaluation(state, candidate)
     if state.evalCandidateFeasible == true and isCandidateUseful(candidate) then
-        if type(state.evalBestCandidate) ~= "table" or compareCandidates(candidate, state.evalBestCandidate) > 0 then
-            state.evalBestCandidate = candidate
+        local reevaluated = SequencePlanning.ReevaluateCandidate(
+            candidate,
+            state.currentAnchorEvaluation.tacticalLedger,
+            state.tacticalContext
+        )
+        if type(reevaluated) == "table" and isCandidateUseful(reevaluated) then
+            state.evalCandidates[#state.evalCandidates + 1] = reevaluated
         end
     end
     state.evalCandidateIndex = state.evalCandidateIndex + 1
@@ -586,32 +566,42 @@ end
 local function beginAnchorEvaluation(state, anchor)
     state.currentAnchorEvaluation = {
         anchor = anchor,
-        selectedCandidates = {},
+        selectedSequences = {},
+        tacticalLedger = SequencePlanning.CloneTacticalLedger(state.initialTacticalLedger),
         aggregateUtility = 0,
         usefulCoverage = 0,
         urgentHealingCount = 0,
+        urgentInterruptCount = 0,
     }
     state.evalMemberIndex = 1
     state.evalCandidateIndex = 1
-    state.evalBestCandidate = nil
+    state.evalCandidates = {}
     resetCandidateEvaluation(state)
 end
 
 local function finishMemberEvaluation(state)
     local evaluation = state.currentAnchorEvaluation
-    local candidate = state.evalBestCandidate
-    evaluation.selectedCandidates[state.evalMemberIndex] = candidate
-    if type(candidate) == "table" then
-        evaluation.aggregateUtility = evaluation.aggregateUtility + getCandidateUtility(candidate)
+    local member = state.activeMembers[state.evalMemberIndex]
+    local unit = getMemberUnit(member)
+    local sequence = SequencePlanning.BuildSequence(state.evalCandidates, unit)
+    evaluation.selectedSequences[state.evalMemberIndex] = sequence
+
+    local summary = SequencePlanning.SummarizeSequence(sequence)
+    if summary.hasUsefulAction == true then
+        evaluation.aggregateUtility = evaluation.aggregateUtility + normalizeNonNegative(summary.sequenceUtility)
         evaluation.usefulCoverage = evaluation.usefulCoverage + 1
-        if candidate.urgentHealing == true then
-            evaluation.urgentHealingCount = evaluation.urgentHealingCount + 1
-        end
+        evaluation.urgentHealingCount = evaluation.urgentHealingCount + math.max(0, tonumber(summary.urgentHealingCount) or 0)
+        evaluation.urgentInterruptCount = evaluation.urgentInterruptCount + math.max(0, tonumber(summary.urgentInterruptCount) or 0)
+        evaluation.tacticalLedger = SequencePlanning.ReserveSequence(
+            evaluation.tacticalLedger,
+            sequence,
+            state.tacticalContext
+        )
     end
 
     state.evalMemberIndex = state.evalMemberIndex + 1
     state.evalCandidateIndex = 1
-    state.evalBestCandidate = nil
+    state.evalCandidates = {}
     resetCandidateEvaluation(state)
 end
 
@@ -805,34 +795,42 @@ local function buildFinalResult(state)
 
     local actions = {}
     local objectiveSeen = {}
-    for index = 1, #state.activeMembers do
-        local member = state.activeMembers[index]
+    for memberIndex = 1, #state.activeMembers do
+        local member = state.activeMembers[memberIndex]
         local unit = getMemberUnit(member)
-        local candidate = best.selectedCandidates[index]
-        if type(unit) == "table" and type(candidate) == "table" then
-            local targetEventIds = collectTargetEventIds(candidate)
-            local action = {
-                actionType = "spell",
-                casterEventId = normalizeEventId(unit.eventID),
-                spellRef = tostring(candidate.spellRef or ""),
-                targetEventId = targetEventIds[1] or normalizeEventId(candidate.targetEventId),
-                targetEventIds = targetEventIds,
-                totalUtility = getCandidateUtility(candidate),
-                urgentHealing = candidate.urgentHealing == true,
-                requiresMeleePosition = candidateRequiresMelee(candidate),
-                status = "pending",
-            }
-            if movement and action.requiresMeleePosition then
-                action.requiresMovementActionId = movement.actionId
-                for targetIndex = 1, #targetEventIds do
-                    local targetEventId = targetEventIds[targetIndex]
-                    if not objectiveSeen[targetEventId] then
-                        objectiveSeen[targetEventId] = true
-                        movement.objectiveTargetEventIds[#movement.objectiveTargetEventIds + 1] = targetEventId
+        local sequence = best.selectedSequences[memberIndex]
+        for sequenceIndex = 1, #(type(sequence) == "table" and sequence.actions or {}) do
+            local entry = sequence.actions[sequenceIndex]
+            local candidate = type(entry) == "table" and entry.candidate or nil
+            if type(unit) == "table" and type(candidate) == "table" then
+                local targetEventIds = collectTargetEventIds(candidate)
+                local action = {
+                    actionType = "spell",
+                    casterEventId = normalizeEventId(unit.eventID),
+                    spellRef = tostring(candidate.spellRef or ""),
+                    targetEventId = targetEventIds[1] or normalizeEventId(candidate.targetEventId),
+                    targetEventIds = targetEventIds,
+                    totalUtility = getCandidateUtility(candidate),
+                    urgentHealing = candidate.urgentHealing == true,
+                    urgentInterrupt = candidate.urgentInterrupt == true,
+                    actionEconomyClass = tostring(entry.actionClass or ""),
+                    casterSequenceIndex = sequenceIndex,
+                    casterSequenceCount = #(sequence.actions or {}),
+                    requiresMeleePosition = candidateRequiresMelee(candidate),
+                    status = "pending",
+                }
+                if movement and action.requiresMeleePosition then
+                    action.requiresMovementActionId = movement.actionId
+                    for targetIndex = 1, #targetEventIds do
+                        local targetEventId = targetEventIds[targetIndex]
+                        if not objectiveSeen[targetEventId] then
+                            objectiveSeen[targetEventId] = true
+                            movement.objectiveTargetEventIds[#movement.objectiveTargetEventIds + 1] = targetEventId
+                        end
                     end
                 end
+                actions[#actions + 1] = action
             end
-            actions[#actions + 1] = action
         end
     end
 
@@ -857,6 +855,9 @@ local function buildFinalResult(state)
         aggregateUtility = best.aggregateUtility,
         adjustedUtility = best.adjustedUtility,
         usefulCoverage = best.usefulCoverage,
+        urgentHealingCount = best.urgentHealingCount,
+        urgentInterruptCount = best.urgentInterruptCount,
+        tacticalLedger = SequencePlanning.CloneTacticalLedger(best.tacticalLedger),
         movement = movement,
         actions = actions,
         warnings = warnings,
@@ -935,6 +936,10 @@ function Solver.CopyResult(state)
             targetEventIds = targets,
             totalUtility = source.totalUtility,
             urgentHealing = source.urgentHealing == true,
+            urgentInterrupt = source.urgentInterrupt == true,
+            actionEconomyClass = source.actionEconomyClass,
+            casterSequenceIndex = source.casterSequenceIndex,
+            casterSequenceCount = source.casterSequenceCount,
             requiresMeleePosition = source.requiresMeleePosition == true,
             requiresMovementActionId = source.requiresMovementActionId,
             status = source.status,
@@ -988,6 +993,9 @@ function Solver.CopyResult(state)
         aggregateUtility = result.aggregateUtility,
         adjustedUtility = result.adjustedUtility,
         usefulCoverage = result.usefulCoverage,
+        urgentHealingCount = result.urgentHealingCount,
+        urgentInterruptCount = result.urgentInterruptCount,
+        tacticalLedger = SequencePlanning.CloneTacticalLedger(result.tacticalLedger),
         movement = copiedMovement,
         actions = copiedActions,
         warnings = copiedWarnings,
