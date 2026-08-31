@@ -36,6 +36,9 @@ local function normalizeIntent(value)
     if intent == "damage" or intent == "hostile" then
         return "hostile"
     end
+    if intent == "interrupt" then
+        return "interrupt"
+    end
     return nil
 end
 
@@ -135,6 +138,44 @@ local function buildHealingEntry(state, targetUnit)
     }
 end
 
+local function resolveInterruptRemainingTurns(activeCast)
+    if type(activeCast) ~= "table" then
+        return nil
+    end
+    local remaining = activeCast.turnsRemaining
+    if remaining == nil then
+        remaining = activeCast.remainingTurns
+    end
+    if remaining == nil then
+        remaining = activeCast.castRemainingTurns
+    end
+    if tonumber(remaining) == nil then
+        return nil
+    end
+    return math.max(0, math.floor(tonumber(remaining) or 0))
+end
+
+local function buildInterruptEntry(state, targetUnit)
+    if tostring(state.policy and state.policy.targetDisposition or "") ~= "enemy" then
+        return nil
+    end
+    local eventId = normalizeEventId(targetUnit and targetUnit.eventID)
+    local activeCast = eventId > 0
+        and type(state.activeCastsByEventId) == "table"
+        and state.activeCastsByEventId[eventId]
+        or nil
+    if type(activeCast) ~= "table" then
+        return nil
+    end
+    return {
+        unit = targetUnit,
+        eventId = eventId,
+        threat = getThreat(state.casterUnit, targetUnit),
+        activeCast = activeCast,
+        interruptRemainingTurns = resolveInterruptRemainingTurns(activeCast),
+    }
+end
+
 local function compareKnownDistance(leftDistance, rightDistance)
     local leftKnown = tonumber(leftDistance) ~= nil
     local rightKnown = tonumber(rightDistance) ~= nil
@@ -226,6 +267,27 @@ local function compareHealing(left, right)
     return 0
 end
 
+local function compareInterrupt(left, right)
+    local leftRemaining = tonumber(left and left.interruptRemainingTurns)
+    local rightRemaining = tonumber(right and right.interruptRemainingTurns)
+    if leftRemaining ~= nil and rightRemaining ~= nil and leftRemaining ~= rightRemaining then
+        return leftRemaining < rightRemaining and 1 or -1
+    end
+
+    local leftThreat = math.max(0, tonumber(left and left.threat) or 0)
+    local rightThreat = math.max(0, tonumber(right and right.threat) or 0)
+    if leftThreat ~= rightThreat then
+        return leftThreat > rightThreat and 1 or -1
+    end
+
+    local leftEventId = normalizeEventId(left and left.eventId)
+    local rightEventId = normalizeEventId(right and right.eventId)
+    if leftEventId ~= rightEventId then
+        return leftEventId < rightEventId and 1 or -1
+    end
+    return 0
+end
+
 local function isOptionalHealingTargetUseful(entry)
     local health = type(entry) == "table" and entry.health or nil
     if type(health) ~= "table" then
@@ -293,6 +355,9 @@ end
 local function compareForPhase(state, left, right)
     if state.kind == "healing" then
         return compareHealing(left, right)
+    end
+    if state.kind == "interrupt" then
+        return compareInterrupt(left, right)
     end
     if state.phase == "select-secondary" then
         return compareHostileSecondary(left, right)
@@ -362,6 +427,7 @@ function Selector.CreateState(activationSnapshot, options)
         casterUnit = activationSnapshot.casterUnit,
         spatialRuntime = options.spatialRuntime,
         projectedHealingLedger = options.projectedHealingLedger,
+        activeCastsByEventId = options.activeCastsByEventId,
         kind = kind,
         targetGroupKey = groupKey,
         policy = policy,
@@ -396,10 +462,15 @@ function Selector.Step(state, deadlineMs)
         if state.phase == "scan" then
             while state.candidateIndex <= #(state.candidates or {}) do
                 local targetUnit = state.candidates[state.candidateIndex]
-                local entry = state.kind == "healing"
-                    and buildHealingEntry(state, targetUnit)
-                    or buildHostileEntry(state, targetUnit)
-                if entry.eventId > 0 then
+                local entry = nil
+                if state.kind == "healing" then
+                    entry = buildHealingEntry(state, targetUnit)
+                elseif state.kind == "interrupt" then
+                    entry = buildInterruptEntry(state, targetUnit)
+                else
+                    entry = buildHostileEntry(state, targetUnit)
+                end
+                if type(entry) == "table" and entry.eventId > 0 then
                     state.entries[#state.entries + 1] = entry
                 end
                 state.candidateIndex = state.candidateIndex + 1
