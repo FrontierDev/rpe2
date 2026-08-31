@@ -1,130 +1,165 @@
-## Validation result: **FAIL — keep #141 open**
+## Goal
 
-Validated against current `dev` at `6e4a16ac8e6e74816bae435dfa73d589ebf69ae5` (`Issue #141`), with parent `c66602bf8f3157048b0970b97476320860bc1852`.
+Create the read-only planning foundation required for periodic, control, and interrupt evaluation without changing current tactical selection behavior yet.
 
-The implementation is otherwise well-scoped: the commit changes only `RPEngine_Dev.toc`, adds `client/autopilot/AuraEvaluator.lua`, and modifies `PlannerIntegration.lua` / `SpellEvaluator.lua`. Canonical Aura definition resolution is reused, both `apply_aura` and damage/heal `applyAura` spell patterns are recognized, the Aura profile exposes the requested stacking/control/event metadata, active-cast summaries expose the useful cast timing/target state, and the existing direct damage/heal utility comparator is not changed.
+**Source design:** `.docs/RPE2-NPC-Autopilot-Advanced-Spell-Utility-Action-Economy-PDD.md`  
+**Implementation plan:** `.docs/RPE2-NPC-Autopilot-Advanced-Spell-Utility-Action-Economy-Implementation-Plan.md`  
+**Depends on:** current Autopilot implementation only.
 
-However, there are two blocking validation defects.
+## Implementation-agent rules
 
----
+This task is sized for **5.6-Luna-ExtraHigh**.
 
-### 1. The new Aura/cast planning snapshot is not actually frozen across planner slices
+Before editing:
 
-`Planner.CreateState()` currently stores direct references to the live mutable runtime buckets:
+1. work from the current `dev` branch;
+2. read the current version of every affected file;
+3. trace the exact current callers/callees being modified;
+4. do not assume the PDD source snapshot is still current;
+5. implement **only this issue**;
+6. do not pre-implement #142–#148;
+7. search every changed API/helper for all call sites;
+8. exercise pure logic with deterministic Lua fixtures/mocks where possible;
+9. review the final diff for accidental architectural expansion;
+10. close this issue only after its acceptance criteria are validated, then stop.
 
-```lua
-state.scratch.auraSourceBucket = getEventAuraBucket(eventState.id)
-state.scratch.castSourceBucket = Client.ActiveSpellcastsByEventId[tostring(eventState.id or "")]
-```
+Preserve manual mode, host-only planning, canonical spell/aura semantics, sliceability, and the same-marker no-split invariant.
 
-`phaseSnapshotAuras()` then traverses the live Aura table with a resumable cursor:
+## Primary current files to inspect
 
-```lua
-local auraKey = next(bucket.byKey, state.cursors.auraKeyScan)
-```
+- `client/autopilot/PlannerIntegration.lua`
+- `client/autopilot/SpellEvaluator.lua`
+- `client/spellcasting/AuraManager.lua`
+- `core/classes/Aura.lua`
+- `core/classes/Spell.lua`
+- `RPEngine_Dev.toc`
 
-and only later copies each live entry:
+Expected new module if current source supports it:
 
-```lua
-local entry = bucket.byKey[auraKey]
-local copied = auraEvaluator.CopyAuraEntry(entry, ...)
-```
+- `client/autopilot/AuraEvaluator.lua`
 
-`phaseSnapshotCasts()` does the same thing for the live cast bucket:
+Do not force this exact file split if the current load/dependency graph demonstrates a narrower existing home, but do not fold the work into generic AuraManager mutation paths merely for convenience.
 
-```lua
-local casterEventId = next(bucket, state.cursors.castKeyScan)
-...
-local entry = bucket[casterEventId]
-local summary = copyActiveCastSummary(entry, ...)
-```
+## Required changes
 
-Both phases explicitly yield/resume through `Tasks:ShouldYield()`.
+### 1. Freeze relevant aura state for the planning snapshot
 
-Those source tables are not immutable. `AuraManager` adds/removes/mutates `bucket.byKey` entries in place and bumps `bucket.revision`; spellcasting advances `turnsElapsed`/`lastAdvancedTurnNumber` and removes completed cast entries in place.
+Extend planner snapshot/scratch state so later utility evaluation can inspect immutable aura information relevant to candidate targets.
 
-Therefore, if live Aura/cast state changes after the planner starts but before the corresponding entry has been copied:
-
-- different records in one supposed frozen snapshot can represent different live moments;
-- a changed Aura/cast can be silently copied with post-start state;
-- an entry removed before its copy can silently disappear;
-- a newly added entry can be partially included depending on traversal timing;
-- importantly, resuming `next(liveTable, previousKey)` after `previousKey` has been removed can produce Lua's `invalid key to 'next'` failure.
-
-The final `buildSnapshotResult()` deep copy does **not** fix this, because by then the inconsistent live traversal has already happened.
-
-There is also no current validation guard mitigating this: `phaseRevalidate()` / `Planner.IsFrozenSnapshotStale()` do not validate the Aura/cast source generation before publication.
-
-This directly fails #141's requirement that the planner expose a **frozen, immutable** Aura/cast planning context and that later live state changes not alter the snapshot being built.
-
-#### Required fix
-
-Do not traverse a live mutable Aura/cast table across yields without a mutation generation guard.
-
-Use a narrow snapshot-generation design, preferably:
-
-1. **Aura source:** capture the existing Aura bucket `revision` when Aura snapshotting begins.
-2. Copy Aura records sliceably as today, but before every resume / before calling `next()` with a saved cursor, verify that the live bucket and revision still match the captured generation.
-3. Verify the revision again after the last record is copied. If it changed, discard/reset the partial Aura snapshot and rebuild from one current generation (or fail this planner snapshot as stale through the existing lifecycle). Never publish a mixed-generation result.
-4. **Cast source:** add/reuse an equivalent small per-event spellcast generation/revision which is bumped whenever the active-cast bucket is added to, removed from, or advanced. Use the same before/resume/after guard for `snapshot-casts`.
-   - If current source offers an existing generic spellcast revision after re-inspection, reuse it instead of adding another one.
-   - Do not attach any Autopilot plan/action metadata to persistent casts.
-5. Ensure a source-generation mismatch is detected **before** resuming `next(table, previousKey)` so a removed traversal key cannot trigger an invalid-key error.
-6. Keep definition/profile resolution sliceable and cached; do not solve this by synchronously deep-copying the entire AuraManager/cast runtime at `CreateState()`.
-
-An equivalent stable-source representation is acceptable if current source supports it more cleanly, but the invariant must be:
+At minimum retain enough information to derive:
 
 ```text
-one planner Aura/cast snapshot
-= one coherent source generation
+aura identity/ref
+dataset context where required
+aura caster event ID
+aura target event ID
+current stacks
+remaining duration/turns
+stack behavior
+max stacks
+resolved definition/ref
+current target control state where relevant
 ```
 
-not a traversal of live state over multiple frames.
+Do not blindly clone the entire live AuraManager runtime if a narrower immutable representation is sufficient.
 
----
+The snapshot must not mutate when live aura state changes later during planning.
 
-### 2. Final frozen-control aggregation is an unyieldable second full Aura pass
+### 2. Freeze active spellcast summary for later interrupt evaluation
 
-After the per-Aura copy loop, `phaseSnapshotAuras()` currently performs:
+Capture the current active-cast information needed to answer whether a potential target is casting and, where the canonical runtime exposes it, remaining/urgency information.
+
+Do **not** add Autopilot plan/action identity to persistent casts.
+
+### 3. Add per-plan Aura definition resolution/cache
+
+Provide a read-only resolver/cache that maps spell-applied `auraRef` values through the same registry/dataset semantics used by normal spell/aura execution.
+
+Support both existing spell patterns:
+
+```text
+component.effect.type = apply_aura
+```
+
+and:
+
+```text
+damage/heal component with applyAura = true and auraRef = ...
+```
+
+Repeated resolution of the same Aura definition inside one plan should use the planning cache rather than repeatedly walking registry/dataset state.
+
+### 4. Add a normalized Aura planning profile
+
+Expose a deterministic, side-effect-free API conceptually equivalent to:
 
 ```lua
-for targetEventId, records in pairs(state.snapshot.activeAurasByTargetEventId) do
-    state.snapshot.controlStateByTargetEventId[targetEventId] = controlBuilder(records)
-end
+AuraEvaluator.BuildAuraProfile(...)
 ```
 
-`AuraEvaluator.BuildControlState(records)` then loops every Aura record for that target.
+The exact name may follow current conventions.
 
-This work has no cursor / `Tasks:ShouldYield(deadlineMs)` boundary. Consequently, after already slice-copying the active Aura set, one planner slice can perform another O(active Auras) aggregation pass in a single uninterrupted call.
+The normalized profile should make later issues able to inspect:
 
-That conflicts with #141's explicit requirement that scans over active Aura state which can grow with event size remain bounded/cached or integrated into the resumable planner.
+- direct Aura damage/heal effects present;
+- control effects present;
+- triggered-event descriptors;
+- duration;
+- stack behavior;
+- max stacks;
+- any other existing immutable information needed by #142/#143.
 
-#### Required fix
+This issue does **not** assign tactical utility values yet.
 
-Prefer eliminating the second pass entirely:
+### 5. Preserve sliceability/load order
 
-- incrementally merge each copied Aura record's control state into `state.snapshot.controlStateByTargetEventId[targetEventId]` as `appendFrozenAuraRecord()` runs; or
-- add explicit target/record cursors and yield boundaries for the aggregation phase.
+Inspect the current TOC and module dependencies before adding the new module.
 
-The incremental merge is narrower and naturally preserves the same canonical semantics: boolean controls OR together and `movementRangeOverride` takes the minimum value.
+Current source loads `SpellEvaluator.lua` before `AuraManager.lua`, while `PlannerIntegration.lua` loads later. Do not create a load-time dependency on an API that does not yet exist at that point.
 
----
+Any scan over active auras or Aura event definitions which can grow with event/dataset size must be bounded/cached or integrated into the existing resumable planner.
 
-## Required deterministic regression coverage
+## Explicitly out of scope
 
-Before closing #141, add/run deterministic mocks for at least:
+Do not implement in this issue:
 
-1. Aura snapshot yields after one entry; that entry is then mutated before resume -> the final snapshot must not silently mix generations.
-2. Aura snapshot yields; the last traversal key is removed before resume -> no `invalid key to 'next'` and no mixed snapshot.
-3. Aura snapshot yields; a new Aura is added before resume -> result is either entirely the old generation or an explicitly rebuilt/new generation, never partial inclusion.
-4. Cast snapshot yields; `turnsElapsed` changes before resume -> no mixed cast generation.
-5. Cast snapshot yields; the previously visited cast is removed before resume -> safe deterministic handling.
-6. Unchanged Aura/cast state across multiple forced yields -> snapshot output is deterministic and equivalent to a one-slice run.
-7. Large active-Aura/control sets -> aggregation yields/remains bounded rather than performing one full second pass.
-8. Existing direct damage/heal Autopilot choices remain unchanged.
-9. Planner-side Aura profile/snapshot calls still mutate no canonical Aura/cast/resource/cooldown/combat state.
-10. Manual spell/Aura behavior remains unchanged.
+- periodic future-value math;
+- DoT/HoT scoring;
+- aura refresh/stack tactical value;
+- projected aura reservations;
+- control score coefficients;
+- interrupt prioritization;
+- multiple actions per NPC;
+- action-economy ledgers;
+- authorization/execution changes;
+- DM Helper UI changes;
+- new Spell/Aura AI metadata.
 
-## Status
+## Deterministic regression coverage
 
-The new AuraEvaluator/profile/cache work itself is structurally suitable for the next issues, but #141 must remain open until the snapshot source is generation-stable and the remaining unyieldable Aura aggregation is removed/bounded.
+Validate at minimum:
+
+1. A pure `apply_aura` spell resolves its canonical Aura definition.
+2. A damage/heal component using `applyAura = true` resolves through the same canonical path.
+3. Frozen active-aura records preserve caster/target/stacks/duration identity.
+4. `refresh_duration` and `independent_duration` remain distinguishable.
+5. `maxStacks` is available to later planning.
+6. Control flags are readable without mutating live AuraManager control state.
+7. Current active-cast state can be frozen/read without changing the cast entry.
+8. Repeated Aura refs use the per-plan definition cache.
+9. A planner-side Aura profile call never applies, removes, advances, or rolls an Aura effect.
+10. Existing direct-damage/direct-heal Autopilot selection remains unchanged by this foundation-only issue.
+11. Manual spell/aura behavior remains unchanged.
+
+## Acceptance criteria
+
+- [ ] Advanced planning can inspect a frozen, immutable subset of relevant active Aura state.
+- [ ] Advanced planning can inspect current active-cast summaries without taking ownership of casts.
+- [ ] Applied Aura definitions are resolved through canonical registry/dataset semantics.
+- [ ] Both pure `apply_aura` and damage/heal `applyAura` spell patterns are supported.
+- [ ] A per-plan Aura-definition cache prevents repeated equivalent resolution work.
+- [ ] The normalized Aura profile exposes effect/event/control/stacking metadata but performs no tactical scoring.
+- [ ] No planning call mutates canonical Aura, cast, resource, cooldown, or combat state.
+- [ ] Current direct-only Autopilot decisions remain behaviorally unchanged.
+- [ ] New work remains bounded/sliceable and does not increase the global TaskQueue budget.
+- [ ] Manual mode and normal Aura behavior remain unchanged.
