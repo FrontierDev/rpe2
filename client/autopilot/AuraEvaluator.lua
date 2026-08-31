@@ -431,7 +431,10 @@ function Evaluator.CopyAuraEntry(entry, context, cache)
         maxStacks = normalizePositiveInteger(entry.maxStacks, 1),
         lastAdvancedOwnerTurnNumber = tonumber(entry.lastAdvancedOwnerTurnNumber),
         lastAdvancedTurnNumber = tonumber(entry.lastAdvancedTurnNumber),
-        pendingAdvancedOwnerTurnNumber = tonumber(entry.pendingAdvancedOwnerTurnNumber),
+        -- AuraManager mutates pendingAdvancedOwnerTurnNumber as queue/scheduling
+        -- bookkeeping without bumping the Aura revision. It is not tactical Aura
+        -- state, so excluding it keeps one frozen planner record tied to one
+        -- revision-covered source generation.
         stackTurns = copyValue(entry.stackTurns),
     }
 
