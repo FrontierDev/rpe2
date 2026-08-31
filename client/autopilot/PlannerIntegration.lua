@@ -582,6 +582,17 @@ local function buildSpellAction(state, actorKey, unit, candidate, movementAction
         targetEventId = targetEventIds[1],
         totalUtility = tonumber(candidate.totalUtility) or 0,
         urgentHealing = candidate.urgentHealing == true,
+        hasControl = candidate.hasControl == true,
+        movementControlUtility = tonumber(candidate.movementControlUtility) or 0,
+        castingPreventionUtility = tonumber(candidate.castingPreventionUtility) or 0,
+        controlUtility = tonumber(candidate.controlUtility) or 0,
+        hasInterrupt = candidate.hasInterrupt == true,
+        hasUsefulInterrupt = candidate.hasUsefulInterrupt == true,
+        urgentInterrupt = candidate.urgentInterrupt == true,
+        interruptTargetEventId = normalizeEventId(candidate.interruptTargetEventId),
+        interruptRemainingTurns = candidate.interruptRemainingTurns ~= nil
+            and math.max(0, math.floor(tonumber(candidate.interruptRemainingTurns) or 0))
+            or nil,
         requiresMeleePosition = candidateRequiresMelee(candidate),
         status = "ready",
     }
@@ -1215,6 +1226,8 @@ local function phaseActivation(state, deadlineMs)
                     and SpellEvaluator.BuildSpellProfile(activation, {
                         auraDefinitionCache = state.scratch.auraDefinitionCache,
                         activeAurasByTargetEventId = state.snapshot.activeAurasByTargetEventId,
+                        controlStateByTargetEventId = state.snapshot.controlStateByTargetEventId,
+                        activeCastsByEventId = state.snapshot.activeCastsByEventId,
                     })
                     or nil
                 state.scratch.profileByKey[cacheKey] = profile or false
@@ -1251,6 +1264,8 @@ local function buildCandidateFromSelection(state, activation, profile, selection
             targetGroupKey = selection.targetGroupKey,
             hasDamage = profile.hasDamage,
             hasHeal = profile.hasHeal,
+            hasControl = profile.hasControl == true,
+            hasInterrupt = profile.hasInterrupt == true,
             auraApplications = profile.auraApplications,
             appliedAuras = profile.appliedAuras,
             hasAuraApplication = profile.hasAuraApplication == true,
@@ -1260,8 +1275,15 @@ local function buildCandidateFromSelection(state, activation, profile, selection
             expectedHealing = profile.expectedHealing,
             damageUtility = utility,
             healingUtility = 0,
+            movementControlUtility = 0,
+            castingPreventionUtility = 0,
+            controlUtility = 0,
             totalUtility = utility,
             urgentHealing = false,
+            hasUsefulInterrupt = false,
+            urgentInterrupt = false,
+            interruptTargetEventId = 0,
+            interruptRemainingTurns = nil,
             resourceBurden = profile.resourceBurden,
             cooldownCommitment = profile.cooldownCommitment,
             chargeCommitment = profile.chargeCommitment,
@@ -1271,21 +1293,42 @@ local function buildCandidateFromSelection(state, activation, profile, selection
 
     local damageUtility = 0
     local healingUtility = 0
+    local movementControlUtility = 0
+    local castingPreventionUtility = 0
+    local controlUtility = 0
     local urgentHealing = false
+    local hasUsefulInterrupt = false
+    local urgentInterrupt = false
+    local interruptTargetEventId = 0
+    local interruptRemainingTurns = nil
     local targetEventIds = {}
+    local isHostileTarget = type(selection.policy) == "table"
+        and tostring(selection.policy.targetDisposition or "") == "enemy"
     for index = 1, #targets do
         local target = targets[index]
         local evaluated = type(SpellEvaluator.EvaluateCandidate) == "function"
             and SpellEvaluator.EvaluateCandidate(activation, target, {
                 projectedHealingLedger = state.scratch.projectedHealingLedger,
                 auraDefinitionCache = state.scratch.auraDefinitionCache,
+                controlStateByTargetEventId = state.snapshot.controlStateByTargetEventId,
+                activeCastsByEventId = state.snapshot.activeCastsByEventId,
+                isHostileTarget = isHostileTarget,
                 profile = profile,
             })
             or nil
         if type(evaluated) == "table" then
             damageUtility = damageUtility + (tonumber(evaluated.damageUtility) or 0)
             healingUtility = healingUtility + (tonumber(evaluated.healingUtility) or 0)
+            movementControlUtility = movementControlUtility + (tonumber(evaluated.movementControlUtility) or 0)
+            castingPreventionUtility = castingPreventionUtility + (tonumber(evaluated.castingPreventionUtility) or 0)
+            controlUtility = controlUtility + (tonumber(evaluated.controlUtility) or 0)
             urgentHealing = urgentHealing or evaluated.urgentHealing == true
+            if evaluated.hasUsefulInterrupt == true and hasUsefulInterrupt ~= true then
+                hasUsefulInterrupt = true
+                interruptTargetEventId = normalizeEventId(evaluated.interruptTargetEventId)
+                interruptRemainingTurns = evaluated.interruptRemainingTurns
+            end
+            urgentInterrupt = urgentInterrupt or evaluated.urgentInterrupt == true
             local targetId = normalizeEventId(target and target.eventID)
             if targetId > 0 then
                 state.scratch.healthByEventId[targetId] = evaluated.targetHealth or state.scratch.healthByEventId[targetId]
@@ -1294,8 +1337,8 @@ local function buildCandidateFromSelection(state, activation, profile, selection
         targetEventIds[index] = normalizeEventId(target and target.eventID)
     end
 
-    local totalUtility = damageUtility + healingUtility
-    if totalUtility <= 0 and urgentHealing ~= true then
+    local totalUtility = damageUtility + healingUtility + controlUtility
+    if totalUtility <= 0 and urgentHealing ~= true and urgentInterrupt ~= true then
         return nil
     end
 
@@ -1310,6 +1353,8 @@ local function buildCandidateFromSelection(state, activation, profile, selection
         targetGroupKey = selection.targetGroupKey,
         hasDamage = profile.hasDamage,
         hasHeal = profile.hasHeal,
+        hasControl = profile.hasControl == true,
+        hasInterrupt = profile.hasInterrupt == true,
         auraApplications = profile.auraApplications,
         appliedAuras = profile.appliedAuras,
         hasAuraApplication = profile.hasAuraApplication == true,
@@ -1319,8 +1364,15 @@ local function buildCandidateFromSelection(state, activation, profile, selection
         expectedHealing = profile.expectedHealing,
         damageUtility = damageUtility,
         healingUtility = healingUtility,
+        movementControlUtility = movementControlUtility,
+        castingPreventionUtility = castingPreventionUtility,
+        controlUtility = controlUtility,
         totalUtility = totalUtility,
         urgentHealing = urgentHealing,
+        hasUsefulInterrupt = hasUsefulInterrupt,
+        urgentInterrupt = urgentInterrupt,
+        interruptTargetEventId = interruptTargetEventId,
+        interruptRemainingTurns = interruptRemainingTurns,
         resourceBurden = profile.resourceBurden,
         cooldownCommitment = profile.cooldownCommitment,
         chargeCommitment = profile.chargeCommitment,
@@ -1333,8 +1385,11 @@ local function getIntentList(profile)
     if type(profile) == "table" and profile.hasHeal == true then
         intents[#intents + 1] = "healing"
     end
-    if type(profile) == "table" and profile.hasDamage == true then
+    if type(profile) == "table" and (profile.hasDamage == true or profile.hasControl == true) then
         intents[#intents + 1] = "hostile"
+    end
+    if type(profile) == "table" and profile.hasInterrupt == true then
+        intents[#intents + 1] = "interrupt"
     end
     return intents
 end
@@ -1372,6 +1427,7 @@ local function phaseTargets(state, deadlineMs)
                                 intent = intent,
                                 spatialRuntime = state.snapshot.spatialRuntime,
                                 projectedHealingLedger = state.scratch.projectedHealingLedger,
+                                activeCastsByEventId = state.snapshot.activeCastsByEventId,
                             }))
                             or nil
                         state.scratch.targetSelectionByKey[selectionKey] = selectionState or false
@@ -1388,12 +1444,15 @@ local function phaseTargets(state, deadlineMs)
                             and TargetSelector.CopyResult(selectionState)
                             or nil
                         state.scratch.targetOrderByKey[selectionKey] = selection
+                        local candidateIntent = intent == "hostile" and "damage"
+                            or intent == "interrupt" and "interrupt"
+                            or "heal"
                         local candidate = buildCandidateFromSelection(
                             state,
                             activation,
                             profile,
                             selection,
-                            intent == "hostile" and "damage" or "heal"
+                            candidateIntent
                         )
                         if type(candidate) == "table" then
                             local bucket = state.scratch.actionCandidatesByEventId[eventId]
