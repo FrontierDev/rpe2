@@ -69,7 +69,7 @@ end
 
 local function isCandidateUseful(candidate)
     return type(candidate) == "table"
-        and (candidate.urgentHealing == true or getCandidateUtility(candidate) > 0)
+        and (candidate.urgentHealing == true or candidate.urgentInterrupt == true or getCandidateUtility(candidate) > 0)
 end
 
 local function candidateRequiresMelee(candidate)
