@@ -120,6 +120,7 @@ server/server_EventAutopilotSchedule.lua
 client/autopilot/Spatial.lua
 client/autopilot/SpellEvaluator.lua
 client/autopilot/ActionEconomy.lua
+client/autopilot/SequencePlanning.lua
 client/autopilot/TargetSelector.lua
 client/autopilot/Planner.lua
 client/client_Autopilot.lua
