@@ -1302,6 +1302,7 @@ local function buildCandidateFromSelection(state, activation, profile, selection
     local interruptTargetEventId = 0
     local interruptRemainingTurns = nil
     local targetEventIds = {}
+    local evaluateInterrupt = intent == "interrupt"
     local isHostileTarget = type(selection.policy) == "table"
         and tostring(selection.policy.targetDisposition or "") == "enemy"
     for index = 1, #targets do
@@ -1323,12 +1324,12 @@ local function buildCandidateFromSelection(state, activation, profile, selection
             castingPreventionUtility = castingPreventionUtility + (tonumber(evaluated.castingPreventionUtility) or 0)
             controlUtility = controlUtility + (tonumber(evaluated.controlUtility) or 0)
             urgentHealing = urgentHealing or evaluated.urgentHealing == true
-            if evaluated.hasUsefulInterrupt == true and hasUsefulInterrupt ~= true then
+            if evaluateInterrupt and evaluated.hasUsefulInterrupt == true and hasUsefulInterrupt ~= true then
                 hasUsefulInterrupt = true
                 interruptTargetEventId = normalizeEventId(evaluated.interruptTargetEventId)
                 interruptRemainingTurns = evaluated.interruptRemainingTurns
             end
-            urgentInterrupt = urgentInterrupt or evaluated.urgentInterrupt == true
+            urgentInterrupt = urgentInterrupt or (evaluateInterrupt and evaluated.urgentInterrupt == true)
             local targetId = normalizeEventId(target and target.eventID)
             if targetId > 0 then
                 state.scratch.healthByEventId[targetId] = evaluated.targetHealth or state.scratch.healthByEventId[targetId]
