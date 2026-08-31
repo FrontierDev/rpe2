@@ -689,7 +689,9 @@ function Evaluator.ClassifyDeterministicFutureOccurrences(state)
     local profile = type(state.profile) == "table" and state.profile
         or Evaluator.BuildAuraProfile(state, { datasetId = state.datasetId })
     local occurrences = {}
-    if type(profile) == "table" then
+    if type(profile) == "table"
+        and (profile.hasPeriodicDamage == true or profile.hasPeriodicHealing == true)
+    then
         local count = getOccurrenceCount(state)
         for occurrenceIndex = 1, count do
             local activeStacks = getActiveStackCountAtOccurrence(state, occurrenceIndex)
