@@ -1200,68 +1200,10 @@ local function validateLiveSpatialSnapshot(state)
 end
 
 local function phaseRevalidate(state, deadlineMs)
-    if getConfigurationRevision() ~= tonumber(state.snapshot.configurationRevision or 0)
-        or getAuraRevision(state.eventId) ~= tonumber(state.snapshot.auraRevision or 0)
-        or not validateLiveSpatialSnapshot(state)
-    then
-        return invalidateFrozenPlan(state, "snapshot-stale")
-    end
-
-    local frozenUnits = state.snapshot.eventState.units or {}
-    while state.cursors.revalidateUnit <= #frozenUnits do
-        local frozenUnit = frozenUnits[state.cursors.revalidateUnit]
-        local liveUnit = findUnitByEventId(state.sourceEventState and state.sourceEventState.units, frozenUnit and frozenUnit.eventID)
-        if type(liveUnit) ~= "table"
-            or buildUnitFrozenSignature(liveUnit) ~= tostring(frozenUnit.__autopilotFrozenSignature or "")
-        then
-            return invalidateFrozenPlan(state, "snapshot-stale")
-        end
-        state.cursors.revalidateUnit = state.cursors.revalidateUnit + 1
-        if shouldYield(deadlineMs) then
-            return false
-        end
-    end
-
-    local Movement = getMovement()
-    while state.cursors.revalidateMember <= #state.snapshot.actorMembers do
-        local entry = state.snapshot.actorMembers[state.cursors.revalidateMember]
-        local frozenUnit = entry.unit
-        local liveUnit = findUnitByEventId(state.sourceEventState and state.sourceEventState.units, frozenUnit and frozenUnit.eventID)
-        local frozenMovement = state.snapshot.movementByEventId[normalizeEventId(frozenUnit and frozenUnit.eventID)]
-        local allowance, details = nil, nil
-        if type(Movement) == "table" and type(Movement.ResolveEventUnitMovementAllowance) == "function" then
-            allowance, details = Movement:ResolveEventUnitMovementAllowance(state.sourceEventState, liveUnit)
-        end
-        local currentOverride = type(details) == "table" and tonumber(details.movementRangeOverride) or nil
-        local frozenOverride = type(frozenMovement) == "table" and tonumber(frozenMovement.movementRangeOverride) or nil
-        if math.max(0, tonumber(allowance) or 0) ~= math.max(0, tonumber(frozenMovement and frozenMovement.effectiveValue) or 0)
-            or currentOverride ~= frozenOverride
-        then
-            return invalidateFrozenPlan(state, "snapshot-stale")
-        end
-        state.cursors.revalidateMember = state.cursors.revalidateMember + 1
-        if shouldYield(deadlineMs) then
-            return false
-        end
-    end
-
-    local Spellcasting = getSpellcasting()
-    local activationKeys = state.scratch.activationKeys or {}
-    while state.cursors.revalidateActivation <= #activationKeys do
-        local activation = state.scratch.activationByKey[activationKeys[state.cursors.revalidateActivation]]
-        if type(activation) == "table"
-            and type(Spellcasting) == "table"
-            and type(Spellcasting.IsSpellActivationSnapshotValid) == "function"
-            and Spellcasting.IsSpellActivationSnapshotValid(Client, activation) ~= true
-        then
-            return invalidateFrozenPlan(state, "snapshot-stale")
-        end
-        state.cursors.revalidateActivation = state.cursors.revalidateActivation + 1
-        if shouldYield(deadlineMs) then
-            return false
-        end
-    end
-
+    -- A plan is a snapshot of one turn step. Spell completions and combat
+    -- reactions can legitimately alter resources, auras, and health while it
+    -- is being calculated; those changes must not cancel the step's plan.
+    -- Step changes are still rejected by Client:IsAutopilotPlanStateStale.
     state.phase = "finalize"
     return true
 end
@@ -1528,11 +1470,7 @@ function Planner.ReleaseScratch(state)
 end
 
 function Planner.IsFrozenSnapshotStale(state)
-    if type(state) ~= "table" or type(state.snapshot) ~= "table" then
-        return false
-    end
-    return getConfigurationRevision() ~= tonumber(state.snapshot.configurationRevision or 0)
-        or getAuraRevision(state.eventId) ~= tonumber(state.snapshot.auraRevision or 0)
+    return false
 end
 
 local baseIsAutopilotPlanStateStale = Client.IsAutopilotPlanStateStale

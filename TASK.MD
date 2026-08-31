@@ -1,205 +1,165 @@
 ## Goal
 
-Add a Ruleset -> Resources option that enables or disables automatic resource regeneration at the start of a unit's turn.
+Create the read-only planning foundation required for periodic, control, and interrupt evaluation without changing current tactical selection behavior yet.
 
-Required default:
+**Source design:** `.docs/RPE2-NPC-Autopilot-Advanced-Spell-Utility-Action-Economy-PDD.md`  
+**Implementation plan:** `.docs/RPE2-NPC-Autopilot-Advanced-Spell-Utility-Action-Economy-Implementation-Plan.md`  
+**Depends on:** current Autopilot implementation only.
+
+## Implementation-agent rules
+
+This task is sized for **5.6-Luna-ExtraHigh**.
+
+Before editing:
+
+1. work from the current `dev` branch;
+2. read the current version of every affected file;
+3. trace the exact current callers/callees being modified;
+4. do not assume the PDD source snapshot is still current;
+5. implement **only this issue**;
+6. do not pre-implement #142–#148;
+7. search every changed API/helper for all call sites;
+8. exercise pure logic with deterministic Lua fixtures/mocks where possible;
+9. review the final diff for accidental architectural expansion;
+10. close this issue only after its acceptance criteria are validated, then stop.
+
+Preserve manual mode, host-only planning, canonical spell/aura semantics, sliceability, and the same-marker no-split invariant.
+
+## Primary current files to inspect
+
+- `client/autopilot/PlannerIntegration.lua`
+- `client/autopilot/SpellEvaluator.lua`
+- `client/spellcasting/AuraManager.lua`
+- `core/classes/Aura.lua`
+- `core/classes/Spell.lua`
+- `RPEngine_Dev.toc`
+
+Expected new module if current source supports it:
+
+- `client/autopilot/AuraEvaluator.lua`
+
+Do not force this exact file split if the current load/dependency graph demonstrates a narrower existing home, but do not fold the work into generic AuraManager mutation paths merely for convenience.
+
+## Required changes
+
+### 1. Freeze relevant aura state for the planning snapshot
+
+Extend planner snapshot/scratch state so later utility evaluation can inspect immutable aura information relevant to candidate targets.
+
+At minimum retain enough information to derive:
 
 ```text
-Enable Resource Regeneration Per Turn = true
+aura identity/ref
+dataset context where required
+aura caster event ID
+aura target event ID
+current stacks
+remaining duration/turns
+stack behavior
+max stacks
+resolved definition/ref
+current target control state where relevant
 ```
 
-Existing rulesets must therefore retain the current regeneration behavior unless explicitly disabled.
+Do not blindly clone the entire live AuraManager runtime if a narrower immutable representation is sufficient.
 
-## Current-code investigation / root cause
+The snapshot must not mutate when live aura state changes later during planning.
 
-### Resource definitions already own regeneration formulas
+### 2. Freeze active spellcast summary for later interrupt evaluation
 
-`core/classes/Resource.lua` currently stores authored regeneration configuration such as:
+Capture the current active-cast information needed to answer whether a potential target is casting and, where the canonical runtime exposes it, remaining/urgency information.
+
+Do **not** add Autopilot plan/action identity to persistent casts.
+
+### 3. Add per-plan Aura definition resolution/cache
+
+Provide a read-only resolver/cache that maps spell-applied `auraRef` values through the same registry/dataset semantics used by normal spell/aura execution.
+
+Support both existing spell patterns:
+
+```text
+component.effect.type = apply_aura
+```
+
+and:
+
+```text
+damage/heal component with applyAura = true and auraRef = ...
+```
+
+Repeated resolution of the same Aura definition inside one plan should use the planning cache rather than repeatedly walking registry/dataset state.
+
+### 4. Add a normalized Aura planning profile
+
+Expose a deterministic, side-effect-free API conceptually equivalent to:
 
 ```lua
-regenMode
-regenPerSecond
-regenSourceStatRef
-regenMultiplier
+AuraEvaluator.BuildAuraProfile(...)
 ```
 
-This issue must not change those Resource definition fields or their formula semantics.
+The exact name may follow current conventions.
 
-### Turn regeneration is already centralized
+The normalized profile should make later issues able to inspect:
 
-`client/client_Resources.lua` owns the current turn-regeneration application path.
+- direct Aura damage/heal effects present;
+- control effects present;
+- triggered-event descriptors;
+- duration;
+- stack behavior;
+- max stacks;
+- any other existing immutable information needed by #142/#143.
 
-The client tracks:
+This issue does **not** assign tactical utility values yet.
 
-```lua
-Client.LastAppliedTurnRegenKey
-```
+### 5. Preserve sliceability/load order
 
-and builds a key from:
+Inspect the current TOC and module dependencies before adding the new module.
 
-```text
-eventState.id
-turnNumber
-activeEventId
-```
+Current source loads `SpellEvaluator.lua` before `AuraManager.lua`, while `PlannerIntegration.lua` loads later. Do not create a load-time dependency on an API that does not yet exist at that point.
 
-so the same actor's regeneration is not applied repeatedly for one turn occurrence.
+Any scan over active auras or Aura event definitions which can grow with event/dataset size must be bounded/cached or integrated into the existing resumable planner.
 
-When the turn is eligible, the code calls:
+## Explicitly out of scope
 
-```lua
-ResourceSync.BuildPlayerTurnRegenResourceDeltas(activeEventUnit.resources, ...)
-```
+Do not implement in this issue:
 
-and queues the result as:
+- periodic future-value math;
+- DoT/HoT scoring;
+- aura refresh/stack tactical value;
+- projected aura reservations;
+- control score coefficients;
+- interrupt prioritization;
+- multiple actions per NPC;
+- action-economy ledgers;
+- authorization/execution changes;
+- DM Helper UI changes;
+- new Spell/Aura AI metadata.
 
-```text
-reason = "turn-regen"
-scope  = "turn"
-```
+## Deterministic regression coverage
 
-through the normal resource-delta path.
+Validate at minimum:
 
-`core/internal/comms/ResourceSync.lua` contains the actual `BuildPlayerTurnRegenResourceDeltas(...)` formula builder.
-
-There is currently no Ruleset-level switch before this work is generated, so authored resource regeneration always participates in turn processing.
-
-## Required Ruleset addition
-
-Add under the existing `resources` section in `core/internal/ruleset/Rules.lua`:
-
-```lua
-{
-    key = "enable_resource_regeneration_per_turn",
-    label = "Enable Resource Regeneration Per Turn",
-    type = "checkbox",
-    default = true,
-    description = "Automatically apply configured resource regeneration when an eligible unit's turn begins.",
-}
-```
-
-The exact internal key may follow repository naming conventions, but the default must be `true`.
-
-The normal Ruleset editor should expose the new field through the existing rule-definition-driven UI. Do not add a separate bespoke settings control if the generic Ruleset UI already handles checkbox rules.
-
-## Required runtime behavior
-
-Gate the existing centralized turn-regeneration application path before regeneration deltas are calculated/queued.
-
-Conceptually:
-
-```text
-eligible actor turn
--> build event/turn/actor regen key
--> rule enabled?
-     yes -> existing BuildPlayerTurnRegenResourceDeltas path
-     no  -> no regeneration deltas
--> mark this turn occurrence handled
-```
-
-When the rule is disabled:
-
-- do not call/queue automatic turn-regeneration resource deltas;
-- do not change the actor's current resources;
-- do not alter maximum-resource calculations;
-- do not mutate the authored `Resource.regen*` definition fields;
-- do not interfere with explicit spell/effect/resource changes;
-- do not send a fake zero-delta packet merely to represent disabled regeneration.
-
-The existing `LastAppliedTurnRegenKey` idempotency behavior should remain intact. The disabled path should still mark the current `(event, turn, actor)` occurrence as handled so repeated event-state refreshes do not repeatedly revisit the same turn-regeneration decision.
-
-## Scope of the toggle
-
-This rule controls **automatic per-turn regeneration only**.
-
-It must not disable unrelated resource changes such as:
-
-```text
-spell costs;
-damage/healing;
-resource-gain spell effects;
-resource losses;
-manual/server resource changes;
-resource initialization at Event start;
-maximum-resource recalculation.
-```
-
-If a resource has no configured regeneration already, behavior remains unchanged regardless of the toggle.
-
-## Primary files
-
-- `core/internal/ruleset/Rules.lua`
-- `client/client_Resources.lua`
-
-Supporting code should normally remain unchanged:
-
-- `core/internal/comms/ResourceSync.lua`
-- `core/classes/Resource.lua`
-
-Only modify the latter files if a concrete shared helper is required; do not move the regeneration formula merely for this toggle.
-
-## Backward compatibility
-
-No Dataset/Profile schema change should be necessary because this is a Ruleset rule with a default value resolved through the existing Ruleset system.
-
-Legacy rulesets without the new key must resolve it as:
-
-```text
-true
-```
-
-and therefore behave exactly as before.
+1. A pure `apply_aura` spell resolves its canonical Aura definition.
+2. A damage/heal component using `applyAura = true` resolves through the same canonical path.
+3. Frozen active-aura records preserve caster/target/stacks/duration identity.
+4. `refresh_duration` and `independent_duration` remain distinguishable.
+5. `maxStacks` is available to later planning.
+6. Control flags are readable without mutating live AuraManager control state.
+7. Current active-cast state can be frozen/read without changing the cast entry.
+8. Repeated Aura refs use the per-plan definition cache.
+9. A planner-side Aura profile call never applies, removes, advances, or rolls an Aura effect.
+10. Existing direct-damage/direct-heal Autopilot selection remains unchanged by this foundation-only issue.
+11. Manual spell/aura behavior remains unchanged.
 
 ## Acceptance criteria
 
-- [ ] Ruleset -> Resources contains an `Enable Resource Regeneration Per Turn` checkbox.
-- [ ] The checkbox defaults to `true`.
-- [ ] Existing/legacy rulesets without an explicit value continue regenerating resources per turn.
-- [ ] When enabled, current regeneration calculations and amounts are unchanged.
-- [ ] When disabled, automatic turn regeneration produces no resource delta and no resource-value change.
-- [ ] Disabling regeneration does not disable spell/resource effects or resource costs.
-- [ ] Disabling regeneration does not alter Resource definition data.
-- [ ] The same Event/turn/actor occurrence remains idempotent and cannot repeatedly apply/check regeneration because of repeated state refreshes.
-- [ ] Re-enabling the rule affects subsequent eligible turn occurrences without requiring Resource definitions to be edited.
-- [ ] No fake network resource packet is emitted for a disabled regeneration occurrence.
-
-## Validation matrix
-
-```text
-legacy ruleset; no stored new key
--> regeneration works exactly as today
-
-new ruleset; toggle true
--> resource with fixed regen gains existing expected amount on turn
-
-new ruleset; toggle false
--> same resource gains 0 from automatic turn regeneration
-
-rule false; cast spell that restores resource
--> spell resource gain still applies
-
-rule false; cast spell with resource cost
--> resource cost still applies
-
-rule false; receive damage/healing
--> health/resource changes still apply normally
-
-same turn state delivered/refreshed repeatedly
--> no duplicate regen when enabled
--> no repeated queued work when disabled
-
-advance to next turn with rule true
--> next normal regeneration occurrence is processed once
-```
-
-## Constraints
-
-- Do not remove or reinterpret `regenMode`, `regenPerSecond`, `regenSourceStatRef`, or `regenMultiplier`.
-- Do not implement this as a per-Resource definition toggle; the requested control is Ruleset-wide under Resources.
-- Do not disable all resource mutation when the rule is false.
-- Do not introduce a second regeneration calculation path.
-- Preserve the existing resource-delta authority/synchronization flow and `LastAppliedTurnRegenKey` guard.
-
-## Coding-agent instructions
-
-Use current `FrontierDev/rpe2` as authoritative. Trace the turn-regeneration call in `client/client_Resources.lua` through `ResourceSync.BuildPlayerTurnRegenResourceDeltas()` before editing. Add the rule at the single highest-level turn-regeneration decision point so all current formulas remain untouched. Report the exact gate location, legacy/default behavior, files changed, and validation results.
+- [ ] Advanced planning can inspect a frozen, immutable subset of relevant active Aura state.
+- [ ] Advanced planning can inspect current active-cast summaries without taking ownership of casts.
+- [ ] Applied Aura definitions are resolved through canonical registry/dataset semantics.
+- [ ] Both pure `apply_aura` and damage/heal `applyAura` spell patterns are supported.
+- [ ] A per-plan Aura-definition cache prevents repeated equivalent resolution work.
+- [ ] The normalized Aura profile exposes effect/event/control/stacking metadata but performs no tactical scoring.
+- [ ] No planning call mutates canonical Aura, cast, resource, cooldown, or combat state.
+- [ ] Current direct-only Autopilot decisions remain behaviorally unchanged.
+- [ ] New work remains bounded/sliceable and does not increase the global TaskQueue budget.
+- [ ] Manual mode and normal Aura behavior remain unchanged.

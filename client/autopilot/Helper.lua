@@ -5,6 +5,8 @@ Addon.Internal = Addon.Internal or {}
 
 local Client = Addon.Client
 local Registry = Addon.Internal.Registry or {}
+local UI = Addon.UI or {}
+local Inline = UI.Inline or {}
 local Event = Addon.Internal
     and Addon.Internal.Database
     and Addon.Internal.Database.Classes
@@ -101,6 +103,55 @@ local function unitName(eventState, eventId)
     return numeric > 0 and ("Unit %d"):format(numeric) or "Unknown"
 end
 
+local function colorizeText(text, color)
+    if type(color) ~= "table" then
+        return tostring(text or "")
+    end
+
+    local function toByte(value, fallback)
+        local number = tonumber(value)
+        if number == nil then
+            number = fallback
+        end
+        if number <= 1 then
+            number = number * 255
+        end
+        return math.max(0, math.min(255, math.floor(number + 0.5)))
+    end
+
+    return ("|c%02x%02x%02x%02x%s|r"):format(
+        toByte(color.a, 1),
+        toByte(color.r, 1),
+        toByte(color.g, 1),
+        toByte(color.b, 1),
+        tostring(text or "")
+    )
+end
+
+local function unitLabel(eventState, eventId)
+    local unit = findUnit(eventState, eventId)
+    local eventUnitId = normalizeEventId(eventId)
+    local name = unitName(eventState, eventId)
+    local teamColor = type(Event) == "table" and type(Event.GetTeamColor) == "function"
+        and Event.GetTeamColor(eventState, tonumber(unit and unit.team) or 0)
+        or nil
+    local marker = math.floor(tonumber(unit and unit.raidMarker) or 0)
+    local parts = {}
+
+    if marker >= 1 and marker <= 8 and type(Inline.RaidMarker) == "function" then
+        local markerIcon = Inline:RaidMarker(marker, 14, 14)
+        if markerIcon ~= "" then
+            parts[#parts + 1] = markerIcon
+        end
+    end
+
+    parts[#parts + 1] = colorizeText(name, teamColor)
+    if eventUnitId > 0 then
+        parts[#parts + 1] = ("[#%d]"):format(eventUnitId)
+    end
+    return table.concat(parts, " ")
+end
+
 local function spellName(spellRef)
     local ref = tostring(spellRef or "")
     if ref == "" then
@@ -115,10 +166,40 @@ local function spellName(spellRef)
     return ref
 end
 
+local function spellLabel(spellRef)
+    local spell = nil
+    local ref = tostring(spellRef or "")
+    if ref ~= "" and type(Registry.ResolveSpellReference) == "function" then
+        local _, resolved = Registry:ResolveSpellReference(ref)
+        spell = resolved
+    end
+
+    local parts = {}
+    local icon = type(Client.ResolveCombatLogSpellIcon) == "function"
+        and Client:ResolveCombatLogSpellIcon(spell, ref)
+        or (type(spell) == "table" and tostring(spell.icon or "") or "")
+    if icon ~= "" and type(Inline.Build) == "function" then
+        local markup = Inline:Build({
+            texture = icon,
+            coords = {
+                left = 0,
+                right = 1,
+                top = 0,
+                bottom = 1,
+            },
+        }, 14, 14)
+        if markup ~= "" then
+            parts[#parts + 1] = markup
+        end
+    end
+    parts[#parts + 1] = spellName(spellRef)
+    return table.concat(parts, " ")
+end
+
 local function targetNames(eventState, targetEventIds)
     local names = {}
     for index = 1, #(targetEventIds or {}) do
-        names[#names + 1] = unitName(eventState, targetEventIds[index])
+        names[#names + 1] = unitLabel(eventState, targetEventIds[index])
     end
     return #names > 0 and table.concat(names, ", ") or "no target"
 end
@@ -196,7 +277,7 @@ end
 local function joinNamesForEventIds(eventState, eventIds)
     local names = {}
     for index = 1, #(eventIds or {}) do
-        names[#names + 1] = unitName(eventState, eventIds[index])
+        names[#names + 1] = unitLabel(eventState, eventIds[index])
     end
     return #names > 0 and table.concat(names, ", ") or nil
 end
@@ -299,6 +380,25 @@ function Helper.GetMarkerStates(eventState)
     local states = {}
     local runtime = getRuntime(eventState)
     local usage = {}
+    local movementNeededByMarker = {}
+    local pending = type(Client.GetAutopilotPendingPlan) == "function"
+        and select(1, Client:GetAutopilotPendingPlan(eventState))
+        or nil
+
+    if type(pending) == "table" and tostring(pending.status or "") ~= "stale" then
+        for index = 1, #(pending.movementActionIds or {}) do
+            local action = type(pending.actionsById) == "table"
+                and pending.actionsById[pending.movementActionIds[index]]
+                or nil
+            local marker = math.floor(tonumber(action and action.raidMarker) or 0)
+            local status = tostring(action and action.status or "")
+            if marker >= 1 and marker <= 8
+                and (status == "pending" or status == "authorized" or status == "executing")
+            then
+                movementNeededByMarker[marker] = true
+            end
+        end
+    end
 
     for index = 1, #((eventState and eventState.units) or {}) do
         local unit = eventState.units[index]
@@ -325,6 +425,7 @@ function Helper.GetMarkerStates(eventState)
             and type(Spatial.IsPositionAvailable) == "function"
             and Spatial.IsPositionAvailable(position) == true
             or false
+        local needsMovement = used and movementNeededByMarker[marker] == true
         local lines = {}
         local reasonCode, reasonText = nil, nil
         appendDetail(lines, "Marker", marker)
@@ -332,6 +433,7 @@ function Helper.GetMarkerStates(eventState)
         if used then
             appendDetail(lines, "Actor", actorKey)
             appendDetail(lines, "Status", positionAvailable and "Position set" or "Position not set")
+            appendDetail(lines, "Movement", needsMovement and "Movement planned" or nil)
             appendDetail(lines, "Position", positionText(position))
             if not positionAvailable then
                 reasonCode, reasonText = appendReason(lines, position and position.reason or "position-unset")
@@ -351,6 +453,7 @@ function Helper.GetMarkerStates(eventState)
             unitCount = usage[marker] or 0,
             position = position,
             positionAvailable = positionAvailable,
+            needsMovement = needsMovement,
             canSetPosition = used and type(runtime) == "table" and runtime.status == "ready",
             summary = ("Marker %d — %s"):format(
                 marker,
@@ -361,7 +464,7 @@ function Helper.GetMarkerStates(eventState)
                 used and (positionAvailable and tostring(positionText(position) or "Position set") or "Position not set") or "Unused"
             ),
             details = table.concat(lines, "\n"),
-            status = used and (positionAvailable and "ready" or "position-unset") or "unused",
+            status = used and (positionAvailable and (needsMovement and "movement-pending" or "ready") or "position-unset") or "unused",
             reasonCode = reasonCode,
             reasonText = reasonText,
         }
@@ -376,9 +479,13 @@ local function buildMovementRow(eventState, action)
     local destinationNames = targetNames(eventState, action and action.objectiveTargetEventIds)
     local status = tostring(action and action.status or "pending")
     local reason = tostring(action and action.reason or "")
-    local displayText = ("Move marker %d near %s"):format(marker, destinationNames)
+    local markerLabel = type(Inline.RaidMarker) == "function" and Inline:RaidMarker(marker, 14, 14) or ""
+    if markerLabel == "" then
+        markerLabel = ("marker %d"):format(marker)
+    end
+    local displayText = ("Move %s near %s"):format(markerLabel, destinationNames)
     if destinationNames == "no target" then
-        displayText = ("Move marker %d to the proposed position"):format(marker)
+        displayText = ("Move %s to the proposed position"):format(markerLabel)
     end
 
     local lines = {}
@@ -417,8 +524,8 @@ local function buildMovementRow(eventState, action)
 end
 
 local function buildSpellRow(eventState, action)
-    local caster = unitName(eventState, action and action.casterEventId)
-    local spell = spellName(action and action.spellRef)
+    local caster = unitLabel(eventState, action and action.casterEventId)
+    local spell = spellLabel(action and action.spellRef)
     local targets = targetNames(eventState, action and action.targetEventIds)
     local status = tostring(action and action.status or "pending")
     local reason = tostring(action and action.reason or "")
@@ -647,7 +754,7 @@ function Helper.GetTurnOutcomes(eventState)
             if outcome.killed == true then
                 labels[#labels + 1] = "Killed"
             end
-            local actionName = tostring(outcome.spellRef or "") ~= "" and spellName(outcome.spellRef) or nil
+            local actionName = tostring(outcome.spellRef or "") ~= "" and spellLabel(outcome.spellRef) or nil
             if not actionName or actionName == "" then
                 local attackType = string.lower(tostring(outcome.attackType or ""))
                 if attackType == "melee" then
@@ -661,14 +768,14 @@ function Helper.GetTurnOutcomes(eventState)
                 end
             end
             local summary = ("%s -> %s — %s — %s"):format(
-                tostring(outcome.sourceName or "Unknown"),
-                tostring(outcome.targetName or "Unknown"),
+                unitLabel(eventState, outcome.sourceEventId),
+                unitLabel(eventState, outcome.targetEventId),
                 actionName,
                 table.concat(labels, " · ")
             )
             local lines = {
-                ("Source: %s"):format(tostring(outcome.sourceName or "Unknown")),
-                ("Target: %s"):format(tostring(outcome.targetName or "Unknown")),
+                ("Source: %s"):format(unitLabel(eventState, outcome.sourceEventId)),
+                ("Target: %s"):format(unitLabel(eventState, outcome.targetEventId)),
                 ("Action: %s"):format(actionName),
                 ("Outcome: %s"):format(table.concat(labels, " · ")),
             }

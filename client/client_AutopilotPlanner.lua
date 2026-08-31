@@ -417,6 +417,14 @@ function Client:StartAutopilotStep(eventStateOverride)
                     jobRuntime.plannerStatus = "ready"
                     jobRuntime.lastCompletedPlanId = tostring(jobState and jobState.planId or "")
                     jobRuntime.activePlanId = tostring(jobState and jobState.planId or "")
+
+                    -- Publish while the completed plan and its runtime are
+                    -- still live.  Relying on ReleaseScratch for this left a
+                    -- completed cast-transition plan visible as "Planning"
+                    -- when another deferred task ran first.
+                    if type(Client.PublishAutopilotPendingPlan) == "function" then
+                        pcall(Client.PublishAutopilotPendingPlan, Client, completedPlan, jobRuntime)
+                    end
                 else
                     jobRuntime.plannerStatus = "failed"
                 end
@@ -531,6 +539,20 @@ if type(baseStartEvent) == "function" then
             queueAutopilotStepStart(eventState, "event-started")
         end
         return unpack(results, 2, results.n)
+    end
+end
+
+-- Advancing a turn invalidates every plan and authorization from the outgoing
+-- step.  Clear it at the request boundary, before pending turn settlement or
+-- a completing non-instant spell can observe the old batch.
+local baseAdvanceEventStep = Server.AdvanceEventStep
+if type(baseAdvanceEventStep) == "function" then
+    function Server:AdvanceEventStep(...)
+        local eventState = self.EventState
+        if isHostAutopilotEvent(eventState) then
+            Client:ClearAutopilotBatch(getEventId(eventState), "step-advance-requested")
+        end
+        return baseAdvanceEventStep(self, ...)
     end
 end
 

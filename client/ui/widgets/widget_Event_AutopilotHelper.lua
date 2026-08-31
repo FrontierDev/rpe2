@@ -23,8 +23,8 @@ local DASHBOARD_PANEL_HEIGHT = 460
 local MARKER_BUTTON_SIZE = 28
 local MARKER_GAP = 5
 local SECTION_TITLE_HEIGHT = 16
-local PENDING_HEIGHT = 100
-local OUTCOMES_HEIGHT = 70
+local PENDING_HEIGHT = 158
+local OUTCOMES_HEIGHT = 138
 local DETAIL_TOGGLE_HEIGHT = 20
 local DETAIL_HEIGHT = 92
 local TOOLBAR_HEIGHT = 22
@@ -499,6 +499,17 @@ function EventWidget:RefreshAutopilotMarkerButtons(markerStatesOverride)
                 frame:SetAlpha(not used and 0.28 or (selectedMarker == marker and 1 or 0.72))
             end
         end
+        if button and type(button.SetBorderColor) == "function" then
+            local border = UI.ResolveColor(nil, "panel.border")
+            if used and markerState.positionAvailable ~= true then
+                border = { r = 0.92, g = 0.24, b = 0.20, a = 1 }
+            elseif used and markerState.needsMovement == true then
+                border = { r = 0.96, g = 0.76, b = 0.20, a = 1 }
+            elseif selectedMarker == marker then
+                border = UI.ResolveColor(nil, "accent")
+            end
+            button:SetBorderColor(border.r, border.g, border.b, border.a)
+        end
     end
     return true
 end
@@ -534,6 +545,7 @@ function EventWidget:RefreshAutopilotHelperControls(actionRowsOverride, markerSt
     local state = getActiveEventState()
     local active = isHostAutopilotEvent(state)
         and tostring(self.combatLogHistoryMode or "") == "dm-helper"
+        and self.autopilotDetailsExpanded ~= true
     setShown(self.autopilotToolbarFrame, active)
     if not active then
         return false
@@ -585,9 +597,24 @@ function EventWidget:RefreshAutopilotHelperControls(actionRowsOverride, markerSt
     return true
 end
 
+local function setAutopilotSummaryShown(self, shown)
+    setShown(self.autopilotMarkerFrame, shown)
+    setShown(self.autopilotPendingTitle, shown)
+    setShown(self.autopilotPendingScroll, shown)
+    setShown(self.autopilotPendingEmptyText, shown)
+    setShown(self.autopilotOutcomeTitle, shown)
+    setShown(self.autopilotOutcomeScroll, shown)
+    setShown(self.autopilotOutcomeEmptyText, shown)
+    setShown(self.autopilotToolbarFrame, shown)
+end
+
 function EventWidget:SetAutopilotDetailsExpanded(expanded)
     self.autopilotDetailsExpanded = expanded == true
     setShown(self.autopilotDetailPanel, self.autopilotDetailsExpanded)
+    setAutopilotSummaryShown(self, not self.autopilotDetailsExpanded)
+    if self.autopilotDetailToggleButton and type(self.autopilotDetailToggleButton.SetText) == "function" then
+        self.autopilotDetailToggleButton:SetText(self.autopilotDetailsExpanded and "Back" or "Details")
+    end
     self:LayoutAutopilotHelperDashboard()
     return self.autopilotDetailsExpanded
 end
@@ -607,11 +634,12 @@ function EventWidget:LayoutAutopilotHelperDashboard()
     detailToggleFrame:ClearAllPoints()
     if detailExpanded and detailPanelFrame then
         detailPanelFrame:ClearAllPoints()
-        detailPanelFrame:SetPoint("BOTTOMLEFT", toolbar, "TOPLEFT", 0, SECTION_GAP)
-        detailPanelFrame:SetPoint("BOTTOMRIGHT", toolbar, "TOPRIGHT", 0, SECTION_GAP)
-        detailPanelFrame:SetHeight(DETAIL_HEIGHT)
-        detailToggleFrame:SetPoint("BOTTOMLEFT", detailPanelFrame, "TOPLEFT", 0, 2)
-        detailToggleFrame:SetPoint("BOTTOMRIGHT", detailPanelFrame, "TOPRIGHT", 0, 2)
+        detailPanelFrame:SetAllPoints(self.autopilotDashboardFrame)
+        detailToggleFrame:SetPoint("BOTTOMLEFT", self.autopilotDashboardFrame, "BOTTOMLEFT", 4, 4)
+        detailToggleFrame:SetPoint("BOTTOMRIGHT", self.autopilotDashboardFrame, "BOTTOMRIGHT", -4, 4)
+        if type(detailToggleFrame.SetFrameLevel) == "function" and type(detailPanelFrame.GetFrameLevel) == "function" then
+            detailToggleFrame:SetFrameLevel(detailPanelFrame:GetFrameLevel() + 1)
+        end
     else
         detailToggleFrame:SetPoint("BOTTOMLEFT", toolbar, "TOPLEFT", 0, SECTION_GAP)
         detailToggleFrame:SetPoint("BOTTOMRIGHT", toolbar, "TOPRIGHT", 0, SECTION_GAP)
@@ -644,8 +672,10 @@ function EventWidget:RefreshAutopilotHelperDashboard()
     self.autopilotPendingScroll:SetItems(actionRows)
     self.autopilotOutcomeScroll:SetItems(outcomeRows)
 
-    setShown(self.autopilotPendingEmptyText, #actionRows == 0)
-    setShown(self.autopilotOutcomeEmptyText, #outcomeRows == 0)
+    if self.autopilotDetailsExpanded ~= true then
+        setShown(self.autopilotPendingEmptyText, #actionRows == 0)
+        setShown(self.autopilotOutcomeEmptyText, #outcomeRows == 0)
+    end
 
     local selected = self:GetSelectedAutopilotHelperEntry()
     if self.selectedAutopilotDetailKey and not selected then
@@ -653,6 +683,7 @@ function EventWidget:RefreshAutopilotHelperDashboard()
     end
     self:RefreshAutopilotHelperDetail()
     self:RefreshAutopilotHelperControls(actionRows, markerStates)
+    setAutopilotSummaryShown(self, self.autopilotDetailsExpanded ~= true)
     self:LayoutAutopilotHelperDashboard()
     return pending ~= nil or #markerStates > 0 or #outcomeRows > 0
 end
@@ -685,12 +716,14 @@ function EventWidget:EnsureAutopilotHelperUI()
     local totalMarkerWidth = (8 * MARKER_BUTTON_SIZE) + (7 * MARKER_GAP)
     local firstOffset = math.max(0, math.floor((DASHBOARD_PANEL_WIDTH - totalMarkerWidth) / 2) - 8)
     for marker = 1, 8 do
-        local button = UI.ImageButton:New({
+        local button = UI.ObjectSlot:New({
             name = "RPEClientEventWidgetDMAutopilotMarker" .. marker,
-            width = MARKER_BUTTON_SIZE,
+            size = MARKER_BUTTON_SIZE,
             height = MARKER_BUTTON_SIZE,
-            normalTexture = ("Interface\\TargetingFrame\\UI-RaidTargetingIcon_%d"):format(marker),
-            highlightTexture = "Interface\\Buttons\\UI-Common-MouseHilight",
+            iconTexture = ("Interface\\TargetingFrame\\UI-RaidTargetingIcon_%d"):format(marker),
+            iconTexCoord = { left = 4 / 64, right = 60 / 64, top = 4 / 64, bottom = 60 / 64 },
+            slotBorderSize = 2,
+            slotBorderColor = UI.ResolveColor(nil, "panel.border"),
         })
         button:SetParent(self.autopilotMarkerFrame)
         button:Create()
@@ -728,7 +761,7 @@ function EventWidget:EnsureAutopilotHelperUI()
         name = "RPEClientEventWidgetDMAutopilotPendingScroll",
         rowHeight = ACTION_ROW_HEIGHT,
         rowSpacing = 2,
-        visibleRows = 3,
+        visibleRows = 5,
         rowElementClass = AutopilotActionRow,
         rowRenderer = function(row, item)
             row:SetItem(item, self)
@@ -771,7 +804,7 @@ function EventWidget:EnsureAutopilotHelperUI()
         name = "RPEClientEventWidgetDMAutopilotOutcomeScroll",
         rowHeight = OUTCOME_ROW_HEIGHT,
         rowSpacing = 2,
-        visibleRows = 2,
+        visibleRows = 5,
         rowElementClass = AutopilotOutcomeRow,
         rowRenderer = function(row, item)
             row:SetItem(item, self)
