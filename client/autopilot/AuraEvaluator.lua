@@ -312,8 +312,9 @@ local function buildAuraProfileFromDefinition(definition, dataset, qualifiedAura
 
     -- Current runtime cadence is explicit: AuraManager:AdvanceAuraEntry invokes
     -- TickAura once for each due owner occurrence, and TickAura executes these
-    -- top-level definition.effects. definition.events are reactive
-    -- HandleCombatEvent procs and are deliberately not projected as periodic.
+    -- top-level definition.effects. Current runtime emits NO periodic
+    -- combatEventId. definition.events are reactive HandleCombatEvent procs and
+    -- are deliberately not projected as periodic occurrences.
     local effects = definition.effects or {}
     local periodicDamageEffects = {}
     local periodicHealingEffects = {}
@@ -671,6 +672,46 @@ local function getOccurrenceCount(state)
     return math.max(0, math.floor(tonumber(state.turnsRemaining) or 0))
 end
 
+-- Returns only provably deterministic future owner occurrences from frozen
+-- state. The current runtime has no periodic combatEventId whitelist: there
+-- are zero such IDs. Each returned occurrence represents the top-level
+-- TickAura execution on one future owner occurrence. Reactive definition.events
+-- are intentionally absent, regardless of their combatEventId/chance.
+function Evaluator.ClassifyDeterministicFutureOccurrences(state)
+    if type(state) ~= "table" then
+        return {
+            cadence = "owner_occurrence",
+            deterministicCombatEventIds = {},
+            occurrences = {},
+        }
+    end
+
+    local profile = type(state.profile) == "table" and state.profile
+        or Evaluator.BuildAuraProfile(state, { datasetId = state.datasetId })
+    local occurrences = {}
+    if type(profile) == "table" then
+        local count = getOccurrenceCount(state)
+        for occurrenceIndex = 1, count do
+            local activeStacks = getActiveStackCountAtOccurrence(state, occurrenceIndex)
+            if activeStacks > 0 then
+                occurrences[#occurrences + 1] = {
+                    index = occurrenceIndex,
+                    chancePercent = 100,
+                    activeStacks = activeStacks,
+                    periodicDamageEffects = profile.periodicDamageEffects,
+                    periodicHealingEffects = profile.periodicHealingEffects,
+                }
+            end
+        end
+    end
+
+    return {
+        cadence = "owner_occurrence",
+        deterministicCombatEventIds = {},
+        occurrences = occurrences,
+    }
+end
+
 -- Projects only TickAura's deterministic top-level damage/heal effects. Aura
 -- event procs are reactive to combatEventId and are therefore zero here.
 function Evaluator.ProjectPeriodicAuraValue(state, casterUnit, targetUnit)
@@ -682,53 +723,48 @@ function Evaluator.ProjectPeriodicAuraValue(state, casterUnit, targetUnit)
         }
     end
 
-    local profile = type(state.profile) == "table" and state.profile
-        or Evaluator.BuildAuraProfile(state, { datasetId = state.datasetId })
-    if type(profile) ~= "table" then
-        return {
-            periodicDamage = 0,
-            periodicHealing = 0,
-            occurrenceCount = 0,
-        }
-    end
-
-    local occurrenceCount = getOccurrenceCount(state)
+    local classification = Evaluator.ClassifyDeterministicFutureOccurrences(state)
     local periodicDamage = 0
     local periodicHealing = 0
     local discount = tonumber(Evaluator.FUTURE_EFFECT_DISCOUNT) or 0.8
-    for occurrenceIndex = 1, occurrenceCount do
-        local activeStacks = getActiveStackCountAtOccurrence(state, occurrenceIndex)
-        if activeStacks > 0 then
-            local occurrenceDamage = 0
-            for effectIndex = 1, #(profile.periodicDamageEffects or {}) do
-                occurrenceDamage = occurrenceDamage + Evaluator.ResolvePeriodicEffectMagnitude(
-                    casterUnit,
-                    targetUnit,
-                    profile.periodicDamageEffects[effectIndex],
-                    state.powerLevel,
-                    activeStacks
-                )
-            end
-            local occurrenceHealing = 0
-            for effectIndex = 1, #(profile.periodicHealingEffects or {}) do
-                occurrenceHealing = occurrenceHealing + Evaluator.ResolvePeriodicEffectMagnitude(
-                    casterUnit,
-                    targetUnit,
-                    profile.periodicHealingEffects[effectIndex],
-                    state.powerLevel,
-                    activeStacks
-                )
-            end
-            local weight = discount ^ occurrenceIndex
-            periodicDamage = periodicDamage + (Evaluator.ResolveExpectedOccurrenceValue(occurrenceDamage, 100) * weight)
-            periodicHealing = periodicHealing + (Evaluator.ResolveExpectedOccurrenceValue(occurrenceHealing, 100) * weight)
+    for index = 1, #(classification.occurrences or {}) do
+        local occurrence = classification.occurrences[index]
+        local occurrenceDamage = 0
+        for effectIndex = 1, #(occurrence.periodicDamageEffects or {}) do
+            occurrenceDamage = occurrenceDamage + Evaluator.ResolvePeriodicEffectMagnitude(
+                casterUnit,
+                targetUnit,
+                occurrence.periodicDamageEffects[effectIndex],
+                state.powerLevel,
+                occurrence.activeStacks
+            )
         end
+        local occurrenceHealing = 0
+        for effectIndex = 1, #(occurrence.periodicHealingEffects or {}) do
+            occurrenceHealing = occurrenceHealing + Evaluator.ResolvePeriodicEffectMagnitude(
+                casterUnit,
+                targetUnit,
+                occurrence.periodicHealingEffects[effectIndex],
+                state.powerLevel,
+                occurrence.activeStacks
+            )
+        end
+        local occurrenceIndex = math.max(1, math.floor(tonumber(occurrence.index) or index))
+        local weight = discount ^ occurrenceIndex
+        periodicDamage = periodicDamage + (Evaluator.ResolveExpectedOccurrenceValue(
+            occurrenceDamage,
+            occurrence.chancePercent
+        ) * weight)
+        periodicHealing = periodicHealing + (Evaluator.ResolveExpectedOccurrenceValue(
+            occurrenceHealing,
+            occurrence.chancePercent
+        ) * weight)
     end
 
     return {
         periodicDamage = periodicDamage,
         periodicHealing = periodicHealing,
-        occurrenceCount = occurrenceCount,
+        occurrenceCount = #(classification.occurrences or {}),
     }
 end
 
