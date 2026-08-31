@@ -119,6 +119,7 @@ server/server_EventSpellEquipmentVariants.lua
 server/server_EventAutopilotSchedule.lua
 client/autopilot/Spatial.lua
 client/autopilot/SpellEvaluator.lua
+client/autopilot/ActionEconomy.lua
 client/autopilot/TargetSelector.lua
 client/autopilot/Planner.lua
 client/client_Autopilot.lua
@@ -341,7 +342,6 @@ client/ui/editor/inspectors/page_InspectorGuildSetting.lua
 client/ui/editor/inspectors/aura/page_InspectorAuraShared.lua
 client/ui/editor/inspectors/aura/page_InspectorAuraGeneral.lua
 client/ui/editor/inspectors/aura/page_InspectorAuraEffects.lua
-client/ui/editor/inspectors/aura/page_InspectorAuraEvents.lua
 client/ui/editor/inspectors/page_InspectorAura.lua
 client/ui/editor/inspectors/spell/page_InspectorSpellShared.lua
 client/ui/editor/inspectors/spell/page_InspectorSpellGeneral.lua
