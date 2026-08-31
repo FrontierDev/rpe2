@@ -1214,6 +1214,7 @@ local function phaseActivation(state, deadlineMs)
                 local profile = type(SpellEvaluator.BuildSpellProfile) == "function"
                     and SpellEvaluator.BuildSpellProfile(activation, {
                         auraDefinitionCache = state.scratch.auraDefinitionCache,
+                        activeAurasByTargetEventId = state.snapshot.activeAurasByTargetEventId,
                     })
                     or nil
                 state.scratch.profileByKey[cacheKey] = profile or false
