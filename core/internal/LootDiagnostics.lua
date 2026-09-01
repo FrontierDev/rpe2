@@ -294,6 +294,9 @@ function Loot.DiagnoseLootTable(loot)
         diagnosis.totalWeight = rawTotalWeight
     end
 
+    -- Per-entry validation above uses the canonical validator on each row. Apply
+    -- the canonical cross-row duplicate-ID constraint without changing the full
+    -- table result, whose reason/detail came directly from ValidateLootTable.
     local seenIds = {}
     for index = 1, #diagnosis.entries do
         local row = diagnosis.entries[index]
