@@ -33,7 +33,7 @@ local ENTRY_DEFINITIONS = {
     itemSlots = { className = "ItemSlot", singular = "Item Slot", buttonLabel = "New Item Slot", emptyName = "Unnamed Item Slot", assignsId = true },
     weaponTypes = { className = "WeaponType", singular = "Weapon Type", buttonLabel = "New Weapon Type", emptyName = "Unnamed Weapon Type", assignsId = true },
     damageSchools = { className = "DamageSchool", singular = "Damage School", buttonLabel = "New Damage School", emptyName = "Unnamed Damage School", assignsId = true },
-    loot = { className = "Loot", singular = "Loot", buttonLabel = "New Loot", emptyName = "Unnamed Loot", assignsId = true },
+    loot = { className = "Loot", singular = "Loot Table", buttonLabel = "New Loot Table", emptyName = "Unnamed Loot Table", assignsId = true },
     recipes = { className = "Recipe", singular = "Recipe", buttonLabel = "New Recipe", emptyName = "Unnamed Recipe", assignsId = true },
     auras = { className = "Aura", singular = "Aura", buttonLabel = "New Aura", emptyName = "Unnamed Aura", assignsId = true },
     interactions = { className = "Interaction", singular = "Interaction", buttonLabel = "New Interaction", emptyName = "Unnamed Interaction", assignsId = true },
@@ -55,6 +55,7 @@ local INSPECTOR_PAGE_BY_COLLECTION = {
     itemSlots = "itemSlot",
     weaponTypes = "weaponType",
     damageSchools = "damageSchool",
+    loot = "loot",
     stats = "stat",
     resources = "resource",
     achievements = "achievement",
@@ -102,6 +103,7 @@ local INSPECTOR_REFRESHER_BY_PAGE = {
     itemSlot = "RefreshItemSlotInspectorPage",
     weaponType = "RefreshWeaponTypeInspectorPage",
     damageSchool = "RefreshDamageSchoolInspectorPage",
+    loot = "RefreshLootInspectorPage",
     stat = "RefreshStatInspectorPage",
     resource = "RefreshResourceInspectorPage",
     achievement = "RefreshAchievementInspectorPage",
@@ -124,6 +126,7 @@ local INSPECTOR_SELECTION_GETTER_BY_PAGE = {
     itemSlot = "GetSelectedItemSlot",
     weaponType = "GetSelectedWeaponType",
     damageSchool = "GetSelectedDamageSchool",
+    loot = "GetSelectedLoot",
     stat = "GetSelectedStat",
     resource = "GetSelectedResource",
     achievement = "GetSelectedAchievement",
@@ -147,6 +150,7 @@ local function collectionQueuesDependencyRecompute(collectionKey)
         or collectionKey == "itemSlots"
         or collectionKey == "weaponTypes"
         or collectionKey == "damageSchools"
+        or collectionKey == "loot"
         or collectionKey == "auras"
         or collectionKey == "achievements"
         or collectionKey == "guildSettings"
@@ -338,6 +342,8 @@ function DataEditor:SetSelectedDatasetEntryIndex(collectionKey, index)
     if collectionKey == "auras" then
         self.SelectedAuraEffectIndex = nil
         self.SelectedAuraScalingIndex = nil
+    elseif collectionKey == "loot" then
+        self.SelectedLootEntryIndex = nil
     end
     local dataset = self:GetSelectedDataset()
     local entries = dataset and dataset[collectionKey] or nil
@@ -403,6 +409,9 @@ function DataEditor:CreateDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = "weaponType"
         elseif collectionKey == "damageSchools" then
             self.ActiveInspectorPageKey = "damageSchool"
+        elseif collectionKey == "loot" then
+            self.SelectedLootEntryIndex = nil
+            self.ActiveInspectorPageKey = "loot"
         elseif collectionKey == "stats" then
             self.ActiveInspectorPageKey = "stat"
         elseif collectionKey == "resources" then
@@ -459,6 +468,9 @@ function DataEditor:CloneSelectedDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = "weaponType"
         elseif collectionKey == "damageSchools" then
             self.ActiveInspectorPageKey = "damageSchool"
+        elseif collectionKey == "loot" then
+            self.SelectedLootEntryIndex = nil
+            self.ActiveInspectorPageKey = "loot"
         elseif collectionKey == "stats" then
             self.ActiveInspectorPageKey = "stat"
         elseif collectionKey == "resources" then
@@ -521,6 +533,9 @@ function DataEditor:DeleteSelectedDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = nextIndex and "weaponType" or "dataset"
         elseif collectionKey == "damageSchools" then
             self.ActiveInspectorPageKey = nextIndex and "damageSchool" or "dataset"
+        elseif collectionKey == "loot" then
+            self.SelectedLootEntryIndex = nil
+            self.ActiveInspectorPageKey = nextIndex and "loot" or "dataset"
         elseif collectionKey == "stats" then
             self.ActiveInspectorPageKey = nextIndex and "stat" or "dataset"
         elseif collectionKey == "resources" then
@@ -638,7 +653,7 @@ local CONTENT_PAGE_DEFINITIONS = {
     { key = "itemSlots", label = "Item Slots", builder = "BuildItemSlotsPage" },
     { key = "weaponTypes", label = "Weapon Types", builder = "BuildWeaponTypesPage" },
     { key = "damageSchools", label = "Damage Schools", builder = "BuildDamageSchoolsPage" },
-    { key = "loot", label = "Loot", builder = "BuildLootPage" },
+    { key = "loot", label = "Loot Tables", builder = "BuildLootPage" },
     { key = "recipes", label = "Recipe", builder = "BuildRecipePage" },
     { key = "auras", label = "Aura", builder = "BuildAuraPage" },
     { key = "interactions", label = "Interaction", builder = "BuildInteractionPage" },
@@ -1192,6 +1207,10 @@ function DataEditor:GetSelectedResource()
     return self:GetSelectedDatasetEntry("resources")
 end
 
+function DataEditor:GetSelectedLoot()
+    return self:GetSelectedDatasetEntry("loot")
+end
+
 function DataEditor:GetSelectedAchievement()
     return self:GetSelectedDatasetEntry("achievements")
 end
@@ -1234,6 +1253,7 @@ function DataEditor:SetSelectedDatasetId(datasetId)
     self.SelectedEntryIndices = {}
     self.SelectedAuraEffectIndex = nil
     self.SelectedAuraScalingIndex = nil
+    self.SelectedLootEntryIndex = nil
     self.ActiveInspectorPageKey = "dataset"
     if self.Database and self.Database.SetActiveDatasetId then
         self.Database.SetActiveDatasetId(datasetId)
@@ -1662,6 +1682,7 @@ function DataEditor:DeleteDataset(datasetId)
 
     self.SelectedUnitIndex = nil
     self.SelectedEntryIndices = {}
+    self.SelectedLootEntryIndex = nil
     self.ActiveInspectorPageKey = "dataset"
 
     if self.Database and self.Database.SetActiveDatasetId then
@@ -1704,6 +1725,7 @@ function DataEditor:ShowInspectorPage(pageKey)
         itemSlot = "BuildItemSlotInspectorPage",
         weaponType = "BuildWeaponTypeInspectorPage",
         damageSchool = "BuildDamageSchoolInspectorPage",
+        loot = "BuildLootInspectorPage",
         spell = "BuildSpellInspectorPage",
         trait = "BuildTraitInspectorPage",
         skill = "BuildSkillInspectorPage",
@@ -1847,6 +1869,9 @@ function DataEditor:RefreshAll()
     end
     if self.RefreshDamageSchoolInspectorPage then
         self:RefreshDamageSchoolInspectorPage()
+    end
+    if self.RefreshLootInspectorPage then
+        self:RefreshLootInspectorPage()
     end
     if self.RefreshStatInspectorPage then
         self:RefreshStatInspectorPage()
