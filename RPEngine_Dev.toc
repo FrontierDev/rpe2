@@ -112,6 +112,7 @@ core/classes/Event.lua
 core/classes/EventAutopilotMode.lua
 core/classes/EventVariantNetwork.lua
 core/classes/EventVariantSpellEquipmentNetwork.lua
+core/classes/EventEndLoot.lua
 
 client/client_Event.lua
 client/client_Loot.lua
@@ -119,6 +120,7 @@ client/client_CombatLog.lua
 client/client_CombatLogTurnIdentity.lua
 client/client_Skills.lua
 server/server_Event.lua
+server/server_EventEndLoot.lua
 server/server_Loot.lua
 server/server_EventAutopilot.lua
 server/server_EventVariants.lua
@@ -175,6 +177,7 @@ client/client_Targeting.lua
 client/spellcasting/ExplicitCasterActivation.lua
 client/autopilot/MovementAllowanceFrozen.lua
 client/autopilot/PlannerIntegration.lua
+client/autopilot/PlannerEndLoot.lua
 client/autopilot/Authorization.lua
 client/autopilot/Execution.lua
 client/autopilot/AuthorizationSequence.lua
@@ -285,6 +288,7 @@ server/ui/eventmanage/page_EventManageUnits.lua
 server/ui/eventmanage/page_EventManageVariantPresentation.lua
 server/ui/eventmanage/page_EventManageActions.lua
 server/ui/eventmanage/page_EventManageSettings.lua
+server/ui/eventmanage/page_EventManageSettingsLoot.lua
 server/ui/eventmanage/page_EventManageAutopilot.lua
 server/ui/window_EventManage.lua
 client/ui/editor/pages/page_Datasets.lua
