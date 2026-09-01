@@ -15,6 +15,7 @@ end
 local baseRecomputeDatasetDependencies = Dependecies.RecomputeDatasetDependencies
 local baseHandleDatasetDeleted = Dependecies.HandleDatasetDeleted
 local baseHandleDatasetEntryDeleted = Dependecies.HandleDatasetEntryDeleted
+local trackedRecomputes = nil
 
 local function getDatasetRoot()
     return Database.Datasets or rawget(_G or {}, "RPEngineDatasetDB")
@@ -27,7 +28,7 @@ local function parseQualifiedRef(reference)
 
     local text = tostring(reference or "")
     local datasetId, entryId = text:match("^([^:]+):([^:]+)$")
-    if datasetId == "" or entryId == "" then
+    if not datasetId or datasetId == "" or not entryId or entryId == "" then
         return nil, nil
     end
     return datasetId, entryId
@@ -40,6 +41,20 @@ local function isLootReferenceEntry(entry)
 
     local entryType = string.lower(tostring(entry.type or ""))
     return entryType == "item" or entryType == "currency"
+end
+
+local function iterateLootEntries(dataset, callback)
+    if type(dataset) ~= "table" or type(callback) ~= "function" then
+        return
+    end
+
+    for _, loot in pairs(type(dataset.loot) == "table" and dataset.loot or {}) do
+        if type(loot) == "table" and type(loot.entries) == "table" then
+            for _, entry in pairs(loot.entries) do
+                callback(entry)
+            end
+        end
+    end
 end
 
 local function appendLootDependencies(dataset, dependencies)
@@ -55,22 +70,18 @@ local function appendLootDependencies(dataset, dependencies)
         end
     end
 
-    for lootIndex = 1, #(dataset.loot or {}) do
-        local loot = dataset.loot[lootIndex]
-        for entryIndex = 1, #(type(loot) == "table" and loot.entries or {}) do
-            local entry = loot.entries[entryIndex]
-            if isLootReferenceEntry(entry) then
-                local sourceDatasetId = parseQualifiedRef(entry.ref)
-                if sourceDatasetId
-                    and sourceDatasetId ~= tostring(dataset.id or "")
-                    and not seen[sourceDatasetId]
-                then
-                    dependencies[#dependencies + 1] = sourceDatasetId
-                    seen[sourceDatasetId] = true
-                end
+    iterateLootEntries(dataset, function(entry)
+        if isLootReferenceEntry(entry) then
+            local sourceDatasetId = parseQualifiedRef(entry.ref)
+            if sourceDatasetId
+                and sourceDatasetId ~= tostring(dataset.id or "")
+                and not seen[sourceDatasetId]
+            then
+                dependencies[#dependencies + 1] = sourceDatasetId
+                seen[sourceDatasetId] = true
             end
         end
-    end
+    end)
 
     table.sort(dependencies, function(left, right)
         return tostring(left or "") < tostring(right or "")
@@ -84,33 +95,53 @@ local function pruneLootReferences(dataset, deletedDatasetId, deletedRef, collec
     end
 
     local mutated = false
-    for lootIndex = 1, #(dataset.loot or {}) do
-        local loot = dataset.loot[lootIndex]
-        for entryIndex = 1, #(type(loot) == "table" and loot.entries or {}) do
-            local entry = loot.entries[entryIndex]
-            if isLootReferenceEntry(entry) then
-                local entryType = string.lower(tostring(entry.type or ""))
-                local expectedCollection = entryType == "item" and "items" or "currencies"
-                local matchesCollection = collectionKey == nil or collectionKey == expectedCollection
-                local sourceDatasetId = parseQualifiedRef(entry.ref)
-                local matchesDeleted = deletedRef ~= nil
-                    and tostring(entry.ref or "") == tostring(deletedRef)
-                    or (deletedDatasetId ~= nil and sourceDatasetId == tostring(deletedDatasetId))
+    iterateLootEntries(dataset, function(entry)
+        if isLootReferenceEntry(entry) then
+            local entryType = string.lower(tostring(entry.type or ""))
+            local expectedCollection = entryType == "item" and "items" or "currencies"
+            local matchesCollection = collectionKey == nil or collectionKey == expectedCollection
+            local sourceDatasetId = parseQualifiedRef(entry.ref)
+            local matchesDeleted = (deletedRef ~= nil and tostring(entry.ref or "") == tostring(deletedRef))
+                or (deletedDatasetId ~= nil and sourceDatasetId == tostring(deletedDatasetId))
 
-                if matchesCollection and matchesDeleted then
-                    -- Preserve the authored entry and its weight/quantity semantics so the
-                    -- editor/runtime validator can report the missing reference explicitly.
-                    entry.ref = nil
-                    mutated = true
-                end
+            if matchesCollection and matchesDeleted then
+                -- Preserve the authored entry and its weight/quantity semantics so the
+                -- editor/runtime validator can report the missing reference explicitly.
+                entry.ref = nil
+                mutated = true
             end
         end
-    end
+    end)
 
     return mutated
 end
 
+local function beginTrackingRecomputes()
+    local previous = trackedRecomputes
+    trackedRecomputes = {}
+    return previous
+end
+
+local function finishTrackingRecomputes(previous)
+    local completed = trackedRecomputes or {}
+    trackedRecomputes = previous
+    return completed
+end
+
+local function countKeys(values)
+    local count = 0
+    for _ in pairs(values or {}) do
+        count = count + 1
+    end
+    return count
+end
+
 function Dependecies.RecomputeDatasetDependencies(datasetId)
+    local normalizedDatasetId = tostring(datasetId or "")
+    if trackedRecomputes and normalizedDatasetId ~= "" then
+        trackedRecomputes[normalizedDatasetId] = true
+    end
+
     local dependencies = type(baseRecomputeDatasetDependencies) == "function"
         and baseRecomputeDatasetDependencies(datasetId)
         or nil
@@ -121,7 +152,7 @@ function Dependecies.RecomputeDatasetDependencies(datasetId)
     local root = getDatasetRoot()
     local dataset = type(root) == "table"
         and type(root.datasets) == "table"
-        and root.datasets[tostring(datasetId or "")]
+        and root.datasets[normalizedDatasetId]
         or nil
     if not dataset then
         return dependencies
@@ -141,20 +172,22 @@ function Dependecies.HandleDatasetDeleted(datasetId)
             if tostring(currentDatasetId) ~= tostring(datasetId)
                 and pruneLootReferences(dataset, tostring(datasetId), nil, nil)
             then
-                lootMutatedDatasetIds[#lootMutatedDatasetIds + 1] = tostring(currentDatasetId)
+                lootMutatedDatasetIds[tostring(currentDatasetId)] = true
             end
         end
     end
 
-    local changed = type(baseHandleDatasetDeleted) == "function"
-        and baseHandleDatasetDeleted(datasetId)
-        or 0
-
-    for index = 1, #lootMutatedDatasetIds do
-        Dependecies.RecomputeDatasetDependencies(lootMutatedDatasetIds[index])
+    local previousTracking = beginTrackingRecomputes()
+    if type(baseHandleDatasetDeleted) == "function" then
+        baseHandleDatasetDeleted(datasetId)
     end
 
-    return math.max(tonumber(changed) or 0, #lootMutatedDatasetIds)
+    for currentDatasetId in pairs(lootMutatedDatasetIds) do
+        Dependecies.RecomputeDatasetDependencies(currentDatasetId)
+    end
+    local changedDatasetIds = finishTrackingRecomputes(previousTracking)
+
+    return countKeys(changedDatasetIds)
 end
 
 function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
@@ -172,21 +205,23 @@ function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
         if type(root) == "table" and type(root.datasets) == "table" then
             for currentDatasetId, dataset in pairs(root.datasets) do
                 if pruneLootReferences(dataset, nil, deletedRef, collectionKey) then
-                    lootMutatedDatasetIds[#lootMutatedDatasetIds + 1] = tostring(currentDatasetId)
+                    lootMutatedDatasetIds[tostring(currentDatasetId)] = true
                 end
             end
         end
     end
 
-    local changed = type(baseHandleDatasetEntryDeleted) == "function"
-        and baseHandleDatasetEntryDeleted(datasetId, collectionKey, entry)
-        or 0
-
-    for index = 1, #lootMutatedDatasetIds do
-        Dependecies.RecomputeDatasetDependencies(lootMutatedDatasetIds[index])
+    local previousTracking = beginTrackingRecomputes()
+    if type(baseHandleDatasetEntryDeleted) == "function" then
+        baseHandleDatasetEntryDeleted(datasetId, collectionKey, entry)
     end
 
-    return math.max(tonumber(changed) or 0, #lootMutatedDatasetIds)
+    for currentDatasetId in pairs(lootMutatedDatasetIds) do
+        Dependecies.RecomputeDatasetDependencies(currentDatasetId)
+    end
+    local changedDatasetIds = finishTrackingRecomputes(previousTracking)
+
+    return countKeys(changedDatasetIds)
 end
 
 Dependecies._lootDependencyIntegrationInstalled = true
