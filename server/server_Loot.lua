@@ -430,6 +430,10 @@ local function validateExecuteContext(context)
     end
     local eventState = type(Server.GetEventState) == "function" and Server:GetEventState() or Server.EventState
     if type(eventState) ~= "table" or eventState.active ~= true then
+        local source = trim(type(context) == "table" and context.source or "")
+        if source == "event-manager" and type(Loot.ResolveRetainedEventManagerAuthority) == "function" then
+            return Loot:ResolveRetainedEventManagerAuthority(context)
+        end
         return nil, "event-inactive"
     end
     if type(Server.IsEventUnitsReady) == "function" and Server:IsEventUnitsReady() ~= true then
