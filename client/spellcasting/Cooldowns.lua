@@ -238,13 +238,8 @@ local function getConfigurationRevision()
     return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
 end
 
-local function spellIgnoresGlobalCooldown(spell)
-    return type(spell) == "table" and spell.ignoreGCD == true
-end
-
-local function spellUsesGlobalCooldown(spell)
-    return spellIgnoresGlobalCooldown(spell) ~= true and type(spell) == "table" and spell.triggersGCD == true
-end
+local spellIgnoresGlobalCooldown = Spellcasting.SpellIgnoresGlobalCooldown
+local spellUsesGlobalCooldown = Spellcasting.SpellUsesGlobalCooldown
 
 local function normalizeCooldownTurns(spell, requirePositive)
     local turns = Spellcasting.NormalizeTurnCount and Spellcasting.NormalizeTurnCount(spell and spell.cooldown) or nil

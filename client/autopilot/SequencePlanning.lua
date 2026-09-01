@@ -241,15 +241,33 @@ local function appendResolvedCosts(target, costs, result)
     end
 end
 
-local function buildResourceCommitments(candidate)
+local function buildResourceCommitments(candidate, protectsFutureActivation)
     local activation = type(candidate) == "table" and candidate.activationSnapshot or nil
     local casterUnit = type(activation) == "table" and activation.casterUnit or nil
-    local result = {}
     if type(casterUnit) ~= "table" then
-        return result
+        return {}
     end
-    appendResolvedCosts(casterUnit, activation.startCosts or {}, result)
-    appendResolvedCosts(casterUnit, activation.endCosts or {}, result)
+
+    local startCommitments = {}
+    local endCommitments = {}
+    appendResolvedCosts(casterUnit, activation.startCosts or {}, startCommitments)
+    appendResolvedCosts(casterUnit, activation.endCosts or {}, endCommitments)
+
+    local result = copyMap(startCommitments)
+    for resourceRef, amount in pairs(endCommitments) do
+        if protectsFutureActivation == true then
+            -- Canonical activation checks start/end affordability separately.
+            -- A main action executes after all auxiliaries, so earlier actions
+            -- only need to preserve the larger phase requirement for that
+            -- later live activation; summing both phases would be stricter
+            -- than BuildSpellActivationSnapshot.
+            result[resourceRef] = math.max(normalizeNonNegative(result[resourceRef]), normalizeNonNegative(amount))
+        else
+            -- An instant auxiliary resolves before the next sequence action,
+            -- so both phases are actual prior consumption and must be reserved.
+            result[resourceRef] = normalizeNonNegative(result[resourceRef]) + normalizeNonNegative(amount)
+        end
+    end
     return result
 end
 
@@ -262,16 +280,18 @@ local function buildActionEconomyInput(candidate)
         return nil
     end
 
-    local normalizeTurns = type(Spellcasting.NormalizeTurnCount) == "function"
-        and Spellcasting.NormalizeTurnCount
-        or function(value)
-            local numeric = tonumber(value)
-            return numeric and numeric > 0 and math.max(1, math.ceil(numeric)) or nil
-        end
-    local persistentCastTurns = normalizeTurns(spell.totalTicks) or normalizeTurns(spell.castTime)
-    local ignoresGlobalCooldown = spell.ignoreGCD == true
-    local usesGlobalCooldown = ignoresGlobalCooldown ~= true and spell.triggersGCD == true
-    local cooldownTurns = normalizeTurns(spell.cooldown)
+    if type(Spellcasting.ResolvePersistentCastTurns) ~= "function"
+        or type(Spellcasting.SpellIgnoresGlobalCooldown) ~= "function"
+        or type(Spellcasting.SpellUsesGlobalCooldown) ~= "function"
+        or type(Spellcasting.NormalizeTurnCount) ~= "function"
+    then
+        return nil
+    end
+
+    local persistentCastTurns = Spellcasting.ResolvePersistentCastTurns(spell)
+    local ignoresGlobalCooldown = Spellcasting.SpellIgnoresGlobalCooldown(spell)
+    local usesGlobalCooldown = Spellcasting.SpellUsesGlobalCooldown(spell)
+    local cooldownTurns = Spellcasting.NormalizeTurnCount(spell.cooldown)
     local cooldownGroup = nil
     if cooldownTurns ~= nil then
         local group = tostring(spell.cooldownGroup or "")
@@ -286,7 +306,10 @@ local function buildActionEconomyInput(candidate)
         usesGlobalCooldown = usesGlobalCooldown,
         ignoresGlobalCooldown = ignoresGlobalCooldown,
         cooldownGroup = cooldownGroup,
-        resourceCommitments = buildResourceCommitments(candidate),
+        resourceCommitments = buildResourceCommitments(
+            candidate,
+            persistentCastTurns ~= nil or usesGlobalCooldown == true
+        ),
     })
 end
 

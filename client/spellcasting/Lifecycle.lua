@@ -562,10 +562,7 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
 
     local timer = startTiming("Spellcast start", 8, spellRef)
 
-    local numericCastTime = Spellcasting.NormalizeTurnCount(castTime)
-    if numericCastTime == nil then
-        numericCastTime = Spellcasting.NormalizeTurnCount(spell.totalTicks) or Spellcasting.NormalizeTurnCount(spell.castTime)
-    end
+    local numericCastTime = Spellcasting.ResolvePersistentCastTurns(spell, castTime)
 
     local startCosts = snapshot.startCosts or Spellcasting.GetSpellResourceCostsForPhase(spell, "on_cast_start")
     local resolvedStartCostAmounts = nil

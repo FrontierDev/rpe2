@@ -1191,6 +1191,31 @@ function Spellcasting.NormalizeTurnCount(turnCount)
     return math.max(1, math.ceil(numericTurns))
 end
 
+
+-- Canonical pure spell classification helpers. Keep planner projections and
+-- live cooldown/lifecycle rules on the same definitions.
+function Spellcasting.SpellIgnoresGlobalCooldown(spell)
+    return type(spell) == "table" and spell.ignoreGCD == true
+end
+
+function Spellcasting.SpellUsesGlobalCooldown(spell)
+    return Spellcasting.SpellIgnoresGlobalCooldown(spell) ~= true
+        and type(spell) == "table"
+        and spell.triggersGCD == true
+end
+
+function Spellcasting.ResolvePersistentCastTurns(spell, turnCountOverride)
+    local turns = Spellcasting.NormalizeTurnCount(turnCountOverride)
+    if turns ~= nil then
+        return turns
+    end
+    if type(spell) ~= "table" then
+        return nil
+    end
+    return Spellcasting.NormalizeTurnCount(spell.totalTicks)
+        or Spellcasting.NormalizeTurnCount(spell.castTime)
+end
+
 function Spellcasting.NormalizeRefundFraction(refundOnInterrupt)
     local numericRefund = tonumber(refundOnInterrupt) or 0
     if numericRefund <= 0 then
