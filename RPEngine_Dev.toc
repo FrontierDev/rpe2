@@ -169,6 +169,7 @@ client/autopilot/MovementAllowanceFrozen.lua
 client/autopilot/PlannerIntegration.lua
 client/autopilot/Authorization.lua
 client/autopilot/Execution.lua
+client/autopilot/AuthorizationSequence.lua
 client/client_PendingChanges.lua
 server/server_Spellcasting.lua
 

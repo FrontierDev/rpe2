@@ -529,6 +529,9 @@ local function buildSpellRow(eventState, action)
     local targets = targetNames(eventState, action and action.targetEventIds)
     local status = tostring(action and action.status or "pending")
     local reason = tostring(action and action.reason or "")
+    local dependencyReasons = type(action and action.dependencyReasons) == "table"
+        and action.dependencyReasons
+        or {}
     local displayText = ("%s casts %s at %s"):format(caster, spell, targets)
 
     local lines = {}
@@ -555,7 +558,11 @@ local function buildSpellRow(eventState, action)
         status = status,
         reasonCode = reasonCode,
         reasonText = reasonText,
-        canAuthorize = status == "pending",
+        dependencyReasons = {
+            sequence = dependencyReasons.sequence,
+            movement = dependencyReasons.movement,
+        },
+        canAuthorize = action and action.canAuthorize == true,
         canReject = status == "pending" or status == "blocked",
     }
 end
