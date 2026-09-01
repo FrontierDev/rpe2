@@ -43,6 +43,7 @@ core/internal/ruleset/Ruleset.lua
 core/internal/ruleset/NpcDifficulty.lua
 core/internal/Registry.lua
 core/internal/RegistryLoot.lua
+core/internal/Loot.lua
 core/internal/comms/ResourceSync.lua
 core/internal/Movement.lua
 core/internal/Autopilot.lua
