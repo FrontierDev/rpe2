@@ -138,6 +138,46 @@ local function generateHashFromSegments(salts, segments)
     })
 end
 
+local function collectDatasetHashIds(rootIds)
+    local ids = {}
+    local seen = {}
+
+    local function visit(datasetId)
+        local normalizedId = tostring(datasetId or "")
+        if normalizedId == "" or seen[normalizedId] then
+            return
+        end
+        seen[normalizedId] = true
+        ids[#ids + 1] = normalizedId
+
+        local dataset = Database.GetDatasetByID and Database.GetDatasetByID(normalizedId) or nil
+        local dependencies = {}
+        local dependencySeen = {}
+        for index = 1, #(dataset and dataset.dependencies or {}) do
+            local dependencyId = tostring(dataset.dependencies[index] or "")
+            if dependencyId ~= "" and not dependencySeen[dependencyId] then
+                dependencySeen[dependencyId] = true
+                dependencies[#dependencies + 1] = dependencyId
+            end
+        end
+        sortIds(dependencies)
+        for index = 1, #dependencies do
+            visit(dependencies[index])
+        end
+    end
+
+    local roots = {}
+    for index = 1, #(rootIds or {}) do
+        roots[#roots + 1] = rootIds[index]
+    end
+    sortIds(roots)
+    for index = 1, #roots do
+        visit(roots[index])
+    end
+
+    return sortIds(ids)
+end
+
 function Registry:ListActivatedDatasetIds()
     if Database.ListActivatedDatasetIds then
         return Database.ListActivatedDatasetIds()
@@ -199,14 +239,8 @@ function Registry:GenerateActivatedDatasetsHash()
         return cached.value
     end
 
-    local ids = self:ListActivatedDatasetIds() or {}
-    local sortedIds = {}
+    local sortedIds = collectDatasetHashIds(self:ListActivatedDatasetIds() or {})
     local segments = {}
-
-    for index = 1, #ids do
-        sortedIds[index] = ids[index]
-    end
-    sortIds(sortedIds)
 
     for index = 1, #sortedIds do
         local datasetId = tostring(sortedIds[index] or "")
