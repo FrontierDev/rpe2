@@ -555,7 +555,6 @@ if type(baseAuthorizeAllPendingActions) == "function" then
                     if type(attemptedAction) ~= "table" then
                         return false, authorized, reason
                     end
-                    Authorization.RefreshPlanDependencies(plan)
                     local afterStatus = tostring(attemptedAction.status or "")
                     if afterStatus ~= tostring(beforeStatus or "") then
                         transitionCount = transitionCount + 1
@@ -578,7 +577,6 @@ if type(baseAuthorizeAllPendingActions) == "function" then
             end
         end
 
-        Authorization.RefreshPlanDependencies(plan)
         notifyHelperRefresh()
         return true, authorized
     end
