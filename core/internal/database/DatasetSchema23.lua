@@ -46,33 +46,75 @@ local function normalizeLootRecord(record)
     return record
 end
 
-local function normalizeLootCollections(root)
+local function normalizeDatasetLoot(dataset)
+    if type(dataset) ~= "table" or type(dataset.loot) ~= "table" then
+        return dataset
+    end
+
+    for key, lootRecord in pairs(dataset.loot) do
+        if type(lootRecord) == "table" then
+            dataset.loot[key] = normalizeLootRecord(lootRecord)
+        end
+    end
+    return dataset
+end
+
+local function advanceDatasetSchema(root)
+    if type(root) == "table" then
+        root._schema = math.max(tonumber(root._schema) or 0, DATASET_SCHEMA_VERSION)
+    end
+    return root
+end
+
+local function normalizeExistingLoot(root)
     if type(root) ~= "table" then
         return root
     end
 
     for _, dataset in pairs(type(root.datasets) == "table" and root.datasets or {}) do
-        if type(dataset) == "table" and type(dataset.loot) == "table" then
-            for index = 1, #dataset.loot do
-                if type(dataset.loot[index]) == "table" then
-                    normalizeLootRecord(dataset.loot[index])
-                end
-            end
-        end
+        normalizeDatasetLoot(dataset)
     end
-
-    root._schema = math.max(tonumber(root._schema) or 0, DATASET_SCHEMA_VERSION)
-    return root
+    return advanceDatasetSchema(root)
 end
 
-normalizeLootCollections(rawget(_G, "RPEngineDatasetDB"))
+-- Existing saved datasets were initialized before Loot.lua was loaded, so run
+-- the schema-23 Loot normalization once now that the class is available.
+local normalizedRoot = normalizeExistingLoot(rawget(_G, "RPEngineDatasetDB"))
 
 local baseEnsureDatasets = Database.EnsureDatasets
 function Database.EnsureDatasets(...)
     local root = type(baseEnsureDatasets) == "function"
         and baseEnsureDatasets(...)
         or rawget(_G, "RPEngineDatasetDB")
-    return normalizeLootCollections(root)
+
+    -- A replaced SavedVariables root needs one normalization pass. Normal reads
+    -- only advance the marker and do not rescan every Loot Table.
+    if root ~= normalizedRoot then
+        normalizedRoot = normalizeExistingLoot(root)
+    else
+        advanceDatasetSchema(root)
+    end
+    return root
+end
+
+-- Full-dataset import uses normalizeDatasetRecord rather than per-entry class
+-- normalization, so normalize the imported Loot collection at this boundary.
+local baseImportDataset = Database.ImportDataset
+if type(baseImportDataset) == "function" then
+    function Database.ImportDataset(...)
+        local dataset, err = baseImportDataset(...)
+        if type(dataset) ~= "table" then
+            return dataset, err
+        end
+
+        normalizeDatasetLoot(dataset)
+        if type(Database.Dependecies) == "table"
+            and type(Database.Dependecies.RecomputeDatasetDependencies) == "function"
+        then
+            Database.Dependecies.RecomputeDatasetDependencies(dataset.id)
+        end
+        return dataset, err
+    end
 end
 
 Database.DatasetSchemaVersion = DATASET_SCHEMA_VERSION
