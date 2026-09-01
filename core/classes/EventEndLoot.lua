@@ -263,6 +263,7 @@ end
 local baseMerge = Event.Merge
 function Event:Merge(data)
     local existingCanonical = cloneEndLootGrants(self.endLootGrants)
+    local canonicalAlreadyEstablished = self._endLootCanonicalPresent == true
     local hasCanonicalInput = type(data) == "table" and data.endLootGrants ~= nil
     local hasLegacyInput = type(data) == "table" and data.lootRefs ~= nil
     local constructionContext = Event._endLootConstructionContext
@@ -271,12 +272,16 @@ function Event:Merge(data)
 
     if hasCanonicalInput then
         self.endLootGrants = cloneEndLootGrants(data.endLootGrants)
+        self._endLootCanonicalPresent = true
     elseif type(constructionContext) == "table" and hasLegacyInput then
         self.endLootGrants = cloneEndLootGrants(constructionContext)
-    elseif #existingCanonical > 0 then
+        self._endLootCanonicalPresent = true
+    elseif canonicalAlreadyEstablished then
         self.endLootGrants = existingCanonical
+        self._endLootCanonicalPresent = true
     elseif hasLegacyInput and type(self.lootRefs) == "table" and #self.lootRefs > 0 then
         self.endLootGrants = buildEndLootGrantsFromLegacyRefs(self.lootRefs)
+        self._endLootCanonicalPresent = true
     else
         self.endLootGrants = cloneEndLootGrants(self.endLootGrants)
     end
