@@ -118,8 +118,17 @@ local function actionStatusColorToken(item)
     end
     if value == "blocked" and type(item) == "table" then
         local dependencies = type(item.dependencyReasons) == "table" and item.dependencyReasons or {}
-        if tostring(dependencies.sequence or "") == "previous-caster-action-pending"
-            or tostring(dependencies.movement or "") == "movement-pending"
+        local sequenceReason = tostring(dependencies.sequence or "")
+        local movementReason = tostring(dependencies.movement or "")
+        if sequenceReason == "previous-caster-action-failed"
+            or sequenceReason == "previous-caster-action-stale"
+            or sequenceReason == "sequence-invariant-invalid"
+            or movementReason == "movement-stale"
+        then
+            return "danger"
+        end
+        if sequenceReason == "previous-caster-action-pending"
+            or movementReason == "movement-pending"
         then
             return "warning"
         end
