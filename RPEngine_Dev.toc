@@ -287,6 +287,7 @@ server/ui/eventmanage/page_EventManageDashboard.lua
 server/ui/eventmanage/page_EventManageUnits.lua
 server/ui/eventmanage/page_EventManageVariantPresentation.lua
 server/ui/eventmanage/page_EventManageActions.lua
+server/ui/eventmanage/page_EventManageActionsLoot.lua
 server/ui/eventmanage/page_EventManageSettings.lua
 server/ui/eventmanage/page_EventManageSettingsLoot.lua
 server/ui/eventmanage/page_EventManageAutopilot.lua
