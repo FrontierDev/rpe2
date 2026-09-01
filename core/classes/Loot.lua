@@ -94,9 +94,13 @@ local function normalizeEntries(entries)
         return {}
     end
 
-    local normalized = {}
-    for index = 1, #entries do
-        normalized[index] = normalizeEntry(entries[index])
+    -- Preserve unknown/sparse imported keys rather than collapsing malformed data
+    -- that a later editor/runtime validator needs to diagnose explicitly.
+    local normalized = deepCopy(entries)
+    for key, entry in pairs(entries) do
+        if type(key) == "number" then
+            normalized[key] = normalizeEntry(entry)
+        end
     end
     return normalized
 end
