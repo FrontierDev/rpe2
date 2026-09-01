@@ -8,6 +8,7 @@ local Client = Addon.Client
 local Planner = Client.AutopilotPlanner or {}
 local SpellEvaluator = Client.AutopilotSpellEvaluator or {}
 local AuraEvaluator = Client.AutopilotAuraEvaluator or {}
+local SequencePlanning = Client.AutopilotSequencePlanning or {}
 local TargetSelector = Client.AutopilotTargetSelector or {}
 local MovementSolver = Client.AutopilotMovementSolver or {}
 local Spatial = Client.AutopilotSpatial or {}
@@ -551,12 +552,14 @@ local function appendNoAction(state, actorKey, unit, reason)
     }
 end
 
-local function buildSpellAction(state, actorKey, unit, candidate, movementActionId)
+local function buildSpellAction(state, actorKey, unit, candidate, movementActionId, sequenceIndex, sequenceCount, actionClass, previousActionId)
     local eventId = normalizeEventId(unit and unit.eventID)
     if eventId <= 0 or type(candidate) ~= "table" then
         return nil
     end
 
+    local resolvedSequenceIndex = math.max(1, math.floor(tonumber(sequenceIndex) or 1))
+    local resolvedSequenceCount = math.max(resolvedSequenceIndex, math.floor(tonumber(sequenceCount) or resolvedSequenceIndex))
     local selections, selectionOrder, targetEventIds = copyTargetSelectionMap(
         candidate.targetUnits,
         candidate.targetGroupKey
@@ -568,7 +571,7 @@ local function buildSpellAction(state, actorKey, unit, candidate, movementAction
 
     local action = {
         actionType = "spell",
-        actionId = ("%s:spell:%d"):format(state.planId, eventId),
+        actionId = ("%s:spell:%d:%d"):format(state.planId, eventId, resolvedSequenceIndex),
         planId = state.planId,
         eventId = state.eventId,
         turnNumber = state.turnNumber,
@@ -576,11 +579,23 @@ local function buildSpellAction(state, actorKey, unit, candidate, movementAction
         actorKey = tostring(actorKey or ""),
         casterEventId = eventId,
         spellRef = tostring(candidate.spellRef or ""),
+        casterSequenceIndex = resolvedSequenceIndex,
+        casterSequenceCount = resolvedSequenceCount,
+        actionEconomyClass = tostring(actionClass or ""),
+        previousCasterActionId = previousActionId,
         targetSelections = selections,
         targetSelectionOrder = selectionOrder,
         targetEventIds = targetEventIds,
         targetEventId = targetEventIds[1],
         totalUtility = tonumber(candidate.totalUtility) or 0,
+        damageUtility = tonumber(candidate.damageUtility) or 0,
+        healingUtility = tonumber(candidate.healingUtility) or 0,
+        immediateDamage = tonumber(candidate.immediateDamage) or 0,
+        periodicDamage = tonumber(candidate.periodicDamage) or 0,
+        immediateHealing = tonumber(candidate.immediateHealing) or 0,
+        periodicHealing = tonumber(candidate.periodicHealing) or 0,
+        hasPeriodicDamage = candidate.hasPeriodicDamage == true or (tonumber(candidate.periodicDamage) or 0) ~= 0,
+        hasPeriodicHealing = candidate.hasPeriodicHealing == true or (tonumber(candidate.periodicHealing) or 0) ~= 0,
         urgentHealing = candidate.urgentHealing == true,
         hasControl = candidate.hasControl == true,
         movementControlUtility = tonumber(candidate.movementControlUtility) or 0,
@@ -602,26 +617,81 @@ local function buildSpellAction(state, actorKey, unit, candidate, movementAction
     return action
 end
 
-local function reserveChosenHealing(state, candidate)
-    if type(candidate) ~= "table" or (tonumber(candidate.healingUtility) or 0) <= 0 then
-        return
+local function buildTacticalContext(state)
+    return {
+        eventState = state.snapshot.eventState,
+        auraDefinitionCache = state.scratch.auraDefinitionCache,
+        controlStateByTargetEventId = state.snapshot.controlStateByTargetEventId,
+        activeCastsByEventId = state.snapshot.activeCastsByEventId,
+    }
+end
+
+local function clonePlanTacticalLedger(state)
+    local ledger = {
+        projectedHealingLedger = state.scratch.projectedHealingLedger,
+        projectedAuraLedger = state.scratch.projectedAuraLedger,
+    }
+    return type(SequencePlanning.CloneTacticalLedger) == "function"
+        and SequencePlanning.CloneTacticalLedger(ledger)
+        or copyDeep(ledger)
+end
+
+local function commitPlanTacticalLedger(state, ledger)
+    if type(ledger) ~= "table" then
+        return false
     end
-    if type(SpellEvaluator.ReserveProjectedHealing) ~= "function" then
-        return
+    local copied = type(SequencePlanning.CloneTacticalLedger) == "function"
+        and SequencePlanning.CloneTacticalLedger(ledger)
+        or copyDeep(ledger)
+    state.scratch.projectedHealingLedger = copied.projectedHealingLedger or { reservedByEventId = {} }
+    state.scratch.projectedAuraLedger = copied.projectedAuraLedger
+    return true
+end
+
+local function initializePlanTacticalLedger(state)
+    if type(SequencePlanning.CreateTacticalLedger) == "function" then
+        local ledger = SequencePlanning.CreateTacticalLedger(state.snapshot.activeAuraRecords)
+        commitPlanTacticalLedger(state, ledger)
+    elseif state.scratch.projectedAuraLedger == nil and type(AuraEvaluator.CreateProjectedAuraLedger) == "function" then
+        state.scratch.projectedAuraLedger = AuraEvaluator.CreateProjectedAuraLedger(state.snapshot.activeAuraRecords)
     end
-    local targets = candidateTargets(candidate)
-    if #targets == 0 then
-        return
+end
+
+local function emitSequenceActions(state, actor, unit, sequence, movementActionId, noActionReason)
+    local entries = type(sequence) == "table" and sequence.actions or {}
+    if #entries == 0 then
+        appendNoAction(state, actor.key, unit, noActionReason or "no-useful-action")
+        return false
     end
-    local expectedPerTarget = tonumber(candidate.expectedHealing) or 0
-    for index = 1, #targets do
-        SpellEvaluator.ReserveProjectedHealing(
-            state.scratch.projectedHealingLedger,
-            targets[index],
-            state.snapshot.eventState,
-            expectedPerTarget
-        )
+
+    local previousActionId = nil
+    local sequenceCount = #entries
+    for sequenceIndex = 1, sequenceCount do
+        local entry = entries[sequenceIndex]
+        local candidate = type(entry) == "table" and entry.candidate or nil
+        if type(candidate) == "table" then
+            local action = buildSpellAction(
+                state,
+                actor.key,
+                unit,
+                candidate,
+                movementActionId,
+                sequenceIndex,
+                sequenceCount,
+                entry.actionClass,
+                previousActionId
+            )
+            if action then
+                state.output.actions[#state.output.actions + 1] = action
+                previousActionId = action.actionId
+            end
+        end
     end
+    if previousActionId == nil then
+        appendNoAction(state, actor.key, unit, noActionReason or "no-useful-action")
+        return false
+    end
+    return true
 end
 
 local function snapshotUnitSummary(unit, spellRefs, movementSnapshot)
@@ -973,6 +1043,7 @@ local function phaseSnapshotAuras(state, deadlineMs)
         if not auraGenerationIsCurrent(state) then
             return restartAuraGeneration(state)
         end
+        initializePlanTacticalLedger(state)
         state.phase = "snapshot-casts"
         return true
     end
@@ -1029,6 +1100,7 @@ local function phaseSnapshotAuras(state, deadlineMs)
     if not auraGenerationIsCurrent(state) then
         return restartAuraGeneration(state)
     end
+    initializePlanTacticalLedger(state)
     state.phase = "snapshot-casts"
     state.cursors.castKeyScan = nil
     return true
@@ -1251,6 +1323,8 @@ local function buildCandidateFromSelection(state, activation, profile, selection
     end
 
     local targets = selection.targetUnits or {}
+    local isHostileTarget = type(selection.policy) == "table"
+        and tostring(selection.policy.targetDisposition or "") == "enemy"
     if #targets == 0 then
         local utility = intent == "damage" and (tonumber(profile.expectedDamage) or 0) or 0
         if utility <= 0 then
@@ -1262,15 +1336,24 @@ local function buildCandidateFromSelection(state, activation, profile, selection
             targetUnits = {},
             targetEventIds = {},
             targetGroupKey = selection.targetGroupKey,
+            planningIntent = intent,
+            planningProfile = profile,
+            isHostileTarget = isHostileTarget,
             hasDamage = profile.hasDamage,
             hasHeal = profile.hasHeal,
             hasControl = profile.hasControl == true,
             hasInterrupt = profile.hasInterrupt == true,
+            hasPeriodicDamage = profile.hasPeriodicDamage == true,
+            hasPeriodicHealing = profile.hasPeriodicHealing == true,
             auraApplications = profile.auraApplications,
             appliedAuras = profile.appliedAuras,
             hasAuraApplication = profile.hasAuraApplication == true,
             damageTypes = profile.damageTypes,
             damageTypeList = profile.damageTypeList,
+            immediateDamage = tonumber(profile.immediateDamage) or 0,
+            periodicDamage = 0,
+            immediateHealing = tonumber(profile.immediateHealing) or 0,
+            periodicHealing = 0,
             expectedDamage = profile.expectedDamage,
             expectedHealing = profile.expectedHealing,
             damageUtility = utility,
@@ -1296,6 +1379,12 @@ local function buildCandidateFromSelection(state, activation, profile, selection
     local movementControlUtility = 0
     local castingPreventionUtility = 0
     local controlUtility = 0
+    local immediateDamage = 0
+    local immediateHealing = 0
+    local periodicDamage = 0
+    local periodicHealing = 0
+    local expectedDamage = 0
+    local expectedHealing = 0
     local urgentHealing = false
     local hasUsefulInterrupt = false
     local urgentInterrupt = false
@@ -1303,13 +1392,12 @@ local function buildCandidateFromSelection(state, activation, profile, selection
     local interruptRemainingTurns = nil
     local targetEventIds = {}
     local evaluateInterrupt = intent == "interrupt"
-    local isHostileTarget = type(selection.policy) == "table"
-        and tostring(selection.policy.targetDisposition or "") == "enemy"
     for index = 1, #targets do
         local target = targets[index]
         local evaluated = type(SpellEvaluator.EvaluateCandidate) == "function"
             and SpellEvaluator.EvaluateCandidate(activation, target, {
                 projectedHealingLedger = state.scratch.projectedHealingLedger,
+                projectedAuraLedger = state.scratch.projectedAuraLedger,
                 auraDefinitionCache = state.scratch.auraDefinitionCache,
                 controlStateByTargetEventId = state.snapshot.controlStateByTargetEventId,
                 activeCastsByEventId = state.snapshot.activeCastsByEventId,
@@ -1323,6 +1411,12 @@ local function buildCandidateFromSelection(state, activation, profile, selection
             movementControlUtility = movementControlUtility + (tonumber(evaluated.movementControlUtility) or 0)
             castingPreventionUtility = castingPreventionUtility + (tonumber(evaluated.castingPreventionUtility) or 0)
             controlUtility = controlUtility + (tonumber(evaluated.controlUtility) or 0)
+            immediateDamage = immediateDamage + (tonumber(evaluated.immediateDamage) or 0)
+            immediateHealing = immediateHealing + (tonumber(evaluated.immediateHealing) or 0)
+            periodicDamage = periodicDamage + (tonumber(evaluated.usefulPeriodicDamage) or 0)
+            periodicHealing = periodicHealing + (tonumber(evaluated.usefulPeriodicHealing) or 0)
+            expectedDamage = expectedDamage + (tonumber(evaluated.expectedDamage) or 0)
+            expectedHealing = expectedHealing + (tonumber(evaluated.expectedHealing) or 0)
             urgentHealing = urgentHealing or evaluated.urgentHealing == true
             if evaluateInterrupt and evaluated.hasUsefulInterrupt == true and hasUsefulInterrupt ~= true then
                 hasUsefulInterrupt = true
@@ -1352,17 +1446,26 @@ local function buildCandidateFromSelection(state, activation, profile, selection
         primaryTargetUnit = targets[1],
         targetEventId = targetEventIds[1],
         targetGroupKey = selection.targetGroupKey,
+        planningIntent = intent,
+        planningProfile = profile,
+        isHostileTarget = isHostileTarget,
         hasDamage = profile.hasDamage,
         hasHeal = profile.hasHeal,
         hasControl = profile.hasControl == true,
         hasInterrupt = profile.hasInterrupt == true,
+        hasPeriodicDamage = profile.hasPeriodicDamage == true,
+        hasPeriodicHealing = profile.hasPeriodicHealing == true,
         auraApplications = profile.auraApplications,
         appliedAuras = profile.appliedAuras,
         hasAuraApplication = profile.hasAuraApplication == true,
         damageTypes = profile.damageTypes,
         damageTypeList = profile.damageTypeList,
-        expectedDamage = profile.expectedDamage,
-        expectedHealing = profile.expectedHealing,
+        immediateDamage = immediateDamage,
+        periodicDamage = periodicDamage,
+        immediateHealing = immediateHealing,
+        periodicHealing = periodicHealing,
+        expectedDamage = expectedDamage,
+        expectedHealing = expectedHealing,
         damageUtility = damageUtility,
         healingUtility = healingUtility,
         movementControlUtility = movementControlUtility,
@@ -1520,49 +1623,93 @@ local function finalizeMarkedActor(state, actor, solveState)
         appendWarning(state, result.warnings[index])
     end
 
-    local selectedCandidates = solveState.bestAnchorEvaluation and solveState.bestAnchorEvaluation.selectedCandidates or {}
+    local selectedSequences = solveState.bestAnchorEvaluation and solveState.bestAnchorEvaluation.selectedSequences or {}
     for index = 1, #actor.members do
-        local unit = actor.members[index]
-        local candidate = selectedCandidates[index]
-        if type(candidate) == "table" then
-            local action = buildSpellAction(state, actor.key, unit, candidate, movementActionId)
-            if action then
-                state.output.actions[#state.output.actions + 1] = action
-                reserveChosenHealing(state, candidate)
-            end
-        else
-            appendNoAction(state, actor.key, unit, "no-useful-action")
-        end
+        emitSequenceActions(
+            state,
+            actor,
+            actor.members[index],
+            selectedSequences[index],
+            movementActionId,
+            "no-useful-action"
+        )
     end
+    commitPlanTacticalLedger(state, result.tacticalLedger)
 end
 
-local function solveSingletonActor(state, actor)
-    local unit = actor.members[1]
-    if type(unit) ~= "table" then
-        return
-    end
-    local eventId = normalizeEventId(unit.eventID)
-    local candidates = state.scratch.actionCandidatesByEventId[eventId] or {}
-    local spatialActorKey = type(Spatial.GetNpcActorKey) == "function" and Spatial.GetNpcActorKey(unit) or actor.key
-    local position = getActorPosition(state, spatialActorKey)
-    local best = nil
-    for index = 1, #candidates do
-        local candidate = candidates[index]
-        if isCandidateFeasibleAtPosition(state, candidate, position)
-            and (type(best) ~= "table" or compareCandidates(candidate, best) > 0)
-        then
-            best = candidate
+local function createFixedSolveState(state, actor, position, allowMelee, noActionReason)
+    return {
+        actor = actor,
+        position = position,
+        allowMelee = allowMelee == true,
+        noActionReason = noActionReason,
+        memberIndex = 1,
+        candidateIndex = 1,
+        reevaluatedCandidates = {},
+        sequences = {},
+        tacticalLedger = clonePlanTacticalLedger(state),
+        complete = false,
+    }
+end
+
+local function stepFixedSolveState(state, solveState, deadlineMs)
+    local actor = solveState.actor
+    local context = buildTacticalContext(state)
+    while solveState.memberIndex <= #(actor.members or {}) do
+        local unit = actor.members[solveState.memberIndex]
+        local candidates = state.scratch.actionCandidatesByEventId[normalizeEventId(unit and unit.eventID)] or {}
+        if solveState.candidateIndex <= #candidates then
+            local candidate = candidates[solveState.candidateIndex]
+            local spatiallyFeasible = not candidateRequiresMelee(candidate)
+                or (solveState.allowMelee and isCandidateFeasibleAtPosition(state, candidate, solveState.position))
+            if spatiallyFeasible and type(SequencePlanning.ReevaluateCandidate) == "function" then
+                local reevaluated = SequencePlanning.ReevaluateCandidate(candidate, solveState.tacticalLedger, context)
+                if type(reevaluated) == "table" then
+                    solveState.reevaluatedCandidates[#solveState.reevaluatedCandidates + 1] = reevaluated
+                end
+            end
+            solveState.candidateIndex = solveState.candidateIndex + 1
+        else
+            local sequence = type(SequencePlanning.BuildSequence) == "function"
+                and SequencePlanning.BuildSequence(solveState.reevaluatedCandidates, unit)
+                or { status = "failed", actions = {} }
+            solveState.sequences[solveState.memberIndex] = sequence
+            local summary = type(SequencePlanning.SummarizeSequence) == "function"
+                and SequencePlanning.SummarizeSequence(sequence)
+                or { hasUsefulAction = false }
+            if summary.hasUsefulAction == true and type(SequencePlanning.ReserveSequence) == "function" then
+                solveState.tacticalLedger = SequencePlanning.ReserveSequence(
+                    solveState.tacticalLedger,
+                    sequence,
+                    context
+                )
+            end
+            solveState.memberIndex = solveState.memberIndex + 1
+            solveState.candidateIndex = 1
+            solveState.reevaluatedCandidates = {}
+        end
+
+        if shouldYield(deadlineMs) then
+            return false
         end
     end
-    if type(best) == "table" then
-        local action = buildSpellAction(state, actor.key, unit, best, nil)
-        if action then
-            state.output.actions[#state.output.actions + 1] = action
-            reserveChosenHealing(state, best)
-        end
-    else
-        appendNoAction(state, actor.key, unit, position and "no-useful-action" or "position-unavailable")
+    solveState.complete = true
+    return true
+end
+
+local function finalizeFixedActor(state, solveState)
+    local actor = solveState.actor
+    for index = 1, #(actor.members or {}) do
+        emitSequenceActions(
+            state,
+            actor,
+            actor.members[index],
+            solveState.sequences[index],
+            nil,
+            solveState.noActionReason
+        )
     end
+    commitPlanTacticalLedger(state, solveState.tacticalLedger)
 end
 
 local function phaseSolveActors(state, deadlineMs)
@@ -1571,75 +1718,86 @@ local function phaseSolveActors(state, deadlineMs)
         if actor.kind == "npc_marker" then
             local currentPosition = getActorPosition(state, actor.key)
             if type(currentPosition) ~= "table" then
-                appendWarning(state, {
-                    warningType = "position-unavailable",
-                    actorKey = actor.key,
-                    raidMarker = actor.raidMarker,
-                    memberEventIds = copyArray(actor.memberEventIds),
-                    text = ("Marker %d has no cached virtual position; spatial melee actions are unavailable."):format(actor.raidMarker),
-                })
-                for memberIndex = 1, #actor.members do
-                    local unit = actor.members[memberIndex]
-                    local candidates = state.scratch.actionCandidatesByEventId[normalizeEventId(unit.eventID)] or {}
-                    local best = nil
-                    for candidateIndex = 1, #candidates do
-                        local candidate = candidates[candidateIndex]
-                        if not candidateRequiresMelee(candidate)
-                            and (type(best) ~= "table" or compareCandidates(candidate, best) > 0)
-                        then
-                            best = candidate
-                        end
-                    end
-                    if type(best) == "table" then
-                        local action = buildSpellAction(state, actor.key, unit, best, nil)
-                        if action then
-                            state.output.actions[#state.output.actions + 1] = action
-                            reserveChosenHealing(state, best)
-                        end
-                    else
-                        appendNoAction(state, actor.key, unit, "position-unavailable")
-                    end
-                end
-                state.cursors.actor = state.cursors.actor + 1
-            else
-            local solveState = state.scratch.movementSolveByActorKey[actor.key]
-            if type(solveState) ~= "table" then
-                local members = {}
-                for index = 1, #actor.members do
-                    local unit = actor.members[index]
-                    members[index] = {
-                        unit = unit,
-                        actionCandidates = state.scratch.actionCandidatesByEventId[normalizeEventId(unit.eventID)] or {},
-                    }
-                end
-                solveState = type(MovementSolver.CreateState) == "function"
-                    and select(1, MovementSolver.CreateState({
-                        eventState = state.snapshot.eventState,
-                        spatialRuntime = state.snapshot.spatialRuntime,
+                if state.scratch.positionWarningByActorKey[actor.key] ~= true then
+                    appendWarning(state, {
+                        warningType = "position-unavailable",
                         actorKey = actor.key,
                         raidMarker = actor.raidMarker,
-                        members = members,
-                    }))
-                    or nil
-                state.scratch.movementSolveByActorKey[actor.key] = solveState or false
-            end
-
-            if type(solveState) ~= "table" then
-                for index = 1, #actor.members do
-                    appendNoAction(state, actor.key, actor.members[index], "movement-solve-unavailable")
+                        memberEventIds = copyArray(actor.memberEventIds),
+                        text = ("Marker %d has no cached virtual position; spatial melee actions are unavailable."):format(actor.raidMarker),
+                    })
+                    state.scratch.positionWarningByActorKey[actor.key] = true
                 end
-                state.cursors.actor = state.cursors.actor + 1
-            else
-                local complete = MovementSolver.Step(solveState, deadlineMs) == true
-                if not complete then
+                local fixed = state.scratch.fixedSolveByActorKey[actor.key]
+                if type(fixed) ~= "table" then
+                    fixed = createFixedSolveState(state, actor, nil, false, "position-unavailable")
+                    state.scratch.fixedSolveByActorKey[actor.key] = fixed
+                end
+                if stepFixedSolveState(state, fixed, deadlineMs) ~= true then
                     return false
                 end
-                finalizeMarkedActor(state, actor, solveState)
+                finalizeFixedActor(state, fixed)
                 state.cursors.actor = state.cursors.actor + 1
-            end
+            else
+                local solveState = state.scratch.movementSolveByActorKey[actor.key]
+                if type(solveState) ~= "table" then
+                    local members = {}
+                    for index = 1, #actor.members do
+                        local unit = actor.members[index]
+                        members[index] = {
+                            unit = unit,
+                            actionCandidates = state.scratch.actionCandidatesByEventId[normalizeEventId(unit.eventID)] or {},
+                        }
+                    end
+                    solveState = type(MovementSolver.CreateState) == "function"
+                        and select(1, MovementSolver.CreateState({
+                            eventState = state.snapshot.eventState,
+                            spatialRuntime = state.snapshot.spatialRuntime,
+                            actorKey = actor.key,
+                            raidMarker = actor.raidMarker,
+                            members = members,
+                            initialTacticalLedger = clonePlanTacticalLedger(state),
+                            tacticalContext = buildTacticalContext(state),
+                        }))
+                        or nil
+                    state.scratch.movementSolveByActorKey[actor.key] = solveState or false
+                end
+
+                if type(solveState) ~= "table" then
+                    for index = 1, #actor.members do
+                        appendNoAction(state, actor.key, actor.members[index], "movement-solve-unavailable")
+                    end
+                    state.cursors.actor = state.cursors.actor + 1
+                else
+                    local complete = MovementSolver.Step(solveState, deadlineMs) == true
+                    if not complete then
+                        return false
+                    end
+                    finalizeMarkedActor(state, actor, solveState)
+                    state.cursors.actor = state.cursors.actor + 1
+                end
             end
         else
-            solveSingletonActor(state, actor)
+            local unit = actor.members[1]
+            if type(unit) == "table" then
+                local spatialActorKey = type(Spatial.GetNpcActorKey) == "function" and Spatial.GetNpcActorKey(unit) or actor.key
+                local position = getActorPosition(state, spatialActorKey)
+                local fixed = state.scratch.fixedSolveByActorKey[actor.key]
+                if type(fixed) ~= "table" then
+                    fixed = createFixedSolveState(
+                        state,
+                        actor,
+                        position,
+                        type(position) == "table",
+                        position and "no-useful-action" or "position-unavailable"
+                    )
+                    state.scratch.fixedSolveByActorKey[actor.key] = fixed
+                end
+                if stepFixedSolveState(state, fixed, deadlineMs) ~= true then
+                    return false
+                end
+                finalizeFixedActor(state, fixed)
+            end
             state.cursors.actor = state.cursors.actor + 1
         end
 
@@ -1783,6 +1941,7 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
         projectedHealingLedger = type(SpellEvaluator.CreateProjectedHealingLedger) == "function"
             and SpellEvaluator.CreateProjectedHealingLedger()
             or { reservedByEventId = {} },
+        projectedAuraLedger = nil,
         spellDefinitionByRef = {},
         auraDefinitionCache = type(AuraEvaluator.CreatePlanCache) == "function"
             and AuraEvaluator.CreatePlanCache()
@@ -1806,6 +1965,8 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
         targetOrderByKey = {},
         actionCandidatesByEventId = {},
         movementSolveByActorKey = {},
+        fixedSolveByActorKey = {},
+        positionWarningByActorKey = {},
     }
     state.cursors = {
         unit = 1,
