@@ -61,7 +61,7 @@ local function normalizeReceipt(receipt, deliveryId)
     end
 
     local status = string.lower(trim(receipt.status))
-    normalized.status = VALID_STATUSES[status] and status or "failed"
+    normalized.status = VALID_STATUSES[status] and status or "recovery-required"
     normalized.startedAt = normalizeTimestamp(receipt.startedAt)
     normalized.completedAt = normalizeTimestamp(receipt.completedAt)
     normalized.failedAt = normalizeTimestamp(receipt.failedAt)
