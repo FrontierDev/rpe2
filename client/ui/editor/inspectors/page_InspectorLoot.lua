@@ -447,8 +447,8 @@ function DataEditor:BuildLootInspectorPage(parent)
         local page = CreateFrame("Frame", name, self.LootInspectorPage)
         page:SetPoint("TOPLEFT", self.LootInspectorPage, "TOPLEFT", SIDE_PADDING, -24)
         page:SetPoint("TOPRIGHT", self.LootInspectorPage, "TOPRIGHT", -SIDE_PADDING, -24)
-        page:SetPoint("BOTTOMLEFT", self.LootInspectorPage, "BOTTOMLEFT", SIDE_PADDING, 50)
-        page:SetPoint("BOTTOMRIGHT", self.LootInspectorPage, "BOTTOMRIGHT", -SIDE_PADDING, 50)
+        page:SetPoint("BOTTOMLEFT", self.LootInspectorPage, "BOTTOMLEFT", SIDE_PADDING, 18)
+        page:SetPoint("BOTTOMRIGHT", self.LootInspectorPage, "BOTTOMRIGHT", -SIDE_PADDING, 18)
         return page
     end
 
@@ -458,7 +458,7 @@ function DataEditor:BuildLootInspectorPage(parent)
     self:BuildLootInspectorEntriesPage(self.LootInspectorEntriesPage)
 
     self.LootInspectorValidationText = UI.CreateText(self.LootInspectorPage, "RPEDataEditorLootInspectorValidationText", "", {
-        width = FIELD_WIDTH, height = 46, justifyH = "LEFT", textColor = UI.ResolveColor(nil, "text.secondary"), wordWrap = true,
+        width = FIELD_WIDTH, height = 16, justifyH = "LEFT", textColor = UI.ResolveColor(nil, "text.secondary"),
     })
     self.LootInspectorValidationText:GetFrame():SetPoint("BOTTOMLEFT", self.LootInspectorPage, "BOTTOMLEFT", SIDE_PADDING, 0)
 
@@ -528,17 +528,17 @@ end
 
 function DataEditor:BuildLootInspectorEntriesPage(parent)
     local root = UI.CreateLayout(UI.VerticalLayoutGroup, parent, "RPEDataEditorLootInspectorEntriesLayout", {
-        spacing = 2, fitChildrenWidth = true, fitChildrenHeight = false,
+        spacing = 1, fitChildrenWidth = true, fitChildrenHeight = false,
     })
     UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
 
     local panel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorLootInspectorEntriesPanel", {
-        width = FIELD_WIDTH, height = 66, contentInset = 2, showBorder = false,
+        width = FIELD_WIDTH, height = 48, contentInset = 2, showBorder = false,
     })
     root:AddChild(panel)
     self.LootInspectorEntryScroll = UI.ScrollLayout:New({
-        name = "RPEDataEditorLootInspectorEntryScroll", width = FIELD_WIDTH - 4, height = 62,
-        visibleRows = 3, autoFitRows = true, rowHeight = 20, rowSpacing = 0, border = false,
+        name = "RPEDataEditorLootInspectorEntryScroll", width = FIELD_WIDTH - 4, height = 44,
+        visibleRows = 2, autoFitRows = true, rowHeight = 20, rowSpacing = 0, border = false,
         rowElementClass = UI.ScrollListEntry, categoryWidth = 102, statusWidth = 58, categoryInsetLeft = 4, statusInsetRight = 4,
     })
     self.LootInspectorEntryScroll:SetParent(panel:GetContentFrame())
@@ -643,9 +643,9 @@ function DataEditor:BuildLootInspectorEntriesPage(parent)
     root:AddChild(self.LootInspectorEntryTypeDropdown)
 
     self.LootInspectorItemDatasetGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorLootInspectorItemDatasetGroup", {
-        spacing = 1, height = 31, fitChildrenWidth = true, fitChildrenHeight = false,
+        spacing = 1, height = 30, fitChildrenWidth = true, fitChildrenHeight = false,
     })
-    self.LootInspectorItemDatasetGroup._visibleHeight = 31
+    self.LootInspectorItemDatasetGroup._visibleHeight = 30
     self.LootInspectorItemDatasetGroup:AddChild(makeLabel(self.LootInspectorItemDatasetGroup:GetFrame(), "RPEDataEditorLootInspectorItemDatasetLabel", "Item Dataset"))
     self.LootInspectorItemDatasetDropdown = UI.CreateDropdown(self.LootInspectorItemDatasetGroup:GetFrame(), "RPEDataEditorLootInspectorItemDatasetDropdown", {
         width = FIELD_WIDTH, height = 18, items = { { label = "None", value = "" } },
@@ -665,9 +665,9 @@ function DataEditor:BuildLootInspectorEntriesPage(parent)
     root:AddChild(self.LootInspectorItemDatasetGroup)
 
     self.LootInspectorItemGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorLootInspectorItemGroup", {
-        spacing = 1, height = 31, fitChildrenWidth = true, fitChildrenHeight = false,
+        spacing = 1, height = 30, fitChildrenWidth = true, fitChildrenHeight = false,
     })
-    self.LootInspectorItemGroup._visibleHeight = 31
+    self.LootInspectorItemGroup._visibleHeight = 30
     self.LootInspectorItemGroup:AddChild(makeLabel(self.LootInspectorItemGroup:GetFrame(), "RPEDataEditorLootInspectorItemLabel", "Item"))
     self.LootInspectorItemDropdown = UI.CreateDropdown(self.LootInspectorItemGroup:GetFrame(), "RPEDataEditorLootInspectorItemDropdown", {
         width = FIELD_WIDTH, height = 18, items = { { label = "None", value = "" } },
@@ -684,9 +684,9 @@ function DataEditor:BuildLootInspectorEntriesPage(parent)
     root:AddChild(self.LootInspectorItemGroup)
 
     self.LootInspectorCurrencyGroup = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorLootInspectorCurrencyGroup", {
-        spacing = 1, height = 31, fitChildrenWidth = true, fitChildrenHeight = false,
+        spacing = 1, height = 30, fitChildrenWidth = true, fitChildrenHeight = false,
     })
-    self.LootInspectorCurrencyGroup._visibleHeight = 31
+    self.LootInspectorCurrencyGroup._visibleHeight = 30
     self.LootInspectorCurrencyGroup:AddChild(makeLabel(self.LootInspectorCurrencyGroup:GetFrame(), "RPEDataEditorLootInspectorCurrencyLabel", "Currency"))
     self.LootInspectorCurrencyDropdown = UI.CreateDropdown(self.LootInspectorCurrencyGroup:GetFrame(), "RPEDataEditorLootInspectorCurrencyDropdown", {
         width = FIELD_WIDTH, height = 18, items = { { label = "None", value = "" } },
@@ -838,10 +838,9 @@ function DataEditor:RefreshLootInspectorValidationStatus()
     for index = 1, #validation.warnings do messages[#messages + 1] = "Warning: " .. validation.warnings[index] end
 
     if #messages == 0 then self.LootInspectorValidationText:SetText("Loot Table is valid."); return end
-    local visible = {}
-    for index = 1, math.min(#messages, 3) do visible[#visible + 1] = messages[index] end
-    if #messages > 3 then visible[#visible + 1] = ("+%d more issue(s)"):format(#messages - 3) end
-    self.LootInspectorValidationText:SetText(table.concat(visible, "\n"))
+    local text = messages[1]
+    if #messages > 1 then text = text .. (" (+%d more)"):format(#messages - 1) end
+    self.LootInspectorValidationText:SetText(text)
 end
 
 function DataEditor:RefreshLootInspectorPage()
