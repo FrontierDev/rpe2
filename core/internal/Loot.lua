@@ -533,14 +533,14 @@ end
 function Loot.NormalizeEligiblePlayers(players)
     local normalized = {}
     local seen = {}
+    local orderedPlayers = collectOrderedEntries(players)
 
-    if type(players) == "table" then
-        for index = 1, #players do
-            local identity = type(players[index]) == "string" and trim(players[index]) or ""
-            if identity ~= "" and not seen[identity] then
-                seen[identity] = true
-                normalized[#normalized + 1] = identity
-            end
+    for index = 1, #orderedPlayers do
+        local value = orderedPlayers[index].entry
+        local identity = type(value) == "string" and trim(value) or ""
+        if identity ~= "" and not seen[identity] then
+            seen[identity] = true
+            normalized[#normalized + 1] = identity
         end
     end
 
