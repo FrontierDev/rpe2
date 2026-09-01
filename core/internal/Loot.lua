@@ -387,13 +387,29 @@ function Loot.ResolveQuantity(minQuantity, maxQuantity, rng)
     return minimum + math.floor(sample * span)
 end
 
+local function mergeValidatedRewards(rewards)
+    local merged = {}
+    local indexByKey = {}
+    for index = 1, #(rewards or {}) do
+        local reward = rewards[index]
+        local key = reward.type .. "\0" .. reward.ref
+        local existingIndex = indexByKey[key]
+        if existingIndex then
+            merged[existingIndex].amount = merged[existingIndex].amount + reward.amount
+        else
+            indexByKey[key] = #merged + 1
+            merged[#merged + 1] = copyReward(reward)
+        end
+    end
+    return merged
+end
+
 function Loot.MergeConcreteRewards(rewards)
     if type(rewards) ~= "table" then
         return nil, "invalid-reward", { reason = "rewards-not-table" }
     end
 
-    local merged = {}
-    local indexByKey = {}
+    local validated = {}
     for index = 1, #rewards do
         local concrete, err, detail = Loot.ValidateConcreteReward(rewards[index])
         if not concrete then
@@ -401,18 +417,10 @@ function Loot.MergeConcreteRewards(rewards)
             detail.rewardIndex = index
             return nil, err, detail
         end
-
-        local key = concrete.type .. "\0" .. concrete.ref
-        local existingIndex = indexByKey[key]
-        if existingIndex then
-            merged[existingIndex].amount = merged[existingIndex].amount + concrete.amount
-        else
-            indexByKey[key] = #merged + 1
-            merged[#merged + 1] = concrete
-        end
+        validated[#validated + 1] = concrete
     end
 
-    return merged
+    return mergeValidatedRewards(validated)
 end
 
 function Loot.ResolveValidatedLootTable(validatedLoot, rng)
@@ -449,7 +457,7 @@ function Loot.ResolveValidatedLootTable(validatedLoot, rng)
         }
     end
 
-    return Loot.MergeConcreteRewards(rewards)
+    return mergeValidatedRewards(rewards)
 end
 
 function Loot.ResolveLootTable(loot, rng)
