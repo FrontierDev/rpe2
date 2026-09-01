@@ -43,6 +43,7 @@ local function countEntries(value)
 end
 
 Client.ActiveSpellcastsByEventId = Client.ActiveSpellcastsByEventId or {}
+Client.ActiveSpellcastRevisionByEventId = Client.ActiveSpellcastRevisionByEventId or {}
 Client.ActiveAurasByEventId = Client.ActiveAurasByEventId or {}
 
 function Client:GetSpellcastEntry(eventId, casterEventId)
@@ -67,6 +68,12 @@ function Client:ResetSpellcastingState(eventId)
         return true
     end
 
+    local existingCastBuckets = self.ActiveSpellcastsByEventId
+    if type(existingCastBuckets) == "table" and Spellcasting.BumpEventCastRevision then
+        for existingEventId in pairs(existingCastBuckets) do
+            Spellcasting.BumpEventCastRevision(self, tostring(existingEventId or ""))
+        end
+    end
     self.ActiveSpellcastsByEventId = {}
     if Spellcasting.ResetCooldownState then
         Spellcasting.ResetCooldownState(self)
@@ -110,6 +117,7 @@ function Client:AdvanceSpellcastState(previousTurnNumber, previousTickNumber)
     end
 
     local changed = false
+    local advanced = false
     local toComplete = {}
     for casterEventId, entry in pairs(bucket) do
         local turnsTotal = type(entry) == "table" and Spellcasting.NormalizeTurnCount and Spellcasting.NormalizeTurnCount(entry.turnsTotal) or nil
@@ -124,12 +132,17 @@ function Client:AdvanceSpellcastState(previousTurnNumber, previousTickNumber)
                 entry.turnsElapsed = elapsedTurns
                 entry.lastAdvancedTurnNumber = currentTurnNumber
                 changed = true
+                advanced = true
 
                 if elapsedTurns >= turnsTotal then
                     toComplete[#toComplete + 1] = tonumber(casterEventId) or 0
                 end
             end
         end
+    end
+
+    if advanced and Spellcasting.BumpEventCastRevision then
+        Spellcasting.BumpEventCastRevision(self, eventId)
     end
 
     for index = 1, #toComplete do

@@ -48,6 +48,17 @@ local function getTimedEventOpcodeKey(opcode)
     return nil
 end
 
+local function shouldImmediatelyEchoOpcode(opcode)
+    local operation = Operations and Operations.Get and Operations:Get(opcode) or nil
+    local key = type(operation) == "table" and tostring(operation.key or "") or ""
+    return key == "EVENT_START"
+        or key == "EVENT_UNITS"
+        or key == "EVENT_STATE"
+        or key == "SPELLCAST_START"
+        or key == "SPELLCAST_COMPLETE"
+        or key == "SPELLCAST_INTERRUPT"
+end
+
 local function logTimingParts(label, context, parts, totalElapsedMs, thresholdMs)
     local timings = getTimings()
     if type(timings) == "table" and type(timings.LogParts) == "function" then
@@ -98,7 +109,7 @@ local function shouldEchoOutboundChannel(distribution, target)
 end
 
 local function shouldDeliverImmediateLocalEcho(distribution, target, opcode)
-    return shouldEchoOutboundChannel(distribution, target) and getTimedEventOpcodeKey(opcode) ~= nil
+    return shouldEchoOutboundChannel(distribution, target) and shouldImmediatelyEchoOpcode(opcode)
 end
 
 local function getEventUnitsOpcode()
