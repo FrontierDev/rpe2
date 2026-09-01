@@ -33,6 +33,11 @@ local REASON_TEXT = {
     ["movement-allowance-api-unavailable"] = "The movement allowance resolver is unavailable.",
     ["movement-allowance-unavailable"] = "The NPC's effective movement allowance could not be resolved.",
     ["movement-pending"] = "This action requires the marker's planned movement to be confirmed first.",
+    ["movement-stale"] = "The required marker movement is no longer valid.",
+    ["sequence-invariant-invalid"] = "This action sequence is invalid and must be replanned.",
+    ["previous-caster-action-pending"] = "Waiting for previous action.",
+    ["previous-caster-action-failed"] = "A previous action for this NPC failed; later actions cannot proceed.",
+    ["previous-caster-action-stale"] = "A previous action for this NPC became stale; later actions cannot proceed.",
     ["movement-missing"] = "This action depends on a movement proposal that is no longer available.",
     ["movement-skipped"] = "The required marker movement was skipped by the DM.",
     ["movement-solve-unavailable"] = "The shared-marker movement solver is unavailable.",
@@ -523,6 +528,52 @@ local function buildMovementRow(eventState, action)
     }
 end
 
+local SPELL_DEPENDENCY_DISPLAY_TEXT = {
+    ["previous-caster-action-pending"] = "Waiting for previous action",
+    ["previous-caster-action-failed"] = "Previous action failed",
+    ["previous-caster-action-stale"] = "Previous action became stale",
+    ["sequence-invariant-invalid"] = "Invalid sequence — replan required",
+    ["movement-pending"] = "Waiting for marker movement",
+    ["movement-stale"] = "Marker movement is no longer valid",
+}
+
+local function spellDependencyDisplayText(reason)
+    local code = tostring(reason or "")
+    if code == "" then
+        return nil
+    end
+    return SPELL_DEPENDENCY_DISPLAY_TEXT[code] or Helper.GetReasonText(code) or code
+end
+
+local function buildSpellAnnotations(action)
+    local labels = {}
+    if tostring(type(action) == "table" and action.actionEconomyClass or "") == "auxiliary" then
+        labels[#labels + 1] = "Off GCD"
+    end
+    if (tonumber(type(action) == "table" and action.periodicDamage) or 0) > 0 then
+        labels[#labels + 1] = "DoT"
+    end
+    if (tonumber(type(action) == "table" and action.periodicHealing) or 0) > 0 then
+        labels[#labels + 1] = "HoT"
+    end
+    if type(action) == "table" and action.hasUsefulInterrupt == true then
+        labels[#labels + 1] = "Interrupt"
+    end
+    if (tonumber(type(action) == "table" and action.controlUtility) or 0) > 0 then
+        labels[#labels + 1] = "Control"
+    end
+    if tostring(type(action) == "table" and action.actionEconomyClass or "") == "terminal" then
+        labels[#labels + 1] = "Casting"
+    end
+    return labels
+end
+
+local function appendSpellDependencyDetails(lines, dependencyReasons)
+    local reasons = type(dependencyReasons) == "table" and dependencyReasons or {}
+    appendDetail(lines, "Sequence dependency", spellDependencyDisplayText(reasons.sequence))
+    appendDetail(lines, "Movement dependency", spellDependencyDisplayText(reasons.movement))
+end
+
 local function buildSpellRow(eventState, action)
     local caster = unitLabel(eventState, action and action.casterEventId)
     local spell = spellLabel(action and action.spellRef)
@@ -532,14 +583,44 @@ local function buildSpellRow(eventState, action)
     local dependencyReasons = type(action and action.dependencyReasons) == "table"
         and action.dependencyReasons
         or {}
+    local sequenceIndex = math.max(1, math.floor(tonumber(action and action.casterSequenceIndex) or 1))
+    local sequenceCount = math.max(sequenceIndex, math.floor(tonumber(action and action.casterSequenceCount) or sequenceIndex))
+    local annotations = buildSpellAnnotations(action)
+    local annotationText = #annotations > 0 and table.concat(annotations, " · ") or ""
+    local dependencyLabels = {}
+    local sequenceDependencyText = spellDependencyDisplayText(dependencyReasons.sequence)
+    local movementDependencyText = spellDependencyDisplayText(dependencyReasons.movement)
+    if sequenceDependencyText then
+        dependencyLabels[#dependencyLabels + 1] = sequenceDependencyText
+    end
+    if movementDependencyText then
+        dependencyLabels[#dependencyLabels + 1] = movementDependencyText
+    end
+    local dependencyText = #dependencyLabels > 0 and table.concat(dependencyLabels, " · ") or ""
+
     local displayText = ("%s casts %s at %s"):format(caster, spell, targets)
+    if sequenceCount > 1 then
+        displayText = ("%s [%d/%d] casts %s at %s"):format(caster, sequenceIndex, sequenceCount, spell, targets)
+    end
+    if annotationText ~= "" then
+        displayText = displayText .. " [" .. annotationText .. "]"
+    end
+    if dependencyText ~= "" then
+        displayText = displayText .. " — " .. dependencyText
+    end
 
     local lines = {}
     appendDetail(lines, "NPC", caster)
     appendDetail(lines, "Actor", action and action.actorKey)
     appendDetail(lines, "Action", "Cast " .. spell)
+    if sequenceCount > 1 then
+        appendDetail(lines, "Sequence", ("%d / %d"):format(sequenceIndex, sequenceCount))
+    end
+    appendDetail(lines, "Action economy", action and action.actionEconomyClass)
+    appendDetail(lines, "Annotations", annotationText ~= "" and annotationText or nil)
     appendDetail(lines, "Targets", targets)
     appendDetail(lines, "Status", statusLabel(status))
+    appendSpellDependencyDetails(lines, dependencyReasons)
     local reasonCode, reasonText = appendReason(lines, reason)
 
     return {
@@ -549,8 +630,14 @@ local function buildSpellRow(eventState, action)
         actionId = action and action.actionId or nil,
         actorKey = action and action.actorKey or nil,
         casterEventId = action and action.casterEventId or nil,
+        casterSequenceIndex = sequenceIndex,
+        casterSequenceCount = sequenceCount,
+        actionEconomyClass = action and action.actionEconomyClass or nil,
         spellRef = action and action.spellRef or nil,
         targetEventIds = action and action.targetEventIds or nil,
+        annotations = annotations,
+        annotationText = annotationText,
+        dependencyText = dependencyText,
         summary = displayText,
         displayText = displayText,
         text = displayText,
@@ -565,6 +652,85 @@ local function buildSpellRow(eventState, action)
         canAuthorize = action and action.canAuthorize == true,
         canReject = status == "pending" or status == "blocked",
     }
+end
+
+local function buildOrderedSpellRows(eventState, pending, includeStale)
+    local groupsByCaster = {}
+    local groupOrder = {}
+    local seenActionIds = {}
+    local nextFallbackOrder = #(pending and pending.orderedActionIds or {})
+
+    local function addAction(action, orderIndex)
+        if type(action) ~= "table" or action.actionType ~= "spell" then
+            return
+        end
+        if includeStale ~= true and tostring(action.status or "") == "stale" then
+            return
+        end
+        local actionId = tostring(action.actionId or "")
+        if actionId == "" or seenActionIds[actionId] == true then
+            return
+        end
+        seenActionIds[actionId] = true
+
+        local casterEventId = normalizeEventId(action.casterEventId)
+        local casterKey = casterEventId > 0 and tostring(casterEventId) or ("action:" .. actionId)
+        local group = groupsByCaster[casterKey]
+        if type(group) ~= "table" then
+            group = {
+                casterKey = casterKey,
+                casterEventId = casterEventId,
+                entries = {},
+            }
+            groupsByCaster[casterKey] = group
+            groupOrder[#groupOrder + 1] = casterKey
+        end
+        group.entries[#group.entries + 1] = {
+            action = action,
+            orderIndex = orderIndex,
+        }
+    end
+
+    for index = 1, #(pending and pending.orderedActionIds or {}) do
+        local actionId = pending.orderedActionIds[index]
+        local action = type(pending.actionsById) == "table" and pending.actionsById[actionId] or nil
+        addAction(action, index)
+    end
+
+    for index = 1, #(pending and pending.spellActionIds or {}) do
+        local actionId = pending.spellActionIds[index]
+        local action = type(pending.actionsById) == "table" and pending.actionsById[actionId] or nil
+        nextFallbackOrder = nextFallbackOrder + 1
+        addAction(action, nextFallbackOrder)
+    end
+
+    local rows = {}
+    for groupIndex = 1, #groupOrder do
+        local group = groupsByCaster[groupOrder[groupIndex]]
+        table.sort(group.entries, function(left, right)
+            local leftSequence = tonumber(left.action and left.action.casterSequenceIndex)
+            local rightSequence = tonumber(right.action and right.action.casterSequenceIndex)
+            if leftSequence ~= nil and rightSequence ~= nil and leftSequence ~= rightSequence then
+                return leftSequence < rightSequence
+            end
+            if leftSequence ~= nil and rightSequence == nil then
+                return true
+            end
+            if leftSequence == nil and rightSequence ~= nil then
+                return false
+            end
+            return tonumber(left.orderIndex) < tonumber(right.orderIndex)
+        end)
+
+        for entryIndex = 1, #group.entries do
+            local row = buildSpellRow(eventState, group.entries[entryIndex].action)
+            row.casterGroupKey = "caster:" .. tostring(group.casterKey)
+            row.sequenceGroupStart = entryIndex == 1
+            row.sequenceGroupEnd = entryIndex == #group.entries
+            rows[#rows + 1] = row
+        end
+    end
+    return rows
 end
 
 function Helper.GetPendingActionRows(eventState)
@@ -588,13 +754,9 @@ function Helper.GetPendingActionRows(eventState)
             rows[#rows + 1] = buildMovementRow(eventState, action)
         end
     end
-    for index = 1, #(pending.spellActionIds or {}) do
-        local action = type(pending.actionsById) == "table"
-            and pending.actionsById[pending.spellActionIds[index]]
-            or nil
-        if type(action) == "table" and tostring(action.status or "") ~= "stale" then
-            rows[#rows + 1] = buildSpellRow(eventState, action)
-        end
+    local spellRows = buildOrderedSpellRows(eventState, pending, false)
+    for index = 1, #spellRows do
+        rows[#rows + 1] = spellRows[index]
     end
     return rows, pending
 end
@@ -889,13 +1051,9 @@ function Helper.BuildEntries(eventState)
             reasonText = reasonText,
         }
     end
-    for index = 1, #(pending.spellActionIds or {}) do
-        local action = type(pending.actionsById) == "table"
-            and pending.actionsById[pending.spellActionIds[index]]
-            or nil
-        if type(action) == "table" then
-            entries[#entries + 1] = buildSpellRow(eventState, action)
-        end
+    local spellRows = buildOrderedSpellRows(eventState, pending, true)
+    for index = 1, #spellRows do
+        entries[#entries + 1] = spellRows[index]
     end
     for index = 1, #(pending.noActions or {}) do
         local noAction = pending.noActions[index]

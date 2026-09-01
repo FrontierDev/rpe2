@@ -111,10 +111,18 @@ local function setTextColor(region, token)
     region:SetTextColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
 end
 
-local function actionStatusColorToken(status)
-    local value = tostring(status or "")
+local function actionStatusColorToken(item)
+    local value = tostring(type(item) == "table" and item.status or item or "")
     if value == "pending" then
         return "warning"
+    end
+    if value == "blocked" and type(item) == "table" then
+        local dependencies = type(item.dependencyReasons) == "table" and item.dependencyReasons or {}
+        if tostring(dependencies.sequence or "") == "previous-caster-action-pending"
+            or tostring(dependencies.movement or "") == "movement-pending"
+        then
+            return "warning"
+        end
     end
     if value == "authorized" or value == "executing" or value == "completed" or value == "confirmed" then
         return "success"
@@ -249,7 +257,7 @@ function AutopilotActionRow:SetItem(item, ownerWidget)
 
     local selected = tostring(ownerWidget and ownerWidget.selectedAutopilotDetailKey or "")
         == tostring(item.entryId or "")
-    applyRowBackground(self.background, actionStatusColorToken(item.status), selected)
+    applyRowBackground(self.background, actionStatusColorToken(item), selected)
 
     local doneVisible = item.actionType == "movement" and item.canConfirm == true
     local authoriseVisible = item.actionType == "spell" and item.canAuthorize == true
