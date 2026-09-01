@@ -26,6 +26,7 @@ core/internal/comms/Channel.lua
 core/internal/runtime/RuntimeTransaction.lua
 core/internal/Runtime.lua
 core/internal/database/Dependecies.lua
+core/internal/database/LootDependencies.lua
 core/internal/database/Database.lua
 core/internal/database/DatasetSchema21.lua
 core/internal/database/DatasetSchema22.lua
@@ -41,6 +42,7 @@ core/internal/ruleset/Rules.lua
 core/internal/ruleset/Ruleset.lua
 core/internal/ruleset/NpcDifficulty.lua
 core/internal/Registry.lua
+core/internal/RegistryLoot.lua
 core/internal/comms/ResourceSync.lua
 core/internal/Movement.lua
 core/internal/Autopilot.lua
@@ -96,6 +98,7 @@ core/classes/ItemSlot.lua
 core/classes/WeaponType.lua
 core/classes/DamageSchool.lua
 core/classes/Loot.lua
+core/internal/database/DatasetSchema23.lua
 core/classes/Recipe.lua
 core/classes/Aura.lua
 core/classes/Interaction.lua
