@@ -222,6 +222,11 @@ function Protocol.ParseResponseArguments(arguments)
         return nil, "invalid-payload", { reason = "argument-count" }
     end
 
+    local successFlag = tostring(arguments[3] or "")
+    if successFlag ~= "0" and successFlag ~= "1" then
+        return nil, "invalid-payload", { reason = "success-flag" }
+    end
+
     local deliveryId, deliveryReason = decodeField(arguments[2])
     local responseReason, reasonReason = decodeField(arguments[4])
     if deliveryId == nil or responseReason == nil then
@@ -236,7 +241,7 @@ function Protocol.ParseResponseArguments(arguments)
     return {
         protocolVersion = tonumber(arguments[1]),
         deliveryId = deliveryId,
-        success = tostring(arguments[3] or "") == "1",
+        success = successFlag == "1",
         reason = responseReason ~= "" and responseReason or nil,
         rewards = rewards,
     }
