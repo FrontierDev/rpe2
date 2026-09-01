@@ -282,7 +282,7 @@ function Server:ExecuteEventEndLoot(eventStateOverride)
 
     local grants = snapshot.endLootGrants or {}
     if #grants == 0 then
-        return {
+        local batch = {
             eventSessionId = snapshot.eventSessionId,
             hostName = snapshot.hostName,
             source = "event-end",
@@ -295,6 +295,8 @@ function Server:ExecuteEventEndLoot(eventStateOverride)
             failedCount = 0,
             status = "none",
         }
+        rememberEndResult(Loot, batch)
+        return deepCopy(batch)
     end
 
     local loot = self.Loot
