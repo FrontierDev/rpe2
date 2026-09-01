@@ -119,6 +119,7 @@ client/client_CombatLog.lua
 client/client_CombatLogTurnIdentity.lua
 client/client_Skills.lua
 server/server_Event.lua
+server/server_Loot.lua
 server/server_EventAutopilot.lua
 server/server_EventVariants.lua
 server/server_EventResourceIntegration.lua
