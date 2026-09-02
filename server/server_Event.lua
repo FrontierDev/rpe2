@@ -113,6 +113,13 @@ local function buildSendMetadata(opcode)
     return metadata
 end
 
+local function buildEventSnapshotSendMetadata(opcode)
+    local metadata = buildSendMetadata(opcode)
+    metadata.priority = "CRITICAL"
+    metadata.replaceKey = nil
+    return metadata
+end
+
 local function buildEventId()
     local now = tonumber(Common.GetNow()) or 0
     local randomA = math.random(0, 0xffff)
@@ -1031,9 +1038,9 @@ local function sendEventSnapshotToClient(eventState, clientName)
         return false
     end
 
-    local sentStart = Comms:SendMessage("WHISPER", EVENT_START_OPCODE, buildStartArguments(eventState), normalizedClientName, buildSendMetadata(EVENT_START_OPCODE))
-    Comms:SendMessage("WHISPER", EVENT_UNITS_OPCODE, buildEventUnitsArguments(eventState), normalizedClientName, buildSendMetadata(EVENT_UNITS_OPCODE))
-    Comms:SendMessage("WHISPER", EVENT_STATE_OPCODE, buildEventStateArguments(eventState), normalizedClientName, buildSendMetadata(EVENT_STATE_OPCODE))
+    local sentStart = Comms:SendMessage("WHISPER", EVENT_START_OPCODE, buildStartArguments(eventState), normalizedClientName, buildEventSnapshotSendMetadata(EVENT_START_OPCODE))
+    Comms:SendMessage("WHISPER", EVENT_UNITS_OPCODE, buildEventUnitsArguments(eventState), normalizedClientName, buildEventSnapshotSendMetadata(EVENT_UNITS_OPCODE))
+    Comms:SendMessage("WHISPER", EVENT_STATE_OPCODE, buildEventStateArguments(eventState), normalizedClientName, buildEventSnapshotSendMetadata(EVENT_STATE_OPCODE))
     return sentStart and true or false
 end
 
@@ -1656,21 +1663,21 @@ function Server:StartEvent(data)
             sessionState.channelId,
             EVENT_START_OPCODE,
             buildStartArguments(eventState),
-            buildSendMetadata(EVENT_START_OPCODE)
+            buildEventSnapshotSendMetadata(EVENT_START_OPCODE)
         ) and true or false
 
         Comms:SendToChannel(
             sessionState.channelId,
             EVENT_UNITS_OPCODE,
             buildEventUnitsArguments(eventState),
-            buildSendMetadata(EVENT_UNITS_OPCODE)
+            buildEventSnapshotSendMetadata(EVENT_UNITS_OPCODE)
         )
 
         Comms:SendToChannel(
             sessionState.channelId,
             EVENT_STATE_OPCODE,
             buildEventStateArguments(eventState),
-            buildSendMetadata(EVENT_STATE_OPCODE)
+            buildEventSnapshotSendMetadata(EVENT_STATE_OPCODE)
         )
         stopTiming(broadcastTimer)
     end
