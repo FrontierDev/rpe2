@@ -248,6 +248,7 @@ client/ui/widgets/widget_Event_DMHelper.lua
 client/autopilot/Helper.lua
 client/ui/widgets/widget_Event_AutopilotHelper.lua
 client/ui/widgets/widget_Event_PortraitReadiness.lua
+client/ui/widgets/widget_Event_QueueStatus.lua
 client/ui/widgets/widget_ActionBar.lua
 client/ui/widgets/widget_ActionBar_Resources.lua
 client/ui/widgets/widget_ActionBar_Casting.lua
