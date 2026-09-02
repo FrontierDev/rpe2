@@ -412,7 +412,14 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
     end
 
     local queueCheckStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
-    if MessageQueue.CanAccept and not MessageQueue:CanAccept(partCount) then
+    if MessageQueue.CanAccept and not MessageQueue:CanAccept(
+        partCount,
+        diagnosticsMetadata and diagnosticsMetadata.replaceKey or nil,
+        self.Prefix,
+        opcode,
+        distribution,
+        target
+    ) then
         if Diagnostics.RecordSendFailure then
             Diagnostics:RecordSendFailure("queue-full")
         end
@@ -493,7 +500,7 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
             end
 
             sendState.failed = true
-            if Diagnostics.RecordSendFailure then
+            if result ~= "superseded" and Diagnostics.RecordSendFailure then
                 Diagnostics:RecordSendFailure(result)
             end
 
