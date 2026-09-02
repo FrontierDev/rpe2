@@ -984,6 +984,29 @@ local function getEventSnapshotRecipients(sessionState)
     return recipients
 end
 
+local function getVerifiedEventSnapshotRecipients(server, sessionState, recipients)
+    local verifiedRecipients = {}
+    local hostName = Common.NormalizeName(Common.GetPlayerName())
+
+    for index = 1, #(recipients or {}) do
+        local clientName = Common.NormalizeName(recipients[index])
+        if clientName ~= ""
+            and (
+                clientName == hostName
+                or (
+                    type(server) == "table"
+                    and type(server.ClientHashesMatch) == "function"
+                    and server:ClientHashesMatch(clientName, sessionState) == true
+                )
+            )
+        then
+            verifiedRecipients[#verifiedRecipients + 1] = clientName
+        end
+    end
+
+    return verifiedRecipients
+end
+
 local function resolveInitialEventSnapshotChannel(server, sessionState, recipients)
     if type(server) ~= "table"
         or type(sessionState) ~= "table"
@@ -1228,12 +1251,13 @@ end
 local function sendInitialEventSnapshot(server, sessionState, eventState)
     local snapshot = buildEventSnapshot(eventState)
     local recipients = getEventSnapshotRecipients(sessionState)
-    local fallbackLogicalMessages = #recipients * 3
+    local verifiedRecipients = getVerifiedEventSnapshotRecipients(server, sessionState, recipients)
+    local fallbackLogicalMessages = #verifiedRecipients * 3
     if not snapshot then
         recordInitialEventSnapshotDelivery(
             eventState,
             "WHISPER",
-            recipients,
+            verifiedRecipients,
             nil,
             "snapshot-build-failed",
             fallbackLogicalMessages,
@@ -1304,14 +1328,14 @@ local function sendInitialEventSnapshot(server, sessionState, eventState)
         fallbackReason = "channel-queue-capacity"
     end
 
-    local sentAll = #recipients > 0
-    for index = 1, #recipients do
-        sentAll = sendEventSnapshotToClient(eventState, recipients[index], snapshot) and sentAll
+    local sentAll = #verifiedRecipients > 0
+    for index = 1, #verifiedRecipients do
+        sentAll = sendEventSnapshotToClient(eventState, verifiedRecipients[index], snapshot) and sentAll
     end
     recordInitialEventSnapshotDelivery(
         eventState,
         "WHISPER",
-        recipients,
+        verifiedRecipients,
         channelId,
         fallbackReason or "channel-not-safe",
         fallbackLogicalMessages,
