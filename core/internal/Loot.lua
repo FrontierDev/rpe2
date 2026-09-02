@@ -49,7 +49,7 @@ end
 
 local function normalizeRewardType(value)
     local rewardType = string.lower(trim(value))
-    if rewardType == "item" or rewardType == "currency" then
+    if rewardType == "item" or rewardType == "currency" or rewardType == "nothing" then
         return rewardType
     end
     return nil
@@ -170,7 +170,7 @@ function Loot.ValidateConcreteReward(reward)
     end
 
     local rewardType = normalizeRewardType(reward.type)
-    if not rewardType then
+    if not rewardType or rewardType == "nothing" then
         return nil, "invalid-reward", {
             field = "type",
             value = reward.type,
@@ -266,29 +266,6 @@ function Loot.ValidateLootTable(loot)
             }
         end
 
-        local minimum = positiveInteger(entry.minQuantity)
-        local maximum = positiveInteger(entry.maxQuantity)
-        if not minimum or not maximum or maximum < minimum then
-            return nil, "invalid-quantity-range", {
-                entryIndex = sourceIndex,
-                entryId = entryId,
-                minQuantity = entry.minQuantity,
-                maxQuantity = entry.maxQuantity,
-            }
-        end
-
-        local concrete, err, detail = Loot.ValidateConcreteReward({
-            type = rewardType,
-            ref = entry.ref,
-            amount = 1,
-        })
-        if not concrete then
-            detail = type(detail) == "table" and detail or {}
-            detail.entryIndex = sourceIndex
-            detail.entryId = entryId
-            return nil, err, detail
-        end
-
         totalWeight = totalWeight + weight
         if finiteNumber(totalWeight) == nil then
             return nil, "invalid-weight", {
@@ -298,15 +275,41 @@ function Loot.ValidateLootTable(loot)
             }
         end
 
-        normalizedEntries[#normalizedEntries + 1] = {
+        local normalizedEntry = {
             id = entryId,
-            type = concrete.type,
-            ref = concrete.ref,
+            type = rewardType,
             weight = weight,
-            minQuantity = minimum,
-            maxQuantity = maximum,
             sourceIndex = sourceIndex,
         }
+        if rewardType ~= "nothing" then
+            local minimum = positiveInteger(entry.minQuantity)
+            local maximum = positiveInteger(entry.maxQuantity)
+            if not minimum or not maximum or maximum < minimum then
+                return nil, "invalid-quantity-range", {
+                    entryIndex = sourceIndex,
+                    entryId = entryId,
+                    minQuantity = entry.minQuantity,
+                    maxQuantity = entry.maxQuantity,
+                }
+            end
+
+            local concrete, err, detail = Loot.ValidateConcreteReward({
+                type = rewardType,
+                ref = entry.ref,
+                amount = 1,
+            })
+            if not concrete then
+                detail = type(detail) == "table" and detail or {}
+                detail.entryIndex = sourceIndex
+                detail.entryId = entryId
+                return nil, err, detail
+            end
+            normalizedEntry.type = concrete.type
+            normalizedEntry.ref = concrete.ref
+            normalizedEntry.minQuantity = minimum
+            normalizedEntry.maxQuantity = maximum
+        end
+        normalizedEntries[#normalizedEntries + 1] = normalizedEntry
     end
 
     return {
@@ -441,20 +444,22 @@ function Loot.ResolveValidatedLootTable(validatedLoot, rng)
             return nil, err, detail
         end
 
-        local amount = nil
-        amount, err, detail = Loot.ResolveQuantity(entry.minQuantity, entry.maxQuantity, rng)
-        if not amount then
-            detail = type(detail) == "table" and detail or {}
-            detail.drawIndex = drawIndex
-            detail.entryId = entry.id
-            return nil, err, detail
-        end
+        if entry.type ~= "nothing" then
+            local amount = nil
+            amount, err, detail = Loot.ResolveQuantity(entry.minQuantity, entry.maxQuantity, rng)
+            if not amount then
+                detail = type(detail) == "table" and detail or {}
+                detail.drawIndex = drawIndex
+                detail.entryId = entry.id
+                return nil, err, detail
+            end
 
-        rewards[#rewards + 1] = {
-            type = entry.type,
-            ref = entry.ref,
-            amount = amount,
-        }
+            rewards[#rewards + 1] = {
+                type = entry.type,
+                ref = entry.ref,
+                amount = amount,
+            }
+        end
     end
 
     return mergeValidatedRewards(rewards)
@@ -625,7 +630,9 @@ function Loot.BuildAssignments(source, distribution, eligiblePlayers, rng)
                     return nil, err, detail
                 end
             end
-            appendAssignment(assignments, assignmentByPlayer, players[playerIndex], rewards)
+            if #rewards > 0 then
+                appendAssignment(assignments, assignmentByPlayer, players[playerIndex], rewards)
+            end
         end
         return assignments
     end

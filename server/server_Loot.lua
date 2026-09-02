@@ -259,6 +259,25 @@ local function isServerActive()
     return type(state) == "table" and state.active == true
 end
 
+local function resolveStandaloneServerAuthority(eventSessionId)
+    local state = type(Server.GetState) == "function" and Server:GetState() or Server.State
+    local channelName = trim(state and state.channelName)
+    local hostName = localPlayerName()
+    if type(state) ~= "table" or state.active ~= true or channelName == "" or hostName == "" then
+        return nil, "server-inactive"
+    end
+    local expectedSessionId = "server:" .. channelName
+    if tostring(eventSessionId or "") ~= expectedSessionId then
+        return nil, "unknown-event-session"
+    end
+    return {
+        eventSessionId = expectedSessionId,
+        hostName = hostName,
+        active = true,
+        standalone = true,
+    }
+end
+
 local function validateRetainedExecutionAuthority(execution)
     if not isServerActive() then
         return nil, "server-inactive"
@@ -267,6 +286,9 @@ local function validateRetainedExecutionAuthority(execution)
         return nil, "unknown-delivery"
     end
     local authority, reason = resolveEventAuthority(execution.eventSessionId)
+    if not authority then
+        authority, reason = resolveStandaloneServerAuthority(execution.eventSessionId)
+    end
     if not authority then
         return nil, reason or "unknown-event-session"
     end
@@ -282,6 +304,9 @@ function Loot:PruneExecutions()
     for index = #self.SessionOrder, 1, -1 do
         local sessionId = self.SessionOrder[index]
         local authority = resolveEventAuthority(sessionId)
+        if not authority then
+            authority = resolveStandaloneServerAuthority(sessionId)
+        end
         if not authority then
             local keys = self.ExecutionKeysBySession[sessionId]
             removed = removed + (type(keys) == "table" and #keys or 0)
@@ -431,6 +456,19 @@ local function validateExecuteContext(context)
     local eventState = type(Server.GetEventState) == "function" and Server:GetEventState() or Server.EventState
     if type(eventState) ~= "table" or eventState.active ~= true then
         local source = trim(type(context) == "table" and context.source or "")
+        if source == "event-manager" and type(context) == "table" and context.standalone == true then
+            local authority, reason = resolveStandaloneServerAuthority(context.eventSessionId)
+            if not authority then
+                return nil, reason
+            end
+            if normalizeName(context.hostName) ~= authority.hostName or type(context.eventState) ~= "table" then
+                return nil, "event-state-mismatch"
+            end
+            authority.eventState = context.eventState
+            authority.source = source
+            authority.rng = context.rng
+            return authority
+        end
         if source == "event-manager" and type(Loot.ResolveRetainedEventManagerAuthority) == "function" then
             return Loot:ResolveRetainedEventManagerAuthority(context)
         end
@@ -565,10 +603,6 @@ local function freezeAssignments(assignments, eligiblePlayers)
         end
     end
 
-    if #frozen == 0 then
-        return nil, "invalid-assignment", { reason = "no-assignments" }
-    end
-
     for index = 1, #frozen do
         if type(LootLogic.MergeConcreteRewards) == "function" then
             local merged, reason, detail = LootLogic.MergeConcreteRewards(frozen[index].rewards)
@@ -613,7 +647,8 @@ local function updateExecutionStatus(execution)
     end
 
     if count == 0 then
-        execution.status = "failed"
+        execution.status = "success"
+        execution.completedAt = getNow()
     elseif succeeded == count then
         execution.status = "success"
         execution.completedAt = getNow()

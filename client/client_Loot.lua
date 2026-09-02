@@ -697,6 +697,31 @@ function Client:ResolveLootEventAuthority(eventSessionId)
     return nil, "unknown-event-session"
 end
 
+function Client:ResolveLootDeliveryAuthority(eventSessionId)
+    local authority, reason = self:ResolveLootEventAuthority(eventSessionId)
+    if authority then
+        return authority
+    end
+
+    local state = type(self.GetState) == "function" and self:GetState() or self.State
+    local channelName = trim(state and state.channelName)
+    local hostName = normalizeName(state and state.hostName)
+    if type(state) == "table"
+        and state.active == true
+        and channelName ~= ""
+        and hostName ~= ""
+        and tostring(eventSessionId or "") == "server:" .. channelName
+    then
+        return {
+            eventSessionId = "server:" .. channelName,
+            hostName = hostName,
+            active = true,
+            standalone = true,
+        }
+    end
+    return nil, reason or "unknown-event-session"
+end
+
 local function installEventAuthorityHooks()
     if Client._lootEventAuthorityHooksInstalled == true then
         return
@@ -876,7 +901,7 @@ function Client:HandleLootDelivery(arguments, sender)
         return false, buildFailureResponse("", parseReason or "invalid-payload")
     end
 
-    local authority, authorityReason = self:ResolveLootEventAuthority(payload.eventSessionId)
+    local authority, authorityReason = self:ResolveLootDeliveryAuthority(payload.eventSessionId)
     if not authority then
         return false, buildFailureResponse(payload.deliveryId, authorityReason or "unknown-event-session")
     end

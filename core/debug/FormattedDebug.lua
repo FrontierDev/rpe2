@@ -140,12 +140,9 @@ function Debug.Internal(message, ...)
 end
 
 function Debug.EnsureInternalLevelEnabled()
-    if type(Debug.SetLevelEnabled) == "function"
-        and type(Debug.IsLevelEnabled) == "function"
-        and not Debug.IsLevelEnabled("internal")
-    then
-        Debug.SetLevelEnabled("internal", true)
-    end
+    -- Kept for callers that opt into detailed diagnostics, but internal output
+    -- is always controlled explicitly by the runtime debug setting.
+    return Debug.IsLevelEnabled and Debug.IsLevelEnabled("internal") or false
 end
 
 function Debug.SetLevelEnabled(level, enabled)

@@ -326,6 +326,37 @@ local function currentServerEvent()
     return type(Server.GetEventState) == "function" and Server:GetEventState() or Server.EventState
 end
 
+local function buildStandaloneLootContext()
+    local state = type(Server.GetState) == "function" and Server:GetState() or Server.State
+    if type(state) ~= "table" or state.active ~= true then
+        return nil, "server-inactive"
+    end
+
+    local channelName = trim(state.channelName)
+    local hostName = normalizeName(type(Common.GetPlayerName) == "function" and Common.GetPlayerName() or "")
+    if channelName == "" or hostName == "" then
+        return nil, "loot-coordinator-unavailable"
+    end
+
+    local players, seen, units = {}, {}, {}
+    for index = 1, #(state.clientOrder or {}) do
+        local player = normalizeName(state.clientOrder[index])
+        if player ~= "" and not seen[player] then
+            seen[player] = true
+            players[#players + 1] = player
+            units[#units + 1] = { isPlayer = true, name = player, ownerID = player, controllerID = player }
+        end
+    end
+
+    return {
+        standalone = true,
+        eventSessionId = "server:" .. channelName,
+        hostName = hostName,
+        players = players,
+        eventState = { units = units },
+    }
+end
+
 local function canUseActions()
     if type(Server.CanUseEventManagerActions) ~= "function" then
         return false, "event-action-blocked"
@@ -334,29 +365,27 @@ local function canUseActions()
 end
 
 function Server:GetEventManagerLootEligiblePlayers()
-    local allowed, reason = canUseActions()
-    if allowed ~= true then
-        return nil, reason
-    end
     local eventState = currentServerEvent()
-    if type(eventState) ~= "table" then
-        return nil, "event-inactive"
-    end
     if type(self.Loot) ~= "table" or type(self.Loot.GetEligiblePlayers) ~= "function" then
         return nil, "loot-coordinator-unavailable"
     end
-    return self.Loot:GetEligiblePlayers(eventState)
+    if type(eventState) == "table" and eventState.active == true then
+        local allowed, reason = canUseActions()
+        if allowed ~= true then
+            return nil, reason
+        end
+        return self.Loot:GetEligiblePlayers(eventState)
+    end
+
+    local context, reason = buildStandaloneLootContext()
+    if not context then
+        return nil, reason
+    end
+    return deepCopy(context.players)
 end
 
 function Server:ExecuteEventManagerLootGrant(grant, selectedPlayers)
-    local allowed, reason = canUseActions()
-    if allowed ~= true then
-        return nil, reason
-    end
     local eventState = currentServerEvent()
-    if type(eventState) ~= "table" or eventState.active ~= true then
-        return nil, "event-inactive"
-    end
     local loot = self.Loot
     if type(loot) ~= "table"
         or type(loot.ValidateEligiblePlayers) ~= "function"
@@ -364,6 +393,38 @@ function Server:ExecuteEventManagerLootGrant(grant, selectedPlayers)
         or type(loot.ExecuteGrant) ~= "function"
     then
         return nil, "loot-coordinator-unavailable"
+    end
+
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        local context, reason = buildStandaloneLootContext()
+        if not context then
+            return nil, reason
+        end
+        local players, playerReason, playerDetail = loot:ValidateEligiblePlayers(context.eventState, selectedPlayers)
+        if not players then
+            return nil, playerReason, playerDetail
+        end
+        local grantId, grantIdReason = loot:GenerateGrantId(context.eventSessionId, "event-manager")
+        if not grantId then
+            return nil, grantIdReason or "loot-grant-id-unavailable"
+        end
+        local summary, executeReason, executeDetail = loot:ExecuteGrant(grant, players, {
+            eventSessionId = context.eventSessionId,
+            grantId = grantId,
+            hostName = context.hostName,
+            source = "event-manager",
+            standalone = true,
+            eventState = context.eventState,
+        })
+        if type(summary) ~= "table" then
+            return nil, executeReason, executeDetail
+        end
+        return summary, nil, nil, grantId
+    end
+
+    local allowed, reason = canUseActions()
+    if allowed ~= true then
+        return nil, reason
     end
 
     local players, playerReason, playerDetail = loot:ValidateEligiblePlayers(eventState, selectedPlayers)
@@ -670,7 +731,8 @@ function EventManage:RefreshActionLootSection()
         return false
     end
 
-    local ready, actionReason = canUseActions()
+    local ready = type(Server.IsActive) == "function" and Server:IsActive() == true
+    local actionReason = ready and nil or "server-inactive"
     local eventState = currentServerEvent()
     local eventSessionId = tostring(type(eventState) == "table" and eventState.id or "")
 
@@ -709,8 +771,9 @@ function EventManage:RefreshActionLootSection()
     end
 
     self.ActionsLootQuantity = trim(self.ActionsLootQuantityInput and self.ActionsLootQuantityInput:GetText() or self.ActionsLootQuantity or "1")
-    local grant, validationReason = self:ValidateActionLootControls(eligiblePlayers)
-    local valid = ready == true and type(grant) == "table"
+    local _, validationReason = self:ValidateActionLootControls(eligiblePlayers)
+    local configuredGrant = self:BuildActionLootGrant()
+    local valid = ready == true and type(configuredGrant) == "table"
 
     setEnabled(self.ActionsLootSourceDropdown, ready == true)
     setEnabled(self.ActionsLootDistributionDropdown, ready == true)
@@ -888,7 +951,7 @@ function EventManage:BuildActionLootSection(root)
         multiSelect = true,
         selectedValues = {},
         popupWidth = 210,
-        tooltip = "Choose one or more participating player EventUnits. NPCs and pets are not eligible.",
+        tooltip = "Choose one or more event players, or connected server clients when no event is active.",
         onValueChanged = function(values)
             self:SetActionLootSelectedPlayers(values)
             self:RefreshActionLootSection()

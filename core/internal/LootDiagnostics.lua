@@ -120,7 +120,7 @@ function Loot.FormatLootDiagnosticIssue(reason, detail, entry)
             return prefix .. ": Entry ID is blank."
         end
         if info.field == "type" then
-            return prefix .. ": Type must be Item or Currency."
+            return prefix .. ": Type must be Item, Currency, or No Reward."
         end
         if info.reason == "entry-not-table" then
             return prefix .. ": entry data is invalid."
@@ -132,7 +132,7 @@ function Loot.FormatLootDiagnosticIssue(reason, detail, entry)
             return prefix .. ": Reference is blank."
         end
         if info.field == "type" then
-            return prefix .. ": Type must be Item or Currency."
+            return prefix .. ": Type must be Item, Currency, or No Reward."
         end
         return prefix .. ": reward data is invalid."
     end

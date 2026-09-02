@@ -52,6 +52,9 @@ local function resolveLootContext()
     return Loot:GetEventManagerLootContext()
 end
 
+local baseGetEventManagerLootEligiblePlayers = Server.GetEventManagerLootEligiblePlayers
+local baseExecuteEventManagerLootGrant = Server.ExecuteEventManagerLootGrant
+
 local function contextLabel(context)
     local label = trim(context and context.eventName)
     if label == "" then
@@ -81,6 +84,9 @@ end
 function Server:GetEventManagerLootEligiblePlayers()
     local context, reason, detail = resolveLootContext()
     if type(context) ~= "table" then
+        if type(baseGetEventManagerLootEligiblePlayers) == "function" then
+            return baseGetEventManagerLootEligiblePlayers(self)
+        end
         return nil, reason, detail
     end
     if #(context.players or {}) == 0 then
@@ -92,6 +98,9 @@ end
 function Server:ExecuteEventManagerLootGrant(grant, selectedPlayers)
     local context, reason, detail = resolveLootContext()
     if type(context) ~= "table" then
+        if type(baseExecuteEventManagerLootGrant) == "function" then
+            return baseExecuteEventManagerLootGrant(self, grant, selectedPlayers)
+        end
         return nil, reason, detail
     end
     if type(Loot.ValidateEligiblePlayers) ~= "function"
@@ -159,8 +168,9 @@ if type(baseRefreshActionLootSection) == "function" then
                 or self.ActionsLootQuantity
                 or "1"
         )
-        local grant, validationReason = self:ValidateActionLootControls(eligiblePlayers)
-        local valid = type(grant) == "table"
+        local _, validationReason = self:ValidateActionLootControls(eligiblePlayers)
+        local configuredGrant = self:BuildActionLootGrant()
+        local valid = type(configuredGrant) == "table"
         local sourceType = normalizeToken(self.ActionsLootSourceType or "direct")
         local rewardType = normalizeToken(self.ActionsLootRewardType or "item")
         local needsDataset = sourceType == "loot_table" or (sourceType == "direct" and rewardType == "item")

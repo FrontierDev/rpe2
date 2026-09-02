@@ -19,6 +19,7 @@ local PAGE_DEFINITIONS = {
 local ENTRY_TYPE_ITEMS = {
     { label = "Item", value = "item" },
     { label = "Currency", value = "currency" },
+    { label = "No Reward", value = "nothing" },
 }
 
 local function trim(value)
@@ -45,7 +46,7 @@ end
 
 local function normalizeEntryType(value)
     local entryType = string.lower(trim(value))
-    if entryType == "item" or entryType == "currency" then
+    if entryType == "item" or entryType == "currency" or entryType == "nothing" then
         return entryType
     end
     return nil
@@ -333,11 +334,11 @@ function DataEditor:ValidateLootTableAuthoring(loot)
 
             local entryType = normalizeEntryType(entry.type)
             if not entryType then
-                result.errors[#result.errors + 1] = prefix .. "Type must be Item or Currency."
+                result.errors[#result.errors + 1] = prefix .. "Type must be Item, Currency, or No Reward."
             end
 
             local reference = trim(entry.ref)
-            if reference == "" then
+            if entryType == "item" and reference == "" then
                 result.errors[#result.errors + 1] = prefix .. "Reference is blank."
             elseif entryType == "item" then
                 local dataset, item = nil, nil
@@ -348,6 +349,8 @@ function DataEditor:ValidateLootTableAuthoring(loot)
                 if not dataset or not item then
                     result.errors[#result.errors + 1] = prefix .. ("Item reference '%s' cannot be resolved."):format(reference)
                 end
+            elseif entryType == "currency" and reference == "" then
+                result.errors[#result.errors + 1] = prefix .. "Reference is blank."
             elseif entryType == "currency" then
                 local definition = nil
                 if type(Profile.ResolveCurrencyDefinition) == "function" then
@@ -362,12 +365,14 @@ function DataEditor:ValidateLootTableAuthoring(loot)
             if not parsePositiveNumber(entry.weight) then
                 result.errors[#result.errors + 1] = prefix .. "Weight must be a finite number greater than 0."
             end
-            local minimum = parsePositiveInteger(entry.minQuantity)
-            local maximum = parsePositiveInteger(entry.maxQuantity)
-            if not minimum then result.errors[#result.errors + 1] = prefix .. "Minimum Quantity must be a positive integer." end
-            if not maximum then result.errors[#result.errors + 1] = prefix .. "Maximum Quantity must be a positive integer." end
-            if minimum and maximum and maximum < minimum then
-                result.errors[#result.errors + 1] = prefix .. "Maximum Quantity cannot be less than Minimum Quantity."
+            if entryType ~= "nothing" then
+                local minimum = parsePositiveInteger(entry.minQuantity)
+                local maximum = parsePositiveInteger(entry.maxQuantity)
+                if not minimum then result.errors[#result.errors + 1] = prefix .. "Minimum Quantity must be a positive integer." end
+                if not maximum then result.errors[#result.errors + 1] = prefix .. "Maximum Quantity must be a positive integer." end
+                if minimum and maximum and maximum < minimum then
+                    result.errors[#result.errors + 1] = prefix .. "Maximum Quantity cannot be less than Minimum Quantity."
+                end
             end
         end
     end
@@ -531,6 +536,7 @@ function DataEditor:BuildLootInspectorEntriesPage(parent)
         spacing = 1, fitChildrenWidth = true, fitChildrenHeight = false,
     })
     UI.Utils.AnchorFill(root, parent, 0, 0, 0, 0)
+    self.LootInspectorEntriesLayout = root
 
     local panel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorLootInspectorEntriesPanel", {
         width = FIELD_WIDTH, height = 48, contentInset = 2, showBorder = false,
@@ -545,7 +551,8 @@ function DataEditor:BuildLootInspectorEntriesPage(parent)
     self.LootInspectorEntryScroll:SetRowRenderer(function(row, entry, index)
         if type(entry) == "table" then
             row:SetCategory(trim(entry.id) ~= "" and trim(entry.id) or "-")
-            row:SetStatus(normalizeEntryType(entry.type) or "Invalid")
+            local entryType = normalizeEntryType(entry.type)
+            row:SetStatus(entryType == "nothing" and "No Reward" or entryType or "Invalid")
             row:SetDetail(trim(entry.ref))
         else
             row:SetCategory("Invalid")
@@ -779,7 +786,7 @@ function DataEditor:RefreshLootEntriesInspector()
     if self.LootInspectorEntryIdInput then self.LootInspectorEntryIdInput:SetText(editable and tostring(entry.id or "") or ""); setTextEnabled(self.LootInspectorEntryIdInput, editable) end
     self._refreshingLootEntries = true
     if self.LootInspectorEntryTypeDropdown then
-        local typeItems = { { label = "Item", value = "item" }, { label = "Currency", value = "currency" } }
+        local typeItems = { { label = "Item", value = "item" }, { label = "Currency", value = "currency" }, { label = "No Reward", value = "nothing" } }
         if rawType ~= "" and not entryType then typeItems[#typeItems + 1] = { label = "Unsupported: " .. rawType, value = rawType } end
         self.LootInspectorEntryTypeDropdown:SetItems(typeItems)
         self.LootInspectorEntryTypeDropdown:SetSelectedValue(entryType or rawType, true)
@@ -799,6 +806,7 @@ function DataEditor:RefreshLootEntriesInspector()
     setGroupVisible(self.LootInspectorItemDatasetGroup, editable and entryType == "item")
     setGroupVisible(self.LootInspectorItemGroup, editable and entryType == "item")
     setGroupVisible(self.LootInspectorCurrencyGroup, editable and entryType == "currency")
+    if self.LootInspectorEntriesLayout then self.LootInspectorEntriesLayout:RefreshLayout() end
 
     if self.LootInspectorItemDatasetDropdown then
         self.LootInspectorItemDatasetDropdown:SetItems(buildItemDatasetItems(self, itemDatasetId))
@@ -819,8 +827,8 @@ function DataEditor:RefreshLootEntriesInspector()
     self._refreshingLootEntries = false
 
     if self.LootInspectorWeightInput then self.LootInspectorWeightInput:SetText(editable and tostring(entry.weight or "") or ""); setTextEnabled(self.LootInspectorWeightInput, editable) end
-    if self.LootInspectorMinQuantityInput then self.LootInspectorMinQuantityInput:SetText(editable and tostring(entry.minQuantity or "") or ""); setTextEnabled(self.LootInspectorMinQuantityInput, editable) end
-    if self.LootInspectorMaxQuantityInput then self.LootInspectorMaxQuantityInput:SetText(editable and tostring(entry.maxQuantity or "") or ""); setTextEnabled(self.LootInspectorMaxQuantityInput, editable) end
+    if self.LootInspectorMinQuantityInput then self.LootInspectorMinQuantityInput:SetText(editable and tostring(entry.minQuantity or "") or ""); setTextEnabled(self.LootInspectorMinQuantityInput, editable and entryType ~= "nothing") end
+    if self.LootInspectorMaxQuantityInput then self.LootInspectorMaxQuantityInput:SetText(editable and tostring(entry.maxQuantity or "") or ""); setTextEnabled(self.LootInspectorMaxQuantityInput, editable and entryType ~= "nothing") end
     self:RefreshLootInspectorValidationStatus()
 end
 
