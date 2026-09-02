@@ -360,7 +360,7 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
         return false
     end
 
-    if not MessageQueue or not MessageQueue.EnqueueAddonMessage or not C_ChatInfo or not C_ChatInfo.SendAddonMessage then
+    if not MessageQueue or not MessageQueue.EnqueueLogicalMessage or not C_ChatInfo or not C_ChatInfo.SendAddonMessage then
         if Diagnostics.RecordSendFailure then
             Diagnostics:RecordSendFailure("missing-api")
         end
@@ -390,26 +390,7 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
         )
     end
 
-    local queueCheckStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
-    if MessageQueue.CanAccept and not MessageQueue:CanAccept(partCount) then
-        if Diagnostics.RecordSendFailure then
-            Diagnostics:RecordSendFailure("queue-full")
-        end
-        return false
-    end
-    local queueCheckElapsedMs = queueCheckStartTime and (getTimingNowMilliseconds() - queueCheckStartTime) or 0
-
-    local sendState = {
-        failed = false,
-        pendingParts = partCount,
-        timedOpcodeKey = timedOpcodeKey,
-        totalStartTime = totalStartTime,
-        enqueueElapsedMs = 0,
-        chunkPlanElapsedMs = chunkPlanElapsedMs,
-        queueCheckElapsedMs = queueCheckElapsedMs,
-        immediateLocalEcho = shouldDeliverImmediateLocalEcho(distribution, target, opcode),
-    }
-
+    local packets = {}
     for partIndex = 1, partCount do
         local chunkToken = Serialization:BuildChunkToken(partIndex, partCount)
         local rangeStart = ((partIndex - 1) * chunkLength) + 1
@@ -427,84 +408,103 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
             end
             return false
         end
+        packets[partIndex] = packet
+    end
 
-        if sendState.immediateLocalEcho == true then
+    local queueCheckStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
+    if MessageQueue.CanAccept and not MessageQueue:CanAccept(partCount) then
+        if Diagnostics.RecordSendFailure then
+            Diagnostics:RecordSendFailure("queue-full")
+        end
+        return false
+    end
+    local queueCheckElapsedMs = queueCheckStartTime and (getTimingNowMilliseconds() - queueCheckStartTime) or 0
+
+    local sendState = {
+        failed = false,
+        timedOpcodeKey = timedOpcodeKey,
+        totalStartTime = totalStartTime,
+        enqueueElapsedMs = 0,
+        chunkPlanElapsedMs = chunkPlanElapsedMs,
+        queueCheckElapsedMs = queueCheckElapsedMs,
+        immediateLocalEcho = shouldDeliverImmediateLocalEcho(distribution, target, opcode),
+    }
+
+    if sendState.immediateLocalEcho == true then
+        for partIndex = 1, partCount do
             self:ReceiveMessage(
                 self.Prefix,
-                packet,
+                packets[partIndex],
                 distribution,
                 Common.GetPlayerName and Common.GetPlayerName() or (getPlayerName and getPlayerName() or ""),
                 target,
                 { localEcho = true, immediateLocalEcho = true }
             )
         end
-
-        local enqueueStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
-        MessageQueue:EnqueueAddonMessage(self.Prefix, packet, distribution, target, {
-            chunkPartIndex = partIndex,
-            chunkPartCount = partCount,
-            shouldSkip = function()
-                return sendState.failed
-            end,
-            onSent = function(item, result)
-                if sendState.failed then
-                    return
-                end
-
-                if sendState.immediateLocalEcho ~= true and shouldEchoOutboundChannel(distribution, target) then
-                    self:ReceiveMessage(
-                        self.Prefix,
-                        item.payload,
-                        distribution,
-                        Common.GetPlayerName and Common.GetPlayerName() or (getPlayerName and getPlayerName() or ""),
-                        target,
-                        { localEcho = true }
-                    )
-                end
-
-                sendState.pendingParts = sendState.pendingParts - 1
-                if sendState.pendingParts == 0 then
-                    if Diagnostics.RecordSendSuccess then
-                        Diagnostics:RecordSendSuccess(diagnosticsMetadata, distribution, target, argumentsText, partCount)
-                    end
-
-                    if sendState.timedOpcodeKey then
-                        local deliveredElapsedMs = getTimingNowMilliseconds() - sendState.totalStartTime
-                        logTimingParts(
-                            ("%s chunks=%d"):format(sendState.timedOpcodeKey, partCount),
-                            "event-send",
-                            {
-                                { label = "chunk-plan", elapsedMs = sendState.chunkPlanElapsedMs },
-                                { label = "queue-check", elapsedMs = sendState.queueCheckElapsedMs },
-                                { label = "enqueue", elapsedMs = sendState.enqueueElapsedMs },
-                            },
-                            deliveredElapsedMs,
-                            sendState.timedOpcodeKey == "EVENT_UNITS" and 25 or 15
-                        )
-                    end
-
-                    Common.InvokeCallback(deliveredCallback, item, result)
-                end
-            end,
-            onFailed = function(item, result)
-                if sendState.failed then
-                    return
-                end
-
-                sendState.failed = true
-                if Diagnostics.RecordSendFailure then
-                    Diagnostics:RecordSendFailure(result)
-                end
-
-                Common.InvokeCallback(failedCallback, item, result)
-            end,
-        })
-        if enqueueStartTime then
-            sendState.enqueueElapsedMs = sendState.enqueueElapsedMs + (getTimingNowMilliseconds() - enqueueStartTime)
-        end
     end
 
-    return true
+    local enqueueStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
+    local queued = MessageQueue:EnqueueLogicalMessage(self.Prefix, opcode, packets, distribution, target, {
+        onChunkSent = function(item, packet, result)
+            if sendState.failed then
+                return
+            end
+
+            if sendState.immediateLocalEcho ~= true and shouldEchoOutboundChannel(distribution, target) then
+                self:ReceiveMessage(
+                    self.Prefix,
+                    packet,
+                    distribution,
+                    Common.GetPlayerName and Common.GetPlayerName() or (getPlayerName and getPlayerName() or ""),
+                    target,
+                    { localEcho = true }
+                )
+            end
+        end,
+        onDelivered = function(item, result)
+            if sendState.failed then
+                return
+            end
+
+            if Diagnostics.RecordSendSuccess then
+                Diagnostics:RecordSendSuccess(diagnosticsMetadata, distribution, target, argumentsText, partCount)
+            end
+
+            if sendState.timedOpcodeKey then
+                local deliveredElapsedMs = getTimingNowMilliseconds() - sendState.totalStartTime
+                logTimingParts(
+                    ("%s chunks=%d"):format(sendState.timedOpcodeKey, partCount),
+                    "event-send",
+                    {
+                        { label = "chunk-plan", elapsedMs = sendState.chunkPlanElapsedMs },
+                        { label = "queue-check", elapsedMs = sendState.queueCheckElapsedMs },
+                        { label = "enqueue", elapsedMs = sendState.enqueueElapsedMs },
+                    },
+                    deliveredElapsedMs,
+                    sendState.timedOpcodeKey == "EVENT_UNITS" and 25 or 15
+                )
+            end
+
+            Common.InvokeCallback(deliveredCallback, item, result)
+        end,
+        onFailed = function(item, result)
+            if sendState.failed then
+                return
+            end
+
+            sendState.failed = true
+            if Diagnostics.RecordSendFailure then
+                Diagnostics:RecordSendFailure(result)
+            end
+
+            Common.InvokeCallback(failedCallback, item, result)
+        end,
+    }, diagnosticsMetadata)
+    if enqueueStartTime then
+        sendState.enqueueElapsedMs = getTimingNowMilliseconds() - enqueueStartTime
+    end
+
+    return queued ~= nil
 end
 
 function Comms:SendToChannel(channelId, opcodeOrPayload, argumentsOrMetadata, metadata)
