@@ -1003,7 +1003,13 @@ function Queue:ProcessNext()
     removeSkippedItems(self)
     if #self.Items == 0 then
         clearScheduledWake(self)
+        self.CurrentImmediateBurstCount = 0
         recordSchedulerState(self, "none", nil, nil, getCurrentTime())
+        return false
+    end
+
+    if self.CurrentImmediateBurstCount >= getConfiguredImmediateBurstLimit(self) then
+        scheduleImmediateYield(self)
         return false
     end
 
@@ -1016,11 +1022,6 @@ function Queue:ProcessNext()
         else
             recordSchedulerState(self, waitReason or "none", waitUntil, waitingItem, now)
         end
-        return false
-    end
-
-    if self.CurrentImmediateBurstCount >= getConfiguredImmediateBurstLimit(self) then
-        scheduleImmediateYield(self)
         return false
     end
 
