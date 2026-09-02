@@ -20,16 +20,25 @@ Queue.DefaultMaxSendDelay = Queue.DefaultMaxSendDelay or 2
 Queue.MaxSendDelay = Queue.MaxSendDelay or Queue.DefaultMaxSendDelay
 Queue.DefaultMaxAttempts = Queue.DefaultMaxAttempts or 0
 Queue.MaxAttempts = Queue.MaxAttempts or Queue.DefaultMaxAttempts
+-- Retained for compatibility: this limit continues to bound pending physical chunks,
+-- not just the number of logical queue records.
 Queue.DefaultMaxQueueLength = Queue.DefaultMaxQueueLength or 256
 Queue.MaxQueueLength = Queue.MaxQueueLength or Queue.DefaultMaxQueueLength
 Queue.Items = Queue.Items or {}
 Queue.IsSending = Queue.IsSending or false
 Queue.NextSendAt = Queue.NextSendAt or 0
+Queue.PendingChunkHighWater = math.max(0, math.floor(tonumber(Queue.PendingChunkHighWater) or 0))
+Queue.LogicalMessageHighWater = math.max(0, math.floor(tonumber(Queue.LogicalMessageHighWater) or 0))
 
 -- Helpers
 local invokeCallback = Common.InvokeCallback
 
 local function getItemOpcode(item)
+    local explicitOpcode = tonumber(item and item.opcode)
+    if explicitOpcode then
+        return explicitOpcode
+    end
+
     local serialization = Addon.Internal
         and Addon.Internal.Comms
         and Addon.Internal.Comms.Serialization
@@ -97,13 +106,90 @@ local function scheduleNextProcess(self, delay)
     return false
 end
 
+local function getChunkCount(item)
+    return type(item) == "table" and type(item.chunks) == "table" and #item.chunks or 0
+end
+
+local function getNextChunkIndex(item)
+    local chunkCount = getChunkCount(item)
+    if chunkCount <= 0 then
+        return 1
+    end
+    return math.max(1, math.min(chunkCount + 1, math.floor(tonumber(item.nextChunkIndex) or 1)))
+end
+
+local function getRemainingChunkCount(item)
+    local chunkCount = getChunkCount(item)
+    if chunkCount <= 0 then
+        return 0
+    end
+    local nextChunkIndex = getNextChunkIndex(item)
+    if nextChunkIndex > chunkCount then
+        return 0
+    end
+    return chunkCount - nextChunkIndex + 1
+end
+
+local function setCurrentChunkFields(item, chunkIndex)
+    local chunkCount = getChunkCount(item)
+    local normalizedIndex = math.max(1, math.min(chunkCount, math.floor(tonumber(chunkIndex) or 1)))
+    item.chunkPartIndex = normalizedIndex
+    item.chunkPartCount = chunkCount
+    item.payload = item.chunks and item.chunks[normalizedIndex] or nil
+    return item.payload, normalizedIndex, chunkCount
+end
+
+local function updateQueueMetrics(self)
+    local logicalCount = #(type(self.Items) == "table" and self.Items or {})
+    local pendingChunks = self:GetPendingChunkCount()
+    self.LogicalMessageHighWater = math.max(tonumber(self.LogicalMessageHighWater) or 0, logicalCount)
+    self.PendingChunkHighWater = math.max(tonumber(self.PendingChunkHighWater) or 0, pendingChunks)
+
+    local diagnostics = Diagnostics.GetQueueDiagnosticsStore and Diagnostics:GetQueueDiagnosticsStore() or nil
+    if type(diagnostics) == "table" then
+        diagnostics.currentLogicalMessageCount = logicalCount
+        diagnostics.highWaterLogicalMessageCount = math.max(
+            math.floor(tonumber(diagnostics.highWaterLogicalMessageCount) or 0),
+            logicalCount
+        )
+        diagnostics.currentPendingChunkCount = pendingChunks
+        diagnostics.highWaterPendingChunkCount = math.max(
+            math.floor(tonumber(diagnostics.highWaterPendingChunkCount) or 0),
+            pendingChunks
+        )
+    end
+    return logicalCount, pendingChunks
+end
+
+local function recordSkippedChunks(item, firstIndex)
+    if type(Diagnostics.RecordQueueSkipped) ~= "function" then
+        return
+    end
+    local chunkCount = getChunkCount(item)
+    for chunkIndex = math.max(1, math.floor(tonumber(firstIndex) or 1)), chunkCount do
+        setCurrentChunkFields(item, chunkIndex)
+        Diagnostics:RecordQueueSkipped(item, "logical-message-cancelled")
+    end
+end
+
+function Queue:GetPendingChunkCount()
+    local pending = 0
+    for index = 1, #(self.Items or {}) do
+        pending = pending + getRemainingChunkCount(self.Items[index])
+    end
+    return pending
+end
+
 function Queue:Reset()
     self.Items = {}
     self.IsSending = false
     self.NextSendAt = 0
+    self.PendingChunkHighWater = 0
+    self.LogicalMessageHighWater = 0
     if Diagnostics.RecordQueueReset then
         Diagnostics:RecordQueueReset()
     end
+    updateQueueMetrics(self)
     return self
 end
 
@@ -112,20 +198,39 @@ function Queue:Enqueue(item)
         error("Addon.Internal.Comms.MessageQueue:Enqueue(item) requires a table.", 2)
     end
 
-    local maxQueueLength = tonumber(self.MaxQueueLength) or tonumber(self.DefaultMaxQueueLength) or 0
-    if maxQueueLength > 0 and (#self.Items + 1) > maxQueueLength then
+    local requestedChunkCount = getChunkCount(item)
+    if requestedChunkCount <= 0 then
+        error("Addon.Internal.Comms.MessageQueue:Enqueue(item) requires one or more chunks.", 2)
+    end
+
+    if not self:CanAccept(requestedChunkCount) then
         if Diagnostics.RecordQueueFailure then
+            setCurrentChunkFields(item, 1)
             Diagnostics:RecordQueueFailure(item, "queue-full")
+        end
+        if Diagnostics.RecordQueueLogicalFailure then
+            Diagnostics:RecordQueueLogicalFailure(item, "queue-full")
         end
         invokeCallback(item.callbacks and item.callbacks.onFailed, item, "queue-full")
         return nil
     end
 
+    item.nextChunkIndex = getNextChunkIndex(item)
     item.attempts = tonumber(item.attempts) or 0
+    item.totalAttempts = tonumber(item.totalAttempts) or 0
     self.Items[#self.Items + 1] = item
-    if Diagnostics.RecordQueueEnqueued then
-        Diagnostics:RecordQueueEnqueued(item)
+
+    if Diagnostics.RecordQueueLogicalEnqueued then
+        Diagnostics:RecordQueueLogicalEnqueued(item)
     end
+    if Diagnostics.RecordQueueEnqueued then
+        for chunkIndex = 1, requestedChunkCount do
+            setCurrentChunkFields(item, chunkIndex)
+            Diagnostics:RecordQueueEnqueued(item)
+        end
+    end
+    setCurrentChunkFields(item, item.nextChunkIndex)
+    updateQueueMetrics(self)
 
     self:ProcessNext()
     return item
@@ -138,35 +243,32 @@ function Queue:CanAccept(count)
         return true
     end
 
-    return (#self.Items + requestedCount) <= maxQueueLength
+    return (self:GetPendingChunkCount() + requestedCount) <= maxQueueLength
 end
 
-function Queue:EnqueueAddonMessage(prefix, payload, distribution, target, callbacks)
+function Queue:EnqueueLogicalMessage(prefix, opcode, chunks, distribution, target, callbacks, metadata)
     return self:Enqueue({
         prefix = prefix,
-        payload = payload,
+        opcode = tonumber(opcode),
         distribution = distribution,
         target = target,
-        chunkPartIndex = callbacks and callbacks.chunkPartIndex or nil,
-        chunkPartCount = callbacks and callbacks.chunkPartCount or nil,
+        chunks = chunks,
+        nextChunkIndex = 1,
         shouldSkip = callbacks and callbacks.shouldSkip or nil,
         callbacks = callbacks,
+        metadata = metadata,
     })
 end
 
 function Queue:HandleSuccess(item, result)
-    table.remove(self.Items, 1)
+    local chunk, chunkPartIndex, chunkPartCount = setCurrentChunkFields(item, item.nextChunkIndex)
     if Diagnostics.RecordQueueSent then
         Diagnostics:RecordQueueSent(item, result)
     end
 
     local chunkSuffix = ""
-    local chunkPartCount = tonumber(item and item.chunkPartCount) or 0
     if chunkPartCount > 1 then
-        chunkSuffix = (" part=%d/%d"):format(
-            math.max(1, tonumber(item and item.chunkPartIndex) or 1),
-            chunkPartCount
-        )
+        chunkSuffix = (" part=%d/%d"):format(chunkPartIndex, chunkPartCount)
     end
 
     if Addon.Debug and Addon.Debug.CommsTracing == true and Addon.Debug.Internal then
@@ -179,9 +281,25 @@ function Queue:HandleSuccess(item, result)
         )
     end
 
-    invokeCallback(item.callbacks and item.callbacks.onSent, item, result)
+    invokeCallback(item.callbacks and item.callbacks.onChunkSent, item, chunk, result, chunkPartIndex, chunkPartCount)
+
+    item.nextChunkIndex = chunkPartIndex + 1
+    item.attempts = 0
+    local delivered = item.nextChunkIndex > chunkPartCount
+    if delivered then
+        table.remove(self.Items, 1)
+        if Diagnostics.RecordQueueLogicalDelivered then
+            Diagnostics:RecordQueueLogicalDelivered(item, result)
+        end
+        invokeCallback(item.callbacks and item.callbacks.onDelivered, item, result)
+    else
+        setCurrentChunkFields(item, item.nextChunkIndex)
+    end
+
     self.IsSending = false
+    updateQueueMetrics(self)
     self:ProcessNext()
+    return delivered
 end
 
 function Queue:HandleThrottle(item, result)
@@ -208,10 +326,16 @@ function Queue:HandleThrottle(item, result)
 end
 
 function Queue:HandleFailure(item, result)
+    local failedIndex = getNextChunkIndex(item)
+    recordSkippedChunks(item, failedIndex + 1)
+    setCurrentChunkFields(item, failedIndex)
     table.remove(self.Items, 1)
     self.IsSending = false
     if Diagnostics.RecordQueueFailure then
         Diagnostics:RecordQueueFailure(item, result)
+    end
+    if Diagnostics.RecordQueueLogicalFailure then
+        Diagnostics:RecordQueueLogicalFailure(item, result)
     end
 
     Debug.Internal(
@@ -224,6 +348,7 @@ function Queue:HandleFailure(item, result)
     )
 
     invokeCallback(item.callbacks and item.callbacks.onFailed, item, result)
+    updateQueueMetrics(self)
     self:ProcessNext()
 end
 
@@ -246,7 +371,19 @@ function Queue:ProcessNext()
             break
         end
 
+        local currentIndex = getNextChunkIndex(nextItem)
+        local remainingChunkCount = getRemainingChunkCount(nextItem)
+        -- #164 wraps shouldSkip and records the current skipped packet. When
+        -- that wrapper is absent, record the current packet here as well.
+        local firstUnrecordedIndex = nextItem._rpeDiagnosticSkipRecorded == true
+            and (currentIndex + 1)
+            or currentIndex
+        recordSkippedChunks(nextItem, firstUnrecordedIndex)
         table.remove(self.Items, 1)
+        if Diagnostics.RecordQueueLogicalSkipped then
+            Diagnostics:RecordQueueLogicalSkipped(nextItem, remainingChunkCount)
+        end
+        updateQueueMetrics(self)
     end
 
     if #self.Items == 0 then
@@ -258,6 +395,12 @@ function Queue:ProcessNext()
         return false
     end
 
+    local payload = setCurrentChunkFields(item, item.nextChunkIndex)
+    if type(payload) ~= "string" then
+        self:HandleFailure(item, "missing-chunk")
+        return false
+    end
+
     if not C_ChatInfo or not C_ChatInfo.SendAddonMessage then
         self:HandleFailure(item, "missing-api")
         return false
@@ -265,9 +408,10 @@ function Queue:ProcessNext()
 
     self.IsSending = true
     item.attempts = (item.attempts or 0) + 1
+    item.totalAttempts = (item.totalAttempts or 0) + 1
     self.NextSendAt = now + getMinimumSendDelay(self)
 
-    local result = C_ChatInfo.SendAddonMessage(item.prefix, item.payload, item.distribution, item.target)
+    local result = C_ChatInfo.SendAddonMessage(item.prefix, payload, item.distribution, item.target)
     if result == 3 or result == 8 then
         self:HandleThrottle(item, result)
         return false
@@ -285,6 +429,17 @@ end
 function Queue:GetStats()
     local stats = Diagnostics.GetMessageQueueDiagnostics and Diagnostics:GetMessageQueueDiagnostics() or {}
     stats.queueLength = #self.Items
+    stats.logicalMessageCount = #self.Items
+    stats.pendingChunkCount = self:GetPendingChunkCount()
+    stats.highWaterLogicalMessageCount = math.max(
+        math.floor(tonumber(stats.highWaterLogicalMessageCount) or 0),
+        math.floor(tonumber(self.LogicalMessageHighWater) or 0)
+    )
+    stats.highWaterPendingChunkCount = math.max(
+        math.floor(tonumber(stats.highWaterPendingChunkCount) or 0),
+        math.floor(tonumber(self.PendingChunkHighWater) or 0)
+    )
+    stats.maxPendingChunkCount = tonumber(self.MaxQueueLength) or tonumber(self.DefaultMaxQueueLength) or 0
     stats.sendDelay = self.SendDelay
     stats.isSending = self.IsSending and true or false
     return stats
