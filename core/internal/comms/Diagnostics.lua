@@ -66,6 +66,9 @@ function Diagnostics:ResetQueueDiagnostics()
         selectedEffectiveCountByPriority = {},
         queueWaitByPriority = {},
         starvationPromotionCount = 0,
+        supersededMessageCount = 0,
+        supersededPendingChunkCount = 0,
+        supersededPendingBytes = 0,
     }
     return self.State.queue
 end
@@ -182,6 +185,7 @@ function Diagnostics:RecordQueueLogicalEnqueued(item)
         chunkCount = type(item) == "table" and type(item.chunks) == "table" and #item.chunks or 0,
         priority = getItemPriority(item),
         enqueueSequence = item and item.enqueueSequence or nil,
+        replaceKey = item and item.replaceKey or nil,
     }
 end
 
@@ -234,6 +238,30 @@ function Diagnostics:RecordQueueLogicalSelected(item, queueWaitSeconds, effectiv
         priorityBypassCount = math.max(0, math.floor(tonumber(item and item.priorityBypassCount) or 0)),
         starvationPromoted = promoted == true,
         enqueueSequence = item and item.enqueueSequence or nil,
+        replaceKey = item and item.replaceKey or nil,
+    }
+end
+
+function Diagnostics:RecordQueueLogicalSuperseded(item, replacement, savedPendingChunkCount, savedPendingBytes)
+    local diagnostics = self:GetQueueDiagnosticsStore()
+    local savedChunks = math.max(0, math.floor(tonumber(savedPendingChunkCount) or 0))
+    local savedBytes = math.max(0, math.floor(tonumber(savedPendingBytes) or 0))
+    diagnostics.supersededMessageCount = (diagnostics.supersededMessageCount or 0) + 1
+    diagnostics.supersededPendingChunkCount = (diagnostics.supersededPendingChunkCount or 0) + savedChunks
+    diagnostics.supersededPendingBytes = (diagnostics.supersededPendingBytes or 0) + savedBytes
+    diagnostics.lastLogicalSuperseded = {
+        at = getNow(),
+        prefix = item and item.prefix or nil,
+        opcode = item and item.opcode or nil,
+        distribution = item and item.distribution or nil,
+        target = item and item.target or nil,
+        priority = getItemPriority(item),
+        effectivePriority = item and item.effectivePriority or nil,
+        replaceKey = item and item.replaceKey or nil,
+        savedPendingChunkCount = savedChunks,
+        savedPendingBytes = savedBytes,
+        replacementOpcode = replacement and replacement.opcode or nil,
+        replacementPriority = getItemPriority(replacement),
     }
 end
 
@@ -250,6 +278,7 @@ function Diagnostics:RecordQueueLogicalDelivered(item, result)
         result = result,
         priority = getItemPriority(item),
         effectivePriority = item and item.effectivePriority or nil,
+        replaceKey = item and item.replaceKey or nil,
     }
 end
 
@@ -266,6 +295,7 @@ function Diagnostics:RecordQueueLogicalFailure(item, result)
         result = result,
         priority = getItemPriority(item),
         effectivePriority = item and item.effectivePriority or nil,
+        replaceKey = item and item.replaceKey or nil,
     }
 end
 
@@ -280,6 +310,7 @@ function Diagnostics:RecordQueueLogicalSkipped(item, remainingChunkCount)
         target = item and item.target or nil,
         remainingChunkCount = math.max(0, math.floor(tonumber(remainingChunkCount) or 0)),
         priority = getItemPriority(item),
+        replaceKey = item and item.replaceKey or nil,
     }
 end
 
