@@ -134,6 +134,7 @@ local function newStartupBucket()
         physicalBytes = 0,
         deliveredMessages = 0,
         failedMessages = 0,
+        supersededMessages = 0,
         firstEnqueuedAtMs = nil,
         lastTerminalAtMs = nil,
         deliveryDurationMs = 0,
@@ -217,6 +218,7 @@ local function registerStartupLogical(logical)
         physicalBytes = logical.physicalPacketBytes or 0,
         status = "queued",
         deliveryDurationMs = nil,
+        replaceKey = logical.replaceKey,
     }
     session.messageOrder[#session.messageOrder + 1] = logical.id
     while #session.messageOrder > MAX_STARTUP_MESSAGES_PER_SESSION do
@@ -239,6 +241,8 @@ local function registerStartupTerminal(logical, status, terminalAtMs)
     for _, bucket in ipairs({ total, opcodeBucket, routeBucket }) do
         if status == "delivered" then
             bucket.deliveredMessages = (bucket.deliveredMessages or 0) + 1
+        elseif status == "superseded" then
+            bucket.supersededMessages = (bucket.supersededMessages or 0) + 1
         else
             bucket.failedMessages = (bucket.failedMessages or 0) + 1
         end
@@ -277,6 +281,30 @@ local function finalizeLogicalFailure(logical, reason, nowMs)
     transport.logicalFailedCount = (transport.logicalFailedCount or 0) + 1
     transport.lastLogicalSend = deepCopy(logical)
     registerStartupTerminal(logical, "failed", terminalAt)
+    archiveLogical(logical)
+    return true
+end
+
+local function finalizeLogicalSuperseded(logical, reason, nowMs)
+    if type(logical) ~= "table" or logical.terminal == true then
+        return false
+    end
+    local terminalAt = tonumber(nowMs) or getNowMilliseconds()
+    logical.terminal = true
+    logical.status = "superseded"
+    logical.supersedeReason = reason or "superseded"
+    logical.supersededAt = terminalAt
+    logical.supersededAtMs = terminalAt
+    logical.totalDeliveryMs = logical.enqueuedAtMs ~= nil
+        and math.max(0, terminalAt - logical.enqueuedAtMs)
+        or math.max(0, terminalAt - (tonumber(logical.startedAtMs) or terminalAt))
+    if logical.firstAttemptAtMs ~= nil and logical.enqueuedAtMs ~= nil then
+        logical.queueWaitMs = math.max(0, logical.firstAttemptAtMs - logical.enqueuedAtMs)
+    end
+    local transport = Diagnostics:GetTransportDiagnosticsStore()
+    transport.logicalSupersededCount = (transport.logicalSupersededCount or 0) + 1
+    transport.lastLogicalSend = deepCopy(logical)
+    registerStartupTerminal(logical, "superseded", terminalAt)
     archiveLogical(logical)
     return true
 end
@@ -331,6 +359,7 @@ function Diagnostics:BeginLogicalSend(metadata, distribution, target, payloadTex
         scope = metadata and metadata.scope or nil,
         distribution = distribution,
         target = target ~= nil and tostring(target) or nil,
+        replaceKey = metadata and metadata.replaceKey or nil,
         serializedArgumentBytes = #(payloadText or ""),
         physicalPacketCount = math.max(0, math.floor(tonumber(packetCount) or 0)),
         physicalPacketBytes = math.max(0, math.floor(tonumber(packetBytes) or 0)),
@@ -364,6 +393,10 @@ end
 
 function Diagnostics:FailLogicalSend(logicalId, reason)
     return finalizeLogicalFailure(getLogical(logicalId), reason or "send-rejected", getNowMilliseconds())
+end
+
+function Diagnostics:SupersedeLogicalSend(logicalId, reason)
+    return finalizeLogicalSuperseded(getLogical(logicalId), reason or "superseded", getNowMilliseconds())
 end
 
 function Diagnostics:GetLogicalSendDiagnostics()
