@@ -29,6 +29,28 @@ Queue.IsSending = Queue.IsSending or false
 Queue.NextSendAt = Queue.NextSendAt or 0
 Queue.PendingChunkHighWater = math.max(0, math.floor(tonumber(Queue.PendingChunkHighWater) or 0))
 Queue.LogicalMessageHighWater = math.max(0, math.floor(tonumber(Queue.LogicalMessageHighWater) or 0))
+Queue.EnqueueSequence = math.max(0, math.floor(tonumber(Queue.EnqueueSequence) or 0))
+Queue.Priority = Queue.Priority or {}
+Queue.Priority.CRITICAL = "CRITICAL"
+Queue.Priority.NORMAL = "NORMAL"
+Queue.Priority.BACKGROUND = "BACKGROUND"
+-- One waiting logical message gains one priority level after this many other
+-- logical messages are selected. A BACKGROUND message therefore reaches
+-- CRITICAL after at most 8 bypasses and then wins FIFO ties against newer work.
+Queue.PriorityAgingDispatchesPerLevel = math.max(
+    1,
+    math.floor(tonumber(Queue.PriorityAgingDispatchesPerLevel) or 4)
+)
+
+local PRIORITY_ORDER = {
+    Queue.Priority.BACKGROUND,
+    Queue.Priority.NORMAL,
+    Queue.Priority.CRITICAL,
+}
+local PRIORITY_RANK = {}
+for index = 1, #PRIORITY_ORDER do
+    PRIORITY_RANK[PRIORITY_ORDER[index]] = index
+end
 
 -- Helpers
 local invokeCallback = Common.InvokeCallback
@@ -172,6 +194,114 @@ local function recordSkippedChunks(item, firstIndex)
     end
 end
 
+local function getPriorityRank(item)
+    return PRIORITY_RANK[tostring(item and item.priority or "")] or PRIORITY_RANK[Queue.Priority.NORMAL]
+end
+
+local function getEffectivePriorityRank(self, item)
+    local baseRank = getPriorityRank(item)
+    local bypassCount = math.max(0, math.floor(tonumber(item and item.priorityBypassCount) or 0))
+    local agingStep = math.max(1, math.floor(tonumber(self.PriorityAgingDispatchesPerLevel) or 4))
+    return math.min(#PRIORITY_ORDER, baseRank + math.floor(bypassCount / agingStep)), baseRank
+end
+
+local function removeSkippedItems(self)
+    local removed = false
+    for itemIndex = #(self.Items or {}), 1, -1 do
+        local item = self.Items[itemIndex]
+        if item and type(item.shouldSkip) == "function" and item.shouldSkip() then
+            local currentIndex = getNextChunkIndex(item)
+            local remainingChunkCount = getRemainingChunkCount(item)
+            -- #164 wraps shouldSkip and records the current skipped packet. When
+            -- that wrapper is absent, record the current packet here as well.
+            local firstUnrecordedIndex = item._rpeDiagnosticSkipRecorded == true
+                and (currentIndex + 1)
+                or currentIndex
+            recordSkippedChunks(item, firstUnrecordedIndex)
+            table.remove(self.Items, itemIndex)
+            if Diagnostics.RecordQueueLogicalSkipped then
+                Diagnostics:RecordQueueLogicalSkipped(item, remainingChunkCount)
+            end
+            removed = true
+        end
+    end
+    if removed then
+        updateQueueMetrics(self)
+    end
+end
+
+local function selectNextMessage(self)
+    if #(self.Items or {}) == 0 then
+        return nil
+    end
+
+    -- A started logical message owns the sender until terminal state so its
+    -- chunks remain contiguous even if higher-priority work arrives meanwhile.
+    for itemIndex = 1, #self.Items do
+        local item = self.Items[itemIndex]
+        if item and item.started == true then
+            if itemIndex ~= 1 then
+                table.remove(self.Items, itemIndex)
+                table.insert(self.Items, 1, item)
+            end
+            return item
+        end
+    end
+
+    local bestIndex = nil
+    local bestEffectiveRank = -1
+    local bestSequence = math.huge
+    for itemIndex = 1, #self.Items do
+        local item = self.Items[itemIndex]
+        local effectiveRank = getEffectivePriorityRank(self, item)
+        local sequence = math.max(0, math.floor(tonumber(item and item.enqueueSequence) or itemIndex))
+        if effectiveRank > bestEffectiveRank
+            or (effectiveRank == bestEffectiveRank and sequence < bestSequence)
+        then
+            bestIndex = itemIndex
+            bestEffectiveRank = effectiveRank
+            bestSequence = sequence
+        end
+    end
+
+    if not bestIndex then
+        return nil
+    end
+
+    local selected = self.Items[bestIndex]
+    local _, baseRank = getEffectivePriorityRank(self, selected)
+    selected.effectivePriority = PRIORITY_ORDER[bestEffectiveRank]
+    selected.priorityPromoted = bestEffectiveRank > baseRank
+
+    -- Age every other eligible logical message once per logical dispatch. This
+    -- is independent of frame time and gives deterministic bounded starvation.
+    for itemIndex = 1, #self.Items do
+        if itemIndex ~= bestIndex then
+            local item = self.Items[itemIndex]
+            if item and item.started ~= true then
+                item.priorityBypassCount = math.max(
+                    0,
+                    math.floor(tonumber(item.priorityBypassCount) or 0)
+                ) + 1
+            end
+        end
+    end
+
+    if bestIndex ~= 1 then
+        table.remove(self.Items, bestIndex)
+        table.insert(self.Items, 1, selected)
+    end
+    return selected
+end
+
+function Queue:NormalizePriority(value)
+    local normalized = tostring(value or ""):upper()
+    if PRIORITY_RANK[normalized] then
+        return normalized
+    end
+    return self.Priority.NORMAL
+end
+
 function Queue:GetPendingChunkCount()
     local pending = 0
     for index = 1, #(self.Items or {}) do
@@ -186,6 +316,7 @@ function Queue:Reset()
     self.NextSendAt = 0
     self.PendingChunkHighWater = 0
     self.LogicalMessageHighWater = 0
+    self.EnqueueSequence = 0
     if Diagnostics.RecordQueueReset then
         Diagnostics:RecordQueueReset()
     end
@@ -197,6 +328,9 @@ function Queue:Enqueue(item)
     if type(item) ~= "table" then
         error("Addon.Internal.Comms.MessageQueue:Enqueue(item) requires a table.", 2)
     end
+
+    item.priority = self:NormalizePriority(item.priority or (item.metadata and item.metadata.priority))
+    item.priorityBypassCount = math.max(0, math.floor(tonumber(item.priorityBypassCount) or 0))
 
     local requestedChunkCount = getChunkCount(item)
     if requestedChunkCount <= 0 then
@@ -215,9 +349,13 @@ function Queue:Enqueue(item)
         return nil
     end
 
+    self.EnqueueSequence = math.max(0, math.floor(tonumber(self.EnqueueSequence) or 0)) + 1
+    item.enqueueSequence = self.EnqueueSequence
+    item.enqueuedAt = getCurrentTime()
     item.nextChunkIndex = getNextChunkIndex(item)
     item.attempts = tonumber(item.attempts) or 0
     item.totalAttempts = tonumber(item.totalAttempts) or 0
+    item.started = item.started == true
     self.Items[#self.Items + 1] = item
 
     if Diagnostics.RecordQueueLogicalEnqueued then
@@ -257,6 +395,7 @@ function Queue:EnqueueLogicalMessage(prefix, opcode, chunks, distribution, targe
         shouldSkip = callbacks and callbacks.shouldSkip or nil,
         callbacks = callbacks,
         metadata = metadata,
+        priority = metadata and metadata.priority or nil,
     })
 end
 
@@ -365,34 +504,28 @@ function Queue:ProcessNext()
         return false
     end
 
-    while #self.Items > 0 do
-        local nextItem = self.Items[1]
-        if not nextItem or type(nextItem.shouldSkip) ~= "function" or not nextItem.shouldSkip() then
-            break
-        end
-
-        local currentIndex = getNextChunkIndex(nextItem)
-        local remainingChunkCount = getRemainingChunkCount(nextItem)
-        -- #164 wraps shouldSkip and records the current skipped packet. When
-        -- that wrapper is absent, record the current packet here as well.
-        local firstUnrecordedIndex = nextItem._rpeDiagnosticSkipRecorded == true
-            and (currentIndex + 1)
-            or currentIndex
-        recordSkippedChunks(nextItem, firstUnrecordedIndex)
-        table.remove(self.Items, 1)
-        if Diagnostics.RecordQueueLogicalSkipped then
-            Diagnostics:RecordQueueLogicalSkipped(nextItem, remainingChunkCount)
-        end
-        updateQueueMetrics(self)
-    end
-
+    removeSkippedItems(self)
     if #self.Items == 0 then
         return false
     end
 
-    local item = self.Items[1]
+    local item = selectNextMessage(self)
     if not item then
         return false
+    end
+
+    if item.started ~= true then
+        item.started = true
+        item.startedAt = now
+        item.queueWaitSeconds = math.max(0, now - (tonumber(item.enqueuedAt) or now))
+        if Diagnostics.RecordQueueLogicalSelected then
+            Diagnostics:RecordQueueLogicalSelected(
+                item,
+                item.queueWaitSeconds,
+                item.effectivePriority or item.priority,
+                item.priorityPromoted == true
+            )
+        end
     end
 
     local payload = setCurrentChunkFields(item, item.nextChunkIndex)
@@ -440,6 +573,7 @@ function Queue:GetStats()
         math.floor(tonumber(self.PendingChunkHighWater) or 0)
     )
     stats.maxPendingChunkCount = tonumber(self.MaxQueueLength) or tonumber(self.DefaultMaxQueueLength) or 0
+    stats.priorityAgingDispatchesPerLevel = self.PriorityAgingDispatchesPerLevel
     stats.sendDelay = self.SendDelay
     stats.isSending = self.IsSending and true or false
     return stats
