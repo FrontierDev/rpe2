@@ -22,6 +22,7 @@ core/internal/comms/MessageQueue.lua
 core/internal/comms/Operations.lua
 core/internal/comms/Serialization.lua
 core/internal/comms/Core.lua
+core/internal/comms/TransportDiagnostics.lua
 core/internal/comms/Channel.lua
 core/internal/comms/LootDelivery.lua
 core/internal/runtime/RuntimeTransaction.lua
