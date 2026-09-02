@@ -530,7 +530,7 @@ local function getItemEligibility(self, item, now)
 
     local routeState = getRouteThrottleState(self, item, false)
     local routeBlockedUntil = type(routeState) == "table" and math.max(0, tonumber(routeState.blockedUntil) or 0) or 0
-    if routeBlockedUntil > currentTime and (waitUntil == nil or routeBlockedUntil > waitUntil) then
+    if routeBlockedUntil > currentTime and (waitUntil == nil or routeBlockedUntil >= waitUntil) then
         waitUntil = routeBlockedUntil
         waitReason = "channel-throttle"
     end
@@ -1019,9 +1019,7 @@ function Queue:ProcessNext()
         return false
     end
 
-    if not usesPrefixAllowance(item)
-        and self.CurrentImmediateBurstCount >= getConfiguredImmediateBurstLimit(self)
-    then
+    if self.CurrentImmediateBurstCount >= getConfiguredImmediateBurstLimit(self) then
         scheduleImmediateYield(self)
         return false
     end
