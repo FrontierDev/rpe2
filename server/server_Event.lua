@@ -96,10 +96,18 @@ local function findActivatedUnitDefinition(registryId)
 end
 
 local function buildSendMetadata(opcode)
-    return {
+    local metadata = {
         opcode = opcode,
         scope = "server",
     }
+    local operation = Operations and Operations.Get and Operations:Get(opcode) or nil
+    if type(operation) == "table" and tostring(operation.key or "") == "EVENT_STATE" then
+        local eventId = tostring(Server.EventState and Server.EventState.id or "")
+        if eventId ~= "" then
+            metadata.replaceKey = "event-state:" .. eventId
+        end
+    end
+    return metadata
 end
 
 local function buildEventId()
@@ -1647,7 +1655,6 @@ function Server:StartEvent(data)
             buildStartArguments(eventState),
             buildSendMetadata(EVENT_START_OPCODE)
         ) and true or false
-
         Comms:SendToChannel(
             sessionState.channelId,
             EVENT_UNITS_OPCODE,
