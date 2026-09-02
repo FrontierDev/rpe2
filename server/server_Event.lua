@@ -102,9 +102,12 @@ local function buildSendMetadata(opcode)
     }
     local operation = Operations and Operations.Get and Operations:Get(opcode) or nil
     if type(operation) == "table" and tostring(operation.key or "") == "EVENT_STATE" then
-        local eventId = tostring(Server.EventState and Server.EventState.id or "")
+        local eventState = Server.EventState
+        local eventId = tostring(eventState and eventState.id or "")
         if eventId ~= "" then
-            metadata.replaceKey = "event-state:" .. eventId
+            local turnNumber = math.max(0, math.floor(tonumber(eventState.turnNumber) or 0))
+            local tickNumber = math.max(0, math.floor(tonumber(eventState.tickNumber) or 0))
+            metadata.replaceKey = ("event-state:%s:%d:%d"):format(eventId, turnNumber, tickNumber)
         end
     end
     return metadata
@@ -1655,6 +1658,7 @@ function Server:StartEvent(data)
             buildStartArguments(eventState),
             buildSendMetadata(EVENT_START_OPCODE)
         ) and true or false
+
         Comms:SendToChannel(
             sessionState.channelId,
             EVENT_UNITS_OPCODE,
