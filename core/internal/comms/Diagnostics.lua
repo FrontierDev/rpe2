@@ -23,6 +23,10 @@ local function getStore(self, key)
     return self.State[key]
 end
 
+local function getItemPriority(item)
+    return tostring(item and item.priority or "NORMAL")
+end
+
 local function buildSendDiagnostics(metadata, distribution, target, payloadText, packetCount)
     return {
         at = getNow(),
@@ -58,6 +62,10 @@ function Diagnostics:ResetQueueDiagnostics()
         currentPendingChunkCount = 0,
         highWaterLogicalMessageCount = 0,
         highWaterPendingChunkCount = 0,
+        selectedCountByPriority = {},
+        selectedEffectiveCountByPriority = {},
+        queueWaitByPriority = {},
+        starvationPromotionCount = 0,
     }
     return self.State.queue
 end
@@ -172,6 +180,60 @@ function Diagnostics:RecordQueueLogicalEnqueued(item)
         distribution = item and item.distribution or nil,
         target = item and item.target or nil,
         chunkCount = type(item) == "table" and type(item.chunks) == "table" and #item.chunks or 0,
+        priority = getItemPriority(item),
+        enqueueSequence = item and item.enqueueSequence or nil,
+    }
+end
+
+function Diagnostics:RecordQueueLogicalSelected(item, queueWaitSeconds, effectivePriority, promoted)
+    local diagnostics = self:GetQueueDiagnosticsStore()
+    local priority = getItemPriority(item)
+    local effective = tostring(effectivePriority or priority)
+    local waitSeconds = math.max(0, tonumber(queueWaitSeconds) or 0)
+
+    diagnostics.selectedCountByPriority = type(diagnostics.selectedCountByPriority) == "table"
+        and diagnostics.selectedCountByPriority or {}
+    diagnostics.selectedCountByPriority[priority] = (diagnostics.selectedCountByPriority[priority] or 0) + 1
+
+    diagnostics.selectedEffectiveCountByPriority = type(diagnostics.selectedEffectiveCountByPriority) == "table"
+        and diagnostics.selectedEffectiveCountByPriority or {}
+    diagnostics.selectedEffectiveCountByPriority[effective] = (diagnostics.selectedEffectiveCountByPriority[effective] or 0) + 1
+
+    diagnostics.queueWaitByPriority = type(diagnostics.queueWaitByPriority) == "table"
+        and diagnostics.queueWaitByPriority or {}
+    local waitBucket = diagnostics.queueWaitByPriority[priority]
+    if type(waitBucket) ~= "table" then
+        waitBucket = {
+            count = 0,
+            totalSeconds = 0,
+            maxSeconds = 0,
+            lastSeconds = 0,
+            averageSeconds = 0,
+        }
+        diagnostics.queueWaitByPriority[priority] = waitBucket
+    end
+    waitBucket.count = (waitBucket.count or 0) + 1
+    waitBucket.totalSeconds = (waitBucket.totalSeconds or 0) + waitSeconds
+    waitBucket.maxSeconds = math.max(tonumber(waitBucket.maxSeconds) or 0, waitSeconds)
+    waitBucket.lastSeconds = waitSeconds
+    waitBucket.averageSeconds = waitBucket.totalSeconds / waitBucket.count
+
+    if promoted == true then
+        diagnostics.starvationPromotionCount = (diagnostics.starvationPromotionCount or 0) + 1
+    end
+
+    diagnostics.lastLogicalSelected = {
+        at = getNow(),
+        prefix = item and item.prefix or nil,
+        opcode = item and item.opcode or nil,
+        distribution = item and item.distribution or nil,
+        target = item and item.target or nil,
+        priority = priority,
+        effectivePriority = effective,
+        queueWaitSeconds = waitSeconds,
+        priorityBypassCount = math.max(0, math.floor(tonumber(item and item.priorityBypassCount) or 0)),
+        starvationPromoted = promoted == true,
+        enqueueSequence = item and item.enqueueSequence or nil,
     }
 end
 
@@ -186,6 +248,8 @@ function Diagnostics:RecordQueueLogicalDelivered(item, result)
         target = item and item.target or nil,
         chunkCount = type(item) == "table" and type(item.chunks) == "table" and #item.chunks or 0,
         result = result,
+        priority = getItemPriority(item),
+        effectivePriority = item and item.effectivePriority or nil,
     }
 end
 
@@ -200,6 +264,8 @@ function Diagnostics:RecordQueueLogicalFailure(item, result)
         target = item and item.target or nil,
         chunkCount = type(item) == "table" and type(item.chunks) == "table" and #item.chunks or 0,
         result = result,
+        priority = getItemPriority(item),
+        effectivePriority = item and item.effectivePriority or nil,
     }
 end
 
@@ -213,6 +279,7 @@ function Diagnostics:RecordQueueLogicalSkipped(item, remainingChunkCount)
         distribution = item and item.distribution or nil,
         target = item and item.target or nil,
         remainingChunkCount = math.max(0, math.floor(tonumber(remainingChunkCount) or 0)),
+        priority = getItemPriority(item),
     }
 end
 
@@ -226,6 +293,7 @@ function Diagnostics:RecordQueueEnqueued(item)
         target = item.target,
         chunkPartIndex = item.chunkPartIndex,
         chunkPartCount = item.chunkPartCount,
+        priority = getItemPriority(item),
     }
 end
 
@@ -240,6 +308,8 @@ function Diagnostics:RecordQueueSent(item, result)
         target = item.target,
         chunkPartIndex = item.chunkPartIndex,
         chunkPartCount = item.chunkPartCount,
+        priority = getItemPriority(item),
+        effectivePriority = item and item.effectivePriority or nil,
     }
 end
 
@@ -255,6 +325,8 @@ function Diagnostics:RecordQueueThrottle(item, result)
         attempts = item.attempts,
         chunkPartIndex = item.chunkPartIndex,
         chunkPartCount = item.chunkPartCount,
+        priority = getItemPriority(item),
+        effectivePriority = item and item.effectivePriority or nil,
     }
 end
 
@@ -271,6 +343,8 @@ function Diagnostics:RecordQueueFailure(item, result)
         code = result,
         chunkPartIndex = item.chunkPartIndex,
         chunkPartCount = item.chunkPartCount,
+        priority = getItemPriority(item),
+        effectivePriority = item and item.effectivePriority or nil,
     }
 end
 
@@ -285,6 +359,7 @@ function Diagnostics:RecordQueueSkipped(item, reason)
         chunkPartIndex = item and item.chunkPartIndex or nil,
         chunkPartCount = item and item.chunkPartCount or nil,
         reason = reason or "skipped",
+        priority = getItemPriority(item),
     }
 end
 
