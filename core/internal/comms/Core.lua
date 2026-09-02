@@ -14,7 +14,8 @@ local Serialization = Addon.Internal.Comms.Serialization or {}
 
 Comms.Prefix = Comms.Prefix or Constants.AddonMessagePrefix or "RPE"
 Comms.MaxAddonMessageLength = Comms.MaxAddonMessageLength or 255
-Comms.SafeChunkLength = Comms.SafeChunkLength or 180
+-- Optional compatibility cap. Nil uses the full header-adjusted addon-message payload budget.
+Comms.SafeChunkLength = tonumber(Comms.SafeChunkLength)
 Comms.IncomingChunks = Comms.IncomingChunks or {}
 Comms.IncomingChunkTimeout = Comms.IncomingChunkTimeout or 30
 Comms.MaxIncomingChunkEntries = Comms.MaxIncomingChunkEntries or 128
@@ -241,22 +242,38 @@ end
 
 function Comms:ResolveChunkPlan(argumentsText, opcode)
     local payloadLength = #(argumentsText or "")
-    local maxLength = tonumber(self.MaxAddonMessageLength) or 255
-    local chunkLength = math.max(1, math.min(tonumber(self.SafeChunkLength) or maxLength, maxLength))
-    local partCount = math.max(1, math.ceil(payloadLength / chunkLength))
+    local optionalCap = tonumber(self.SafeChunkLength)
+    if optionalCap ~= nil then
+        optionalCap = math.floor(optionalCap)
+        if optionalCap < 1 then
+            optionalCap = nil
+        end
+    end
 
+    local partCount = 1
+    local seenPartCounts = {}
     while true do
-        local packetPayloadLimit = self:GetPacketPayloadLimit(opcode, partCount)
+        if seenPartCounts[partCount] then
+            return nil
+        end
+        seenPartCounts[partCount] = true
+
+        local packetPayloadLimit = math.floor(tonumber(self:GetPacketPayloadLimit(opcode, partCount)) or 0)
         if packetPayloadLimit < 1 then
             return nil
         end
 
-        if chunkLength <= packetPayloadLimit then
+        local chunkLength = optionalCap and math.min(packetPayloadLimit, optionalCap) or packetPayloadLimit
+        if chunkLength < 1 then
+            return nil
+        end
+
+        local requiredPartCount = math.max(1, math.ceil(payloadLength / chunkLength))
+        if requiredPartCount == partCount then
             return chunkLength, partCount
         end
 
-        chunkLength = packetPayloadLimit
-        partCount = math.max(1, math.ceil(payloadLength / chunkLength))
+        partCount = requiredPartCount
     end
 end
 
@@ -359,6 +376,18 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
             Diagnostics:RecordSendFailure("packet-too-large")
         end
         return false
+    end
+
+    if Diagnostics.RecordChunkPlan then
+        Diagnostics:RecordChunkPlan(
+            diagnosticsMetadata,
+            distribution,
+            target,
+            #argumentsText,
+            chunkLength,
+            partCount,
+            self:GetPacketPayloadLimit(opcode, partCount)
+        )
     end
 
     local queueCheckStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
