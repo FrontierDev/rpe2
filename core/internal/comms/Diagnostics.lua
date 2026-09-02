@@ -85,6 +85,28 @@ function Diagnostics:RecordSendSuccess(metadata, distribution, target, payloadTe
     diagnostics.lastSent = buildSendDiagnostics(metadata, distribution, target, payloadText, packetCount)
 end
 
+function Diagnostics:RecordChunkPlan(metadata, distribution, target, payloadBytes, chunkLength, packetCount, packetPayloadLimit)
+    local diagnostics = self:GetTransportDiagnosticsStore()
+    local record = {
+        at = getNow(),
+        distribution = distribution,
+        target = target ~= nil and tostring(target) or nil,
+        opcode = metadata and metadata.opcode or nil,
+        scope = metadata and metadata.scope or nil,
+        serializedArgumentBytes = math.max(0, math.floor(tonumber(payloadBytes) or 0)),
+        chunkPayloadBytes = math.max(0, math.floor(tonumber(chunkLength) or 0)),
+        packetPayloadLimit = math.max(0, math.floor(tonumber(packetPayloadLimit) or 0)),
+        packetCount = math.max(0, math.floor(tonumber(packetCount) or 0)),
+        optionalChunkCap = tonumber(Comms.SafeChunkLength),
+    }
+    diagnostics.chunkPlanCount = (diagnostics.chunkPlanCount or 0) + 1
+    diagnostics.lastChunkPlan = record
+    diagnostics.chunkPlansByOpcode = diagnostics.chunkPlansByOpcode or {}
+    if record.opcode ~= nil then
+        diagnostics.chunkPlansByOpcode[tostring(record.opcode)] = copyTable(record)
+    end
+end
+
 function Diagnostics:RecordInboundMessage(payload, distribution, sender, target, partCount, opcode)
     local diagnostics = self:GetTransportDiagnosticsStore()
     diagnostics.receivedCount = (diagnostics.receivedCount or 0) + 1
