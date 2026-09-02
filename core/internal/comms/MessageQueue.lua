@@ -14,10 +14,19 @@ local Queue = Addon.Internal.Comms.MessageQueue or {}
 Addon.Internal.Comms.MessageQueue = Queue
 
 -- Runtime State
-Queue.DefaultSendDelay = Queue.DefaultSendDelay or 0.2
-Queue.SendDelay = Queue.SendDelay or Queue.DefaultSendDelay
-Queue.DefaultMaxSendDelay = Queue.DefaultMaxSendDelay or 2
-Queue.MaxSendDelay = Queue.MaxSendDelay or Queue.DefaultMaxSendDelay
+-- These values are scheduler estimates only. The WoW server may reconfigure
+-- real throttle limits at runtime; result codes from SendAddonMessage always
+-- override the local model.
+Queue.DefaultPrefixBurstCapacity = Queue.DefaultPrefixBurstCapacity or 10
+Queue.PrefixBurstCapacity = Queue.PrefixBurstCapacity or Queue.DefaultPrefixBurstCapacity
+Queue.DefaultPrefixRefillRate = Queue.DefaultPrefixRefillRate or 1
+Queue.PrefixRefillRate = Queue.PrefixRefillRate or Queue.DefaultPrefixRefillRate
+Queue.DefaultMaxImmediateBurstPackets = Queue.DefaultMaxImmediateBurstPackets or 10
+Queue.MaxImmediateBurstPackets = Queue.MaxImmediateBurstPackets or Queue.DefaultMaxImmediateBurstPackets
+Queue.DefaultChannelBackoffSeconds = Queue.DefaultChannelBackoffSeconds or 1
+Queue.ChannelBackoffSeconds = Queue.ChannelBackoffSeconds or Queue.DefaultChannelBackoffSeconds
+Queue.DefaultMaxChannelBackoffSeconds = Queue.DefaultMaxChannelBackoffSeconds or 8
+Queue.MaxChannelBackoffSeconds = Queue.MaxChannelBackoffSeconds or Queue.DefaultMaxChannelBackoffSeconds
 Queue.DefaultMaxAttempts = Queue.DefaultMaxAttempts or 0
 Queue.MaxAttempts = Queue.MaxAttempts or Queue.DefaultMaxAttempts
 -- Retained for compatibility: this limit continues to bound pending physical chunks,
@@ -26,10 +35,20 @@ Queue.DefaultMaxQueueLength = Queue.DefaultMaxQueueLength or 256
 Queue.MaxQueueLength = Queue.MaxQueueLength or Queue.DefaultMaxQueueLength
 Queue.Items = Queue.Items or {}
 Queue.IsSending = Queue.IsSending or false
-Queue.NextSendAt = Queue.NextSendAt or 0
 Queue.PendingChunkHighWater = math.max(0, math.floor(tonumber(Queue.PendingChunkHighWater) or 0))
 Queue.LogicalMessageHighWater = math.max(0, math.floor(tonumber(Queue.LogicalMessageHighWater) or 0))
 Queue.EnqueueSequence = math.max(0, math.floor(tonumber(Queue.EnqueueSequence) or 0))
+Queue.PrefixBurstCapacityEstimate = tonumber(Queue.PrefixBurstCapacityEstimate)
+Queue.PrefixAllowance = tonumber(Queue.PrefixAllowance)
+Queue.PrefixAllowanceUpdatedAt = tonumber(Queue.PrefixAllowanceUpdatedAt)
+Queue.PrefixBlockedUntil = math.max(0, tonumber(Queue.PrefixBlockedUntil) or 0)
+Queue.PrefixRecoveryPending = Queue.PrefixRecoveryPending == true
+Queue.ChannelThrottleState = type(Queue.ChannelThrottleState) == "table" and Queue.ChannelThrottleState or {}
+Queue.ScheduledWakeAt = math.max(0, tonumber(Queue.ScheduledWakeAt) or 0)
+Queue.ScheduledWakeHandle = nil
+Queue.ScheduledWakeGeneration = math.max(0, math.floor(tonumber(Queue.ScheduledWakeGeneration) or 0))
+Queue.CurrentImmediateBurstCount = math.max(0, math.floor(tonumber(Queue.CurrentImmediateBurstCount) or 0))
+Queue.ImmediateYieldPending = Queue.ImmediateYieldPending == true
 Queue.Priority = Queue.Priority or {}
 Queue.Priority.CRITICAL = "CRITICAL"
 Queue.Priority.NORMAL = "NORMAL"
@@ -108,23 +127,265 @@ local function getCurrentTime()
     return 0
 end
 
-local function getMinimumSendDelay(self)
-    local configuredDelay = tonumber(self.SendDelay) or tonumber(self.DefaultSendDelay) or 0.2
-    return math.max(0.2, configuredDelay)
+local function getConfiguredBurstCapacity(self)
+    return math.max(
+        1,
+        math.floor(tonumber(self.PrefixBurstCapacity) or tonumber(self.DefaultPrefixBurstCapacity) or 10)
+    )
 end
 
-local function scheduleNextProcess(self, delay)
+local function getConfiguredRefillRate(self)
+    return math.max(0.001, tonumber(self.PrefixRefillRate) or tonumber(self.DefaultPrefixRefillRate) or 1)
+end
+
+local function getConfiguredImmediateBurstLimit(self)
+    return math.max(
+        1,
+        math.floor(tonumber(self.MaxImmediateBurstPackets) or tonumber(self.DefaultMaxImmediateBurstPackets) or 10)
+    )
+end
+
+local function getConfiguredChannelBackoff(self)
+    return math.max(0.05, tonumber(self.ChannelBackoffSeconds) or tonumber(self.DefaultChannelBackoffSeconds) or 1)
+end
+
+local function getConfiguredMaxChannelBackoff(self)
+    local base = getConfiguredChannelBackoff(self)
+    return math.max(base, tonumber(self.MaxChannelBackoffSeconds) or tonumber(self.DefaultMaxChannelBackoffSeconds) or 8)
+end
+
+local function ensureSchedulerState(self, now)
+    local currentTime = tonumber(now) or getCurrentTime()
+    local configuredCapacity = getConfiguredBurstCapacity(self)
+    local estimate = tonumber(self.PrefixBurstCapacityEstimate)
+    if estimate == nil then
+        estimate = configuredCapacity
+    end
+    estimate = math.max(1, math.min(configuredCapacity, math.floor(estimate)))
+    self.PrefixBurstCapacityEstimate = estimate
+
+    if self.PrefixAllowance == nil then
+        self.PrefixAllowance = estimate
+    else
+        self.PrefixAllowance = math.max(0, math.min(estimate, tonumber(self.PrefixAllowance) or 0))
+    end
+    if self.PrefixAllowanceUpdatedAt == nil then
+        self.PrefixAllowanceUpdatedAt = currentTime
+    end
+    self.PrefixBlockedUntil = math.max(0, tonumber(self.PrefixBlockedUntil) or 0)
+    self.ChannelThrottleState = type(self.ChannelThrottleState) == "table" and self.ChannelThrottleState or {}
+    return currentTime
+end
+
+local function refreshPrefixAllowance(self, now)
+    local currentTime = ensureSchedulerState(self, now)
+    local previous = tonumber(self.PrefixAllowanceUpdatedAt) or currentTime
+    local elapsed = math.max(0, currentTime - previous)
+    if elapsed > 0 then
+        self.PrefixAllowance = math.min(
+            self.PrefixBurstCapacityEstimate,
+            (tonumber(self.PrefixAllowance) or 0) + (elapsed * getConfiguredRefillRate(self))
+        )
+    end
+    self.PrefixAllowanceUpdatedAt = currentTime
+    if self.PrefixBlockedUntil > 0 and self.PrefixBlockedUntil <= currentTime then
+        self.PrefixBlockedUntil = 0
+    end
+    return self.PrefixAllowance
+end
+
+local function getNextEstimatedRefillAt(self, now)
+    local currentTime = tonumber(now) or getCurrentTime()
+    refreshPrefixAllowance(self, currentTime)
+    if self.PrefixBlockedUntil > currentTime then
+        return self.PrefixBlockedUntil
+    end
+    if (tonumber(self.PrefixAllowance) or 0) >= 1 then
+        return nil
+    end
+    local missing = 1 - math.max(0, tonumber(self.PrefixAllowance) or 0)
+    return currentTime + (missing / getConfiguredRefillRate(self))
+end
+
+local function isOutsideInstanceWhisper(item)
+    if tostring(item and item.distribution or ""):upper() ~= "WHISPER" or type(IsInInstance) ~= "function" then
+        return false
+    end
+    local ok, inInstance = pcall(IsInInstance)
+    return ok and inInstance == false
+end
+
+local function usesPrefixAllowance(item)
+    return not isOutsideInstanceWhisper(item)
+end
+
+local function buildRouteKey(item)
+    return tostring(item and item.distribution or "") .. "\31" .. tostring(item and item.target or "")
+end
+
+local function getRouteThrottleState(self, item, create)
+    self.ChannelThrottleState = type(self.ChannelThrottleState) == "table" and self.ChannelThrottleState or {}
+    local key = buildRouteKey(item)
+    local state = self.ChannelThrottleState[key]
+    if type(state) ~= "table" and create == true then
+        state = {
+            distribution = item and item.distribution or nil,
+            target = item and item.target or nil,
+            blockedUntil = 0,
+            consecutiveThrottleCount = 0,
+            recoveryPending = false,
+        }
+        self.ChannelThrottleState[key] = state
+    end
+    return state, key
+end
+
+local function recordSchedulerState(self, waitReason, waitUntil, item, now)
+    local diagnostics = Diagnostics.GetQueueDiagnosticsStore and Diagnostics:GetQueueDiagnosticsStore() or nil
+    if type(diagnostics) ~= "table" then
+        return
+    end
+    local currentTime = tonumber(now) or getCurrentTime()
+    diagnostics.estimatedAllowance = tonumber(self.PrefixAllowance) or 0
+    diagnostics.estimatedBurstCapacity = tonumber(self.PrefixBurstCapacityEstimate) or getConfiguredBurstCapacity(self)
+    diagnostics.estimatedRefillRate = getConfiguredRefillRate(self)
+    diagnostics.nextEstimatedRefillAt = getNextEstimatedRefillAt(self, currentTime)
+    diagnostics.prefixBlockedUntil = math.max(0, tonumber(self.PrefixBlockedUntil) or 0)
+    diagnostics.scheduledWakeAt = math.max(0, tonumber(self.ScheduledWakeAt) or 0)
+    diagnostics.waitReason = waitReason or "none"
+    diagnostics.waitUntil = tonumber(waitUntil)
+    diagnostics.currentImmediateBurstCount = math.max(0, math.floor(tonumber(self.CurrentImmediateBurstCount) or 0))
+    if item then
+        diagnostics.waitDistribution = item.distribution
+        diagnostics.waitTarget = item.target
+    elseif (waitReason or "none") == "none" then
+        diagnostics.waitDistribution = nil
+        diagnostics.waitTarget = nil
+    end
+end
+
+local function recordRecoveryAttempt(self, item, reason, now)
+    local diagnostics = Diagnostics.GetQueueDiagnosticsStore and Diagnostics:GetQueueDiagnosticsStore() or nil
+    if type(diagnostics) ~= "table" then
+        return
+    end
+    diagnostics.recoveryAttemptCount = (diagnostics.recoveryAttemptCount or 0) + 1
+    diagnostics.lastRecoveryAttempt = {
+        at = tonumber(now) or getCurrentTime(),
+        reason = reason,
+        distribution = item and item.distribution or nil,
+        target = item and item.target or nil,
+        opcode = getItemOpcode(item),
+    }
+end
+
+local function recordSuccessfulBurstSend(self, item, now)
+    self.CurrentImmediateBurstCount = math.max(0, math.floor(tonumber(self.CurrentImmediateBurstCount) or 0)) + 1
+    local diagnostics = Diagnostics.GetQueueDiagnosticsStore and Diagnostics:GetQueueDiagnosticsStore() or nil
+    if type(diagnostics) == "table" then
+        diagnostics.actualBurstSendCount = (diagnostics.actualBurstSendCount or 0) + 1
+        diagnostics.currentImmediateBurstCount = self.CurrentImmediateBurstCount
+        diagnostics.maxImmediateBurstCount = math.max(
+            math.floor(tonumber(diagnostics.maxImmediateBurstCount) or 0),
+            self.CurrentImmediateBurstCount
+        )
+        diagnostics.lastBurstSend = {
+            at = tonumber(now) or getCurrentTime(),
+            burstIndex = self.CurrentImmediateBurstCount,
+            distribution = item and item.distribution or nil,
+            target = item and item.target or nil,
+            opcode = getItemOpcode(item),
+        }
+    end
+end
+
+local function clearScheduledWake(self)
+    local handle = self.ScheduledWakeHandle
+    if type(handle) == "table" and type(handle.Cancel) == "function" then
+        pcall(handle.Cancel, handle)
+    end
+    self.ScheduledWakeGeneration = math.max(0, math.floor(tonumber(self.ScheduledWakeGeneration) or 0)) + 1
+    self.ScheduledWakeHandle = nil
+    self.ScheduledWakeAt = 0
+end
+
+local function scheduleNextProcess(self, wakeAt, waitReason, item)
+    local now = getCurrentTime()
+    local targetTime = math.max(now, tonumber(wakeAt) or now)
+    local delay = math.max(0, targetTime - now)
+    self.CurrentImmediateBurstCount = 0
+
+    local existingWakeAt = math.max(0, tonumber(self.ScheduledWakeAt) or 0)
+    if existingWakeAt > now and existingWakeAt <= targetTime + 0.001 then
+        recordSchedulerState(self, waitReason, targetTime, item, now)
+        return true
+    end
+
+    clearScheduledWake(self)
+    if delay <= 0 then
+        recordSchedulerState(self, "none", nil, nil, now)
+        return false
+    end
+
+    self.ScheduledWakeAt = targetTime
+    self.ScheduledWakeGeneration = math.max(0, math.floor(tonumber(self.ScheduledWakeGeneration) or 0)) + 1
+    local generation = self.ScheduledWakeGeneration
+    recordSchedulerState(self, waitReason, targetTime, item, now)
+
     local function retry()
-        self.IsSending = false
+        if generation ~= self.ScheduledWakeGeneration then
+            return
+        end
+        self.ScheduledWakeHandle = nil
+        self.ScheduledWakeAt = 0
         self:ProcessNext()
     end
 
-    if C_Timer and C_Timer.After and delay and delay > 0 then
+    if C_Timer and type(C_Timer.NewTimer) == "function" then
+        self.ScheduledWakeHandle = C_Timer.NewTimer(delay, retry)
+        return true
+    end
+    if C_Timer and type(C_Timer.After) == "function" then
         C_Timer.After(delay, retry)
         return true
     end
 
-    retry()
+    self.ScheduledWakeAt = 0
+    recordSchedulerState(self, waitReason, targetTime, item, now)
+    return false
+end
+
+local function scheduleImmediateYield(self)
+    if self.ImmediateYieldPending == true then
+        return true
+    end
+
+    clearScheduledWake(self)
+    self.CurrentImmediateBurstCount = 0
+    self.ImmediateYieldPending = true
+    self.ScheduledWakeGeneration = math.max(0, math.floor(tonumber(self.ScheduledWakeGeneration) or 0)) + 1
+    local generation = self.ScheduledWakeGeneration
+    recordSchedulerState(self, "none", nil, nil, getCurrentTime())
+
+    local function retry()
+        if generation ~= self.ScheduledWakeGeneration then
+            return
+        end
+        self.ImmediateYieldPending = false
+        self.ScheduledWakeHandle = nil
+        self:ProcessNext()
+    end
+
+    if C_Timer and type(C_Timer.NewTimer) == "function" then
+        self.ScheduledWakeHandle = C_Timer.NewTimer(0, retry)
+        return true
+    end
+    if C_Timer and type(C_Timer.After) == "function" then
+        C_Timer.After(0, retry)
+        return true
+    end
+
+    self.ImmediateYieldPending = false
     return false
 end
 
@@ -253,6 +514,30 @@ local function getEffectivePriorityRank(self, item)
     return math.min(#PRIORITY_ORDER, baseRank + math.floor(bypassCount / agingStep)), baseRank
 end
 
+local function getItemEligibility(self, item, now)
+    local currentTime = tonumber(now) or getCurrentTime()
+    refreshPrefixAllowance(self, currentTime)
+
+    local waitUntil = nil
+    local waitReason = "none"
+    if self.PrefixBlockedUntil > currentTime then
+        waitUntil = self.PrefixBlockedUntil
+        waitReason = "prefix-throttle"
+    elseif usesPrefixAllowance(item) and (tonumber(self.PrefixAllowance) or 0) < 1 then
+        waitUntil = getNextEstimatedRefillAt(self, currentTime)
+        waitReason = "allowance"
+    end
+
+    local routeState = getRouteThrottleState(self, item, false)
+    local routeBlockedUntil = type(routeState) == "table" and math.max(0, tonumber(routeState.blockedUntil) or 0) or 0
+    if routeBlockedUntil > currentTime and (waitUntil == nil or routeBlockedUntil > waitUntil) then
+        waitUntil = routeBlockedUntil
+        waitReason = "channel-throttle"
+    end
+
+    return waitUntil == nil, waitUntil, waitReason
+end
+
 local function removeSkippedItems(self)
     local removed = false
     for itemIndex = #(self.Items or {}), 1, -1 do
@@ -278,9 +563,9 @@ local function removeSkippedItems(self)
     end
 end
 
-local function selectNextMessage(self)
+local function selectNextMessage(self, now)
     if #(self.Items or {}) == 0 then
-        return nil
+        return nil, nil, "none", nil
     end
 
     -- A started logical message owns the sender until terminal state so its
@@ -292,28 +577,42 @@ local function selectNextMessage(self)
                 table.remove(self.Items, itemIndex)
                 table.insert(self.Items, 1, item)
             end
-            return item
+            local eligible, waitUntil, waitReason = getItemEligibility(self, item, now)
+            return eligible and item or nil, waitUntil, waitReason, item
         end
     end
 
     local bestIndex = nil
     local bestEffectiveRank = -1
     local bestSequence = math.huge
+    local eligibleByIndex = {}
+    local earliestWaitUntil = nil
+    local earliestWaitReason = "none"
+    local earliestWaitItem = nil
+
     for itemIndex = 1, #self.Items do
         local item = self.Items[itemIndex]
-        local effectiveRank = getEffectivePriorityRank(self, item)
-        local sequence = math.max(0, math.floor(tonumber(item and item.enqueueSequence) or itemIndex))
-        if effectiveRank > bestEffectiveRank
-            or (effectiveRank == bestEffectiveRank and sequence < bestSequence)
-        then
-            bestIndex = itemIndex
-            bestEffectiveRank = effectiveRank
-            bestSequence = sequence
+        local eligible, waitUntil, waitReason = getItemEligibility(self, item, now)
+        eligibleByIndex[itemIndex] = eligible == true
+        if eligible then
+            local effectiveRank = getEffectivePriorityRank(self, item)
+            local sequence = math.max(0, math.floor(tonumber(item and item.enqueueSequence) or itemIndex))
+            if effectiveRank > bestEffectiveRank
+                or (effectiveRank == bestEffectiveRank and sequence < bestSequence)
+            then
+                bestIndex = itemIndex
+                bestEffectiveRank = effectiveRank
+                bestSequence = sequence
+            end
+        elseif waitUntil ~= nil and (earliestWaitUntil == nil or waitUntil < earliestWaitUntil) then
+            earliestWaitUntil = waitUntil
+            earliestWaitReason = waitReason
+            earliestWaitItem = item
         end
     end
 
     if not bestIndex then
-        return nil
+        return nil, earliestWaitUntil, earliestWaitReason, earliestWaitItem
     end
 
     local selected = self.Items[bestIndex]
@@ -321,10 +620,11 @@ local function selectNextMessage(self)
     selected.effectivePriority = PRIORITY_ORDER[bestEffectiveRank]
     selected.priorityPromoted = bestEffectiveRank > baseRank
 
-    -- Age every other eligible logical message once per logical dispatch. This
-    -- is independent of frame time and gives deterministic bounded starvation.
+    -- Age every other currently eligible logical message once per logical
+    -- dispatch. Temporarily throttled routes do not gain bypasses while they
+    -- are ineligible, but resume normal starvation protection on recovery.
     for itemIndex = 1, #self.Items do
-        if itemIndex ~= bestIndex then
+        if itemIndex ~= bestIndex and eligibleByIndex[itemIndex] == true then
             local item = self.Items[itemIndex]
             if item and item.started ~= true then
                 item.priorityBypassCount = math.max(
@@ -339,7 +639,51 @@ local function selectNextMessage(self)
         table.remove(self.Items, bestIndex)
         table.insert(self.Items, 1, selected)
     end
-    return selected
+    return selected, nil, "none", nil
+end
+
+local function consumePrefixAllowance(self, item, now)
+    local currentTime = tonumber(now) or getCurrentTime()
+    refreshPrefixAllowance(self, currentTime)
+    if self.PrefixBlockedUntil > currentTime then
+        return false
+    end
+    if not usesPrefixAllowance(item) then
+        return true
+    end
+    local allowance = tonumber(self.PrefixAllowance) or 0
+    if allowance < 1 then
+        return false
+    end
+    self.PrefixAllowance = allowance - 1
+    return true
+end
+
+local function recordPendingRecoveries(self, item, now)
+    local currentTime = tonumber(now) or getCurrentTime()
+    if self.PrefixRecoveryPending == true and self.PrefixBlockedUntil <= currentTime then
+        self.PrefixRecoveryPending = false
+        recordRecoveryAttempt(self, item, "prefix-throttle", currentTime)
+    end
+
+    local routeState = getRouteThrottleState(self, item, false)
+    if type(routeState) == "table"
+        and routeState.recoveryPending == true
+        and (tonumber(routeState.blockedUntil) or 0) <= currentTime
+    then
+        routeState.recoveryPending = false
+        recordRecoveryAttempt(self, item, "channel-throttle", currentTime)
+    end
+end
+
+local function clearRouteThrottleAfterSuccess(self, item)
+    local routeState = getRouteThrottleState(self, item, false)
+    if type(routeState) ~= "table" then
+        return
+    end
+    routeState.blockedUntil = 0
+    routeState.consecutiveThrottleCount = 0
+    routeState.recoveryPending = false
 end
 
 function Queue:NormalizePriority(value)
@@ -359,16 +703,25 @@ function Queue:GetPendingChunkCount()
 end
 
 function Queue:Reset()
+    clearScheduledWake(self)
     self.Items = {}
     self.IsSending = false
-    self.NextSendAt = 0
     self.PendingChunkHighWater = 0
     self.LogicalMessageHighWater = 0
     self.EnqueueSequence = 0
+    self.PrefixBurstCapacityEstimate = getConfiguredBurstCapacity(self)
+    self.PrefixAllowance = self.PrefixBurstCapacityEstimate
+    self.PrefixAllowanceUpdatedAt = getCurrentTime()
+    self.PrefixBlockedUntil = 0
+    self.PrefixRecoveryPending = false
+    self.ChannelThrottleState = {}
+    self.CurrentImmediateBurstCount = 0
+    self.ImmediateYieldPending = false
     if Diagnostics.RecordQueueReset then
         Diagnostics:RecordQueueReset()
     end
     updateQueueMetrics(self)
+    recordSchedulerState(self, "none", nil, nil, self.PrefixAllowanceUpdatedAt)
     return self
 end
 
@@ -504,6 +857,7 @@ function Queue:EnqueueLogicalMessage(prefix, opcode, chunks, distribution, targe
 end
 
 function Queue:HandleSuccess(item, result)
+    local now = getCurrentTime()
     local chunk, chunkPartIndex, chunkPartCount = setCurrentChunkFields(item, item.nextChunkIndex)
     if Diagnostics.RecordQueueSent then
         Diagnostics:RecordQueueSent(item, result)
@@ -526,6 +880,8 @@ function Queue:HandleSuccess(item, result)
 
     invokeCallback(item.callbacks and item.callbacks.onChunkSent, item, chunk, result, chunkPartIndex, chunkPartCount)
 
+    clearRouteThrottleAfterSuccess(self, item)
+    recordSuccessfulBurstSend(self, item, now)
     item.nextChunkIndex = chunkPartIndex + 1
     item.attempts = 0
     local delivered = item.nextChunkIndex > chunkPartCount
@@ -541,6 +897,7 @@ function Queue:HandleSuccess(item, result)
 
     self.IsSending = false
     updateQueueMetrics(self)
+    recordSchedulerState(self, "none", nil, nil, now)
     self:ProcessNext()
     return delivered
 end
@@ -552,20 +909,62 @@ function Queue:HandleThrottle(item, result)
         return
     end
 
-    self.IsSending = true
+    local now = getCurrentTime()
     if Diagnostics.RecordQueueThrottle then
         Diagnostics:RecordQueueThrottle(item, result)
     end
 
-    if C_Timer and C_Timer.After then
-        local baseDelay = tonumber(self.SendDelay) or tonumber(self.DefaultSendDelay) or 0.2
-        local maxDelay = tonumber(self.MaxSendDelay) or tonumber(self.DefaultMaxSendDelay) or baseDelay
-        local delay = math.min(baseDelay * (2 ^ math.max(0, (item.attempts or 1) - 1)), maxDelay)
-        scheduleNextProcess(self, delay)
-        return
+    local diagnostics = Diagnostics.GetQueueDiagnosticsStore and Diagnostics:GetQueueDiagnosticsStore() or nil
+    if tonumber(result) == 3 then
+        refreshPrefixAllowance(self, now)
+        local previousEstimate = tonumber(self.PrefixBurstCapacityEstimate) or getConfiguredBurstCapacity(self)
+        local reducedEstimate = math.max(1, math.floor(previousEstimate * 0.75))
+        if previousEstimate > 1 and reducedEstimate >= previousEstimate then
+            reducedEstimate = previousEstimate - 1
+        end
+        self.PrefixBurstCapacityEstimate = reducedEstimate
+        self.PrefixAllowance = 0
+        self.PrefixAllowanceUpdatedAt = now
+        local blockedDuration = 1 / getConfiguredRefillRate(self)
+        self.PrefixBlockedUntil = now + blockedDuration
+        self.PrefixRecoveryPending = true
+        if type(diagnostics) == "table" then
+            diagnostics.lastPrefixThrottleBlockedDuration = blockedDuration
+            diagnostics.lastPrefixThrottleBurstEstimateBefore = previousEstimate
+            diagnostics.lastPrefixThrottleBurstEstimateAfter = reducedEstimate
+            diagnostics.prefixBlockedUntil = self.PrefixBlockedUntil
+        end
+    elseif tonumber(result) == 8 then
+        local routeState, routeKey = getRouteThrottleState(self, item, true)
+        routeState.consecutiveThrottleCount = math.max(
+            0,
+            math.floor(tonumber(routeState.consecutiveThrottleCount) or 0)
+        ) + 1
+        local blockedDuration = math.min(
+            getConfiguredChannelBackoff(self) * (2 ^ math.max(0, routeState.consecutiveThrottleCount - 1)),
+            getConfiguredMaxChannelBackoff(self)
+        )
+        routeState.blockedUntil = now + blockedDuration
+        routeState.recoveryPending = true
+        if type(diagnostics) == "table" then
+            diagnostics.lastChannelThrottleRouteKey = routeKey
+            diagnostics.lastChannelThrottleDistribution = item and item.distribution or nil
+            diagnostics.lastChannelThrottleTarget = item and item.target or nil
+            diagnostics.lastChannelThrottleBlockedDuration = blockedDuration
+            diagnostics.lastChannelBlockedUntil = routeState.blockedUntil
+        end
     end
 
-    scheduleNextProcess(self, 0)
+    self.IsSending = false
+    self.CurrentImmediateBurstCount = 0
+    recordSchedulerState(
+        self,
+        tonumber(result) == 3 and "prefix-throttle" or "channel-throttle",
+        nil,
+        item,
+        now
+    )
+    self:ProcessNext()
 end
 
 function Queue:HandleFailure(item, result)
@@ -592,29 +991,38 @@ function Queue:HandleFailure(item, result)
 
     invokeCallback(item.callbacks and item.callbacks.onFailed, item, result)
     updateQueueMetrics(self)
+    recordSchedulerState(self, "none", nil, nil, getCurrentTime())
     self:ProcessNext()
 end
 
 function Queue:ProcessNext()
-    if self.IsSending then
-        return false
-    end
-
-    local now = getCurrentTime()
-    local nextSendAt = tonumber(self.NextSendAt) or 0
-    if nextSendAt > now then
-        self.IsSending = true
-        scheduleNextProcess(self, nextSendAt - now)
+    if self.IsSending or self.ImmediateYieldPending == true then
         return false
     end
 
     removeSkippedItems(self)
     if #self.Items == 0 then
+        clearScheduledWake(self)
+        recordSchedulerState(self, "none", nil, nil, getCurrentTime())
         return false
     end
 
-    local item = selectNextMessage(self)
+    local now = getCurrentTime()
+    refreshPrefixAllowance(self, now)
+    local item, waitUntil, waitReason, waitingItem = selectNextMessage(self, now)
     if not item then
+        if waitUntil ~= nil and waitUntil > now then
+            scheduleNextProcess(self, waitUntil, waitReason, waitingItem)
+        else
+            recordSchedulerState(self, waitReason or "none", waitUntil, waitingItem, now)
+        end
+        return false
+    end
+
+    if not usesPrefixAllowance(item)
+        and self.CurrentImmediateBurstCount >= getConfiguredImmediateBurstLimit(self)
+    then
+        scheduleImmediateYield(self)
         return false
     end
 
@@ -643,10 +1051,19 @@ function Queue:ProcessNext()
         return false
     end
 
+    if not consumePrefixAllowance(self, item, now) then
+        local _, nextEligibleAt, reason = getItemEligibility(self, item, now)
+        if nextEligibleAt and nextEligibleAt > now then
+            scheduleNextProcess(self, nextEligibleAt, reason, item)
+        end
+        return false
+    end
+
+    recordPendingRecoveries(self, item, now)
+    recordSchedulerState(self, "none", nil, nil, now)
     self.IsSending = true
     item.attempts = (item.attempts or 0) + 1
     item.totalAttempts = (item.totalAttempts or 0) + 1
-    self.NextSendAt = now + getMinimumSendDelay(self)
 
     local result = C_ChatInfo.SendAddonMessage(item.prefix, payload, item.distribution, item.target)
     if result == 3 or result == 8 then
@@ -664,6 +1081,8 @@ function Queue:ProcessNext()
 end
 
 function Queue:GetStats()
+    local now = getCurrentTime()
+    refreshPrefixAllowance(self, now)
     local stats = Diagnostics.GetMessageQueueDiagnostics and Diagnostics:GetMessageQueueDiagnostics() or {}
     stats.queueLength = #self.Items
     stats.logicalMessageCount = #self.Items
@@ -678,7 +1097,13 @@ function Queue:GetStats()
     )
     stats.maxPendingChunkCount = tonumber(self.MaxQueueLength) or tonumber(self.DefaultMaxQueueLength) or 0
     stats.priorityAgingDispatchesPerLevel = self.PriorityAgingDispatchesPerLevel
-    stats.sendDelay = self.SendDelay
+    stats.estimatedAllowance = tonumber(self.PrefixAllowance) or 0
+    stats.estimatedBurstCapacity = tonumber(self.PrefixBurstCapacityEstimate) or getConfiguredBurstCapacity(self)
+    stats.estimatedRefillRate = getConfiguredRefillRate(self)
+    stats.nextEstimatedRefillAt = getNextEstimatedRefillAt(self, now)
+    stats.prefixBlockedUntil = math.max(0, tonumber(self.PrefixBlockedUntil) or 0)
+    stats.scheduledWakeAt = math.max(0, tonumber(self.ScheduledWakeAt) or 0)
+    stats.isWaiting = stats.scheduledWakeAt > now or self.ImmediateYieldPending == true
     stats.isSending = self.IsSending and true or false
     return stats
 end
