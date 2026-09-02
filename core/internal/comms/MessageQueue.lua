@@ -152,6 +152,14 @@ local function getRemainingChunkCount(item)
     return chunkCount - nextChunkIndex + 1
 end
 
+local function getRemainingChunkBytes(item)
+    local totalBytes = 0
+    for chunkIndex = getNextChunkIndex(item), getChunkCount(item) do
+        totalBytes = totalBytes + #(tostring(item and item.chunks and item.chunks[chunkIndex] or ""))
+    end
+    return totalBytes
+end
+
 local function setCurrentChunkFields(item, chunkIndex)
     local chunkCount = getChunkCount(item)
     local normalizedIndex = math.max(1, math.min(chunkCount, math.floor(tonumber(chunkIndex) or 1)))
@@ -183,15 +191,55 @@ local function updateQueueMetrics(self)
     return logicalCount, pendingChunks
 end
 
-local function recordSkippedChunks(item, firstIndex)
+local function recordSkippedChunks(item, firstIndex, reason)
     if type(Diagnostics.RecordQueueSkipped) ~= "function" then
         return
     end
     local chunkCount = getChunkCount(item)
     for chunkIndex = math.max(1, math.floor(tonumber(firstIndex) or 1)), chunkCount do
         setCurrentChunkFields(item, chunkIndex)
-        Diagnostics:RecordQueueSkipped(item, "logical-message-cancelled")
+        Diagnostics:RecordQueueSkipped(item, reason or "logical-message-cancelled")
     end
+end
+
+local function normalizeReplaceKey(value)
+    local normalized = tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    return normalized ~= "" and normalized or nil
+end
+
+local function isSameReplacementScope(item, replaceKey, prefix, opcode, distribution, target)
+    if type(item) ~= "table" or normalizeReplaceKey(item.replaceKey) ~= replaceKey then
+        return false
+    end
+    if tostring(item.prefix or "") ~= tostring(prefix or "") then
+        return false
+    end
+    if tonumber(item.opcode) ~= tonumber(opcode) then
+        return false
+    end
+    if tostring(item.distribution or "") ~= tostring(distribution or "") then
+        return false
+    end
+    return tostring(item.target or "") == tostring(target or "")
+end
+
+local function findReplaceableMessage(self, replaceKey, prefix, opcode, distribution, target)
+    local normalizedKey = normalizeReplaceKey(replaceKey)
+    if not normalizedKey then
+        return nil, nil
+    end
+
+    for itemIndex = #(self.Items or {}), 1, -1 do
+        local item = self.Items[itemIndex]
+        if isSameReplacementScope(item, normalizedKey, prefix, opcode, distribution, target)
+            and item.started ~= true
+            and (tonumber(item.totalAttempts) or 0) <= 0
+        then
+            return itemIndex, item
+        end
+    end
+
+    return nil, nil
 end
 
 local function getPriorityRank(item)
@@ -331,13 +379,21 @@ function Queue:Enqueue(item)
 
     item.priority = self:NormalizePriority(item.priority or (item.metadata and item.metadata.priority))
     item.priorityBypassCount = math.max(0, math.floor(tonumber(item.priorityBypassCount) or 0))
+    item.replaceKey = normalizeReplaceKey(item.replaceKey or (item.metadata and item.metadata.replaceKey))
 
     local requestedChunkCount = getChunkCount(item)
     if requestedChunkCount <= 0 then
         error("Addon.Internal.Comms.MessageQueue:Enqueue(item) requires one or more chunks.", 2)
     end
 
-    if not self:CanAccept(requestedChunkCount) then
+    if not self:CanAccept(
+        requestedChunkCount,
+        item.replaceKey,
+        item.prefix,
+        item.opcode,
+        item.distribution,
+        item.target
+    ) then
         if Diagnostics.RecordQueueFailure then
             setCurrentChunkFields(item, 1)
             Diagnostics:RecordQueueFailure(item, "queue-full")
@@ -347,6 +403,36 @@ function Queue:Enqueue(item)
         end
         invokeCallback(item.callbacks and item.callbacks.onFailed, item, "queue-full")
         return nil
+    end
+
+    local supersededIndex, supersededItem = findReplaceableMessage(
+        self,
+        item.replaceKey,
+        item.prefix,
+        item.opcode,
+        item.distribution,
+        item.target
+    )
+    local supersededPendingChunks = supersededItem and getRemainingChunkCount(supersededItem) or 0
+    local supersededPendingBytes = supersededItem and getRemainingChunkBytes(supersededItem) or 0
+    if supersededItem then
+        recordSkippedChunks(
+            supersededItem,
+            getNextChunkIndex(supersededItem),
+            "logical-message-superseded"
+        )
+        table.remove(self.Items, supersededIndex)
+        if Diagnostics.RecordQueueLogicalSuperseded then
+            Diagnostics:RecordQueueLogicalSuperseded(
+                supersededItem,
+                item,
+                supersededPendingChunks,
+                supersededPendingBytes
+            )
+        end
+        if Diagnostics.SupersedeLogicalSend then
+            Diagnostics:SupersedeLogicalSend(supersededItem._rpeLogicalDiagnosticId, "superseded")
+        end
     end
 
     self.EnqueueSequence = math.max(0, math.floor(tonumber(self.EnqueueSequence) or 0)) + 1
@@ -370,18 +456,35 @@ function Queue:Enqueue(item)
     setCurrentChunkFields(item, item.nextChunkIndex)
     updateQueueMetrics(self)
 
+    if supersededItem then
+        invokeCallback(supersededItem.callbacks and supersededItem.callbacks.onFailed, supersededItem, "superseded")
+    end
+
     self:ProcessNext()
     return item
 end
 
-function Queue:CanAccept(count)
+function Queue:CanAccept(count, replaceKey, prefix, opcode, distribution, target)
     local requestedCount = math.max(0, math.floor(tonumber(count) or 0))
     local maxQueueLength = tonumber(self.MaxQueueLength) or tonumber(self.DefaultMaxQueueLength) or 0
     if maxQueueLength <= 0 then
         return true
     end
 
-    return (self:GetPendingChunkCount() + requestedCount) <= maxQueueLength
+    local pendingChunkCount = self:GetPendingChunkCount()
+    local _, replaceableItem = findReplaceableMessage(
+        self,
+        replaceKey,
+        prefix,
+        opcode,
+        distribution,
+        target
+    )
+    if replaceableItem then
+        pendingChunkCount = math.max(0, pendingChunkCount - getRemainingChunkCount(replaceableItem))
+    end
+
+    return (pendingChunkCount + requestedCount) <= maxQueueLength
 end
 
 function Queue:EnqueueLogicalMessage(prefix, opcode, chunks, distribution, target, callbacks, metadata)
@@ -396,6 +499,7 @@ function Queue:EnqueueLogicalMessage(prefix, opcode, chunks, distribution, targe
         callbacks = callbacks,
         metadata = metadata,
         priority = metadata and metadata.priority or nil,
+        replaceKey = metadata and metadata.replaceKey or nil,
     })
 end
 
