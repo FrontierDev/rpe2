@@ -54,6 +54,10 @@ function Diagnostics:ResetQueueDiagnostics()
     self.State = self.State or {}
     self.State.queue = {
         lastResetAt = getNow(),
+        currentLogicalMessageCount = 0,
+        currentPendingChunkCount = 0,
+        highWaterLogicalMessageCount = 0,
+        highWaterPendingChunkCount = 0,
     }
     return self.State.queue
 end
@@ -158,6 +162,60 @@ function Diagnostics:RecordQueueReset()
     self:ResetQueueDiagnostics()
 end
 
+function Diagnostics:RecordQueueLogicalEnqueued(item)
+    local diagnostics = self:GetQueueDiagnosticsStore()
+    diagnostics.enqueuedMessageCount = (diagnostics.enqueuedMessageCount or 0) + 1
+    diagnostics.lastLogicalEnqueued = {
+        at = getNow(),
+        prefix = item and item.prefix or nil,
+        opcode = item and item.opcode or nil,
+        distribution = item and item.distribution or nil,
+        target = item and item.target or nil,
+        chunkCount = type(item) == "table" and type(item.chunks) == "table" and #item.chunks or 0,
+    }
+end
+
+function Diagnostics:RecordQueueLogicalDelivered(item, result)
+    local diagnostics = self:GetQueueDiagnosticsStore()
+    diagnostics.deliveredMessageCount = (diagnostics.deliveredMessageCount or 0) + 1
+    diagnostics.lastLogicalDelivered = {
+        at = getNow(),
+        prefix = item and item.prefix or nil,
+        opcode = item and item.opcode or nil,
+        distribution = item and item.distribution or nil,
+        target = item and item.target or nil,
+        chunkCount = type(item) == "table" and type(item.chunks) == "table" and #item.chunks or 0,
+        result = result,
+    }
+end
+
+function Diagnostics:RecordQueueLogicalFailure(item, result)
+    local diagnostics = self:GetQueueDiagnosticsStore()
+    diagnostics.failedMessageCount = (diagnostics.failedMessageCount or 0) + 1
+    diagnostics.lastLogicalFailure = {
+        at = getNow(),
+        prefix = item and item.prefix or nil,
+        opcode = item and item.opcode or nil,
+        distribution = item and item.distribution or nil,
+        target = item and item.target or nil,
+        chunkCount = type(item) == "table" and type(item.chunks) == "table" and #item.chunks or 0,
+        result = result,
+    }
+end
+
+function Diagnostics:RecordQueueLogicalSkipped(item, remainingChunkCount)
+    local diagnostics = self:GetQueueDiagnosticsStore()
+    diagnostics.skippedMessageCount = (diagnostics.skippedMessageCount or 0) + 1
+    diagnostics.lastLogicalSkipped = {
+        at = getNow(),
+        prefix = item and item.prefix or nil,
+        opcode = item and item.opcode or nil,
+        distribution = item and item.distribution or nil,
+        target = item and item.target or nil,
+        remainingChunkCount = math.max(0, math.floor(tonumber(remainingChunkCount) or 0)),
+    }
+end
+
 function Diagnostics:RecordQueueEnqueued(item)
     local diagnostics = self:GetQueueDiagnosticsStore()
     diagnostics.enqueuedCount = (diagnostics.enqueuedCount or 0) + 1
@@ -166,6 +224,8 @@ function Diagnostics:RecordQueueEnqueued(item)
         prefix = item.prefix,
         distribution = item.distribution,
         target = item.target,
+        chunkPartIndex = item.chunkPartIndex,
+        chunkPartCount = item.chunkPartCount,
     }
 end
 
@@ -178,6 +238,8 @@ function Diagnostics:RecordQueueSent(item, result)
         prefix = item.prefix,
         distribution = item.distribution,
         target = item.target,
+        chunkPartIndex = item.chunkPartIndex,
+        chunkPartCount = item.chunkPartCount,
     }
 end
 
@@ -191,6 +253,8 @@ function Diagnostics:RecordQueueThrottle(item, result)
         distribution = item.distribution,
         target = item.target,
         attempts = item.attempts,
+        chunkPartIndex = item.chunkPartIndex,
+        chunkPartCount = item.chunkPartCount,
     }
 end
 
@@ -205,6 +269,22 @@ function Diagnostics:RecordQueueFailure(item, result)
         target = item.target,
         attempts = item.attempts,
         code = result,
+        chunkPartIndex = item.chunkPartIndex,
+        chunkPartCount = item.chunkPartCount,
+    }
+end
+
+function Diagnostics:RecordQueueSkipped(item, reason)
+    local diagnostics = self:GetQueueDiagnosticsStore()
+    diagnostics.skippedCount = (diagnostics.skippedCount or 0) + 1
+    diagnostics.lastSkipped = {
+        at = getNow(),
+        prefix = item and item.prefix or nil,
+        distribution = item and item.distribution or nil,
+        target = item and item.target or nil,
+        chunkPartIndex = item and item.chunkPartIndex or nil,
+        chunkPartCount = item and item.chunkPartCount or nil,
+        reason = reason or "skipped",
     }
 end
 
