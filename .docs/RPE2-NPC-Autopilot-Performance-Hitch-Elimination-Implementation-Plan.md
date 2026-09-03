@@ -5,6 +5,7 @@
 **Target:** RPEngine 2.0 (`FrontierDev/rpe2`, `dev`)  
 **Source design:** `.docs/RPE2-NPC-Autopilot-Performance-Hitch-Elimination-PDD.md`  
 **Execution model:** Two issues, executed sequentially in this conversation by GPT-5.6 Sol High  
+**Issues:** #180, #181  
 
 ---
 
@@ -54,22 +55,20 @@ Do not increase the global TaskQueue budget as a performance workaround.
 # 3. Delivery Sequence
 
 ```text
-Task A — Authorization + DM Helper hitch elimination
+#180 Authorization + DM Helper hitch elimination
     ↓
 In-game Authorise All validation
     ↓
-Task B — Planner bounded slices + completion/allocation optimization
+#181 Planner bounded slices + completion/allocation optimization
     ↓
 In-game planner/turn-advance validation
 ```
 
-Issue numbers are assigned after the repository issues are created.
-
 ---
 
-# 4. Task A — Authorization and DM Helper Hitch Elimination
+# 4. Task A — Issue #180: Authorization and DM Helper Hitch Elimination
 
-**GitHub issue:** _to be assigned_  
+**GitHub issue:** #180 — `Eliminate Autopilot Authorise All and DM Helper frame hitches`  
 **Primary symptom:** `Autopilot authorize all took 4123.09ms` for a five-unit event  
 
 ## Goal
@@ -89,6 +88,7 @@ client/ui/widgets/widget_Event_DMHelper.lua
 client/ui/widgets/widget_Event_AutopilotHelper.lua
 core/internal/tasks/TaskQueue.lua
 client/spellcasting/Lifecycle.lua
+RPEngine_Dev.toc
 ```
 
 Confirm the actual TOC load order before changing wrapped APIs.
@@ -276,9 +276,9 @@ Task A is complete when:
 
 ---
 
-# 5. Task B — Planner Bounded Slices and Completion/Allocation Optimization
+# 5. Task B — Issue #181: Planner Bounded Slices and Completion/Allocation Optimization
 
-**GitHub issue:** _to be assigned_  
+**GitHub issue:** #181 — `Bound Autopilot planner slices and remove completion copy/publication duplication`  
 **Primary symptom:** planner `maxSlice=179.92ms`, `wall=5865.87ms`; outer planning `6509.10ms`  
 
 ## Goal
@@ -302,6 +302,7 @@ client/autopilot/Authorization.lua
 client/autopilot/AuthorizationSequence.lua
 client/spellcasting/Helpers.lua
 core/internal/tasks/TaskQueue.lua
+RPEngine_Dev.toc
 ```
 
 Read current `Planner.Step`, completion callbacks and `Planner.ReleaseScratch` wrappers before selecting the exact seam.
@@ -464,8 +465,8 @@ anchors=3
 6. Verify the generated pending plan has the expected number/order of NPC actions.
 7. Verify target choices and shared-marker movement recommendations remain sensible/equivalent to the pre-fix semantics.
 8. Verify the plan appears once in DM Helper.
-9. Verify no second publication/refresh happens after completion.
-10. Repeat with DM Helper closed.
+9. Verify no duplicate publication/refresh occurs after planner completion.
+10. Repeat with the DM Helper closed.
 11. Repeat a case containing healing if available.
 12. Repeat a case containing an Aura/control spell if available to exercise projected Aura optimization.
 13. Repeat a marked melee cohort to exercise movement-anchor reevaluation.
@@ -525,7 +526,7 @@ Combined in-game smoke test:
 
 # 7. Completion Criteria
 
-The implementation plan is complete when both issues are closed and the user-provided in-game reproduction demonstrates:
+The implementation plan is complete when #180 and #181 are closed and the user-provided in-game reproduction demonstrates:
 
 ```text
 Planner maxSlice < 16.7ms       (target <= 8ms)
