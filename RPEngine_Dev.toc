@@ -127,7 +127,6 @@ core/classes/Interaction.lua
 core/classes/Achievement.lua
 core/classes/GuildSetting.lua
 core/classes/Currency.lua
-data/default/Install.lua
 core/classes/Event.lua
 core/classes/EventAutopilotMode.lua
 core/classes/EventVariantNetwork.lua
@@ -417,5 +416,6 @@ client/ui/editor/windows/window_DataEditor.lua
 client/ui/ruleset/inspectors/page_InspectorRuleset.lua
 client/ui/ruleset/window_Ruleset.lua
 
+data/default/Install.lua
 BagScanTest.lua
 RuneclothDeleteTest.lua
