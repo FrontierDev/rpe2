@@ -193,6 +193,24 @@ local function deepCopy(value)
     return copy
 end
 
+local function copyAuthoredConfiguration(value)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local copy = {}
+    for key, nestedValue in pairs(value) do
+        -- Underscore-prefixed fields are runtime/private state. Dataset records
+        -- are live SavedVariables tables, so lookup caches can otherwise leak
+        -- into exports and make identical authored data hash differently.
+        if type(key) ~= "string" or string.sub(key, 1, 1) ~= "_" then
+            copy[copyAuthoredConfiguration(key)] = copyAuthoredConfiguration(nestedValue)
+        end
+    end
+
+    return copy
+end
+
 local function markConfigurationChanged()
     Addon.Internal = Addon.Internal or {}
     Addon.Internal.ConfigurationRevision = math.max(0, math.floor(tonumber(Addon.Internal.ConfigurationRevision) or 0)) + 1
@@ -644,6 +662,47 @@ local function normalizeRulesetRecordPreservingExtras(record, fallbackId, fallba
     end
 
     return merged
+end
+
+local function buildCompleteRulesetExportRecord(record, fallbackId, fallbackName)
+    local exported = normalizeRulesetRecordPreservingExtras(record, fallbackId, fallbackName)
+    exported.rules = deepCopy(ensureTable(exported.rules))
+
+    local rulesetLogic = Addon.Internal and Addon.Internal.Ruleset or nil
+    local rules = type(rulesetLogic) == "table" and rulesetLogic.Rules or nil
+    local categoryDefinitions = type(rules) == "table" and rules.Definitions or nil
+
+    for categoryIndex = 1, #(categoryDefinitions or {}) do
+        local categoryDefinition = categoryDefinitions[categoryIndex]
+        local categoryKey = type(categoryDefinition) == "table" and categoryDefinition.key or nil
+        if type(categoryKey) == "string" and categoryKey ~= "" then
+            local categoryRules = exported.rules[categoryKey]
+            if type(categoryRules) ~= "table" then
+                categoryRules = {}
+                exported.rules[categoryKey] = categoryRules
+            end
+
+            local ruleDefinitions = categoryDefinition.rules
+            for ruleIndex = 1, #(ruleDefinitions or {}) do
+                local ruleDefinition = ruleDefinitions[ruleIndex]
+                local ruleKey = type(ruleDefinition) == "table" and ruleDefinition.key or nil
+                if type(ruleKey) == "string" and ruleKey ~= "" then
+                    local value = categoryRules[ruleKey]
+                    if type(rulesetLogic.GetRulesetRuleValue) == "function" then
+                        value = rulesetLogic.GetRulesetRuleValue(exported, categoryKey, ruleDefinition)
+                    elseif value == nil then
+                        value = ruleDefinition.default
+                    end
+
+                    if value ~= nil then
+                        categoryRules[ruleKey] = deepCopy(value)
+                    end
+                end
+            end
+        end
+    end
+
+    return copyAuthoredConfiguration(exported)
 end
 
 local function normalizeProfileEquipmentEntry(record)
@@ -1631,7 +1690,7 @@ local function normalizeRulesetsCollection(root)
             fallbackName = key
         end
 
-        local ruleset = normalizeRulesetRecord(value, fallbackId, fallbackName)
+        local ruleset = normalizeRulesetRecordPreservingExtras(value, fallbackId, fallbackName)
         if ruleset.id == "" then
             ruleset.id = fallbackId or ""
         end
@@ -3469,7 +3528,7 @@ function Database.ExportRuleset(rulesetId)
     local payload = {
         format = "rpe-ruleset",
         version = 2,
-        ruleset = normalizeRulesetRecordPreservingExtras(ruleset, ruleset.id, ruleset.name),
+        ruleset = buildCompleteRulesetExportRecord(ruleset, ruleset.id, ruleset.name),
     }
 
     return "RPE_RULESET_V2\n" .. serializeLuaValue(payload)
@@ -3820,7 +3879,7 @@ function Database.ExportDataset(datasetId)
     local payload = {
         format = "rpe-dataset",
         version = 1,
-        dataset = normalizeDatasetRecord(deepCopy(dataset), dataset.id, dataset.name),
+        dataset = normalizeDatasetRecord(copyAuthoredConfiguration(dataset), dataset.id, dataset.name),
     }
 
     return "RPE_DATASET_V1\n" .. serializeLuaValue(payload)
@@ -3835,7 +3894,7 @@ function Database.ExportDatasets(datasetIds)
     for index = 1, #datasetIds do
         local dataset = Database.GetDatasetByID(datasetIds[index])
         if dataset then
-            datasets[#datasets + 1] = normalizeDatasetRecord(deepCopy(dataset), dataset.id, dataset.name)
+            datasets[#datasets + 1] = normalizeDatasetRecord(copyAuthoredConfiguration(dataset), dataset.id, dataset.name)
         end
     end
 
@@ -3929,7 +3988,7 @@ function Database.ExportDatasetEntry(datasetId, collectionKey, entryIdOrIndex)
         version = 1,
         collectionKey = collectionKey,
         datasetId = dataset.id,
-        entry = normalizeDatasetEntryRecord(dataset, collectionKey, entry, entry.id),
+        entry = copyAuthoredConfiguration(normalizeDatasetEntryRecord(dataset, collectionKey, entry, entry.id)),
     }
 
     return "RPE_DATASET_ENTRY_V1\n" .. serializeLuaValue(payload)
