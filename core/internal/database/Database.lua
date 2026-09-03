@@ -142,6 +142,7 @@ local CONFIGURATION_CHANGE_CLASSIFICATION = {
     ["ruleset-rename"] = "authored configuration",
     ["ruleset-update"] = "authored configuration",
     ["dataset-activation"] = "authored configuration",
+    ["dataset-default-sync"] = "authored configuration",
     ["dataset-import"] = "authored configuration",
     ["dataset-delete"] = "authored configuration",
     ["dataset-rename"] = "authored configuration",
@@ -1656,7 +1657,7 @@ local function normalizeRulesetsCollection(root)
     return root.rulesets
 end
 
-local function normalizeActivatedDatasets(root)
+local function normalizeActivatedDatasets(root, preserveMissing)
     local values = ensureTable(root and root.activatedDatasets)
     local normalized = {}
     local seen = {}
@@ -1670,7 +1671,10 @@ local function normalizeActivatedDatasets(root)
             datasetId = ensureString(key, "")
         end
 
-        if datasetId ~= "" and datasets[datasetId] ~= nil and not seen[datasetId] then
+        if datasetId ~= ""
+            and (preserveMissing == true or datasets[datasetId] ~= nil)
+            and not seen[datasetId]
+        then
             normalized[#normalized + 1] = datasetId
             seen[datasetId] = true
         end
@@ -3186,19 +3190,146 @@ function Database.EnsureDatasets()
         datasets = {},
         activeByChar = {},
         activatedDatasets = {},
+        defaultDatasetVersions = {},
         nextId = 1,
     })
 
     datasets.currentByChar = nil
     datasets.activeByChar = ensureTable(datasets.activeByChar)
+    datasets.defaultDatasetVersions = ensureTable(datasets.defaultDatasetVersions)
     normalizeDatasetsCollection(datasets)
-    normalizeActivatedDatasets(datasets)
+    -- Preserve activation IDs whose record is temporarily missing so a known
+    -- packaged default can be restored later in the same startup without being
+    -- mistaken for a first installation. Public activation reads still filter
+    -- IDs which do not resolve to a current dataset record.
+    normalizeActivatedDatasets(datasets, true)
     Database.Datasets = datasets
     if Dependecies and Dependecies.RecomputeAllDatasetDependencies then
         Dependecies.RecomputeAllDatasetDependencies()
     end
 
     return datasets
+end
+
+local function isPositiveInteger(value)
+    return type(value) == "number"
+        and value > 0
+        and value == math.floor(value)
+end
+
+local function logDefaultDatasetSyncDiagnostic(definitionKey, message)
+    local debug = Addon.Debug or nil
+    if debug and type(debug.Internal) == "function" then
+        debug.Internal(
+            "Skipping packaged default dataset '%s': %s",
+            tostring(definitionKey),
+            tostring(message)
+        )
+    end
+end
+
+local function hasActivatedDatasetId(root, datasetId)
+    for key, value in pairs(ensureTable(root and root.activatedDatasets)) do
+        local activatedId = ""
+        if type(key) == "number" then
+            activatedId = ensureString(value, "")
+        elseif value == true then
+            activatedId = ensureString(key, "")
+        end
+
+        if activatedId == datasetId then
+            return true
+        end
+    end
+
+    return false
+end
+
+function Database.SyncDefaultDatasets(defaultDefinitions)
+    local changedDatasetIds = {}
+    local skippedDefinitions = 0
+
+    if type(defaultDefinitions) ~= "table" then
+        logDefaultDatasetSyncDiagnostic("<definitions>", "definitions must be a table")
+        return changedDatasetIds, 1
+    end
+
+    local root = Database.EnsureDatasets()
+    root.datasets = ensureTable(root.datasets)
+    root.activatedDatasets = ensureTable(root.activatedDatasets)
+    root.defaultDatasetVersions = ensureTable(root.defaultDatasetVersions)
+
+    local definitionKeys = {}
+    for definitionKey in pairs(defaultDefinitions) do
+        definitionKeys[#definitionKeys + 1] = definitionKey
+    end
+    table.sort(definitionKeys, function(left, right)
+        return tostring(left) < tostring(right)
+    end)
+
+    local seenDatasetIds = {}
+    for index = 1, #definitionKeys do
+        local definitionKey = definitionKeys[index]
+        local definition = defaultDefinitions[definitionKey]
+        local dataset = type(definition) == "table" and definition.dataset or nil
+        local datasetId = type(dataset) == "table" and ensureString(dataset.id, "") or ""
+        local packagedVersion = type(definition) == "table" and definition.version or nil
+        local validationError = nil
+
+        if type(definition) ~= "table" then
+            validationError = "definition must be a table"
+        elseif type(dataset) ~= "table" then
+            validationError = "definition must contain a dataset table"
+        elseif datasetId == "" then
+            validationError = "dataset must have a non-empty id"
+        elseif not isPositiveInteger(packagedVersion) then
+            validationError = "packaged version must be a positive integer"
+        elseif seenDatasetIds[datasetId] then
+            validationError = "dataset id is duplicated in packaged definitions"
+        end
+
+        if validationError then
+            skippedDefinitions = skippedDefinitions + 1
+            logDefaultDatasetSyncDiagnostic(definitionKey, validationError)
+        else
+            seenDatasetIds[datasetId] = true
+
+            local installedVersion = root.defaultDatasetVersions[datasetId]
+            local existingDataset = root.datasets[datasetId]
+            local firstInstall = installedVersion == nil
+            local needsWrite = existingDataset == nil or installedVersion ~= packagedVersion
+
+            if needsWrite then
+                local installedDataset = normalizeDatasetRecord(
+                    deepCopy(dataset),
+                    datasetId,
+                    dataset.name
+                )
+                installedDataset.id = datasetId
+
+                root.datasets[datasetId] = installedDataset
+                root.defaultDatasetVersions[datasetId] = packagedVersion
+
+                if firstInstall and not hasActivatedDatasetId(root, datasetId) then
+                    root.activatedDatasets[#root.activatedDatasets + 1] = datasetId
+                end
+
+                changedDatasetIds[#changedDatasetIds + 1] = datasetId
+            end
+        end
+    end
+
+    for index = 1, #changedDatasetIds do
+        if Dependecies and Dependecies.RecomputeDatasetDependencies then
+            Dependecies.RecomputeDatasetDependencies(changedDatasetIds[index])
+        end
+    end
+
+    if #changedDatasetIds > 0 then
+        notifyConfigurationChanged("dataset-default-sync")
+    end
+
+    return changedDatasetIds, skippedDefinitions
 end
 
 function Database.GetDatasetDisplayName(dataset)
