@@ -184,6 +184,7 @@ client/autopilot/PlannerEndLoot.lua
 client/autopilot/Authorization.lua
 client/autopilot/Execution.lua
 client/autopilot/AuthorizationSequence.lua
+client/autopilot/AuthorizationBatch.lua
 client/client_PendingChanges.lua
 server/server_Spellcasting.lua
 
@@ -247,6 +248,7 @@ client/ui/widgets/widget_Event_CombatLogHistory.lua
 client/ui/widgets/widget_Event_DMHelper.lua
 client/autopilot/Helper.lua
 client/ui/widgets/widget_Event_AutopilotHelper.lua
+client/ui/widgets/widget_Event_AutopilotPerformance.lua
 client/ui/widgets/widget_Event_PortraitReadiness.lua
 client/ui/widgets/widget_Event_QueueStatus.lua
 client/ui/widgets/widget_ActionBar.lua
