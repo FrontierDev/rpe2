@@ -151,22 +151,8 @@ function Debug.SetLevelEnabled(level, enabled)
         return false
     end
 
-    local nextEnabled = enabled == true
     Debug.EnabledLevels = Debug.EnabledLevels or {}
-    Debug.EnabledLevels[normalizedLevel] = nextEnabled
-
-    -- INTERNAL is the development diagnostics level. Keep timing collection in
-    -- lockstep with it so enabling RPE INTERNAL immediately exposes the timing
-    -- scopes that already instrument event startup and other hot paths.
-    if normalizedLevel == "internal" then
-        local timings = Debug.Timings
-        if type(timings) == "table" and type(timings.SetEnabled) == "function" then
-            timings:SetEnabled(nextEnabled)
-        elseif type(timings) == "table" then
-            timings.Enabled = nextEnabled
-        end
-    end
-
+    Debug.EnabledLevels[normalizedLevel] = enabled == true
     return true
 end
 
