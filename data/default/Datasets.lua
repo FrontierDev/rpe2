@@ -26,6 +26,13 @@ local PACKAGED_VERSIONS = {
     ["7259f1d3"] = 1, -- Tailoring
 }
 
+local packagedDatasetCount = 0
+for _ in pairs(PACKAGED_VERSIONS) do
+    packagedDatasetCount = packagedDatasetCount + 1
+end
+
+local registeredPackagedCount = 0
+
 local function isPositiveInteger(value)
     return type(value) == "number"
         and value > 0
@@ -74,8 +81,15 @@ function RPE_DATASET_V1(payload)
         error(("Default dataset '%s' has no packaged version."):format(tostring(datasetId)), 2)
     end
 
-    return DefaultDatasets:Register({
+    local definition = DefaultDatasets:Register({
         version = packagedVersion,
         dataset = payload.dataset,
     })
+
+    registeredPackagedCount = registeredPackagedCount + 1
+    if registeredPackagedCount == packagedDatasetCount then
+        RPE_DATASET_V1 = nil
+    end
+
+    return definition
 end
