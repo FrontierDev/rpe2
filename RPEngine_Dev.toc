@@ -127,6 +127,7 @@ core/classes/Interaction.lua
 core/classes/Achievement.lua
 core/classes/GuildSetting.lua
 core/classes/Currency.lua
+data/default/Install.lua
 core/classes/Event.lua
 core/classes/EventAutopilotMode.lua
 core/classes/EventVariantNetwork.lua
