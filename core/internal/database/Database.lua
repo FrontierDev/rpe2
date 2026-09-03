@@ -3254,7 +3254,10 @@ function Database.SyncDefaultDatasets(defaultDefinitions)
         return changedDatasetIds, 1
     end
 
-    local root = Database.EnsureDatasets()
+    local root = Database.Datasets
+    if type(root) ~= "table" then
+        root = Database.EnsureDatasets()
+    end
     root.datasets = ensureTable(root.datasets)
     root.activatedDatasets = ensureTable(root.activatedDatasets)
     root.defaultDatasetVersions = ensureTable(root.defaultDatasetVersions)
