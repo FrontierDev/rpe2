@@ -32,75 +32,83 @@ jobs:
           event_path = Path('client/client_Event.lua')
           event = event_path.read_text()
 
-          marker = '''function Client:HandleEventStart(arguments, sender)
-'''
-          helper = '''local function hydrateLocalHostAuthoritativeRoster(eventState)
-              if type(eventState) ~= "table" then
-                  return false
-              end
-
-              local localPlayerName = Common.GetPlayerName and Common.GetPlayerName() or nil
-              localPlayerName = Common.NormalizeName and Common.NormalizeName(localPlayerName) or tostring(localPlayerName or "")
-              local eventHostName = Common.NormalizeName and Common.NormalizeName(eventState.hostName) or tostring(eventState.hostName or "")
-              if localPlayerName == "" or eventHostName == "" or eventHostName ~= localPlayerName then
-                  return false
-              end
-
-              local serverEventState = Addon.Server and Addon.Server.EventState or nil
-              if type(serverEventState) ~= "table"
-                  or serverEventState.active ~= true
-                  or tostring(serverEventState.id or "") ~= tostring(eventState.id or "")
-                  or type(serverEventState.SerializeUnitsForNetwork) ~= "function"
-                  or type(Event.DeserializeUnitsFromNetwork) ~= "function"
-              then
-                  return false
-              end
-
-              local units = Event.DeserializeUnitsFromNetwork(serverEventState:SerializeUnitsForNetwork())
-              if type(units) ~= "table" or #units == 0 then
-                  return false
-              end
-
-              eventState.units = units
-              eventState.rosterReady = true
-              eventState.unitsChunkReceived = eventState.unitsChunkExpected or eventState.unitsChunkReceived or 0
-              return true
-          end
-
-          function Client:HandleEventStart(arguments, sender)
-'''
+          marker = 'function Client:HandleEventStart(arguments, sender)\n'
+          helper_lines = [
+              'local function hydrateLocalHostAuthoritativeRoster(eventState)',
+              '    if type(eventState) ~= "table" then',
+              '        return false',
+              '    end',
+              '',
+              '    local localPlayerName = Common.GetPlayerName and Common.GetPlayerName() or nil',
+              '    localPlayerName = Common.NormalizeName and Common.NormalizeName(localPlayerName) or tostring(localPlayerName or "")',
+              '    local eventHostName = Common.NormalizeName and Common.NormalizeName(eventState.hostName) or tostring(eventState.hostName or "")',
+              '    if localPlayerName == "" or eventHostName == "" or eventHostName ~= localPlayerName then',
+              '        return false',
+              '    end',
+              '',
+              '    local serverEventState = Addon.Server and Addon.Server.EventState or nil',
+              '    if type(serverEventState) ~= "table"',
+              '        or serverEventState.active ~= true',
+              '        or tostring(serverEventState.id or "") ~= tostring(eventState.id or "")',
+              '        or type(serverEventState.SerializeUnitsForNetwork) ~= "function"',
+              '        or type(Event.DeserializeUnitsFromNetwork) ~= "function"',
+              '    then',
+              '        return false',
+              '    end',
+              '',
+              '    local units = Event.DeserializeUnitsFromNetwork(serverEventState:SerializeUnitsForNetwork())',
+              '    if type(units) ~= "table" or #units == 0 then',
+              '        return false',
+              '    end',
+              '',
+              '    eventState.units = units',
+              '    eventState.rosterReady = true',
+              '    eventState.unitsChunkReceived = eventState.unitsChunkExpected or eventState.unitsChunkReceived or 0',
+              '    return true',
+              'end',
+              '',
+              'function Client:HandleEventStart(arguments, sender)',
+          ]
+          helper = '\n'.join(helper_lines) + '\n'
           event = replace_once(event, marker, helper, 'insert host authoritative roster helper')
 
-          old = '''    if type(self.EventState) == "table" then
-              clearEventStateNow(self, self.EventState, "event-replaced", {
-                  cancelReason = "event-replaced",
-              })
-          end
-
-          local hydrateStartTime = timingParts and getTimingNowMilliseconds() or nil
-'''
-          new = '''    if type(self.EventState) == "table" then
-              clearEventStateNow(self, self.EventState, "event-replaced", {
-                  cancelReason = "event-replaced",
-              })
-          end
-
-          hydrateLocalHostAuthoritativeRoster(nextState)
-
-          local hydrateStartTime = timingParts and getTimingNowMilliseconds() or nil
-'''
-          event = replace_once(event, old, new, 'hydrate host roster before readiness calculation')
+          old_lines = [
+              '    if type(self.EventState) == "table" then',
+              '        clearEventStateNow(self, self.EventState, "event-replaced", {',
+              '            cancelReason = "event-replaced",',
+              '        })',
+              '    end',
+              '',
+              '    local hydrateStartTime = timingParts and getTimingNowMilliseconds() or nil',
+          ]
+          new_lines = [
+              '    if type(self.EventState) == "table" then',
+              '        clearEventStateNow(self, self.EventState, "event-replaced", {',
+              '            cancelReason = "event-replaced",',
+              '        })',
+              '    end',
+              '',
+              '    hydrateLocalHostAuthoritativeRoster(nextState)',
+              '',
+              '    local hydrateStartTime = timingParts and getTimingNowMilliseconds() or nil',
+          ]
+          event = replace_once(
+              event,
+              '\n'.join(old_lines) + '\n',
+              '\n'.join(new_lines) + '\n',
+              'hydrate host roster before readiness calculation',
+          )
           event_path.write_text(event)
 
           resources_path = Path('client/client_Resources.lua')
           resources = resources_path.read_text()
-          old = '''    local capturedResources = ResourceSync.CloneResources and ResourceSync.CloneResources(resources) or resources
-'''
-          new = '''    local capturedResources = nil
-              if resources ~= nil then
-                  capturedResources = ResourceSync.CloneResources and ResourceSync.CloneResources(resources) or resources
-              end
-'''
+          old = '    local capturedResources = ResourceSync.CloneResources and ResourceSync.CloneResources(resources) or resources\n'
+          new = '\n'.join([
+              '    local capturedResources = nil',
+              '    if resources ~= nil then',
+              '        capturedResources = ResourceSync.CloneResources and ResourceSync.CloneResources(resources) or resources',
+              '    end',
+          ]) + '\n'
           resources = replace_once(resources, old, new, 'preserve nil resource override')
           resources_path.write_text(resources)
           PY
@@ -120,7 +128,6 @@ jobs:
           resources = Path('client/client_Resources.lua').read_text()
           resource_sync = Path('core/internal/comms/ResourceSync.lua').read_text()
 
-          # Host-local roster fix: remote EVENT_START remains unready by default.
           assert 'nextState.rosterReady = false' in event
           assert 'local function hydrateLocalHostAuthoritativeRoster(eventState)' in event
           assert 'eventHostName ~= localPlayerName' in event
@@ -141,7 +148,6 @@ jobs:
           assert 'SendMessage' not in helper
           assert 'SendToChannel' not in helper
 
-          # Resource queue fix: nil override must remain nil; explicit empty remains rejected.
           queue_start = resources.index('function Client:QueueClientResourceSync(reason, options)')
           queue_end = resources.index('function Client:ResolveLocalActiveSpellcasterResources', queue_start)
           queue = resources[queue_start:queue_end]
@@ -152,10 +158,8 @@ jobs:
           assert 'capturedResources = ResourceSync.CloneResources and ResourceSync.CloneResources(resources) or resources' in queue
           assert 'targetClient:SendClientResources(expectedState, syncReason, queuedPlayerName, queuedResources, targetEventId)' in queue
 
-          # Final readiness contract remains unchanged.
           assert 'unitsReady = rosterComplete and resourcesReady' in resource_sync
 
-          # Deterministic semantic model for QueueClientResourceSync capture/send selection.
           EMPTY_REJECTED = object()
           def capture(override):
               if isinstance(override, list) and len(override) == 0:
@@ -171,28 +175,21 @@ jobs:
                   return authoritative
               return profile
 
-          # No override stays nil, allowing authoritative resources.
           captured = capture(None)
           assert captured is None
           authoritative = [{'resourceRef': 'health', 'currentValue': 42, 'maxValue': 50}]
           profile = [{'resourceRef': 'health', 'currentValue': 50, 'maxValue': 50}]
           assert select_resources(captured, authoritative, profile) == authoritative
-
-          # No override also permits profile fallback when authoritative resolution is absent.
           assert select_resources(captured, None, profile) == profile
 
-          # A supplied non-empty override is cloned and remains authoritative for that queued send.
           override = [{'resourceRef': 'health', 'currentValue': 30, 'maxValue': 50}]
           captured = capture(override)
           assert captured == override and captured is not override
           override[0]['currentValue'] = 1
           assert captured[0]['currentValue'] == 30
           assert select_resources(captured, authoritative, profile) == captured
-
-          # An explicitly empty table remains rejected and cannot become a successful empty sync.
           assert capture([]) is EMPTY_REJECTED
 
-          # Deterministic host/remote roster semantics.
           def host_roster_hydration(local_name, event_host, event_id, server_event):
               if not local_name or not event_host or event_host != local_name:
                   return False, False, []
@@ -208,17 +205,13 @@ jobs:
               'id': 'evt-test',
               'units': [{'eventID': 1, 'isPlayer': True}, {'eventID': 2, 'isPlayer': True}],
           }
-          # Host can establish roster readiness without EVENT_UNITS loopback.
           applied, roster_ready, units = host_roster_hydration('Host', 'Host', 'evt-test', authoritative_event)
           assert applied and roster_ready and len(units) == 2
-          # Remote client cannot take the host shortcut.
           applied, roster_ready, units = host_roster_hydration('Client', 'Host', 'evt-test', authoritative_event)
           assert not applied and not roster_ready and units == []
-          # Stale/mismatched server Event cannot mark a new Event ready.
           applied, roster_ready, units = host_roster_hydration('Host', 'Host', 'evt-other', authoritative_event)
           assert not applied and not roster_ready and units == []
 
-          # Startup ordering from #186 remains intact.
           run_start = event.index('local function runEventStartupStep')
           run_end = event.index('local function queueEventStartupWork', run_start)
           run = event[run_start:run_end]
