@@ -909,7 +909,7 @@ function ResourceSync.GetEventReadinessState(eventState)
     local progressExpected = unitsChunkExpected + healthResourcesExpected
     local progressReceived = unitsChunkReceived + healthResourcesReceived
     local rosterReady = type(eventState) == "table" and eventState.rosterReady == true
-    local rosterComplete = rosterReady and (unitsChunkExpected <= 0 or unitsChunkReceived >= unitsChunkExpected)
+    local rosterComplete = rosterReady
     local resourcesReady = healthResourcesExpected == 0 or healthResourcesReceived >= healthResourcesExpected
 
     return {
