@@ -7,6 +7,7 @@ Addon.Internal = Addon.Internal or {}
 local Client = Addon.Client
 local Server = Addon.Server
 local Tasks = Addon.Internal.Tasks or {}
+local Comms = Addon.Internal.Comms or {}
 local Debug = Addon.Debug or {}
 
 Client.AutopilotAuthorization = Client.AutopilotAuthorization or {}
@@ -72,6 +73,11 @@ local function notifyHelperRefresh()
     if type(Client.QueueAutopilotDMHelperRefresh) == "function" then
         Client:QueueAutopilotDMHelperRefresh()
     end
+end
+
+local function hasPendingLocalSpellcastDispatch()
+    return type(Comms.HasPendingLocalSpellcastDispatch) == "function"
+        and Comms:HasPendingLocalSpellcastDispatch() == true
 end
 
 local function resolveBatchStaleReason(state)
@@ -182,6 +188,15 @@ local function runBatchSlice(state, deadlineMs)
         state.outcome = "cancelled"
         state.reason = staleReason
         return true
+    end
+
+    -- A spellcast loopback dispatch queued by the preceding action must settle
+    -- before the next action can observe server/client mirrored spellcast state.
+    -- This is especially important for instant spells: their queued completion
+    -- job can run immediately before this batch slice and enqueue the COMPLETE
+    -- loopback dispatch during the same TaskQueue flush.
+    if hasPendingLocalSpellcastDispatch() then
+        return false
     end
 
     local plan = state.plan
