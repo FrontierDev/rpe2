@@ -9,97 +9,63 @@ local SequencePlanning = Client.AutopilotSequencePlanning or {}
 local MovementSolver = Client.AutopilotMovementSolver or {}
 local Spatial = Client.AutopilotSpatial or {}
 local Tasks = Addon.Internal.Tasks or {}
+local EPSILON = 0.0001
 
-if type(Planner) ~= "table" or Planner._performanceSolveInstalled == true then
-    return
-end
-
+if type(Planner) ~= "table" or Planner._performanceSolveInstalled == true then return end
+if type(SequencePlanning.CreateCandidateReevaluationState) ~= "function" then return end
 Planner.Performance = Planner.Performance or {}
 local Performance = Planner.Performance
 
 local function shouldYield(deadlineMs)
     return type(Tasks.ShouldYield) == "function" and Tasks:ShouldYield(deadlineMs) == true
 end
-
 local function normalizeEventId(value)
     local eventId = math.floor(tonumber(value) or 0)
     return eventId > 0 and eventId or 0
 end
-
-local function copyArray(values)
-    local copied = {}
-    for index = 1, #(values or {}) do
-        copied[index] = values[index]
-    end
-    return copied
-end
-
-local function copyMap(values)
-    local copied = {}
-    for key, value in pairs(type(values) == "table" and values or {}) do
-        copied[key] = value
-    end
-    return copied
-end
-
+local function normalizeNonNegative(value) return math.max(0, tonumber(value) or 0) end
+local function copyArray(values) local copied={} for i=1,#(values or {}) do copied[i]=values[i] end return copied end
+local function copyMap(values) local copied={} for k,v in pairs(type(values)=="table" and values or {}) do copied[k]=v end return copied end
 local function copyPosition(position)
-    if type(Spatial.CopyPosition) == "function" then
-        return Spatial.CopyPosition(position)
-    end
-    return type(position) == "table" and copyMap(position) or nil
+    if type(Spatial.CopyPosition)=="function" then return Spatial.CopyPosition(position) end
+    return type(position)=="table" and copyMap(position) or nil
 end
-
 local function candidateTargets(candidate)
-    if type(candidate) ~= "table" then
-        return {}
-    end
-    if type(candidate.targetUnits) == "table" then
-        return candidate.targetUnits
-    end
-    local target = candidate.targetUnit or candidate.primaryTargetUnit
-    return type(target) == "table" and { target } or {}
+    if type(candidate)~="table" then return {} end
+    if type(candidate.targetUnits)=="table" then return candidate.targetUnits end
+    local target=candidate.targetUnit or candidate.primaryTargetUnit
+    return type(target)=="table" and {target} or {}
 end
-
 local function candidateRequiresMelee(candidate)
-    if type(candidate) ~= "table" then
-        return false
-    end
-    if candidate.requiresMeleePosition == true then
-        return true
-    end
-    return type(candidate.damageTypes) == "table"
-        and candidate.damageTypes.melee == true
-        and math.max(0, tonumber(candidate.damageUtility or candidate.expectedDamage) or 0) > 0
+    if type(candidate)~="table" then return false end
+    if candidate.requiresMeleePosition==true then return true end
+    return type(candidate.damageTypes)=="table" and candidate.damageTypes.melee==true
+        and normalizeNonNegative(candidate.damageUtility or candidate.expectedDamage)>0
 end
 
-local function isCandidateFeasibleAtPosition(state, candidate, position)
-    if not candidateRequiresMelee(candidate) then
-        return true
-    end
-    if type(position) ~= "table" then
+local function buildTacticalContext(state)
+    return {
+        eventState = state.snapshot.eventState,
+        auraDefinitionCache = state.scratch.auraDefinitionCache,
+        controlStateByTargetEventId = state.snapshot.controlStateByTargetEventId,
+        activeCastsByEventId = state.snapshot.activeCastsByEventId,
+    }
+end
+
+local function clonePlanTacticalLedger(state)
+    return SequencePlanning.CloneTacticalLedger({
+        projectedHealingLedger = state.scratch.projectedHealingLedger,
+        projectedAuraLedger = state.scratch.projectedAuraLedger,
+    })
+end
+
+local function commitPlanTacticalLedger(state, ledger)
+    if type(ledger) ~= "table" then
         return false
     end
-    local targets = candidateTargets(candidate)
-    if #targets == 0 then
-        return false
-    end
-    local range = tonumber(MovementSolver.MELEE_RANGE_YARDS) or 5
-    for index = 1, #targets do
-        local targetPosition = type(Spatial.GetCachedUnitPosition) == "function"
-            and select(1, Spatial.GetCachedUnitPosition(
-                state.snapshot.spatialRuntime,
-                state.snapshot.eventState,
-                targets[index]
-            ))
-            or nil
-        local distance = targetPosition
-            and type(Spatial.DistanceBetweenPositions) == "function"
-            and Spatial.DistanceBetweenPositions(position, targetPosition)
-            or nil
-        if tonumber(distance) == nil or tonumber(distance) > range + 0.0001 then
-            return false
-        end
-    end
+    local copied = SequencePlanning.CloneTacticalLedger(ledger)
+    state.scratch.projectedHealingLedger = copied.projectedHealingLedger or { reservedByEventId = {} }
+    state.scratch.projectedAuraLedger = copied.projectedAuraLedger
     return true
 end
 
@@ -118,6 +84,33 @@ local function getActorPosition(state, actorKey)
     return position
 end
 
+local function isCandidateFeasibleAtPosition(state, candidate, position)
+    if not candidateRequiresMelee(candidate) then
+        return true
+    end
+    if type(position) ~= "table" then
+        return false
+    end
+    local targets = candidateTargets(candidate)
+    if #targets == 0 then
+        return false
+    end
+    local range = tonumber(MovementSolver.MELEE_RANGE_YARDS) or 5
+    for index = 1, #targets do
+        local targetPosition = type(Spatial.GetCachedUnitPosition) == "function"
+            and select(1, Spatial.GetCachedUnitPosition(state.snapshot.spatialRuntime, state.snapshot.eventState, targets[index]))
+            or nil
+        local distance = targetPosition
+            and type(Spatial.DistanceBetweenPositions) == "function"
+            and Spatial.DistanceBetweenPositions(position, targetPosition)
+            or nil
+        if tonumber(distance) == nil or tonumber(distance) > range + EPSILON then
+            return false
+        end
+    end
+    return true
+end
+
 local function appendWarning(state, warning)
     if type(warning) == "table" then
         state.output.warnings[#state.output.warnings + 1] = warning
@@ -126,9 +119,7 @@ end
 
 local function appendNoAction(state, actorKey, unit, reason)
     local eventId = normalizeEventId(unit and unit.eventID)
-    if eventId <= 0 then
-        return
-    end
+    if eventId <= 0 then return end
     state.output.noActions[#state.output.noActions + 1] = {
         actionType = "no-action",
         actionId = ("%s:noaction:%d"):format(state.planId, eventId),
@@ -146,17 +137,13 @@ local function copyTargetSelectionMap(targetUnits, targetGroupKey)
         eventIds[index] = normalizeEventId(targetUnits[index] and targetUnits[index].eventID)
     end
     local key = tostring(targetGroupKey or "")
-    if key == "" then
-        key = "default"
-    end
+    if key == "" then key = "default" end
     return { [key] = eventIds }, { key }, eventIds
 end
 
 local function buildSpellAction(state, actorKey, unit, candidate, movementActionId, sequenceIndex, sequenceCount, actionClass, previousActionId)
     local eventId = normalizeEventId(unit and unit.eventID)
-    if eventId <= 0 or type(candidate) ~= "table" then
-        return nil
-    end
+    if eventId <= 0 or type(candidate) ~= "table" then return nil end
     local resolvedSequenceIndex = math.max(1, math.floor(tonumber(sequenceIndex) or 1))
     local resolvedSequenceCount = math.max(resolvedSequenceIndex, math.floor(tonumber(sequenceCount) or resolvedSequenceIndex))
     local selections, selectionOrder, targetEventIds = copyTargetSelectionMap(candidate.targetUnits, candidate.targetGroupKey)
@@ -219,21 +206,13 @@ local function emitSequenceActions(state, actor, unit, sequence, movementActionI
         return false
     end
     local previousActionId = nil
-    local sequenceCount = #entries
-    for sequenceIndex = 1, sequenceCount do
+    for sequenceIndex = 1, #entries do
         local entry = entries[sequenceIndex]
         local candidate = type(entry) == "table" and entry.candidate or nil
         if type(candidate) == "table" then
             local action = buildSpellAction(
-                state,
-                actor.key,
-                unit,
-                candidate,
-                movementActionId,
-                sequenceIndex,
-                sequenceCount,
-                entry.actionClass,
-                previousActionId
+                state, actor.key, unit, candidate, movementActionId,
+                sequenceIndex, #entries, entry.actionClass, previousActionId
             )
             if action then
                 state.output.actions[#state.output.actions + 1] = action
@@ -248,32 +227,6 @@ local function emitSequenceActions(state, actor, unit, sequence, movementActionI
     return true
 end
 
-local function buildTacticalContext(state)
-    return {
-        eventState = state.snapshot.eventState,
-        auraDefinitionCache = state.scratch.auraDefinitionCache,
-        controlStateByTargetEventId = state.snapshot.controlStateByTargetEventId,
-        activeCastsByEventId = state.snapshot.activeCastsByEventId,
-    }
-end
-
-local function clonePlanTacticalLedger(state)
-    return SequencePlanning.CloneTacticalLedger({
-        projectedHealingLedger = state.scratch.projectedHealingLedger,
-        projectedAuraLedger = state.scratch.projectedAuraLedger,
-    })
-end
-
-local function commitPlanTacticalLedger(state, ledger)
-    if type(ledger) ~= "table" then
-        return false
-    end
-    local copied = SequencePlanning.CloneTacticalLedger(ledger)
-    state.scratch.projectedHealingLedger = copied.projectedHealingLedger or { reservedByEventId = {} }
-    state.scratch.projectedAuraLedger = copied.projectedAuraLedger
-    return true
-end
-
 local function createFixedSolveState(state, actor, position, allowMelee, noActionReason)
     return {
         actor = actor,
@@ -283,88 +236,87 @@ local function createFixedSolveState(state, actor, position, allowMelee, noActio
         memberIndex = 1,
         candidateIndex = 1,
         reevaluatedCandidates = {},
-        reevaluationState = nil,
-        memberStage = "candidates",
-        memberSequence = nil,
-        memberSummary = nil,
         sequences = {},
         tacticalLedger = clonePlanTacticalLedger(state),
+        performanceReevaluationState = nil,
+        memberStage = nil,
         complete = false,
     }
 end
 
+local function stepFixedMemberFinish(state, solveState, unit, deadlineMs)
+    local stage = solveState.memberStage or "build"
+    if stage == "build" then
+        solveState.memberSequence = SequencePlanning.BuildSequence(solveState.reevaluatedCandidates, unit)
+        solveState.memberStage = "summarize"
+        if shouldYield(deadlineMs) then return false end
+        stage = "summarize"
+    end
+    if stage == "summarize" then
+        solveState.memberSummary = SequencePlanning.SummarizeSequence(solveState.memberSequence)
+        solveState.memberStage = "reserve"
+        if shouldYield(deadlineMs) then return false end
+        stage = "reserve"
+    end
+    if stage == "reserve" then
+        solveState.sequences[solveState.memberIndex] = solveState.memberSequence
+        if solveState.memberSummary and solveState.memberSummary.hasUsefulAction == true then
+            solveState.tacticalLedger = SequencePlanning.ReserveSequence(
+                solveState.tacticalLedger,
+                solveState.memberSequence,
+                buildTacticalContext(state)
+            )
+        end
+        solveState.memberStage = "advance"
+        if shouldYield(deadlineMs) then return false end
+    end
+    solveState.memberIndex = solveState.memberIndex + 1
+    solveState.candidateIndex = 1
+    solveState.reevaluatedCandidates = {}
+    solveState.performanceReevaluationState = nil
+    solveState.memberStage = nil
+    solveState.memberSequence = nil
+    solveState.memberSummary = nil
+    return true
+end
+
 local function stepFixedSolveState(state, solveState, deadlineMs)
     local actor = solveState.actor
-    local context = buildTacticalContext(state)
     while solveState.memberIndex <= #(actor.members or {}) do
         local unit = actor.members[solveState.memberIndex]
         local candidates = state.scratch.actionCandidatesByEventId[normalizeEventId(unit and unit.eventID)] or {}
-
-        if solveState.memberStage == "candidates" then
-            if solveState.candidateIndex <= #candidates then
-                local candidate = candidates[solveState.candidateIndex]
-                local spatiallyFeasible = not candidateRequiresMelee(candidate)
-                    or (solveState.allowMelee and isCandidateFeasibleAtPosition(state, candidate, solveState.position))
-                if spatiallyFeasible then
-                    if solveState.reevaluationState == nil then
-                        solveState.reevaluationState = select(1, SequencePlanning.CreateCandidateReevaluationState(
-                            candidate,
-                            solveState.tacticalLedger,
-                            context
-                        )) or false
-                    end
-                    if type(solveState.reevaluationState) == "table" then
-                        if SequencePlanning.StepCandidateReevaluation(solveState.reevaluationState, deadlineMs) ~= true then
-                            return false
-                        end
-                        local reevaluated = SequencePlanning.CopyCandidateReevaluationResult(solveState.reevaluationState)
-                        if type(reevaluated) == "table" then
-                            solveState.reevaluatedCandidates[#solveState.reevaluatedCandidates + 1] = reevaluated
-                        end
-                    end
-                end
-                solveState.reevaluationState = nil
+        if solveState.candidateIndex <= #candidates then
+            local candidate = candidates[solveState.candidateIndex]
+            local spatiallyFeasible = not candidateRequiresMelee(candidate)
+                or (solveState.allowMelee and isCandidateFeasibleAtPosition(state, candidate, solveState.position))
+            if not spatiallyFeasible then
                 solveState.candidateIndex = solveState.candidateIndex + 1
-                if shouldYield(deadlineMs) then
-                    return false
-                end
             else
-                solveState.memberStage = "build"
-            end
-        elseif solveState.memberStage == "build" then
-            solveState.memberSequence = SequencePlanning.BuildSequence(solveState.reevaluatedCandidates, unit)
-            solveState.sequences[solveState.memberIndex] = solveState.memberSequence
-            solveState.memberStage = "summarize"
-            if shouldYield(deadlineMs) then
-                return false
-            end
-        elseif solveState.memberStage == "summarize" then
-            solveState.memberSummary = SequencePlanning.SummarizeSequence(solveState.memberSequence)
-            solveState.memberStage = "reserve"
-            if shouldYield(deadlineMs) then
-                return false
-            end
-        elseif solveState.memberStage == "reserve" then
-            if solveState.memberSummary and solveState.memberSummary.hasUsefulAction == true then
-                solveState.tacticalLedger = SequencePlanning.ReserveSequence(
-                    solveState.tacticalLedger,
-                    solveState.memberSequence,
-                    context
-                )
-            end
-            solveState.memberStage = "advance"
-            if shouldYield(deadlineMs) then
-                return false
+                if solveState.performanceReevaluationState == nil then
+                    solveState.performanceReevaluationState = select(1, SequencePlanning.CreateCandidateReevaluationState(
+                        candidate,
+                        solveState.tacticalLedger,
+                        buildTacticalContext(state)
+                    )) or false
+                end
+                if type(solveState.performanceReevaluationState) == "table" then
+                    if SequencePlanning.StepCandidateReevaluation(solveState.performanceReevaluationState, deadlineMs) ~= true then
+                        return false
+                    end
+                    local reevaluated = SequencePlanning.CopyCandidateReevaluationResult(solveState.performanceReevaluationState)
+                    if type(reevaluated) == "table" then
+                        solveState.reevaluatedCandidates[#solveState.reevaluatedCandidates + 1] = reevaluated
+                    end
+                end
+                solveState.performanceReevaluationState = nil
+                solveState.candidateIndex = solveState.candidateIndex + 1
             end
         else
-            solveState.memberIndex = solveState.memberIndex + 1
-            solveState.candidateIndex = 1
-            solveState.reevaluatedCandidates = {}
-            solveState.reevaluationState = nil
-            solveState.memberSequence = nil
-            solveState.memberSummary = nil
-            solveState.memberStage = "candidates"
+            if stepFixedMemberFinish(state, solveState, unit, deadlineMs) ~= true then
+                return false
+            end
         end
+        if shouldYield(deadlineMs) then return false end
     end
     solveState.complete = true
     return true
@@ -373,16 +325,17 @@ end
 local function finalizeFixedActor(state, solveState)
     local actor = solveState.actor
     for index = 1, #(actor.members or {}) do
-        emitSequenceActions(
-            state,
-            actor,
-            actor.members[index],
-            solveState.sequences[index],
-            nil,
-            solveState.noActionReason
-        )
+        emitSequenceActions(state, actor, actor.members[index], solveState.sequences[index], nil, solveState.noActionReason)
     end
     commitPlanTacticalLedger(state, solveState.tacticalLedger)
+end
+
+local function copyMovement(movement)
+    if type(movement) ~= "table" then return nil end
+    local copied = copyMap(movement)
+    copied.objectiveTargetEventIds = copyArray(movement.objectiveTargetEventIds)
+    copied.proposedPosition = copyPosition(movement.proposedPosition)
+    return copied
 end
 
 local function estimateMovementDiagnostics(solveState)
@@ -395,21 +348,6 @@ local function estimateMovementDiagnostics(solveState)
     return accepted, math.max(0, math.floor(potential - accepted))
 end
 
-local function copyMovement(movement)
-    if type(movement) ~= "table" then
-        return nil
-    end
-    local copied = copyMap(movement)
-    copied.objectiveTargetEventIds = copyArray(movement.objectiveTargetEventIds)
-    copied.proposedPosition = copyPosition(movement.proposedPosition)
-    if type(movement.movementByMemberEventId) == "table" then
-        copied.movementByMemberEventId = movement.movementByMemberEventId
-    end
-    copied.limitingMemberEventIds = copyArray(movement.limitingMemberEventIds)
-    copied.plannedLimitingMemberEventIds = copyArray(movement.plannedLimitingMemberEventIds)
-    return copied
-end
-
 local function finalizeMarkedActor(state, actor, solveState)
     local result = type(MovementSolver.CopyResult) == "function" and MovementSolver.CopyResult(solveState) or nil
     if type(result) ~= "table" or result.status ~= "ready" then
@@ -418,7 +356,6 @@ local function finalizeMarkedActor(state, actor, solveState)
         end
         return
     end
-
     local acceptedAnchors, rejectedAnchors = estimateMovementDiagnostics(solveState)
     state.metrics.candidateAnchorCount = (tonumber(state.metrics.candidateAnchorCount) or 0) + acceptedAnchors
     state.metrics.rejectedUnreachableAnchors = (tonumber(state.metrics.rejectedUnreachableAnchors) or 0) + rejectedAnchors
@@ -436,26 +373,17 @@ local function finalizeMarkedActor(state, actor, solveState)
         movementActionId = movement.actionId
         state.output.movements[#state.output.movements + 1] = movement
     end
-
     for index = 1, #(result.warnings or {}) do
         appendWarning(state, result.warnings[index])
     end
-
     local selectedSequences = solveState.bestAnchorEvaluation and solveState.bestAnchorEvaluation.selectedSequences or {}
     for index = 1, #actor.members do
-        emitSequenceActions(
-            state,
-            actor,
-            actor.members[index],
-            selectedSequences[index],
-            movementActionId,
-            "no-useful-action"
-        )
+        emitSequenceActions(state, actor, actor.members[index], selectedSequences[index], movementActionId, "no-useful-action")
     end
     commitPlanTacticalLedger(state, result.tacticalLedger)
 end
 
-function Performance.StepSolveActors(state, deadlineMs)
+local function phaseSolveActorsBounded(state, deadlineMs)
     while state.cursors.actor <= #state.snapshot.actors do
         local actor = state.snapshot.actors[state.cursors.actor]
         if actor.kind == "npc_marker" then
@@ -476,9 +404,7 @@ function Performance.StepSolveActors(state, deadlineMs)
                     fixed = createFixedSolveState(state, actor, nil, false, "position-unavailable")
                     state.scratch.fixedSolveByActorKey[actor.key] = fixed
                 end
-                if stepFixedSolveState(state, fixed, deadlineMs) ~= true then
-                    return false
-                end
+                if stepFixedSolveState(state, fixed, deadlineMs) ~= true then return false end
                 finalizeFixedActor(state, fixed)
                 state.cursors.actor = state.cursors.actor + 1
             else
@@ -505,16 +431,13 @@ function Performance.StepSolveActors(state, deadlineMs)
                         or nil
                     state.scratch.movementSolveByActorKey[actor.key] = solveState or false
                 end
-
                 if type(solveState) ~= "table" then
                     for index = 1, #actor.members do
                         appendNoAction(state, actor.key, actor.members[index], "movement-solve-unavailable")
                     end
                     state.cursors.actor = state.cursors.actor + 1
                 else
-                    if MovementSolver.Step(solveState, deadlineMs) ~= true then
-                        return false
-                    end
+                    if MovementSolver.Step(solveState, deadlineMs) ~= true then return false end
                     finalizeMarkedActor(state, actor, solveState)
                     state.cursors.actor = state.cursors.actor + 1
                 end
@@ -522,40 +445,27 @@ function Performance.StepSolveActors(state, deadlineMs)
         else
             local unit = actor.members[1]
             if type(unit) == "table" then
-                local spatialActorKey = type(Spatial.GetNpcActorKey) == "function"
-                    and Spatial.GetNpcActorKey(unit)
-                    or actor.key
+                local spatialActorKey = type(Spatial.GetNpcActorKey) == "function" and Spatial.GetNpcActorKey(unit) or actor.key
                 local position = getActorPosition(state, spatialActorKey)
                 local fixed = state.scratch.fixedSolveByActorKey[actor.key]
                 if type(fixed) ~= "table" then
                     fixed = createFixedSolveState(
-                        state,
-                        actor,
-                        position,
-                        type(position) == "table",
+                        state, actor, position, type(position) == "table",
                         position and "no-useful-action" or "position-unavailable"
                     )
                     state.scratch.fixedSolveByActorKey[actor.key] = fixed
                 end
-                if stepFixedSolveState(state, fixed, deadlineMs) ~= true then
-                    return false
-                end
+                if stepFixedSolveState(state, fixed, deadlineMs) ~= true then return false end
                 finalizeFixedActor(state, fixed)
             end
             state.cursors.actor = state.cursors.actor + 1
         end
-
-        if shouldYield(deadlineMs) then
-            return false
-        end
+        if shouldYield(deadlineMs) then return false end
     end
-
     state.phase = "revalidate"
-    state.cursors.revalidateUnit = 1
-    state.cursors.revalidateMember = 1
-    state.cursors.revalidateActivation = 1
     return false
 end
 
+Performance.StepSolveActors = phaseSolveActorsBounded
 Planner._performanceSolveInstalled = true
 return Performance
