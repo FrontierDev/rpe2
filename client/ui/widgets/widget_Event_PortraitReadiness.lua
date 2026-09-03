@@ -239,6 +239,21 @@ local function restoreStartupRefreshRawMethod(target, key, previousValue)
     end
 end
 
+local function hideStartupPortraitHosts(widget)
+    if type(widget) ~= "table" then
+        return false
+    end
+
+    local hostKeys = { "portraitPanel", "bossPortraitPanel", "initiativePortraitPanel" }
+    for index = 1, #hostKeys do
+        local frame = getFrame(widget[hostKeys[index]])
+        if frame and frame.Hide then
+            frame:Hide()
+        end
+    end
+    return true
+end
+
 local function finalizeStartupStructuralRefresh(work)
     local widget = work and work.widget or nil
     if type(widget) ~= "table" then
@@ -281,6 +296,9 @@ local function stepStartupStructuralRefresh(work, deadlineMs)
             -- Build() is idempotent; by startup-ready the waiting-state widget
             -- normally already exists, so this avoids reconstructing its tree.
             work.widget:Build()
+            -- Keep the portrait hosts hidden until every slot has been refreshed.
+            -- This prevents partially updated/stale slots from becoming interactive.
+            hideStartupPortraitHosts(work.widget)
             work.phase = "show"
         elseif work.phase == "show" then
             work.widget:Show()
