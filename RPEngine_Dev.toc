@@ -172,6 +172,7 @@ client/combat/effects/Resource.lua
 client/combat/effects/Interrupt.lua
 client/combat/effects/Revert.lua
 client/combat/effects/SummonPet.lua
+client/combat/ReactionPerformance.lua
 client/spellcasting/TooltipTemplate.lua
 client/spellcasting/AuraDescriptionBuilder.lua
 client/spellcasting/DescriptionBuilder.lua
@@ -258,6 +259,7 @@ client/ui/widgets/widget_ActionBar_Control.lua
 client/ui/widgets/widget_ActionBar_Skills.lua
 client/ui/widgets/widget_Targeting.lua
 client/ui/widgets/widget_Reaction.lua
+client/ui/widgets/widget_ReactionPerformance.lua
 client/ui/tooltips/tooltip_Spell.lua
 client/ui/tooltips/tooltip_Skill.lua
 client/ui/tooltips/tooltip_Trait.lua
