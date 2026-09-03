@@ -6,6 +6,7 @@ Addon.Internal = Addon.Internal or {}
 local Client = Addon.Client
 local Planner = Client.AutopilotPlanner or {}
 local Tasks = Addon.Internal.Tasks or {}
+local Debug = Addon.Debug or {}
 local Event = Addon.Internal
     and Addon.Internal.Database
     and Addon.Internal.Database.Classes
@@ -19,6 +20,30 @@ end
 local basePlannerStep = Planner.Step
 if type(basePlannerStep) ~= "function" then
     return
+end
+
+-- PlannerPreparationPerformance temporarily skipped the canonical initial-target
+-- resolver for frozen planner proxies. That shortcut changes the condition
+-- context because spell conditions are evaluated before the later candidate
+-- collection pass. Preserve the canonical resolver exactly for planner proxies;
+-- the prepared registry caches still remove the expensive first-use scans.
+local preparedResolveSpellActivationTargetUnit = Client.ResolveSpellActivationTargetUnit
+if type(preparedResolveSpellActivationTargetUnit) == "function"
+    and Client._autopilotCanonicalInitialTargetRestored ~= true
+then
+    function Client:ResolveSpellActivationTargetUnit(activation, targetGroup)
+        if rawget(self, "__autopilotPlannerProxy") == true then
+            rawset(self, "__autopilotPlannerProxy", nil)
+            local results = { pcall(preparedResolveSpellActivationTargetUnit, self, activation, targetGroup) }
+            rawset(self, "__autopilotPlannerProxy", true)
+            if results[1] ~= true then
+                error(results[2], 0)
+            end
+            return results[2]
+        end
+        return preparedResolveSpellActivationTargetUnit(self, activation, targetGroup)
+    end
+    Client._autopilotCanonicalInitialTargetRestored = true
 end
 
 local function nowMilliseconds()
@@ -220,34 +245,110 @@ local function stepSnapshotUnits(state, deadlineMs)
 
     state.performanceUnitSnapshot = nil
     state.phase = "snapshot-positions"
-    state.cursors.positionUnit = 1
+    -- PlannerIntegration.phaseSnapshotPositions consumes cursors.unit. Reset
+    -- that exact cursor; using a separate positionUnit cursor skips the entire
+    -- frozen position pass and makes melee reach/movement planning impossible.
+    state.cursors.unit = 1
     return true
+end
+
+local function ensureMetrics(state)
+    state.metrics = type(state.metrics) == "table" and state.metrics or {}
+    return state.metrics
+end
+
+local function recordSnapshotMetric(state, key, elapsed)
+    local metrics = ensureMetrics(state)
+    metrics[key] = math.max(tonumber(metrics[key]) or 0, math.max(0, tonumber(elapsed) or 0))
 end
 
 local function recordSlice(state, startedAt)
     local elapsed = math.max(0, nowMilliseconds() - startedAt)
-    state.metrics = type(state.metrics) == "table" and state.metrics or {}
-    local metrics = state.metrics
+    local metrics = ensureMetrics(state)
     metrics.sliceCount = (tonumber(metrics.sliceCount) or 0) + 1
     metrics.yieldCount = (tonumber(metrics.yieldCount) or 0) + 1
     metrics.maxSliceMs = math.max(tonumber(metrics.maxSliceMs) or 0, elapsed)
     metrics.snapshotMaxMs = math.max(tonumber(metrics.snapshotMaxMs) or 0, elapsed)
+    recordSnapshotMetric(state, "snapshotUnitsMaxMs", elapsed)
+end
+
+local function preparationStageAtEntry(state, phase)
+    local preparation = type(state.performancePreparation) == "table" and state.performancePreparation or nil
+    if phase == "snapshot-auras" then
+        local stage = preparation and preparation.stageA or nil
+        if type(stage) ~= "table" or stage.complete ~= true then
+            return "snapshotPrepareAMaxMs"
+        end
+    elseif phase == "snapshot-movement" then
+        local stage = preparation and preparation.stageB or nil
+        if type(stage) ~= "table" or stage.complete ~= true then
+            return "snapshotPrepareBMaxMs"
+        end
+    end
+    return nil
+end
+
+local SNAPSHOT_PHASE_METRIC = {
+    validate = "snapshotValidateMaxMs",
+    ["snapshot-positions"] = "snapshotPositionsMaxMs",
+    ["snapshot-auras"] = "snapshotAurasMaxMs",
+    ["snapshot-casts"] = "snapshotCastsMaxMs",
+    ["snapshot-spells"] = "snapshotSpellsMaxMs",
+    ["snapshot-movement"] = "snapshotMovementMaxMs",
+}
+
+local function logSnapshotBreakdown(state)
+    if state._performanceSnapshotBreakdownLogged == true or type(Debug.Internal) ~= "function" then
+        return
+    end
+    state._performanceSnapshotBreakdownLogged = true
+    local m = state.metrics or {}
+    Debug.Internal(
+        "Autopilot snapshot phases event=%s turn=%d tick=%d validate=%.2fms units=%.2fms positions=%.2fms prepA=%.2fms auras=%.2fms casts=%.2fms spells=%.2fms prepB=%.2fms movement=%.2fms",
+        tostring(state.eventId or ""),
+        tonumber(state.turnNumber) or 0,
+        tonumber(state.tickNumber) or 0,
+        tonumber(m.snapshotValidateMaxMs) or 0,
+        tonumber(m.snapshotUnitsMaxMs) or 0,
+        tonumber(m.snapshotPositionsMaxMs) or 0,
+        tonumber(m.snapshotPrepareAMaxMs) or 0,
+        tonumber(m.snapshotAurasMaxMs) or 0,
+        tonumber(m.snapshotCastsMaxMs) or 0,
+        tonumber(m.snapshotSpellsMaxMs) or 0,
+        tonumber(m.snapshotPrepareBMaxMs) or 0,
+        tonumber(m.snapshotMovementMaxMs) or 0
+    )
 end
 
 function Planner.Step(state, deadlineMs)
     if type(state) ~= "table" then
         return true
     end
-    if tostring(state.phase or "") ~= "snapshot-units" then
-        return basePlannerStep(state, deadlineMs)
+
+    local entryPhase = tostring(state.phase or "")
+    if entryPhase == "snapshot-units" then
+        local startedAt = nowMilliseconds()
+        stepSnapshotUnits(state, deadlineMs)
+        recordSlice(state, startedAt)
+        -- Always hand back to TaskQueue after this bounded snapshot slice. If the
+        -- phase completed, the next frame starts snapshot-positions cleanly.
+        return false
     end
 
+    local preparationMetric = preparationStageAtEntry(state, entryPhase)
     local startedAt = nowMilliseconds()
-    stepSnapshotUnits(state, deadlineMs)
-    recordSlice(state, startedAt)
-    -- Always hand back to TaskQueue after this bounded snapshot slice. If the
-    -- phase completed, the next frame starts snapshot-positions cleanly.
-    return false
+    local complete = basePlannerStep(state, deadlineMs)
+    local elapsed = math.max(0, nowMilliseconds() - startedAt)
+
+    local phaseMetric = preparationMetric or SNAPSHOT_PHASE_METRIC[entryPhase]
+    if phaseMetric then
+        recordSnapshotMetric(state, phaseMetric, elapsed)
+    end
+
+    if state.phase == "complete" then
+        logSnapshotBreakdown(state)
+    end
+    return complete
 end
 
 Planner._performanceSnapshotUnitsInstalled = true
