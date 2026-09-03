@@ -454,7 +454,10 @@ local function refreshEventStartupPhase(eventState, runtime)
     if eventState.startupReady == true then
         return setEventStartupPhase(eventState, runtime, "ready")
     end
-    if eventState.unitsReady ~= true then
+    local readiness = type(ResourceSync.GetEventReadinessState) == "function"
+        and ResourceSync.GetEventReadinessState(eventState)
+        or nil
+    if type(readiness) ~= "table" or readiness.rosterComplete ~= true then
         return setEventStartupPhase(eventState, runtime, "waiting-units")
     end
     if type(runtime) ~= "table" or runtime.startupStateReceived ~= true then
@@ -478,6 +481,9 @@ local function refreshEventStartupPhase(eventState, runtime)
     end
     if runtime.resourceSyncQueued ~= true then
         return setEventStartupPhase(eventState, runtime, "resource-sync")
+    end
+    if type(readiness) ~= "table" or readiness.resourcesReady ~= true then
+        return setEventStartupPhase(eventState, runtime, "waiting-resources")
     end
     if runtime.consumablesQueued ~= true then
         return setEventStartupPhase(eventState, runtime, "consumable-prompts")
@@ -882,7 +888,10 @@ local function runEventStartupStep(targetClient, queuedEventId, queuedGeneration
         return false
     end
 
-    if eventState.unitsReady ~= true then
+    local readiness = type(ResourceSync.GetEventReadinessState) == "function"
+        and ResourceSync.GetEventReadinessState(eventState)
+        or nil
+    if type(readiness) ~= "table" or readiness.rosterComplete ~= true then
         setEventStartupPhase(eventState, runtime, "waiting-units")
         targetClient:SetEventTransitionPhase("waiting-units", eventState)
         return true
@@ -1083,6 +1092,15 @@ local function runEventStartupStep(targetClient, queuedEventId, queuedGeneration
         if not runtime.resourceSyncQueued then
             return true
         end
+        return true
+    end
+
+    readiness = type(ResourceSync.GetEventReadinessState) == "function"
+        and ResourceSync.GetEventReadinessState(eventState)
+        or nil
+    if type(readiness) ~= "table" or readiness.resourcesReady ~= true then
+        setEventStartupPhase(eventState, runtime, "waiting-resources")
+        targetClient:SetEventTransitionPhase("waiting-resources", eventState)
         return true
     end
 
@@ -2752,7 +2770,7 @@ function Client:HandleEventStart(arguments, sender)
     nextState.turnNumber = math.max(1, tonumber(nextState.turnNumber) or 1)
     nextState.tickNumber = math.max(1, tonumber(nextState.tickNumber) or 1)
     nextState.totalTicks = math.max(1, tonumber(nextState.totalTicks) or 1)
-    nextState.rosterReady = true
+    nextState.rosterReady = false
     nextState.unitsReady = false
     nextState.unitsChunkReceived = 0
     nextState.unitsChunkExpected = 0

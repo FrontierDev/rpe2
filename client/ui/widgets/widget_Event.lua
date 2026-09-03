@@ -2008,6 +2008,8 @@ function EventWidget:Refresh(reason)
                 waitingText = "Resolving Traits"
             elseif startupPhase == "resource-sync" then
                 waitingText = "Syncing Resources"
+            elseif startupPhase == "waiting-resources" then
+                waitingText = "Waiting for Player Resources"
             elseif startupPhase == "consumable-prompts" then
                 waitingText = "Waiting for Consumable Choice"
             elseif startupPhase == "achievement" then
