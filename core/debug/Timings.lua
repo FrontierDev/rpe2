@@ -8,6 +8,9 @@ local Timings = Debug.Timings
 
 local unpackValues = unpack or table.unpack
 
+-- Timings.Enabled is the explicit detailed-diagnostics switch controlled by
+-- /rpe debug timings. RPE INTERNAL independently enables high-level process
+-- timings without enabling per-phase or per-slice diagnostics.
 Timings.Enabled = Timings.Enabled == true
 Timings.DefaultThresholdMs = tonumber(Timings.DefaultThresholdMs) or 0
 Timings.MaxRecentRecords = math.max(1, math.floor(tonumber(Timings.MaxRecentRecords) or 100))
@@ -15,6 +18,12 @@ Timings.RecentRecords = Timings.RecentRecords or Timings.RecentSlowRecords or {}
 Timings.RecentSlowRecords = Timings.RecentRecords
 Timings.RecentRecordOrder = tonumber(Timings.RecentRecordOrder) or 0
 Timings.RuntimeHooks = Timings.RuntimeHooks or {}
+Timings.RuntimeProcessDepth = 0
+Timings.PendingAdvanceProcess = nil
+Timings.ProcessLabels = Timings.ProcessLabels or {
+    ["Event start total transition"] = true,
+}
+
 while #Timings.RecentRecords > Timings.MaxRecentRecords do
     table.remove(Timings.RecentRecords, 1)
 end
@@ -41,20 +50,37 @@ local function isInternalEnabled()
         and Debug.IsLevelEnabled("internal") == true
 end
 
--- RPE INTERNAL is the authoritative development diagnostics switch. Keep the
--- explicit Timings.Enabled flag for /rpe debug timings compatibility, but do
--- not require it when INTERNAL itself is enabled. This also covers settings/UI
--- paths that update EnabledLevels without calling Debug.SetLevelEnabled().
 local function isEnabled()
     return Timings.Enabled == true or isInternalEnabled()
 end
 
-local function shouldLog(options)
-    if type(options) == "table" and options.force == true then
+local function isProcessLabel(label)
+    return Timings.ProcessLabels[tostring(label or "")] == true
+end
+
+local function resolveProcessTiming(label, options)
+    return (type(options) == "table" and options.process == true)
+        or isProcessLabel(label)
+end
+
+local function canCollect(processTiming, force)
+    if force == true then
         return true
     end
+    if processTiming == true then
+        return isEnabled()
+    end
+    return Timings.Enabled == true
+end
 
-    return isInternalEnabled()
+local function shouldLog(processTiming, force)
+    if force == true then
+        return true
+    end
+    if not isInternalEnabled() then
+        return false
+    end
+    return processTiming == true or Timings.Enabled == true
 end
 
 local function shouldMarkSlow(elapsedMs, thresholdMs)
@@ -109,10 +135,6 @@ local function copyCardinality(cardinality)
 end
 
 local function appendRecentRecord(label, elapsedMs, context, thresholdMs, cardinality, timestampMs, slow)
-    if not isEnabled() then
-        return
-    end
-
     Timings.RecentRecordOrder = (tonumber(Timings.RecentRecordOrder) or 0) + 1
     local records = Timings.RecentRecords
     records[#records + 1] = {
@@ -163,6 +185,10 @@ local function buildPartSegment(part)
     ), slow
 end
 
+local function packValues(...)
+    return { n = select("#", ...), ... }
+end
+
 function Timings.GetNowMilliseconds()
     return getNowMilliseconds()
 end
@@ -181,6 +207,10 @@ function Timings.IsEnabled()
     return isEnabled()
 end
 
+function Timings.IsDetailedEnabled()
+    return Timings.Enabled == true
+end
+
 function Timings.IsActive()
     return isEnabled()
         and isInternalEnabled()
@@ -189,17 +219,20 @@ function Timings.IsActive()
 end
 
 function Timings:Start(label, options)
-    if not isEnabled() and not (type(options) == "table" and options.force == true) then
+    local resolvedOptions = type(options) == "table" and options or {}
+    local processTiming = resolveProcessTiming(label, resolvedOptions)
+    local force = resolvedOptions.force == true
+    if not canCollect(processTiming, force) then
         return nil
     end
-    local resolvedOptions = type(options) == "table" and options or {}
 
     return {
         label = tostring(label or "operation"),
         context = resolvedOptions.context,
         thresholdMs = tonumber(resolvedOptions.thresholdMs),
         startedAtMs = getNowMilliseconds(),
-        force = resolvedOptions.force == true,
+        force = force,
+        process = processTiming,
     }
 end
 
@@ -223,25 +256,27 @@ function Timings:Stop(timer, options)
         thresholdMs = Timings.DefaultThresholdMs
     end
 
+    local label = resolvedOptions.label or timer.label
+    local processTiming = timer.process == true
+        or resolvedOptions.process == true
+        or isProcessLabel(label)
+    local force = resolvedOptions.force == true or timer.force == true
     local slow = shouldMarkSlow(elapsedMs, thresholdMs)
-    if isEnabled() then
-        appendRecentRecord(
-            resolvedOptions.label or timer.label,
-            elapsedMs,
-            context,
-            thresholdMs,
-            resolvedOptions.cardinality,
-            getNowMilliseconds(),
-            slow
-        )
-    end
+
+    appendRecentRecord(
+        label,
+        elapsedMs,
+        context,
+        thresholdMs,
+        resolvedOptions.cardinality,
+        getNowMilliseconds(),
+        slow
+    )
 
     local logged = false
-    if shouldLog({
-        force = resolvedOptions.force == true or timer.force == true,
-    }) then
+    if shouldLog(processTiming, force) then
         logged = emitTiming(
-            resolvedOptions.label or timer.label,
+            label,
             elapsedMs,
             context,
             thresholdMs,
@@ -257,21 +292,20 @@ function Timings:Measure(label, fn, options, ...)
         return nil
     end
 
-    if not isEnabled() and not (type(options) == "table" and options.force == true) then
+    local timer = self:Start(label, options)
+    if timer == nil then
         return fn(...)
     end
-    local resolvedOptions = type(options) == "table" and options or {}
 
-    local timer = self:Start(label, resolvedOptions)
-    local results = { pcall(fn, ...) }
-    local ok = table.remove(results, 1)
+    local results = packValues(pcall(fn, ...))
+    local ok = results[1] == true
     self:Stop(timer, options)
 
     if not ok then
-        error(results[1], 0)
+        error(results[2], 0)
     end
 
-    return unpackValues(results)
+    return unpackValues(results, 2, results.n)
 end
 
 function Timings:GetRecentRecords(options)
@@ -324,7 +358,8 @@ function Timings:Wrap(label, fn, options)
 end
 
 function Timings:LogParts(label, context, parts, totalElapsedMs, thresholdMs, cardinality)
-    if not isEnabled() then
+    local processTiming = isProcessLabel(label)
+    if not canCollect(processTiming, false) then
         return false
     end
 
@@ -345,7 +380,7 @@ function Timings:LogParts(label, context, parts, totalElapsedMs, thresholdMs, ca
 
     appendRecentRecord(label, totalMs, context, resolvedThreshold, cardinality, getNowMilliseconds(), hasSlow)
 
-    if not Timings.IsActive() then
+    if not shouldLog(processTiming, false) then
         return false
     end
 
@@ -358,10 +393,6 @@ function Timings:LogParts(label, context, parts, totalElapsedMs, thresholdMs, ca
         table.concat(segments, ", "),
         cardinalityText ~= "" and (" [" .. cardinalityText .. "]") or ""
     ) == true
-end
-
-local function packValues(...)
-    return { n = select("#", ...), ... }
 end
 
 local function getEventStateFromTarget(target)
@@ -384,24 +415,28 @@ local function getEventStateFromTarget(target)
     return Addon.Client and Addon.Client.EventState or nil
 end
 
-local function buildRuntimeCardinality(target)
+local function buildRuntimeCardinality(target, extras)
     local eventState = getEventStateFromTarget(target)
-    if type(eventState) ~= "table" then
-        return nil
+    local cardinality = {}
+    if type(eventState) == "table" then
+        cardinality.eventId = tostring(eventState.id or "")
+        cardinality.eventUnits = type(eventState.units) == "table" and #eventState.units or 0
+        cardinality.turn = tonumber(eventState.turnNumber) or 0
+        cardinality.tick = tonumber(eventState.tickNumber) or 0
     end
-
-    return {
-        eventId = tostring(eventState.id or ""),
-        eventUnits = type(eventState.units) == "table" and #eventState.units or 0,
-        turn = tonumber(eventState.turnNumber) or 0,
-        tick = tonumber(eventState.tickNumber) or 0,
-    }
+    if type(extras) == "table" then
+        for key, value in pairs(extras) do
+            cardinality[key] = value
+        end
+    end
+    return next(cardinality) ~= nil and cardinality or nil
 end
 
-local function wrapMethod(target, methodName, label, context, thresholdMs, hookKey)
+local function wrapProcessMethod(target, methodName, label, context, thresholdMs, hookKey)
     if type(target) ~= "table" or type(target[methodName]) ~= "function" then
         return false
     end
+
     hookKey = tostring(hookKey or methodName)
     if Timings.RuntimeHooks[hookKey] == true then
         return false
@@ -413,89 +448,280 @@ local function wrapMethod(target, methodName, label, context, thresholdMs, hookK
             return original(self, ...)
         end
 
+        local previousDepth = math.max(0, math.floor(tonumber(Timings.RuntimeProcessDepth) or 0))
+        if previousDepth > 0 then
+            return original(self, ...)
+        end
+
+        Timings.RuntimeProcessDepth = previousDepth + 1
         local timer = Timings:Start(label, {
             context = context,
             thresholdMs = thresholdMs or 8,
+            process = true,
         })
-        local results = packValues(original(self, ...))
+        local results = packValues(pcall(original, self, ...))
+        Timings.RuntimeProcessDepth = previousDepth
+
         Timings:Stop(timer, {
-            cardinality = buildRuntimeCardinality(self),
+            cardinality = buildRuntimeCardinality(self, {
+                outcome = results[1] == true and "completed" or "error",
+            }),
+            process = true,
         })
-        return unpackValues(results, 1, results.n)
+
+        if results[1] ~= true then
+            error(results[2], 0)
+        end
+        return unpackValues(results, 2, results.n)
     end
+
     Timings.RuntimeHooks[hookKey] = true
     return true
 end
 
-local function wrapFunction(target, functionName, label, context, thresholdMs, hookKey)
-    if type(target) ~= "table" or type(target[functionName]) ~= "function" then
-        return false
+local function eventStepIdentity(eventState)
+    if type(eventState) ~= "table" then
+        return nil
     end
-    hookKey = tostring(hookKey or functionName)
-    if Timings.RuntimeHooks[hookKey] == true then
+    return {
+        eventId = tostring(eventState.id or ""),
+        turn = tonumber(eventState.turnNumber) or 0,
+        tick = tonumber(eventState.tickNumber) or 0,
+    }
+end
+
+local function eventStepChanged(before, after)
+    if type(before) ~= "table" or type(after) ~= "table" then
+        return before ~= after
+    end
+    return tostring(before.eventId or "") ~= tostring(after.eventId or "")
+        or tonumber(before.turn) ~= tonumber(after.turn)
+        or tonumber(before.tick) ~= tonumber(after.tick)
+end
+
+local function finishAdvanceProcess(pending, server, outcome)
+    if type(pending) ~= "table" or pending.finished == true then
         return false
     end
 
-    local original = target[functionName]
-    target[functionName] = function(...)
+    pending.finished = true
+    if Timings.PendingAdvanceProcess == pending then
+        Timings.PendingAdvanceProcess = nil
+    end
+
+    Timings:Stop(pending.timer, {
+        process = true,
+        cardinality = buildRuntimeCardinality(server, {
+            outcome = tostring(outcome or "completed"),
+        }),
+    })
+    return true
+end
+
+local function wrapAdvanceProcess(server)
+    if type(server) ~= "table" or type(server.AdvanceEventStep) ~= "function" then
+        return false
+    end
+    if Timings.RuntimeHooks["Server.AdvanceEventStepProcess"] == true then
+        return false
+    end
+
+    local originalAdvance = server.AdvanceEventStep
+    local originalCommit = server._AdvanceEventStepAfterCommit
+
+    if type(originalCommit) == "function" then
+        server._AdvanceEventStepAfterCommit = function(self, ...)
+            local pending = Timings.PendingAdvanceProcess
+            local results = packValues(pcall(originalCommit, self, ...))
+            if type(pending) == "table" and pending.server == self then
+                finishAdvanceProcess(pending, self, results[1] == true and "completed" or "error")
+            end
+            if results[1] ~= true then
+                error(results[2], 0)
+            end
+            return unpackValues(results, 2, results.n)
+        end
+        Timings.RuntimeHooks["Server._AdvanceEventStepAfterCommitProcess"] = true
+    end
+
+    server.AdvanceEventStep = function(self, ...)
         if not isEnabled() then
-            return original(...)
+            return originalAdvance(self, ...)
         end
 
-        local timer = Timings:Start(label, {
-            context = context,
-            thresholdMs = thresholdMs or 2,
-        })
-        local results = packValues(original(...))
-        Timings:Stop(timer)
-        return unpackValues(results, 1, results.n)
+        local previous = Timings.PendingAdvanceProcess
+        if type(previous) == "table" and previous.finished ~= true then
+            finishAdvanceProcess(previous, previous.server or self, "replaced")
+        end
+
+        local pending = {
+            server = self,
+            before = eventStepIdentity(self.EventState),
+            timer = Timings:Start("Advance turn/tick", {
+                context = "event-advance",
+                thresholdMs = 8,
+                process = true,
+            }),
+            finished = false,
+        }
+        Timings.PendingAdvanceProcess = pending
+
+        local results = packValues(pcall(originalAdvance, self, ...))
+        if results[1] ~= true then
+            finishAdvanceProcess(pending, self, "error")
+            error(results[2], 0)
+        end
+
+        if pending.finished ~= true then
+            local after = eventStepIdentity(self.EventState)
+            local accepted = results[2] == true
+            if eventStepChanged(pending.before, after) then
+                finishAdvanceProcess(pending, self, "completed")
+            elseif not accepted then
+                finishAdvanceProcess(pending, self, "rejected")
+            elseif type(originalCommit) ~= "function" then
+                finishAdvanceProcess(pending, self, "completed")
+            end
+        end
+
+        return unpackValues(results, 2, results.n)
     end
-    Timings.RuntimeHooks[hookKey] = true
+
+    Timings.RuntimeHooks["Server.AdvanceEventStepProcess"] = true
+    return true
+end
+
+local function buildPlanCardinality(plan, state, outcome)
+    local source = type(plan) == "table" and plan or {}
+    local stateSource = type(state) == "table" and state or {}
+    return {
+        eventId = tostring(source.eventId or stateSource.eventId or ""),
+        turn = tonumber(source.turnNumber or stateSource.turnNumber) or 0,
+        tick = tonumber(source.tickNumber or stateSource.tickNumber) or 0,
+        actor = tostring(source.actorKey or stateSource.actorKey or ""),
+        outcome = tostring(outcome or "completed"),
+    }
+end
+
+local function wrapAutopilotPlanning(client)
+    if type(client) ~= "table" or type(client.StartAutopilotStep) ~= "function" then
+        return false
+    end
+    if Timings.RuntimeHooks["Client.StartAutopilotStepProcess"] == true then
+        return false
+    end
+
+    local original = client.StartAutopilotStep
+    client.StartAutopilotStep = function(self, ...)
+        if not isEnabled() then
+            return original(self, ...)
+        end
+
+        local timer = Timings:Start("Autopilot planning", {
+            context = "autopilot",
+            thresholdMs = 8,
+            process = true,
+        })
+        local results = packValues(pcall(original, self, ...))
+        if results[1] ~= true then
+            Timings:Stop(timer, {
+                process = true,
+                cardinality = { outcome = "error" },
+            })
+            error(results[2], 0)
+        end
+
+        local plan = results[2]
+        local created = results[3] == true
+        local job = type(plan) == "table" and plan.job or nil
+        if not created then
+            return unpackValues(results, 2, results.n)
+        end
+
+        if type(job) ~= "table" then
+            Timings:Stop(timer, {
+                process = true,
+                cardinality = buildPlanCardinality(plan, nil, "failed"),
+            })
+            return unpackValues(results, 2, results.n)
+        end
+
+        if job._rpeProcessTimingWrapped == true then
+            return unpackValues(results, 2, results.n)
+        end
+        job._rpeProcessTimingWrapped = true
+
+        local finalized = false
+        local function finalize(state, outcome)
+            if finalized then
+                return
+            end
+            finalized = true
+            Timings:Stop(timer, {
+                process = true,
+                cardinality = buildPlanCardinality(plan, state, outcome),
+            })
+        end
+
+        local originalComplete = job.onComplete
+        job.onComplete = function(state, completedJob)
+            local callbackResults = nil
+            if type(originalComplete) == "function" then
+                callbackResults = packValues(pcall(originalComplete, state, completedJob))
+            else
+                callbackResults = { n = 1, true }
+            end
+            finalize(state, callbackResults[1] == true and "completed" or "error")
+            if callbackResults[1] ~= true then
+                error(callbackResults[2], 0)
+            end
+            return unpackValues(callbackResults, 2, callbackResults.n)
+        end
+
+        local originalCancel = job.onCancel
+        job.onCancel = function(state, reason, cancelledJob)
+            local callbackResults = nil
+            if type(originalCancel) == "function" then
+                callbackResults = packValues(pcall(originalCancel, state, reason, cancelledJob))
+            else
+                callbackResults = { n = 1, true }
+            end
+            finalize(state, callbackResults[1] == true and tostring(reason or "cancelled") or "error")
+            if callbackResults[1] ~= true then
+                error(callbackResults[2], 0)
+            end
+            return unpackValues(callbackResults, 2, callbackResults.n)
+        end
+
+        return unpackValues(results, 2, results.n)
+    end
+
+    Timings.RuntimeHooks["Client.StartAutopilotStepProcess"] = true
     return true
 end
 
 function Timings:InstallRuntimeHooks()
     local server = Addon.Server
     local client = Addon.Client
-    local planner = type(client) == "table" and client.AutopilotPlanner or nil
 
-    -- Host event lifecycle. Existing inner scopes remain in place; these outer
-    -- scopes guarantee a visible total even when execution passes through later
-    -- wrappers such as autopilot integration.
-    wrapMethod(server, "StartEvent", "Host event start", "event-start", 8, "Server.StartEvent")
-    wrapMethod(server, "AdvanceEventStep", "Host advance turn/tick request", "event-advance", 8, "Server.AdvanceEventStep")
-    wrapMethod(server, "_AdvanceEventStepAfterCommit", "Host advance turn/tick commit", "event-advance", 8, "Server._AdvanceEventStepAfterCommit")
+    -- Full process boundaries only. Detailed phase/slice instrumentation remains
+    -- available through /rpe debug timings on, but INTERNAL alone does not emit it.
+    wrapProcessMethod(server, "StartEvent", "Event start (host)", "event-start", 8, "Server.StartEventProcess")
+    wrapAdvanceProcess(server)
+    wrapAutopilotPlanning(client)
 
-    -- Client receive/application totals. These complement the detailed parts in
-    -- client_Event.lua and make it obvious which side incurred the frame cost.
-    wrapMethod(client, "HandleEventStart", "Client EVENT_START", "event-start", 8, "Client.HandleEventStart")
-    wrapMethod(client, "HandleEventUnits", "Client EVENT_UNITS", "event-start", 8, "Client.HandleEventUnits")
-    wrapMethod(client, "HandleEventState", "Client EVENT_STATE", "event-state", 8, "Client.HandleEventState")
-
-    -- Autopilot orchestration and execution boundaries.
-    wrapMethod(client, "InitializeAutopilotSpatialRuntime", "Autopilot spatial initialization", "autopilot", 4, "Client.InitializeAutopilotSpatialRuntime")
-    wrapMethod(client, "ReconcileAutopilotSpatialRuntime", "Autopilot spatial reconciliation", "autopilot", 4, "Client.ReconcileAutopilotSpatialRuntime")
-    wrapMethod(client, "RefreshAutopilotPlayerPositionsForCompletedStep", "Autopilot player position refresh", "autopilot", 4, "Client.RefreshAutopilotPlayerPositionsForCompletedStep")
-    wrapMethod(client, "StartAutopilotStep", "Autopilot step start", "autopilot", 4, "Client.StartAutopilotStep")
-    wrapMethod(client, "ReplaceAutopilotPlanForCurrentStep", "Autopilot replan", "autopilot", 4, "Client.ReplaceAutopilotPlanForCurrentStep")
-    wrapMethod(client, "AuthorizeAutopilotPendingAction", "Autopilot authorize action", "autopilot", 4, "Client.AuthorizeAutopilotPendingAction")
-    wrapMethod(client, "AuthorizeAllAutopilotPendingActions", "Autopilot authorize all", "autopilot", 4, "Client.AuthorizeAllAutopilotPendingActions")
-    wrapMethod(client, "ConfirmAutopilotPendingMovement", "Autopilot confirm movement", "autopilot", 4, "Client.ConfirmAutopilotPendingMovement")
-    wrapMethod(client, "ExecuteEventUnitSpell", "Autopilot execute spell", "autopilot", 4, "Client.ExecuteEventUnitSpell")
-    wrapMethod(server, "GetNpcAutopilotCapability", "Autopilot capability check", "autopilot", 4, "Server.GetNpcAutopilotCapability")
-
-    -- Planner.Step is the sliceable cost centre. TaskQueue also records each
-    -- slice; this label makes the planner's own contribution explicit.
-    wrapFunction(planner, "Step", "Autopilot planner step", "autopilot-planner", 2, "Planner.Step")
-    wrapFunction(planner, "StepTargetSelection", "Autopilot target selection", "autopilot-planner", 2, "Planner.StepTargetSelection")
-    wrapFunction(planner, "StepMovementSolve", "Autopilot movement solve", "autopilot-planner", 2, "Planner.StepMovementSolve")
+    -- These are complete host actions. RuntimeProcessDepth prevents nested
+    -- authorization/execution calls from producing duplicate process lines.
+    wrapProcessMethod(client, "AuthorizeAllAutopilotPendingActions", "Autopilot authorize all", "autopilot", 8, "Client.AuthorizeAllAutopilotPendingActionsProcess")
+    wrapProcessMethod(client, "AuthorizeAutopilotPendingAction", "Autopilot authorize action", "autopilot", 8, "Client.AuthorizeAutopilotPendingActionProcess")
+    wrapProcessMethod(client, "ConfirmAutopilotPendingMovement", "Autopilot confirm movement", "autopilot", 8, "Client.ConfirmAutopilotPendingMovementProcess")
+    wrapProcessMethod(client, "ExecuteEventUnitSpell", "Autopilot execute spell", "autopilot", 8, "Client.ExecuteEventUnitSpellProcess")
 
     return true
 end
 
--- Timings.lua loads before the event/autopilot implementation files. Install
--- the wrappers at ADDON_LOADED, which fires after every file in this addon's
--- TOC has executed, so the final wrapped call paths are the ones measured.
+-- Timings.lua loads before event/autopilot implementation files. Install after
+-- the addon's TOC has finished so the final wrapped methods are measured.
 if type(CreateFrame) == "function" then
     local hookFrame = CreateFrame("Frame")
     hookFrame:RegisterEvent("ADDON_LOADED")
