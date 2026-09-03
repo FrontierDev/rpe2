@@ -163,6 +163,86 @@ local function cleanupIncomingChunks(self, now)
     end
 end
 
+local function normalizeRecentLocalEchoEntry(self, key)
+    local stored = self.RecentLocalEchoes and self.RecentLocalEchoes[key] or nil
+    if stored == nil then
+        return nil
+    end
+
+    if type(stored) == "table" then
+        stored.pendingCount = math.max(0, math.floor(tonumber(stored.pendingCount) or 0))
+        stored.sentCount = math.max(0, math.floor(tonumber(stored.sentCount) or 0))
+        stored.recordedAt = tonumber(stored.recordedAt) or tonumber(stored.sentAt) or 0
+        stored.sentAt = tonumber(stored.sentAt)
+        return stored
+    end
+
+    local timestamp = tonumber(stored)
+    if timestamp == nil then
+        self.RecentLocalEchoes[key] = nil
+        return nil
+    end
+
+    local entry = {
+        pendingCount = 0,
+        sentCount = 1,
+        recordedAt = timestamp,
+        sentAt = timestamp,
+    }
+    self.RecentLocalEchoes[key] = entry
+    return entry
+end
+
+local function recordRecentLocalEcho(self, prefix, message, distribution, sender, target, now, pending)
+    local key = buildRecentLocalEchoKey(prefix, message, distribution, sender, target)
+    local entry = normalizeRecentLocalEchoEntry(self, key)
+    if not entry then
+        entry = {
+            pendingCount = 0,
+            sentCount = 0,
+            recordedAt = tonumber(now) or 0,
+            sentAt = nil,
+        }
+        self.RecentLocalEchoes[key] = entry
+    end
+
+    entry.recordedAt = tonumber(now) or entry.recordedAt or 0
+    if pending == true then
+        entry.pendingCount = entry.pendingCount + 1
+    else
+        entry.sentCount = entry.sentCount + 1
+        entry.sentAt = tonumber(now) or entry.recordedAt or 0
+    end
+    return key, entry
+end
+
+local function markRecentLocalEchoSent(self, prefix, message, distribution, sender, target, now)
+    local key = buildRecentLocalEchoKey(prefix, message, distribution, sender, target)
+    local entry = normalizeRecentLocalEchoEntry(self, key)
+    if not entry or entry.pendingCount <= 0 then
+        return false
+    end
+
+    entry.pendingCount = entry.pendingCount - 1
+    entry.sentCount = entry.sentCount + 1
+    entry.sentAt = tonumber(now) or entry.recordedAt or 0
+    return true
+end
+
+local function releasePendingRecentLocalEcho(self, prefix, message, distribution, sender, target)
+    local key = buildRecentLocalEchoKey(prefix, message, distribution, sender, target)
+    local entry = normalizeRecentLocalEchoEntry(self, key)
+    if not entry or entry.pendingCount <= 0 then
+        return false
+    end
+
+    entry.pendingCount = entry.pendingCount - 1
+    if entry.pendingCount <= 0 and entry.sentCount <= 0 then
+        self.RecentLocalEchoes[key] = nil
+    end
+    return true
+end
+
 local function cleanupRecentLocalEchoes(self, now)
     local timeoutSeconds = tonumber(self.RecentLocalEchoTimeout) or 0
     local maxEntries = tonumber(self.MaxRecentLocalEchoes) or 0
@@ -170,15 +250,28 @@ local function cleanupRecentLocalEchoes(self, now)
     local oldestKey = nil
     local oldestAt = nil
 
-    for key, receivedAt in pairs(self.RecentLocalEchoes or {}) do
-        local numericReceivedAt = tonumber(receivedAt) or 0
-        if timeoutSeconds > 0 and (now - numericReceivedAt) > timeoutSeconds then
-            self.RecentLocalEchoes[key] = nil
-        else
-            entryCount = entryCount + 1
-            if maxEntries > 0 and (oldestAt == nil or numericReceivedAt < oldestAt) then
-                oldestAt = numericReceivedAt
-                oldestKey = key
+    for key in pairs(self.RecentLocalEchoes or {}) do
+        local entry = normalizeRecentLocalEchoEntry(self, key)
+        if entry then
+            local pendingCount = math.max(0, tonumber(entry.pendingCount) or 0)
+            local sentCount = math.max(0, tonumber(entry.sentCount) or 0)
+            if pendingCount <= 0 and sentCount <= 0 then
+                self.RecentLocalEchoes[key] = nil
+            elseif pendingCount <= 0 then
+                local referenceAt = tonumber(entry.sentAt) or tonumber(entry.recordedAt) or 0
+                if timeoutSeconds > 0 and (now - referenceAt) > timeoutSeconds then
+                    self.RecentLocalEchoes[key] = nil
+                else
+                    entryCount = entryCount + 1
+                    if maxEntries > 0 and (oldestAt == nil or referenceAt < oldestAt) then
+                        oldestAt = referenceAt
+                        oldestKey = key
+                    end
+                end
+            else
+                -- A pending entry maps to a physical packet that is still queued/throttled.
+                -- Pending entries are never age-expired or size-evicted.
+                entryCount = entryCount + 1
             end
         end
     end
@@ -186,14 +279,16 @@ local function cleanupRecentLocalEchoes(self, now)
     while maxEntries > 0 and entryCount >= maxEntries and oldestKey do
         self.RecentLocalEchoes[oldestKey] = nil
         entryCount = entryCount - 1
-
         oldestKey = nil
         oldestAt = nil
-        for key, receivedAt in pairs(self.RecentLocalEchoes or {}) do
-            local numericReceivedAt = tonumber(receivedAt) or 0
-            if oldestAt == nil or numericReceivedAt < oldestAt then
-                oldestAt = numericReceivedAt
-                oldestKey = key
+        for key in pairs(self.RecentLocalEchoes or {}) do
+            local entry = normalizeRecentLocalEchoEntry(self, key)
+            if entry and (tonumber(entry.pendingCount) or 0) <= 0 and (tonumber(entry.sentCount) or 0) > 0 then
+                local referenceAt = tonumber(entry.sentAt) or tonumber(entry.recordedAt) or 0
+                if oldestAt == nil or referenceAt < oldestAt then
+                    oldestAt = referenceAt
+                    oldestKey = key
+                end
             end
         end
     end
@@ -203,7 +298,6 @@ local function shouldSkipDuplicateLocalEcho(self, prefix, message, distribution,
     if type(options) == "table" and options.localEcho == true then
         return false
     end
-
     if distribution ~= "CHANNEL" then
         return false
     end
@@ -215,12 +309,25 @@ local function shouldSkipDuplicateLocalEcho(self, prefix, message, distribution,
     end
 
     local key = buildRecentLocalEchoKey(prefix, message, distribution, sender, target)
-    if self.RecentLocalEchoes[key] then
-        self.RecentLocalEchoes[key] = nil
-        return true
+    local entry = normalizeRecentLocalEchoEntry(self, key)
+    if not entry then
+        return false
     end
 
-    return false
+    if entry.sentCount > 0 then
+        entry.sentCount = entry.sentCount - 1
+    elseif entry.pendingCount > 0 then
+        -- If the self-copy arrives before the send-success callback, consume the pending slot.
+        entry.pendingCount = entry.pendingCount - 1
+    else
+        self.RecentLocalEchoes[key] = nil
+        return false
+    end
+
+    if entry.pendingCount <= 0 and entry.sentCount <= 0 then
+        self.RecentLocalEchoes[key] = nil
+    end
+    return true
 end
 
 local function buildSendMetadata(opcode, metadata)
@@ -427,6 +534,7 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
     end
     local queueCheckElapsedMs = queueCheckStartTime and (getTimingNowMilliseconds() - queueCheckStartTime) or 0
 
+    local localEchoSender = Common.GetPlayerName and Common.GetPlayerName() or (getPlayerName and getPlayerName() or "")
     local sendState = {
         failed = false,
         timedOpcodeKey = timedOpcodeKey,
@@ -443,9 +551,25 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
                 self.Prefix,
                 packets[partIndex],
                 distribution,
-                Common.GetPlayerName and Common.GetPlayerName() or (getPlayerName and getPlayerName() or ""),
+                localEchoSender,
                 target,
                 { localEcho = true, immediateLocalEcho = true }
+            )
+        end
+    end
+
+    local function releasePendingImmediateLocalEchoes()
+        if sendState.immediateLocalEcho ~= true then
+            return
+        end
+        for partIndex = 1, partCount do
+            releasePendingRecentLocalEcho(
+                self,
+                self.Prefix,
+                packets[partIndex],
+                distribution,
+                localEchoSender,
+                target
             )
         end
     end
@@ -453,21 +577,31 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
     local enqueueStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
     local queued = MessageQueue:EnqueueLogicalMessage(self.Prefix, opcode, packets, distribution, target, {
         onChunkSent = function(item, packet, result)
-            if sendState.failed then
-                return
-            end
+    if sendState.failed then
+        return
+    end
 
-            if sendState.immediateLocalEcho ~= true and shouldEchoOutboundChannel(distribution, target) then
-                self:ReceiveMessage(
-                    self.Prefix,
-                    packet,
-                    distribution,
-                    Common.GetPlayerName and Common.GetPlayerName() or (getPlayerName and getPlayerName() or ""),
-                    target,
-                    { localEcho = true }
-                )
-            end
-        end,
+    if sendState.immediateLocalEcho == true then
+        markRecentLocalEchoSent(
+            self,
+            self.Prefix,
+            packet,
+            distribution,
+            localEchoSender,
+            target,
+            getTimestamp()
+        )
+    elseif shouldEchoOutboundChannel(distribution, target) then
+        self:ReceiveMessage(
+            self.Prefix,
+            packet,
+            distribution,
+            localEchoSender,
+            target,
+            { localEcho = true }
+        )
+    end
+end,
         onDelivered = function(item, result)
             if sendState.failed then
                 return
@@ -495,21 +629,26 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
             Common.InvokeCallback(deliveredCallback, item, result)
         end,
         onFailed = function(item, result)
-            if sendState.failed then
-                return
-            end
+    if sendState.failed then
+        return
+    end
 
-            sendState.failed = true
-            if result ~= "superseded" and Diagnostics.RecordSendFailure then
-                Diagnostics:RecordSendFailure(result)
-            end
+    sendState.failed = true
+    releasePendingImmediateLocalEchoes()
+    if result ~= "superseded" and Diagnostics.RecordSendFailure then
+        Diagnostics:RecordSendFailure(result)
+    end
 
-            Common.InvokeCallback(failedCallback, item, result)
-        end,
+    Common.InvokeCallback(failedCallback, item, result)
+end,
     }, diagnosticsMetadata)
     if enqueueStartTime then
         sendState.enqueueElapsedMs = getTimingNowMilliseconds() - enqueueStartTime
     end
+
+    if queued == nil then
+    releasePendingImmediateLocalEchoes()
+end
 
     return queued ~= nil
 end
@@ -577,9 +716,17 @@ function Comms:ReceiveMessage(prefix, message, distribution, sender, target, opt
     end
 
     if type(options) == "table" and options.localEcho == true then
-        local echoKey = buildRecentLocalEchoKey(prefix, message, distribution, sender, target)
-        self.RecentLocalEchoes[echoKey] = now
-    end
+    recordRecentLocalEcho(
+        self,
+        prefix,
+        message,
+        distribution,
+        sender,
+        target,
+        now,
+        options.immediateLocalEcho == true
+    )
+end
 
     local packet = Serialization:DeserializePacket(message)
     if not packet or packet.prefix ~= self.Prefix then

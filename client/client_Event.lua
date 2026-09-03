@@ -2803,6 +2803,21 @@ function Client:HandleEventStart(arguments, sender)
     nextState.turnNumber = math.max(1, tonumber(nextState.turnNumber) or 1)
     nextState.tickNumber = math.max(1, tonumber(nextState.tickNumber) or 1)
     nextState.totalTicks = math.max(1, tonumber(nextState.totalTicks) or 1)
+
+    local currentEventState = self.EventState
+    if type(currentEventState) == "table"
+        and currentEventState.active == true
+        and tostring(currentEventState.id or "") ~= ""
+        and tostring(currentEventState.id or "") == tostring(nextState.id or "")
+    then
+        if timer then
+            stopEventTiming(timer, currentEventState, {
+                eventId = currentEventState.id,
+                duplicateStart = 1,
+            })
+        end
+        return true
+    end
     nextState.rosterReady = false
     nextState.unitsReady = false
     nextState.unitsChunkReceived = 0
@@ -3146,7 +3161,7 @@ function Client:HandleInboundChunkProgress(packet, receivedCount, distribution, 
     end
 
     local eventState = self.EventState
-    if not eventState or eventState.active ~= true or eventState.ending == true or eventState.unitsReady == true then
+    if not eventState or eventState.active ~= true or eventState.ending == true or eventState.rosterReady == true then
         return false
     end
 
