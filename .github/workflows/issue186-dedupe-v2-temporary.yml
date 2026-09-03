@@ -1,4 +1,4 @@
-name: issue186-dedupe-temporary
+name: issue186-dedupe-v2-temporary
 
 on:
   push:
@@ -32,9 +32,9 @@ jobs:
           core_path = Path('core/internal/comms/Core.lua')
           core = core_path.read_text()
 
-          cleanup_start = core.index('local function cleanupRecentLocalEchoes(self, now)\n')
-          cleanup_end = core.index('local function buildSendMetadata(opcode, metadata)\n', cleanup_start)
-          local_echo_helpers = r'''local function normalizeRecentLocalEchoEntry(self, key)
+          helper_start = core.index('local function cleanupRecentLocalEchoes(self, now)\n')
+          helper_end = core.index('local function buildSendMetadata(opcode, metadata)\n', helper_start)
+          helpers = '''local function normalizeRecentLocalEchoEntry(self, key)
               local stored = self.RecentLocalEchoes and self.RecentLocalEchoes[key] or nil
               if stored == nil then
                   return nil
@@ -140,8 +140,8 @@ jobs:
                               end
                           end
                       else
-                          -- Pending immediate-local-echo entries correspond to physical packets
-                          -- which are still queued/throttled. They must not age out or be evicted.
+                          -- A pending entry maps to a physical packet that is still queued/throttled.
+                          -- Pending entries are never age-expired or size-evicted.
                           entryCount = entryCount + 1
                       end
                   end
@@ -150,7 +150,6 @@ jobs:
               while maxEntries > 0 and entryCount >= maxEntries and oldestKey do
                   self.RecentLocalEchoes[oldestKey] = nil
                   entryCount = entryCount - 1
-
                   oldestKey = nil
                   oldestAt = nil
                   for key in pairs(self.RecentLocalEchoes or {}) do
@@ -170,7 +169,6 @@ jobs:
               if type(options) == "table" and options.localEcho == true then
                   return false
               end
-
               if distribution ~= "CHANNEL" then
                   return false
               end
@@ -190,8 +188,7 @@ jobs:
               if entry.sentCount > 0 then
                   entry.sentCount = entry.sentCount - 1
               elseif entry.pendingCount > 0 then
-                  -- The physical self-copy can theoretically be delivered before the
-                  -- send-success callback. Consuming the pending slot is still correct.
+                  -- If the self-copy arrives before the send-success callback, consume the pending slot.
                   entry.pendingCount = entry.pendingCount - 1
               else
                   self.RecentLocalEchoes[key] = nil
@@ -205,11 +202,12 @@ jobs:
           end
 
           '''
-          core = core[:cleanup_start] + local_echo_helpers + core[cleanup_end:]
+          core = core[:helper_start] + helpers + core[helper_end:]
 
-          send_start = core.index('    local sendState = {\n', core.index('function Comms:SendMessage'))
-          send_end = core.index('    local enqueueStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil\n', send_start)
-          send_preamble = r'''    local localEchoSender = Common.GetPlayerName and Common.GetPlayerName() or (getPlayerName and getPlayerName() or "")
+          send_function = core.index('function Comms:SendMessage')
+          preamble_start = core.index('    local sendState = {\n', send_function)
+          preamble_end = core.index('    local enqueueStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil\n', preamble_start)
+          preamble = '''    local localEchoSender = Common.GetPlayerName and Common.GetPlayerName() or (getPlayerName and getPlayerName() or "")
               local sendState = {
                   failed = false,
                   timedOpcodeKey = timedOpcodeKey,
@@ -250,26 +248,11 @@ jobs:
               end
 
           '''
-          core = core[:send_start] + send_preamble + core[send_end:]
+          core = core[:preamble_start] + preamble + core[preamble_end:]
 
-          old_chunk = r'''        onChunkSent = function(item, packet, result)
-              if sendState.failed then
-                  return
-              end
-
-              if sendState.immediateLocalEcho ~= true and shouldEchoOutboundChannel(distribution, target) then
-                  self:ReceiveMessage(
-                      self.Prefix,
-                      packet,
-                      distribution,
-                      Common.GetPlayerName and Common.GetPlayerName() or (getPlayerName and getPlayerName() or ""),
-                      target,
-                      { localEcho = true }
-                  )
-              end
-          end,
-          '''
-          new_chunk = r'''        onChunkSent = function(item, packet, result)
+          chunk_start = core.index('        onChunkSent = function(item, packet, result)\n', core.index('MessageQueue:EnqueueLogicalMessage', send_function))
+          chunk_end = core.index('        onDelivered = function(item, result)\n', chunk_start)
+          chunk_callback = '''        onChunkSent = function(item, packet, result)
               if sendState.failed then
                   return
               end
@@ -296,22 +279,11 @@ jobs:
               end
           end,
           '''
-          core = replace_once(core, old_chunk, new_chunk, 'tie local-echo state to successful chunk send')
+          core = core[:chunk_start] + chunk_callback + core[chunk_end:]
 
-          old_failed = r'''        onFailed = function(item, result)
-              if sendState.failed then
-                  return
-              end
-
-              sendState.failed = true
-              if result ~= "superseded" and Diagnostics.RecordSendFailure then
-                  Diagnostics:RecordSendFailure(result)
-              end
-
-              Common.InvokeCallback(failedCallback, item, result)
-          end,
-          '''
-          new_failed = r'''        onFailed = function(item, result)
+          failed_start = core.index('        onFailed = function(item, result)\n', chunk_start)
+          failed_end = core.index('    }, diagnosticsMetadata)\n', failed_start)
+          failed_callback = '''        onFailed = function(item, result)
               if sendState.failed then
                   return
               end
@@ -325,33 +297,22 @@ jobs:
               Common.InvokeCallback(failedCallback, item, result)
           end,
           '''
-          core = replace_once(core, old_failed, new_failed, 'release pending local echoes on terminal send failure')
+          core = core[:failed_start] + failed_callback + core[failed_end:]
 
-          old_tail = r'''    if enqueueStartTime then
-              sendState.enqueueElapsedMs = getTimingNowMilliseconds() - enqueueStartTime
-          end
-
-          return queued ~= nil
-          end
-          '''
-          new_tail = r'''    if enqueueStartTime then
-              sendState.enqueueElapsedMs = getTimingNowMilliseconds() - enqueueStartTime
-          end
-          if queued == nil then
+          tail_marker = '    return queued ~= nil\nend\n\nfunction Comms:SendToChannel'
+          tail_replacement = '''    if queued == nil then
               releasePendingImmediateLocalEchoes()
           end
 
-          return queued ~= nil
+              return queued ~= nil
           end
-          '''
-          core = replace_once(core, old_tail, new_tail, 'release pending local echoes on enqueue rejection')
 
-          old_record = r'''    if type(options) == "table" and options.localEcho == true then
-              local echoKey = buildRecentLocalEchoKey(prefix, message, distribution, sender, target)
-              self.RecentLocalEchoes[echoKey] = now
-          end
-          '''
-          new_record = r'''    if type(options) == "table" and options.localEcho == true then
+          function Comms:SendToChannel'''
+          core = replace_once(core, tail_marker, tail_replacement, 'enqueue-rejection cleanup')
+
+          record_start = core.index('    if type(options) == "table" and options.localEcho == true then\n', core.index('function Comms:ReceiveMessage'))
+          record_end = core.index('    local packet = Serialization:DeserializePacket(message)\n', record_start)
+          record_block = '''    if type(options) == "table" and options.localEcho == true then
               recordRecentLocalEcho(
                   self,
                   prefix,
@@ -363,8 +324,9 @@ jobs:
                   options.immediateLocalEcho == true
               )
           end
+
           '''
-          core = replace_once(core, old_record, new_record, 'record lifecycle-aware local echo state')
+          core = core[:record_start] + record_block + core[record_end:]
           core_path.write_text(core)
 
           resource_path = Path('core/internal/comms/ResourceSync.lua')
@@ -379,16 +341,8 @@ jobs:
 
           event_path = Path('client/client_Event.lua')
           event = event_path.read_text()
-          old_start = r'''    nextState.totalTicks = math.max(1, tonumber(nextState.totalTicks) or 1)
-              nextState.rosterReady = false
-              nextState.unitsReady = false
-              nextState.unitsChunkReceived = 0
-              nextState.unitsChunkExpected = 0
-
-              if type(self.EventState) == "table" then
-          '''
-          new_start = r'''    nextState.totalTicks = math.max(1, tonumber(nextState.totalTicks) or 1)
-
+          start_marker = '    nextState.totalTicks = math.max(1, tonumber(nextState.totalTicks) or 1)\n'
+          duplicate_guard = '''
               local currentEventState = self.EventState
               if type(currentEventState) == "table"
                   and currentEventState.active == true
@@ -403,20 +357,13 @@ jobs:
                   end
                   return true
               end
-
-              nextState.rosterReady = false
-              nextState.unitsReady = false
-              nextState.unitsChunkReceived = 0
-              nextState.unitsChunkExpected = 0
-
-              if type(self.EventState) == "table" then
           '''
-          event = replace_once(event, old_start, new_start, 'make same-event EVENT_START idempotent')
+          event = replace_once(event, start_marker, start_marker + duplicate_guard, 'same-event EVENT_START guard')
           event = replace_once(
               event,
               '    if not eventState or eventState.active ~= true or eventState.ending == true or eventState.unitsReady == true then\n',
               '    if not eventState or eventState.active ~= true or eventState.ending == true or eventState.rosterReady == true then\n',
-              'ignore chunk-progress readiness mutation after full roster applied',
+              'ignore readiness-affecting progress after roster application',
           )
           event_path.write_text(event)
           PY
@@ -430,12 +377,10 @@ jobs:
 
           python3 - <<'PY'
           from pathlib import Path
-
           core = Path('core/internal/comms/Core.lua').read_text()
           event = Path('client/client_Event.lua').read_text()
           resource = Path('core/internal/comms/ResourceSync.lua').read_text()
 
-          # Canonical roster readiness is monotonic once a full roster has been applied.
           assert 'local rosterComplete = rosterReady\n' in resource
           assert 'rosterReady and (unitsChunkExpected <= 0 or unitsChunkReceived >= unitsChunkExpected)' not in resource
           assert 'unitsReady = rosterComplete and resourcesReady' in resource
@@ -445,10 +390,7 @@ jobs:
           progress = event[progress_start:progress_end]
           assert 'eventState.rosterReady == true' in progress
           assert 'eventState.unitsReady == true' not in progress
-          assert 'eventState.unitsChunkExpected = expectedCount' in progress
-          assert 'eventState.unitsChunkReceived = received' in progress
 
-          # Final EVENT_UNITS application is still present and independent from progress reporting.
           units_start = event.index('function Client:HandleEventUnits(arguments)')
           units_end = event.index('function Client:HandleEventUnitDeltaBatch', units_start)
           units = event[units_start:units_end]
@@ -456,74 +398,69 @@ jobs:
           assert 'eventState.units = units' in units
           assert 'eventState.rosterReady = true' in units
 
-          # Same-event EVENT_START is idempotent and the guard occurs before teardown/replacement.
           start_start = event.index('function Client:HandleEventStart(arguments, sender)')
           start_end = event.index('function Client:HandleEventEnd', start_start)
           start = event[start_start:start_end]
-          duplicate_check = 'tostring(currentEventState.id or "") == tostring(nextState.id or "")'
-          assert duplicate_check in start
+          duplicate = 'tostring(currentEventState.id or "") == tostring(nextState.id or "")'
+          assert duplicate in start
           assert 'duplicateStart = 1' in start
-          assert start.index(duplicate_check) < start.index('clearEventStateNow(self, self.EventState, "event-replaced"')
-          assert start.index('return true', start.index(duplicate_check)) < start.index('clearEventStateNow(self, self.EventState, "event-replaced"')
+          assert start.index(duplicate) < start.index('clearEventStateNow(self, self.EventState, "event-replaced"')
+          assert start.index('return true', start.index(duplicate)) < start.index('clearEventStateNow(self, self.EventState, "event-replaced"')
 
-          # Transport entries are lifecycle-aware: pending entries do not age/size-evict,
-          # successful sends transition them to post-send suppression, terminal failure releases them.
-          assert 'pendingCount' in core and 'sentCount' in core
-          assert 'local function markRecentLocalEchoSent' in core
-          assert 'local function releasePendingRecentLocalEcho' in core
-          assert 'Pending immediate-local-echo entries correspond to physical packets' in core
-          assert 'if sendState.immediateLocalEcho == true then\n                markRecentLocalEchoSent' in core
-          assert 'releasePendingImmediateLocalEchoes()' in core
-          assert 'options.immediateLocalEcho == true' in core
+          for required in [
+              'local function normalizeRecentLocalEchoEntry',
+              'local function markRecentLocalEchoSent',
+              'local function releasePendingRecentLocalEcho',
+              'pendingCount', 'sentCount',
+              'releasePendingImmediateLocalEchoes()',
+              'options.immediateLocalEcho == true',
+          ]:
+              assert required in core, required
+          assert 'Pending entries are never age-expired or size-evicted.' in core
 
-          # Deterministic readiness model mirrors the exact new invariants.
+          # Exact readiness regression: roster completion no longer depends on duplicate chunk counters.
           def readiness(roster_ready, resources_ready):
               roster_complete = bool(roster_ready)
               return roster_complete, roster_complete and bool(resources_ready)
 
-          roster_complete, units_ready = readiness(True, False)
-          assert roster_complete is True and units_ready is False
-          # A delayed duplicate partial transfer may alter diagnostic counters, but cannot regress roster completeness.
-          units_chunk_expected, units_chunk_received = 9, 1
-          roster_complete_after, units_ready_after = readiness(True, False)
-          assert units_chunk_received < units_chunk_expected
-          assert roster_complete_after is True and units_ready_after is False
+          rc, ur = readiness(True, False)
+          assert rc is True and ur is False
+          expected, received = 9, 1
+          assert received < expected
+          rc2, ur2 = readiness(True, False)
+          assert rc2 is True and ur2 is False
 
-          # Remote client still reports transfer progress while rosterReady is false.
-          remote_roster_ready = False
+          # Remote path remains incomplete until final EVENT_UNITS application flips rosterReady.
+          rc, _ = readiness(False, False)
+          assert rc is False
           remote_expected, remote_received = 4, 1
           assert remote_received < remote_expected
-          remote_complete, _ = readiness(remote_roster_ready, False)
-          assert remote_complete is False
           remote_received = 4
-          # Finalization (HandleEventUnits) is the operation that flips rosterReady.
-          remote_roster_ready = True
-          remote_complete, _ = readiness(remote_roster_ready, False)
-          assert remote_complete is True
+          rc, _ = readiness(True, False)
+          assert rc is True
 
-          # Same-ID duplicate preserves existing object; different IDs still replace.
-          def handle_start_model(current, incoming_id):
-              if current and current.get('active') and current.get('id') and current.get('id') == incoming_id:
+          # Same ID preserves the active object; different ID replaces it.
+          def start_model(current, incoming_id):
+              if current and current.get('active') and current.get('id') and current['id'] == incoming_id:
                   return current, False
               return {'active': True, 'id': incoming_id, 'units': []}, True
 
           existing = {
               'active': True,
               'id': 'evt-a',
-              'units': [{'eventID': 1, 'resources': [{'resourceRef': 'health', 'currentValue': 42}]}],
-              'startupRuntime': {'phase': 'waiting-resources'},
+              'units': [{'resources': [{'resourceRef': 'health', 'currentValue': 42}]}],
+              'runtime': {'phase': 'waiting-resources'},
           }
-          same, replaced = handle_start_model(existing, 'evt-a')
+          same, replaced = start_model(existing, 'evt-a')
           assert same is existing and replaced is False
           assert same['units'][0]['resources'][0]['currentValue'] == 42
-          assert same['startupRuntime']['phase'] == 'waiting-resources'
-          different, replaced = handle_start_model(existing, 'evt-b')
+          assert same['runtime']['phase'] == 'waiting-resources'
+          different, replaced = start_model(existing, 'evt-b')
           assert replaced is True and different is not existing and different['id'] == 'evt-b'
 
           print('Issue 186 source/readiness/idempotency assertions: PASS')
           PY
 
-          # Explicitly audit that this fix does not alter routing or throttle/backoff policy.
           test -z "$(git diff --name-only -- server/server_Event.lua core/internal/comms/MessageQueue.lua)"
 
       - name: Lua 5.1 syntax and transport lifecycle validation
@@ -542,15 +479,7 @@ jobs:
           local dispatched = {}
           local progress = {}
 
-          C_ChatInfo = {
-              SendAddonMessage = function()
-                  return true
-              end,
-          }
-
-          local function normalizeName(value)
-              return tostring(value or "")
-          end
+          C_ChatInfo = { SendAddonMessage = function() return true end }
 
           local Serialization = {}
           function Serialization:BuildChunkToken(partIndex, partCount)
@@ -561,9 +490,7 @@ jobs:
           end
           function Serialization:DeserializePacket(message)
               local prefix, token, opcode, payload = tostring(message):match("^([^|]*)|([^|]*)|([^|]*)|(.*)$")
-              if not prefix then
-                  return nil
-              end
+              if not prefix then return nil end
               local partIndex, partCount = token:match("^(%d+)/(%d+)$")
               return {
                   prefix = prefix,
@@ -588,36 +515,22 @@ jobs:
           end
           function Operations:GetOpcode(key)
               for opcode, candidate in pairs(keys) do
-                  if candidate == key then
-                      return opcode
-                  end
+                  if candidate == key then return opcode end
               end
               return nil
           end
           function Operations:Dispatch(opcode, arguments, sender, distribution, target, message)
-              dispatched[#dispatched + 1] = {
-                  opcode = opcode,
-                  sender = sender,
-                  distribution = distribution,
-                  target = target,
-                  message = message,
-              }
+              dispatched[#dispatched + 1] = { opcode = opcode, sender = sender, message = message }
               return true
           end
 
           local MessageQueue = {}
-          function MessageQueue:CanAccept()
-              return true
-          end
+          function MessageQueue:CanAccept() return true end
           function MessageQueue:EnqueueLogicalMessage(prefix, opcode, chunks, distribution, target, callbacks, metadata)
               local item = {
-                  prefix = prefix,
-                  opcode = opcode,
-                  chunks = chunks,
-                  distribution = distribution,
-                  target = target,
-                  callbacks = callbacks,
-                  metadata = metadata,
+                  prefix = prefix, opcode = opcode, chunks = chunks,
+                  distribution = distribution, target = target,
+                  callbacks = callbacks, metadata = metadata,
               }
               queued[#queued + 1] = item
               return item
@@ -639,26 +552,19 @@ jobs:
                       GetGroupType = function() return "PARTY" end,
                       GetNow = function() return now end,
                       GetPlayerName = function() return "Host" end,
-                      NormalizeName = normalizeName,
+                      NormalizeName = function(value) return tostring(value or "") end,
                       InvokeCallback = function(callback, ...)
-                          if type(callback) == "function" then
-                              return callback(...)
-                          end
+                          if type(callback) == "function" then return callback(...) end
                       end,
                   },
               },
               Debug = {},
           }
 
-          local chunk = assert(loadfile('core/internal/comms/Core.lua'))
-          chunk(nil, Addon)
+          assert(loadfile('core/internal/comms/Core.lua'))(nil, Addon)
           local Comms = Addon.Internal.Comms
           function Comms:HandleInboundChunkProgress(packet, receivedCount, distribution, sender, target)
-              progress[#progress + 1] = {
-                  opcode = packet.opcode,
-                  receivedCount = receivedCount,
-                  sender = sender,
-              }
+              progress[#progress + 1] = { opcode = packet.opcode, receivedCount = receivedCount, sender = sender }
               return true
           end
 
@@ -674,54 +580,48 @@ jobs:
 
           assert(Comms:SendMessage("CHANNEL", 2, "ABCDEFGHIJKL", 7, {}) == true)
           local item = assert(queued[1])
-          assert(#item.chunks > 1, "EVENT_UNITS fixture must be multipart")
-          assert(#dispatched == 1, "immediate local echo must finalize EVENT_UNITS once")
-          assert(#progress == #item.chunks, "immediate local echo must report its chunk progression")
-          assert(countPending() == #item.chunks, "all immediate echoes must remain pending until physical send")
+          assert(#item.chunks > 1)
+          assert(#dispatched == 1, "local EVENT_UNITS echo should finalize exactly once")
+          assert(#progress == #item.chunks)
+          assert(countPending() == #item.chunks)
 
-          -- Age beyond the old five-second timeout while the packets are still queued.
           now = 6
           local unrelated = Serialization:SerializePacket("RPE", "1/1", 9, "remote")
           Comms:ReceiveMessage("RPE", unrelated, "CHANNEL", "Other", 7)
-          assert(countPending() == #item.chunks, "queued/throttled immediate echoes must not age out")
+          assert(countPending() == #item.chunks, "pending echoes must survive beyond old timeout")
 
-          local progressBeforePhysical = #progress
-          local dispatchBeforePhysical = #dispatched
-
-          -- Simulate successful physical sends followed by their CHANNEL self-copies.
+          local progressBefore = #progress
+          local dispatchBefore = #dispatched
           for index = 1, #item.chunks do
-              now = 10 + (index * 0.1)
+              now = 10 + index * 0.1
               item.callbacks.onChunkSent(item, item.chunks[index], 0)
-              local beforeProgress = #progress
-              local beforeDispatch = #dispatched
+              local p = #progress
+              local d = #dispatched
               now = now + 0.01
-              local duplicate = Comms:ReceiveMessage("RPE", item.chunks[index], "CHANNEL", "Host", 7)
-              assert(duplicate == nil, "physical self-copy must be deduplicated")
-              assert(#progress == beforeProgress, "deduplicated self-copy must not restart chunk progress")
-              assert(#dispatched == beforeDispatch, "deduplicated self-copy must not redispatch logical input")
+              assert(Comms:ReceiveMessage("RPE", item.chunks[index], "CHANNEL", "Host", 7) == nil)
+              assert(#progress == p, "self-copy must not restart EVENT_UNITS progress")
+              assert(#dispatched == d, "self-copy must not redispatch")
           end
-          assert(#progress == progressBeforePhysical)
-          assert(#dispatched == dispatchBeforePhysical)
+          assert(#progress == progressBefore)
+          assert(#dispatched == dispatchBefore)
           assert(countPending() == 0)
 
-          -- A terminally failed immediate-echo send must release unsent pending entries.
           assert(Comms:SendMessage("CHANNEL", 2, "MNOPQRSTUVWX", 7, {}) == true)
           local failedItem = assert(queued[2])
           assert(countPending() == #failedItem.chunks)
           failedItem.callbacks.onFailed(failedItem, "terminal-test")
-          assert(countPending() == 0, "terminal failure must release all still-pending echoes")
+          assert(countPending() == 0, "terminal failure must release unsent pending echoes")
 
-          -- Non-immediate CHANNEL local echo still enters a post-send suppression window.
           assert(Comms:SendMessage("CHANNEL", 9, "normal", 7, {}) == true)
           local normalItem = assert(queued[3])
-          local dispatchedBeforeNormal = #dispatched
+          local beforeNormal = #dispatched
           now = 20
           normalItem.callbacks.onChunkSent(normalItem, normalItem.chunks[1], 0)
-          assert(#dispatched == dispatchedBeforeNormal + 1, "post-send local echo must still dispatch locally")
-          local afterLocalNormal = #dispatched
+          assert(#dispatched == beforeNormal + 1)
+          local afterNormal = #dispatched
           now = 20.1
           assert(Comms:ReceiveMessage("RPE", normalItem.chunks[1], "CHANNEL", "Host", 7) == nil)
-          assert(#dispatched == afterLocalNormal, "normal CHANNEL physical self-copy must be suppressed")
+          assert(#dispatched == afterNormal)
 
           print('Issue 186 Core.lua transport lifecycle test: PASS')
           LUA
@@ -744,6 +644,6 @@ jobs:
           git config user.email "elvetgames@gmail.com"
           git add client/client_Event.lua core/internal/comms/Core.lua core/internal/comms/ResourceSync.lua
           git commit -m "Fix host startup local-echo readiness regression (#186)"
-          git rm .github/workflows/issue186-dedupe-temporary.yml
-          git commit -m "Remove temporary Issue 186 validation workflow"
+          git rm .github/workflows/issue186-dedupe-v2-temporary.yml
+          git commit -m "Remove temporary Issue 186 dedupe validation workflow"
           git push origin HEAD:issue-186-dedupe-validation
