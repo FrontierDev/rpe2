@@ -577,31 +577,31 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
     local enqueueStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
     local queued = MessageQueue:EnqueueLogicalMessage(self.Prefix, opcode, packets, distribution, target, {
         onChunkSent = function(item, packet, result)
-    if sendState.failed then
-        return
-    end
+            if sendState.failed then
+                return
+            end
 
-    if sendState.immediateLocalEcho == true then
-        markRecentLocalEchoSent(
-            self,
-            self.Prefix,
-            packet,
-            distribution,
-            localEchoSender,
-            target,
-            getTimestamp()
-        )
-    elseif shouldEchoOutboundChannel(distribution, target) then
-        self:ReceiveMessage(
-            self.Prefix,
-            packet,
-            distribution,
-            localEchoSender,
-            target,
-            { localEcho = true }
-        )
-    end
-end,
+            if sendState.immediateLocalEcho == true then
+                markRecentLocalEchoSent(
+                    self,
+                    self.Prefix,
+                    packet,
+                    distribution,
+                    localEchoSender,
+                    target,
+                    getTimestamp()
+                )
+            elseif shouldEchoOutboundChannel(distribution, target) then
+                self:ReceiveMessage(
+                    self.Prefix,
+                    packet,
+                    distribution,
+                    localEchoSender,
+                    target,
+                    { localEcho = true }
+                )
+            end
+        end,
         onDelivered = function(item, result)
             if sendState.failed then
                 return
@@ -629,26 +629,26 @@ end,
             Common.InvokeCallback(deliveredCallback, item, result)
         end,
         onFailed = function(item, result)
-    if sendState.failed then
-        return
-    end
+            if sendState.failed then
+                return
+            end
 
-    sendState.failed = true
-    releasePendingImmediateLocalEchoes()
-    if result ~= "superseded" and Diagnostics.RecordSendFailure then
-        Diagnostics:RecordSendFailure(result)
-    end
+            sendState.failed = true
+            releasePendingImmediateLocalEchoes()
+            if result ~= "superseded" and Diagnostics.RecordSendFailure then
+                Diagnostics:RecordSendFailure(result)
+            end
 
-    Common.InvokeCallback(failedCallback, item, result)
-end,
+            Common.InvokeCallback(failedCallback, item, result)
+        end,
     }, diagnosticsMetadata)
     if enqueueStartTime then
         sendState.enqueueElapsedMs = getTimingNowMilliseconds() - enqueueStartTime
     end
 
     if queued == nil then
-    releasePendingImmediateLocalEchoes()
-end
+        releasePendingImmediateLocalEchoes()
+    end
 
     return queued ~= nil
 end
@@ -716,17 +716,17 @@ function Comms:ReceiveMessage(prefix, message, distribution, sender, target, opt
     end
 
     if type(options) == "table" and options.localEcho == true then
-    recordRecentLocalEcho(
-        self,
-        prefix,
-        message,
-        distribution,
-        sender,
-        target,
-        now,
-        options.immediateLocalEcho == true
-    )
-end
+        recordRecentLocalEcho(
+            self,
+            prefix,
+            message,
+            distribution,
+            sender,
+            target,
+            now,
+            options.immediateLocalEcho == true
+        )
+    end
 
     local packet = Serialization:DeserializePacket(message)
     if not packet or packet.prefix ~= self.Prefix then
