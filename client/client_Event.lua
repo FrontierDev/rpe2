@@ -2744,6 +2744,39 @@ local function queueEventEndWork(client, eventState, transition, reason, work)
     return true
 end
 
+local function hydrateLocalHostAuthoritativeRoster(eventState)
+    if type(eventState) ~= "table" then
+        return false
+    end
+
+    local localPlayerName = Common.GetPlayerName and Common.GetPlayerName() or nil
+    localPlayerName = Common.NormalizeName and Common.NormalizeName(localPlayerName) or tostring(localPlayerName or "")
+    local eventHostName = Common.NormalizeName and Common.NormalizeName(eventState.hostName) or tostring(eventState.hostName or "")
+    if localPlayerName == "" or eventHostName == "" or eventHostName ~= localPlayerName then
+        return false
+    end
+
+    local serverEventState = Addon.Server and Addon.Server.EventState or nil
+    if type(serverEventState) ~= "table"
+        or serverEventState.active ~= true
+        or tostring(serverEventState.id or "") ~= tostring(eventState.id or "")
+        or type(serverEventState.SerializeUnitsForNetwork) ~= "function"
+        or type(Event.DeserializeUnitsFromNetwork) ~= "function"
+    then
+        return false
+    end
+
+    local units = Event.DeserializeUnitsFromNetwork(serverEventState:SerializeUnitsForNetwork())
+    if type(units) ~= "table" or #units == 0 then
+        return false
+    end
+
+    eventState.units = units
+    eventState.rosterReady = true
+    eventState.unitsChunkReceived = eventState.unitsChunkExpected or eventState.unitsChunkReceived or 0
+    return true
+end
+
 function Client:HandleEventStart(arguments, sender)
     local totalStartTime = getTimingNowMilliseconds()
     local timingParts = totalStartTime > 0 and {} or nil
@@ -2780,6 +2813,8 @@ function Client:HandleEventStart(arguments, sender)
             cancelReason = "event-replaced",
         })
     end
+
+    hydrateLocalHostAuthoritativeRoster(nextState)
 
     local hydrateStartTime = timingParts and getTimingNowMilliseconds() or nil
     if ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
