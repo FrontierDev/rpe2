@@ -192,6 +192,7 @@ client/autopilot/MovementSolverPerformance.lua
 client/autopilot/PlannerTargetPerformance.lua
 client/autopilot/PlannerSolvePerformance.lua
 client/autopilot/PlannerCompletionPerformance.lua
+client/autopilot/PlannerPreparationPerformance.lua
 client/client_PendingChanges.lua
 server/server_Spellcasting.lua
 
