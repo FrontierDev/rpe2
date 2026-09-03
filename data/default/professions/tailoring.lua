@@ -1,2 +1,10285 @@
-RPE_DATASET_V1
-{ dataset = { achievements = {  }, auras = {  }, authorName = "Ortellus-ArgentDawn", classes = {  }, currencies = {  }, damageSchools = {  }, datasetType = "crafting", dependencies = { "f82db71a" }, description = "", groupName = "Core", guildSettings = {  }, id = "7259f1d3", interactions = {  }, itemSlots = {  }, items = { { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_fabric_linen_01.blp", id = "agzskvec", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Linen Cloth", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_fabric_wool_01.blp", id = "1wssn0qp", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Wool Cloth", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_fabric_silk_01.blp", id = "jt6ktqiu", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Silk Cloth", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_fabric_mageweave_01.blp", id = "edth2zu1", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Mageweave Cloth", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_fabric_purplefire_01.blp", id = "dx7zh3l2", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Runecloth", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_blacksmithdye_black.blp", id = "dsuj9x3j", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Black Dye", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_tailoringdye_red.blp", id = "oo8796rr", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Red Dye", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_tailoringdye_blue.blp", id = "nfwx3196", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Blue Dye", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_fabric_linen_03.blp", id = "pujc8hth", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Coarse Thread", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_fabric_wool_02.blp", id = "4ml43y0u", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Fine Thread", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_fabric_silk_02.blp", id = "uv6t44ol", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Silken Thread", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_fabric_silk_02.blp", id = "shbu7lxd", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Heavy Silken Thread", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/spell_shadow_antimagicshell.blp", id = "x8ste3qj", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Rune Thread", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "none", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 46, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_belt_15.blp", id = "zowdkbia", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Runecloth Belt", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 37 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 12 }, { sourceStatRef = "f82db71a:kec9rhli", value = 8 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = { "f82db71a:haks0gz4" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "none", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 51, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_boots_05.blp", id = "puyk08a6", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Runecloth Boots", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 50 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 9 }, { sourceStatRef = "f82db71a:kec9rhli", value = 14 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = { "f82db71a:raiu9t05" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "none", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 48, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_cape_10.blp", id = "vqcblk29", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Runecloth Cloak", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 34 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 8 }, { sourceStatRef = "f82db71a:kec9rhli", value = 9 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = { "f82db71a:bqwhrw0g" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "none", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 50, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_cape_10.blp", id = "m67kl8yo", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Runecloth Gloves", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 45 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 9 }, { sourceStatRef = "f82db71a:kec9rhli", value = 9 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 12 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 12 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = { "f82db71a:wasvuom2" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "none", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 54, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_bandana_03.blp", id = "up4gfqdo", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Runecloth Headband", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 62 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 20 }, { sourceStatRef = "f82db71a:kec9rhli", value = 13 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = { "f82db71a:bgvs1zx6" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "none", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 52, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_pants_09.blp", id = "v3874ra7", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Runecloth Pants", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 65 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 12 }, { sourceStatRef = "f82db71a:kec9rhli", value = 20 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = { "f82db71a:obmt4ntq" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "none", blueSockets = 1, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 47, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_04.blp", id = "4n9ygjop", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Runecloth Tunic", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = { { color = "blue" } }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 68 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 11 }, { sourceStatRef = "f82db71a:kec9rhli", value = 17 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "none", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 56, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_shoulder_21.blp", id = "a2unhyjv", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Runecloth Shoulders", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 59 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 15 }, { sourceStatRef = "f82db71a:kec9rhli", value = 10 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, uniqueFlag = "none", validSlotRefs = { "f82db71a:66i80qm1" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 14, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_cape_11.blp", id = "gkcxrbcq", isTwoHanded = false, itemLevel = 21, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Pearl-clasped Cloak", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 16 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 3 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bqwhrw0g" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 21, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_cape_14.blp", id = "zvlujs9w", isTwoHanded = false, itemLevel = 21, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Heavy Woolen Cloak", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 17 }, { sourceStatRef = "f82db71a:kec9rhli", value = 4 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bqwhrw0g" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 30, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_14.blp", id = "pbqhbyto", isTwoHanded = false, itemLevel = 35, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Azure Silk Cloak", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 23 }, { sourceStatRef = "f82db71a:kec9rhli", value = 3 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 8 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bqwhrw0g" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 31, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_16.blp", id = "o3evqgf5", isTwoHanded = false, itemLevel = 36, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Crimson Silk Cloak", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 24 }, { sourceStatRef = "f82db71a:ygjno50i", value = 3 }, { sourceStatRef = "f82db71a:0w7c7p09", value = 7 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bqwhrw0g" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 32, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_cape_02.blp", id = "st2pubf9", isTwoHanded = false, itemLevel = 37, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Long Silken Cloak", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 24 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 5 }, { sourceStatRef = "f82db71a:kec9rhli", value = 6 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bqwhrw0g" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 35, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_cape_04.blp", id = "zq02lspb", isTwoHanded = false, itemLevel = 40, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Icy Cloak", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 29 }, { sourceStatRef = "f82db71a:jjn0my8k", value = 11 }, { sourceStatRef = "f82db71a:kec9rhli", value = 6 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bqwhrw0g" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 50, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_cape_18.blp", id = "ayc1gfkp", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Cindercloth Cloak", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 36 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 8 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 13 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bqwhrw0g" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 50, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_cape_11.blp", id = "9cwg3gri", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Brightcloth Cloak", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 36 }, { sourceStatRef = "f82db71a:itpo751d", value = 7 }, { sourceStatRef = "f82db71a:jjn0my8k", value = 7 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bqwhrw0g" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 57, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_cape_06.blp", id = "vzvsfj3a", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Cloak of Warding", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 36 }, { sourceStatRef = "f82db71a:0wyp78x9", value = 7 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bqwhrw0g" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 50, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_cape_18.blp", id = "ylmlt4ky", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Cloak of Fire", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 36 }, { sourceStatRef = "f82db71a:ygjno50i", value = 7 }, { sourceStatRef = "f82db71a:0w7c7p09", value = 15 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bqwhrw0g" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 60, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_cape_17.blp", id = "byvkorwx", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Gaea's Embrace", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 49 }, { sourceStatRef = "f82db71a:ygjno50i", value = 6 }, { sourceStatRef = "f82db71a:pg0ytacb", value = 20 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bqwhrw0g" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 60, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_cape_16.blp", id = "kxopzq6p", isTwoHanded = false, itemLevel = 60, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Glacial Cloak", prismaticSockets = 0, quality = "epic", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 61 }, { sourceStatRef = "f82db71a:ygjno50i", value = 18 }, { sourceStatRef = "f82db71a:jjn0my8k", value = 24 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bqwhrw0g" }, yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_fabric_moonrag_01.blp", id = "xnx0kwlv", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Mooncloth", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 5, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_04.blp", id = "r5amyo04", isTwoHanded = false, itemLevel = 10, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "White Linen Robe", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 19 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 1 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 5, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_21.blp", id = "j4seqsjb", isTwoHanded = false, itemLevel = 10, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Brown Linen Robe", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 19 }, { sourceStatRef = "f82db71a:kec9rhli", value = 1 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 7, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_18.blp", id = "6f0fq3bu", isTwoHanded = false, itemLevel = 12, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Red Linen Robe", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 23 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 2 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 7, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_37.blp", id = "i1odbqvc", isTwoHanded = false, itemLevel = 12, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Blue Linen Vest", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 23 }, { sourceStatRef = "f82db71a:kec9rhli", value = 2 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 9, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_fur.blp", id = "vr4f36zt", isTwoHanded = false, itemLevel = 14, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Barbaric Linen Vest", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 26 }, { sourceStatRef = "f82db71a:kec9rhli", value = 2 }, { sourceStatRef = "f82db71a:ygjno50i", value = 2 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 9, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_23.blp", id = "n2f9v181", isTwoHanded = false, itemLevel = 14, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Blue Linen Robe", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 26 }, { sourceStatRef = "f82db71a:kec9rhli", value = 3 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 9, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_pants_07.blp", id = "nxeyb4yk", isTwoHanded = false, itemLevel = 14, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Handstitched Linen Britches", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 23 }, { sourceStatRef = "f82db71a:kec9rhli", value = 2 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 2 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:obmt4ntq" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 4, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_belt_02.blp", id = "or9bjbku", isTwoHanded = false, itemLevel = 9, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Linen Belt", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 9 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 1 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:haks0gz4" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 4, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_boots_05.blp", id = "pr7ml76d", isTwoHanded = false, itemLevel = 9, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Simple Linen Boots", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 11 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 1 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:raiu9t05" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 4, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_pants_06.blp", id = "ls3e9k5e", isTwoHanded = false, itemLevel = 10, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Brown Linen Pants", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 16 }, { sourceStatRef = "f82db71a:kec9rhli", value = 1 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:obmt4ntq" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 7, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_bracer_12.blp", id = "9hvghvqa", isTwoHanded = false, itemLevel = 12, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Green Linen Bracers", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 9 }, { sourceStatRef = "f82db71a:ygjno50i", value = 1 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:crezt6ix" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 11, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_boots_09.blp", id = "biqr2ktc", isTwoHanded = false, itemLevel = 16, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Soft-soled Linen Boots", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 20 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 2 }, { sourceStatRef = "f82db71a:ygjno50i", value = 2 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:raiu9t05" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 12, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_gauntlets_05.blp", id = "xvmmos17", isTwoHanded = false, itemLevel = 17, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Heavy Woolen Gloves", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 19 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 2 }, { sourceStatRef = "f82db71a:kec9rhli", value = 2 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:wasvuom2" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 14, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_boots_09.blp", id = "4ejyqw47", isTwoHanded = false, itemLevel = 19, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Woolen Boots", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 22 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 2 }, { sourceStatRef = "f82db71a:kec9rhli", value = 2 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 2 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 2 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:raiu9t05" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 15, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_boots_09.blp", id = "vdu2gsbp", isTwoHanded = false, itemLevel = 20, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Red Woolen Boots", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 23 }, { sourceStatRef = "f82db71a:kec9rhli", value = 5 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:raiu9t05" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 15, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_shirt_13.blp", id = "4phnjwul", isTwoHanded = false, itemLevel = 20, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Blue Overalls", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 34 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 5 }, { sourceStatRef = "f82db71a:ygjno50i", value = 4 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 5 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 16, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_13.blp", id = "kkgt8k0c", isTwoHanded = false, itemLevel = 21, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Grey Woolen Robe", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 35 }, { sourceStatRef = "f82db71a:ygjno50i", value = 4 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 5 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 17, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_pants_01.blp", id = "h4e9sjsd", isTwoHanded = false, itemLevel = 22, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Heavy Woolen Pants", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 31 }, { sourceStatRef = "f82db71a:kec9rhli", value = 6 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 3 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:obmt4ntq" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 18, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_24.blp", id = "ewnqq9mc", isTwoHanded = false, itemLevel = 23, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Greater Adept's Robe", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 37 }, { sourceStatRef = "f82db71a:ygjno50i", value = 1 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 2 }, { sourceStatRef = "f82db71a:kec9rhli", value = 7 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_tailoringdye_green.blp", id = "m3m72ds8", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Green Dye", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = true, armorWeight = "cosmetic", bindingFlag = "none", blueSockets = 0, canDisenchant = false, canSell = true, canStack = true, canTrade = true, cogSockets = 0, conditions = {  }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_blacksmithdye_gray.blp", id = "z1nr9mnr", isTwoHanded = false, itemLevel = 0, itemSetKey = "", itemType = "material", maxDamagePerTurn = 0, maxGenericModificationCounts = {  }, maxModificationCounts = {  }, maxStackSize = 200, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Grey Dye", prismaticSockets = 0, quality = "common", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = {  }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = {  }, wowConversionSkillRef = "f82db71a:goqp0alw", yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 14, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_pants_02.blp", id = "nozc0zy7", isTwoHanded = false, itemLevel = 19, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Colorful Kilt", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 33 }, { sourceStatRef = "f82db71a:kec9rhli", value = 6 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 6 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 6 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:obmt4ntq" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 20, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_boots_05.blp", id = "lpjdgcr7", isTwoHanded = false, itemLevel = 25, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Pearl-inlaid Silk Boots", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 29 }, { sourceStatRef = "f82db71a:kec9rhli", value = 7 }, { sourceStatRef = "f82db71a:ygjno50i", value = 4 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 4 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:raiu9t05" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 21, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_gauntlets_05.blp", id = "z4e6tgje", isTwoHanded = false, itemLevel = 26, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Gloves of Meditation", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 25 }, { sourceStatRef = "f82db71a:kec9rhli", value = 7 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:wasvuom2" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 22, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_17.blp", id = "t9hr4z4i", isTwoHanded = false, itemLevel = 27, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Lesser Wizard's Robe", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 41 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 8 }, { sourceStatRef = "f82db71a:kec9rhli", value = 5 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 23, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_boots_09.blp", id = "iv8w1nkt", isTwoHanded = false, itemLevel = 28, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Spider Silk Slippers", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 29 }, { sourceStatRef = "f82db71a:kec9rhli", value = 7 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 4 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 4 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:raiu9t05" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 24, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_helmet_29.blp", id = "4p45lf3u", isTwoHanded = false, itemLevel = 29, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Azure Silk Hood", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 33 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 5 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 5 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bgvs1zx6" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 25, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_29.blp", id = "9kd6g8n8", isTwoHanded = false, itemLevel = 30, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Robes of Arcana", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 43 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 8 }, { sourceStatRef = "f82db71a:kec9rhli", value = 7 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 25, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_gauntlets_16.blp", id = "2cex0ivf", isTwoHanded = false, itemLevel = 30, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Truefaith Gloves", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 27 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 3 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 15 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 5 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:wasvuom2" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 27, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_bandana_01.blp", id = "43u4st9h", isTwoHanded = false, itemLevel = 32, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Silk Headband", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 34 }, { sourceStatRef = "f82db71a:ygjno50i", value = 5 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 5 }, { sourceStatRef = "f82db71a:kec9rhli", value = 4 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bgvs1zx6" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 28, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_helmet_31.blp", id = "ag2bqcm1", isTwoHanded = false, itemLevel = 33, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Enchanter's Cowl", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 37 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 10 }, { sourceStatRef = "f82db71a:kec9rhli", value = 6 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bgvs1zx6" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 28, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_06.blp", id = "ox5dsp94", isTwoHanded = false, itemLevel = 33, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Green Silk Armor", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 45 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 13 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 29, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_shirt_04.blp", id = "22wu2d71", isTwoHanded = false, itemLevel = 34, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Earthen Vest", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 46 }, { sourceStatRef = "f82db71a:ygjno50i", value = 6 }, { sourceStatRef = "f82db71a:kec9rhli", value = 10 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 30, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_belt_04.blp", id = "27zw5yao", isTwoHanded = false, itemLevel = 35, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Crimson Silk Belt", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 26 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 7 }, { sourceStatRef = "f82db71a:kec9rhli", value = 6 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:haks0gz4" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 30, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_boots_05.blp", id = "u5d3ghmm", isTwoHanded = false, itemLevel = 35, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Boots of the Enchanter", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 32 }, { sourceStatRef = "f82db71a:kec9rhli", value = 6 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 5 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 4 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:raiu9t05" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 31, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_shoulder_18.blp", id = "z3s6o9o7", isTwoHanded = false, itemLevel = 36, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Green Silken Shoulders", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 36 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 11 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:66i80qm1" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 33, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_shoulder_23.blp", id = "y966beta", isTwoHanded = false, itemLevel = 38, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Crimson Silk Shoulders", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 38 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 8 }, { sourceStatRef = "f82db71a:kec9rhli", value = 7 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:66i80qm1" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_pickup", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = false, cogSockets = 0, conditions = { { invert = false, minimumValue = 33, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_02.blp", id = "nq3oml24", isTwoHanded = false, itemLevel = 38, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Robe of Power", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 55 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 12 }, { sourceStatRef = "f82db71a:kec9rhli", value = 8 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 14 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 14 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 34, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_belt_24.blp", id = "bo7gq4mq", isTwoHanded = false, itemLevel = 39, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Earthen Silk Belt", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 29 }, { sourceStatRef = "f82db71a:ygjno50i", value = 8 }, { sourceStatRef = "f82db71a:kec9rhli", value = 8 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:haks0gz4" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 35, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_belt_06.blp", id = "ghl39cpx", isTwoHanded = false, itemLevel = 40, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Star Belt", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 30 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 13 }, { sourceStatRef = "f82db71a:kec9rhli", value = 4 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 13 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:haks0gz4" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 36, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_25.blp", id = "zpiqzilq", isTwoHanded = false, itemLevel = 41, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Crimson Silk Robe", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 54 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 15 }, { sourceStatRef = "f82db71a:kec9rhli", value = 6 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 36, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_leather_03.blp", id = "7je8t4yb", isTwoHanded = false, itemLevel = 41, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Black Mageweave Vest", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 54 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 11 }, { sourceStatRef = "f82db71a:kec9rhli", value = 12 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 36, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_pants_09.blp", id = "q3sznxi0", isTwoHanded = false, itemLevel = 41, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Black Mageweave Leggings", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 47 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 8 }, { sourceStatRef = "f82db71a:kec9rhli", value = 14 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:obmt4ntq" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 37, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_13.blp", id = "3cc39cob", isTwoHanded = false, itemLevel = 42, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Black Mageweave Robe", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 55 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 8 }, { sourceStatRef = "f82db71a:kec9rhli", value = 14 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 38, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_cape_11.blp", id = "mdzvfbok", isTwoHanded = false, itemLevel = 43, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "White Bandit Mask", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 46 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 11 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 13 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 13 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bgvs1zx6" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 38, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_shirt_09.blp", id = "0nwgkdih", isTwoHanded = false, itemLevel = 43, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Red Mageweave Vest", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 57 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 18 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 38, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_pants_06.blp", id = "t5zmjxy7", isTwoHanded = false, itemLevel = 43, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Red Mageweave Pants", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 49 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 12 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 14 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 14 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:obmt4ntq" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 38, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_gauntlets_05.blp", id = "bn8nd7gq", isTwoHanded = false, itemLevel = 43, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Black Mageweave Gloves", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 35 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 15 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 15 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:wasvuom2" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 40, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_42.blp", id = "cwkerny4", isTwoHanded = false, itemLevel = 45, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Dreamweave Vest", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 65 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 9 }, { sourceStatRef = "f82db71a:kec9rhli", value = 14 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 18 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 18 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 40, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_gauntlets_18.blp", id = "5ro18gtd", isTwoHanded = false, itemLevel = 45, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Dreamweave Gloves", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 41 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 4 }, { sourceStatRef = "f82db71a:kec9rhli", value = 7 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 18 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 18 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:wasvuom2" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 40, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_gauntlets_19.blp", id = "mt1lompv", isTwoHanded = false, itemLevel = 45, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Red Mageweave Gloves", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 37 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 10 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 11 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 11 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:wasvuom2" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 41, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_bandana_01.blp", id = "cqggqg4u", isTwoHanded = false, itemLevel = 46, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Black Mageweave Headband", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 49 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 12 }, { sourceStatRef = "f82db71a:kec9rhli", value = 13 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bgvs1zx6" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 41, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_shoulder_25.blp", id = "4jvsf9vy", isTwoHanded = false, itemLevel = 46, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Black Mageweave Shoulders", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 45 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 9 }, { sourceStatRef = "f82db71a:kec9rhli", value = 10 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:66i80qm1" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 41, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_boots_05.blp", id = "t9oha2l3", isTwoHanded = false, itemLevel = 46, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Black Mageweave Boots", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 41 }, { sourceStatRef = "f82db71a:kec9rhli", value = 7 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 11 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:raiu9t05" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 42, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_shoulder_23.blp", id = "f0eqxb9v", isTwoHanded = false, itemLevel = 47, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Red Mageweave Shoulders", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 46 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 15 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:66i80qm1" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 43, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_bandana_03.blp", id = "nqwa9la3", isTwoHanded = false, itemLevel = 48, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Red Mageweave Headband", prismaticSockets = 0, quality = "uncommon", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 51 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 20 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bgvs1zx6" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 45, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_crown_01.blp", id = "y5taywcv", isTwoHanded = false, itemLevel = 50, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Dreamweave Circlet", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 58 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 10 }, { sourceStatRef = "f82db71a:kec9rhli", value = 12 }, { sourceStatRef = "f82db71a:7t7xgzcx", value = 21 }, { sourceStatRef = "f82db71a:hj6d4kvy", value = 21 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bgvs1zx6" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 58, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_belt_09.blp", id = "43w9k3mf", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Wisdom of the Timbermaw", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 46 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 21 }, { sourceStatRef = "f82db71a:kec9rhli", value = 12 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:haks0gz4" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 53, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_pants_13.blp", id = "8f7vbtoq", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Mooncloth Leggings", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 72 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 14 }, { sourceStatRef = "f82db71a:kec9rhli", value = 21 }, { sourceStatRef = "f82db71a:ygjno50i", value = 12 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:obmt4ntq" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 53, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_boots_cloth_03.blp", id = "2tq936qq", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Argent Boots", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 57 }, { sourceStatRef = "f82db71a:kec9rhli", value = 7 }, { sourceStatRef = "f82db71a:ygjno50i", value = 21 }, { sourceStatRef = "f82db71a:itpo751d", value = 4 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:raiu9t05" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 55, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_chest_cloth_42.blp", id = "he1t3q0n", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Mooncloth Vest", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 85 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 20 }, { sourceStatRef = "f82db71a:kec9rhli", value = 19 }, { sourceStatRef = "f82db71a:ygjno50i", value = 12 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:nwfvxbto" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 51, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_boots_05.blp", id = "c3zsw8vk", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Mooncloth Boots", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 55 }, { sourceStatRef = "f82db71a:kec9rhli", value = 13 }, { sourceStatRef = "f82db71a:ygjno50i", value = 11 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 14 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:raiu9t05" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 57, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_gauntlets_17.blp", id = "z65t76x7", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Mooncloth Gloves", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 55 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 16 }, { sourceStatRef = "f82db71a:kec9rhli", value = 15 }, { sourceStatRef = "f82db71a:ygjno50i", value = 9 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:wasvuom2" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 56, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_shoulder_02.blp", id = "bl8tt5fn", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Mooncloth Shoulders", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 65 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 17 }, { sourceStatRef = "f82db71a:kec9rhli", value = 11 }, { sourceStatRef = "f82db71a:ygjno50i", value = 9 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:66i80qm1" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 57, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_misc_bandana_01.blp", id = "yqkv77d0", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Mooncloth Circlet", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 71 }, { sourceStatRef = "f82db71a:75y3a8ib", value = 23 }, { sourceStatRef = "f82db71a:kec9rhli", value = 15 }, { sourceStatRef = "f82db71a:ygjno50i", value = 13 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:bgvs1zx6" }, yellowSockets = 0 }, { allowWowConversion = false, armorWeight = "cloth", bindingFlag = "bind_on_equip", blueSockets = 0, canDisenchant = true, canSell = true, canStack = false, canTrade = true, cogSockets = 0, conditions = { { invert = false, minimumValue = 59, showOnTooltip = true, tooltipTextOverride = "", type = "level" } }, consumableElixirType = "", consumableType = "", damageMode = "fixed", damagePerTurn = 0, description = "", gemColor = "none", genericModificationKey = "", greenSockets = 0, icon = "interface/icons/inv_shoulder_02.blp", id = "vfqq6p5y", isTwoHanded = false, itemLevel = 55, itemSetKey = "", itemType = "armor", maxDamagePerTurn = 0, maxGenericModificationCounts = { mod = 1 }, maxModificationCounts = { mod = 1 }, maxStackSize = 1, metaSockets = 0, minDamagePerTurn = 0, modificationKind = "generic", name = "Argent Shoulders", prismaticSockets = 0, quality = "rare", redSockets = 0, sellPrice = 0, skillBonuses = {  }, socketTypes = {  }, sockets = {  }, stats = { { sourceStatRef = "f82db71a:v42albuv", value = 68 }, { sourceStatRef = "f82db71a:ygjno50i", value = 23 }, { sourceStatRef = "f82db71a:kec9rhli", value = 8 }, { sourceStatRef = "f82db71a:itpo751d", value = 7 } }, tags = {  }, targetArmorWeight = "none", targetSlotRefs = {  }, targetTwoHandedOnly = false, uniqueFlag = "none", validSlotRefs = { "f82db71a:66i80qm1" }, yellowSockets = 0 } }, loot = { { conditions = {  }, description = "Equal-weighting roll table for classic cloths (quantities 1-5). No roll (50%).", drawCount = 1, entries = { { id = "linen", maxQuantity = 5, minQuantity = 1, ref = "7259f1d3:agzskvec", type = "item", weight = 1 }, { id = "wool", maxQuantity = 5, minQuantity = 1, ref = "7259f1d3:1wssn0qp", type = "item", weight = 1 }, { id = "silk", maxQuantity = 5, minQuantity = 1, ref = "7259f1d3:jt6ktqiu", type = "item", weight = 1 }, { id = "mageweave", maxQuantity = 5, minQuantity = 1, ref = "7259f1d3:edth2zu1", type = "item", weight = 1 }, { id = "runecloth", maxQuantity = 5, minQuantity = 1, ref = "7259f1d3:dx7zh3l2", type = "item", weight = 1 }, { id = "nothing", maxQuantity = 1, minQuantity = 1, ref = "", type = "nothing", weight = 5 } }, id = "jcih77uu", items = {  }, name = "Cloth No-Roll", tags = {  } }, { conditions = {  }, description = "Equal-weighting roll table for classic cloths (quantities 1-5). No roll (50%).", drawCount = 1, entries = { { id = "linen", maxQuantity = 5, minQuantity = 1, ref = "7259f1d3:agzskvec", type = "item", weight = 1 }, { id = "wool", maxQuantity = 5, minQuantity = 1, ref = "7259f1d3:1wssn0qp", type = "item", weight = 1 }, { id = "silk", maxQuantity = 5, minQuantity = 1, ref = "7259f1d3:jt6ktqiu", type = "item", weight = 1 }, { id = "mageweave", maxQuantity = 5, minQuantity = 1, ref = "7259f1d3:edth2zu1", type = "item", weight = 1 }, { id = "runecloth", maxQuantity = 5, minQuantity = 1, ref = "7259f1d3:dx7zh3l2", type = "item", weight = 1 } }, id = "jiieayww", items = {  }, name = "Cloth Guaranteed", tags = {  } } }, mounts = {  }, name = "Tailoring", pets = {  }, races = {  }, recipes = { { category = "", description = "", id = "ng402a98", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Runecloth Belt", output = { itemRef = "7259f1d3:zowdkbia", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 255, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 111255 }, { category = "", description = "", id = "s1a4fib4", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 }, { itemRef = "538a54a0:4gnkyr9f", kind = "rpe_item", quantity = 4 } }, learnMode = "trainer", name = "Runecloth Boots", output = { itemRef = "7259f1d3:puyk08a6", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 280, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 133355 }, { category = "", description = "", id = "mkgwta43", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Runecloth Cloak", output = { itemRef = "7259f1d3:vqcblk29", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 265, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 119855 }, { category = "", description = "", id = "bsygugir", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 }, { itemRef = "538a54a0:4gnkyr9f", kind = "rpe_item", quantity = 4 } }, learnMode = "trainer", name = "Runecloth Gloves", output = { itemRef = "7259f1d3:m67kl8yo", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 275, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 128775 }, { category = "", description = "", id = "lvcl90wb", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Runecloth Headband", output = { itemRef = "7259f1d3:up4gfqdo", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 295, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 147575 }, { category = "", description = "", id = "kiwwvjkk", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 30 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Runecloth Pants", output = { itemRef = "7259f1d3:v3874ra7", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 285, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 138015 }, { category = "", description = "", id = "d70cfewg", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 25 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Runecloth Tunic", output = { itemRef = "7259f1d3:4n9ygjop", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 260, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 115515 }, { category = "", description = "", id = "ga82eeez", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 35 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 }, { itemRef = "538a54a0:4gnkyr9f", kind = "rpe_item", quantity = 4 } }, learnMode = "trainer", name = "Runecloth Shoulders", output = { itemRef = "7259f1d3:a2unhyjv", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 300, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 152475 }, { category = "", description = "", id = "m4xabqnb", inputs = { { itemRef = "7259f1d3:1wssn0qp", kind = "rpe_item", quantity = 9 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 2 }, { itemRef = "4999dcec:s9lu5jap", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Pearl-clasped Cloak", output = { itemRef = "7259f1d3:gkcxrbcq", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 90, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 15555 }, { category = "", description = "", id = "mejped4q", inputs = { { itemRef = "7259f1d3:1wssn0qp", kind = "rpe_item", quantity = 9 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 2 }, { itemRef = "4999dcec:s9lu5jap", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Heavy Woolen Cloak", output = { itemRef = "7259f1d3:zvlujs9w", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 100, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 18875 }, { category = "", description = "", id = "6d54hny4", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 12 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 2 }, { itemRef = "7259f1d3:nfwx3196", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Azure Silk Cloak", output = { itemRef = "7259f1d3:pbqhbyto", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 175, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 53975 }, { category = "", description = "", id = "12q8prcb", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:uv6t44ol", kind = "rpe_item", quantity = 1 }, { itemRef = "7259f1d3:oo8796rr", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Crimson Silk Cloak", output = { itemRef = "7259f1d3:o3evqgf5", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 180, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 56955 }, { category = "", description = "", id = "va4276y9", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 16 }, { itemRef = "7259f1d3:uv6t44ol", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Long Silken Cloak", output = { itemRef = "7259f1d3:st2pubf9", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 185, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 60015 }, { category = "", description = "", id = "f7vuhh1v", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:uv6t44ol", kind = "rpe_item", quantity = 2 }, { itemRef = "732368d4:7z1lti71", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Icy Cloak", output = { itemRef = "7259f1d3:zq02lspb", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 200, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 69675 }, { category = "", description = "", id = "lfxrka81", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 25 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 }, { itemRef = "732368d4:50qj8dzw", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Cindercloth Cloak", output = { itemRef = "7259f1d3:ayc1gfkp", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 275, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 128775 }, { category = "", description = "", id = "rsdfv2t9", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 }, { itemRef = "61fdf3df:hqook9xe", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Brightcloth Cloak", output = { itemRef = "7259f1d3:9cwg3gri", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 275, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 128775 }, { category = "", description = "", id = "ee4sysyp", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 30 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 }, { itemRef = "732368d4:50qj8dzw", kind = "rpe_item", quantity = 4 }, { itemRef = "732368d4:sclalidn", kind = "rpe_item", quantity = 4 } }, learnMode = "trainer", name = "Cloak of Fire", output = { itemRef = "7259f1d3:ylmlt4ky", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 275, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 128775 }, { category = "", description = "", id = "99fhdxdz", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 60 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 2 }, { itemRef = "3eb7e9bb:hq608hly", kind = "rpe_item", quantity = 4 }, { itemRef = "732368d4:sclalidn", kind = "rpe_item", quantity = 4 }, { itemRef = "61fdf3df:6hy57ood", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Cloak of Warding", output = { itemRef = "7259f1d3:vzvsfj3a", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 300, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 152475 }, { category = "", description = "", id = "gt5nfit3", inputs = { { itemRef = "7259f1d3:xnx0kwlv", kind = "rpe_item", quantity = 2 }, { itemRef = "732368d4:lxqnh3pp", kind = "rpe_item", quantity = 4 }, { itemRef = "3eb7e9bb:8eummju4", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Gaea's Embrace", output = { itemRef = "7259f1d3:byvkorwx", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 300, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 152475 }, { category = "", description = "", id = "gl1n4hdv", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 20 }, { itemRef = "3eb7e9bb:06vxv3hh", kind = "rpe_item", quantity = 5 }, { itemRef = "732368d4:7z1lti71", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Glacial Cloak", output = { itemRef = "7259f1d3:kxopzq6p", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 300, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 152475 }, { category = "", description = "", id = "yi1dfxvq", inputs = { { itemRef = "7259f1d3:agzskvec", kind = "rpe_item", quantity = 6 }, { itemRef = "7259f1d3:pujc8hth", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "White Linen Robe", output = { itemRef = "7259f1d3:r5amyo04", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 1, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 104 }, { category = "", description = "", id = "0nspxuqr", inputs = { { itemRef = "7259f1d3:agzskvec", kind = "rpe_item", quantity = 6 }, { itemRef = "7259f1d3:pujc8hth", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Brown Linen Robe", output = { itemRef = "7259f1d3:j4seqsjb", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 15, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 855 }, { category = "", description = "", id = "8mv5sjnu", inputs = { { itemRef = "7259f1d3:agzskvec", kind = "rpe_item", quantity = 6 }, { itemRef = "7259f1d3:pujc8hth", kind = "rpe_item", quantity = 2 }, { itemRef = "7259f1d3:oo8796rr", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Red Linen Robe", output = { itemRef = "7259f1d3:6f0fq3bu", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 30, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 2355 }, { category = "", description = "", id = "z3hhs9kl", inputs = { { itemRef = "7259f1d3:agzskvec", kind = "rpe_item", quantity = 6 }, { itemRef = "7259f1d3:pujc8hth", kind = "rpe_item", quantity = 1 }, { itemRef = "7259f1d3:nfwx3196", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Blue Linen Vest", output = { itemRef = "7259f1d3:i1odbqvc", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 45, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 4575 }, { category = "", description = "", id = "y4wjzxax", inputs = { { itemRef = "7259f1d3:agzskvec", kind = "rpe_item", quantity = 8 }, { itemRef = "7259f1d3:pujc8hth", kind = "rpe_item", quantity = 1 }, { itemRef = "538a54a0:sm9q37oi", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Barbaric Linen Vest", output = { itemRef = "7259f1d3:vr4f36zt", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 50, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 5475 }, { category = "", description = "", id = "85k6rqx5", inputs = { { itemRef = "7259f1d3:agzskvec", kind = "rpe_item", quantity = 8 }, { itemRef = "7259f1d3:pujc8hth", kind = "rpe_item", quantity = 2 }, { itemRef = "7259f1d3:nfwx3196", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Blue Linen Robe", output = { itemRef = "7259f1d3:n2f9v181", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 60, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 7515 }, { category = "", description = "", id = "zd1q1pnu", inputs = { { itemRef = "7259f1d3:agzskvec", kind = "rpe_item", quantity = 8 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Handstitched Linen Britches", output = { itemRef = "7259f1d3:nxeyb4yk", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 70, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 9875 }, { category = "", description = "", id = "x35wzfwq", inputs = { { itemRef = "7259f1d3:agzskvec", kind = "rpe_item", quantity = 4 }, { itemRef = "7259f1d3:pujc8hth", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Linen Belt", output = { itemRef = "7259f1d3:or9bjbku", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 5, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 255 }, { category = "", description = "", id = "310eyve3", inputs = { { itemRef = "7259f1d3:agzskvec", kind = "rpe_item", quantity = 4 }, { itemRef = "7259f1d3:pujc8hth", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Simple Linen Boots", output = { itemRef = "7259f1d3:pr7ml76d", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 10, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 515 }, { category = "", description = "", id = "tf2llo9u", inputs = { { itemRef = "7259f1d3:agzskvec", kind = "rpe_item", quantity = 6 }, { itemRef = "7259f1d3:pujc8hth", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Brown Linen Pants", output = { itemRef = "7259f1d3:ls3e9k5e", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 20, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 1275 }, { category = "", description = "", id = "ybyjcu4n", inputs = { { itemRef = "7259f1d3:agzskvec", kind = "rpe_item", quantity = 6 }, { itemRef = "7259f1d3:pujc8hth", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Green Linen Bracers", output = { itemRef = "7259f1d3:9hvghvqa", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 25, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 1775 }, { category = "", description = "", id = "e6r678mk", inputs = { { itemRef = "7259f1d3:agzskvec", kind = "rpe_item", quantity = 10 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 1 }, { itemRef = "538a54a0:sm9q37oi", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Soft-soled Linen Boots", output = { itemRef = "7259f1d3:biqr2ktc", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 80, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 12555 }, { category = "", description = "", id = "wzw1pk46", inputs = { { itemRef = "7259f1d3:1wssn0qp", kind = "rpe_item", quantity = 9 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Heavy Woolen Gloves", output = { itemRef = "7259f1d3:xvmmos17", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 85, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 14015 }, { category = "", description = "", id = "jfnav21x", inputs = { { itemRef = "7259f1d3:1wssn0qp", kind = "rpe_item", quantity = 12 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 2 }, { itemRef = "538a54a0:sm9q37oi", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Woolen Boots", output = { itemRef = "7259f1d3:4ejyqw47", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 95, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 17175 }, { category = "", description = "", id = "vxy1029k", inputs = { { itemRef = "7259f1d3:1wssn0qp", kind = "rpe_item", quantity = 12 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 1 }, { itemRef = "538a54a0:sm9q37oi", kind = "rpe_item", quantity = 2 }, { itemRef = "7259f1d3:oo8796rr", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Red Woolen Boots", output = { itemRef = "7259f1d3:vdu2gsbp", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 95, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 17175 }, { category = "", description = "", id = "74yqa5j0", inputs = { { itemRef = "7259f1d3:1wssn0qp", kind = "rpe_item", quantity = 12 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 2 }, { itemRef = "7259f1d3:nfwx3196", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Red Woolen Boots", output = { itemRef = "7259f1d3:vdu2gsbp", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 100, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 18875 }, { category = "", description = "", id = "wg4qpadf", inputs = { { itemRef = "7259f1d3:1wssn0qp", kind = "rpe_item", quantity = 12 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 3 }, { itemRef = "7259f1d3:z1nr9mnr", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Grey Woolen Robe", output = { itemRef = "7259f1d3:kkgt8k0c", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 105, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 20655 }, { category = "", description = "", id = "tdtiifyg", inputs = { { itemRef = "7259f1d3:1wssn0qp", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 4 } }, learnMode = "trainer", name = "Heavy Woolen Pants", output = { itemRef = "7259f1d3:h4e9sjsd", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 110, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 22515 }, { category = "", description = "", id = "3c3e33aw", inputs = { { itemRef = "7259f1d3:1wssn0qp", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 3 }, { itemRef = "7259f1d3:oo8796rr", kind = "rpe_item", quantity = 3 } }, learnMode = "trainer", name = "Greater Adept's Robe", output = { itemRef = "7259f1d3:ewnqq9mc", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 115, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 24455 }, { category = "", description = "", id = "vrronyq9", inputs = { { itemRef = "7259f1d3:1wssn0qp", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 1 }, { itemRef = "7259f1d3:oo8796rr", kind = "rpe_item", quantity = 3 } }, learnMode = "trainer", name = "Colorful Kilt", output = { itemRef = "7259f1d3:nozc0zy7", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 120, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 26475 }, { category = "", description = "", id = "a5kv8ob4", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 8 }, { itemRef = "538a54a0:84y6qzsn", kind = "rpe_item", quantity = 4 }, { itemRef = "4999dcec:ms6y0fi0", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Pearl-inlaid Silk Boots", output = { itemRef = "7259f1d3:lpjdgcr7", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 125, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 28575 }, { category = "", description = "", id = "jrqw0fhf", inputs = { { itemRef = "7259f1d3:1wssn0qp", kind = "rpe_item", quantity = 12 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 3 } }, learnMode = "trainer", name = "Gloves of Meditation", output = { itemRef = "7259f1d3:z4e6tgje", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 130, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 30755 }, { category = "", description = "", id = "15my9crs", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 8 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Lesser Wizard's Robe", output = { itemRef = "7259f1d3:t9hr4z4i", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 135, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 33015 }, { category = "", description = "", id = "urypzfyh", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 12 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Spider Silk Slippers", output = { itemRef = "7259f1d3:iv8w1nkt", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 140, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 35355 }, { category = "", description = "", id = "1gv0s7pm", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 8 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 1 }, { itemRef = "7259f1d3:nfwx3196", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Azure Silk Hood", output = { itemRef = "7259f1d3:4p45lf3u", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 140, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 35355 }, { category = "", description = "", id = "enemqsvd", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 16 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Robes of Arcana", output = { itemRef = "7259f1d3:9kd6g8n8", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 150, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 40275 }, { category = "", description = "", id = "k4yc0mf1", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 12 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 1 }, { itemRef = "538a54a0:55k8gjup", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Truefaith Gloves", output = { itemRef = "7259f1d3:2cex0ivf", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 150, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 40275 }, { category = "", description = "", id = "oym9kn5n", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 12 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Silk Headband", output = { itemRef = "7259f1d3:43u4st9h", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 160, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 45515 }, { category = "", description = "", id = "xy6ojn78", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 12 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Enchanter's Cowl", output = { itemRef = "7259f1d3:ag2bqcm1", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 165, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 48255 }, { category = "", description = "", id = "lmpyk94n", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:uv6t44ol", kind = "rpe_item", quantity = 1 }, { itemRef = "7259f1d3:m3m72ds8", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Green Silk Armor", output = { itemRef = "7259f1d3:ox5dsp94", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 165, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 48255 }, { category = "", description = "", id = "lh8w3zzx", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 12 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 2 }, { itemRef = "732368d4:ku9j8vhw", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Earthen Vest", output = { itemRef = "7259f1d3:22wu2d71", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 170, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 51075 }, { category = "", description = "", id = "8oa3v1ky", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 16 }, { itemRef = "7259f1d3:4ml43y0u", kind = "rpe_item", quantity = 2 }, { itemRef = "61fdf3df:ov027km6", kind = "rpe_item", quantity = 1 }, { itemRef = "7259f1d3:oo8796rr", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Crimson Silk Belt", output = { itemRef = "7259f1d3:27zw5yao", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 175, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 53975 }, { category = "", description = "", id = "ghufvujj", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 16 }, { itemRef = "7259f1d3:uv6t44ol", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Boots of the Enchanter", output = { itemRef = "7259f1d3:u5d3ghmm", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 175, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 53975 }, { category = "", description = "", id = "1pkocm5r", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:uv6t44ol", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Green Silken Shoulders", output = { itemRef = "7259f1d3:z3s6o9o7", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 180, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 56955 }, { category = "", description = "", id = "e60dv2un", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:uv6t44ol", kind = "rpe_item", quantity = 2 }, { itemRef = "7259f1d3:oo8796rr", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Crimson Silk Shoulders", output = { itemRef = "7259f1d3:y966beta", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 190, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 63155 }, { category = "", description = "", id = "hqb6wk2o", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 10 }, { itemRef = "7259f1d3:uv6t44ol", kind = "rpe_item", quantity = 2 }, { itemRef = "732368d4:ku9j8vhw", kind = "rpe_item", quantity = 2 }, { itemRef = "732368d4:2616xh4v", kind = "rpe_item", quantity = 2 }, { itemRef = "732368d4:vlwvpmfx", kind = "rpe_item", quantity = 2 }, { itemRef = "732368d4:sclalidn", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Robe of Power", output = { itemRef = "7259f1d3:nq3oml24", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 190, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 63155 }, { category = "", description = "", id = "mloacq2h", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:uv6t44ol", kind = "rpe_item", quantity = 2 }, { itemRef = "538a54a0:55k8gjup", kind = "rpe_item", quantity = 2 }, { itemRef = "732368d4:ku9j8vhw", kind = "rpe_item", quantity = 4 }, { itemRef = "61fdf3df:ov027km6", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Earthen Silk Belt", output = { itemRef = "7259f1d3:bo7gq4mq", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 195, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 66375 }, { category = "", description = "", id = "no5rakzv", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:uv6t44ol", kind = "rpe_item", quantity = 1 }, { itemRef = "538a54a0:55k8gjup", kind = "rpe_item", quantity = 4 }, { itemRef = "4999dcec:ht59o8mx", kind = "rpe_item", quantity = 1 }, { itemRef = "61fdf3df:ov027km6", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Star Belt", output = { itemRef = "7259f1d3:ghl39cpx", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 200, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 69675 }, { category = "", description = "", id = "x2hr8t1f", inputs = { { itemRef = "7259f1d3:jt6ktqiu", kind = "rpe_item", quantity = 32 }, { itemRef = "7259f1d3:uv6t44ol", kind = "rpe_item", quantity = 1 }, { itemRef = "732368d4:sclalidn", kind = "rpe_item", quantity = 4 }, { itemRef = "7259f1d3:oo8796rr", kind = "rpe_item", quantity = 4 } }, learnMode = "trainer", name = "Crimson Silk Robe", output = { itemRef = "7259f1d3:zpiqzilq", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 205, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 73055 }, { category = "", description = "", id = "817mti2c", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:uv6t44ol", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Black Mageweave Vest", output = { itemRef = "7259f1d3:7je8t4yb", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 205, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 73055 }, { category = "", description = "", id = "tdp7h1j1", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:uv6t44ol", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Black Mageweave Leggings", output = { itemRef = "7259f1d3:q3sznxi0", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 205, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 73055 }, { category = "", description = "", id = "hv9vxl2n", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Black Mageweave Robe", output = { itemRef = "7259f1d3:3cc39cob", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 210, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 76515 }, { category = "", description = "", id = "o18kkeir", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 10 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "White Bandit Mask", output = { itemRef = "7259f1d3:mdzvfbok", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 215, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 80055 }, { category = "", description = "", id = "8zic9is4", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 1 }, { itemRef = "7259f1d3:oo8796rr", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Red Mageweave Vest", output = { itemRef = "7259f1d3:0nwgkdih", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 215, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 80055 }, { category = "", description = "", id = "dz6bv4rk", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 1 }, { itemRef = "7259f1d3:oo8796rr", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Red Mageweave Pants", output = { itemRef = "7259f1d3:t5zmjxy7", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 215, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 80055 }, { category = "", description = "", id = "zxil0qgp", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 10 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Black Mageweave Gloves", output = { itemRef = "7259f1d3:bn8nd7gq", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 215, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 80055 }, { category = "", description = "", id = "ngst3bxu", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 30 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 2 }, { itemRef = "3eb7e9bb:w2plwren", kind = "rpe_item", quantity = 2 }, { itemRef = "3eb7e9bb:2hbdmyj4", kind = "rpe_item", quantity = 6 } }, learnMode = "trainer", name = "Dreamweave Vest", output = { itemRef = "7259f1d3:cwkerny4", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 225, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 87375 }, { category = "", description = "", id = "pxqiz2kh", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 2 }, { itemRef = "3eb7e9bb:w2plwren", kind = "rpe_item", quantity = 2 }, { itemRef = "3eb7e9bb:2hbdmyj4", kind = "rpe_item", quantity = 4 } }, learnMode = "trainer", name = "Dreamweave Gloves", output = { itemRef = "7259f1d3:5ro18gtd", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 225, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 87375 }, { category = "", description = "", id = "aelksbyz", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 2 }, { itemRef = "7259f1d3:oo8796rr", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Red Mageweave Gloves", output = { itemRef = "7259f1d3:mt1lompv", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 225, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 87375 }, { category = "", description = "", id = "78k379de", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Black Mageweave Headband", output = { itemRef = "7259f1d3:cqggqg4u", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 230, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 91155 }, { category = "", description = "", id = "t2df3xbr", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Black Mageweave Shoulders", output = { itemRef = "7259f1d3:4jvsf9vy", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 230, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 91155 }, { category = "", description = "", id = "1d5c7ffa", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 15 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 2 }, { itemRef = "538a54a0:u0wy9jz1", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Black Mageweave Boots", output = { itemRef = "7259f1d3:t9oha2l3", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 230, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 91155 }, { category = "", description = "", id = "wqagmm2p", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 3 }, { itemRef = "7259f1d3:oo8796rr", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Red Mageweave Shoulders", output = { itemRef = "7259f1d3:f0eqxb9v", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 235, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 95015 }, { category = "", description = "", id = "pqbd8aml", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 2 }, { itemRef = "7259f1d3:oo8796rr", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Red Mageweave Headband", output = { itemRef = "7259f1d3:nqwa9la3", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 240, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 98955 }, { category = "", description = "", id = "x30zwb1g", inputs = { { itemRef = "7259f1d3:edth2zu1", kind = "rpe_item", quantity = 40 }, { itemRef = "7259f1d3:shbu7lxd", kind = "rpe_item", quantity = 3 }, { itemRef = "4999dcec:qgjc3m5m", kind = "rpe_item", quantity = 1 }, { itemRef = "61fdf3df:ufv4fdnf", kind = "rpe_item", quantity = 1 }, { itemRef = "3eb7e9bb:2hbdmyj4", kind = "rpe_item", quantity = 4 }, { itemRef = "3eb7e9bb:w2plwren", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Dreamweave Circlet", output = { itemRef = "7259f1d3:y5taywcv", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 250, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 107075 }, { category = "", description = "", id = "98w7opvs", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 40 }, { itemRef = "732368d4:tfwg197j", kind = "rpe_item", quantity = 3 }, { itemRef = "732368d4:lxqnh3pp", kind = "rpe_item", quantity = 3 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Wisdom of the Timbermaw", output = { itemRef = "7259f1d3:43w9k3mf", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 290, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 142755 }, { category = "", description = "", id = "sqfva5ep", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 30 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 }, { itemRef = "7259f1d3:xnx0kwlv", kind = "rpe_item", quantity = 4 }, { itemRef = "4999dcec:6b4o47go", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Mooncloth Boots", output = { itemRef = "7259f1d3:c3zsw8vk", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 290, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 142755 }, { category = "", description = "", id = "ftyeepq3", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 30 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 }, { itemRef = "7259f1d3:xnx0kwlv", kind = "rpe_item", quantity = 4 } }, learnMode = "trainer", name = "Mooncloth Leggings", output = { itemRef = "7259f1d3:8f7vbtoq", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 290, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 142755 }, { category = "", description = "", id = "d2z3p3q9", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 30 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 }, { itemRef = "732368d4:x5hz6tby", kind = "rpe_item", quantity = 4 }, { itemRef = "4999dcec:y7998n1r", kind = "rpe_item", quantity = 2 }, { itemRef = "3eb7e9bb:hq608hly", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Argent Boots", output = { itemRef = "7259f1d3:2tq936qq", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 290, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 142755 }, { category = "", description = "", id = "z9e69v87", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 30 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 }, { itemRef = "7259f1d3:xnx0kwlv", kind = "rpe_item", quantity = 4 } }, learnMode = "trainer", name = "Mooncloth Vest", output = { itemRef = "7259f1d3:he1t3q0n", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 300, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 152475 }, { category = "", description = "", id = "l6t8sy2p", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 25 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 1 }, { itemRef = "7259f1d3:xnx0kwlv", kind = "rpe_item", quantity = 5 } }, learnMode = "trainer", name = "Mooncloth Shoulders", output = { itemRef = "7259f1d3:bl8tt5fn", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 300, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 152475 }, { category = "", description = "", id = "jnzv2ft2", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 20 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 2 }, { itemRef = "7259f1d3:xnx0kwlv", kind = "rpe_item", quantity = 6 }, { itemRef = "732368d4:x5hz6tby", kind = "rpe_item", quantity = 2 }, { itemRef = "4999dcec:atpvfzht", kind = "rpe_item", quantity = 1 } }, learnMode = "trainer", name = "Mooncloth Circlet", output = { itemRef = "7259f1d3:yqkv77d0", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 300, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 152475 }, { category = "", description = "", id = "4e35smex", inputs = { { itemRef = "7259f1d3:dx7zh3l2", kind = "rpe_item", quantity = 60 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 2 }, { itemRef = "7259f1d3:xnx0kwlv", kind = "rpe_item", quantity = 6 }, { itemRef = "4999dcec:y7998n1r", kind = "rpe_item", quantity = 2 } }, learnMode = "trainer", name = "Mooncloth Gloves", output = { itemRef = "7259f1d3:z65t76x7", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 300, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 152475 }, { category = "", description = "", id = "j17ju2i7", inputs = { { itemRef = "3eb7e9bb:hq608hly", kind = "rpe_item", quantity = 2 }, { itemRef = "7259f1d3:x8ste3qj", kind = "rpe_item", quantity = 2 }, { itemRef = "7259f1d3:xnx0kwlv", kind = "rpe_item", quantity = 5 } }, learnMode = "trainer", name = "Argent Shoulders", output = { itemRef = "7259f1d3:vfqq6p5y", maxQuantity = 1, minQuantity = 1 }, reagents = {  }, requiredSkillLevel = 300, results = {  }, skillRef = "f82db71a:goqp0alw", tags = {  }, trainerCostCopper = 152475 } }, resources = {  }, skills = {  }, spells = {  }, stats = {  }, traits = {  }, units = {  }, weaponTypes = {  } }, format = "rpe-dataset", version = 1 }
+local _, Addon = ...
+
+Addon.Data.DefaultDatasets:Register({
+    version = 1,
+    dataset = {
+        achievements = {},
+        auras = {},
+        authorName = "Ortellus-ArgentDawn",
+        classes = {},
+        currencies = {},
+        damageSchools = {},
+        datasetType = "crafting",
+        dependencies = {
+            "f82db71a"
+        },
+        description = "",
+        groupName = "Core",
+        guildSettings = {},
+        id = "7259f1d3",
+        interactions = {},
+        itemSlots = {},
+        items = {
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_fabric_linen_01.blp",
+                id = "agzskvec",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Linen Cloth",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_fabric_wool_01.blp",
+                id = "1wssn0qp",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Wool Cloth",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_fabric_silk_01.blp",
+                id = "jt6ktqiu",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Silk Cloth",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_fabric_mageweave_01.blp",
+                id = "edth2zu1",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Mageweave Cloth",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_fabric_purplefire_01.blp",
+                id = "dx7zh3l2",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runecloth",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_blacksmithdye_black.blp",
+                id = "dsuj9x3j",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Black Dye",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_tailoringdye_red.blp",
+                id = "oo8796rr",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Red Dye",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_tailoringdye_blue.blp",
+                id = "nfwx3196",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Blue Dye",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_fabric_linen_03.blp",
+                id = "pujc8hth",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Coarse Thread",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_fabric_wool_02.blp",
+                id = "4ml43y0u",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Fine Thread",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_fabric_silk_02.blp",
+                id = "uv6t44ol",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Silken Thread",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_fabric_silk_02.blp",
+                id = "shbu7lxd",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Heavy Silken Thread",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/spell_shadow_antimagicshell.blp",
+                id = "x8ste3qj",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Rune Thread",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 46,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_15.blp",
+                id = "zowdkbia",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runecloth Belt",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 37
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 12
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 8
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 51,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_05.blp",
+                id = "puyk08a6",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runecloth Boots",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 50
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 9
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 14
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 48,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_10.blp",
+                id = "vqcblk29",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runecloth Cloak",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 34
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 8
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 9
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_10.blp",
+                id = "m67kl8yo",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runecloth Gloves",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 45
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 9
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 9
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 12
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 12
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 54,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_bandana_03.blp",
+                id = "up4gfqdo",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runecloth Headband",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 62
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 20
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 13
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 52,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_09.blp",
+                id = "v3874ra7",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runecloth Pants",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 65
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 12
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 20
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "none",
+                blueSockets = 1,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 47,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_04.blp",
+                id = "4n9ygjop",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runecloth Tunic",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {
+                    {
+                        color = "blue"
+                    }
+                },
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 68
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 11
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 17
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 56,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_21.blp",
+                id = "a2unhyjv",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runecloth Shoulders",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 59
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 15
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 10
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 14,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_11.blp",
+                id = "gkcxrbcq",
+                isTwoHanded = false,
+                itemLevel = 21,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Pearl-clasped Cloak",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 16
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 3
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 21,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_14.blp",
+                id = "zvlujs9w",
+                isTwoHanded = false,
+                itemLevel = 21,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Heavy Woolen Cloak",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 17
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 4
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 30,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_14.blp",
+                id = "pbqhbyto",
+                isTwoHanded = false,
+                itemLevel = 35,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Azure Silk Cloak",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 23
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 3
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 8
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 31,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_16.blp",
+                id = "o3evqgf5",
+                isTwoHanded = false,
+                itemLevel = 36,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Crimson Silk Cloak",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 24
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 3
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 7
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 32,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_02.blp",
+                id = "st2pubf9",
+                isTwoHanded = false,
+                itemLevel = 37,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Long Silken Cloak",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 24
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 5
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 35,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_04.blp",
+                id = "zq02lspb",
+                isTwoHanded = false,
+                itemLevel = 40,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Icy Cloak",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 29
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jjn0my8k",
+                        value = 11
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_18.blp",
+                id = "ayc1gfkp",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Cindercloth Cloak",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 36
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 8
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 13
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_11.blp",
+                id = "9cwg3gri",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Brightcloth Cloak",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 36
+                    },
+                    {
+                        sourceStatRef = "f82db71a:itpo751d",
+                        value = 7
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jjn0my8k",
+                        value = 7
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_06.blp",
+                id = "vzvsfj3a",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Cloak of Warding",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 36
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0wyp78x9",
+                        value = 7
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_18.blp",
+                id = "ylmlt4ky",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Cloak of Fire",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 36
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 7
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 15
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_17.blp",
+                id = "byvkorwx",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Gaea's Embrace",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 49
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 6
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 20
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_16.blp",
+                id = "kxopzq6p",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Glacial Cloak",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 61
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 18
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jjn0my8k",
+                        value = 24
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_fabric_moonrag_01.blp",
+                id = "xnx0kwlv",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Mooncloth",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 5,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_04.blp",
+                id = "r5amyo04",
+                isTwoHanded = false,
+                itemLevel = 10,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "White Linen Robe",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 19
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 1
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 5,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_21.blp",
+                id = "j4seqsjb",
+                isTwoHanded = false,
+                itemLevel = 10,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Brown Linen Robe",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 19
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 1
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 7,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_18.blp",
+                id = "6f0fq3bu",
+                isTwoHanded = false,
+                itemLevel = 12,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Red Linen Robe",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 23
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 2
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 7,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_37.blp",
+                id = "i1odbqvc",
+                isTwoHanded = false,
+                itemLevel = 12,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Blue Linen Vest",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 23
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 2
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 9,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_fur.blp",
+                id = "vr4f36zt",
+                isTwoHanded = false,
+                itemLevel = 14,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Barbaric Linen Vest",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 26
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 2
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 2
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 9,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_23.blp",
+                id = "n2f9v181",
+                isTwoHanded = false,
+                itemLevel = 14,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Blue Linen Robe",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 26
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 3
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 9,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_07.blp",
+                id = "nxeyb4yk",
+                isTwoHanded = false,
+                itemLevel = 14,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Handstitched Linen Britches",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 23
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 2
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 2
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 4,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_02.blp",
+                id = "or9bjbku",
+                isTwoHanded = false,
+                itemLevel = 9,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Linen Belt",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 9
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 1
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 4,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_05.blp",
+                id = "pr7ml76d",
+                isTwoHanded = false,
+                itemLevel = 9,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Simple Linen Boots",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 11
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 1
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 4,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_06.blp",
+                id = "ls3e9k5e",
+                isTwoHanded = false,
+                itemLevel = 10,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Brown Linen Pants",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 16
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 1
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 7,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_12.blp",
+                id = "9hvghvqa",
+                isTwoHanded = false,
+                itemLevel = 12,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Green Linen Bracers",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 9
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 1
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 11,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_09.blp",
+                id = "biqr2ktc",
+                isTwoHanded = false,
+                itemLevel = 16,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Soft-soled Linen Boots",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 20
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 2
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 2
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 12,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_05.blp",
+                id = "xvmmos17",
+                isTwoHanded = false,
+                itemLevel = 17,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Heavy Woolen Gloves",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 19
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 2
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 2
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 14,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_09.blp",
+                id = "4ejyqw47",
+                isTwoHanded = false,
+                itemLevel = 19,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Woolen Boots",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 22
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 2
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 2
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 2
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 2
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 15,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_09.blp",
+                id = "vdu2gsbp",
+                isTwoHanded = false,
+                itemLevel = 20,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Red Woolen Boots",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 23
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 5
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 15,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shirt_13.blp",
+                id = "4phnjwul",
+                isTwoHanded = false,
+                itemLevel = 20,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Blue Overalls",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 34
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 5
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 4
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 5
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 16,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_13.blp",
+                id = "kkgt8k0c",
+                isTwoHanded = false,
+                itemLevel = 21,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Grey Woolen Robe",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 35
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 4
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 5
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 17,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_01.blp",
+                id = "h4e9sjsd",
+                isTwoHanded = false,
+                itemLevel = 22,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Heavy Woolen Pants",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 31
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 3
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 18,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_24.blp",
+                id = "ewnqq9mc",
+                isTwoHanded = false,
+                itemLevel = 23,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Greater Adept's Robe",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 37
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 1
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 2
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 7
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_tailoringdye_green.blp",
+                id = "m3m72ds8",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Green Dye",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_blacksmithdye_gray.blp",
+                id = "z1nr9mnr",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Grey Dye",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 14,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_02.blp",
+                id = "nozc0zy7",
+                isTwoHanded = false,
+                itemLevel = 19,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Colorful Kilt",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 33
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 6
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 6
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 20,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_05.blp",
+                id = "lpjdgcr7",
+                isTwoHanded = false,
+                itemLevel = 25,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Pearl-inlaid Silk Boots",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 29
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 7
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 4
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 4
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 21,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_05.blp",
+                id = "z4e6tgje",
+                isTwoHanded = false,
+                itemLevel = 26,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Gloves of Meditation",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 25
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 7
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 22,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_17.blp",
+                id = "t9hr4z4i",
+                isTwoHanded = false,
+                itemLevel = 27,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Lesser Wizard's Robe",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 41
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 8
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 5
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 23,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_09.blp",
+                id = "iv8w1nkt",
+                isTwoHanded = false,
+                itemLevel = 28,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Spider Silk Slippers",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 29
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 7
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 4
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 4
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 24,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_helmet_29.blp",
+                id = "4p45lf3u",
+                isTwoHanded = false,
+                itemLevel = 29,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Azure Silk Hood",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 33
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 5
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 5
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 25,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_29.blp",
+                id = "9kd6g8n8",
+                isTwoHanded = false,
+                itemLevel = 30,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Robes of Arcana",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 43
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 8
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 7
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 25,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_16.blp",
+                id = "2cex0ivf",
+                isTwoHanded = false,
+                itemLevel = 30,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Truefaith Gloves",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 27
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 3
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 15
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 5
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 27,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_bandana_01.blp",
+                id = "43u4st9h",
+                isTwoHanded = false,
+                itemLevel = 32,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Silk Headband",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 34
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 5
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 5
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 4
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 28,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_helmet_31.blp",
+                id = "ag2bqcm1",
+                isTwoHanded = false,
+                itemLevel = 33,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Enchanter's Cowl",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 37
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 10
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 28,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_06.blp",
+                id = "ox5dsp94",
+                isTwoHanded = false,
+                itemLevel = 33,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Green Silk Armor",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 45
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 13
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 29,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shirt_04.blp",
+                id = "22wu2d71",
+                isTwoHanded = false,
+                itemLevel = 34,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Earthen Vest",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 46
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 6
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 10
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 30,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_04.blp",
+                id = "27zw5yao",
+                isTwoHanded = false,
+                itemLevel = 35,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Crimson Silk Belt",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 26
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 7
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 30,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_05.blp",
+                id = "u5d3ghmm",
+                isTwoHanded = false,
+                itemLevel = 35,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Boots of the Enchanter",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 32
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 5
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 4
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 31,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_18.blp",
+                id = "z3s6o9o7",
+                isTwoHanded = false,
+                itemLevel = 36,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Green Silken Shoulders",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 36
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 11
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 33,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_23.blp",
+                id = "y966beta",
+                isTwoHanded = false,
+                itemLevel = 38,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Crimson Silk Shoulders",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 38
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 8
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 7
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_pickup",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = false,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 33,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_02.blp",
+                id = "nq3oml24",
+                isTwoHanded = false,
+                itemLevel = 38,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Robe of Power",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 55
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 12
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 8
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 14
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 14
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 34,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_24.blp",
+                id = "bo7gq4mq",
+                isTwoHanded = false,
+                itemLevel = 39,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Earthen Silk Belt",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 29
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 8
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 8
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 35,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_06.blp",
+                id = "ghl39cpx",
+                isTwoHanded = false,
+                itemLevel = 40,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Star Belt",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 30
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 13
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 4
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 13
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 36,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_25.blp",
+                id = "zpiqzilq",
+                isTwoHanded = false,
+                itemLevel = 41,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Crimson Silk Robe",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 54
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 15
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 36,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_leather_03.blp",
+                id = "7je8t4yb",
+                isTwoHanded = false,
+                itemLevel = 41,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Black Mageweave Vest",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 54
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 11
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 12
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 36,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_09.blp",
+                id = "q3sznxi0",
+                isTwoHanded = false,
+                itemLevel = 41,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Black Mageweave Leggings",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 47
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 8
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 14
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 37,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_13.blp",
+                id = "3cc39cob",
+                isTwoHanded = false,
+                itemLevel = 42,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Black Mageweave Robe",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 55
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 8
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 14
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 38,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_11.blp",
+                id = "mdzvfbok",
+                isTwoHanded = false,
+                itemLevel = 43,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "White Bandit Mask",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 46
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 11
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 13
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 13
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 38,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shirt_09.blp",
+                id = "0nwgkdih",
+                isTwoHanded = false,
+                itemLevel = 43,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Red Mageweave Vest",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 57
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 18
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 38,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_06.blp",
+                id = "t5zmjxy7",
+                isTwoHanded = false,
+                itemLevel = 43,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Red Mageweave Pants",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 49
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 12
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 14
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 14
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 38,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_05.blp",
+                id = "bn8nd7gq",
+                isTwoHanded = false,
+                itemLevel = 43,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Black Mageweave Gloves",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 35
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 15
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 15
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 40,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_42.blp",
+                id = "cwkerny4",
+                isTwoHanded = false,
+                itemLevel = 45,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Dreamweave Vest",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 65
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 9
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 14
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 18
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 18
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 40,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_18.blp",
+                id = "5ro18gtd",
+                isTwoHanded = false,
+                itemLevel = 45,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Dreamweave Gloves",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 41
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 4
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 7
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 18
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 18
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 40,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_19.blp",
+                id = "mt1lompv",
+                isTwoHanded = false,
+                itemLevel = 45,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Red Mageweave Gloves",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 37
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 10
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 11
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 11
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 41,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_bandana_01.blp",
+                id = "cqggqg4u",
+                isTwoHanded = false,
+                itemLevel = 46,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Black Mageweave Headband",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 49
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 12
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 13
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 41,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_25.blp",
+                id = "4jvsf9vy",
+                isTwoHanded = false,
+                itemLevel = 46,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Black Mageweave Shoulders",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 45
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 9
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 10
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 41,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_05.blp",
+                id = "t9oha2l3",
+                isTwoHanded = false,
+                itemLevel = 46,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Black Mageweave Boots",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 41
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 7
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 11
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 42,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_23.blp",
+                id = "f0eqxb9v",
+                isTwoHanded = false,
+                itemLevel = 47,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Red Mageweave Shoulders",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 46
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 15
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 43,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_bandana_03.blp",
+                id = "nqwa9la3",
+                isTwoHanded = false,
+                itemLevel = 48,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Red Mageweave Headband",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 51
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 20
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 45,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_crown_01.blp",
+                id = "y5taywcv",
+                isTwoHanded = false,
+                itemLevel = 50,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Dreamweave Circlet",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 58
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 10
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 12
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 21
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 21
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 58,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_09.blp",
+                id = "43w9k3mf",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Wisdom of the Timbermaw",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 46
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 21
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 12
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 53,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_13.blp",
+                id = "8f7vbtoq",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Mooncloth Leggings",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 72
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 14
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 21
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 12
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 53,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_cloth_03.blp",
+                id = "2tq936qq",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Argent Boots",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 57
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 7
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 21
+                    },
+                    {
+                        sourceStatRef = "f82db71a:itpo751d",
+                        value = 4
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 55,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_42.blp",
+                id = "he1t3q0n",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Mooncloth Vest",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 85
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 20
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 19
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 12
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 51,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_05.blp",
+                id = "c3zsw8vk",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Mooncloth Boots",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 55
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 13
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 11
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 14
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_17.blp",
+                id = "z65t76x7",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Mooncloth Gloves",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 55
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 16
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 15
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 9
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 56,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_02.blp",
+                id = "bl8tt5fn",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Mooncloth Shoulders",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 65
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 17
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 11
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 9
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_bandana_01.blp",
+                id = "yqkv77d0",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Mooncloth Circlet",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 71
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 23
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 15
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 13
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 59,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_02.blp",
+                id = "vfqq6p5y",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Argent Shoulders",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 68
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 23
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 8
+                    },
+                    {
+                        sourceStatRef = "f82db71a:itpo751d",
+                        value = 7
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1"
+                },
+                yellowSockets = 0
+            }
+        },
+        loot = {
+            {
+                conditions = {},
+                description = "Equal-weighting roll table for classic cloths (quantities 1-5). No roll (50%).",
+                drawCount = 1,
+                entries = {
+                    {
+                        id = "linen",
+                        maxQuantity = 5,
+                        minQuantity = 1,
+                        ref = "7259f1d3:agzskvec",
+                        type = "item",
+                        weight = 1
+                    },
+                    {
+                        id = "wool",
+                        maxQuantity = 5,
+                        minQuantity = 1,
+                        ref = "7259f1d3:1wssn0qp",
+                        type = "item",
+                        weight = 1
+                    },
+                    {
+                        id = "silk",
+                        maxQuantity = 5,
+                        minQuantity = 1,
+                        ref = "7259f1d3:jt6ktqiu",
+                        type = "item",
+                        weight = 1
+                    },
+                    {
+                        id = "mageweave",
+                        maxQuantity = 5,
+                        minQuantity = 1,
+                        ref = "7259f1d3:edth2zu1",
+                        type = "item",
+                        weight = 1
+                    },
+                    {
+                        id = "runecloth",
+                        maxQuantity = 5,
+                        minQuantity = 1,
+                        ref = "7259f1d3:dx7zh3l2",
+                        type = "item",
+                        weight = 1
+                    },
+                    {
+                        id = "nothing",
+                        maxQuantity = 1,
+                        minQuantity = 1,
+                        ref = "",
+                        type = "nothing",
+                        weight = 5
+                    }
+                },
+                id = "jcih77uu",
+                items = {},
+                name = "Cloth No-Roll",
+                tags = {}
+            },
+            {
+                conditions = {},
+                description = "Equal-weighting roll table for classic cloths (quantities 1-5). No roll (50%).",
+                drawCount = 1,
+                entries = {
+                    {
+                        id = "linen",
+                        maxQuantity = 5,
+                        minQuantity = 1,
+                        ref = "7259f1d3:agzskvec",
+                        type = "item",
+                        weight = 1
+                    },
+                    {
+                        id = "wool",
+                        maxQuantity = 5,
+                        minQuantity = 1,
+                        ref = "7259f1d3:1wssn0qp",
+                        type = "item",
+                        weight = 1
+                    },
+                    {
+                        id = "silk",
+                        maxQuantity = 5,
+                        minQuantity = 1,
+                        ref = "7259f1d3:jt6ktqiu",
+                        type = "item",
+                        weight = 1
+                    },
+                    {
+                        id = "mageweave",
+                        maxQuantity = 5,
+                        minQuantity = 1,
+                        ref = "7259f1d3:edth2zu1",
+                        type = "item",
+                        weight = 1
+                    },
+                    {
+                        id = "runecloth",
+                        maxQuantity = 5,
+                        minQuantity = 1,
+                        ref = "7259f1d3:dx7zh3l2",
+                        type = "item",
+                        weight = 1
+                    }
+                },
+                id = "jiieayww",
+                items = {},
+                name = "Cloth Guaranteed",
+                tags = {}
+            }
+        },
+        mounts = {},
+        name = "Tailoring",
+        pets = {},
+        races = {},
+        recipes = {
+            {
+                category = "",
+                description = "",
+                id = "ng402a98",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Runecloth Belt",
+                output = {
+                    itemRef = "7259f1d3:zowdkbia",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 255,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 111255
+            },
+            {
+                category = "",
+                description = "",
+                id = "s1a4fib4",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "538a54a0:4gnkyr9f",
+                        kind = "rpe_item",
+                        quantity = 4
+                    }
+                },
+                learnMode = "trainer",
+                name = "Runecloth Boots",
+                output = {
+                    itemRef = "7259f1d3:puyk08a6",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 280,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 133355
+            },
+            {
+                category = "",
+                description = "",
+                id = "mkgwta43",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Runecloth Cloak",
+                output = {
+                    itemRef = "7259f1d3:vqcblk29",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 265,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 119855
+            },
+            {
+                category = "",
+                description = "",
+                id = "bsygugir",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "538a54a0:4gnkyr9f",
+                        kind = "rpe_item",
+                        quantity = 4
+                    }
+                },
+                learnMode = "trainer",
+                name = "Runecloth Gloves",
+                output = {
+                    itemRef = "7259f1d3:m67kl8yo",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 275,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 128775
+            },
+            {
+                category = "",
+                description = "",
+                id = "lvcl90wb",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Runecloth Headband",
+                output = {
+                    itemRef = "7259f1d3:up4gfqdo",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 295,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 147575
+            },
+            {
+                category = "",
+                description = "",
+                id = "kiwwvjkk",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 30
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Runecloth Pants",
+                output = {
+                    itemRef = "7259f1d3:v3874ra7",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 285,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 138015
+            },
+            {
+                category = "",
+                description = "",
+                id = "d70cfewg",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 25
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Runecloth Tunic",
+                output = {
+                    itemRef = "7259f1d3:4n9ygjop",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 260,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 115515
+            },
+            {
+                category = "",
+                description = "",
+                id = "ga82eeez",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 35
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "538a54a0:4gnkyr9f",
+                        kind = "rpe_item",
+                        quantity = 4
+                    }
+                },
+                learnMode = "trainer",
+                name = "Runecloth Shoulders",
+                output = {
+                    itemRef = "7259f1d3:a2unhyjv",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 300,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 152475
+            },
+            {
+                category = "",
+                description = "",
+                id = "m4xabqnb",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:1wssn0qp",
+                        kind = "rpe_item",
+                        quantity = 9
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "4999dcec:s9lu5jap",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Pearl-clasped Cloak",
+                output = {
+                    itemRef = "7259f1d3:gkcxrbcq",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 90,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 15555
+            },
+            {
+                category = "",
+                description = "",
+                id = "mejped4q",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:1wssn0qp",
+                        kind = "rpe_item",
+                        quantity = 9
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "4999dcec:s9lu5jap",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Heavy Woolen Cloak",
+                output = {
+                    itemRef = "7259f1d3:zvlujs9w",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 100,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 18875
+            },
+            {
+                category = "",
+                description = "",
+                id = "6d54hny4",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 12
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "7259f1d3:nfwx3196",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Azure Silk Cloak",
+                output = {
+                    itemRef = "7259f1d3:pbqhbyto",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 175,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 53975
+            },
+            {
+                category = "",
+                description = "",
+                id = "12q8prcb",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "7259f1d3:oo8796rr",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Crimson Silk Cloak",
+                output = {
+                    itemRef = "7259f1d3:o3evqgf5",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 180,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 56955
+            },
+            {
+                category = "",
+                description = "",
+                id = "va4276y9",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 16
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Long Silken Cloak",
+                output = {
+                    itemRef = "7259f1d3:st2pubf9",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 185,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 60015
+            },
+            {
+                category = "",
+                description = "",
+                id = "f7vuhh1v",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "732368d4:7z1lti71",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Icy Cloak",
+                output = {
+                    itemRef = "7259f1d3:zq02lspb",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 200,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 69675
+            },
+            {
+                category = "",
+                description = "",
+                id = "lfxrka81",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 25
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "732368d4:50qj8dzw",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Cindercloth Cloak",
+                output = {
+                    itemRef = "7259f1d3:ayc1gfkp",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 275,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 128775
+            },
+            {
+                category = "",
+                description = "",
+                id = "rsdfv2t9",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "61fdf3df:hqook9xe",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Brightcloth Cloak",
+                output = {
+                    itemRef = "7259f1d3:9cwg3gri",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 275,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 128775
+            },
+            {
+                category = "",
+                description = "",
+                id = "ee4sysyp",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 30
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "732368d4:50qj8dzw",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "732368d4:sclalidn",
+                        kind = "rpe_item",
+                        quantity = 4
+                    }
+                },
+                learnMode = "trainer",
+                name = "Cloak of Fire",
+                output = {
+                    itemRef = "7259f1d3:ylmlt4ky",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 275,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 128775
+            },
+            {
+                category = "",
+                description = "",
+                id = "99fhdxdz",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 60
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "3eb7e9bb:hq608hly",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "732368d4:sclalidn",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "61fdf3df:6hy57ood",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Cloak of Warding",
+                output = {
+                    itemRef = "7259f1d3:vzvsfj3a",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 300,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 152475
+            },
+            {
+                category = "",
+                description = "",
+                id = "gt5nfit3",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:xnx0kwlv",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "732368d4:lxqnh3pp",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "3eb7e9bb:8eummju4",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Gaea's Embrace",
+                output = {
+                    itemRef = "7259f1d3:byvkorwx",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 300,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 152475
+            },
+            {
+                category = "",
+                description = "",
+                id = "gl1n4hdv",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "3eb7e9bb:06vxv3hh",
+                        kind = "rpe_item",
+                        quantity = 5
+                    },
+                    {
+                        itemRef = "732368d4:7z1lti71",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Glacial Cloak",
+                output = {
+                    itemRef = "7259f1d3:kxopzq6p",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 300,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 152475
+            },
+            {
+                category = "",
+                description = "",
+                id = "yi1dfxvq",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:agzskvec",
+                        kind = "rpe_item",
+                        quantity = 6
+                    },
+                    {
+                        itemRef = "7259f1d3:pujc8hth",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "White Linen Robe",
+                output = {
+                    itemRef = "7259f1d3:r5amyo04",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 1,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 104
+            },
+            {
+                category = "",
+                description = "",
+                id = "0nspxuqr",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:agzskvec",
+                        kind = "rpe_item",
+                        quantity = 6
+                    },
+                    {
+                        itemRef = "7259f1d3:pujc8hth",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Brown Linen Robe",
+                output = {
+                    itemRef = "7259f1d3:j4seqsjb",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 15,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 855
+            },
+            {
+                category = "",
+                description = "",
+                id = "8mv5sjnu",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:agzskvec",
+                        kind = "rpe_item",
+                        quantity = 6
+                    },
+                    {
+                        itemRef = "7259f1d3:pujc8hth",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "7259f1d3:oo8796rr",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Red Linen Robe",
+                output = {
+                    itemRef = "7259f1d3:6f0fq3bu",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 30,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 2355
+            },
+            {
+                category = "",
+                description = "",
+                id = "z3hhs9kl",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:agzskvec",
+                        kind = "rpe_item",
+                        quantity = 6
+                    },
+                    {
+                        itemRef = "7259f1d3:pujc8hth",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "7259f1d3:nfwx3196",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Blue Linen Vest",
+                output = {
+                    itemRef = "7259f1d3:i1odbqvc",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 45,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 4575
+            },
+            {
+                category = "",
+                description = "",
+                id = "y4wjzxax",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:agzskvec",
+                        kind = "rpe_item",
+                        quantity = 8
+                    },
+                    {
+                        itemRef = "7259f1d3:pujc8hth",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "538a54a0:sm9q37oi",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Barbaric Linen Vest",
+                output = {
+                    itemRef = "7259f1d3:vr4f36zt",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 50,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 5475
+            },
+            {
+                category = "",
+                description = "",
+                id = "85k6rqx5",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:agzskvec",
+                        kind = "rpe_item",
+                        quantity = 8
+                    },
+                    {
+                        itemRef = "7259f1d3:pujc8hth",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "7259f1d3:nfwx3196",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Blue Linen Robe",
+                output = {
+                    itemRef = "7259f1d3:n2f9v181",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 60,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 7515
+            },
+            {
+                category = "",
+                description = "",
+                id = "zd1q1pnu",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:agzskvec",
+                        kind = "rpe_item",
+                        quantity = 8
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Handstitched Linen Britches",
+                output = {
+                    itemRef = "7259f1d3:nxeyb4yk",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 70,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 9875
+            },
+            {
+                category = "",
+                description = "",
+                id = "x35wzfwq",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:agzskvec",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "7259f1d3:pujc8hth",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Linen Belt",
+                output = {
+                    itemRef = "7259f1d3:or9bjbku",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 5,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 255
+            },
+            {
+                category = "",
+                description = "",
+                id = "310eyve3",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:agzskvec",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "7259f1d3:pujc8hth",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Simple Linen Boots",
+                output = {
+                    itemRef = "7259f1d3:pr7ml76d",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 10,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 515
+            },
+            {
+                category = "",
+                description = "",
+                id = "tf2llo9u",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:agzskvec",
+                        kind = "rpe_item",
+                        quantity = 6
+                    },
+                    {
+                        itemRef = "7259f1d3:pujc8hth",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Brown Linen Pants",
+                output = {
+                    itemRef = "7259f1d3:ls3e9k5e",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 20,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 1275
+            },
+            {
+                category = "",
+                description = "",
+                id = "ybyjcu4n",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:agzskvec",
+                        kind = "rpe_item",
+                        quantity = 6
+                    },
+                    {
+                        itemRef = "7259f1d3:pujc8hth",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Green Linen Bracers",
+                output = {
+                    itemRef = "7259f1d3:9hvghvqa",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 25,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 1775
+            },
+            {
+                category = "",
+                description = "",
+                id = "e6r678mk",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:agzskvec",
+                        kind = "rpe_item",
+                        quantity = 10
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "538a54a0:sm9q37oi",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Soft-soled Linen Boots",
+                output = {
+                    itemRef = "7259f1d3:biqr2ktc",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 80,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 12555
+            },
+            {
+                category = "",
+                description = "",
+                id = "wzw1pk46",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:1wssn0qp",
+                        kind = "rpe_item",
+                        quantity = 9
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Heavy Woolen Gloves",
+                output = {
+                    itemRef = "7259f1d3:xvmmos17",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 85,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 14015
+            },
+            {
+                category = "",
+                description = "",
+                id = "jfnav21x",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:1wssn0qp",
+                        kind = "rpe_item",
+                        quantity = 12
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "538a54a0:sm9q37oi",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Woolen Boots",
+                output = {
+                    itemRef = "7259f1d3:4ejyqw47",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 95,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 17175
+            },
+            {
+                category = "",
+                description = "",
+                id = "vxy1029k",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:1wssn0qp",
+                        kind = "rpe_item",
+                        quantity = 12
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "538a54a0:sm9q37oi",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "7259f1d3:oo8796rr",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Red Woolen Boots",
+                output = {
+                    itemRef = "7259f1d3:vdu2gsbp",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 95,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 17175
+            },
+            {
+                category = "",
+                description = "",
+                id = "74yqa5j0",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:1wssn0qp",
+                        kind = "rpe_item",
+                        quantity = 12
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "7259f1d3:nfwx3196",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Red Woolen Boots",
+                output = {
+                    itemRef = "7259f1d3:vdu2gsbp",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 100,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 18875
+            },
+            {
+                category = "",
+                description = "",
+                id = "wg4qpadf",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:1wssn0qp",
+                        kind = "rpe_item",
+                        quantity = 12
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 3
+                    },
+                    {
+                        itemRef = "7259f1d3:z1nr9mnr",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Grey Woolen Robe",
+                output = {
+                    itemRef = "7259f1d3:kkgt8k0c",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 105,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 20655
+            },
+            {
+                category = "",
+                description = "",
+                id = "tdtiifyg",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:1wssn0qp",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 4
+                    }
+                },
+                learnMode = "trainer",
+                name = "Heavy Woolen Pants",
+                output = {
+                    itemRef = "7259f1d3:h4e9sjsd",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 110,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 22515
+            },
+            {
+                category = "",
+                description = "",
+                id = "3c3e33aw",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:1wssn0qp",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 3
+                    },
+                    {
+                        itemRef = "7259f1d3:oo8796rr",
+                        kind = "rpe_item",
+                        quantity = 3
+                    }
+                },
+                learnMode = "trainer",
+                name = "Greater Adept's Robe",
+                output = {
+                    itemRef = "7259f1d3:ewnqq9mc",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 115,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 24455
+            },
+            {
+                category = "",
+                description = "",
+                id = "vrronyq9",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:1wssn0qp",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "7259f1d3:oo8796rr",
+                        kind = "rpe_item",
+                        quantity = 3
+                    }
+                },
+                learnMode = "trainer",
+                name = "Colorful Kilt",
+                output = {
+                    itemRef = "7259f1d3:nozc0zy7",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 120,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 26475
+            },
+            {
+                category = "",
+                description = "",
+                id = "a5kv8ob4",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 8
+                    },
+                    {
+                        itemRef = "538a54a0:84y6qzsn",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "4999dcec:ms6y0fi0",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Pearl-inlaid Silk Boots",
+                output = {
+                    itemRef = "7259f1d3:lpjdgcr7",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 125,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 28575
+            },
+            {
+                category = "",
+                description = "",
+                id = "jrqw0fhf",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:1wssn0qp",
+                        kind = "rpe_item",
+                        quantity = 12
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 3
+                    }
+                },
+                learnMode = "trainer",
+                name = "Gloves of Meditation",
+                output = {
+                    itemRef = "7259f1d3:z4e6tgje",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 130,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 30755
+            },
+            {
+                category = "",
+                description = "",
+                id = "15my9crs",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 8
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Lesser Wizard's Robe",
+                output = {
+                    itemRef = "7259f1d3:t9hr4z4i",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 135,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 33015
+            },
+            {
+                category = "",
+                description = "",
+                id = "urypzfyh",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 12
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Spider Silk Slippers",
+                output = {
+                    itemRef = "7259f1d3:iv8w1nkt",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 140,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 35355
+            },
+            {
+                category = "",
+                description = "",
+                id = "1gv0s7pm",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 8
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "7259f1d3:nfwx3196",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Azure Silk Hood",
+                output = {
+                    itemRef = "7259f1d3:4p45lf3u",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 140,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 35355
+            },
+            {
+                category = "",
+                description = "",
+                id = "enemqsvd",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 16
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Robes of Arcana",
+                output = {
+                    itemRef = "7259f1d3:9kd6g8n8",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 150,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 40275
+            },
+            {
+                category = "",
+                description = "",
+                id = "k4yc0mf1",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 12
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "538a54a0:55k8gjup",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Truefaith Gloves",
+                output = {
+                    itemRef = "7259f1d3:2cex0ivf",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 150,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 40275
+            },
+            {
+                category = "",
+                description = "",
+                id = "oym9kn5n",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 12
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Silk Headband",
+                output = {
+                    itemRef = "7259f1d3:43u4st9h",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 160,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 45515
+            },
+            {
+                category = "",
+                description = "",
+                id = "xy6ojn78",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 12
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Enchanter's Cowl",
+                output = {
+                    itemRef = "7259f1d3:ag2bqcm1",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 165,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 48255
+            },
+            {
+                category = "",
+                description = "",
+                id = "lmpyk94n",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "7259f1d3:m3m72ds8",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Green Silk Armor",
+                output = {
+                    itemRef = "7259f1d3:ox5dsp94",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 165,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 48255
+            },
+            {
+                category = "",
+                description = "",
+                id = "lh8w3zzx",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 12
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "732368d4:ku9j8vhw",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Earthen Vest",
+                output = {
+                    itemRef = "7259f1d3:22wu2d71",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 170,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 51075
+            },
+            {
+                category = "",
+                description = "",
+                id = "8oa3v1ky",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 16
+                    },
+                    {
+                        itemRef = "7259f1d3:4ml43y0u",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "61fdf3df:ov027km6",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "7259f1d3:oo8796rr",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Crimson Silk Belt",
+                output = {
+                    itemRef = "7259f1d3:27zw5yao",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 175,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 53975
+            },
+            {
+                category = "",
+                description = "",
+                id = "ghufvujj",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 16
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Boots of the Enchanter",
+                output = {
+                    itemRef = "7259f1d3:u5d3ghmm",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 175,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 53975
+            },
+            {
+                category = "",
+                description = "",
+                id = "1pkocm5r",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Green Silken Shoulders",
+                output = {
+                    itemRef = "7259f1d3:z3s6o9o7",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 180,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 56955
+            },
+            {
+                category = "",
+                description = "",
+                id = "e60dv2un",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "7259f1d3:oo8796rr",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Crimson Silk Shoulders",
+                output = {
+                    itemRef = "7259f1d3:y966beta",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 190,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 63155
+            },
+            {
+                category = "",
+                description = "",
+                id = "hqb6wk2o",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 10
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "732368d4:ku9j8vhw",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "732368d4:2616xh4v",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "732368d4:vlwvpmfx",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "732368d4:sclalidn",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Robe of Power",
+                output = {
+                    itemRef = "7259f1d3:nq3oml24",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 190,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 63155
+            },
+            {
+                category = "",
+                description = "",
+                id = "mloacq2h",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "538a54a0:55k8gjup",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "732368d4:ku9j8vhw",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "61fdf3df:ov027km6",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Earthen Silk Belt",
+                output = {
+                    itemRef = "7259f1d3:bo7gq4mq",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 195,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 66375
+            },
+            {
+                category = "",
+                description = "",
+                id = "no5rakzv",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "538a54a0:55k8gjup",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "4999dcec:ht59o8mx",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "61fdf3df:ov027km6",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Star Belt",
+                output = {
+                    itemRef = "7259f1d3:ghl39cpx",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 200,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 69675
+            },
+            {
+                category = "",
+                description = "",
+                id = "x2hr8t1f",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 32
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "732368d4:sclalidn",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "7259f1d3:oo8796rr",
+                        kind = "rpe_item",
+                        quantity = 4
+                    }
+                },
+                learnMode = "trainer",
+                name = "Crimson Silk Robe",
+                output = {
+                    itemRef = "7259f1d3:zpiqzilq",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 205,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 73055
+            },
+            {
+                category = "",
+                description = "",
+                id = "817mti2c",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Black Mageweave Vest",
+                output = {
+                    itemRef = "7259f1d3:7je8t4yb",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 205,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 73055
+            },
+            {
+                category = "",
+                description = "",
+                id = "tdp7h1j1",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Black Mageweave Leggings",
+                output = {
+                    itemRef = "7259f1d3:q3sznxi0",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 205,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 73055
+            },
+            {
+                category = "",
+                description = "",
+                id = "hv9vxl2n",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Black Mageweave Robe",
+                output = {
+                    itemRef = "7259f1d3:3cc39cob",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 210,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 76515
+            },
+            {
+                category = "",
+                description = "",
+                id = "o18kkeir",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 10
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "White Bandit Mask",
+                output = {
+                    itemRef = "7259f1d3:mdzvfbok",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 215,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 80055
+            },
+            {
+                category = "",
+                description = "",
+                id = "8zic9is4",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "7259f1d3:oo8796rr",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Red Mageweave Vest",
+                output = {
+                    itemRef = "7259f1d3:0nwgkdih",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 215,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 80055
+            },
+            {
+                category = "",
+                description = "",
+                id = "dz6bv4rk",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "7259f1d3:oo8796rr",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Red Mageweave Pants",
+                output = {
+                    itemRef = "7259f1d3:t5zmjxy7",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 215,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 80055
+            },
+            {
+                category = "",
+                description = "",
+                id = "zxil0qgp",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 10
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Black Mageweave Gloves",
+                output = {
+                    itemRef = "7259f1d3:bn8nd7gq",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 215,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 80055
+            },
+            {
+                category = "",
+                description = "",
+                id = "ngst3bxu",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 30
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "3eb7e9bb:w2plwren",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "3eb7e9bb:2hbdmyj4",
+                        kind = "rpe_item",
+                        quantity = 6
+                    }
+                },
+                learnMode = "trainer",
+                name = "Dreamweave Vest",
+                output = {
+                    itemRef = "7259f1d3:cwkerny4",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 225,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 87375
+            },
+            {
+                category = "",
+                description = "",
+                id = "pxqiz2kh",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "3eb7e9bb:w2plwren",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "3eb7e9bb:2hbdmyj4",
+                        kind = "rpe_item",
+                        quantity = 4
+                    }
+                },
+                learnMode = "trainer",
+                name = "Dreamweave Gloves",
+                output = {
+                    itemRef = "7259f1d3:5ro18gtd",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 225,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 87375
+            },
+            {
+                category = "",
+                description = "",
+                id = "aelksbyz",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "7259f1d3:oo8796rr",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Red Mageweave Gloves",
+                output = {
+                    itemRef = "7259f1d3:mt1lompv",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 225,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 87375
+            },
+            {
+                category = "",
+                description = "",
+                id = "78k379de",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Black Mageweave Headband",
+                output = {
+                    itemRef = "7259f1d3:cqggqg4u",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 230,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 91155
+            },
+            {
+                category = "",
+                description = "",
+                id = "t2df3xbr",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Black Mageweave Shoulders",
+                output = {
+                    itemRef = "7259f1d3:4jvsf9vy",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 230,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 91155
+            },
+            {
+                category = "",
+                description = "",
+                id = "1d5c7ffa",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 15
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "538a54a0:u0wy9jz1",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Black Mageweave Boots",
+                output = {
+                    itemRef = "7259f1d3:t9oha2l3",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 230,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 91155
+            },
+            {
+                category = "",
+                description = "",
+                id = "wqagmm2p",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 3
+                    },
+                    {
+                        itemRef = "7259f1d3:oo8796rr",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Red Mageweave Shoulders",
+                output = {
+                    itemRef = "7259f1d3:f0eqxb9v",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 235,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 95015
+            },
+            {
+                category = "",
+                description = "",
+                id = "pqbd8aml",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "7259f1d3:oo8796rr",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Red Mageweave Headband",
+                output = {
+                    itemRef = "7259f1d3:nqwa9la3",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 240,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 98955
+            },
+            {
+                category = "",
+                description = "",
+                id = "x30zwb1g",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:edth2zu1",
+                        kind = "rpe_item",
+                        quantity = 40
+                    },
+                    {
+                        itemRef = "7259f1d3:shbu7lxd",
+                        kind = "rpe_item",
+                        quantity = 3
+                    },
+                    {
+                        itemRef = "4999dcec:qgjc3m5m",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "61fdf3df:ufv4fdnf",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "3eb7e9bb:2hbdmyj4",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "3eb7e9bb:w2plwren",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Dreamweave Circlet",
+                output = {
+                    itemRef = "7259f1d3:y5taywcv",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 250,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 107075
+            },
+            {
+                category = "",
+                description = "",
+                id = "98w7opvs",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 40
+                    },
+                    {
+                        itemRef = "732368d4:tfwg197j",
+                        kind = "rpe_item",
+                        quantity = 3
+                    },
+                    {
+                        itemRef = "732368d4:lxqnh3pp",
+                        kind = "rpe_item",
+                        quantity = 3
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Wisdom of the Timbermaw",
+                output = {
+                    itemRef = "7259f1d3:43w9k3mf",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 290,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 142755
+            },
+            {
+                category = "",
+                description = "",
+                id = "sqfva5ep",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 30
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "7259f1d3:xnx0kwlv",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "4999dcec:6b4o47go",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Mooncloth Boots",
+                output = {
+                    itemRef = "7259f1d3:c3zsw8vk",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 290,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 142755
+            },
+            {
+                category = "",
+                description = "",
+                id = "ftyeepq3",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 30
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "7259f1d3:xnx0kwlv",
+                        kind = "rpe_item",
+                        quantity = 4
+                    }
+                },
+                learnMode = "trainer",
+                name = "Mooncloth Leggings",
+                output = {
+                    itemRef = "7259f1d3:8f7vbtoq",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 290,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 142755
+            },
+            {
+                category = "",
+                description = "",
+                id = "d2z3p3q9",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 30
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "732368d4:x5hz6tby",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "4999dcec:y7998n1r",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "3eb7e9bb:hq608hly",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Argent Boots",
+                output = {
+                    itemRef = "7259f1d3:2tq936qq",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 290,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 142755
+            },
+            {
+                category = "",
+                description = "",
+                id = "z9e69v87",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 30
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "7259f1d3:xnx0kwlv",
+                        kind = "rpe_item",
+                        quantity = 4
+                    }
+                },
+                learnMode = "trainer",
+                name = "Mooncloth Vest",
+                output = {
+                    itemRef = "7259f1d3:he1t3q0n",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 300,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 152475
+            },
+            {
+                category = "",
+                description = "",
+                id = "l6t8sy2p",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 25
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 1
+                    },
+                    {
+                        itemRef = "7259f1d3:xnx0kwlv",
+                        kind = "rpe_item",
+                        quantity = 5
+                    }
+                },
+                learnMode = "trainer",
+                name = "Mooncloth Shoulders",
+                output = {
+                    itemRef = "7259f1d3:bl8tt5fn",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 300,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 152475
+            },
+            {
+                category = "",
+                description = "",
+                id = "jnzv2ft2",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 20
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "7259f1d3:xnx0kwlv",
+                        kind = "rpe_item",
+                        quantity = 6
+                    },
+                    {
+                        itemRef = "732368d4:x5hz6tby",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "4999dcec:atpvfzht",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Mooncloth Circlet",
+                output = {
+                    itemRef = "7259f1d3:yqkv77d0",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 300,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 152475
+            },
+            {
+                category = "",
+                description = "",
+                id = "4e35smex",
+                inputs = {
+                    {
+                        itemRef = "7259f1d3:dx7zh3l2",
+                        kind = "rpe_item",
+                        quantity = 60
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "7259f1d3:xnx0kwlv",
+                        kind = "rpe_item",
+                        quantity = 6
+                    },
+                    {
+                        itemRef = "4999dcec:y7998n1r",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Mooncloth Gloves",
+                output = {
+                    itemRef = "7259f1d3:z65t76x7",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 300,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 152475
+            },
+            {
+                category = "",
+                description = "",
+                id = "j17ju2i7",
+                inputs = {
+                    {
+                        itemRef = "3eb7e9bb:hq608hly",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "7259f1d3:x8ste3qj",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "7259f1d3:xnx0kwlv",
+                        kind = "rpe_item",
+                        quantity = 5
+                    }
+                },
+                learnMode = "trainer",
+                name = "Argent Shoulders",
+                output = {
+                    itemRef = "7259f1d3:vfqq6p5y",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 300,
+                results = {},
+                skillRef = "f82db71a:goqp0alw",
+                tags = {},
+                trainerCostCopper = 152475
+            }
+        },
+        resources = {},
+        skills = {},
+        spells = {},
+        stats = {},
+        traits = {},
+        units = {},
+        weaponTypes = {}
+    },
+})
