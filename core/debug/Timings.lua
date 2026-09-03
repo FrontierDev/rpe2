@@ -1,4 +1,4 @@
-local _, Addon = ...
+local addonName, Addon = ...
 
 local Debug = Addon.Debug or {}
 Addon.Debug = Debug
@@ -14,6 +14,7 @@ Timings.MaxRecentRecords = math.max(1, math.floor(tonumber(Timings.MaxRecentReco
 Timings.RecentRecords = Timings.RecentRecords or Timings.RecentSlowRecords or {}
 Timings.RecentSlowRecords = Timings.RecentRecords
 Timings.RecentRecordOrder = tonumber(Timings.RecentRecordOrder) or 0
+Timings.RuntimeHooks = Timings.RuntimeHooks or {}
 while #Timings.RecentRecords > Timings.MaxRecentRecords do
     table.remove(Timings.RecentRecords, 1)
 end
@@ -34,12 +35,26 @@ local function getNowMilliseconds()
     return 0
 end
 
+local function isInternalEnabled()
+    return type(Debug) == "table"
+        and type(Debug.IsLevelEnabled) == "function"
+        and Debug.IsLevelEnabled("internal") == true
+end
+
+-- RPE INTERNAL is the authoritative development diagnostics switch. Keep the
+-- explicit Timings.Enabled flag for /rpe debug timings compatibility, but do
+-- not require it when INTERNAL itself is enabled. This also covers settings/UI
+-- paths that update EnabledLevels without calling Debug.SetLevelEnabled().
+local function isEnabled()
+    return Timings.Enabled == true or isInternalEnabled()
+end
+
 local function shouldLog(options)
     if type(options) == "table" and options.force == true then
         return true
     end
 
-    return Timings.Enabled == true
+    return isInternalEnabled()
 end
 
 local function shouldMarkSlow(elapsedMs, thresholdMs)
@@ -94,7 +109,7 @@ local function copyCardinality(cardinality)
 end
 
 local function appendRecentRecord(label, elapsedMs, context, thresholdMs, cardinality, timestampMs, slow)
-    if not Timings.Enabled then
+    if not isEnabled() then
         return
     end
 
@@ -117,25 +132,20 @@ local function appendRecentRecord(label, elapsedMs, context, thresholdMs, cardin
 end
 
 local function emitTiming(label, elapsedMs, context, thresholdMs, cardinality)
-    if type(Debug) ~= "table" or type(Debug.Internal) ~= "function" then
+    if type(Debug) ~= "table" or type(Debug.Internal) ~= "function" or not isInternalEnabled() then
         return false
-    end
-
-    if type(Debug.EnsureInternalLevelEnabled) == "function" then
-        Debug.EnsureInternalLevelEnabled()
     end
 
     local slow = shouldMarkSlow(elapsedMs, thresholdMs)
     local cardinalityText = formatCardinality(cardinality)
-    Debug.Internal(
+    return Debug.Internal(
         "%sTiming%s %s took %.2fms%s",
         slow and "SLOW " or "",
         buildContextSuffix(context),
         tostring(label or "operation"),
         math.max(0, tonumber(elapsedMs) or 0),
         cardinalityText ~= "" and (" [" .. cardinalityText .. "]") or ""
-    )
-    return true
+    ) == true
 end
 
 local function buildPartSegment(part)
@@ -168,17 +178,18 @@ function Timings.SetEnabled(selfOrEnabled, maybeEnabled)
 end
 
 function Timings.IsEnabled()
-    return Timings.Enabled == true
+    return isEnabled()
 end
 
 function Timings.IsActive()
-    return Timings.Enabled == true
+    return isEnabled()
+        and isInternalEnabled()
         and type(Debug) == "table"
         and type(Debug.Internal) == "function"
 end
 
 function Timings:Start(label, options)
-    if not Timings.Enabled and not (type(options) == "table" and options.force == true) then
+    if not isEnabled() and not (type(options) == "table" and options.force == true) then
         return nil
     end
     local resolvedOptions = type(options) == "table" and options or {}
@@ -213,7 +224,7 @@ function Timings:Stop(timer, options)
     end
 
     local slow = shouldMarkSlow(elapsedMs, thresholdMs)
-    if Timings.Enabled then
+    if isEnabled() then
         appendRecentRecord(
             resolvedOptions.label or timer.label,
             elapsedMs,
@@ -246,7 +257,7 @@ function Timings:Measure(label, fn, options, ...)
         return nil
     end
 
-    if not Timings.Enabled and not (type(options) == "table" and options.force == true) then
+    if not isEnabled() and not (type(options) == "table" and options.force == true) then
         return fn(...)
     end
     local resolvedOptions = type(options) == "table" and options or {}
@@ -313,7 +324,7 @@ function Timings:Wrap(label, fn, options)
 end
 
 function Timings:LogParts(label, context, parts, totalElapsedMs, thresholdMs, cardinality)
-    if not Timings.IsEnabled() then
+    if not isEnabled() then
         return false
     end
 
@@ -338,20 +349,168 @@ function Timings:LogParts(label, context, parts, totalElapsedMs, thresholdMs, ca
         return false
     end
 
-    if type(Debug.EnsureInternalLevelEnabled) == "function" then
-        Debug.EnsureInternalLevelEnabled()
-    end
-
     local cardinalityText = formatCardinality(cardinality)
-    Debug.Internal(
+    return Debug.Internal(
         "%sTiming%s %s: %s%s",
         hasSlow and "SLOW " or "",
         buildContextSuffix(context),
         tostring(label or "operation"),
         table.concat(segments, ", "),
         cardinalityText ~= "" and (" [" .. cardinalityText .. "]") or ""
-    )
+    ) == true
+end
+
+local function packValues(...)
+    return { n = select("#", ...), ... }
+end
+
+local function getEventStateFromTarget(target)
+    if type(target) == "table" then
+        if type(target.GetEventState) == "function" then
+            local state = target:GetEventState()
+            if type(state) == "table" then
+                return state
+            end
+        end
+        if type(target.EventState) == "table" then
+            return target.EventState
+        end
+    end
+
+    local serverState = Addon.Server and Addon.Server.EventState or nil
+    if type(serverState) == "table" then
+        return serverState
+    end
+    return Addon.Client and Addon.Client.EventState or nil
+end
+
+local function buildRuntimeCardinality(target)
+    local eventState = getEventStateFromTarget(target)
+    if type(eventState) ~= "table" then
+        return nil
+    end
+
+    return {
+        eventId = tostring(eventState.id or ""),
+        eventUnits = type(eventState.units) == "table" and #eventState.units or 0,
+        turn = tonumber(eventState.turnNumber) or 0,
+        tick = tonumber(eventState.tickNumber) or 0,
+    }
+end
+
+local function wrapMethod(target, methodName, label, context, thresholdMs, hookKey)
+    if type(target) ~= "table" or type(target[methodName]) ~= "function" then
+        return false
+    end
+    hookKey = tostring(hookKey or methodName)
+    if Timings.RuntimeHooks[hookKey] == true then
+        return false
+    end
+
+    local original = target[methodName]
+    target[methodName] = function(self, ...)
+        if not isEnabled() then
+            return original(self, ...)
+        end
+
+        local timer = Timings:Start(label, {
+            context = context,
+            thresholdMs = thresholdMs or 8,
+        })
+        local results = packValues(original(self, ...))
+        Timings:Stop(timer, {
+            cardinality = buildRuntimeCardinality(self),
+        })
+        return unpackValues(results, 1, results.n)
+    end
+    Timings.RuntimeHooks[hookKey] = true
     return true
+end
+
+local function wrapFunction(target, functionName, label, context, thresholdMs, hookKey)
+    if type(target) ~= "table" or type(target[functionName]) ~= "function" then
+        return false
+    end
+    hookKey = tostring(hookKey or functionName)
+    if Timings.RuntimeHooks[hookKey] == true then
+        return false
+    end
+
+    local original = target[functionName]
+    target[functionName] = function(...)
+        if not isEnabled() then
+            return original(...)
+        end
+
+        local timer = Timings:Start(label, {
+            context = context,
+            thresholdMs = thresholdMs or 2,
+        })
+        local results = packValues(original(...))
+        Timings:Stop(timer)
+        return unpackValues(results, 1, results.n)
+    end
+    Timings.RuntimeHooks[hookKey] = true
+    return true
+end
+
+function Timings:InstallRuntimeHooks()
+    local server = Addon.Server
+    local client = Addon.Client
+    local planner = type(client) == "table" and client.AutopilotPlanner or nil
+
+    -- Host event lifecycle. Existing inner scopes remain in place; these outer
+    -- scopes guarantee a visible total even when execution passes through later
+    -- wrappers such as autopilot integration.
+    wrapMethod(server, "StartEvent", "Host event start", "event-start", 8, "Server.StartEvent")
+    wrapMethod(server, "AdvanceEventStep", "Host advance turn/tick request", "event-advance", 8, "Server.AdvanceEventStep")
+    wrapMethod(server, "_AdvanceEventStepAfterCommit", "Host advance turn/tick commit", "event-advance", 8, "Server._AdvanceEventStepAfterCommit")
+
+    -- Client receive/application totals. These complement the detailed parts in
+    -- client_Event.lua and make it obvious which side incurred the frame cost.
+    wrapMethod(client, "HandleEventStart", "Client EVENT_START", "event-start", 8, "Client.HandleEventStart")
+    wrapMethod(client, "HandleEventUnits", "Client EVENT_UNITS", "event-start", 8, "Client.HandleEventUnits")
+    wrapMethod(client, "HandleEventState", "Client EVENT_STATE", "event-state", 8, "Client.HandleEventState")
+
+    -- Autopilot orchestration and execution boundaries.
+    wrapMethod(client, "InitializeAutopilotSpatialRuntime", "Autopilot spatial initialization", "autopilot", 4, "Client.InitializeAutopilotSpatialRuntime")
+    wrapMethod(client, "ReconcileAutopilotSpatialRuntime", "Autopilot spatial reconciliation", "autopilot", 4, "Client.ReconcileAutopilotSpatialRuntime")
+    wrapMethod(client, "RefreshAutopilotPlayerPositionsForCompletedStep", "Autopilot player position refresh", "autopilot", 4, "Client.RefreshAutopilotPlayerPositionsForCompletedStep")
+    wrapMethod(client, "StartAutopilotStep", "Autopilot step start", "autopilot", 4, "Client.StartAutopilotStep")
+    wrapMethod(client, "ReplaceAutopilotPlanForCurrentStep", "Autopilot replan", "autopilot", 4, "Client.ReplaceAutopilotPlanForCurrentStep")
+    wrapMethod(client, "AuthorizeAutopilotPendingAction", "Autopilot authorize action", "autopilot", 4, "Client.AuthorizeAutopilotPendingAction")
+    wrapMethod(client, "AuthorizeAllAutopilotPendingActions", "Autopilot authorize all", "autopilot", 4, "Client.AuthorizeAllAutopilotPendingActions")
+    wrapMethod(client, "ConfirmAutopilotPendingMovement", "Autopilot confirm movement", "autopilot", 4, "Client.ConfirmAutopilotPendingMovement")
+    wrapMethod(client, "ExecuteEventUnitSpell", "Autopilot execute spell", "autopilot", 4, "Client.ExecuteEventUnitSpell")
+    wrapMethod(server, "GetNpcAutopilotCapability", "Autopilot capability check", "autopilot", 4, "Server.GetNpcAutopilotCapability")
+
+    -- Planner.Step is the sliceable cost centre. TaskQueue also records each
+    -- slice; this label makes the planner's own contribution explicit.
+    wrapFunction(planner, "Step", "Autopilot planner step", "autopilot-planner", 2, "Planner.Step")
+    wrapFunction(planner, "StepTargetSelection", "Autopilot target selection", "autopilot-planner", 2, "Planner.StepTargetSelection")
+    wrapFunction(planner, "StepMovementSolve", "Autopilot movement solve", "autopilot-planner", 2, "Planner.StepMovementSolve")
+
+    return true
+end
+
+-- Timings.lua loads before the event/autopilot implementation files. Install
+-- the wrappers at ADDON_LOADED, which fires after every file in this addon's
+-- TOC has executed, so the final wrapped call paths are the ones measured.
+if type(CreateFrame) == "function" then
+    local hookFrame = CreateFrame("Frame")
+    hookFrame:RegisterEvent("ADDON_LOADED")
+    hookFrame:SetScript("OnEvent", function(frame, _, loadedAddonName)
+        if tostring(loadedAddonName or "") ~= tostring(addonName or "") then
+            return
+        end
+        Timings:InstallRuntimeHooks()
+        frame:UnregisterEvent("ADDON_LOADED")
+        frame:SetScript("OnEvent", nil)
+    end)
+elseif C_Timer and type(C_Timer.After) == "function" then
+    C_Timer.After(0, function()
+        Timings:InstallRuntimeHooks()
+    end)
 end
 
 return Timings
