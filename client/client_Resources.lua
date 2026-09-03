@@ -1651,7 +1651,10 @@ function Client:QueueClientResourceSync(reason, options)
     self.ResourceSyncQueued = true
     local playerName = options.playerName or getPlayerNameForState(state) or "unknown"
     local targetEventId = tonumber(options.targetEventId) or nil
-    local capturedResources = ResourceSync.CloneResources and ResourceSync.CloneResources(resources) or resources
+    local capturedResources = nil
+    if resources ~= nil then
+        capturedResources = ResourceSync.CloneResources and ResourceSync.CloneResources(resources) or resources
+    end
     local enqueued = enqueueResourceSync(function(targetClient, expectedState, syncReason, queuedPlayerName, queuedResources)
         targetClient.ResourceSyncQueued = false
 
