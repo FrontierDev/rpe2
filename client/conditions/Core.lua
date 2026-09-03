@@ -443,14 +443,9 @@ function Conditions:UnitHasAura(context, unit, auraRef)
 end
 
 function Conditions:IsTraitActive(traitRef)
-    local activeTraits = type(Profile.ListActiveTraits) == "function" and Profile.ListActiveTraits() or {}
-    for index = 1, #activeTraits do
-        if ensureString(activeTraits[index] and activeTraits[index].traitRef) == ensureString(traitRef) then
-            return true
-        end
-    end
-
-    return false
+    return type(Profile.IsTraitActive) == "function"
+        and Profile.IsTraitActive(traitRef) == true
+        or false
 end
 
 function Conditions:IsMounted(context, selector)

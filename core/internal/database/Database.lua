@@ -3362,8 +3362,21 @@ function Database.GetRulesetDisplayName(ruleset)
     return tostring(name)
 end
 
+local function getInitializedRulesetRoot()
+    local root = Database.Rulesets
+    if type(root) == "table"
+        and root == rawget(_G, "RPEngineRulesetDB")
+        and type(root.rulesets) == "table"
+        and type(root.activeByChar) == "table"
+    then
+        return root
+    end
+
+    return Database.EnsureRulesets()
+end
+
 function Database.ListRulesets()
-    local root = Database.EnsureRulesets()
+    local root = getInitializedRulesetRoot()
     local entries = {}
 
     for _, ruleset in pairs(root.rulesets or {}) do
@@ -3388,12 +3401,12 @@ function Database.GetRulesetByID(rulesetId)
         return nil
     end
 
-    local root = Database.EnsureRulesets()
+    local root = getInitializedRulesetRoot()
     return root.rulesets and root.rulesets[tostring(rulesetId)] or nil
 end
 
 function Database.GetActiveRulesetId()
-    local root = Database.EnsureRulesets()
+    local root = getInitializedRulesetRoot()
     local activeRulesetId = resolveCharacterScopedActiveId(root, "activeByChar")
     return activeRulesetId
 end
@@ -3569,8 +3582,22 @@ function Database.UpdateRulesetMetadata(rulesetId, metadata)
     return ruleset
 end
 
+local function getInitializedDatasetRoot()
+    local root = Database.Datasets
+    if type(root) == "table"
+        and root == rawget(_G, "RPEngineDatasetDB")
+        and type(root.datasets) == "table"
+        and type(root.activeByChar) == "table"
+        and type(root.activatedDatasets) == "table"
+    then
+        return root
+    end
+
+    return Database.EnsureDatasets()
+end
+
 function Database.ListDatasets()
-    local root = Database.EnsureDatasets()
+    local root = getInitializedDatasetRoot()
     local entries = {}
 
     for _, dataset in pairs(root.datasets or {}) do
@@ -3614,7 +3641,7 @@ function Database.GetDatasetByID(datasetId)
         return nil
     end
 
-    local root = Database.EnsureDatasets()
+    local root = getInitializedDatasetRoot()
     return root.datasets and root.datasets[tostring(datasetId)] or nil
 end
 
@@ -3647,7 +3674,7 @@ function Database.ResolveModelFilePath(displayId, fileDataId)
 end
 
 function Database.GetActiveDatasetId()
-    local root = Database.EnsureDatasets()
+    local root = getInitializedDatasetRoot()
     local activeDatasetId = resolveCharacterScopedActiveId(root, "activeByChar")
     return activeDatasetId
 end
@@ -3671,7 +3698,7 @@ function Database.SetActiveDatasetId(datasetId)
 end
 
 function Database.ListActivatedDatasetIds()
-    local root = Database.EnsureDatasets()
+    local root = getInitializedDatasetRoot()
     return normalizeActivatedDatasets(root)
 end
 
