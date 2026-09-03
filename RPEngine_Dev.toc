@@ -13,6 +13,23 @@ core/debug/Timings.lua
 data/IconData.lua
 data/ModelData.lua
 
+## Packaged Default Datasets
+data/default/Datasets.lua
+data/default/core.lua
+data/default/classes/mage.lua
+data/default/classes/paladin.lua
+data/default/classes/priest.lua
+data/default/classes/rogue.lua
+data/default/classes/warrior.lua
+data/default/professions/alchemy.lua
+data/default/professions/blacksmithing.lua
+data/default/professions/enchanting.lua
+data/default/professions/inscription.lua
+data/default/professions/jewelcrafting.lua
+data/default/professions/leatherworking.lua
+data/default/professions/misc.lua
+data/default/professions/tailoring.lua
+
 utils/Common.lua
 utils/Dice.lua
 utils/Lookup.lua
