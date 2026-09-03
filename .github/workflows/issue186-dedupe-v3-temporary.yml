@@ -1,0 +1,269 @@
+name: issue186-dedupe-v3-temporary
+
+on:
+  push:
+    branches:
+      - issue-186-dedupe-validation
+
+permissions:
+  contents: write
+
+jobs:
+  validate-and-commit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: issue-186-dedupe-validation
+          fetch-depth: 0
+
+      - name: Apply the already-reviewed Issue 186 patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          source = subprocess.check_output([
+              'git', 'show',
+              'aa23bb90b3b5943dc0d9858ca3630ba88808c16f:.github/workflows/issue186-dedupe-v2-temporary.yml'
+          ], text=True)
+          start_marker = "          python3 - <<'PY'\n"
+          start = source.index(start_marker) + len(start_marker)
+          end = source.index("          PY\n", start)
+          block = source[start:end]
+          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in block.splitlines())
+          exec(compile(script, '<issue186-patch>', 'exec'))
+          PY
+
+      - name: Static and deterministic validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test "$(git diff --name-only | sort)" = $'client/client_Event.lua\ncore/internal/comms/Core.lua\ncore/internal/comms/ResourceSync.lua'
+          test -z "$(git diff --name-only -- server/server_Event.lua core/internal/comms/MessageQueue.lua)"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          core = Path('core/internal/comms/Core.lua').read_text()
+          event = Path('client/client_Event.lua').read_text()
+          resource = Path('core/internal/comms/ResourceSync.lua').read_text()
+
+          assert 'local rosterComplete = rosterReady\n' in resource
+          assert 'rosterReady and (unitsChunkExpected <= 0 or unitsChunkReceived >= unitsChunkExpected)' not in resource
+          assert 'unitsReady = rosterComplete and resourcesReady' in resource
+
+          progress = event[event.index('function Client:HandleInboundChunkProgress'):event.index('function Comms:HandleInboundChunkProgress')]
+          assert 'eventState.rosterReady == true' in progress
+          assert 'eventState.unitsReady == true' not in progress
+          assert 'eventState.unitsChunkExpected = expectedCount' in progress
+          assert 'eventState.unitsChunkReceived = received' in progress
+
+          units = event[event.index('function Client:HandleEventUnits(arguments)'):event.index('function Client:HandleEventUnitDeltaBatch')]
+          assert 'local units = Event.DeserializeUnitsFromNetwork' in units
+          assert 'eventState.units = units' in units
+          assert 'eventState.rosterReady = true' in units
+
+          start = event[event.index('function Client:HandleEventStart(arguments, sender)'):event.index('function Client:HandleEventEnd')]
+          duplicate = 'tostring(currentEventState.id or "") == tostring(nextState.id or "")'
+          assert duplicate in start
+          assert 'duplicateStart = 1' in start
+          assert start.index(duplicate) < start.index('clearEventStateNow(self, self.EventState, "event-replaced"')
+          assert start.index('return true', start.index(duplicate)) < start.index('clearEventStateNow(self, self.EventState, "event-replaced"')
+
+          for required in (
+              'local function normalizeRecentLocalEchoEntry',
+              'local function recordRecentLocalEcho',
+              'local function markRecentLocalEchoSent',
+              'local function releasePendingRecentLocalEcho',
+              'pendingCount', 'sentCount',
+              'releasePendingImmediateLocalEchoes()',
+              'options.immediateLocalEcho == true',
+          ):
+              assert required in core, required
+          assert 'Pending entries are never age-expired or size-evicted.' in core
+
+          def readiness(roster_ready, resources_ready):
+              roster_complete = bool(roster_ready)
+              return roster_complete, roster_complete and bool(resources_ready)
+
+          # Full roster cannot regress when a delayed duplicate advertises partial chunk progress.
+          rc, ur = readiness(True, False)
+          assert rc and not ur
+          duplicate_expected, duplicate_received = 9, 1
+          assert duplicate_received < duplicate_expected
+          rc, ur = readiness(True, False)
+          assert rc and not ur
+
+          # Remote clients remain incomplete before final EVENT_UNITS application.
+          rc, _ = readiness(False, False)
+          assert not rc
+          rc, _ = readiness(True, False)
+          assert rc
+
+          # Same-event EVENT_START preserves current state; a different event replaces it.
+          def start_model(current, incoming_id):
+              if current and current.get('active') and current.get('id') and current['id'] == incoming_id:
+                  return current, False
+              return {'active': True, 'id': incoming_id, 'units': []}, True
+
+          current = {
+              'active': True,
+              'id': 'evt-a',
+              'units': [{'resources': [{'resourceRef': 'health', 'currentValue': 42}]}],
+              'runtime': {'phase': 'waiting-resources'},
+          }
+          same, replaced = start_model(current, 'evt-a')
+          assert same is current and not replaced
+          assert same['units'][0]['resources'][0]['currentValue'] == 42
+          assert same['runtime']['phase'] == 'waiting-resources'
+          other, replaced = start_model(current, 'evt-b')
+          assert replaced and other is not current and other['id'] == 'evt-b'
+
+          print('Issue 186 static/deterministic assertions: PASS')
+          PY
+
+      - name: Lua 5.1 syntax and transport lifecycle validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+          luac5.1 -p client/client_Event.lua
+          luac5.1 -p core/internal/comms/Core.lua
+          luac5.1 -p core/internal/comms/ResourceSync.lua
+
+          cat > /tmp/issue186_transport_test.lua <<'LUA'
+          local now = 0
+          local queued, dispatched, progress = {}, {}, {}
+          C_ChatInfo = { SendAddonMessage = function() return true end }
+
+          local Serialization = {}
+          function Serialization:BuildChunkToken(i, n) return tostring(i) .. "/" .. tostring(n) end
+          function Serialization:SerializePacket(prefix, token, opcode, payload)
+              return table.concat({ tostring(prefix), tostring(token), tostring(opcode), tostring(payload or "") }, "|")
+          end
+          function Serialization:DeserializePacket(message)
+              local prefix, token, opcode, payload = tostring(message):match("^([^|]*)|([^|]*)|([^|]*)|(.*)$")
+              if not prefix then return nil end
+              local i, n = token:match("^(%d+)/(%d+)$")
+              return { prefix=prefix, opcode=tonumber(opcode), partIndex=tonumber(i), partCount=tonumber(n), argumentsText=payload }
+          end
+          function Serialization:SerializeArguments(args) return table.concat(args or {}, ",") end
+          function Serialization:DeserializeArguments(text) return { text } end
+
+          local Operations = {}
+          local keys = { [1]="EVENT_START", [2]="EVENT_UNITS", [3]="EVENT_STATE", [9]="OTHER" }
+          function Operations:Get(opcode)
+              local key = keys[tonumber(opcode)]
+              return key and { key=key } or nil
+          end
+          function Operations:GetOpcode(key)
+              for opcode, candidate in pairs(keys) do if candidate == key then return opcode end end
+          end
+          function Operations:Dispatch(opcode, arguments, sender, distribution, target, message)
+              dispatched[#dispatched + 1] = { opcode=opcode, sender=sender, message=message }
+              return true
+          end
+
+          local MessageQueue = {}
+          function MessageQueue:CanAccept() return true end
+          function MessageQueue:EnqueueLogicalMessage(prefix, opcode, chunks, distribution, target, callbacks, metadata)
+              local item = { prefix=prefix, opcode=opcode, chunks=chunks, distribution=distribution, target=target, callbacks=callbacks, metadata=metadata }
+              queued[#queued + 1] = item
+              return item
+          end
+
+          local Addon = {
+              Internal = {
+                  Constants = { AddonMessagePrefix="RPE" },
+                  Comms = { Serialization=Serialization, Operations=Operations, MessageQueue=MessageQueue, Diagnostics={}, SafeChunkLength=4 },
+              },
+              Utils = { Common = {
+                  GetGroupType=function() return "PARTY" end,
+                  GetNow=function() return now end,
+                  GetPlayerName=function() return "Host" end,
+                  NormalizeName=function(v) return tostring(v or "") end,
+                  InvokeCallback=function(cb, ...) if type(cb)=="function" then return cb(...) end end,
+              } },
+              Debug = {},
+          }
+
+          assert(loadfile('core/internal/comms/Core.lua'))(nil, Addon)
+          local Comms = Addon.Internal.Comms
+          function Comms:HandleInboundChunkProgress(packet, receivedCount, distribution, sender, target)
+              progress[#progress + 1] = { opcode=packet.opcode, receivedCount=receivedCount, sender=sender }
+              return true
+          end
+
+          local function countPending()
+              local count = 0
+              for _, entry in pairs(Comms.RecentLocalEchoes or {}) do
+                  if type(entry) == "table" then count = count + math.max(0, tonumber(entry.pendingCount) or 0) end
+              end
+              return count
+          end
+
+          -- Multipart startup EVENT_UNITS is applied immediately once on the host.
+          assert(Comms:SendMessage("CHANNEL", 2, "ABCDEFGHIJKL", 7, {}) == true, "enqueue EVENT_UNITS")
+          local item = assert(queued[1], "EVENT_UNITS queue item")
+          assert(#item.chunks > 1, "fixture must be multipart")
+          assert(#dispatched == 1, "immediate local EVENT_UNITS must dispatch exactly once")
+          assert(#progress == #item.chunks, "immediate multipart progress must complete locally")
+          assert(countPending() == #item.chunks, "all physical self-copies must remain pending")
+
+          -- Force elapsed time past the old fixed five-second suppression window.
+          now = 6
+          Comms:ReceiveMessage("RPE", Serialization:SerializePacket("RPE", "1/1", 9, "remote"), "CHANNEL", "Other", 7)
+          assert(countPending() == #item.chunks, "queued/throttled entries must not expire")
+
+          local progressBefore, dispatchBefore = #progress, #dispatched
+          for i = 1, #item.chunks do
+              now = 10 + i * 0.1
+              item.callbacks.onChunkSent(item, item.chunks[i], 0)
+              local p, d = #progress, #dispatched
+              now = now + 0.01
+              assert(Comms:ReceiveMessage("RPE", item.chunks[i], "CHANNEL", "Host", 7) == nil, "self-copy must be consumed")
+              assert(#progress == p, "physical self-copy must not restart EVENT_UNITS progress")
+              assert(#dispatched == d, "physical self-copy must not redispatch")
+          end
+          assert(#progress == progressBefore, "no duplicate progress after physical delivery")
+          assert(#dispatched == dispatchBefore, "no duplicate logical dispatch after physical delivery")
+          assert(countPending() == 0, "all pending entries consumed")
+
+          -- Terminal failure releases only still-unsent pending entries.
+          assert(Comms:SendMessage("CHANNEL", 2, "MNOPQRSTUVWX", 7, {}) == true, "enqueue failed fixture")
+          local failedItem = assert(queued[2])
+          assert(countPending() == #failedItem.chunks, "failed fixture pending count")
+          failedItem.callbacks.onFailed(failedItem, "terminal-test")
+          assert(countPending() == 0, "terminal failure releases pending entries")
+
+          -- Existing non-immediate CHANNEL behavior is preserved. Use a one-chunk payload.
+          assert(Comms:SendMessage("CHANNEL", 9, "abc", 7, {}) == true, "enqueue normal CHANNEL fixture")
+          local normalItem = assert(queued[3])
+          assert(#normalItem.chunks == 1, "normal fixture must be one chunk")
+          local beforeNormal = #dispatched
+          now = 20
+          normalItem.callbacks.onChunkSent(normalItem, normalItem.chunks[1], 0)
+          assert(#dispatched == beforeNormal + 1, "post-send local echo must dispatch normally")
+          local afterNormal = #dispatched
+          now = 20.1
+          assert(Comms:ReceiveMessage("RPE", normalItem.chunks[1], "CHANNEL", "Host", 7) == nil, "normal physical self-copy consumed")
+          assert(#dispatched == afterNormal, "normal physical self-copy must not redispatch")
+
+          print('Issue 186 transport lifecycle test: PASS')
+          LUA
+
+          lua5.1 /tmp/issue186_transport_test.lua
+          echo 'Lua 5.1 syntax validation: PASS'
+
+      - name: Commit validated source and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ortellus"
+          git config user.email "elvetgames@gmail.com"
+          git add client/client_Event.lua core/internal/comms/Core.lua core/internal/comms/ResourceSync.lua
+          git commit -m "Fix host startup local-echo readiness regression (#186)"
+          git rm .github/workflows/issue186-dedupe-v3-temporary.yml
+          git commit -m "Remove temporary Issue 186 dedupe validation workflow"
+          git push origin HEAD:issue-186-dedupe-validation
