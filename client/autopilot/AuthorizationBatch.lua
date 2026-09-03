@@ -167,8 +167,7 @@ local function probeBlockedBatchContext(state)
         return true
     end
     state.contextProbed = true
-    local eventState = getCurrentEventState()
-    local ok, _, reason = baseAuthorizeAllPendingActions(state.client, eventState)
+    local ok, _, reason = baseAuthorizeAllPendingActions(state.client, state.executionEventState)
     if ok ~= true then
         state.outcome = "failed"
         state.reason = reason
@@ -226,8 +225,11 @@ local function runBatchSlice(state, deadlineMs)
                 state.attempted[actionId] = true
                 state.attemptCount = state.attemptCount + 1
                 local beforeStatus = tostring(action.status or "")
-                local eventState = getCurrentEventState()
-                local ok, attemptedAction, reason = authorizePendingAction(state.client, actionId, eventState)
+                local ok, attemptedAction, reason = authorizePendingAction(
+                    state.client,
+                    actionId,
+                    state.executionEventState
+                )
                 if type(attemptedAction) ~= "table" then
                     state.outcome = "failed"
                     state.reason = reason
@@ -297,6 +299,9 @@ function Client:AuthorizeAllAutopilotPendingActions(eventStateOverride)
         tickNumber = math.max(0, math.floor(tonumber(plan.tickNumber) or 0)),
         actorKey = tostring(plan.actorKey or ""),
         scheduleRevision = tostring(plan.scheduleRevision or ""),
+        executionEventState = type(eventStateOverride) == "table"
+            and eventStateOverride
+            or (type(self.GetEventState) == "function" and self:GetEventState() or self.EventState),
         cursor = 1,
         passMadeProgress = false,
         attempted = {},
