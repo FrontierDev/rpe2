@@ -1,0 +1,5 @@
+-- when the addon first loads, the default datasets are loaded into the database and activate.
+-- they can be deactivated later.
+-- afterwards, when the player logs in or reloads, there should be a quick and simple 
+-- version check to see if the database is up to date, and if not, the default datasets should be reloaded
+-- but not activated again.

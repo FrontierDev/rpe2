@@ -3665,6 +3665,92 @@ function Database.ExportDataset(datasetId)
     return "RPE_DATASET_V1\n" .. serializeLuaValue(payload)
 end
 
+function Database.ExportDatasets(datasetIds)
+    if type(datasetIds) ~= "table" or #datasetIds == 0 then
+        return nil
+    end
+
+    local datasets = {}
+    for index = 1, #datasetIds do
+        local dataset = Database.GetDatasetByID(datasetIds[index])
+        if dataset then
+            datasets[#datasets + 1] = normalizeDatasetRecord(deepCopy(dataset), dataset.id, dataset.name)
+        end
+    end
+
+    if #datasets == 0 then
+        return nil
+    end
+
+    local payload = {
+        format = "rpe-datasets",
+        version = 1,
+        datasets = datasets,
+    }
+
+    return "RPE_DATASETS_V1\n" .. serializeLuaValue(payload)
+end
+
+function Database.ExportDatasetsInChunks(datasetIds, maximumChunkSize)
+    local exportText = Database.ExportDatasets(datasetIds)
+    if not exportText then
+        return nil
+    end
+
+    local chunkSize = math.max(1024, math.floor(tonumber(maximumChunkSize) or (100 * 1024)))
+    local exportId = ("datasets-%d-%06d"):format(
+        math.floor((type(time) == "function" and time() or 0)),
+        math.random(0, 999999)
+    )
+    local payloads = {}
+    local startIndex = 1
+    while startIndex <= #exportText do
+        local endIndex = math.min(#exportText, startIndex + chunkSize - 1)
+        -- Do not split a UTF-8 code point across clipboard chunks.
+        while endIndex > startIndex do
+            local nextByte = exportText:byte(endIndex + 1)
+            if not nextByte or nextByte < 128 or nextByte > 191 then
+                break
+            end
+            endIndex = endIndex - 1
+        end
+        payloads[#payloads + 1] = exportText:sub(startIndex, endIndex)
+        startIndex = endIndex + 1
+    end
+
+    local total = #payloads
+    local chunks = {}
+    for index = 1, total do
+        local payload = payloads[index]
+        chunks[index] = ("RPE_DATASET_CHUNK_V1\nid=%s\nindex=%d\ntotal=%d\n\n%s"):format(exportId, index, total, payload)
+    end
+
+    return {
+        id = exportId,
+        total = total,
+        chunks = chunks,
+    }
+end
+
+function Database.ParseDatasetImportChunk(text)
+    local normalizedText = ensureString(text, ""):gsub("\r\n", "\n"):gsub("\r", "\n")
+    local exportId, indexText, totalText, payload = normalizedText:match(
+        "^RPE_DATASET_CHUNK_V1\nid=([^\n]+)\nindex=(%d+)\ntotal=(%d+)\n\n(.*)$"
+    )
+    local index = tonumber(indexText)
+    local total = tonumber(totalText)
+    if not exportId or exportId == "" or not index or not total or index < 1 or total < 1 or index > total or payload == "" then
+        return nil, "Import text is not a valid dataset export chunk."
+    end
+
+    return {
+        id = exportId,
+        index = index,
+        total = total,
+        payload = payload,
+    }
+end
+
 function Database.ExportDatasetEntry(datasetId, collectionKey, entryIdOrIndex)
     local dataset = Database.GetDatasetByID(datasetId)
     local definition = DATASET_ENTRY_DEFINITIONS[collectionKey]
@@ -3749,6 +3835,90 @@ function Database.ImportDataset(text)
     notifyConfigurationChanged("dataset-import")
 
     return imported
+end
+
+function Database.PrepareDatasetImport(text)
+    local normalizedText = ensureString(text, "")
+    normalizedText = normalizedText:gsub("^%s+", ""):gsub("%s+$", "")
+    if normalizedText == "" then
+        return nil, "Import text is empty."
+    end
+
+    -- Keep the import window backwards compatible with exports made before
+    -- multi-dataset export was introduced.
+    if not startsWith(normalizedText, "RPE_DATASETS_V1") then
+        return { datasetTexts = { normalizedText } }
+    end
+
+    local body = normalizedText:sub(#"RPE_DATASETS_V1" + 1)
+    if startsWith(body, "\r\n") then
+        body = body:sub(3)
+    elseif startsWith(body, "\n") or startsWith(body, "\r") then
+        body = body:sub(2)
+    end
+
+    local payload, decodeError = deserializeLuaValue(body)
+    if type(payload) ~= "table"
+        or payload.format ~= "rpe-datasets"
+        or tonumber(payload.version) ~= 1
+        or type(payload.datasets) ~= "table"
+    then
+        return nil, decodeError or "Import text is not a supported multi-dataset export."
+    end
+
+    if #payload.datasets == 0 then
+        return nil, "The export does not contain any datasets."
+    end
+
+    for index = 1, #payload.datasets do
+        if type(payload.datasets[index]) ~= "table" then
+            return nil, ("Dataset %d is invalid."):format(index)
+        end
+    end
+
+    return { datasets = payload.datasets }
+end
+
+function Database.ImportPreparedDataset(importBatch, index)
+    if type(importBatch) ~= "table" then
+        return nil, "Dataset import is unavailable."
+    end
+
+    local datasetIndex = math.max(1, math.floor(tonumber(index) or 1))
+    local datasetText = type(importBatch.datasetTexts) == "table" and importBatch.datasetTexts[datasetIndex] or nil
+    if type(datasetText) == "string" then
+        return Database.ImportDataset(datasetText)
+    end
+
+    local payloadDataset = type(importBatch.datasets) == "table" and importBatch.datasets[datasetIndex] or nil
+    if type(payloadDataset) ~= "table" then
+        return nil, ("Dataset %d is invalid."):format(datasetIndex)
+    end
+
+    return Database.ImportDataset("RPE_DATASET_V1\n" .. serializeLuaValue({
+        format = "rpe-dataset",
+        version = 1,
+        dataset = payloadDataset,
+    }))
+end
+
+function Database.ImportDatasets(text)
+    local importBatch, prepareError = Database.PrepareDatasetImport(text)
+    if not importBatch then
+        return nil, prepareError
+    end
+
+    local pendingDatasets = importBatch.datasetTexts or importBatch.datasets or {}
+    local importedDatasets = {}
+    for index = 1, #pendingDatasets do
+        local dataset, err = Database.ImportPreparedDataset(importBatch, index)
+        if not dataset then
+            return nil, err or ("Dataset %d failed to import."):format(index)
+        end
+        importedDatasets[#importedDatasets + 1] = dataset
+    end
+
+    return importedDatasets
 end
 
 function Database.ImportDatasetEntry(datasetId, collectionKey, text)

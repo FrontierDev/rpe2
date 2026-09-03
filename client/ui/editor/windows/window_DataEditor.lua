@@ -14,6 +14,15 @@ local function getClipboard()
     return Addon.Debug and Addon.Debug.Clipboard or nil
 end
 
+local function scheduleNextFrame(callback)
+    if C_Timer and type(C_Timer.After) == "function" then
+        C_Timer.After(0, callback)
+        return
+    end
+
+    callback()
+end
+
 DataEditor.__index = DataEditor
 DataEditor.Database = Addon.Internal and Addon.Internal.Database or {}
 DataEditor.Registry = Addon.Internal and Addon.Internal.Registry or {}
@@ -1305,6 +1314,29 @@ function DataEditor:ExportDatasetToClipboard(datasetId)
     return exportText
 end
 
+function DataEditor:ExportActiveDatasetsToClipboard()
+    if not (self.Database and self.Database.ExportDatasetsInChunks) then
+        return nil
+    end
+
+    local activeDatasetIds = {}
+    local datasets = self:GetDatasets()
+    for index = 1, #datasets do
+        local dataset = datasets[index]
+        if dataset and dataset.id and self:IsDatasetActivated(dataset.id) then
+            activeDatasetIds[#activeDatasetIds + 1] = dataset.id
+        end
+    end
+
+    local exportSession = self.Database.ExportDatasetsInChunks(activeDatasetIds)
+    if not exportSession then
+        return nil
+    end
+
+    self:ShowDatasetExportWindow(exportSession)
+    return exportSession
+end
+
 function DataEditor:ExportSelectedDatasetEntryToClipboard(collectionKey)
     if not (self.Database and self.Database.ExportDatasetEntry) then
         return nil
@@ -1341,6 +1373,165 @@ function DataEditor:ImportDatasetFromText(text)
 
     self:SetSelectedDatasetId(dataset.id)
     return dataset
+end
+
+function DataEditor:ImportDatasetsFromText(text)
+    if not (self.Database and self.Database.ImportDatasets) then
+        return nil, "Dataset import is unavailable."
+    end
+
+    local datasets, err = self.Database.ImportDatasets(text)
+    if not datasets then
+        return nil, err or "Dataset import failed."
+    end
+
+    if datasets[1] then
+        self:SetSelectedDatasetId(datasets[#datasets].id)
+    end
+    return datasets
+end
+
+function DataEditor:StartDatasetImportFromText(text)
+    if not (self.Database and self.Database.PrepareDatasetImport and self.Database.ImportPreparedDataset) then
+        return nil, "Dataset import is unavailable."
+    end
+
+    local importBatch, prepareError = self.Database.PrepareDatasetImport(text)
+    if not importBatch then
+        return nil, prepareError or "Dataset import failed."
+    end
+
+    local pendingDatasets = importBatch.datasetTexts or importBatch.datasets or {}
+    if #pendingDatasets == 0 then
+        return nil, "The export does not contain any datasets."
+    end
+
+    self.DatasetImportSessionId = (tonumber(self.DatasetImportSessionId) or 0) + 1
+    local session = {
+        id = self.DatasetImportSessionId,
+        batch = importBatch,
+        totalCount = #pendingDatasets,
+        importedDatasets = {},
+    }
+    self.DatasetImportSession = session
+
+    if self.DatasetImportConfirmButton and self.DatasetImportConfirmButton.SetEnabled then
+        self.DatasetImportConfirmButton:SetEnabled(false)
+    end
+    if self.DatasetImportAddChunkButton and self.DatasetImportAddChunkButton.SetEnabled then
+        self.DatasetImportAddChunkButton:SetEnabled(false)
+    end
+    if self.DatasetImportClearChunksButton and self.DatasetImportClearChunksButton.SetEnabled then
+        self.DatasetImportClearChunksButton:SetEnabled(false)
+    end
+
+    local function updateStatus(message)
+        if self.DatasetImportStatusText and self.DatasetImportStatusText.SetText then
+            self.DatasetImportStatusText:SetText(message)
+        end
+    end
+
+    local function complete(message)
+        if self.DatasetImportSession ~= session then
+            return
+        end
+
+        self.DatasetImportSession = nil
+        if self.DatasetImportConfirmButton and self.DatasetImportConfirmButton.SetEnabled then
+            self.DatasetImportConfirmButton:SetEnabled(true)
+        end
+        if self.DatasetImportAddChunkButton and self.DatasetImportAddChunkButton.SetEnabled then
+            self.DatasetImportAddChunkButton:SetEnabled(true)
+        end
+        if self.DatasetImportClearChunksButton and self.DatasetImportClearChunksButton.SetEnabled then
+            self.DatasetImportClearChunksButton:SetEnabled(true)
+        end
+        updateStatus(message)
+    end
+
+    local function importNext()
+        if self.DatasetImportSession ~= session then
+            return
+        end
+
+        local nextIndex = #session.importedDatasets + 1
+        if nextIndex > session.totalCount then
+            local selectedDataset = session.importedDatasets[#session.importedDatasets]
+            if selectedDataset then
+                self:SetSelectedDatasetId(selectedDataset.id)
+            end
+            complete(("Imported %d dataset%s."):format(session.totalCount, session.totalCount == 1 and "" or "s"))
+            return
+        end
+
+        updateStatus(("Importing dataset %d of %d..."):format(nextIndex, session.totalCount))
+        local dataset, importError = self.Database.ImportPreparedDataset(session.batch, nextIndex)
+        if not dataset then
+            complete(importError or ("Dataset %d failed to import."):format(nextIndex))
+            return
+        end
+
+        session.importedDatasets[#session.importedDatasets + 1] = dataset
+        scheduleNextFrame(importNext)
+    end
+
+    scheduleNextFrame(importNext)
+    return session
+end
+
+function DataEditor:AddDatasetImportChunkFromText(text)
+    if not (self.Database and self.Database.ParseDatasetImportChunk) then
+        return nil, "Dataset chunk import is unavailable."
+    end
+
+    local chunk, parseError = self.Database.ParseDatasetImportChunk(text)
+    if not chunk then
+        return nil, parseError
+    end
+
+    local importChunks = self.DatasetImportChunks
+    if importChunks and (importChunks.id ~= chunk.id or importChunks.total ~= chunk.total) then
+        return nil, "This chunk belongs to a different export. Clear the current chunks before adding it."
+    end
+
+    importChunks = importChunks or {
+        id = chunk.id,
+        total = chunk.total,
+        parts = {},
+    }
+    importChunks.parts[chunk.index] = chunk.payload
+    self.DatasetImportChunks = importChunks
+
+    local receivedCount = 0
+    for index = 1, importChunks.total do
+        if importChunks.parts[index] then
+            receivedCount = receivedCount + 1
+        end
+    end
+
+    return receivedCount, importChunks.total, chunk.id
+end
+
+function DataEditor:StartCollectedDatasetImport()
+    local importChunks = self.DatasetImportChunks
+    if not importChunks then
+        return nil, "Paste and add an export chunk first."
+    end
+
+    local parts = {}
+    for index = 1, importChunks.total do
+        local payload = importChunks.parts[index]
+        if not payload then
+            return nil, ("Missing chunk %d of %d for export %s."):format(index, importChunks.total, importChunks.id)
+        end
+        parts[#parts + 1] = payload
+    end
+
+    local session, importError = self:StartDatasetImportFromText(table.concat(parts))
+    if session then
+        self.DatasetImportChunks = nil
+    end
+    return session, importError
 end
 
 function DataEditor:ImportDatasetEntryFromText(collectionKey, text)
@@ -1397,7 +1588,7 @@ function DataEditor:BuildDatasetImportWindow()
     UI.Utils.AnchorFill(root, window:GetContentFrame(), 0, 0, 0, 0)
 
     self.DatasetImportInstructionText = UI.CreateText(root:GetFrame(), "RPEDataEditorDatasetImportInstructionText",
-        "Paste a dataset export string below and click Import.", {
+        "Paste one numbered export chunk, click Add Chunk, then Import when all chunks are collected.", {
             width = 500,
             height = 14,
             justifyH = "LEFT",
@@ -1414,6 +1605,10 @@ function DataEditor:BuildDatasetImportWindow()
         weight = 1,
         text = "",
         readOnly = false,
+        -- Dataset exports can be much larger than ordinary editor text. Keep
+        -- the edit box viewport-sized so pasting does not lay out the entire
+        -- payload before the Import button can start the batched import.
+        autoResize = false,
         borderColor = UI.ResolveColor(nil, "panel.border"),
         backgroundColor = UI.ResolveColor(nil, "window.background"),
         textColor = UI.ResolveColor(nil, "text.primary"),
@@ -1436,22 +1631,57 @@ function DataEditor:BuildDatasetImportWindow()
     })
     root:AddChild(actions)
 
-    self.DatasetImportConfirmButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorDatasetImportConfirmButton", "Import", 60, function()
+    self.DatasetImportAddChunkButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorDatasetImportAddChunkButton", "Add Chunk", 68, function()
         local importText = self.DatasetImportTextArea and self.DatasetImportTextArea.GetText and self.DatasetImportTextArea:GetText() or ""
-        local dataset, err = self:ImportDatasetFromText(importText)
-        if not dataset then
+        local receivedCount, totalCount, exportIdOrError = self:AddDatasetImportChunkFromText(importText)
+        if not receivedCount then
+            if self.DatasetImportStatusText and self.DatasetImportStatusText.SetText then
+                self.DatasetImportStatusText:SetText(tostring(exportIdOrError or "Could not add chunk."))
+            end
+            return
+        end
+
+        if self.DatasetImportTextArea and self.DatasetImportTextArea.SetText then
+            self.DatasetImportTextArea:SetText("")
+        end
+        if self.DatasetImportStatusText and self.DatasetImportStatusText.SetText then
+            self.DatasetImportStatusText:SetText(("Export %s: received %d of %d chunks."):format(exportIdOrError, receivedCount, totalCount))
+        end
+    end, {
+        height = 20,
+        fontSize = 7,
+    })
+    actions:AddChild(self.DatasetImportAddChunkButton)
+
+    self.DatasetImportClearChunksButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorDatasetImportClearChunksButton", "Clear", 44, function()
+        self.DatasetImportChunks = nil
+        if self.DatasetImportTextArea and self.DatasetImportTextArea.SetText then
+            self.DatasetImportTextArea:SetText("")
+        end
+        if self.DatasetImportStatusText and self.DatasetImportStatusText.SetText then
+            self.DatasetImportStatusText:SetText("Collected chunks cleared.")
+        end
+    end, {
+        height = 20,
+        fontSize = 7,
+    })
+    actions:AddChild(self.DatasetImportClearChunksButton)
+
+    self.DatasetImportConfirmButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorDatasetImportConfirmButton", "Import", 60, function()
+        local session, err
+        if self.DatasetImportChunks then
+            session, err = self:StartCollectedDatasetImport()
+        else
+            local importText = self.DatasetImportTextArea and self.DatasetImportTextArea.GetText and self.DatasetImportTextArea:GetText() or ""
+            session, err = self:StartDatasetImportFromText(importText)
+        end
+        if not session then
             if self.DatasetImportStatusText and self.DatasetImportStatusText.SetText then
                 self.DatasetImportStatusText:SetText(tostring(err or "Import failed."))
             end
             return
         end
 
-        if self.DatasetImportStatusText and self.DatasetImportStatusText.SetText then
-            self.DatasetImportStatusText:SetText("")
-        end
-        if self.DatasetImportWindow and self.DatasetImportWindow.Hide then
-            self.DatasetImportWindow:Hide()
-        end
     end, {
         height = 20,
         fontSize = 7,
@@ -1459,6 +1689,22 @@ function DataEditor:BuildDatasetImportWindow()
     actions:AddChild(self.DatasetImportConfirmButton)
 
     self.DatasetImportCancelButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorDatasetImportCancelButton", "Cancel", 60, function()
+        if self.DatasetImportSession then
+            self.DatasetImportSession = nil
+            if self.DatasetImportConfirmButton and self.DatasetImportConfirmButton.SetEnabled then
+                self.DatasetImportConfirmButton:SetEnabled(true)
+            end
+            if self.DatasetImportAddChunkButton and self.DatasetImportAddChunkButton.SetEnabled then
+                self.DatasetImportAddChunkButton:SetEnabled(true)
+            end
+            if self.DatasetImportClearChunksButton and self.DatasetImportClearChunksButton.SetEnabled then
+                self.DatasetImportClearChunksButton:SetEnabled(true)
+            end
+            if self.DatasetImportStatusText and self.DatasetImportStatusText.SetText then
+                self.DatasetImportStatusText:SetText("Import cancelled. Imported datasets were kept.")
+            end
+            return
+        end
         if self.DatasetImportWindow and self.DatasetImportWindow.Hide then
             self.DatasetImportWindow:Hide()
         end
@@ -1471,11 +1717,144 @@ function DataEditor:BuildDatasetImportWindow()
     return window
 end
 
+function DataEditor:BuildDatasetExportWindow()
+    if self.DatasetExportWindow then
+        return self.DatasetExportWindow
+    end
+
+    local window = UI.Window:New({
+        name = "RPEDataEditorDatasetExportWindow",
+        width = 540,
+        height = 360,
+        point = "CENTER",
+        relativeTo = UIParent,
+        relativePoint = "CENTER",
+        frameStrata = "HIGH",
+        frameLevel = 30,
+        movable = true,
+        clampedToScreen = true,
+        toplevel = true,
+        hidden = true,
+        contentInsetLeft = 10,
+        contentInsetRight = 10,
+        contentInsetTop = 28,
+        contentInsetBottom = 10,
+    })
+    window:SetTitle("Export Active Datasets")
+    window:Create()
+    self.DatasetExportWindow = window
+
+    local root = UI.CreateLayout(UI.VerticalLayoutGroup, window:GetContentFrame(), "RPEDataEditorDatasetExportRoot", {
+        spacing = 8,
+        fitChildrenWidth = true,
+        fitChildrenHeight = true,
+    })
+    UI.Utils.AnchorFill(root, window:GetContentFrame(), 0, 0, 0, 0)
+
+    self.DatasetExportInstructionText = UI.CreateText(root:GetFrame(), "RPEDataEditorDatasetExportInstructionText",
+        "Copy each chunk in order, then paste and add each chunk in the Import Dataset window.", {
+            width = 500,
+            height = 14,
+            justifyH = "LEFT",
+            textColor = UI.ResolveColor(nil, "text.secondary"),
+        }
+    )
+    root:AddChild(self.DatasetExportInstructionText)
+
+    self.DatasetExportTextArea = UI.CreateTextArea(root:GetFrame(), "RPEDataEditorDatasetExportTextArea", {
+        width = 500,
+        height = 260,
+        expandWidth = true,
+        expandHeight = true,
+        weight = 1,
+        text = "",
+        readOnly = true,
+        autoResize = false,
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+        backgroundColor = UI.ResolveColor(nil, "window.background"),
+        textColor = UI.ResolveColor(nil, "text.primary"),
+    })
+    root:AddChild(self.DatasetExportTextArea)
+
+    local actions = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorDatasetExportActions", {
+        spacing = 6,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+        height = 20,
+    })
+    root:AddChild(actions)
+
+    self.DatasetExportPreviousButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorDatasetExportPreviousButton", "Previous", 60, function()
+        self:SetDatasetExportChunkIndex((self.DatasetExportChunkIndex or 1) - 1)
+    end, { height = 20, fontSize = 7 })
+    actions:AddChild(self.DatasetExportPreviousButton)
+
+    self.DatasetExportNextButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorDatasetExportNextButton", "Next", 60, function()
+        self:SetDatasetExportChunkIndex((self.DatasetExportChunkIndex or 1) + 1)
+    end, { height = 20, fontSize = 7 })
+    actions:AddChild(self.DatasetExportNextButton)
+
+    self.DatasetExportCloseButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorDatasetExportCloseButton", "Close", 60, function()
+        if self.DatasetExportWindow and self.DatasetExportWindow.Hide then
+            self.DatasetExportWindow:Hide()
+        end
+    end, { height = 20, fontSize = 7 })
+    actions:AddChild(self.DatasetExportCloseButton)
+
+    return window
+end
+
+function DataEditor:SetDatasetExportChunkIndex(index)
+    local exportSession = self.DatasetExportSession
+    if not exportSession then
+        return
+    end
+
+    local chunkIndex = math.max(1, math.min(exportSession.total, math.floor(tonumber(index) or 1)))
+    self.DatasetExportChunkIndex = chunkIndex
+    if self.DatasetExportTextArea and self.DatasetExportTextArea.SetText then
+        self.DatasetExportTextArea:SetText(exportSession.chunks[chunkIndex] or "")
+        if self.DatasetExportTextArea.Focus then
+            self.DatasetExportTextArea:Focus()
+        end
+        if self.DatasetExportTextArea.HighlightText then
+            self.DatasetExportTextArea:HighlightText()
+        end
+    end
+    if self.DatasetExportInstructionText and self.DatasetExportInstructionText.SetText then
+        self.DatasetExportInstructionText:SetText(("Export %s — chunk %d of %d. Copy this chunk before moving on."):format(exportSession.id, chunkIndex, exportSession.total))
+    end
+    if self.DatasetExportPreviousButton and self.DatasetExportPreviousButton.SetEnabled then
+        self.DatasetExportPreviousButton:SetEnabled(chunkIndex > 1)
+    end
+    if self.DatasetExportNextButton and self.DatasetExportNextButton.SetEnabled then
+        self.DatasetExportNextButton:SetEnabled(chunkIndex < exportSession.total)
+    end
+end
+
+function DataEditor:ShowDatasetExportWindow(exportSession)
+    if type(exportSession) ~= "table" or type(exportSession.chunks) ~= "table" or #exportSession.chunks == 0 then
+        return nil
+    end
+
+    local window = self:BuildDatasetExportWindow()
+    self.DatasetExportSession = exportSession
+    self:SetDatasetExportChunkIndex(1)
+    if window and window.Show then
+        window:Show()
+    end
+    return window
+end
+
 function DataEditor:ShowDatasetImportWindow()
+    if self.DatasetImportSession then
+        return self.DatasetImportWindow
+    end
     local window = self:BuildDatasetImportWindow()
     if self.DatasetImportTextArea and self.DatasetImportTextArea.SetText then
         self.DatasetImportTextArea:SetText("")
     end
+    self.DatasetImportChunks = nil
     if self.DatasetImportStatusText and self.DatasetImportStatusText.SetText then
         self.DatasetImportStatusText:SetText("")
     end

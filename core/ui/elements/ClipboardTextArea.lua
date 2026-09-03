@@ -187,13 +187,26 @@ function ClipboardTextArea:RefreshGeometry()
         width = math.max(1, (self.scrollFrame:GetWidth() or 0) - ((self.options.textInsetLeft or 4) + (self.options.textInsetRight or 4)))
     end
 
-    if self.editBox.SetWidth then
+    if self.editBox.SetWidth and self._geometryWidth ~= width then
         self.editBox:SetWidth(width)
+        self._geometryWidth = width
     end
 
-    if self.editBox.GetStringHeight and self.editBox.SetHeight and self.scrollFrame.GetHeight then
+    if self.editBox.SetHeight and self.scrollFrame.GetHeight then
         local minimumHeight = math.max(1, (self.scrollFrame:GetHeight() or 0) - ((self.options.textInsetTop or 4) + (self.options.textInsetBottom or 4)))
-        self.editBox:SetHeight(math.max(minimumHeight, self.editBox:GetStringHeight() or 0))
+        if self.options.autoResize == false then
+            if self._geometryHeight ~= minimumHeight then
+                self.editBox:SetHeight(minimumHeight)
+                self._geometryHeight = minimumHeight
+            end
+            return
+        end
+
+        if self.editBox.GetStringHeight then
+            self.editBox:SetHeight(math.max(minimumHeight, self.editBox:GetStringHeight() or 0))
+        else
+            self.editBox:SetHeight(minimumHeight)
+        end
     end
 end
 

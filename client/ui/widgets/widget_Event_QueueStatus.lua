@@ -17,6 +17,7 @@ end
 local INDICATOR_SIZE = 14
 local INDICATOR_GAP = 6
 local INDICATOR_REFRESH_INTERVAL = 0.25
+local YELLOW_COLOR = { r = 1, g = 0.84, b = 0.12, a = 1 }
 local ORANGE_COLOR = { r = 1, g = 0.55, b = 0.12, a = 1 }
 
 local function getFrame(element)
@@ -51,6 +52,24 @@ local function resolveColor(token, fallback)
     end
 
     return fallback
+end
+
+local function getAllowancePresentation(stats)
+    local allowance = math.max(0, tonumber(type(stats) == "table" and stats.estimatedAllowance) or 0)
+    local capacity = math.max(1, tonumber(type(stats) == "table" and stats.estimatedBurstCapacity) or 1)
+    local remaining = allowance / capacity
+
+    if remaining > 0.75 then
+        return "green", "Normal", resolveColor("success", { r = 0.35, g = 0.9, b = 0.45, a = 1 })
+    end
+    if remaining > 0.5 then
+        return "yellow", "Allowance reduced", YELLOW_COLOR
+    end
+    if remaining > 0.25 then
+        return "orange", "Allowance low", ORANGE_COLOR
+    end
+
+    return "red", "Allowance critical", resolveColor("danger", { r = 0.95, g = 0.35, b = 0.35, a = 1 })
 end
 
 local function isLocalEventHost(state)
@@ -109,18 +128,12 @@ local function resolveQueuePresentation(stats)
         }
     end
 
-    if reason == "allowance" then
-        return {
-            key = "orange",
-            label = "Rate limited",
-            color = ORANGE_COLOR,
-        }
-    end
+    local key, label, color = getAllowancePresentation(stats)
 
     return {
-        key = "green",
-        label = "Normal",
-        color = resolveColor("success", { r = 0.35, g = 0.9, b = 0.45, a = 1 }),
+        key = key,
+        label = label,
+        color = color,
     }
 end
 

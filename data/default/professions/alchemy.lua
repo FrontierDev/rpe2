@@ -1,0 +1,2 @@
+RPE_DATASET_V1
+{ dataset = { achievements = {  }, auras = {  }, authorName = "Ortellus-ArgentDawn", classes = {  }, currencies = {  }, damageSchools = {  }, datasetType = "crafting", dependencies = {  }, description = "", groupName = "Core", guildSettings = {  }, id = "d6ffc4e2", interactions = {  }, itemSlots = {  }, items = {  }, loot = {  }, mounts = {  }, name = "Alchemy", pets = {  }, races = {  }, recipes = {  }, resources = {  }, skills = {  }, spells = {  }, stats = {  }, traits = {  }, units = {  }, weaponTypes = {  } }, format = "rpe-dataset", version = 1 }
