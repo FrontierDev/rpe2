@@ -569,6 +569,8 @@ local function buildNpcUnit(unitData, ownerName, nextEventUnitId, playerCount)
         eventID = nextEventUnitId,
         isPlayer = false,
         registryID = values.registryID,
+        presetIndex = values.presetIndex,
+        appearanceIndex = values.appearanceIndex,
         raidMarker = tonumber(values.raidMarker) or 0,
         team = math.max(1, math.floor(tonumber(values.team) or 1)),
         ownerID = values.ownerID or ownerName,
