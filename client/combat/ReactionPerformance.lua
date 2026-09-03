@@ -5,6 +5,8 @@ Addon.Client.Combat = Addon.Client.Combat or {}
 
 local Client = Addon.Client
 local Combat = Addon.Client.Combat
+local Ruleset = Addon.Internal and Addon.Internal.Ruleset or {}
+local Common = Addon.Utils and Addon.Utils.Common or {}
 local Normalization = Combat.Normalization or {}
 local normalizeToken = Normalization.NormalizeToken or function(value)
     local text = tostring(value or "")
@@ -17,6 +19,17 @@ local baseBuildHitPreviewEntry = Combat.BuildHitPreviewEntry
 
 if type(baseBuildHitCheckEntry) ~= "function" or type(baseBuildHitPreviewEntry) ~= "function" then
     return true
+end
+
+local function round(value)
+    if type(Common.Round) == "function" then
+        return Common.Round(value)
+    end
+    local numeric = tonumber(value) or 0
+    if numeric >= 0 then
+        return math.floor(numeric + 0.5)
+    end
+    return math.ceil(numeric - 0.5)
 end
 
 local function resolveEventState(context)
@@ -53,6 +66,36 @@ local function cloneValue(value)
         return Combat:CloneValue(value)
     end
     return value
+end
+
+local function applyNpcDifficultyHitBonus(entry)
+    if type(entry) ~= "table" or type(entry.attackerUnit) ~= "table" or entry.attackerUnit.isPlayer == true then
+        return entry
+    end
+
+    local eventState = type(entry.eventState) == "table" and entry.eventState
+        or type(entry.context) == "table" and entry.context.eventState
+        or nil
+    local modifiers = type(Ruleset.GetNpcDifficultyModifiers) == "function"
+        and Ruleset.GetNpcDifficultyModifiers(type(eventState) == "table" and eventState.difficulty or "normal")
+        or nil
+    local hitBonus = tonumber(type(modifiers) == "table" and modifiers.hitBonus or 0) or 0
+
+    if entry._npcDifficultyBaseAttackerTotal == nil then
+        entry._npcDifficultyBaseAttackerTotal = tonumber(entry.attackerTotal) or 0
+    end
+    entry.attackerTotal = round((tonumber(entry._npcDifficultyBaseAttackerTotal) or 0) + hitBonus)
+    entry.difficultyHitBonus = hitBonus
+
+    if type(entry.attackModifierContext) == "table" then
+        entry.attackModifierContext.difficultyHitBonus = hitBonus
+        entry.attackModifierContext.finalTotal = entry.attackerTotal
+    end
+    if type(entry.attackerRollContext) == "table" then
+        entry.attackerRollContext.difficultyHitBonus = hitBonus
+        entry.attackerRollContext.finalTotal = entry.attackerTotal
+    end
+    return entry
 end
 
 local function canBuildLazyPlayerEntry()
@@ -174,7 +217,7 @@ local function buildLazyPlayerHitEntry(self, context, effect, component)
     local rawDamage = tonumber(self:ResolveDamageAmount(context, effect)) or 0
     hitResolutionContext.rawDamage = rawDamage
 
-    return {
+    local entry = {
         eventId = eventId,
         spellRef = spellRef,
         componentKey = componentKey,
@@ -206,6 +249,12 @@ local function buildLazyPlayerHitEntry(self, context, effect, component)
             critRoll = critRoll,
         },
     }
+
+    -- NpcDifficulty.lua wraps the original hit-entry builders before this
+    -- extension loads. The player-target fast path bypasses that wrapper, so
+    -- preserve its hit-bonus contract explicitly while leaving its damage
+    -- modifier on the existing lazy BuildDamagePreview/ApplyResolvedDamage path.
+    return applyNpcDifficultyHitBonus(entry)
 end
 
 function Combat:BuildHitCheckEntry(context, effect, component)
