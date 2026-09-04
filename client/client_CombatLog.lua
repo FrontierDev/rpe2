@@ -598,6 +598,7 @@ function Client:HandleCombatLog(arguments, sender, distribution, target, message
         casterColor = arguments and arguments[12],
         targetColor = arguments and arguments[13],
         detailText = arguments and arguments[14],
+        turnNumber = arguments and arguments[15],
     })
     if not normalized or normalized.eventId ~= tostring(eventState.id or "") then
         return false
