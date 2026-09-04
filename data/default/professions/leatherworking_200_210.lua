@@ -715,7 +715,7 @@ local newRecipes = {
             {
                 itemRef = "538a54a0:u0wy9jz1",
                 kind = "rpe_item",
-                quantity = 14
+                quantity = 38
             },
             {
                 itemRef = "538a54a0:55k8gjup",
@@ -805,7 +805,7 @@ local newRecipes = {
             {
                 itemRef = "538a54a0:u0wy9jz1",
                 kind = "rpe_item",
-                quantity = 2
+                quantity = 8
             }
         },
         learnMode = "trainer",
