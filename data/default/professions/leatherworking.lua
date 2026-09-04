@@ -14462,7 +14462,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Wicked Leather Armor",
                 output = {
                     itemRef = "538a54a0:62656npm",
@@ -14497,7 +14497,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Wicked Leather Belt",
                 output = {
                     itemRef = "538a54a0:1xyj0rh1",
@@ -18338,7 +18338,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Red Dragonscale Breastplate",
                 output = {
                     itemRef = "538a54a0:635dfc77",
@@ -18378,7 +18378,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Runic Leather Pants",
                 output = {
                     itemRef = "538a54a0:078423d4",
@@ -18413,7 +18413,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Onyxia Scale Cloak",
                 output = {
                     itemRef = "538a54a0:400d6c46",
@@ -18448,7 +18448,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Black Dragonscale Shoulders",
                 output = {
                     itemRef = "538a54a0:eba39fc7",
@@ -18488,7 +18488,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Living Breastplate",
                 output = {
                     itemRef = "538a54a0:638749f0",
@@ -18518,7 +18518,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Devilsaur Leggings",
                 output = {
                     itemRef = "538a54a0:55799081",
@@ -18548,7 +18548,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Heavy Scorpid Shoulders",
                 output = {
                     itemRef = "538a54a0:a07838a8",
@@ -18588,7 +18588,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Volcanic Shoulders",
                 output = {
                     itemRef = "538a54a0:01c2a510",
@@ -18628,7 +18628,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Runic Leather Armor",
                 output = {
                     itemRef = "538a54a0:573bd787",
@@ -18668,7 +18668,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Runic Leather Shoulders",
                 output = {
                     itemRef = "538a54a0:0861c43b",
@@ -18698,7 +18698,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Frostsaber Tunic",
                 output = {
                     itemRef = "538a54a0:71935ba2",
@@ -18733,7 +18733,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Black Dragonscale Leggings",
                 output = {
                     itemRef = "538a54a0:63fb556e",
@@ -18773,7 +18773,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Molten Helm",
                 output = {
                     itemRef = "538a54a0:cc7a1b6d",
@@ -18818,7 +18818,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Black Dragonscale Boots",
                 output = {
                     itemRef = "538a54a0:4192f435",
@@ -18848,7 +18848,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Core Armor Kit",
                 output = {
                     itemRef = "538a54a0:81385e9a",
@@ -18878,7 +18878,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 4,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Girdle of Insight",
                 output = {
                     itemRef = "538a54a0:7009da50",
@@ -18918,7 +18918,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 4,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Mongoose Boots",
                 output = {
                     itemRef = "538a54a0:138a1c58",
@@ -18948,7 +18948,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 4,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Swift Flight Bracers",
                 output = {
                     itemRef = "538a54a0:638ce5ab",
@@ -18978,7 +18978,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 8,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Chromatic Cloak",
                 output = {
                     itemRef = "538a54a0:a7aba9e6",
@@ -19018,7 +19018,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 8,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Hide of the Wild",
                 output = {
                     itemRef = "538a54a0:effa4d3e",
@@ -19058,7 +19058,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 8,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Shifting Cloak",
                 output = {
                     itemRef = "538a54a0:a4cef336",
@@ -19093,7 +19093,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 6,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Timbermaw Brawlers",
                 output = {
                     itemRef = "538a54a0:49982f92",
@@ -19138,7 +19138,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Golden Mantle of the Dawn",
                 output = {
                     itemRef = "538a54a0:ad82516c",
@@ -19168,7 +19168,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 5,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Lava Belt",
                 output = {
                     itemRef = "538a54a0:32a73f91",
@@ -19203,7 +19203,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Chromatic Gauntlets",
                 output = {
                     itemRef = "538a54a0:f8f7b277",
@@ -19238,7 +19238,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 10,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Corehound Belt",
                 output = {
                     itemRef = "538a54a0:c10bc450",
@@ -19278,7 +19278,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 6,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Molten Belt",
                 output = {
                     itemRef = "538a54a0:5311e7b2",
@@ -19313,7 +19313,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 4,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Primal Batskin Jerkin",
                 output = {
                     itemRef = "538a54a0:28f1fa90",
@@ -19348,7 +19348,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 3,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Primal Batskin Gloves",
                 output = {
                     itemRef = "538a54a0:6798ff19",
@@ -19383,7 +19383,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 3,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Primal Batskin Bracers",
                 output = {
                     itemRef = "538a54a0:da8ca871",
@@ -19418,7 +19418,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 3,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Blood Tiger Breastplate",
                 output = {
                     itemRef = "538a54a0:31ba19e8",
@@ -19453,7 +19453,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 3,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Blood Tiger Shoulders",
                 output = {
                     itemRef = "538a54a0:b3aafc02",
@@ -19518,7 +19518,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 4,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Dreamscale Breastplate",
                 output = {
                     itemRef = "538a54a0:b24c385a",
@@ -19543,7 +19543,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Spitfire Bracers",
                 output = {
                     itemRef = "538a54a0:fa1b1e80",
@@ -19573,7 +19573,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Spitfire Gauntlets",
                 output = {
                     itemRef = "538a54a0:70d929dd",
@@ -19603,7 +19603,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Spitfire Breastplate",
                 output = {
                     itemRef = "538a54a0:60eb676d",
@@ -19622,7 +19622,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 id = "60efdaa5",
                 inputs = {},
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Sandstalker Bracers",
                 output = {
                     itemRef = "538a54a0:2bbfbc5e",
@@ -19647,7 +19647,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 4,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Sandstalker Gauntlets",
                 output = {
                     itemRef = "538a54a0:7055b5eb",
@@ -19672,7 +19672,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 8,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Sandstalker Breastplate",
                 output = {
                     itemRef = "538a54a0:b1db852b",
@@ -19712,7 +19712,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 4,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Stormshroud Gloves",
                 output = {
                     itemRef = "538a54a0:aa7ec926",
@@ -19752,7 +19752,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Polar Tunic",
                 output = {
                     itemRef = "538a54a0:e7c1c733",
@@ -19792,7 +19792,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Polar Gloves",
                 output = {
                     itemRef = "538a54a0:d006a702",
@@ -19832,7 +19832,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Polar Bracers",
                 output = {
                     itemRef = "538a54a0:282bfc3c",
@@ -19867,7 +19867,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Icy Scale Breastplate",
                 output = {
                     itemRef = "538a54a0:da536b54",
@@ -19902,7 +19902,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Icy Scale Gauntlets",
                 output = {
                     itemRef = "538a54a0:708ccbac",
@@ -19937,7 +19937,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Icy Scale Bracers",
                 output = {
                     itemRef = "538a54a0:339ca1f7",
@@ -19977,7 +19977,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Bramblewood Helm",
                 output = {
                     itemRef = "538a54a0:d8ce6800",
@@ -20012,7 +20012,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Bramblewood Boots",
                 output = {
                     itemRef = "538a54a0:59eeb93b",
@@ -20047,7 +20047,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 2,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Bramblewood Belt",
                 output = {
                     itemRef = "538a54a0:5f663445",
@@ -20070,5 +20070,5 @@ Addon.Data.DefaultDatasets:Register({
         units = {},
         weaponTypes = {},
     },
-    version = 12,
+    version = 13,
 })
