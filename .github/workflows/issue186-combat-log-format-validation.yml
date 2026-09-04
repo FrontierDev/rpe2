@@ -1,0 +1,77 @@
+name: issue186-combat-log-format-validation
+
+on:
+  push:
+    branches:
+      - issue-186-combat-log-self-echo
+
+permissions:
+  contents: write
+
+jobs:
+  format-validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: issue-186-combat-log-self-echo
+          fetch-depth: 0
+
+      - name: Normalize HandleCombatLog guard formatting
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('client/client_CombatLog.lua')
+          text = path.read_text()
+          start = text.index('    local localPlayerName = Common.NormalizeName and Common.NormalizeName(Common.GetPlayerName and Common.GetPlayerName() or "")\n', text.index('function Client:HandleCombatLog'))
+          end = text.index('    local entryType = normalizeEntryType(arguments and arguments[2])\n', start)
+          replacement = '''    local localPlayerName = Common.NormalizeName and Common.NormalizeName(Common.GetPlayerName and Common.GetPlayerName() or "")
+              or tostring(Common.GetPlayerName and Common.GetPlayerName() or "")
+          local normalizedSender = Common.NormalizeName and Common.NormalizeName(sender) or tostring(sender or "")
+          if (distribution == "PARTY" or distribution == "RAID")
+              and localPlayerName ~= ""
+              and normalizedSender == localPlayerName
+          then
+              -- EmitCombatLogEntry already queues the host-local ticker entry before broadcasting.
+              -- Ignore the transport's physical self-copy so the ticker/history only receive it once.
+              return true
+          end
+
+          '''
+          path.write_text(text[:start] + replacement + text[end:])
+          PY
+
+      - name: Validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test "$(git diff --name-only)" = 'client/client_CombatLog.lua'
+          python3 - <<'PY'
+          from pathlib import Path
+          text = Path('client/client_CombatLog.lua').read_text()
+          block = text[text.index('function Client:HandleCombatLog'):text.index('function Client:EmitCombatLogEntry')]
+          assert '\n    local normalizedSender = ' in block
+          assert '\n    if (distribution == "PARTY" or distribution == "RAID")' in block
+          assert '\n        and localPlayerName ~= ""' in block
+          assert '\n        and normalizedSender == localPlayerName' in block
+          assert '\n    then\n' in block
+          assert '\n        return true\n    end\n' in block
+          print('HandleCombatLog formatting validation: PASS')
+          PY
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.1
+          luac5.1 -p client/client_CombatLog.lua
+
+      - name: Commit formatting and remove workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ortellus"
+          git config user.email "elvetgames@gmail.com"
+          git add client/client_CombatLog.lua
+          git commit -m "Normalize combat-log self-echo guard formatting"
+          git rm .github/workflows/issue186-combat-log-format-validation.yml
+          git commit -m "Remove temporary combat-log formatting workflow"
+          git push origin HEAD:issue-186-combat-log-self-echo
