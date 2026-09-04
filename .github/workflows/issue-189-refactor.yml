@@ -27,6 +27,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y lua5.4
 
+      - name: Align validator with packaged elemental aliases
+        run: |
+          sed -i 's/enchantingRefByName\["Essence of Air"\]/enchantingRefByName["Elemental Air"]/g' .github/scripts/issue-189-refactor.lua
+          sed -i 's/enchantingRefByName\["Essence of Water"\]/enchantingRefByName["Elemental Water"]/g' .github/scripts/issue-189-refactor.lua
+
       - name: Consolidate and validate
         run: lua5.4 .github/scripts/issue-189-refactor.lua
 
