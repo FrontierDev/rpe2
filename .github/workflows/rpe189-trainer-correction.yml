@@ -1,0 +1,80 @@
+name: RPE189 Leatherworking Trainer Correction
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - .github/workflows/rpe189-trainer-correction.yml
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Convert all Leatherworking recipes to trainer learning
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path("data/default/professions/leatherworking.lua")
+          text = path.read_text(encoding="utf-8")
+
+          mode_pattern = re.compile(r'^\s*learnMode = "([^"]+)",\s*$', re.MULTILINE)
+          before_modes = mode_pattern.findall(text)
+          assert len(before_modes) == 278, f"Expected 278 Leatherworking recipe learn modes, found {len(before_modes)}"
+          unexpected = sorted(set(before_modes) - {"trainer", "book"})
+          assert not unexpected, f"Unexpected Leatherworking learn modes before correction: {unexpected}"
+          assert "book" in before_modes, "Expected at least one book-mode Leatherworking recipe to correct"
+
+          book_count = before_modes.count("book")
+          trainer_count = before_modes.count("trainer")
+          print(f"Before: {trainer_count} trainer, {book_count} book")
+
+          corrected = text.replace('learnMode = "book"', 'learnMode = "trainer"')
+
+          version_pattern = re.compile(r'^    version = (\d+),\s*$', re.MULTILINE)
+          versions = version_pattern.findall(corrected)
+          assert versions == ["12"], f"Expected canonical Leatherworking dataset version 12, found {versions}"
+          corrected, replacements = version_pattern.subn('    version = 13,', corrected, count=1)
+          assert replacements == 1, "Failed to bump Leatherworking packaged dataset version"
+
+          after_modes = mode_pattern.findall(corrected)
+          assert len(after_modes) == 278, f"Recipe count changed while correcting learn modes: {len(after_modes)}"
+          assert set(after_modes) == {"trainer"}, f"Not every Leatherworking recipe is trainer-learned: {sorted(set(after_modes))}"
+          assert corrected.count('learnMode = "book"') == 0, "Book-mode recipe remains"
+          assert corrected.count('learnMode = "trainer"') == 278, "Expected all 278 recipes to be trainer-learned"
+          assert version_pattern.findall(corrected) == ["13"], "Packaged dataset version did not become 13"
+
+          path.write_text(corrected, encoding="utf-8")
+          print(f"After: 278 trainer, 0 book; converted {book_count} recipes; dataset version 13")
+          PY
+
+      - name: Validate and commit correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test "$(git diff -- data/default/professions/leatherworking.lua | grep -c '^[-+] *learnMode = ' || true)" -gt 0
+          grep -q '^    version = 13,$' data/default/professions/leatherworking.lua
+          ! grep -q 'learnMode = "book"' data/default/professions/leatherworking.lua
+          test "$(grep -c 'learnMode = "trainer"' data/default/professions/leatherworking.lua)" -eq 278
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/default/professions/leatherworking.lua
+          git rm .github/workflows/rpe189-trainer-correction.yml
+          git diff --cached --check
+          git diff --cached --name-status
+          git commit -m "Make Leatherworking recipes trainer-learned"
+          git push origin HEAD:dev
