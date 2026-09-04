@@ -1,0 +1,42 @@
+name: Issue 189 Recipe Consolidation
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - '.github/scripts/issue-189-refactor.lua'
+      - '.github/workflows/issue-189-refactor.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Install Lua
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4
+
+      - name: Consolidate and validate
+        run: lua5.4 .github/scripts/issue-189-refactor.lua
+
+      - name: Commit consolidation
+        run: |
+          rm .github/scripts/issue-189-refactor.lua .github/workflows/issue-189-refactor.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m "Consolidate Leatherworking recipes into canonical dataset"
+          git push origin HEAD:dev
