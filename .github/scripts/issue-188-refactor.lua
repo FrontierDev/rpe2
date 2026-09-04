@@ -205,6 +205,15 @@ local felclothPath = "data/default/professions/tailoring_felcloth.lua"
 -- in TOC order. Recipe deltas are captured separately so #188 does not move
 -- recipes into the canonical dataset; #189 remains responsible for that work.
 local sourceAddon = makeAddon()
+for _, dependencyPath in ipairs({
+    "data/default/professions/blacksmithing.lua",
+    "data/default/professions/enchanting.lua",
+    "data/default/professions/jewelcrafting.lua",
+    "data/default/professions/tailoring.lua",
+    "data/default/professions/misc.lua",
+}) do
+    loadAddonFile(dependencyPath, sourceAddon)
+end
 loadAddonFile(leatherPath, sourceAddon)
 local working = assert(sourceAddon.Data.DefaultDatasets.Definitions["538a54a0"])
 local baseRecipes = deepCopy(working.dataset.recipes or {})
