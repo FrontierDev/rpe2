@@ -1,0 +1,49 @@
+name: Issue 188 canonical version bump
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - .github/workflows/issue-188-version-bump.yml
+
+permissions:
+  contents: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Bump canonical packaged versions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          changes = [
+              (Path("data/default/professions/leatherworking.lua"), 10, 11),
+              (Path("data/default/professions/tailoring.lua"), 2, 3),
+          ]
+          for path, old, new in changes:
+              text = path.read_text()
+              old_suffix = f"    version = {old},\n}})\n"
+              new_suffix = f"    version = {new},\n}})\n"
+              if not text.endswith(old_suffix):
+                  raise SystemExit(f"Unexpected canonical version footer in {path}")
+              path.write_text(text[:-len(old_suffix)] + new_suffix)
+          PY
+
+          git diff --check
+          tail -n 3 data/default/professions/leatherworking.lua | grep -Fq 'version = 11'
+          tail -n 3 data/default/professions/tailoring.lua | grep -Fq 'version = 3'
+
+          git config user.name "FrontierDev"
+          git config user.email "20729370+FrontierDev@users.noreply.github.com"
+          git add data/default/professions/leatherworking.lua data/default/professions/tailoring.lua
+          git commit -m "Bump canonical profession dataset versions"
+          git push origin HEAD:dev
