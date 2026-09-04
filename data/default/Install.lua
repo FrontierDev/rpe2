@@ -10,6 +10,19 @@ local function logInstallDiagnostic(message)
     end
 end
 
+local function applyPackagedVersionCorrections(definitions)
+    -- Leatherworking v2 contents were briefly packaged with version 1, so
+    -- clients that had already recorded v1 would otherwise skip the rewrite.
+    -- Keep this as a version floor so future packaged versions remain authoritative.
+    local leatherworking = definitions["538a54a0"]
+    if type(leatherworking) == "table"
+        and type(leatherworking.version) == "number"
+        and leatherworking.version < 2
+    then
+        leatherworking.version = 2
+    end
+end
+
 local function syncDefaultDatasets()
     local Database = Addon.Internal and Addon.Internal.Database or nil
     local DefaultDatasets = Addon.Data and Addon.Data.DefaultDatasets or nil
@@ -47,6 +60,7 @@ local function syncDefaultDatasets()
         return false
     end
 
+    applyPackagedVersionCorrections(DefaultDatasets.Definitions)
     Database.SyncDefaultDatasets(DefaultDatasets.Definitions)
     return true
 end
