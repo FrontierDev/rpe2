@@ -29,6 +29,7 @@ data/default/professions/jewelcrafting.lua
 data/default/professions/leatherworking.lua
 data/default/professions/leatherworking_200_210.lua
 data/default/professions/leatherworking_210_225.lua
+data/default/professions/leatherworking_230_250.lua
 data/default/professions/misc.lua
 data/default/professions/tailoring.lua
 
