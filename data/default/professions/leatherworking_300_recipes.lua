@@ -19,6 +19,10 @@ local MATERIAL_DATASETS = {
     "4999dcec", -- Jewelcrafting
     "3eb7e9bb", -- Miscellaneous
 }
+local MATERIAL_ALIASES = {
+    ["Essence of Air"] = "Elemental Air",
+    ["Essence of Water"] = "Elemental Water",
+}
 
 local function split(value, separator)
     local result = {}
@@ -50,13 +54,14 @@ local function findPackagedMaterialRef(name)
         return RUGGED_LEATHER_REF
     end
 
+    local lookupName = MATERIAL_ALIASES[name] or name
     for datasetIndex = 1, #MATERIAL_DATASETS do
         local datasetId = MATERIAL_DATASETS[datasetIndex]
         local packaged = definitions and definitions[datasetId] or nil
         local sourceDataset = packaged and packaged.dataset or nil
         for itemIndex = 1, #(sourceDataset and sourceDataset.items or {}) do
             local item = sourceDataset.items[itemIndex]
-            if type(item) == "table" and item.name == name and type(item.id) == "string" and item.id ~= "" then
+            if type(item) == "table" and item.name == lookupName and type(item.id) == "string" and item.id ~= "" then
                 return datasetId .. ":" .. item.id
             end
         end
