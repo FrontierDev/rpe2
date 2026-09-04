@@ -1,0 +1,268 @@
+name: Issue 191 Tailoring Items
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - .github/workflows/issue-191-tailoring-items.yml
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Add canonical skill-300 Tailoring items
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import re
+
+          path = Path("data/default/professions/tailoring.lua")
+          core_path = Path("data/default/core.lua")
+          text = path.read_text(encoding="utf-8")
+          original = text
+          core = core_path.read_text(encoding="utf-8")
+
+          ITEMS = json.loads(r"""[{"name":"Wizardweave Robe","id":"f299a5fb","quality":"uncommon","slot":"chest","level":55,"icon":"inv_chest_cloth_46","stats":{"armor":77,"arcaneResistance":17,"fireResistance":18}},{"name":"Mooncloth Robe","id":"bd219159","quality":"rare","slot":"chest","level":56,"icon":"inv_chest_cloth_04","stats":{"armor":87,"stamina":12,"intellect":25,"spirit":12}},{"name":"Felcloth Robe","id":"843386cd","quality":"rare","slot":"chest","level":56,"icon":"inv_chest_cloth_09","stats":{"armor":79,"stamina":7}},{"name":"Robe of the Archmage","id":"f95e56b6","quality":"epic","slot":"chest","level":57,"icon":"inv_chest_cloth_38","binding":"bind_on_pickup","stats":{"armor":109,"intellect":12,"spellPower":40,"spellCrit":1}},{"name":"Truefaith Vestments","id":"c0536107","quality":"epic","slot":"chest","level":57,"icon":"inv_chest_cloth_31","binding":"bind_on_pickup","stats":{"armor":109,"stamina":14,"healingPower":73,"spellPower":25}},{"name":"Robe of the Void","id":"98d0bb8e","quality":"epic","slot":"chest","level":57,"icon":"inv_chest_cloth_51","binding":"bind_on_pickup","stats":{"armor":109,"stamina":14,"spellPower":46}},{"name":"Bloodvine Vest","id":"9cc001ee","quality":"rare","slot":"chest","level":60,"icon":"inv_chest_cloth_07","stats":{"armor":92,"intellect":13,"spellHit":2,"spellPower":27}},{"name":"Flarecore Robe","id":"b2e11a1d","quality":"epic","slot":"chest","level":60,"icon":"inv_chest_cloth_18","stats":{"armor":116,"stamina":35,"fireResistance":15,"spellPower":23}},{"name":"Glacial Vest","id":"fe062a7d","quality":"epic","slot":"chest","level":60,"icon":"inv_chest_cloth_08","stats":{"armor":139,"stamina":26,"frostResistance":40,"spellPower":21}},{"name":"Sylvan Vest","id":"1b70cf59","quality":"rare","slot":"chest","level":60,"icon":"inv_chest_plate07","stats":{"armor":98,"stamina":15,"natureResistance":30,"spellPower":12}},{"name":"Runed Stygian Boots","id":"3da92844","quality":"rare","slot":"feet","level":58,"icon":"inv_boots_05","stats":{"armor":61,"stamina":8,"shadowResistance":20}},{"name":"Bloodvine Boots","id":"49c73413","quality":"rare","slot":"feet","level":60,"icon":"inv_boots_cloth_02","stats":{"armor":63,"intellect":16,"spellHit":1,"spellPower":19}},{"name":"Felcloth Gloves","id":"662704bb","quality":"rare","slot":"hands","level":57,"icon":"inv_gauntlets_19","stats":{"armor":55,"stamina":9}},{"name":"Gloves of Spell Mastery","id":"7f81f7ae","quality":"epic","slot":"hands","level":57,"icon":"inv_gauntlets_06","stats":{"armor":68,"intellect":10,"spirit":8,"spellCrit":2}},{"name":"Flarecore Gloves","id":"4a2c908b","quality":"epic","slot":"hands","level":57,"icon":"inv_gauntlets_26","stats":{"armor":68,"stamina":10,"intellect":14,"fireResistance":25}},{"name":"Inferno Gloves","id":"94db4fa1","quality":"rare","slot":"hands","level":57,"icon":"inv_gauntlets_19","stats":{"armor":55,"intellect":9}},{"name":"Glacial Gloves","id":"c6944b67","quality":"epic","slot":"hands","level":60,"icon":"inv_gauntlets_06","stats":{"armor":87,"stamina":22,"frostResistance":30,"spellPower":15}},{"name":"Wizardweave Turban","id":"93d11a75","quality":"uncommon","slot":"head","level":56,"icon":"inv_helmet_63","stats":{"armor":64,"arcaneResistance":18,"fireResistance":18}},{"name":"Sylvan Crown","id":"34faf12a","quality":"rare","slot":"head","level":60,"icon":"inv_crown_01","stats":{"armor":80,"stamina":10,"natureResistance":30,"spellPower":18}},{"name":"Runed Stygian Leggings","id":"2c5d12d3","quality":"rare","slot":"legs","level":58,"icon":"inv_pants_cloth_05","stats":{"armor":78,"stamina":13,"shadowResistance":25}},{"name":"Bloodvine Leggings","id":"79664578","quality":"rare","slot":"legs","level":60,"icon":"inv_pants_cloth_14","stats":{"armor":80,"intellect":6,"spellHit":1,"spellPower":37}},{"name":"Flarecore Leggings","id":"484dabbb","quality":"epic","slot":"legs","level":60,"icon":"inv_pants_06","stats":{"armor":107,"stamina":21,"fireResistance":16,"spellPower":43}},{"name":"Flarecore Mantle","id":"fc45ec3c","quality":"epic","slot":"shoulder","level":56,"icon":"inv_shoulder_23","stats":{"armor":81,"stamina":9,"intellect":10,"spirit":10,"fireResistance":24}},{"name":"Felcloth Shoulders","id":"faff150e","quality":"rare","slot":"shoulder","level":57,"icon":"inv_shoulder_23","stats":{"armor":60,"spirit":5}},{"name":"Mantle of the Timbermaw","id":"78265d43","quality":"rare","slot":"shoulder","level":59,"icon":"inv_shoulder_19","stats":{"armor":68,"intellect":21}},{"name":"Sylvan Shoulders","id":"796da506","quality":"rare","slot":"shoulder","level":60,"icon":"inv_shoulder_18","stats":{"armor":74,"stamina":18,"natureResistance":20,"spellPower":7}},{"name":"Belt of the Archmage","id":"d797b079","quality":"epic","slot":"waist","level":57,"icon":"inv_belt_31","stats":{"armor":62,"stamina":10,"intellect":25,"spellCrit":1}},{"name":"Runed Stygian Belt","id":"4d41d2b8","quality":"rare","slot":"waist","level":58,"icon":"inv_belt_14","stats":{"armor":50,"stamina":10,"shadowResistance":20}},{"name":"Flarecore Wraps","id":"e7eb0838","quality":"epic","slot":"wrists","level":60,"icon":"inv_bracer_09","stats":{"armor":49,"intellect":8,"fireResistance":7}},{"name":"Glacial Wrists","id":"35a2b69d","quality":"epic","slot":"wrists","level":60,"icon":"inv_bracer_07","stats":{"armor":61,"stamina":20,"frostResistance":20,"spellPower":12}}]""")
+          EXISTING = [
+              "Mooncloth Vest",
+              "Mooncloth Shoulders",
+              "Runecloth Shoulders",
+              "Mooncloth Circlet",
+              "Mooncloth Gloves",
+              "Cloak of Warding",
+              "Argent Shoulders",
+              "Gaea's Embrace",
+              "Glacial Cloak",
+          ]
+
+          STAT = {
+              "armor": "f82db71a:v42albuv",
+              "stamina": "f82db71a:ygjno50i",
+              "intellect": "f82db71a:75y3a8ib",
+              "spirit": "f82db71a:kec9rhli",
+              "healingPower": "f82db71a:hj6d4kvy",
+              "spellPower": "f82db71a:7t7xgzcx",
+              "spellHit": "f82db71a:v2g0tw0o",
+              "spellCrit": "f82db71a:69hfqhne",
+              "fireResistance": "f82db71a:0w7c7p09",
+              "natureResistance": "f82db71a:pg0ytacb",
+              "arcaneResistance": "f82db71a:954yunb9",
+              "frostResistance": "f82db71a:jjn0my8k",
+              "shadowResistance": "f82db71a:itpo751d",
+          }
+          SLOT = {
+              "head": "f82db71a:bgvs1zx6",
+              "shoulder": "f82db71a:66i80qm1",
+              "chest": "f82db71a:nwfvxbto",
+              "wrists": "f82db71a:crezt6ix",
+              "hands": "f82db71a:wasvuom2",
+              "waist": "f82db71a:haks0gz4",
+              "legs": "f82db71a:obmt4ntq",
+              "feet": "f82db71a:raiu9t05",
+          }
+
+          def stable_id(prefix, name):
+              value = 2166136261
+              for byte in (prefix + name).encode("utf-8"):
+                  value = (value * 16777619 + byte) % 4294967296
+              return f"{value:08x}"
+
+          def item_level(level, quality):
+              value = level + 5
+              if quality == "rare":
+                  return min(value, 55)
+              if quality == "epic":
+                  return min(value, 60)
+              return value
+
+          def slice_table(source, marker, next_marker):
+              start = source.index(marker)
+              end = source.index(next_marker, start)
+              return start, end, source[start:end]
+
+          items_start, items_end, items_before = slice_table(
+              text, "        items = {", "        loot = {"
+          )
+
+          before_names = re.findall(r'^                name = "([^"]+)",$', items_before, re.MULTILINE)
+          before_ids = re.findall(r'^                id = "([^"]+)",$', items_before, re.MULTILINE)
+          assert len(before_names) == len(set(before_names)), "Pre-existing Tailoring item names are not unique"
+          assert len(before_ids) == len(set(before_ids)), "Pre-existing Tailoring item IDs are not unique"
+
+          for name in EXISTING:
+              assert before_names.count(name) == 1, f"Expected existing Tailoring item {name!r} exactly once"
+          for item in ITEMS:
+              assert item["name"] not in before_names, f"Item already exists: {item['name']}"
+              assert item["id"] not in before_ids, f"Generated item ID collides: {item['id']}"
+              assert item["id"] == stable_id("item:", item["name"]), f"Unstable ID for {item['name']}"
+              assert item["slot"] in SLOT
+              assert item["quality"] in {"uncommon", "rare", "epic"}
+              assert item["level"] >= 1
+              assert item["icon"].startswith("inv_") or item["icon"].startswith("spell_")
+              for key in item["stats"]:
+                  assert key in STAT, f"Unsupported stat key {key} on {item['name']}"
+
+          core_ids = set(re.findall(r'^                id = "([^"]+)",$', core, re.MULTILINE))
+          for ref in list(STAT.values()) + list(SLOT.values()):
+              dataset, object_id = ref.split(":", 1)
+              assert dataset == "f82db71a"
+              assert object_id in core_ids, f"Core ref does not resolve: {ref}"
+
+          def q(value):
+              return json.dumps(value)
+
+          def render_item(item):
+              binding = item.get("binding", "bind_on_equip")
+              can_trade = "false" if binding == "bind_on_pickup" else "true"
+              lines = [
+                  "            {",
+                  "                allowWowConversion = false,",
+                  '                armorWeight = "cloth",',
+                  f"                bindingFlag = {q(binding)},",
+                  "                blueSockets = 0,",
+                  "                canDisenchant = true,",
+                  "                canSell = true,",
+                  "                canStack = false,",
+                  f"                canTrade = {can_trade},",
+                  "                cogSockets = 0,",
+                  "                conditions = {",
+                  "                    {",
+                  "                        invert = false,",
+                  f"                        minimumValue = {item['level']},",
+                  "                        showOnTooltip = true,",
+                  '                        tooltipTextOverride = "",',
+                  '                        type = "level",',
+                  "                    },",
+                  "                },",
+                  '                consumableElixirType = "",',
+                  '                consumableType = "",',
+                  '                damageMode = "fixed",',
+                  "                damagePerTurn = 0,",
+                  '                description = "",',
+                  '                gemColor = "none",',
+                  '                genericModificationKey = "",',
+                  "                greenSockets = 0,",
+                  f'                icon = "interface/icons/{item["icon"]}.blp",',
+                  f'                id = "{item["id"]}",',
+                  "                isTwoHanded = false,",
+                  f"                itemLevel = {item_level(item['level'], item['quality'])},",
+                  '                itemSetKey = "",',
+                  '                itemType = "armor",',
+                  "                maxDamagePerTurn = 0,",
+                  "                maxGenericModificationCounts = {",
+                  "                    mod = 1,",
+                  "                },",
+                  "                maxModificationCounts = {",
+                  "                    mod = 1,",
+                  "                },",
+                  "                maxStackSize = 1,",
+                  "                metaSockets = 0,",
+                  "                minDamagePerTurn = 0,",
+                  '                modificationKind = "generic",',
+                  f'                name = {q(item["name"])},',
+                  "                prismaticSockets = 0,",
+                  f'                quality = "{item["quality"]}",',
+                  "                redSockets = 0,",
+                  "                sellPrice = 0,",
+                  "                skillBonuses = {},",
+                  "                socketTypes = {},",
+                  "                sockets = {},",
+                  "                stats = {",
+              ]
+              for key, value in item["stats"].items():
+                  lines.extend([
+                      "                    {",
+                      f'                        sourceStatRef = "{STAT[key]}",',
+                      f"                        value = {value},",
+                      "                    },",
+                  ])
+              lines.extend([
+                  "                },",
+                  "                tags = {},",
+                  '                targetArmorWeight = "none",',
+                  "                targetSlotRefs = {},",
+                  "                targetTwoHandedOnly = false,",
+                  '                uniqueFlag = "none",',
+                  "                validSlotRefs = {",
+                  f'                    "{SLOT[item["slot"]]}",',
+                  "                },",
+                  "                yellowSockets = 0,",
+                  "            },",
+              ])
+              return "\n".join(lines) + "\n"
+
+          felcloth_name_at = items_before.index('                name = "Felcloth",')
+          block_start = items_before.rfind("\n            {\n                allowWowConversion", 0, felcloth_name_at)
+          assert block_start >= 0, "Could not locate top-level Felcloth item block"
+          block_start += 1
+          insertion_at = items_start + block_start
+          rendered = "".join(render_item(item) for item in ITEMS)
+          text = text[:insertion_at] + rendered + text[insertion_at:]
+
+          version_pattern = re.compile(r'^    version = (\d+),$', re.MULTILINE)
+          versions = version_pattern.findall(text)
+          assert versions == ["3"], f"Expected Tailoring packaged version 3 before #191, found {versions}"
+          text, count = version_pattern.subn("    version = 4,", text, count=1)
+          assert count == 1
+
+          _, _, items_after = slice_table(text, "        items = {", "        loot = {")
+          after_names = re.findall(r'^                name = "([^"]+)",$', items_after, re.MULTILINE)
+          after_ids = re.findall(r'^                id = "([^"]+)",$', items_after, re.MULTILINE)
+
+          assert len(after_names) == len(before_names) + 30, (
+              f"Expected exactly 30 new Tailoring items: {len(before_names)} -> {len(after_names)}"
+          )
+          assert len(after_names) == len(set(after_names)), "Duplicate Tailoring item name after #191"
+          assert len(after_ids) == len(set(after_ids)), "Duplicate Tailoring item ID after #191"
+          for name in EXISTING:
+              assert after_names.count(name) == 1, f"Existing item duplicated or removed: {name}"
+          for item in ITEMS:
+              assert after_names.count(item["name"]) == 1, f"Missing/duplicated new item: {item['name']}"
+              assert after_ids.count(item["id"]) == 1, f"Missing/duplicated new ID: {item['id']}"
+              expected_ilvl = item_level(item["level"], item["quality"])
+              name_at = items_after.index(f'                name = {q(item["name"])}')
+              obj_start = items_after.rfind("\n            {\n", 0, name_at) + 1
+              obj_end = items_after.find("\n            },", name_at)
+              assert obj_start >= 0 and obj_end >= 0
+              block = items_after[obj_start:obj_end]
+              assert f"                itemLevel = {expected_ilvl}," in block
+              assert f'                quality = "{item["quality"]}",' in block
+              assert f'                icon = "interface/icons/{item["icon"]}.blp",' in block
+              assert f"                        minimumValue = {item['level']}," in block
+              assert f'                    "{SLOT[item["slot"]]}",' in block
+              assert 'itemType = "container"' not in block
+
+          assert version_pattern.findall(text) == ["4"]
+          assert text != original
+          path.write_text(text, encoding="utf-8")
+          print(f"Validated #191: {len(before_names)} -> {len(after_names)} Tailoring items; added 30; version 3 -> 4")
+          PY
+
+      - name: Validate diff and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test "$(git diff -- data/default/professions/tailoring.lua | grep -c '^+.*name = ' || true)" -eq 30
+          grep -q '^    version = 4,$' data/default/professions/tailoring.lua
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/default/professions/tailoring.lua
+          git rm .github/workflows/issue-191-tailoring-items.yml
+          git diff --cached --check
+          git diff --cached --name-status
+          git commit -m "Add missing skill 300 Tailoring items"
+          git push origin HEAD:dev
