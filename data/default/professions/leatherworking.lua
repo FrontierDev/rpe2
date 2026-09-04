@@ -4500,7 +4500,7 @@ Addon.Data.DefaultDatasets:Register({
                 metaSockets = 0,
                 minDamagePerTurn = 0,
                 modificationKind = "generic",
-                name = "Gem Studded Belt",
+                name = "Gem-studded Leather Belt",
                 prismaticSockets = 0,
                 quality = "rare",
                 redSockets = 0,
@@ -4592,6 +4592,458 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
                         value = 8
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cosmetic",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 32,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_03.blp",
+                id = "hmzr6pp5",
+                isTwoHanded = false,
+                itemLevel = 37,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Guardian Cloak",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 24
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 5
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 33,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_21.blp",
+                id = "iarx47ro",
+                isTwoHanded = false,
+                itemLevel = 38,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Gloves of the Greatfather",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 66
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 18
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 6
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 33,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_06.blp",
+                id = "8rdifxt5",
+                isTwoHanded = false,
+                itemLevel = 38,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Green Whelp Bracers",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 47
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 8
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 33,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_05.blp",
+                id = "dm0rblq4",
+                isTwoHanded = false,
+                itemLevel = 38,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Murloc Scale Bracers",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 47
+                    },
+                    {
+                        sourceStatRef = "f82db71a:zfqm8dxp",
+                        value = 5
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 6
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 34,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_06.blp",
+                id = "rfhy92ax",
+                isTwoHanded = false,
+                itemLevel = 39,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Dusky Belt",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 61
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 8
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 8
+                    }
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4"
+                },
+                yellowSockets = 0
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 34,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    }
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_10.blp",
+                id = "d1867li1",
+                isTwoHanded = false,
+                itemLevel = 39,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1
+                },
+                maxModificationCounts = {
+                    mod = 1
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Guardian Leather Bracers",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 48
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 6
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6
                     }
                 },
                 tags = {},
@@ -6362,7 +6814,7 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 learnMode = "trainer",
-                name = "Gem Studded Belt",
+                name = "Gem-studded Leather Belt",
                 output = {
                     itemRef = "538a54a0:1p85p8ie",
                     maxQuantity = 1,
@@ -6409,6 +6861,206 @@ Addon.Data.DefaultDatasets:Register({
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
                 trainerCostCopper = 60015
+            },
+            {
+                category = "",
+                description = "",
+                id = "zqbrig3r",
+                inputs = {
+                    {
+                        itemRef = "538a54a0:55k8gjup",
+                        kind = "rpe_item",
+                        quantity = 14
+                    },
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 8
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Guardian Cloak",
+                output = {
+                    itemRef = "538a54a0:hmzr6pp5",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 185,
+                results = {},
+                skillRef = "f82db71a:x9qez6bu",
+                tags = {},
+                trainerCostCopper = 60015
+            },
+            {
+                category = "",
+                description = "",
+                id = "8vu386dv",
+                inputs = {
+                    {
+                        itemRef = "538a54a0:55k8gjup",
+                        kind = "rpe_item",
+                        quantity = 8
+                    },
+                    {
+                        itemRef = "732368d4:ku9j8vhw",
+                        kind = "rpe_item",
+                        quantity = 4
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Gloves of the Greatfather",
+                output = {
+                    itemRef = "538a54a0:iarx47ro",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 190,
+                results = {},
+                skillRef = "f82db71a:x9qez6bu",
+                tags = {},
+                trainerCostCopper = 63155
+            },
+            {
+                category = "",
+                description = "",
+                id = "ln12wms9",
+                inputs = {
+                    {
+                        itemRef = "538a54a0:55k8gjup",
+                        kind = "rpe_item",
+                        quantity = 14
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 2
+                    }
+                },
+                learnMode = "trainer",
+                name = "Green Whelp Bracers",
+                output = {
+                    itemRef = "538a54a0:8rdifxt5",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 190,
+                results = {},
+                skillRef = "f82db71a:x9qez6bu",
+                tags = {},
+                trainerCostCopper = 63155
+            },
+            {
+                category = "",
+                description = "",
+                id = "pzheisy3",
+                inputs = {
+                    {
+                        itemRef = "538a54a0:55k8gjup",
+                        kind = "rpe_item",
+                        quantity = 34
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Murloc Scale Bracers",
+                output = {
+                    itemRef = "538a54a0:dm0rblq4",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 190,
+                results = {},
+                skillRef = "f82db71a:x9qez6bu",
+                tags = {},
+                trainerCostCopper = 63155
+            },
+            {
+                category = "",
+                description = "",
+                id = "bn696iil",
+                inputs = {
+                    {
+                        itemRef = "538a54a0:55k8gjup",
+                        kind = "rpe_item",
+                        quantity = 10
+                    },
+                    {
+                        itemRef = "7259f1d3:jt6ktqiu",
+                        kind = "rpe_item",
+                        quantity = 8
+                    },
+                    {
+                        itemRef = "7259f1d3:dsuj9x3j",
+                        kind = "rpe_item",
+                        quantity = 2
+                    },
+                    {
+                        itemRef = "61fdf3df:ov027km6",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Dusky Belt",
+                output = {
+                    itemRef = "538a54a0:rfhy92ax",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 195,
+                results = {},
+                skillRef = "f82db71a:x9qez6bu",
+                tags = {},
+                trainerCostCopper = 66375
+            },
+            {
+                category = "",
+                description = "",
+                id = "i42ct59w",
+                inputs = {
+                    {
+                        itemRef = "538a54a0:55k8gjup",
+                        kind = "rpe_item",
+                        quantity = 14
+                    },
+                    {
+                        itemRef = "7259f1d3:uv6t44ol",
+                        kind = "rpe_item",
+                        quantity = 1
+                    }
+                },
+                learnMode = "trainer",
+                name = "Guardian Leather Bracers",
+                output = {
+                    itemRef = "538a54a0:d1867li1",
+                    maxQuantity = 1,
+                    minQuantity = 1
+                },
+                reagents = {},
+                requiredSkillLevel = 195,
+                results = {},
+                skillRef = "f82db71a:x9qez6bu",
+                tags = {},
+                trainerCostCopper = 66375
             }
         },
         resources = {},
