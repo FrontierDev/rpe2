@@ -20,7 +20,7 @@ jobs:
           ref: dev
           fetch-depth: 0
 
-      - name: Convert all Leatherworking recipes to trainer learning
+      - name: Convert Leatherworking book recipes to trainer learning
         shell: bash
         run: |
           python3 - <<'PY'
@@ -66,16 +66,16 @@ jobs:
           recipes_before, recipe_count = recipe_table_slice(text)
           assert recipe_count == 179, f"Expected 179 canonical Leatherworking recipes, found {recipe_count}"
 
-          # Older canonical entries may omit learnMode; Recipe.lua defaults those to trainer.
           mode_pattern = re.compile(r'^\s*learnMode = "([^"]+)",\s*$', re.MULTILINE)
           before_modes = mode_pattern.findall(recipes_before)
-          unexpected = sorted(set(before_modes) - {"trainer", "book"})
+          unexpected = sorted(set(before_modes) - {"trainer", "book", "always_learned"})
           assert not unexpected, f"Unexpected Leatherworking learn modes before correction: {unexpected}"
           book_count = before_modes.count("book")
           trainer_count = before_modes.count("trainer")
+          always_count = before_modes.count("always_learned")
           implicit_trainer_count = recipe_count - len(before_modes)
           assert book_count > 0, "Expected at least one book-mode Leatherworking recipe to correct"
-          print(f"Before: {recipe_count} recipes; {trainer_count} explicit trainer, {book_count} explicit book, {implicit_trainer_count} implicit trainer")
+          print(f"Before: {recipe_count} recipes; {trainer_count} explicit trainer, {book_count} book, {always_count} always-learned, {implicit_trainer_count} implicit trainer")
 
           corrected = text.replace('learnMode = "book"', 'learnMode = "trainer"')
 
@@ -89,13 +89,14 @@ jobs:
           after_modes = mode_pattern.findall(recipes_after)
           assert after_recipe_count == 179, f"Recipe count changed during correction: {after_recipe_count}"
           assert len(after_modes) == len(before_modes), "Explicit learn-mode field count changed"
-          assert set(after_modes) == {"trainer"}, f"Non-trainer explicit recipe mode remains: {sorted(set(after_modes))}"
+          assert set(after_modes).issubset({"trainer", "always_learned"}), f"Unexpected post-correction modes: {sorted(set(after_modes))}"
+          assert after_modes.count("always_learned") == always_count, "Always-learned recipes changed"
+          assert after_modes.count("trainer") == trainer_count + book_count, "Book-to-trainer conversion count mismatch"
           assert 'learnMode = "book"' not in recipes_after, "Book-mode recipe remains"
-          assert after_modes.count("trainer") + (after_recipe_count - len(after_modes)) == 179, "Not all recipes resolve to trainer learning"
           assert version_pattern.findall(corrected) == ["13"], "Packaged dataset version did not become 13"
 
           path.write_text(corrected, encoding="utf-8")
-          print(f"After: all 179 recipes resolve as trainer; converted {book_count} explicit book recipes; dataset version 13")
+          print(f"After: converted {book_count} book recipes to trainer; {after_modes.count('trainer')} explicit trainer, {always_count} always-learned, {implicit_trainer_count} implicit trainer; dataset version 13")
           PY
 
       - name: Validate and commit correction
@@ -113,5 +114,5 @@ jobs:
           git rm .github/workflows/rpe189-trainer-correction.yml
           git diff --cached --check
           git diff --cached --name-status
-          git commit -m "Make Leatherworking recipes trainer-learned"
+          git commit -m "Make Leatherworking book recipes trainer-learned"
           git push origin HEAD:dev
