@@ -34,6 +34,7 @@ data/default/professions/leatherworking_250_270.lua
 data/default/professions/leatherworking_270_295.lua
 data/default/professions/misc.lua
 data/default/professions/tailoring.lua
+data/default/professions/leatherworking_300.lua
 
 utils/Common.lua
 utils/Dice.lua
@@ -137,7 +138,6 @@ core/classes/EventAutopilotMode.lua
 core/classes/EventVariantNetwork.lua
 core/classes/EventVariantSpellEquipmentNetwork.lua
 core/classes/EventEndLoot.lua
-
 client/client_Event.lua
 client/client_Loot.lua
 client/client_CombatLog.lua
