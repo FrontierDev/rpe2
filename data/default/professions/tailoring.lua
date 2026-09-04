@@ -10331,5 +10331,5 @@ Addon.Data.DefaultDatasets:Register({
         units = {},
         weaponTypes = {},
     },
-    version = 2,
+    version = 3,
 })
