@@ -1,0 +1,58 @@
+name: Issue 192 Tailoring Recipes v2
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - .github/workflows/issue-192-tailoring-recipes-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Run corrected migration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/issue-192-tailoring-recipes.yml').read_text(encoding='utf-8')
+          marker = "python3 - <<'PY'\n"
+          script = workflow.split(marker, 1)[1].split("\n          PY", 1)[0]
+          script = textwrap.dedent(script)
+          old = '"Golden Pearl", "Huge Emerald", "Star Ruby", "Large Brilliant Shard", "Rugged Leather",'
+          new = '"Golden Pearl", "Huge Emerald", "Star Ruby", "Rugged Leather",'
+          assert old in script
+          script = script.replace(old, new, 1)
+          exec(compile(script, 'issue-192-migration.py', 'exec'), {})
+          PY
+
+      - name: Validate diff and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test "$(git diff -- data/default/professions/tailoring.lua | grep -c '^+.*name = ' || true)" -eq 30
+          grep -q '^    version = 5,$' data/default/professions/tailoring.lua
+          test "$(git diff --name-only | grep -v '^data/default/professions/tailoring.lua$' | wc -l)" -eq 0
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/default/professions/tailoring.lua
+          git rm .github/workflows/issue-192-tailoring-recipes.yml
+          git rm .github/workflows/issue-192-tailoring-recipes-v2.yml
+          git diff --cached --check
+          git diff --cached --name-status
+          git commit -m "Add missing skill 300 Tailoring recipes"
+          git push origin HEAD:dev
