@@ -30,16 +30,20 @@ jobs:
           path = Path("data/default/professions/leatherworking.lua")
           text = path.read_text(encoding="utf-8")
 
+          # Every canonical recipe has exactly one requiredSkillLevel field.
+          recipe_count = len(re.findall(r'^\s*requiredSkillLevel = \d+,\s*$', text, re.MULTILINE))
+          assert recipe_count == 278, f"Expected 278 canonical Leatherworking recipes, found {recipe_count}"
+
+          # Older canonical entries may omit learnMode; Recipe.lua defaults those to trainer.
           mode_pattern = re.compile(r'^\s*learnMode = "([^"]+)",\s*$', re.MULTILINE)
           before_modes = mode_pattern.findall(text)
-          assert len(before_modes) == 278, f"Expected 278 Leatherworking recipe learn modes, found {len(before_modes)}"
+          assert len(before_modes) == 175, f"Expected 175 explicit learn modes, found {len(before_modes)}"
           unexpected = sorted(set(before_modes) - {"trainer", "book"})
           assert not unexpected, f"Unexpected Leatherworking learn modes before correction: {unexpected}"
-          assert "book" in before_modes, "Expected at least one book-mode Leatherworking recipe to correct"
-
           book_count = before_modes.count("book")
           trainer_count = before_modes.count("trainer")
-          print(f"Before: {trainer_count} trainer, {book_count} book")
+          assert book_count > 0, "Expected at least one book-mode Leatherworking recipe to correct"
+          print(f"Before: 278 recipes; {trainer_count} explicit trainer, {book_count} explicit book, {278 - len(before_modes)} implicit trainer")
 
           corrected = text.replace('learnMode = "book"', 'learnMode = "trainer"')
 
@@ -49,15 +53,17 @@ jobs:
           corrected, replacements = version_pattern.subn('    version = 13,', corrected, count=1)
           assert replacements == 1, "Failed to bump Leatherworking packaged dataset version"
 
+          after_recipe_count = len(re.findall(r'^\s*requiredSkillLevel = \d+,\s*$', corrected, re.MULTILINE))
           after_modes = mode_pattern.findall(corrected)
-          assert len(after_modes) == 278, f"Recipe count changed while correcting learn modes: {len(after_modes)}"
-          assert set(after_modes) == {"trainer"}, f"Not every Leatherworking recipe is trainer-learned: {sorted(set(after_modes))}"
+          assert after_recipe_count == 278, f"Recipe count changed during correction: {after_recipe_count}"
+          assert len(after_modes) == len(before_modes), "Explicit learn-mode field count changed"
+          assert set(after_modes) == {"trainer"}, f"Non-trainer explicit recipe mode remains: {sorted(set(after_modes))}"
           assert corrected.count('learnMode = "book"') == 0, "Book-mode recipe remains"
-          assert corrected.count('learnMode = "trainer"') == 278, "Expected all 278 recipes to be trainer-learned"
+          assert corrected.count('learnMode = "trainer"') == len(before_modes), "Explicit trainer-mode count mismatch"
           assert version_pattern.findall(corrected) == ["13"], "Packaged dataset version did not become 13"
 
           path.write_text(corrected, encoding="utf-8")
-          print(f"After: 278 trainer, 0 book; converted {book_count} recipes; dataset version 13")
+          print(f"After: all 278 recipes resolve as trainer; converted {book_count} explicit book recipes; dataset version 13")
           PY
 
       - name: Validate and commit correction
@@ -68,7 +74,8 @@ jobs:
           test "$(git diff -- data/default/professions/leatherworking.lua | grep -c '^[-+] *learnMode = ' || true)" -gt 0
           grep -q '^    version = 13,$' data/default/professions/leatherworking.lua
           ! grep -q 'learnMode = "book"' data/default/professions/leatherworking.lua
-          test "$(grep -c 'learnMode = "trainer"' data/default/professions/leatherworking.lua)" -eq 278
+          test "$(grep -c 'learnMode = "trainer"' data/default/professions/leatherworking.lua)" -eq 175
+          test "$(grep -Ec '^\s*requiredSkillLevel = [0-9]+,\s*$' data/default/professions/leatherworking.lua)" -eq 278
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
