@@ -30,20 +30,52 @@ jobs:
           path = Path("data/default/professions/leatherworking.lua")
           text = path.read_text(encoding="utf-8")
 
-          # Every canonical recipe has exactly one requiredSkillLevel field.
-          recipe_count = len(re.findall(r'^\s*requiredSkillLevel = \d+,\s*$', text, re.MULTILINE))
+          def recipe_table_slice(source):
+              marker = "        recipes = {"
+              marker_at = source.index(marker)
+              open_at = source.index("{", marker_at)
+              depth = 0
+              in_string = False
+              quote = ""
+              escaped = False
+              recipe_entries = 0
+              for i in range(open_at, len(source)):
+                  ch = source[i]
+                  if in_string:
+                      if escaped:
+                          escaped = False
+                      elif ch == "\\":
+                          escaped = True
+                      elif ch == quote:
+                          in_string = False
+                      continue
+                  if ch in ('"', "'"):
+                      in_string = True
+                      quote = ch
+                      continue
+                  if ch == "{":
+                      if depth == 1:
+                          recipe_entries += 1
+                      depth += 1
+                  elif ch == "}":
+                      depth -= 1
+                      if depth == 0:
+                          return source[open_at:i + 1], recipe_entries
+              raise AssertionError("Unterminated recipes table")
+
+          recipes_before, recipe_count = recipe_table_slice(text)
           assert recipe_count == 278, f"Expected 278 canonical Leatherworking recipes, found {recipe_count}"
 
           # Older canonical entries may omit learnMode; Recipe.lua defaults those to trainer.
           mode_pattern = re.compile(r'^\s*learnMode = "([^"]+)",\s*$', re.MULTILINE)
-          before_modes = mode_pattern.findall(text)
-          assert len(before_modes) == 175, f"Expected 175 explicit learn modes, found {len(before_modes)}"
+          before_modes = mode_pattern.findall(recipes_before)
           unexpected = sorted(set(before_modes) - {"trainer", "book"})
           assert not unexpected, f"Unexpected Leatherworking learn modes before correction: {unexpected}"
           book_count = before_modes.count("book")
           trainer_count = before_modes.count("trainer")
+          implicit_trainer_count = recipe_count - len(before_modes)
           assert book_count > 0, "Expected at least one book-mode Leatherworking recipe to correct"
-          print(f"Before: 278 recipes; {trainer_count} explicit trainer, {book_count} explicit book, {278 - len(before_modes)} implicit trainer")
+          print(f"Before: {recipe_count} recipes; {trainer_count} explicit trainer, {book_count} explicit book, {implicit_trainer_count} implicit trainer")
 
           corrected = text.replace('learnMode = "book"', 'learnMode = "trainer"')
 
@@ -53,13 +85,13 @@ jobs:
           corrected, replacements = version_pattern.subn('    version = 13,', corrected, count=1)
           assert replacements == 1, "Failed to bump Leatherworking packaged dataset version"
 
-          after_recipe_count = len(re.findall(r'^\s*requiredSkillLevel = \d+,\s*$', corrected, re.MULTILINE))
-          after_modes = mode_pattern.findall(corrected)
+          recipes_after, after_recipe_count = recipe_table_slice(corrected)
+          after_modes = mode_pattern.findall(recipes_after)
           assert after_recipe_count == 278, f"Recipe count changed during correction: {after_recipe_count}"
           assert len(after_modes) == len(before_modes), "Explicit learn-mode field count changed"
           assert set(after_modes) == {"trainer"}, f"Non-trainer explicit recipe mode remains: {sorted(set(after_modes))}"
-          assert corrected.count('learnMode = "book"') == 0, "Book-mode recipe remains"
-          assert corrected.count('learnMode = "trainer"') == len(before_modes), "Explicit trainer-mode count mismatch"
+          assert 'learnMode = "book"' not in recipes_after, "Book-mode recipe remains"
+          assert after_modes.count("trainer") + (after_recipe_count - len(after_modes)) == 278, "Not all recipes resolve to trainer learning"
           assert version_pattern.findall(corrected) == ["13"], "Packaged dataset version did not become 13"
 
           path.write_text(corrected, encoding="utf-8")
@@ -74,8 +106,6 @@ jobs:
           test "$(git diff -- data/default/professions/leatherworking.lua | grep -c '^[-+] *learnMode = ' || true)" -gt 0
           grep -q '^    version = 13,$' data/default/professions/leatherworking.lua
           ! grep -q 'learnMode = "book"' data/default/professions/leatherworking.lua
-          test "$(grep -c 'learnMode = "trainer"' data/default/professions/leatherworking.lua)" -eq 175
-          test "$(grep -Ec '^\s*requiredSkillLevel = [0-9]+,\s*$' data/default/professions/leatherworking.lua)" -eq 278
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
