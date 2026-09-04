@@ -356,6 +356,7 @@ client/ui/editor/pages/page_Aura.lua
 client/ui/editor/pages/page_Interaction.lua
 client/ui/editor/pages/page_Achievement.lua
 client/ui/editor/pages/page_GuildSetting.lua
+client/ui/editor/pages/page_Currency.lua
 client/ui/editor/inspectors/page_InspectorDataset.lua
 client/ui/editor/inspectors/unit/page_InspectorUnitShared.lua
 client/ui/editor/inspectors/unit/page_InspectorUnitGeneral.lua
