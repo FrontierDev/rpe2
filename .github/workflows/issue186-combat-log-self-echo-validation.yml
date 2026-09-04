@@ -25,17 +25,10 @@ jobs:
 
           path = Path('client/client_CombatLog.lua')
           text = path.read_text()
-          old = '''    if type(eventState) ~= "table" or eventState.active ~= true then
-              return false
-          end
-
-          local entryType = normalizeEntryType(arguments and arguments[2])
-          '''
-          new = '''    if type(eventState) ~= "table" or eventState.active ~= true then
-              return false
-          end
-
-          local localPlayerName = Common.NormalizeName and Common.NormalizeName(Common.GetPlayerName and Common.GetPlayerName() or "")
+          start = text.index('function Client:HandleCombatLog(arguments, sender, distribution, target, message)')
+          marker = '    local entryType = normalizeEntryType(arguments and arguments[2])\n'
+          insert_at = text.index(marker, start)
+          guard = '''    local localPlayerName = Common.NormalizeName and Common.NormalizeName(Common.GetPlayerName and Common.GetPlayerName() or "")
               or tostring(Common.GetPlayerName and Common.GetPlayerName() or "")
           local normalizedSender = Common.NormalizeName and Common.NormalizeName(sender) or tostring(sender or "")
           if (distribution == "PARTY" or distribution == "RAID")
@@ -47,11 +40,11 @@ jobs:
               return true
           end
 
-          local entryType = normalizeEntryType(arguments and arguments[2])
           '''
-          if text.count(old) != 1:
-              raise SystemExit(f'expected one HandleCombatLog insertion point, found {text.count(old)}')
-          path.write_text(text.replace(old, new, 1))
+          block = text[start:insert_at]
+          if 'normalizedSender == localPlayerName' in block:
+              raise SystemExit('self-echo guard already present')
+          path.write_text(text[:insert_at] + guard + text[insert_at:])
           PY
 
       - name: Static validation
