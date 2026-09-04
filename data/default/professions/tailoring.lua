@@ -1,7 +1,6 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 1,
     dataset = {
         achievements = {},
         auras = {},
@@ -11,7 +10,7 @@ Addon.Data.DefaultDatasets:Register({
         damageSchools = {},
         datasetType = "crafting",
         dependencies = {
-            "f82db71a"
+            "f82db71a",
         },
         description = "",
         groupName = "Core",
@@ -67,7 +66,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -116,7 +115,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -165,7 +164,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -214,7 +213,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -263,7 +262,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -312,7 +311,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -361,7 +360,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -410,7 +409,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -459,7 +458,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -508,7 +507,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -558,7 +557,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -607,7 +606,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -656,7 +655,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -674,8 +673,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 46,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -693,10 +692,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -713,25 +712,25 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 37
+                        value = 37,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 12
+                        value = 12,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 8
-                    }
+                        value = 8,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -749,8 +748,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 51,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -768,10 +767,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -788,25 +787,25 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 50
+                        value = 50,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 9
+                        value = 9,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 14
-                    }
+                        value = 14,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -824,8 +823,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 48,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -843,10 +842,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -863,25 +862,25 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 34
+                        value = 34,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 9
-                    }
+                        value = 9,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -899,8 +898,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 50,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -918,10 +917,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -938,33 +937,33 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 45
+                        value = 45,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 9
+                        value = 9,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 9
+                        value = 9,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 12
+                        value = 12,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 12
-                    }
+                        value = 12,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -982,8 +981,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 54,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1001,10 +1000,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1021,25 +1020,25 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 62
+                        value = 62,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 20
+                        value = 20,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 13
-                    }
+                        value = 13,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bgvs1zx6"
+                    "f82db71a:bgvs1zx6",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1057,8 +1056,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 52,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1076,10 +1075,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1096,25 +1095,25 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 65
+                        value = 65,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 12
+                        value = 12,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 20
-                    }
+                        value = 20,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1132,8 +1131,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 47,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1151,10 +1150,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1169,31 +1168,31 @@ Addon.Data.DefaultDatasets:Register({
                 socketTypes = {},
                 sockets = {
                     {
-                        color = "blue"
-                    }
+                        color = "blue",
+                    },
                 },
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 68
+                        value = 68,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 11
+                        value = 11,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 17
-                    }
+                        value = 17,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1211,8 +1210,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 56,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1230,10 +1229,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1250,25 +1249,25 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 59
+                        value = 59,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 15
+                        value = 15,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 10
-                    }
+                        value = 10,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:66i80qm1"
+                    "f82db71a:66i80qm1",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1286,8 +1285,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 14,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1305,10 +1304,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1325,12 +1324,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 16
+                        value = 16,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 3
-                    }
+                        value = 3,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1338,9 +1337,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1358,8 +1357,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 21,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1377,10 +1376,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1397,12 +1396,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 17
+                        value = 17,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1410,9 +1409,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1430,8 +1429,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 30,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1449,10 +1448,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1469,16 +1468,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 23
+                        value = 23,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 3
+                        value = 3,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 8
-                    }
+                        value = 8,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1486,9 +1485,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1506,8 +1505,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 31,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1525,10 +1524,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1545,16 +1544,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 24
+                        value = 24,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 3
+                        value = 3,
                     },
                     {
                         sourceStatRef = "f82db71a:0w7c7p09",
-                        value = 7
-                    }
+                        value = 7,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1562,9 +1561,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1582,8 +1581,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 32,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1601,10 +1600,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1621,16 +1620,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 24
+                        value = 24,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 5
+                        value = 5,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1638,9 +1637,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1658,8 +1657,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 35,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1677,10 +1676,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1697,16 +1696,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 29
+                        value = 29,
                     },
                     {
                         sourceStatRef = "f82db71a:jjn0my8k",
-                        value = 11
+                        value = 11,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1714,9 +1713,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1734,8 +1733,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 50,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1753,10 +1752,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1773,16 +1772,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 36
+                        value = 36,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 13
-                    }
+                        value = 13,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1790,9 +1789,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1810,8 +1809,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 50,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1829,10 +1828,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1849,16 +1848,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 36
+                        value = 36,
                     },
                     {
                         sourceStatRef = "f82db71a:itpo751d",
-                        value = 7
+                        value = 7,
                     },
                     {
                         sourceStatRef = "f82db71a:jjn0my8k",
-                        value = 7
-                    }
+                        value = 7,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1866,9 +1865,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1886,8 +1885,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 57,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1905,10 +1904,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1925,12 +1924,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 36
+                        value = 36,
                     },
                     {
                         sourceStatRef = "f82db71a:0wyp78x9",
-                        value = 7
-                    }
+                        value = 7,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1938,9 +1937,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1958,8 +1957,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 50,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1977,10 +1976,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1997,16 +1996,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 36
+                        value = 36,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 7
+                        value = 7,
                     },
                     {
                         sourceStatRef = "f82db71a:0w7c7p09",
-                        value = 15
-                    }
+                        value = 15,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2014,9 +2013,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2034,8 +2033,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 60,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2053,10 +2052,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2073,16 +2072,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 49
+                        value = 49,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 6
+                        value = 6,
                     },
                     {
                         sourceStatRef = "f82db71a:pg0ytacb",
-                        value = 20
-                    }
+                        value = 20,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2090,9 +2089,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2110,8 +2109,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 60,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2129,10 +2128,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2149,16 +2148,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 61
+                        value = 61,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 18
+                        value = 18,
                     },
                     {
                         sourceStatRef = "f82db71a:jjn0my8k",
-                        value = 24
-                    }
+                        value = 24,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2166,9 +2165,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -2218,7 +2217,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2236,8 +2235,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 5,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2255,10 +2254,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2275,12 +2274,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 19
+                        value = 19,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 1
-                    }
+                        value = 1,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2288,9 +2287,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2308,8 +2307,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 5,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2327,10 +2326,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2347,12 +2346,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 19
+                        value = 19,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 1
-                    }
+                        value = 1,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2360,9 +2359,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2380,8 +2379,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 7,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2399,10 +2398,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2419,12 +2418,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 23
+                        value = 23,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 2
-                    }
+                        value = 2,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2432,9 +2431,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2452,8 +2451,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 7,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2471,10 +2470,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2491,12 +2490,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 23
+                        value = 23,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 2
-                    }
+                        value = 2,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2504,9 +2503,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2524,8 +2523,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 9,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2543,10 +2542,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2563,16 +2562,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 26
+                        value = 26,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 2
+                        value = 2,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 2
-                    }
+                        value = 2,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2580,9 +2579,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2600,8 +2599,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 9,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2619,10 +2618,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2639,12 +2638,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 26
+                        value = 26,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 3
-                    }
+                        value = 3,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2652,9 +2651,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2672,8 +2671,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 9,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2691,10 +2690,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2711,16 +2710,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 23
+                        value = 23,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 2
+                        value = 2,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 2
-                    }
+                        value = 2,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2728,9 +2727,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2748,8 +2747,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 4,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2767,10 +2766,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2787,12 +2786,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 9
+                        value = 9,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 1
-                    }
+                        value = 1,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2800,9 +2799,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2820,8 +2819,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 4,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2839,10 +2838,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2859,12 +2858,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 11
+                        value = 11,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 1
-                    }
+                        value = 1,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2872,9 +2871,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2892,8 +2891,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 4,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2911,10 +2910,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2931,12 +2930,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 16
+                        value = 16,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 1
-                    }
+                        value = 1,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2944,9 +2943,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2964,8 +2963,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 7,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2983,10 +2982,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3003,12 +3002,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 9
+                        value = 9,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 1
-                    }
+                        value = 1,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3016,9 +3015,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:crezt6ix"
+                    "f82db71a:crezt6ix",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3036,8 +3035,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 11,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3055,10 +3054,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3075,16 +3074,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 20
+                        value = 20,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 2
+                        value = 2,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 2
-                    }
+                        value = 2,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3092,9 +3091,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3112,8 +3111,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 12,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3131,10 +3130,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3151,16 +3150,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 19
+                        value = 19,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 2
+                        value = 2,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 2
-                    }
+                        value = 2,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3168,9 +3167,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3188,8 +3187,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 14,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3207,10 +3206,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3227,24 +3226,24 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 22
+                        value = 22,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 2
+                        value = 2,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 2
+                        value = 2,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 2
+                        value = 2,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 2
-                    }
+                        value = 2,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3252,9 +3251,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3272,8 +3271,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 15,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3291,10 +3290,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3311,12 +3310,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 23
+                        value = 23,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 5
-                    }
+                        value = 5,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3324,9 +3323,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3344,8 +3343,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 15,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3363,10 +3362,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3383,20 +3382,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 34
+                        value = 34,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 5
+                        value = 5,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 4
+                        value = 4,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 5
-                    }
+                        value = 5,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3404,9 +3403,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3424,8 +3423,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 16,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3443,10 +3442,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3463,16 +3462,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 35
+                        value = 35,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 4
+                        value = 4,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 5
-                    }
+                        value = 5,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3480,9 +3479,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3500,8 +3499,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 17,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3519,10 +3518,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3539,16 +3538,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 31
+                        value = 31,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
+                        value = 6,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 3
-                    }
+                        value = 3,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3556,9 +3555,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3576,8 +3575,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 18,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3595,10 +3594,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3615,20 +3614,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 37
+                        value = 37,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 1
+                        value = 1,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 2
+                        value = 2,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 7
-                    }
+                        value = 7,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3636,9 +3635,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -3688,7 +3687,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -3738,7 +3737,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:goqp0alw",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3756,8 +3755,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 14,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3775,10 +3774,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3795,20 +3794,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 33
+                        value = 33,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
+                        value = 6,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 6
+                        value = 6,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3816,9 +3815,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3836,8 +3835,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 20,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3855,10 +3854,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3875,20 +3874,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 29
+                        value = 29,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 7
+                        value = 7,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 4
+                        value = 4,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3896,9 +3895,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3916,8 +3915,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 21,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3935,10 +3934,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3955,12 +3954,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 25
+                        value = 25,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 7
-                    }
+                        value = 7,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3968,9 +3967,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3988,8 +3987,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 22,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4007,10 +4006,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4027,16 +4026,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 41
+                        value = 41,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 5
-                    }
+                        value = 5,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4044,9 +4043,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4064,8 +4063,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 23,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4083,10 +4082,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4103,20 +4102,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 29
+                        value = 29,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 7
+                        value = 7,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 4
+                        value = 4,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4124,9 +4123,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4144,8 +4143,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 24,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4163,10 +4162,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4183,16 +4182,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 33
+                        value = 33,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 5
+                        value = 5,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 5
-                    }
+                        value = 5,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4200,9 +4199,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bgvs1zx6"
+                    "f82db71a:bgvs1zx6",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4220,8 +4219,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 25,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4239,10 +4238,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4259,16 +4258,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 43
+                        value = 43,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 7
-                    }
+                        value = 7,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4276,9 +4275,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4296,8 +4295,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 25,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4315,10 +4314,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4335,20 +4334,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 27
+                        value = 27,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 3
+                        value = 3,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 15
+                        value = 15,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 5
-                    }
+                        value = 5,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4356,9 +4355,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4376,8 +4375,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 27,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4395,10 +4394,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4415,20 +4414,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 34
+                        value = 34,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 5
+                        value = 5,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 5
+                        value = 5,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4436,9 +4435,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bgvs1zx6"
+                    "f82db71a:bgvs1zx6",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4456,8 +4455,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 28,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4475,10 +4474,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4495,16 +4494,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 37
+                        value = 37,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 10
+                        value = 10,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4512,9 +4511,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bgvs1zx6"
+                    "f82db71a:bgvs1zx6",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4532,8 +4531,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 28,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4551,10 +4550,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4571,12 +4570,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 45
+                        value = 45,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 13
-                    }
+                        value = 13,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4584,9 +4583,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4604,8 +4603,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 29,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4623,10 +4622,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4643,16 +4642,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 46
+                        value = 46,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 6
+                        value = 6,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 10
-                    }
+                        value = 10,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4660,9 +4659,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4680,8 +4679,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 30,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4699,10 +4698,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4719,16 +4718,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 26
+                        value = 26,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 7
+                        value = 7,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4736,9 +4735,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4756,8 +4755,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 30,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4775,10 +4774,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4795,20 +4794,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 32
+                        value = 32,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
+                        value = 6,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 5
+                        value = 5,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4816,9 +4815,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4836,8 +4835,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 31,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4855,10 +4854,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4875,12 +4874,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 36
+                        value = 36,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 11
-                    }
+                        value = 11,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4888,9 +4887,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:66i80qm1"
+                    "f82db71a:66i80qm1",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4908,8 +4907,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 33,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4927,10 +4926,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4947,16 +4946,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 38
+                        value = 38,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 7
-                    }
+                        value = 7,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4964,9 +4963,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:66i80qm1"
+                    "f82db71a:66i80qm1",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4984,8 +4983,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 33,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5003,10 +5002,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5023,24 +5022,24 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 55
+                        value = 55,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 12
+                        value = 12,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 14
+                        value = 14,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 14
-                    }
+                        value = 14,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5048,9 +5047,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -5068,8 +5067,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 34,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5087,10 +5086,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5107,16 +5106,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 29
+                        value = 29,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 8
-                    }
+                        value = 8,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5124,9 +5123,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -5144,8 +5143,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 35,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5163,10 +5162,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5183,20 +5182,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 30
+                        value = 30,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 13
+                        value = 13,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 4
+                        value = 4,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 13
-                    }
+                        value = 13,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5204,9 +5203,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -5224,8 +5223,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 36,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5243,10 +5242,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5263,16 +5262,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 54
+                        value = 54,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 15
+                        value = 15,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5280,9 +5279,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -5300,8 +5299,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 36,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5319,10 +5318,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5339,16 +5338,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 54
+                        value = 54,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 11
+                        value = 11,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 12
-                    }
+                        value = 12,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5356,9 +5355,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -5376,8 +5375,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 36,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5395,10 +5394,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5415,16 +5414,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 47
+                        value = 47,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 14
-                    }
+                        value = 14,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5432,9 +5431,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -5452,8 +5451,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 37,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5471,10 +5470,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5491,16 +5490,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 55
+                        value = 55,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 14
-                    }
+                        value = 14,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5508,9 +5507,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -5528,8 +5527,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 38,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5547,10 +5546,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5567,20 +5566,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 46
+                        value = 46,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 11
+                        value = 11,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 13
+                        value = 13,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 13
-                    }
+                        value = 13,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5588,9 +5587,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bgvs1zx6"
+                    "f82db71a:bgvs1zx6",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -5608,8 +5607,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 38,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5627,10 +5626,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5647,12 +5646,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 57
+                        value = 57,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 18
-                    }
+                        value = 18,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5660,9 +5659,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -5680,8 +5679,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 38,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5699,10 +5698,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5719,20 +5718,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 49
+                        value = 49,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 12
+                        value = 12,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 14
+                        value = 14,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 14
-                    }
+                        value = 14,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5740,9 +5739,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -5760,8 +5759,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 38,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5779,10 +5778,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5799,16 +5798,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 35
+                        value = 35,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 15
+                        value = 15,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 15
-                    }
+                        value = 15,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5816,9 +5815,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -5836,8 +5835,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 40,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5855,10 +5854,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5875,24 +5874,24 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 65
+                        value = 65,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 9
+                        value = 9,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 14
+                        value = 14,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 18
+                        value = 18,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 18
-                    }
+                        value = 18,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5900,9 +5899,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -5920,8 +5919,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 40,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5939,10 +5938,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5959,24 +5958,24 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 41
+                        value = 41,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 4
+                        value = 4,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 7
+                        value = 7,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 18
+                        value = 18,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 18
-                    }
+                        value = 18,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5984,9 +5983,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -6004,8 +6003,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 40,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -6023,10 +6022,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -6043,20 +6042,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 37
+                        value = 37,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 10
+                        value = 10,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 11
+                        value = 11,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 11
-                    }
+                        value = 11,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -6064,9 +6063,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -6084,8 +6083,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 41,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -6103,10 +6102,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -6123,16 +6122,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 49
+                        value = 49,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 12
+                        value = 12,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 13
-                    }
+                        value = 13,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -6140,9 +6139,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bgvs1zx6"
+                    "f82db71a:bgvs1zx6",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -6160,8 +6159,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 41,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -6179,10 +6178,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -6199,16 +6198,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 45
+                        value = 45,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 9
+                        value = 9,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 10
-                    }
+                        value = 10,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -6216,9 +6215,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:66i80qm1"
+                    "f82db71a:66i80qm1",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -6236,8 +6235,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 41,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -6255,10 +6254,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -6275,16 +6274,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 41
+                        value = 41,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 7
+                        value = 7,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 11
-                    }
+                        value = 11,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -6292,9 +6291,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -6312,8 +6311,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 42,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -6331,10 +6330,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -6351,12 +6350,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 46
+                        value = 46,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 15
-                    }
+                        value = 15,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -6364,9 +6363,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:66i80qm1"
+                    "f82db71a:66i80qm1",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -6384,8 +6383,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 43,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -6403,10 +6402,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -6423,12 +6422,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 51
+                        value = 51,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 20
-                    }
+                        value = 20,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -6436,9 +6435,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bgvs1zx6"
+                    "f82db71a:bgvs1zx6",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -6456,8 +6455,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 45,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -6475,10 +6474,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -6495,24 +6494,24 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 58
+                        value = 58,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 10
+                        value = 10,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 12
+                        value = 12,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 21
+                        value = 21,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 21
-                    }
+                        value = 21,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -6520,9 +6519,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bgvs1zx6"
+                    "f82db71a:bgvs1zx6",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -6540,8 +6539,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 58,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -6559,10 +6558,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -6579,16 +6578,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 46
+                        value = 46,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 21
+                        value = 21,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 12
-                    }
+                        value = 12,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -6596,9 +6595,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -6616,8 +6615,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 53,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -6635,10 +6634,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -6655,20 +6654,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 72
+                        value = 72,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 14
+                        value = 14,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 21
+                        value = 21,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 12
-                    }
+                        value = 12,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -6676,9 +6675,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -6696,8 +6695,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 53,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -6715,10 +6714,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -6735,20 +6734,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 57
+                        value = 57,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 7
+                        value = 7,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 21
+                        value = 21,
                     },
                     {
                         sourceStatRef = "f82db71a:itpo751d",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -6756,9 +6755,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -6776,8 +6775,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 55,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -6795,10 +6794,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -6815,20 +6814,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 85
+                        value = 85,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 20
+                        value = 20,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 19
+                        value = 19,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 12
-                    }
+                        value = 12,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -6836,9 +6835,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -6856,8 +6855,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 51,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -6875,10 +6874,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -6895,20 +6894,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 55
+                        value = 55,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 13
+                        value = 13,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 11
+                        value = 11,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 14
-                    }
+                        value = 14,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -6916,9 +6915,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -6936,8 +6935,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 57,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -6955,10 +6954,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -6975,20 +6974,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 55
+                        value = 55,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 16
+                        value = 16,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 15
+                        value = 15,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 9
-                    }
+                        value = 9,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -6996,9 +6995,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -7016,8 +7015,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 56,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -7035,10 +7034,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -7055,20 +7054,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 65
+                        value = 65,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 17
+                        value = 17,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 11
+                        value = 11,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 9
-                    }
+                        value = 9,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -7076,9 +7075,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:66i80qm1"
+                    "f82db71a:66i80qm1",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -7096,8 +7095,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 57,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -7115,10 +7114,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -7135,20 +7134,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 71
+                        value = 71,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 23
+                        value = 23,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 15
+                        value = 15,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 13
-                    }
+                        value = 13,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -7156,9 +7155,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bgvs1zx6"
+                    "f82db71a:bgvs1zx6",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -7176,8 +7175,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 59,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -7195,10 +7194,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -7215,20 +7214,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 68
+                        value = 68,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 23
+                        value = 23,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:itpo751d",
-                        value = 7
-                    }
+                        value = 7,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -7236,10 +7235,60 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:66i80qm1"
+                    "f82db71a:66i80qm1",
                 },
-                yellowSockets = 0
-            }
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_fabric_felrag.blp",
+                id = "8dc72367",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Felcloth",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:goqp0alw",
+                yellowSockets = 0,
+            },
         },
         loot = {
             {
@@ -7253,7 +7302,7 @@ Addon.Data.DefaultDatasets:Register({
                         minQuantity = 1,
                         ref = "7259f1d3:agzskvec",
                         type = "item",
-                        weight = 1
+                        weight = 1,
                     },
                     {
                         id = "wool",
@@ -7261,7 +7310,7 @@ Addon.Data.DefaultDatasets:Register({
                         minQuantity = 1,
                         ref = "7259f1d3:1wssn0qp",
                         type = "item",
-                        weight = 1
+                        weight = 1,
                     },
                     {
                         id = "silk",
@@ -7269,7 +7318,7 @@ Addon.Data.DefaultDatasets:Register({
                         minQuantity = 1,
                         ref = "7259f1d3:jt6ktqiu",
                         type = "item",
-                        weight = 1
+                        weight = 1,
                     },
                     {
                         id = "mageweave",
@@ -7277,7 +7326,7 @@ Addon.Data.DefaultDatasets:Register({
                         minQuantity = 1,
                         ref = "7259f1d3:edth2zu1",
                         type = "item",
-                        weight = 1
+                        weight = 1,
                     },
                     {
                         id = "runecloth",
@@ -7285,7 +7334,7 @@ Addon.Data.DefaultDatasets:Register({
                         minQuantity = 1,
                         ref = "7259f1d3:dx7zh3l2",
                         type = "item",
-                        weight = 1
+                        weight = 1,
                     },
                     {
                         id = "nothing",
@@ -7293,13 +7342,13 @@ Addon.Data.DefaultDatasets:Register({
                         minQuantity = 1,
                         ref = "",
                         type = "nothing",
-                        weight = 5
-                    }
+                        weight = 5,
+                    },
                 },
                 id = "jcih77uu",
                 items = {},
                 name = "Cloth No-Roll",
-                tags = {}
+                tags = {},
             },
             {
                 conditions = {},
@@ -7312,7 +7361,7 @@ Addon.Data.DefaultDatasets:Register({
                         minQuantity = 1,
                         ref = "7259f1d3:agzskvec",
                         type = "item",
-                        weight = 1
+                        weight = 1,
                     },
                     {
                         id = "wool",
@@ -7320,7 +7369,7 @@ Addon.Data.DefaultDatasets:Register({
                         minQuantity = 1,
                         ref = "7259f1d3:1wssn0qp",
                         type = "item",
-                        weight = 1
+                        weight = 1,
                     },
                     {
                         id = "silk",
@@ -7328,7 +7377,7 @@ Addon.Data.DefaultDatasets:Register({
                         minQuantity = 1,
                         ref = "7259f1d3:jt6ktqiu",
                         type = "item",
-                        weight = 1
+                        weight = 1,
                     },
                     {
                         id = "mageweave",
@@ -7336,7 +7385,7 @@ Addon.Data.DefaultDatasets:Register({
                         minQuantity = 1,
                         ref = "7259f1d3:edth2zu1",
                         type = "item",
-                        weight = 1
+                        weight = 1,
                     },
                     {
                         id = "runecloth",
@@ -7344,14 +7393,14 @@ Addon.Data.DefaultDatasets:Register({
                         minQuantity = 1,
                         ref = "7259f1d3:dx7zh3l2",
                         type = "item",
-                        weight = 1
-                    }
+                        weight = 1,
+                    },
                 },
                 id = "jiieayww",
                 items = {},
                 name = "Cloth Guaranteed",
-                tags = {}
-            }
+                tags = {},
+            },
         },
         mounts = {},
         name = "Tailoring",
@@ -7366,27 +7415,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Runecloth Belt",
                 output = {
                     itemRef = "7259f1d3:zowdkbia",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 255,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 111255
+                trainerCostCopper = 111255,
             },
             {
                 category = "",
@@ -7396,32 +7445,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "538a54a0:4gnkyr9f",
                         kind = "rpe_item",
-                        quantity = 4
-                    }
+                        quantity = 4,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Runecloth Boots",
                 output = {
                     itemRef = "7259f1d3:puyk08a6",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 280,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 133355
+                trainerCostCopper = 133355,
             },
             {
                 category = "",
@@ -7431,27 +7480,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Runecloth Cloak",
                 output = {
                     itemRef = "7259f1d3:vqcblk29",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 265,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 119855
+                trainerCostCopper = 119855,
             },
             {
                 category = "",
@@ -7461,32 +7510,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "538a54a0:4gnkyr9f",
                         kind = "rpe_item",
-                        quantity = 4
-                    }
+                        quantity = 4,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Runecloth Gloves",
                 output = {
                     itemRef = "7259f1d3:m67kl8yo",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 275,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 128775
+                trainerCostCopper = 128775,
             },
             {
                 category = "",
@@ -7496,27 +7545,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Runecloth Headband",
                 output = {
                     itemRef = "7259f1d3:up4gfqdo",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 295,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 147575
+                trainerCostCopper = 147575,
             },
             {
                 category = "",
@@ -7526,27 +7575,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 30
+                        quantity = 30,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Runecloth Pants",
                 output = {
                     itemRef = "7259f1d3:v3874ra7",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 285,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 138015
+                trainerCostCopper = 138015,
             },
             {
                 category = "",
@@ -7556,27 +7605,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 25
+                        quantity = 25,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Runecloth Tunic",
                 output = {
                     itemRef = "7259f1d3:4n9ygjop",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 260,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 115515
+                trainerCostCopper = 115515,
             },
             {
                 category = "",
@@ -7586,32 +7635,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 35
+                        quantity = 35,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "538a54a0:4gnkyr9f",
                         kind = "rpe_item",
-                        quantity = 4
-                    }
+                        quantity = 4,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Runecloth Shoulders",
                 output = {
                     itemRef = "7259f1d3:a2unhyjv",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 300,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 152475
+                trainerCostCopper = 152475,
             },
             {
                 category = "",
@@ -7621,32 +7670,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:1wssn0qp",
                         kind = "rpe_item",
-                        quantity = 9
+                        quantity = 9,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "4999dcec:s9lu5jap",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Pearl-clasped Cloak",
                 output = {
                     itemRef = "7259f1d3:gkcxrbcq",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 90,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 15555
+                trainerCostCopper = 15555,
             },
             {
                 category = "",
@@ -7656,32 +7705,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:1wssn0qp",
                         kind = "rpe_item",
-                        quantity = 9
+                        quantity = 9,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "4999dcec:s9lu5jap",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Heavy Woolen Cloak",
                 output = {
                     itemRef = "7259f1d3:zvlujs9w",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 100,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 18875
+                trainerCostCopper = 18875,
             },
             {
                 category = "",
@@ -7691,32 +7740,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:nfwx3196",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Azure Silk Cloak",
                 output = {
                     itemRef = "7259f1d3:pbqhbyto",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 175,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 53975
+                trainerCostCopper = 53975,
             },
             {
                 category = "",
@@ -7726,32 +7775,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:oo8796rr",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Crimson Silk Cloak",
                 output = {
                     itemRef = "7259f1d3:o3evqgf5",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 180,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 56955
+                trainerCostCopper = 56955,
             },
             {
                 category = "",
@@ -7761,27 +7810,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 16
+                        quantity = 16,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Long Silken Cloak",
                 output = {
                     itemRef = "7259f1d3:st2pubf9",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 185,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 60015
+                trainerCostCopper = 60015,
             },
             {
                 category = "",
@@ -7791,32 +7840,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "732368d4:7z1lti71",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Icy Cloak",
                 output = {
                     itemRef = "7259f1d3:zq02lspb",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 200,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 69675
+                trainerCostCopper = 69675,
             },
             {
                 category = "",
@@ -7826,32 +7875,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 25
+                        quantity = 25,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "732368d4:50qj8dzw",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Cindercloth Cloak",
                 output = {
                     itemRef = "7259f1d3:ayc1gfkp",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 275,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 128775
+                trainerCostCopper = 128775,
             },
             {
                 category = "",
@@ -7861,32 +7910,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "61fdf3df:hqook9xe",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Brightcloth Cloak",
                 output = {
                     itemRef = "7259f1d3:9cwg3gri",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 275,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 128775
+                trainerCostCopper = 128775,
             },
             {
                 category = "",
@@ -7896,37 +7945,37 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 30
+                        quantity = 30,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "732368d4:50qj8dzw",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "732368d4:sclalidn",
                         kind = "rpe_item",
-                        quantity = 4
-                    }
+                        quantity = 4,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Cloak of Fire",
                 output = {
                     itemRef = "7259f1d3:ylmlt4ky",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 275,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 128775
+                trainerCostCopper = 128775,
             },
             {
                 category = "",
@@ -7936,42 +7985,42 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 60
+                        quantity = 60,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "3eb7e9bb:hq608hly",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "732368d4:sclalidn",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "61fdf3df:6hy57ood",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Cloak of Warding",
                 output = {
                     itemRef = "7259f1d3:vzvsfj3a",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 300,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 152475
+                trainerCostCopper = 152475,
             },
             {
                 category = "",
@@ -7981,32 +8030,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:xnx0kwlv",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "732368d4:lxqnh3pp",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "3eb7e9bb:8eummju4",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Gaea's Embrace",
                 output = {
                     itemRef = "7259f1d3:byvkorwx",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 300,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 152475
+                trainerCostCopper = 152475,
             },
             {
                 category = "",
@@ -8016,32 +8065,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "3eb7e9bb:06vxv3hh",
                         kind = "rpe_item",
-                        quantity = 5
+                        quantity = 5,
                     },
                     {
                         itemRef = "732368d4:7z1lti71",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Glacial Cloak",
                 output = {
                     itemRef = "7259f1d3:kxopzq6p",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 300,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 152475
+                trainerCostCopper = 152475,
             },
             {
                 category = "",
@@ -8051,27 +8100,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:agzskvec",
                         kind = "rpe_item",
-                        quantity = 6
+                        quantity = 6,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "White Linen Robe",
                 output = {
                     itemRef = "7259f1d3:r5amyo04",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 1,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 104
+                trainerCostCopper = 104,
             },
             {
                 category = "",
@@ -8081,27 +8130,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:agzskvec",
                         kind = "rpe_item",
-                        quantity = 6
+                        quantity = 6,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Brown Linen Robe",
                 output = {
                     itemRef = "7259f1d3:j4seqsjb",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 15,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 855
+                trainerCostCopper = 855,
             },
             {
                 category = "",
@@ -8111,32 +8160,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:agzskvec",
                         kind = "rpe_item",
-                        quantity = 6
+                        quantity = 6,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:oo8796rr",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Red Linen Robe",
                 output = {
                     itemRef = "7259f1d3:6f0fq3bu",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 30,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 2355
+                trainerCostCopper = 2355,
             },
             {
                 category = "",
@@ -8146,32 +8195,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:agzskvec",
                         kind = "rpe_item",
-                        quantity = 6
+                        quantity = 6,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:nfwx3196",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Blue Linen Vest",
                 output = {
                     itemRef = "7259f1d3:i1odbqvc",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 45,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 4575
+                trainerCostCopper = 4575,
             },
             {
                 category = "",
@@ -8181,32 +8230,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:agzskvec",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Barbaric Linen Vest",
                 output = {
                     itemRef = "7259f1d3:vr4f36zt",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 50,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 5475
+                trainerCostCopper = 5475,
             },
             {
                 category = "",
@@ -8216,32 +8265,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:agzskvec",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:nfwx3196",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Blue Linen Robe",
                 output = {
                     itemRef = "7259f1d3:n2f9v181",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 60,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 7515
+                trainerCostCopper = 7515,
             },
             {
                 category = "",
@@ -8251,27 +8300,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:agzskvec",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Handstitched Linen Britches",
                 output = {
                     itemRef = "7259f1d3:nxeyb4yk",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 70,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 9875
+                trainerCostCopper = 9875,
             },
             {
                 category = "",
@@ -8281,27 +8330,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:agzskvec",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Linen Belt",
                 output = {
                     itemRef = "7259f1d3:or9bjbku",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 5,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 255
+                trainerCostCopper = 255,
             },
             {
                 category = "",
@@ -8311,27 +8360,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:agzskvec",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Simple Linen Boots",
                 output = {
                     itemRef = "7259f1d3:pr7ml76d",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 10,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 515
+                trainerCostCopper = 515,
             },
             {
                 category = "",
@@ -8341,27 +8390,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:agzskvec",
                         kind = "rpe_item",
-                        quantity = 6
+                        quantity = 6,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Brown Linen Pants",
                 output = {
                     itemRef = "7259f1d3:ls3e9k5e",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 20,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 1275
+                trainerCostCopper = 1275,
             },
             {
                 category = "",
@@ -8371,27 +8420,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:agzskvec",
                         kind = "rpe_item",
-                        quantity = 6
+                        quantity = 6,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Green Linen Bracers",
                 output = {
                     itemRef = "7259f1d3:9hvghvqa",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 25,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 1775
+                trainerCostCopper = 1775,
             },
             {
                 category = "",
@@ -8401,32 +8450,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:agzskvec",
                         kind = "rpe_item",
-                        quantity = 10
+                        quantity = 10,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Soft-soled Linen Boots",
                 output = {
                     itemRef = "7259f1d3:biqr2ktc",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 80,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 12555
+                trainerCostCopper = 12555,
             },
             {
                 category = "",
@@ -8436,27 +8485,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:1wssn0qp",
                         kind = "rpe_item",
-                        quantity = 9
+                        quantity = 9,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Heavy Woolen Gloves",
                 output = {
                     itemRef = "7259f1d3:xvmmos17",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 85,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 14015
+                trainerCostCopper = 14015,
             },
             {
                 category = "",
@@ -8466,32 +8515,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:1wssn0qp",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Woolen Boots",
                 output = {
                     itemRef = "7259f1d3:4ejyqw47",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 95,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 17175
+                trainerCostCopper = 17175,
             },
             {
                 category = "",
@@ -8501,37 +8550,37 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:1wssn0qp",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:oo8796rr",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Red Woolen Boots",
                 output = {
                     itemRef = "7259f1d3:vdu2gsbp",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 95,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 17175
+                trainerCostCopper = 17175,
             },
             {
                 category = "",
@@ -8541,32 +8590,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:1wssn0qp",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:nfwx3196",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Red Woolen Boots",
                 output = {
                     itemRef = "7259f1d3:vdu2gsbp",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 100,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 18875
+                trainerCostCopper = 18875,
             },
             {
                 category = "",
@@ -8576,32 +8625,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:1wssn0qp",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 3
+                        quantity = 3,
                     },
                     {
                         itemRef = "7259f1d3:z1nr9mnr",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Grey Woolen Robe",
                 output = {
                     itemRef = "7259f1d3:kkgt8k0c",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 105,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 20655
+                trainerCostCopper = 20655,
             },
             {
                 category = "",
@@ -8611,27 +8660,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:1wssn0qp",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 4
-                    }
+                        quantity = 4,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Heavy Woolen Pants",
                 output = {
                     itemRef = "7259f1d3:h4e9sjsd",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 110,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 22515
+                trainerCostCopper = 22515,
             },
             {
                 category = "",
@@ -8641,32 +8690,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:1wssn0qp",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 3
+                        quantity = 3,
                     },
                     {
                         itemRef = "7259f1d3:oo8796rr",
                         kind = "rpe_item",
-                        quantity = 3
-                    }
+                        quantity = 3,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Greater Adept's Robe",
                 output = {
                     itemRef = "7259f1d3:ewnqq9mc",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 115,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 24455
+                trainerCostCopper = 24455,
             },
             {
                 category = "",
@@ -8676,32 +8725,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:1wssn0qp",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:oo8796rr",
                         kind = "rpe_item",
-                        quantity = 3
-                    }
+                        quantity = 3,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Colorful Kilt",
                 output = {
                     itemRef = "7259f1d3:nozc0zy7",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 120,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 26475
+                trainerCostCopper = 26475,
             },
             {
                 category = "",
@@ -8711,32 +8760,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "4999dcec:ms6y0fi0",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Pearl-inlaid Silk Boots",
                 output = {
                     itemRef = "7259f1d3:lpjdgcr7",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 125,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 28575
+                trainerCostCopper = 28575,
             },
             {
                 category = "",
@@ -8746,27 +8795,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:1wssn0qp",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 3
-                    }
+                        quantity = 3,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Gloves of Meditation",
                 output = {
                     itemRef = "7259f1d3:z4e6tgje",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 130,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 30755
+                trainerCostCopper = 30755,
             },
             {
                 category = "",
@@ -8776,27 +8825,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Lesser Wizard's Robe",
                 output = {
                     itemRef = "7259f1d3:t9hr4z4i",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 135,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 33015
+                trainerCostCopper = 33015,
             },
             {
                 category = "",
@@ -8806,27 +8855,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Spider Silk Slippers",
                 output = {
                     itemRef = "7259f1d3:iv8w1nkt",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 140,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 35355
+                trainerCostCopper = 35355,
             },
             {
                 category = "",
@@ -8836,32 +8885,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:nfwx3196",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Azure Silk Hood",
                 output = {
                     itemRef = "7259f1d3:4p45lf3u",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 140,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 35355
+                trainerCostCopper = 35355,
             },
             {
                 category = "",
@@ -8871,27 +8920,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 16
+                        quantity = 16,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Robes of Arcana",
                 output = {
                     itemRef = "7259f1d3:9kd6g8n8",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 150,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 40275
+                trainerCostCopper = 40275,
             },
             {
                 category = "",
@@ -8901,32 +8950,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Truefaith Gloves",
                 output = {
                     itemRef = "7259f1d3:2cex0ivf",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 150,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 40275
+                trainerCostCopper = 40275,
             },
             {
                 category = "",
@@ -8936,27 +8985,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Silk Headband",
                 output = {
                     itemRef = "7259f1d3:43u4st9h",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 160,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 45515
+                trainerCostCopper = 45515,
             },
             {
                 category = "",
@@ -8966,27 +9015,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Enchanter's Cowl",
                 output = {
                     itemRef = "7259f1d3:ag2bqcm1",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 165,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 48255
+                trainerCostCopper = 48255,
             },
             {
                 category = "",
@@ -8996,32 +9045,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:m3m72ds8",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Green Silk Armor",
                 output = {
                     itemRef = "7259f1d3:ox5dsp94",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 165,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 48255
+                trainerCostCopper = 48255,
             },
             {
                 category = "",
@@ -9031,32 +9080,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "732368d4:ku9j8vhw",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Earthen Vest",
                 output = {
                     itemRef = "7259f1d3:22wu2d71",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 170,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 51075
+                trainerCostCopper = 51075,
             },
             {
                 category = "",
@@ -9066,37 +9115,37 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 16
+                        quantity = 16,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "61fdf3df:ov027km6",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:oo8796rr",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Crimson Silk Belt",
                 output = {
                     itemRef = "7259f1d3:27zw5yao",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 175,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 53975
+                trainerCostCopper = 53975,
             },
             {
                 category = "",
@@ -9106,27 +9155,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 16
+                        quantity = 16,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Boots of the Enchanter",
                 output = {
                     itemRef = "7259f1d3:u5d3ghmm",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 175,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 53975
+                trainerCostCopper = 53975,
             },
             {
                 category = "",
@@ -9136,27 +9185,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Green Silken Shoulders",
                 output = {
                     itemRef = "7259f1d3:z3s6o9o7",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 180,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 56955
+                trainerCostCopper = 56955,
             },
             {
                 category = "",
@@ -9166,32 +9215,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:oo8796rr",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Crimson Silk Shoulders",
                 output = {
                     itemRef = "7259f1d3:y966beta",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 190,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 63155
+                trainerCostCopper = 63155,
             },
             {
                 category = "",
@@ -9201,47 +9250,47 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 10
+                        quantity = 10,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "732368d4:ku9j8vhw",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "732368d4:2616xh4v",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "732368d4:vlwvpmfx",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "732368d4:sclalidn",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Robe of Power",
                 output = {
                     itemRef = "7259f1d3:nq3oml24",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 190,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 63155
+                trainerCostCopper = 63155,
             },
             {
                 category = "",
@@ -9251,42 +9300,42 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "732368d4:ku9j8vhw",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "61fdf3df:ov027km6",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Earthen Silk Belt",
                 output = {
                     itemRef = "7259f1d3:bo7gq4mq",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 195,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 66375
+                trainerCostCopper = 66375,
             },
             {
                 category = "",
@@ -9296,42 +9345,42 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "4999dcec:ht59o8mx",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "61fdf3df:ov027km6",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Star Belt",
                 output = {
                     itemRef = "7259f1d3:ghl39cpx",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 200,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 69675
+                trainerCostCopper = 69675,
             },
             {
                 category = "",
@@ -9341,37 +9390,37 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 32
+                        quantity = 32,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "732368d4:sclalidn",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "7259f1d3:oo8796rr",
                         kind = "rpe_item",
-                        quantity = 4
-                    }
+                        quantity = 4,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Crimson Silk Robe",
                 output = {
                     itemRef = "7259f1d3:zpiqzilq",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 205,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 73055
+                trainerCostCopper = 73055,
             },
             {
                 category = "",
@@ -9381,27 +9430,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Black Mageweave Vest",
                 output = {
                     itemRef = "7259f1d3:7je8t4yb",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 205,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 73055
+                trainerCostCopper = 73055,
             },
             {
                 category = "",
@@ -9411,27 +9460,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Black Mageweave Leggings",
                 output = {
                     itemRef = "7259f1d3:q3sznxi0",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 205,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 73055
+                trainerCostCopper = 73055,
             },
             {
                 category = "",
@@ -9441,27 +9490,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Black Mageweave Robe",
                 output = {
                     itemRef = "7259f1d3:3cc39cob",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 210,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 76515
+                trainerCostCopper = 76515,
             },
             {
                 category = "",
@@ -9471,27 +9520,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 10
+                        quantity = 10,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "White Bandit Mask",
                 output = {
                     itemRef = "7259f1d3:mdzvfbok",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 215,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 80055
+                trainerCostCopper = 80055,
             },
             {
                 category = "",
@@ -9501,32 +9550,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:oo8796rr",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Red Mageweave Vest",
                 output = {
                     itemRef = "7259f1d3:0nwgkdih",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 215,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 80055
+                trainerCostCopper = 80055,
             },
             {
                 category = "",
@@ -9536,32 +9585,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:oo8796rr",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Red Mageweave Pants",
                 output = {
                     itemRef = "7259f1d3:t5zmjxy7",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 215,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 80055
+                trainerCostCopper = 80055,
             },
             {
                 category = "",
@@ -9571,27 +9620,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 10
+                        quantity = 10,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Black Mageweave Gloves",
                 output = {
                     itemRef = "7259f1d3:bn8nd7gq",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 215,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 80055
+                trainerCostCopper = 80055,
             },
             {
                 category = "",
@@ -9601,37 +9650,37 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 30
+                        quantity = 30,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "3eb7e9bb:w2plwren",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "3eb7e9bb:2hbdmyj4",
                         kind = "rpe_item",
-                        quantity = 6
-                    }
+                        quantity = 6,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Dreamweave Vest",
                 output = {
                     itemRef = "7259f1d3:cwkerny4",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 225,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 87375
+                trainerCostCopper = 87375,
             },
             {
                 category = "",
@@ -9641,37 +9690,37 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "3eb7e9bb:w2plwren",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "3eb7e9bb:2hbdmyj4",
                         kind = "rpe_item",
-                        quantity = 4
-                    }
+                        quantity = 4,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Dreamweave Gloves",
                 output = {
                     itemRef = "7259f1d3:5ro18gtd",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 225,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 87375
+                trainerCostCopper = 87375,
             },
             {
                 category = "",
@@ -9681,32 +9730,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:oo8796rr",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Red Mageweave Gloves",
                 output = {
                     itemRef = "7259f1d3:mt1lompv",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 225,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 87375
+                trainerCostCopper = 87375,
             },
             {
                 category = "",
@@ -9716,27 +9765,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Black Mageweave Headband",
                 output = {
                     itemRef = "7259f1d3:cqggqg4u",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 230,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 91155
+                trainerCostCopper = 91155,
             },
             {
                 category = "",
@@ -9746,27 +9795,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Black Mageweave Shoulders",
                 output = {
                     itemRef = "7259f1d3:4jvsf9vy",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 230,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 91155
+                trainerCostCopper = 91155,
             },
             {
                 category = "",
@@ -9776,32 +9825,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "538a54a0:u0wy9jz1",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Black Mageweave Boots",
                 output = {
                     itemRef = "7259f1d3:t9oha2l3",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 230,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 91155
+                trainerCostCopper = 91155,
             },
             {
                 category = "",
@@ -9811,32 +9860,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 3
+                        quantity = 3,
                     },
                     {
                         itemRef = "7259f1d3:oo8796rr",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Red Mageweave Shoulders",
                 output = {
                     itemRef = "7259f1d3:f0eqxb9v",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 235,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 95015
+                trainerCostCopper = 95015,
             },
             {
                 category = "",
@@ -9846,32 +9895,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:oo8796rr",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Red Mageweave Headband",
                 output = {
                     itemRef = "7259f1d3:nqwa9la3",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 240,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 98955
+                trainerCostCopper = 98955,
             },
             {
                 category = "",
@@ -9881,47 +9930,47 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:edth2zu1",
                         kind = "rpe_item",
-                        quantity = 40
+                        quantity = 40,
                     },
                     {
                         itemRef = "7259f1d3:shbu7lxd",
                         kind = "rpe_item",
-                        quantity = 3
+                        quantity = 3,
                     },
                     {
                         itemRef = "4999dcec:qgjc3m5m",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "61fdf3df:ufv4fdnf",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "3eb7e9bb:2hbdmyj4",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "3eb7e9bb:w2plwren",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Dreamweave Circlet",
                 output = {
                     itemRef = "7259f1d3:y5taywcv",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 250,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 107075
+                trainerCostCopper = 107075,
             },
             {
                 category = "",
@@ -9931,37 +9980,37 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 40
+                        quantity = 40,
                     },
                     {
                         itemRef = "732368d4:tfwg197j",
                         kind = "rpe_item",
-                        quantity = 3
+                        quantity = 3,
                     },
                     {
                         itemRef = "732368d4:lxqnh3pp",
                         kind = "rpe_item",
-                        quantity = 3
+                        quantity = 3,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Wisdom of the Timbermaw",
                 output = {
                     itemRef = "7259f1d3:43w9k3mf",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 290,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 142755
+                trainerCostCopper = 142755,
             },
             {
                 category = "",
@@ -9971,37 +10020,37 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 30
+                        quantity = 30,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:xnx0kwlv",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "4999dcec:6b4o47go",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Mooncloth Boots",
                 output = {
                     itemRef = "7259f1d3:c3zsw8vk",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 290,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 142755
+                trainerCostCopper = 142755,
             },
             {
                 category = "",
@@ -10011,32 +10060,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 30
+                        quantity = 30,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:xnx0kwlv",
                         kind = "rpe_item",
-                        quantity = 4
-                    }
+                        quantity = 4,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Mooncloth Leggings",
                 output = {
                     itemRef = "7259f1d3:8f7vbtoq",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 290,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 142755
+                trainerCostCopper = 142755,
             },
             {
                 category = "",
@@ -10046,42 +10095,42 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 30
+                        quantity = 30,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "732368d4:x5hz6tby",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "4999dcec:y7998n1r",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "3eb7e9bb:hq608hly",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Argent Boots",
                 output = {
                     itemRef = "7259f1d3:2tq936qq",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 290,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 142755
+                trainerCostCopper = 142755,
             },
             {
                 category = "",
@@ -10091,32 +10140,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 30
+                        quantity = 30,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:xnx0kwlv",
                         kind = "rpe_item",
-                        quantity = 4
-                    }
+                        quantity = 4,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Mooncloth Vest",
                 output = {
                     itemRef = "7259f1d3:he1t3q0n",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 300,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 152475
+                trainerCostCopper = 152475,
             },
             {
                 category = "",
@@ -10126,32 +10175,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 25
+                        quantity = 25,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:xnx0kwlv",
                         kind = "rpe_item",
-                        quantity = 5
-                    }
+                        quantity = 5,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Mooncloth Shoulders",
                 output = {
                     itemRef = "7259f1d3:bl8tt5fn",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 300,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 152475
+                trainerCostCopper = 152475,
             },
             {
                 category = "",
@@ -10161,42 +10210,42 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:xnx0kwlv",
                         kind = "rpe_item",
-                        quantity = 6
+                        quantity = 6,
                     },
                     {
                         itemRef = "732368d4:x5hz6tby",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "4999dcec:atpvfzht",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Mooncloth Circlet",
                 output = {
                     itemRef = "7259f1d3:yqkv77d0",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 300,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 152475
+                trainerCostCopper = 152475,
             },
             {
                 category = "",
@@ -10206,37 +10255,37 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "7259f1d3:dx7zh3l2",
                         kind = "rpe_item",
-                        quantity = 60
+                        quantity = 60,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:xnx0kwlv",
                         kind = "rpe_item",
-                        quantity = 6
+                        quantity = 6,
                     },
                     {
                         itemRef = "4999dcec:y7998n1r",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Mooncloth Gloves",
                 output = {
                     itemRef = "7259f1d3:z65t76x7",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 300,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 152475
+                trainerCostCopper = 152475,
             },
             {
                 category = "",
@@ -10246,33 +10295,33 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "3eb7e9bb:hq608hly",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:xnx0kwlv",
                         kind = "rpe_item",
-                        quantity = 5
-                    }
+                        quantity = 5,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Argent Shoulders",
                 output = {
                     itemRef = "7259f1d3:vfqq6p5y",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 300,
                 results = {},
                 skillRef = "f82db71a:goqp0alw",
                 tags = {},
-                trainerCostCopper = 152475
-            }
+                trainerCostCopper = 152475,
+            },
         },
         resources = {},
         skills = {},
@@ -10280,6 +10329,7 @@ Addon.Data.DefaultDatasets:Register({
         stats = {},
         traits = {},
         units = {},
-        weaponTypes = {}
+        weaponTypes = {},
     },
+    version = 2,
 })

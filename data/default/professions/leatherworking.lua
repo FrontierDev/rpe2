@@ -1,7 +1,6 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 1,
     dataset = {
         achievements = {},
         auras = {},
@@ -11,7 +10,7 @@ Addon.Data.DefaultDatasets:Register({
         damageSchools = {},
         datasetType = "crafting",
         dependencies = {
-            "f82db71a"
+            "f82db71a",
         },
         description = "",
         groupName = "Core",
@@ -67,7 +66,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:x9qez6bu",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -116,7 +115,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:x9qez6bu",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -165,7 +164,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:x9qez6bu",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -214,7 +213,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:x9qez6bu",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -263,12 +262,12 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:x9qez6bu",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
                 armorWeight = "leather",
-                bindingFlag = "none",
+                bindingFlag = "bind_on_equip",
                 blueSockets = 0,
                 canDisenchant = true,
                 canSell = true,
@@ -281,8 +280,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 56,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -295,15 +294,15 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/inv_chest_plate06.blp",
                 id = "62656npm",
                 isTwoHanded = false,
-                itemLevel = 55,
+                itemLevel = 61,
                 itemSetKey = "",
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -316,38 +315,35 @@ Addon.Data.DefaultDatasets:Register({
                 sellPrice = 0,
                 skillBonuses = {},
                 socketTypes = {},
-                sockets = {
-                    {
-                        color = "yellow"
-                    }
-                },
+                sockets = {},
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 156
-                    },
-                    {
-                        sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 25
+                        value = 156,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 8
-                    }
+                        value = 7,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 25,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
+                targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 1
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
                 armorWeight = "leather",
-                bindingFlag = "none",
+                bindingFlag = "bind_on_equip",
                 blueSockets = 0,
                 canDisenchant = true,
                 canSell = true,
@@ -360,8 +356,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 55,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -374,15 +370,15 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/inv_belt_03.blp",
                 id = "1xyj0rh1",
                 isTwoHanded = false,
-                itemLevel = 55,
+                itemLevel = 60,
                 itemSetKey = "",
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -399,30 +395,31 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 87
-                    },
-                    {
-                        sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 14
+                        value = 87,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 13
-                    }
+                        value = 13,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 14,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
+                targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
                 armorWeight = "leather",
-                bindingFlag = "none",
+                bindingFlag = "bind_on_equip",
                 blueSockets = 0,
                 canDisenchant = true,
                 canSell = true,
@@ -435,8 +432,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 48,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -449,15 +446,15 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/inv_bracer_07.blp",
                 id = "b1fmw5tb",
                 isTwoHanded = false,
-                itemLevel = 55,
+                itemLevel = 53,
                 itemSetKey = "",
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -474,30 +471,30 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 61
+                        value = 61,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 11
+                        value = 11,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 5
-                    }
+                        value = 5,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:crezt6ix"
+                    "f82db71a:crezt6ix",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
                 armorWeight = "leather",
-                bindingFlag = "none",
+                bindingFlag = "bind_on_equip",
                 blueSockets = 0,
                 canDisenchant = true,
                 canSell = true,
@@ -510,8 +507,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 47,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -524,15 +521,15 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/inv_gauntlets_31.blp",
                 id = "0bnp5n0m",
                 isTwoHanded = false,
-                itemLevel = 55,
+                itemLevel = 52,
                 itemSetKey = "",
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -549,30 +546,30 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 86
+                        value = 86,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 12
+                        value = 12,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 11
-                    }
+                        value = 11,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
                 armorWeight = "leather",
-                bindingFlag = "none",
+                bindingFlag = "bind_on_equip",
                 blueSockets = 0,
                 canDisenchant = true,
                 canSell = true,
@@ -585,8 +582,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 51,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -604,10 +601,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -624,30 +621,30 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 118
+                        value = 118,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 16
+                        value = 16,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 16
-                    }
+                        value = 16,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bgvs1zx6"
+                    "f82db71a:bgvs1zx6",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
                 armorWeight = "leather",
-                bindingFlag = "none",
+                bindingFlag = "bind_on_equip",
                 blueSockets = 0,
                 canDisenchant = true,
                 canSell = true,
@@ -660,8 +657,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 53,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -679,10 +676,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -699,25 +696,25 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 131
+                        value = 131,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 20
+                        value = 20,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 12
-                    }
+                        value = 12,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -762,8 +759,8 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 8
-                    }
+                        value = 8,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -771,12 +768,12 @@ Addon.Data.DefaultDatasets:Register({
                     "f82db71a:nwfvxbto",
                     "f82db71a:obmt4ntq",
                     "f82db71a:wasvuom2",
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {},
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -794,8 +791,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 3,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -813,10 +810,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -833,12 +830,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 45
+                        value = 45,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 1
-                    }
+                        value = 1,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -846,9 +843,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -866,8 +863,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 3,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -885,10 +882,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -905,12 +902,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 31
+                        value = 31,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 1
-                    }
+                        value = 1,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -918,9 +915,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -938,8 +935,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 4,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -957,10 +954,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -977,12 +974,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 21
+                        value = 21,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 1
-                    }
+                        value = 1,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -990,9 +987,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:crezt6ix"
+                    "f82db71a:crezt6ix",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1010,8 +1007,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 6,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1029,10 +1026,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1049,12 +1046,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 51
+                        value = 51,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 1
-                    }
+                        value = 1,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1062,9 +1059,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1082,8 +1079,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 7,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1101,10 +1098,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1121,12 +1118,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 62
+                        value = 62,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 2
-                    }
+                        value = 2,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1134,9 +1131,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1154,8 +1151,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 8,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1173,10 +1170,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1193,16 +1190,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 31
+                        value = 31,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 2
+                        value = 2,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 2
-                    }
+                        value = 2,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1210,9 +1207,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1230,8 +1227,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 8,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1249,10 +1246,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1269,16 +1266,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 48
+                        value = 48,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 2
+                        value = 2,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 2
-                    }
+                        value = 2,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1286,9 +1283,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1306,8 +1303,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 10,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1325,10 +1322,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1345,16 +1342,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 61
+                        value = 61,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 2
+                        value = 2,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 3
-                    }
+                        value = 3,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1362,9 +1359,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1382,8 +1379,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 10,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1401,10 +1398,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1421,16 +1418,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 43
+                        value = 43,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 2
+                        value = 2,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 2
-                    }
+                        value = 2,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1438,9 +1435,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1458,8 +1455,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 10,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1477,10 +1474,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1497,12 +1494,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 14
+                        value = 14,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 2
-                    }
+                        value = 2,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1510,9 +1507,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1530,8 +1527,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 12,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1549,10 +1546,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1569,16 +1566,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 73
+                        value = 73,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 3
+                        value = 3,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1586,9 +1583,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1606,8 +1603,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 13,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1625,10 +1622,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1645,16 +1642,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 74
+                        value = 74,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 3
+                        value = 3,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1662,9 +1659,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1682,8 +1679,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 13,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1701,10 +1698,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1721,16 +1718,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 42
+                        value = 42,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 3
+                        value = 3,
                     },
                     {
                         sourceStatRef = "f82db71a:zfqm8dxp",
-                        value = 2
-                    }
+                        value = 2,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1738,9 +1735,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1758,8 +1755,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 14,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1777,10 +1774,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1797,16 +1794,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 66
+                        value = 66,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 5
+                        value = 5,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 3
-                    }
+                        value = 3,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1814,9 +1811,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1861,8 +1858,8 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 16
-                    }
+                        value = 16,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1870,12 +1867,12 @@ Addon.Data.DefaultDatasets:Register({
                     "f82db71a:nwfvxbto",
                     "f82db71a:obmt4ntq",
                     "f82db71a:wasvuom2",
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {},
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1893,8 +1890,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 15,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1912,10 +1909,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -1932,16 +1929,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 78
+                        value = 78,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 4
+                        value = 4,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1949,9 +1946,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -1969,8 +1966,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 15,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -1988,10 +1985,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2008,12 +2005,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 78
+                        value = 78,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2021,9 +2018,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2041,8 +2038,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 16,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2060,10 +2057,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2080,16 +2077,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 69
+                        value = 69,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 5
+                        value = 5,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2097,9 +2094,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2117,8 +2114,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 18,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2136,10 +2133,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2156,12 +2153,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 72
+                        value = 72,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 8
-                    }
+                        value = 8,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2169,9 +2166,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2189,8 +2186,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 19,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2211,13 +2208,13 @@ Addon.Data.DefaultDatasets:Register({
                                     amountMode = "flat",
                                     baseDamage = 20,
                                     damageSchoolRefs = {
-                                        "f82db71a:esjguw6d"
+                                        "f82db71a:esjguw6d",
                                     },
                                     statScaling = {},
-                                    type = "damage"
-                                }
+                                    type = "damage",
+                                },
                             },
-                            triggerTarget = "event_other"
+                            triggerTarget = "event_other",
                         },
                         {
                             chance = 3,
@@ -2227,20 +2224,20 @@ Addon.Data.DefaultDatasets:Register({
                                     amountMode = "flat",
                                     baseDamage = 20,
                                     damageSchoolRefs = {
-                                        "f82db71a:esjguw6d"
+                                        "f82db71a:esjguw6d",
                                     },
                                     statScaling = {},
-                                    type = "damage"
-                                }
+                                    type = "damage",
+                                },
                             },
-                            triggerTarget = "event_other"
-                        }
+                            triggerTarget = "event_other",
+                        },
                     },
                     icon = "",
                     name = "",
                     skillBonuses = {},
                     statBonuses = {},
-                    unlockLevel = 1
+                    unlockLevel = 1,
                 },
                 gemColor = "none",
                 genericModificationKey = "",
@@ -2253,10 +2250,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2273,8 +2270,8 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 52
-                    }
+                        value = 52,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2282,9 +2279,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -2334,7 +2331,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:x9qez6bu",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -2384,7 +2381,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:x9qez6bu",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -2434,7 +2431,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:x9qez6bu",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = true,
@@ -2484,7 +2481,7 @@ Addon.Data.DefaultDatasets:Register({
                 uniqueFlag = "none",
                 validSlotRefs = {},
                 wowConversionSkillRef = "f82db71a:x9qez6bu",
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2502,8 +2499,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 19,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2521,10 +2518,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2541,16 +2538,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 52
+                        value = 52,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 4
+                        value = 4,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2558,9 +2555,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2578,8 +2575,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 13,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2597,10 +2594,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2617,16 +2614,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 48
+                        value = 48,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 4
+                        value = 4,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2634,9 +2631,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2654,8 +2651,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 21,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2673,10 +2670,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2690,16 +2687,16 @@ Addon.Data.DefaultDatasets:Register({
                 skillBonuses = {
                     {
                         skillRef = "f82db71a:gwgzj5kg",
-                        value = 3
-                    }
+                        value = 3,
+                    },
                 },
                 socketTypes = {},
                 sockets = {},
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 54
-                    }
+                        value = 54,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2707,9 +2704,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2727,8 +2724,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 20,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2746,10 +2743,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2766,16 +2763,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 48
+                        value = 48,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 4
+                        value = 4,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2783,9 +2780,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2803,8 +2800,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 20,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2822,10 +2819,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2842,16 +2839,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 53
+                        value = 53,
                     },
                     {
                         sourceStatRef = "f82db71a:fercjhm5",
-                        value = 1
+                        value = 1,
                     },
                     {
                         sourceStatRef = "f82db71a:tcn0s8kx",
-                        value = -1
-                    }
+                        value = -1,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2859,9 +2856,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2879,8 +2876,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 21,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2898,10 +2895,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2918,16 +2915,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 65
+                        value = 65,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 5
+                        value = 5,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 4
-                    }
+                        value = 4,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -2935,9 +2932,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:66i80qm1"
+                    "f82db71a:66i80qm1",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -2955,8 +2952,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 22,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -2974,10 +2971,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -2994,12 +2991,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 67
+                        value = 67,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 7
-                    }
+                        value = 7,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3007,9 +3004,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:66i80qm1"
+                    "f82db71a:66i80qm1",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3027,8 +3024,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 22,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3046,10 +3043,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3066,20 +3063,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 61
+                        value = 61,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 6
+                        value = 6,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 3
+                        value = 3,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3087,9 +3084,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3107,8 +3104,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 23,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3126,10 +3123,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3146,12 +3143,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 68
+                        value = 68,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 7
-                    }
+                        value = 7,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3159,9 +3156,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:66i80qm1"
+                    "f82db71a:66i80qm1",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3179,8 +3176,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 23,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3198,10 +3195,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3218,12 +3215,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 56
+                        value = 56,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 8
-                    }
+                        value = 8,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3231,9 +3228,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3251,8 +3248,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 24,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3270,10 +3267,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3290,16 +3287,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 57
+                        value = 57,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 6
+                        value = 6,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 5
-                    }
+                        value = 5,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3307,9 +3304,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3327,8 +3324,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 24,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3346,10 +3343,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3366,12 +3363,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 57
+                        value = 57,
                     },
                     {
                         sourceStatRef = "f82db71a:u7b49vs9",
-                        value = 16
-                    }
+                        value = 16,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3379,9 +3376,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3426,8 +3423,8 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 24
-                    }
+                        value = 24,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3435,12 +3432,12 @@ Addon.Data.DefaultDatasets:Register({
                     "f82db71a:nwfvxbto",
                     "f82db71a:obmt4ntq",
                     "f82db71a:wasvuom2",
-                    "f82db71a:raiu9t05"
+                    "f82db71a:raiu9t05",
                 },
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {},
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3458,8 +3455,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 26,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3477,10 +3474,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3497,16 +3494,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 95
+                        value = 95,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 8
-                    }
+                        value = 8,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3514,9 +3511,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3534,8 +3531,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 27,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3553,10 +3550,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3573,20 +3570,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 47
+                        value = 47,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 4
+                        value = 4,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 4
+                        value = 4,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3594,9 +3591,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:crezt6ix"
+                    "f82db71a:crezt6ix",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3614,8 +3611,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 27,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3633,10 +3630,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3653,16 +3650,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 54
+                        value = 54,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
+                        value = 6,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3670,9 +3667,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3690,8 +3687,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 27,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3709,10 +3706,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3729,16 +3726,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 85
+                        value = 85,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 8
-                    }
+                        value = 8,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3746,9 +3743,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3766,8 +3763,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 28,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3785,10 +3782,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3805,12 +3802,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 98
+                        value = 98,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 13
-                    }
+                        value = 13,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3818,9 +3815,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3838,8 +3835,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 28,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3857,10 +3854,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3877,16 +3874,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 55
+                        value = 55,
                     },
                     {
                         sourceStatRef = "f82db71a:zfqm8dxp",
-                        value = 6
+                        value = 6,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3894,9 +3891,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3914,8 +3911,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 28,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -3933,10 +3930,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -3953,12 +3950,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 86
+                        value = 86,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 13
-                    }
+                        value = 13,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -3966,9 +3963,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -3986,8 +3983,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 29,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4005,10 +4002,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4025,16 +4022,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 56
+                        value = 56,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 7
+                        value = 7,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4042,9 +4039,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4062,8 +4059,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 29,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4081,10 +4078,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4101,20 +4098,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 87
+                        value = 87,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 7
+                        value = 7,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 7
+                        value = 7,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 7
-                    }
+                        value = 7,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4122,9 +4119,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:obmt4ntq"
+                    "f82db71a:obmt4ntq",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4142,8 +4139,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 30,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4161,10 +4158,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4181,20 +4178,20 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 76
+                        value = 76,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 5
+                        value = 5,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 6
+                        value = 6,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 5
-                    }
+                        value = 5,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4202,9 +4199,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:66i80qm1"
+                    "f82db71a:66i80qm1",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4222,8 +4219,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 30,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4241,10 +4238,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4261,16 +4258,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 102
+                        value = 102,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 10
+                        value = 10,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 9
-                    }
+                        value = 9,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4278,9 +4275,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4298,8 +4295,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 30,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4317,10 +4314,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4337,12 +4334,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 102
+                        value = 102,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 14
-                    }
+                        value = 14,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4350,9 +4347,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:nwfvxbto"
+                    "f82db71a:nwfvxbto",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4370,8 +4367,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 31,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4389,10 +4386,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4409,16 +4406,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 45
+                        value = 45,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 6
+                        value = 6,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 5
-                    }
+                        value = 5,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4426,9 +4423,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:crezt6ix"
+                    "f82db71a:crezt6ix",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4446,8 +4443,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 32,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4468,17 +4465,17 @@ Addon.Data.DefaultDatasets:Register({
                                     amountMode = "flat",
                                     baseHealing = 100,
                                     statScaling = {},
-                                    type = "heal"
-                                }
+                                    type = "heal",
+                                },
                             },
-                            triggerTarget = "event_source"
-                        }
+                            triggerTarget = "event_source",
+                        },
                     },
                     icon = "",
                     name = "",
                     skillBonuses = {},
                     statBonuses = {},
-                    unlockLevel = 1
+                    unlockLevel = 1,
                 },
                 gemColor = "none",
                 genericModificationKey = "",
@@ -4491,10 +4488,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4511,16 +4508,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 65
+                        value = 65,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4528,9 +4525,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4548,8 +4545,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 32,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4567,10 +4564,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4587,12 +4584,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 46
+                        value = 46,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 8
-                    }
+                        value = 8,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4600,9 +4597,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:crezt6ix"
+                    "f82db71a:crezt6ix",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4620,8 +4617,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 32,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4639,10 +4636,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4659,16 +4656,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 24
+                        value = 24,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 5
+                        value = 5,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4676,9 +4673,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:bqwhrw0g"
+                    "f82db71a:bqwhrw0g",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4696,8 +4693,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 33,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4715,10 +4712,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4735,16 +4732,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 66
+                        value = 66,
                     },
                     {
                         sourceStatRef = "f82db71a:hj6d4kvy",
-                        value = 18
+                        value = 18,
                     },
                     {
                         sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4752,9 +4749,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:wasvuom2"
+                    "f82db71a:wasvuom2",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4772,8 +4769,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 33,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4791,10 +4788,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4811,12 +4808,12 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 47
+                        value = 47,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 8
-                    }
+                        value = 8,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4824,9 +4821,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:crezt6ix"
+                    "f82db71a:crezt6ix",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4844,8 +4841,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 33,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4863,10 +4860,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4883,16 +4880,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 47
+                        value = 47,
                     },
                     {
                         sourceStatRef = "f82db71a:zfqm8dxp",
-                        value = 5
+                        value = 5,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4900,9 +4897,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:crezt6ix"
+                    "f82db71a:crezt6ix",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4920,8 +4917,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 34,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -4939,10 +4936,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -4959,16 +4956,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 61
+                        value = 61,
                     },
                     {
                         sourceStatRef = "f82db71a:xqz0daz2",
-                        value = 8
+                        value = 8,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 8
-                    }
+                        value = 8,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -4976,9 +4973,9 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:haks0gz4"
+                    "f82db71a:haks0gz4",
                 },
-                yellowSockets = 0
+                yellowSockets = 0,
             },
             {
                 allowWowConversion = false,
@@ -4996,8 +4993,8 @@ Addon.Data.DefaultDatasets:Register({
                         minimumValue = 34,
                         showOnTooltip = true,
                         tooltipTextOverride = "",
-                        type = "level"
-                    }
+                        type = "level",
+                    },
                 },
                 consumableElixirType = "",
                 consumableType = "",
@@ -5015,10 +5012,10 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "armor",
                 maxDamagePerTurn = 0,
                 maxGenericModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxModificationCounts = {
-                    mod = 1
+                    mod = 1,
                 },
                 maxStackSize = 1,
                 metaSockets = 0,
@@ -5035,16 +5032,16 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 48
+                        value = 48,
                     },
                     {
                         sourceStatRef = "f82db71a:75y3a8ib",
-                        value = 6
+                        value = 6,
                     },
                     {
                         sourceStatRef = "f82db71a:kec9rhli",
-                        value = 6
-                    }
+                        value = 6,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -5052,10 +5049,9386 @@ Addon.Data.DefaultDatasets:Register({
                 targetTwoHandedOnly = false,
                 uniqueFlag = "none",
                 validSlotRefs = {
-                    "f82db71a:crezt6ix"
+                    "f82db71a:crezt6ix",
                 },
-                yellowSockets = 0
-            }
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 35,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_32.blp",
+                id = "lu2f3kfd",
+                isTwoHanded = false,
+                itemLevel = 40,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Shadowskin Gloves",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 76,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 6,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jslmczbi",
+                        value = 1,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 35,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                equipmentTrait = {
+                    automaticAuras = {},
+                    category = "",
+                    conditions = {},
+                    description = "",
+                    events = {
+                        {
+                            chance = 9,
+                            combatEventId = "on_auto_attack_hit",
+                            effects = {
+                                {
+                                    amount = 8,
+                                    amountMode = "flat",
+                                    resourceRef = "f82db71a:e2tfklq7",
+                                    type = "resource",
+                                },
+                            },
+                            triggerTarget = "event_source",
+                        },
+                        {
+                            chance = 3,
+                            combatEventId = "on_melee_hit",
+                            effects = {
+                                {
+                                    amount = 8,
+                                    amountMode = "flat",
+                                    resourceRef = "f82db71a:e2tfklq7",
+                                    type = "resource",
+                                },
+                            },
+                            triggerTarget = "event_source",
+                        },
+                    },
+                    icon = "",
+                    name = "",
+                    skillBonuses = {},
+                    statBonuses = {},
+                    unlockLevel = 1,
+                },
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_09.blp",
+                id = "0lboph96",
+                isTwoHanded = false,
+                itemLevel = 40,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Barbaric Belt",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 62,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:zfqm8dxp",
+                        value = 11,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 35,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_helmet_15.blp",
+                id = "zxaispjx",
+                isTwoHanded = false,
+                itemLevel = 40,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Comfortable Leather Hat",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 90,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 11,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 10,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 35,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_07.blp",
+                id = "kh5as5nc",
+                isTwoHanded = false,
+                itemLevel = 40,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Dusky Boots",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 76,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 11,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 3,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 35,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_08.blp",
+                id = "xwmucx64",
+                isTwoHanded = false,
+                itemLevel = 40,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Swift Boots",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 76,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:s1mt6jh9",
+                        value = 3,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 36,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_05.blp",
+                id = "alwzv0yi",
+                isTwoHanded = false,
+                itemLevel = 41,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Turtle Scale Gloves",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 146,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 7,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 6,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 36,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_leather_03.blp",
+                id = "bp7hqyc1",
+                isTwoHanded = false,
+                itemLevel = 41,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Nightscape Tunic",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 113,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 15,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 6,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 37,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_07.blp",
+                id = "bhfwi0g1",
+                isTwoHanded = false,
+                itemLevel = 42,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Nightscape Shoulders",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 86,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 11,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 5,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 36,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_24.blp",
+                id = "znxtc7he",
+                isTwoHanded = false,
+                itemLevel = 41,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Nightscape Headband",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 91,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 11,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 37,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_06.blp",
+                id = "bq7947yq",
+                isTwoHanded = false,
+                itemLevel = 42,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Turtle Scale Bracers",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 204,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 37,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_chain_12.blp",
+                id = "jlnq2160",
+                isTwoHanded = false,
+                itemLevel = 42,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Turtle Scale Breastplate",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 238,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 9,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 9,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 9,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 38,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_25.blp",
+                id = "n9lzzkem",
+                isTwoHanded = false,
+                itemLevel = 43,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Big Voodoo Robe",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 117,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 14,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 9,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 39,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_banner_01.blp",
+                id = "ctzht4zc",
+                isTwoHanded = false,
+                itemLevel = 44,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Big Voodoo Mask",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 97,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 14,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 9,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 39,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_09.blp",
+                id = "riyhi71p",
+                isTwoHanded = false,
+                itemLevel = 44,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Tough Scorpid Bracers",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 107,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 7,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 39,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_leather_02.blp",
+                id = "aku0bj87",
+                isTwoHanded = false,
+                itemLevel = 44,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Tough Scorpid Breastplate",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 245,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 15,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 7,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 39,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_18.blp",
+                id = "qfmdvqn9",
+                isTwoHanded = false,
+                itemLevel = 44,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Wild Leather Shoulders",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 90,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 30,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 10,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 40,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_24.blp",
+                id = "pou2vmn4",
+                isTwoHanded = false,
+                itemLevel = 45,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Tough Scorpid Gloves",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 155,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 9,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 40,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_06.blp",
+                id = "xaci9gkt",
+                isTwoHanded = false,
+                itemLevel = 45,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Wild Leather Vest",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 121,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 41,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 14,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 40,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_helmet_10.blp",
+                id = "ws0amunv",
+                isTwoHanded = false,
+                itemLevel = 45,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Wild Leather Helmet",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 99,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 41,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 14,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 40,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_10.blp",
+                id = "3a4bi80s",
+                isTwoHanded = false,
+                itemLevel = 45,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Dragonscale Gauntlets",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 171,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 7,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jslmczbi",
+                        value = 1,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 40,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_helmet_04.blp",
+                id = "dibi20pl",
+                isTwoHanded = false,
+                itemLevel = 45,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Wolfshead Helm",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 109,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 10,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = true,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {},
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_monsterscales_17.blp",
+                id = "wd5k2n7q",
+                isTwoHanded = false,
+                itemLevel = 0,
+                itemSetKey = "",
+                itemType = "material",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 200,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Worn Dragonscale",
+                prismaticSockets = 0,
+                quality = "common",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {},
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                wowConversionSkillRef = "f82db71a:x9qez6bu",
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 41,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_11.blp",
+                id = "k8j2vh4m",
+                isTwoHanded = false,
+                itemLevel = 46,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Nightscape Pants",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 108,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 16,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 7,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 41,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_helmet_40.blp",
+                id = "rq6b9x2c",
+                isTwoHanded = false,
+                itemLevel = 46,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Turtle Scale Helm",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 206,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 10,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 41,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                equipmentTrait = {
+                    automaticAuras = {},
+                    category = "",
+                    conditions = {},
+                    description = "",
+                    events = {
+                        {
+                            chance = 3,
+                            combatEventId = "on_heal",
+                            effects = {
+                                {
+                                    amountMode = "flat",
+                                    baseHealing = 300,
+                                    statScaling = {},
+                                    type = "heal",
+                                },
+                            },
+                            triggerTarget = "event_other",
+                        },
+                    },
+                    icon = "",
+                    name = "",
+                    skillBonuses = {},
+                    statBonuses = {},
+                    unlockLevel = 1,
+                },
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_30.blp",
+                id = "m3fp7zq1",
+                isTwoHanded = false,
+                itemLevel = 46,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Gauntlets of the Sea",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 85,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 7,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 42,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_05.blp",
+                id = "v7cn4j2s",
+                isTwoHanded = false,
+                itemLevel = 47,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Nightscape Boots",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {
+                    {
+                        skillRef = "f82db71a:muuwon1r",
+                        value = 3,
+                    },
+                },
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 87,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 12,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 42,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_02.blp",
+                id = "h5kw8p3d",
+                isTwoHanded = false,
+                itemLevel = 47,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Turtle Scale Leggings",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 226,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 11,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 11,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 42,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_05.blp",
+                id = "t2gx9m6r",
+                isTwoHanded = false,
+                itemLevel = 47,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Tough Scorpid Boots",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 178,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 7,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 42,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_02.blp",
+                id = "b4ny7q1e",
+                isTwoHanded = false,
+                itemLevel = 47,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Big Voodoo Pants",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 110,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 15,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cosmetic",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 43,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_02.blp",
+                id = "c8pv3k5a",
+                isTwoHanded = false,
+                itemLevel = 48,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Big Voodoo Cloak",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 31,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 9,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 5,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 43,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_04.blp",
+                id = "u6mf2z9w",
+                isTwoHanded = false,
+                itemLevel = 48,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Tough Scorpid Shoulders",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 197,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 10,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 44,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_07.blp",
+                id = "e3jr8x4n",
+                isTwoHanded = false,
+                itemLevel = 49,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Wild Leather Boots",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 90,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 35,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 12,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 44,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_12.blp",
+                id = "p7hd5v2q",
+                isTwoHanded = false,
+                itemLevel = 49,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Tough Scorpid Leggings",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 235,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 17,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 10,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 45,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_helmet_20.blp",
+                id = "g9sk1m6c",
+                isTwoHanded = false,
+                itemLevel = 50,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Tough Scorpid Helm",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 222,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 14,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 14,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 45,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_14.blp",
+                id = "w4zt8r3b",
+                isTwoHanded = false,
+                itemLevel = 50,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Wild Leather Leggings",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 116,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 47,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 16,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cosmetic",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 45,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_03.blp",
+                id = "a2vx6n9j",
+                isTwoHanded = false,
+                itemLevel = 50,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Wild Leather Cloak",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 33,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 26,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 9,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 45,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                equipmentTrait = {
+                    automaticAuras = {},
+                    category = "",
+                    conditions = {},
+                    description = "",
+                    events = {
+                        {
+                            chance = 3,
+                            combatEventId = "on_melee_hit",
+                            effects = {
+                                {
+                                    amountMode = "flat",
+                                    baseDamage = 320,
+                                    damageSchoolRefs = {
+                                        "f82db71a:esjguw6d",
+                                    },
+                                    statScaling = {},
+                                    type = "damage",
+                                },
+                            },
+                            triggerTarget = "event_other",
+                        },
+                        {
+                            chance = 9,
+                            combatEventId = "on_auto_attack_hit",
+                            effects = {
+                                {
+                                    amountMode = "flat",
+                                    baseDamage = 320,
+                                    damageSchoolRefs = {
+                                        "f82db71a:esjguw6d",
+                                    },
+                                    statScaling = {},
+                                    type = "damage",
+                                },
+                            },
+                            triggerTarget = "event_other",
+                        },
+                    },
+                    icon = "",
+                    name = "",
+                    skillBonuses = {},
+                    statBonuses = {},
+                    unlockLevel = 1,
+                },
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_helmet_08.blp",
+                id = "f5qc7k1u",
+                isTwoHanded = false,
+                itemLevel = 50,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Helm of Fire",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 118,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 17,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 5,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 45,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_leather_06.blp",
+                id = "d8mp3h4y",
+                isTwoHanded = false,
+                itemLevel = 50,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Feathered Breastplate",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 146,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 24,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 46,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_09.blp",
+                id = "eo5iira2",
+                isTwoHanded = false,
+                itemLevel = 51,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Heavy Scorpid Bracers",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 122,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 8,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 8,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 46,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_chain_07.blp",
+                id = "8l5byojg",
+                isTwoHanded = false,
+                itemLevel = 51,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Dragonscale Breastplate",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 306,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 13,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jjn0my8k",
+                        value = 13,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:itpo751d",
+                        value = 12,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 47,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_chain_06.blp",
+                id = "a2b45s22",
+                isTwoHanded = false,
+                itemLevel = 52,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Green Dragonscale Breastplate",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 311,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 21,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 11,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 48,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_23.blp",
+                id = "sm7pymht",
+                isTwoHanded = false,
+                itemLevel = 53,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Chimeric Gloves",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 87,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:954yunb9",
+                        value = 11,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 12,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 48,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_chain_15.blp",
+                id = "5us114e3",
+                isTwoHanded = false,
+                itemLevel = 53,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Heavy Scorpid Vest",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 288,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 16,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 15,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 49,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_31.blp",
+                id = "pq3fcbga",
+                isTwoHanded = false,
+                itemLevel = 54,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runic Leather Gauntlets",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 88,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 8,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 14,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 49,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_05.blp",
+                id = "8ei6gxrk",
+                isTwoHanded = false,
+                itemLevel = 54,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Green Dragonscale Leggings",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 282,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 22,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 11,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 49,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_18.blp",
+                id = "lwysa14u",
+                isTwoHanded = false,
+                itemLevel = 54,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Living Shoulders",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 117,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 8,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 13,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 3,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 31,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 11,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 49,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_06.blp",
+                id = "6ej1bpa6",
+                isTwoHanded = false,
+                itemLevel = 54,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Volcanic Leggings",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 204,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 20,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 49,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_06.blp",
+                id = "2op3v3cw",
+                isTwoHanded = false,
+                itemLevel = 54,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Ironfeather Shoulders",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 117,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 20,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 8,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_24.blp",
+                id = "2q7dgadx",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Heavy Scorpid Gauntlet",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 186,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 12,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_11.blp",
+                id = "hclssw0e",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runic Leather Bracers",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 63,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 10,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_09.blp",
+                id = "tmv0pu1u",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Stormshroud Pants",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 138,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jslmczbi",
+                        value = 2,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:o6113cir",
+                        value = 1,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_leather_04.blp",
+                id = "9oubdxly",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Warbear Harness",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 158,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:zfqm8dxp",
+                        value = 11,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 27,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 51,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_12.blp",
+                id = "hiaxkufq",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Green Dragonscale Gauntlets",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 208,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 5,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 18,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 9,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 51,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_03.blp",
+                id = "xvi3ut31",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Heavy Scorpid Belt",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 170,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 12,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 51,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_23.blp",
+                id = "03tc8aq5",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runic Leather Belt",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 82,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 14,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 9,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 52,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_chain_04.blp",
+                id = "ra69ai5u",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Blue Dragonscale Breastplate",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 338,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 28,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 8,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:954yunb9",
+                        value = 8,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 52,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_11.blp",
+                id = "oewffbj4",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Living Leggings",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 142,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 8,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 25,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 5,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 26,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 9,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 52,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_leather_08.blp",
+                id = "nanqe7nt",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Stormshroud Armor",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 163,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jslmczbi",
+                        value = 2,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:o6113cir",
+                        value = 1,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 52,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_12.blp",
+                id = "l0m62g4z",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Warbear Woolies",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 142,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:zfqm8dxp",
+                        value = 28,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 12,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 53,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_chain_07.blp",
+                id = "bitqvvq4",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Black Dragonscale Breastplate",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 344,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 8,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:u7b49vs9",
+                        value = 50,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 53,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_08.blp",
+                id = "fvqbcdu6",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Dawn Treaders",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 114,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 18,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:o6113cir",
+                        value = 1,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 53,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_26.blp",
+                id = "ks88fs1b",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Devilsaur Gauntlets",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 103,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 9,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:u7b49vs9",
+                        value = 28,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jslmczbi",
+                        value = 1,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 53,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_leather_06.blp",
+                id = "x87dzazi",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Ironfeather Breastplate",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 165,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 28,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 53,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_09.blp",
+                id = "tdwjdyz6",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Might of the Timbermaw",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 93,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:zfqm8dxp",
+                        value = 21,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 9,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 53,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_helmet_04.blp",
+                id = "tw0g1cvc",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runic Leather Headband",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 122,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 20,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 12,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 54,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_18.blp",
+                id = "rkpmrmia",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Blue Dragonscale Shoulders",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 262,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 21,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 6,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:954yunb9",
+                        value = 6,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 54,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_07.blp",
+                id = "a2c6cukq",
+                isTwoHanded = false,
+                itemLevel = 59,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Corehound Boots",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 144,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 13,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 24,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 54,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_helmet_20.blp",
+                id = "4uu60rsl",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Heavy Scorpid Helm",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 258,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 20,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 13,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 54,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_05.blp",
+                id = "ei28au20",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Stormshroud Shoulders",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 126,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jslmczbi",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:o6113cir",
+                        value = 1,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 56,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_chain_06.blp",
+                id = "635dfc77",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Red Dragonscale Breastplate",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 360,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 22,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 66,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 55,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_02.blp",
+                id = "078423d4",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runic Leather Pants",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 135,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 20,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 13,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 55,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_05.blp",
+                id = "400d6c46",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Onyxia Scale Cloak",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 43,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 16,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 7,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 55,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_01.blp",
+                id = "eba39fc7",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Black Dragonscale Shoulders",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 266,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 9,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 6,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:u7b49vs9",
+                        value = 40,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 55,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_plate07.blp",
+                id = "638749f0",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Living Breastplate",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 169,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 5,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 9,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 26,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 25,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 55,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_wolf.blp",
+                id = "55799081",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Devilsaur Leggings",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 148,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jslmczbi",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:fercjhm5",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:u7b49vs9",
+                        value = 46,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 56,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_07.blp",
+                id = "a07838a8",
+                isTwoHanded = false,
+                itemLevel = 61,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Heavy Scorpid Shoulders",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 245,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 13,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 14,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 56,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_13.blp",
+                id = "01c2a510",
+                isTwoHanded = false,
+                itemLevel = 61,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Volcanic Shoulders",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 167,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 18,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_leather_07.blp",
+                id = "573bd787",
+                isTwoHanded = false,
+                itemLevel = 62,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runic Leather Armor",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 158,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 13,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 21,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_15.blp",
+                id = "0861c43b",
+                isTwoHanded = false,
+                itemLevel = 62,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Runic Leather Shoulders",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 119,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 15,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_chain_10.blp",
+                id = "71935ba2",
+                isTwoHanded = false,
+                itemLevel = 62,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Frostsaber Tunic",
+                prismaticSockets = 0,
+                quality = "uncommon",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 158,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jjn0my8k",
+                        value = 18,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:itpo751d",
+                        value = 18,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_03.blp",
+                id = "63fb556e",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Black Dragonscale Leggings",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 320,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 8,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 13,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:u7b49vs9",
+                        value = 54,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 55,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_helmet_08.blp",
+                id = "cc7a1b6d",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Molten Helm",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 171,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 16,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 29,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:o6113cir",
+                        value = 1,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 56,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_plate_09.blp",
+                id = "4192f435",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Black Dragonscale Boots",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 308,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 24,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:u7b49vs9",
+                        value = 28,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_26.blp",
+                id = "7009da50",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Girdle of Insight",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 98,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 23,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 9,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_08.blp",
+                id = "138a1c58",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Mongoose Boots",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 120,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 9,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 23,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_05.blp",
+                id = "638ce5ab",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Swift Flight Bracers",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 160,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:v2rs9cpy",
+                        value = 41,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 7,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_02.blp",
+                id = "a7aba9e6",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Chromatic Cloak",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 55,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:itpo751d",
+                        value = 9,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:69hfqhne",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 9,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_01.blp",
+                id = "effa4d3e",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Hide of the Wild",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 55,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 14,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 42,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 8,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 10,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cloth",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_cape_20.blp",
+                id = "a4cef336",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Shifting Cloak",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 55,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:o6113cir",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 8,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 17,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bqwhrw0g",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 59,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_26.blp",
+                id = "49982f92",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Timbermaw Brawlers",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 112,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:zfqm8dxp",
+                        value = 23,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 59,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_26.blp",
+                id = "ad82516c",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Golden Mantle of the Dawn",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 134,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 22,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:o6113cir",
+                        value = 1,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_32.blp",
+                id = "32a73f91",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Lava Belt",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 238,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 26,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 15,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_22.blp",
+                id = "f8f7b277",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Chromatic Gauntlets",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 318,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:itpo751d",
+                        value = 5,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jslmczbi",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:fercjhm5",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 5,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jjn0my8k",
+                        value = 5,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:69hfqhne",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 5,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:u7b49vs9",
+                        value = 44,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_24.blp",
+                id = "c10bc450",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Corehound Belt",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 135,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 21,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:hj6d4kvy",
+                        value = 62,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 16,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_13.blp",
+                id = "5311e7b2",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Molten Belt",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 135,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 16,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:0w7c7p09",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 28,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_leather_03.blp",
+                id = "28f1fa90",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Primal Batskin Jerkin",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 181,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 32,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 6,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:wbj4zuf3",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:dd88li4c",
+                        value = 1,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_31.blp",
+                id = "6798ff19",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Primal Batskin Gloves",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 113,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 9,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:wbj4zuf3",
+                        value = 2,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:dd88li4c",
+                        value = 2,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_07.blp",
+                id = "da8ca871",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Primal Batskin Bracers",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 79,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 14,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 7,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:wbj4zuf3",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:dd88li4c",
+                        value = 1,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_leather_07.blp",
+                id = "31ba19e8",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Blood Tiger Breastplate",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 181,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 16,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 13,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:zfqm8dxp",
+                        value = 17,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 17,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_shoulder_23.blp",
+                id = "b3aafc02",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Blood Tiger Shoulders",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 136,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:zfqm8dxp",
+                        value = 13,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 13,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:66i80qm1",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 55,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_pants_mail_15.blp",
+                id = "62e991ab",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Blue Dragonscale Leggings",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 310,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:954yunb9",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:kec9rhli",
+                        value = 19,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 20,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:obmt4ntq",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_plate08.blp",
+                id = "b24c385a",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Dreamscale Breastplate",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 496,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 30,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 15,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 14,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 15,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_05.blp",
+                id = "fa1b1e80",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Spitfire Bracers",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 160,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 9,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 8,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 9,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_11.blp",
+                id = "70d929dd",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Spitfire Gauntlets",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 228,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 12,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 11,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 12,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_leather_02.blp",
+                id = "60eb676d",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Spitfire Breastplate",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 365,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:75y3a8ib",
+                        value = 16,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        value = 15,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 16,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_12.blp",
+                id = "2bbfbc5e",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Sandstalker Bracers",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 220,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 15,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 7,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_11.blp",
+                id = "7055b5eb",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Sandstalker Gauntlets",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 308,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 20,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 9,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 57,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_plate07.blp",
+                id = "b1db852b",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Sandstalker Breastplate",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 485,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 25,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 13,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_05.blp",
+                id = "aa7ec926",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Stormshroud Gloves",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 99,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:wbj4zuf3",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jslmczbi",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:fercjhm5",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:dd88li4c",
+                        value = 1,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_cloth_08.blp",
+                id = "e7c1c733",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Polar Tunic",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 267,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jjn0my8k",
+                        value = 40,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 26,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 18,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_06.blp",
+                id = "d006a702",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Polar Gloves",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 167,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jjn0my8k",
+                        value = 30,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 18,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 18,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_07.blp",
+                id = "282bfc3c",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Polar Bracers",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 117,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jjn0my8k",
+                        value = 20,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 20,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:xqz0daz2",
+                        value = 12,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_chest_plate09.blp",
+                id = "da536b54",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Icy Scale Breastplate",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 578,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jjn0my8k",
+                        value = 40,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 24,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:u7b49vs9",
+                        value = 40,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_gauntlets_28.blp",
+                id = "708ccbac",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Icy Scale Gauntlets",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 361,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jjn0my8k",
+                        value = 30,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 22,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:u7b49vs9",
+                        value = 22,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:wasvuom2",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "mail",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_bracer_07.blp",
+                id = "339ca1f7",
+                isTwoHanded = false,
+                itemLevel = 60,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Icy Scale Bracers",
+                prismaticSockets = 0,
+                quality = "epic",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 253,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:jjn0my8k",
+                        value = 20,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 17,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:u7b49vs9",
+                        value = 32,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:crezt6ix",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_helmet_58.blp",
+                id = "d8ce6800",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Bramblewood Helm",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 156,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 30,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 20,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:bgvs1zx6",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_boots_cloth_04.blp",
+                id = "59eeb93b",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Bramblewood Boots",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 132,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 25,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 12,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:raiu9t05",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "leather",
+                bindingFlag = "bind_on_equip",
+                blueSockets = 0,
+                canDisenchant = true,
+                canSell = true,
+                canStack = false,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "",
+                gemColor = "none",
+                genericModificationKey = "",
+                greenSockets = 0,
+                icon = "interface/icons/inv_belt_17.blp",
+                id = "5f663445",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "armor",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {
+                    mod = 1,
+                },
+                maxModificationCounts = {
+                    mod = 1,
+                },
+                maxStackSize = 1,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Bramblewood Belt",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:v42albuv",
+                        value = 108,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:pg0ytacb",
+                        value = 15,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:ygjno50i",
+                        value = 14,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {},
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {
+                    "f82db71a:haks0gz4",
+                },
+                yellowSockets = 0,
+            },
+            {
+                allowWowConversion = false,
+                armorWeight = "cosmetic",
+                bindingFlag = "none",
+                blueSockets = 0,
+                canDisenchant = false,
+                canSell = true,
+                canStack = true,
+                canTrade = true,
+                cogSockets = 0,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableElixirType = "",
+                consumableType = "",
+                damageMode = "fixed",
+                damagePerTurn = 0,
+                description = "Permanently adds 5 Defense Rating to an item worn on the chest, legs, hands or feet.",
+                gemColor = "none",
+                genericModificationKey = "mod",
+                greenSockets = 0,
+                icon = "interface/icons/inv_misc_armorkit_05.blp",
+                id = "81385e9a",
+                isTwoHanded = false,
+                itemLevel = 55,
+                itemSetKey = "",
+                itemType = "modification",
+                maxDamagePerTurn = 0,
+                maxGenericModificationCounts = {},
+                maxModificationCounts = {},
+                maxStackSize = 10,
+                metaSockets = 0,
+                minDamagePerTurn = 0,
+                modificationKind = "generic",
+                name = "Core Armor Kit",
+                prismaticSockets = 0,
+                quality = "rare",
+                redSockets = 0,
+                sellPrice = 0,
+                skillBonuses = {},
+                socketTypes = {},
+                sockets = {},
+                stats = {
+                    {
+                        sourceStatRef = "f82db71a:0wyp78x9",
+                        value = 5,
+                    },
+                },
+                tags = {},
+                targetArmorWeight = "none",
+                targetSlotRefs = {
+                    "f82db71a:nwfvxbto",
+                    "f82db71a:obmt4ntq",
+                    "f82db71a:wasvuom2",
+                    "f82db71a:raiu9t05",
+                },
+                targetTwoHandedOnly = false,
+                uniqueFlag = "none",
+                validSlotRefs = {},
+                yellowSockets = 0,
+            },
         },
         loot = {},
         mounts = {},
@@ -5071,31 +14444,31 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:4gnkyr9f",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 name = "Wicked Leather Armor",
                 output = {
                     itemRef = "538a54a0:62656npm",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 1,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 104
+                trainerCostCopper = 104,
             },
             {
                 category = "",
@@ -5105,31 +14478,31 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:4gnkyr9f",
                         kind = "rpe_item",
-                        quantity = 14
+                        quantity = 14,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 name = "Wicked Leather Belt",
                 output = {
                     itemRef = "538a54a0:1xyj0rh1",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 1,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 104
+                trainerCostCopper = 104,
             },
             {
                 category = "",
@@ -5139,31 +14512,31 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:4gnkyr9f",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 name = "Wicked Leather Bracers",
                 output = {
                     itemRef = "538a54a0:b1fmw5tb",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 1,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 104
+                trainerCostCopper = 104,
             },
             {
                 category = "",
@@ -5173,31 +14546,31 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:4gnkyr9f",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 name = "Wicked Leather Gauntlets",
                 output = {
                     itemRef = "538a54a0:0bnp5n0m",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 1,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 104
+                trainerCostCopper = 104,
             },
             {
                 category = "",
@@ -5207,31 +14580,31 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:4gnkyr9f",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 name = "Wicked Leather Headband",
                 output = {
                     itemRef = "538a54a0:9ftjlomf",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 1,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 104
+                trainerCostCopper = 104,
             },
             {
                 category = "",
@@ -5241,31 +14614,31 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:4gnkyr9f",
                         kind = "rpe_item",
-                        quantity = 16
+                        quantity = 16,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 3
+                        quantity = 3,
                     },
                     {
                         itemRef = "7259f1d3:x8ste3qj",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 name = "Wicked Leather Pants",
                 output = {
                     itemRef = "538a54a0:ynfyug9o",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 1,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 104
+                trainerCostCopper = 104,
             },
             {
                 category = "",
@@ -5275,22 +14648,22 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "always_learned",
                 name = "Light Armor Kit",
                 output = {
                     itemRef = "538a54a0:ffq79ky7",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 1,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 104
+                trainerCostCopper = 104,
             },
             {
                 category = "",
@@ -5300,27 +14673,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 3
+                        quantity = 3,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "always_learned",
                 name = "Handstitched Leather Vest",
                 output = {
                     itemRef = "538a54a0:orgrpali",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 1,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 104
+                trainerCostCopper = 104,
             },
             {
                 category = "",
@@ -5330,27 +14703,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Handstitched Leather Boots",
                 output = {
                     itemRef = "538a54a0:tg2o0xbg",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 10,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 515
+                trainerCostCopper = 515,
             },
             {
                 category = "",
@@ -5360,27 +14733,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 3
-                    }
+                        quantity = 3,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Handstitched Leather Bracers",
                 output = {
                     itemRef = "538a54a0:sqikrxbb",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 20,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 1275
+                trainerCostCopper = 1275,
             },
             {
                 category = "",
@@ -5390,27 +14763,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 5
+                        quantity = 5,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 5
-                    }
+                        quantity = 5,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Rugged Leather Pants",
                 output = {
                     itemRef = "538a54a0:3ur6yw5b",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 30,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 2355
+                trainerCostCopper = 2355,
             },
             {
                 category = "",
@@ -5420,27 +14793,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 4
-                    }
+                        quantity = 4,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Embossed Leather Vest",
                 output = {
                     itemRef = "538a54a0:t8ul4ur3",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 40,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 3755
+                trainerCostCopper = 3755,
             },
             {
                 category = "",
@@ -5450,27 +14823,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 3
+                        quantity = 3,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Embossed Leather Gloves",
                 output = {
                     itemRef = "538a54a0:ij4b1lu0",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 50,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 5475
+                trainerCostCopper = 5475,
             },
             {
                 category = "",
@@ -5480,27 +14853,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 5
-                    }
+                        quantity = 5,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Embossed Leather Boots",
                 output = {
                     itemRef = "538a54a0:e15bb5n2",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 60,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 7515
+                trainerCostCopper = 7515,
             },
             {
                 category = "",
@@ -5510,27 +14883,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 9
+                        quantity = 9,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Embossed Leather Pants",
                 output = {
                     itemRef = "538a54a0:qt0kofbw",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 70,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 9875
+                trainerCostCopper = 9875,
             },
             {
                 category = "",
@@ -5540,27 +14913,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 7
+                        quantity = 7,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Fine Leather Gloves",
                 output = {
                     itemRef = "538a54a0:m5yhn5sa",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 80,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 12555
+                trainerCostCopper = 12555,
             },
             {
                 category = "",
@@ -5570,27 +14943,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 10
+                        quantity = 10,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Fine Leather Cloak",
                 output = {
                     itemRef = "538a54a0:xa6fxe5t",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 85,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 14015
+                trainerCostCopper = 14015,
             },
             {
                 category = "",
@@ -5600,27 +14973,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 15
+                        quantity = 15,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 4
-                    }
+                        quantity = 4,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Fine Leather Tunic",
                 output = {
                     itemRef = "538a54a0:whwezo3k",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 90,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 15555
+                trainerCostCopper = 15555,
             },
             {
                 category = "",
@@ -5630,32 +15003,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 9
+                        quantity = 9,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "4999dcec:s9lu5jap",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Moonglow Vest",
                 output = {
                     itemRef = "538a54a0:w2ywi7ur",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 90,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 15555
+                trainerCostCopper = 15555,
             },
             {
                 category = "",
@@ -5665,27 +15038,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 6
+                        quantity = 6,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Fine Leather Belt",
                 output = {
                     itemRef = "538a54a0:p3b72m1l",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 95,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 17175
+                trainerCostCopper = 17175,
             },
             {
                 category = "",
@@ -5695,27 +15068,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 13
+                        quantity = 13,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Light Leather Pants",
                 output = {
                     itemRef = "538a54a0:smeuh9c6",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 95,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 17175
+                trainerCostCopper = 17175,
             },
             {
                 category = "",
@@ -5725,27 +15098,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "7259f1d3:pujc8hth",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Medium Armor Kit",
                 output = {
                     itemRef = "538a54a0:phue87q2",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 100,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 18875
+                trainerCostCopper = 18875,
             },
             {
                 category = "",
@@ -5755,27 +15128,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Hillman's Leather Vest",
                 output = {
                     itemRef = "538a54a0:jxpkiu6j",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 100,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 18875
+                trainerCostCopper = 18875,
             },
             {
                 category = "",
@@ -5785,32 +15158,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 6
+                        quantity = 6,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Dark Leather Tunic",
                 output = {
                     itemRef = "538a54a0:lfes4dn1",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 100,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 18875
+                trainerCostCopper = 18875,
             },
             {
                 category = "",
@@ -5820,32 +15193,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:1wssn0qp",
                         kind = "rpe_item",
-                        quantity = 3
-                    }
+                        quantity = 3,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Fine Leather Pants",
                 output = {
                     itemRef = "538a54a0:yib36f7h",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 110,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 22515
+                trainerCostCopper = 22515,
             },
             {
                 category = "",
@@ -5855,32 +15228,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Dark Leather Pants",
                 output = {
                     itemRef = "538a54a0:duwonsnx",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 115,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 24455
+                trainerCostCopper = 24455,
             },
             {
                 category = "",
@@ -5890,32 +15263,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "538a54a0:8emm2i9i",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Red Whelp Gloves",
                 output = {
                     itemRef = "538a54a0:vopz4n66",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 120,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 26475
+                trainerCostCopper = 26475,
             },
             {
                 category = "",
@@ -5925,27 +15298,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 6
+                        quantity = 6,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Nimble Leather Gloves",
                 output = {
                     itemRef = "538a54a0:ec37yv1b",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 120,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 26475
+                trainerCostCopper = 26475,
             },
             {
                 category = "",
@@ -5955,27 +15328,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Hillman's Belt",
                 output = {
                     itemRef = "538a54a0:vds1s9lm",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 120,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 26475
+                trainerCostCopper = 26475,
             },
             {
                 category = "",
@@ -5985,37 +15358,37 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 3
+                        quantity = 3,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "538a54a0:sm9q37oi",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Dark Leather Gloves",
                 output = {
                     itemRef = "538a54a0:wzscxnl4",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 120,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 26475
+                trainerCostCopper = 26475,
             },
             {
                 category = "",
@@ -6025,32 +15398,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Dark Leather Belt",
                 output = {
                     itemRef = "538a54a0:wwcjuw1g",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 125,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 28575
+                trainerCostCopper = 28575,
             },
             {
                 category = "",
@@ -6060,27 +15433,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Fletcher's Gloves",
                 output = {
                     itemRef = "538a54a0:vsm9y7v3",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 125,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 28575
+                trainerCostCopper = 28575,
             },
             {
                 category = "",
@@ -6090,27 +15463,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Hillman's Shoulders",
                 output = {
                     itemRef = "538a54a0:9d4301af",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 130,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 30755
+                trainerCostCopper = 30755,
             },
             {
                 category = "",
@@ -6120,32 +15493,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 6
+                        quantity = 6,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "732368d4:ku9j8vhw",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Earthen Leather Shoulders",
                 output = {
                     itemRef = "538a54a0:wtce08zw",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 135,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 33015
+                trainerCostCopper = 33015,
             },
             {
                 category = "",
@@ -6155,27 +15528,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Toughened Leather Gloves",
                 output = {
                     itemRef = "538a54a0:tozg1w5v",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 135,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 33015
+                trainerCostCopper = 33015,
             },
             {
                 category = "",
@@ -6185,32 +15558,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Dark Leather Shoulders",
                 output = {
                     itemRef = "538a54a0:im3b9wzf",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 140,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 35355
+                trainerCostCopper = 35355,
             },
             {
                 category = "",
@@ -6220,27 +15593,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 10
+                        quantity = 10,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Pilferer's Gloves",
                 output = {
                     itemRef = "538a54a0:wc9hvk76",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 140,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 35355
+                trainerCostCopper = 35355,
             },
             {
                 category = "",
@@ -6250,27 +15623,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 14
+                        quantity = 14,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 4
-                    }
+                        quantity = 4,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Hillman's Leather Gloves",
                 output = {
                     itemRef = "538a54a0:r5gz8f3f",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 145,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 37775
+                trainerCostCopper = 37775,
             },
             {
                 category = "",
@@ -6280,37 +15653,37 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:84y6qzsn",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:1wssn0qp",
                         kind = "rpe_item",
-                        quantity = 6
+                        quantity = 6,
                     },
                     {
                         itemRef = "732368d4:ku9j8vhw",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Heavy Earthen Gloves",
                 output = {
                     itemRef = "538a54a0:a53oe5lm",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 145,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 37775
+                trainerCostCopper = 37775,
             },
             {
                 category = "",
@@ -6320,27 +15693,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 5
+                        quantity = 5,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Heavy Armor Kit",
                 output = {
                     itemRef = "538a54a0:uc1vqvt6",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 150,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 40275
+                trainerCostCopper = 40275,
             },
             {
                 category = "",
@@ -6350,32 +15723,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 9
+                        quantity = 9,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:m3m72ds8",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Green Leather Armor",
                 output = {
                     itemRef = "538a54a0:jxl5wr29",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 155,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 42855
+                trainerCostCopper = 42855,
             },
             {
                 category = "",
@@ -6385,37 +15758,37 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 5
+                        quantity = 5,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:m3m72ds8",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "61fdf3df:ov027km6",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Green Leather Belt",
                 output = {
                     itemRef = "538a54a0:dpx1354m",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 160,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 45515
+                trainerCostCopper = 45515,
             },
             {
                 category = "",
@@ -6425,32 +15798,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 18
+                        quantity = 18,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "4999dcec:s9lu5jap",
                         kind = "rpe_item",
-                        quantity = 4
-                    }
+                        quantity = 4,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Barbaric Bracers",
                 output = {
                     itemRef = "538a54a0:dh5qqlx0",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 155,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 42855
+                trainerCostCopper = 42855,
             },
             {
                 category = "",
@@ -6460,32 +15833,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 8
-                    }
+                        quantity = 8,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Guardian Pants",
                 output = {
                     itemRef = "538a54a0:70e2h0oi",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 160,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 45515
+                trainerCostCopper = 45515,
             },
             {
                 category = "",
@@ -6495,27 +15868,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 16
+                        quantity = 16,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Raptor Hide Harness",
                 output = {
                     itemRef = "538a54a0:jmxu0njk",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 165,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 48255
+                trainerCostCopper = 48255,
             },
             {
                 category = "",
@@ -6525,27 +15898,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Raptor Hide Belt",
                 output = {
                     itemRef = "538a54a0:o7hylmcn",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 165,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 48255
+                trainerCostCopper = 48255,
             },
             {
                 category = "",
@@ -6555,32 +15928,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 10
+                        quantity = 10,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Dusky Leather Leggings",
                 output = {
                     itemRef = "538a54a0:q64nfnu1",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 165,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 48255
+                trainerCostCopper = 48255,
             },
             {
                 category = "",
@@ -6590,32 +15963,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "61fdf3df:ov027km6",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Guardian Belt",
                 output = {
                     itemRef = "538a54a0:llmwenqv",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 170,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 51075
+                trainerCostCopper = 51075,
             },
             {
                 category = "",
@@ -6625,32 +15998,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 10
+                        quantity = 10,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "4999dcec:gw6wflop",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Barbaric Leggings",
                 output = {
                     itemRef = "538a54a0:nlp6ewem",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 170,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 51075
+                trainerCostCopper = 51075,
             },
             {
                 category = "",
@@ -6660,27 +16033,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 12
+                        quantity = 12,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Barbaric Shoulders",
                 output = {
                     itemRef = "538a54a0:vwvi1b09",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 175,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 53975
+                trainerCostCopper = 53975,
             },
             {
                 category = "",
@@ -6690,27 +16063,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 20
+                        quantity = 20,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Guardian Armor",
                 output = {
                     itemRef = "538a54a0:rlojj40g",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 175,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 53975
+                trainerCostCopper = 53975,
             },
             {
                 category = "",
@@ -6720,32 +16093,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 10
+                        quantity = 10,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Dusky Leather Armor",
                 output = {
                     itemRef = "538a54a0:9sf0iqku",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 175,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 53975
+                trainerCostCopper = 53975,
             },
             {
                 category = "",
@@ -6755,32 +16128,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 14
+                        quantity = 14,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "7259f1d3:m3m72ds8",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Green Leather Bracers",
                 output = {
                     itemRef = "538a54a0:wsea9a7p",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 180,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 56955
+                trainerCostCopper = 56955,
             },
             {
                 category = "",
@@ -6790,42 +16163,42 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 16
+                        quantity = 16,
                     },
                     {
                         itemRef = "7259f1d3:4ml43y0u",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "4999dcec:ht59o8mx",
                         kind = "rpe_item",
-                        quantity = 1
+                        quantity = 1,
                     },
                     {
                         itemRef = "4999dcec:ms6y0fi0",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "4999dcec:qgjc3m5m",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Gem-studded Leather Belt",
                 output = {
                     itemRef = "538a54a0:1p85p8ie",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 185,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 60015
+                trainerCostCopper = 60015,
             },
             {
                 category = "",
@@ -6835,32 +16208,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 16
+                        quantity = 16,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Dusky Bracers",
                 output = {
                     itemRef = "538a54a0:ysrozj6d",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 185,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 60015
+                trainerCostCopper = 60015,
             },
             {
                 category = "",
@@ -6870,32 +16243,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 14
+                        quantity = 14,
                     },
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Guardian Cloak",
                 output = {
                     itemRef = "538a54a0:hmzr6pp5",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 185,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 60015
+                trainerCostCopper = 60015,
             },
             {
                 category = "",
@@ -6905,32 +16278,32 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "732368d4:ku9j8vhw",
                         kind = "rpe_item",
-                        quantity = 4
+                        quantity = 4,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Gloves of the Greatfather",
                 output = {
                     itemRef = "538a54a0:iarx47ro",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 190,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 63155
+                trainerCostCopper = 63155,
             },
             {
                 category = "",
@@ -6940,27 +16313,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 14
+                        quantity = 14,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 2
-                    }
+                        quantity = 2,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Green Whelp Bracers",
                 output = {
                     itemRef = "538a54a0:8rdifxt5",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 190,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 63155
+                trainerCostCopper = 63155,
             },
             {
                 category = "",
@@ -6970,27 +16343,27 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 34
+                        quantity = 34,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Murloc Scale Bracers",
                 output = {
                     itemRef = "538a54a0:dm0rblq4",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 190,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 63155
+                trainerCostCopper = 63155,
             },
             {
                 category = "",
@@ -7000,37 +16373,37 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 10
+                        quantity = 10,
                     },
                     {
                         itemRef = "7259f1d3:jt6ktqiu",
                         kind = "rpe_item",
-                        quantity = 8
+                        quantity = 8,
                     },
                     {
                         itemRef = "7259f1d3:dsuj9x3j",
                         kind = "rpe_item",
-                        quantity = 2
+                        quantity = 2,
                     },
                     {
                         itemRef = "61fdf3df:ov027km6",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Dusky Belt",
                 output = {
                     itemRef = "538a54a0:rfhy92ax",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 195,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 66375
+                trainerCostCopper = 66375,
             },
             {
                 category = "",
@@ -7040,28 +16413,28 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         itemRef = "538a54a0:55k8gjup",
                         kind = "rpe_item",
-                        quantity = 14
+                        quantity = 14,
                     },
                     {
                         itemRef = "7259f1d3:uv6t44ol",
                         kind = "rpe_item",
-                        quantity = 1
-                    }
+                        quantity = 1,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Guardian Leather Bracers",
                 output = {
                     itemRef = "538a54a0:d1867li1",
                     maxQuantity = 1,
-                    minQuantity = 1
+                    minQuantity = 1,
                 },
                 reagents = {},
                 requiredSkillLevel = 195,
                 results = {},
                 skillRef = "f82db71a:x9qez6bu",
                 tags = {},
-                trainerCostCopper = 66375
-            }
+                trainerCostCopper = 66375,
+            },
         },
         resources = {},
         skills = {},
@@ -7069,6 +16442,7 @@ Addon.Data.DefaultDatasets:Register({
         stats = {},
         traits = {},
         units = {},
-        weaponTypes = {}
+        weaponTypes = {},
     },
+    version = 10,
 })

@@ -34,8 +34,6 @@ data/default/professions/leatherworking_250_270.lua
 data/default/professions/leatherworking_270_295.lua
 data/default/professions/misc.lua
 data/default/professions/tailoring.lua
-data/default/professions/tailoring_felcloth.lua
-data/default/professions/leatherworking_300.lua
 data/default/professions/leatherworking_300_recipes.lua
 
 utils/Common.lua
