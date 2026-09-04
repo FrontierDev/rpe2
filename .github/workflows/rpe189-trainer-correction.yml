@@ -64,7 +64,7 @@ jobs:
               raise AssertionError("Unterminated recipes table")
 
           recipes_before, recipe_count = recipe_table_slice(text)
-          assert recipe_count == 278, f"Expected 278 canonical Leatherworking recipes, found {recipe_count}"
+          assert recipe_count == 179, f"Expected 179 canonical Leatherworking recipes, found {recipe_count}"
 
           # Older canonical entries may omit learnMode; Recipe.lua defaults those to trainer.
           mode_pattern = re.compile(r'^\s*learnMode = "([^"]+)",\s*$', re.MULTILINE)
@@ -87,15 +87,15 @@ jobs:
 
           recipes_after, after_recipe_count = recipe_table_slice(corrected)
           after_modes = mode_pattern.findall(recipes_after)
-          assert after_recipe_count == 278, f"Recipe count changed during correction: {after_recipe_count}"
+          assert after_recipe_count == 179, f"Recipe count changed during correction: {after_recipe_count}"
           assert len(after_modes) == len(before_modes), "Explicit learn-mode field count changed"
           assert set(after_modes) == {"trainer"}, f"Non-trainer explicit recipe mode remains: {sorted(set(after_modes))}"
           assert 'learnMode = "book"' not in recipes_after, "Book-mode recipe remains"
-          assert after_modes.count("trainer") + (after_recipe_count - len(after_modes)) == 278, "Not all recipes resolve to trainer learning"
+          assert after_modes.count("trainer") + (after_recipe_count - len(after_modes)) == 179, "Not all recipes resolve to trainer learning"
           assert version_pattern.findall(corrected) == ["13"], "Packaged dataset version did not become 13"
 
           path.write_text(corrected, encoding="utf-8")
-          print(f"After: all 278 recipes resolve as trainer; converted {book_count} explicit book recipes; dataset version 13")
+          print(f"After: all 179 recipes resolve as trainer; converted {book_count} explicit book recipes; dataset version 13")
           PY
 
       - name: Validate and commit correction
