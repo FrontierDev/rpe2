@@ -22,14 +22,15 @@ data/default/classes/priest.lua
 data/default/classes/rogue.lua
 data/default/classes/warrior.lua
 data/default/professions/fishing.lua
-data/default/professions/mining.lua
 data/default/professions/alchemy.lua
 data/default/professions/blacksmithing.lua
+data/default/professions/blacksmithing_materials.lua
 data/default/professions/enchanting.lua
 data/default/professions/inscription.lua
 data/default/professions/jewelcrafting.lua
 data/default/professions/leatherworking.lua
 data/default/professions/misc.lua
+data/default/professions/misc_213_cleanup.lua
 data/default/professions/tailoring.lua
 
 utils/Common.lua
@@ -267,7 +268,7 @@ core/ui/prefabs/StatEntry.lua
 core/ui/prefabs/EditorIconField.lua
 core/ui/prefabs/EditorModelField.lua
 core/ui/prefabs/SelectedColor.lua
-core/ui/prefabs/ColorPicker.lua
+core/ui/ColorPicker.lua
 core/ui/prefabs/TableRow.lua
 core/ui/prefabs/Table.lua
 client/ui/CombatText.lua
