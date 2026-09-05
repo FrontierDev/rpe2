@@ -1,0 +1,124 @@
+name: Use Brilliant Shard for Belt of the Archmage
+
+on:
+  push:
+    branches: [dev]
+    paths: [.github/workflows/use-brilliant-shard-tailoring.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Update Belt of the Archmage reagent
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          enchanting_path = Path('data/default/professions/enchanting.lua')
+          tailoring_path = Path('data/default/professions/tailoring.lua')
+          enchanting = enchanting_path.read_text(encoding='utf-8')
+          tailoring = tailoring_path.read_text(encoding='utf-8')
+          original = tailoring
+
+          def table_region(source, start_marker, end_marker):
+              start = source.index(start_marker)
+              end = source.index(end_marker, start)
+              return source[start:end]
+
+          def top_blocks(region):
+              blocks = []
+              current = None
+              for line in region.splitlines(keepends=True):
+                  stripped = line.rstrip('\r\n')
+                  if stripped == '            {':
+                      current = [line]
+                  elif current is not None:
+                      current.append(line)
+                      if stripped in ('            },', '            }'):
+                          blocks.append(''.join(current))
+                          current = None
+              return blocks
+
+          items_region = table_region(enchanting, '        items = {', '        loot = {')
+          brilliant = []
+          for block in top_blocks(items_region):
+              if 'name = "Brilliant Shard"' not in block:
+                  continue
+              match = re.search(r'^                id = "([^"]+)",$', block, re.MULTILINE)
+              assert match, 'Brilliant Shard item has no ID'
+              brilliant.append(match.group(1))
+
+          assert len(brilliant) == 1, f'Expected one packaged Brilliant Shard item, found {brilliant}'
+          shard_ref = f'732368d4:{brilliant[0]}'
+
+          recipes_region_start = tailoring.index('        recipes = {')
+          recipes_region_end = tailoring.index('        resources = {', recipes_region_start)
+          recipes_region = tailoring[recipes_region_start:recipes_region_end]
+          recipe_blocks = top_blocks(recipes_region)
+          belt_blocks = [b for b in recipe_blocks if 'name = "Belt of the Archmage"' in b]
+          assert len(belt_blocks) == 1, f'Expected one Belt of the Archmage recipe, found {len(belt_blocks)}'
+          belt = belt_blocks[0]
+          assert shard_ref not in belt, 'Belt of the Archmage already uses Brilliant Shard'
+
+          input_close = '                },\n                learnMode = "trainer",'
+          assert input_close in belt, 'Could not locate Belt of the Archmage inputs closing'
+          shard_input = (
+              '                    {\n'
+              f'                        itemRef = "{shard_ref}",\n'
+              '                        kind = "rpe_item",\n'
+              '                        quantity = 6,\n'
+              '                    },\n'
+          )
+          updated_belt = belt.replace(input_close, shard_input + input_close, 1)
+          assert updated_belt != belt
+          tailoring = tailoring.replace(belt, updated_belt, 1)
+
+          version_pattern = re.compile(r'^    version = (\d+),$', re.MULTILINE)
+          versions = version_pattern.findall(tailoring)
+          assert versions == ['5'], f'Expected Tailoring version 5, found {versions}'
+          tailoring = version_pattern.sub('    version = 6,', tailoring, count=1)
+
+          # Deterministic validation.
+          final_region = table_region(tailoring, '        recipes = {', '        resources = {')
+          final_blocks = top_blocks(final_region)
+          final_belt = [b for b in final_blocks if 'name = "Belt of the Archmage"' in b]
+          assert len(final_belt) == 1
+          final_belt = final_belt[0]
+          assert final_belt.count(f'itemRef = "{shard_ref}"') == 1
+          shard_segment = re.search(
+              rf'itemRef = "{re.escape(shard_ref)}",\n\s+kind = "rpe_item",\n\s+quantity = (\d+),',
+              final_belt,
+          )
+          assert shard_segment and shard_segment.group(1) == '6'
+          assert 'requiredSkillLevel = 300' in final_belt
+          assert 'learnMode = "trainer"' in final_belt
+          assert version_pattern.findall(tailoring) == ['6']
+          assert tailoring != original
+
+          tailoring_path.write_text(tailoring, encoding='utf-8')
+          print(f'Using Brilliant Shard ref {shard_ref} x6; Tailoring version 5 -> 6')
+          PY
+
+      - name: Validate and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test "$(git diff --name-only | grep -v '^data/default/professions/tailoring.lua$' | wc -l)" -eq 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/default/professions/tailoring.lua
+          git rm .github/workflows/use-brilliant-shard-tailoring.yml
+          git diff --cached --check
+          git commit -m "Use Brilliant Shard for Belt of the Archmage"
+          git push origin HEAD:dev
