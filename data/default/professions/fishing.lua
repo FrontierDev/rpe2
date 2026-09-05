@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 1,
+    version = 2,
     dataset = {
         achievements = {},
         auras = {},
@@ -46,6 +46,16 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "material",
                 maxStackSize = 20,
                 name = "Firefin Snapper",
+                quality = "common",
+            },
+            {
+                canDisenchant = false,
+                icon = "interface/icons/inv_misc_fish_11.blp",
+                id = "s8e2l5qn",
+                itemLevel = 45,
+                itemType = "material",
+                maxStackSize = 20,
+                name = "Stonescale Eel",
                 quality = "common",
             },
         },
