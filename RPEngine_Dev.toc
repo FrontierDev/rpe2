@@ -198,7 +198,6 @@ client/spellcasting/AuraDescriptionBuilder.lua
 client/spellcasting/DescriptionBuilder.lua
 client/traits/DescriptionBuilder.lua
 client/client_Targeting.lua
-client/client_ItemUse.lua
 client/spellcasting/ExplicitCasterActivation.lua
 client/autopilot/MovementAllowanceFrozen.lua
 client/autopilot/PlannerIntegration.lua
@@ -268,7 +267,7 @@ core/ui/prefabs/StatEntry.lua
 core/ui/prefabs/EditorIconField.lua
 core/ui/prefabs/EditorModelField.lua
 core/ui/prefabs/SelectedColor.lua
-core/ui/ColorPicker.lua
+core/ui/prefabs/ColorPicker.lua
 core/ui/prefabs/TableRow.lua
 core/ui/prefabs/Table.lua
 client/ui/CombatText.lua
