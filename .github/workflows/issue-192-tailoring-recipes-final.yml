@@ -1,0 +1,51 @@
+name: Issue 192 Tailoring Recipes Final
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - .github/workflows/issue-192-tailoring-recipes-final.yml
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout dev
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Migrate and validate recipes
+        run: python3 .github/scripts/issue-192-final.py
+
+      - name: Validate scope and commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          test "$(git diff -- data/default/professions/tailoring.lua | grep -c '^+.*name = ' || true)" -eq 30
+          test "$(git diff -- data/default/professions/tailoring.lua | grep -c '^-.*name = "Red Woolen Boots"' || true)" -eq 1
+          grep -q '^    version = 5,$' data/default/professions/tailoring.lua
+          test "$(git diff --name-only | grep -v '^data/default/professions/tailoring.lua$' | wc -l)" -eq 0
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/default/professions/tailoring.lua
+          git rm .github/scripts/issue-192-final.py
+          rm -f .github/workflows/issue-192-tailoring-recipes.yml \
+                .github/workflows/issue-192-tailoring-recipes-v2.yml \
+                .github/workflows/issue-192-tailoring-recipes-v3.yml \
+                .github/workflows/issue-192-tailoring-recipes-v4.yml \
+                .github/workflows/issue-192-tailoring-recipes-v5.yml \
+                .github/workflows/issue-192-diagnose-recipes.yml \
+                .github/workflows/issue-192-tailoring-recipes-final.yml
+          git add -A .github
+          git diff --cached --check
+          git diff --cached --name-status
+          git commit -m "Add missing skill 300 Tailoring recipes"
+          git push origin HEAD:dev
