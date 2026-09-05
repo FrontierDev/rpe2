@@ -4,7 +4,7 @@
 **Target branch:** `dev`  
 **Canonical Alchemy dataset:** `data/default/professions/alchemy.lua`  
 **Alchemy dataset ID:** `d6ffc4e2`  
-**Prepared against Alchemy dataset version:** 7
+**Prepared against Alchemy dataset version:** 9
 
 ## 1. Purpose and scope
 
@@ -38,6 +38,8 @@ These decisions were confirmed after the initial #207 research pass and are auth
    - healing ranges use the source midpoint as `baseHealing`, accepting the existing heal variance behavior;
    - resource ranges use the source midpoint as a fixed `resource` amount;
    - normal potions use the existing 10-turn shared `potion` cooldown convention.
+7. **Elixir of Giant Growth is an elixir-type consumable, not a potion.** Its #209 Item record must use `consumableType = "elixir"`; its manual-use Strength effect still uses the #208 Spell/Aura path. Do not classify it as `consumableType = "potion"` merely because it has an on-use Spell.
+8. **Minor Magic Resistance lasts 10 RPE turns.** Both the supporting Aura definition and the `apply_aura` Spell component duration are 10 turns.
 
 For this range specifically:
 
@@ -225,13 +227,13 @@ Serialize icon paths as `interface/icons/<icon>.blp`.
 | Output | WoW item ID | Icon | ilvl | Req. level | Quality / stack | Intended RPE representation |
 |---|---:|---|---:|---:|---|---|
 | Blackmouth Oil | 6370 | `inv_drink_12` | 15 | — | common / 20 | Alchemy material; no `useSpellRef` |
-| Elixir of Giant Growth | 6662 | `inv_potion_10` | 18 | 8 | common / 5 | +8 Strength for 10 turns through Spell/Aura; ignore cosmetic size growth |
+| Elixir of Giant Growth | 6662 | `inv_potion_10` | 18 | 8 | common / 5 | **Elixir consumable** (`consumableType = "elixir"`); +8 Strength for 10 turns through Spell/Aura; ignore cosmetic size growth |
 | Elixir of Water Breathing | 5996 | `inv_potion_17` | 18 | 8 | common / 5 | Item + recipe only; **ignore gameplay use effect** |
 | Elixir of Wisdom | 3383 | `inv_potion_06` | 20 | 10 | common / 5 | Guardian elixir Trait: +6 Intellect |
 | Holy Protection Potion | 6051 | `inv_potion_09` | 20 | 10 | common / 5 | Classic absorb effect currently blocked; item metadata still implemented |
 | Swim Speed Potion | 6372 | `inv_potion_13` | 20 | 10 | common / 5 | Item + recipe only; **ignore gameplay use effect** |
 | Healing Potion | 929 | `inv_potion_51` | 22 | 12 | common / 5 | `useSpellRef`; heal self using midpoint `baseHealing = 320`, same convention as Minor Healing Potion |
-| Minor Magic Resistance Potion | 3384 | `inv_potion_08` | 22 | 12 | common / 5 | `useSpellRef`; +25 five magic resistances for 15 turns |
+| Minor Magic Resistance Potion | 3384 | `inv_potion_08` | 22 | 12 | common / 5 | `useSpellRef`; +25 five magic resistances for **10 turns** |
 | Lesser Mana Potion | 3385 | `inv_potion_71` | 24 | 14 | common / 5 | `useSpellRef`; restore fixed 320 Mana, same convention as Minor Mana Potion |
 | Elixir of Poison Resistance | 3386 | `inv_potion_12` | 55 | 14 | common / 5 | Poison-category cleanse currently blocked; item metadata still implemented |
 | Strong Troll's Blood Potion | 3388 | `inv_potion_78` | 25 | 15 | common / 5 | Guardian elixir Trait: +6 Spirit to reproduce current regen mapping |
@@ -308,6 +310,7 @@ Do not add a ranged-resource engine as part of this slice.
 
 **Status:** Strength effect implementable; cosmetic growth intentionally ignored.
 
+- #209 Item classification: `itemType = "consumable"`, `consumableType = "elixir"`;
 - target: caster/self;
 - cast time: 0;
 - no resource cost;
@@ -325,7 +328,7 @@ Do not add a ranged-resource engine as part of this slice.
 - cooldown: 10;
 - cooldown group: `potion`;
 - component: `apply_aura`;
-- Aura duration: 15 turns;
+- Aura duration: **10 turns**;
 - Aura effects:
   - +25 Fire resistance `f82db71a:0w7c7p09`;
   - +25 Frost resistance `f82db71a:jjn0my8k`;
@@ -371,6 +374,8 @@ These use the existing Alchemy consumable-Trait model rather than item-use Spell
 | Elixir of Firepower | battle | **+10 Spell Power `f82db71a:7t7xgzcx`** |
 | Elixir of Lesser Agility | battle | +8 Agility `f82db71a:xqz0daz2` |
 | Elixir of Ogre's Strength | battle | +8 Strength `f82db71a:zfqm8dxp` |
+
+Elixir of Giant Growth is also an **elixir-type Item**, but its temporary +8 Strength behavior is implemented through the #208 Spell/Aura rather than through this long-duration embedded Trait table.
 
 The Firepower mapping is a deliberate RPE balance/generalization choice; the underlying vanilla item remains named Elixir of Firepower.
 
@@ -468,7 +473,7 @@ Implement:
 - Healing Potion Spell;
 - Lesser Mana Potion Spell;
 - Giant Growth Strength Spell/Aura;
-- Minor Magic Resistance Spell/Aura.
+- Minor Magic Resistance Spell/Aura with a 10-turn Aura duration.
 
 Do not create use Spells for Water Breathing or Swim Speed. Do not approximate the three remaining blocker capability gaps.
 
@@ -480,6 +485,7 @@ Do not create use Spells for Water Breathing or Swim Speed. Do not approximate t
 - update `RPEngine_Dev.toc` so Fishing loads as packaged default data;
 - increment changed packaged dataset versions monotonically;
 - wire `useSpellRef` for Healing Potion, Lesser Mana Potion, Giant Growth and Minor Magic Resistance according to #208;
+- author Elixir of Giant Growth as `itemType = "consumable"`, `consumableType = "elixir"` — **not** a potion;
 - leave Water Breathing and Swim Speed without use effects by design;
 - apply the embedded Trait mappings from §8, including +10 generic Spell Power for Elixir of Firepower;
 - keep blocked items as complete item records without fake effects.
@@ -520,6 +526,7 @@ Do not create use Spells for Water Breathing or Swim Speed. Do not approximate t
 
 - [ ] Blackmouth Oil/Fire Oil are Alchemy materials with stack 20.
 - [ ] Normal potions/elixirs use stack 5.
+- [ ] Elixir of Giant Growth uses `consumableType = "elixir"`, not `potion`.
 - [ ] Water Breathing and Swim Speed have no gameplay-use Spell by design.
 - [ ] Firepower grants +10 generic Spell Power.
 - [ ] No fake Spell is attached to the remaining blocked effects.
@@ -529,7 +536,7 @@ Do not create use Spells for Water Breathing or Swim Speed. Do not approximate t
 - [ ] Healing Potion uses `baseHealing = 320` and the same item-use/cooldown pattern as Minor Healing Potion.
 - [ ] Lesser Mana Potion restores fixed 320 Mana and follows Minor Mana Potion's pattern.
 - [ ] Normal potion Spells use 10-turn shared group `potion` where applicable.
-- [ ] Minor Magic Resistance uses the five existing magic-resistance stats.
+- [ ] Minor Magic Resistance uses the five existing magic-resistance stats and lasts 10 turns.
 - [ ] Giant Growth's +8 Strength works; cosmetic size growth is ignored.
 
 ### Recipes
