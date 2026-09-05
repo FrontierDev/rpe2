@@ -123,6 +123,10 @@ local function getItemSourceRefs(item)
         refs[#refs + 1] = item.damageSchoolRef
     end
 
+    if type(item.useSpellRef) == "string" and item.useSpellRef ~= "" then
+        refs[#refs + 1] = item.useSpellRef
+    end
+
     if type(item.validSlotRefs) == "table" then
         for index = 1, #item.validSlotRefs do
             local slotRef = item.validSlotRefs[index]
@@ -1169,6 +1173,12 @@ function Dependecies.HandleDatasetDeleted(datasetId)
                     mutated = true
                 end
 
+                local useSpellDatasetId = item and Dependecies.ParseSourceStatRef(item.useSpellRef) or nil
+                if useSpellDatasetId == datasetId then
+                    item.useSpellRef = nil
+                    mutated = true
+                end
+
                 local embeddedTraits = {
                     type(item) == "table" and type(item.consumableTrait) == "table" and item.consumableTrait or nil,
                     type(item) == "table" and type(item.equipmentTrait) == "table" and item.equipmentTrait or nil,
@@ -1946,6 +1956,14 @@ function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
                 end
             end
         elseif collectionKey == "spells" then
+            for index = 1, #(dataset.items or {}) do
+                local item = dataset.items[index]
+                if type(item) == "table" and tostring(item.useSpellRef or "") == deletedRef then
+                    item.useSpellRef = nil
+                    mutated = true
+                end
+            end
+
             for index = 1, #(dataset.mounts or {}) do
                 local mount = dataset.mounts[index]
                 local keptSpellRefs = {}
