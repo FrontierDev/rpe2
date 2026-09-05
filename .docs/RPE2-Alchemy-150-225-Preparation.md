@@ -352,10 +352,8 @@ Classic stack rules for this slice:
 | Superior Healing Potion | 3928 | `inv_potion_53` | 45 | 35 | common / 5 | consumable / potion | Heal 700–900 -> `useSpellRef`, midpoint `baseHealing = 800` |
 | Philosopher's Stone | 9149 | `inv_misc_orb_01` | 45 | — | common / 1 | material/tool, bind-on-pickup | Required for transmutation; reusable Recipe tool; no fabricated trinket stats |
 | Wildvine Potion | 9144 | `inv_potion_34` | 45 | 35 | common / 5 | consumable / potion | 1–1500 Health + 1–1500 Mana -> `useSpellRef`, floor midpoint 750 Health + 750 Mana |
-| Gold Bar | 3577 | canonical Gold Bar icon | 30 | — | common / 20 | Blacksmithing/mining material | Transmute output; shared external Item |
-| Truesilver Bar | 6037 | canonical Truesilver Bar icon | 50 | — | common / 20 | Blacksmithing/mining material | Transmute output; shared external Item |
-
-Gold Bar and Truesilver Bar are owned externally; #213 should take their exact icon from the canonical Blacksmithing/mining material record when authoring that shared Item. Their icon lookup therefore belongs to the owning dataset definition rather than Alchemy Item data.
+| Gold Bar | 3577 | `inv_ingot_03` | 30 | — | common / 20 | Blacksmithing/mining material | Transmute output; shared external Item |
+| Truesilver Bar | 6037 | `inv_ingot_08` | 50 | — | common / 20 | Blacksmithing/mining material | Transmute output; shared external Item |
 
 ---
 
@@ -508,7 +506,7 @@ Principal Classic references used to resolve this slice:
 - Nature Protection Potion recipe: https://www.wowhead.com/classic/item=6057/recipe-nature-protection-potion
 - Elixir of Detect Lesser Invisibility recipe: https://www.wowhead.com/classic/item=3832/recipe-elixir-of-detect-lesser-invisibility
 - Elixir of Greater Defense: https://www.wowhead.com/classic/item=8951/elixir-of-greater-defense
-- Elixir of Greater Defense spell/icon cross-check: https://www.wowhead.com/classic/icon=134845/inv-potion-65
+- Elixir of Greater Defense icon: https://www.wowhead.com/classic/icon=134845/inv-potion-65
 - Catseye Elixir: https://www.wowhead.com/classic/item=10592/catseye-elixir
 - Frost Oil recipe: https://www.wowhead.com/classic/item=14634/recipe-frost-oil
 - Greater Mana Potion: https://www.wowhead.com/classic/spell=11448/greater-mana-potion
@@ -526,8 +524,11 @@ Principal Classic references used to resolve this slice:
 - Wildvine Potion recipe: https://www.wowhead.com/classic/item=9294/recipe-wildvine-potion
 - Wildvine Potion craft: https://www.wowhead.com/classic/spell=11458/wildvine-potion
 - Iron -> Gold recipe: https://www.wowhead.com/classic/item=9304/recipe-transmute-iron-to-gold
+- Iron -> Gold cooldown/icon cross-check: https://wowclassicdb.com/spell/11479
 - Mithril -> Truesilver recipe: https://www.wowhead.com/classic/item=9305/recipe-transmute-mithril-to-truesilver
 - Mithril -> Truesilver cooldown: https://www.wowhead.com/classic/spell=11480/transmute-mithril-to-truesilver
+- Gold Bar icon cross-check: https://wowclassicdb.com/spell/3308
+- Truesilver Bar icon cross-check: https://wowclassicdb.com/spell/10098
 
 Where later-version data contradicts a Classic record, the Classic record is authoritative for #212–#214.
 
@@ -580,6 +581,7 @@ This preparation establishes:
 - vanilla Classic reagent/vial versions resolved explicitly;
 - acquisition modes mapped to current RPE semantics;
 - output quantity 1 for every recipe;
+- complete output metadata, including concrete icons, for all 28 recipe outputs;
 - shared material ownership resolved;
 - representable manual effects defined with concrete RPE values;
 - long-duration stat elixirs assigned to Trait mechanics;
