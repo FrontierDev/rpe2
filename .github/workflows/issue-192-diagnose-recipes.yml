@@ -1,0 +1,50 @@
+name: Issue 192 Diagnose Recipes
+
+on:
+  push:
+    branches: [dev]
+    paths: [.github/workflows/issue-192-diagnose-recipes.yml]
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+      - shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          from collections import Counter
+          text = Path('data/default/professions/tailoring.lua').read_text()
+          start = text.index('        recipes = {')
+          end = text.index('        resources = {', start)
+          region = text[start:end]
+          lines = region.splitlines(keepends=True)
+          blocks=[]; current=None
+          for line in lines:
+              stripped=line.rstrip('\r\n')
+              if stripped == '            {':
+                  current=[line]
+              elif current is not None:
+                  current.append(line)
+                  if stripped in ('            },','            }'):
+                      blocks.append(''.join(current)); current=None
+          rows=[]
+          for block in blocks:
+              n=re.search(r'^                name = "([^"]+)",$',block,re.M)
+              i=re.search(r'^                id = "([^"]+)",$',block,re.M)
+              if n and i: rows.append((n.group(1),i.group(1)))
+          counts=Counter(n for n,_ in rows)
+          print('Parsed recipe count:',len(rows))
+          print('Duplicates:')
+          for name,count in sorted(counts.items()):
+              if count>1:
+                  print(name,count,[i for n,i in rows if n==name])
+          print('Duplicate IDs:')
+          ids=Counter(i for _,i in rows)
+          for rid,count in sorted(ids.items()):
+              if count>1: print(rid,count,[n for n,i in rows if i==rid])
+          PY
