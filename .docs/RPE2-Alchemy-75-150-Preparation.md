@@ -441,12 +441,13 @@ Before writing, #209/#210 must re-check current packaged data and reuse any exac
 
 ## 10. Remaining engine blockers
 
-Only four gameplay families remain genuine blockers for this slice:
+Three gameplay capability gaps remain genuine blockers for this slice:
 
 1. **School absorb shields** — needed by Holy Protection Potion and Shadow Protection Potion.
 2. **Aura-category cleansing** — needed by Elixir of Poison Resistance.
 3. **Control immunity** — needed by Free Action Potion.
-4. Any generic infrastructure necessary to implement those capabilities cleanly without Alchemy-specific hacks.
+
+Any implementation of those capabilities should be generic engine work rather than Alchemy-specific hacks.
 
 The following are explicitly **not** blockers for this slice:
 
@@ -469,7 +470,7 @@ Implement:
 - Giant Growth Strength Spell/Aura;
 - Minor Magic Resistance Spell/Aura.
 
-Do not create use Spells for Water Breathing or Swim Speed. Do not approximate the four remaining blocker effects.
+Do not create use Spells for Water Breathing or Swim Speed. Do not approximate the three remaining blocker capability gaps.
 
 ### #209 — Items/materials
 
