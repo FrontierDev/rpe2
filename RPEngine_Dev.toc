@@ -198,6 +198,7 @@ client/spellcasting/AuraDescriptionBuilder.lua
 client/spellcasting/DescriptionBuilder.lua
 client/traits/DescriptionBuilder.lua
 client/client_Targeting.lua
+client/client_ItemUse.lua
 client/spellcasting/ExplicitCasterActivation.lua
 client/autopilot/MovementAllowanceFrozen.lua
 client/autopilot/PlannerIntegration.lua
