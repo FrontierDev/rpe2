@@ -22,6 +22,7 @@ data/default/classes/priest.lua
 data/default/classes/rogue.lua
 data/default/classes/warrior.lua
 data/default/professions/fishing.lua
+data/default/professions/mining.lua
 data/default/professions/alchemy.lua
 data/default/professions/blacksmithing.lua
 data/default/professions/enchanting.lua
