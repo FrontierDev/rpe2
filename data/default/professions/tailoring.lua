@@ -13653,6 +13653,11 @@ Addon.Data.DefaultDatasets:Register({
                         kind = "rpe_item",
                         quantity = 6,
                     },
+                    {
+                        itemRef = "732368d4:dj36gmuu",
+                        kind = "rpe_item",
+                        quantity = 6,
+                    },
                 },
                 learnMode = "trainer",
                 name = "Belt of the Archmage",
@@ -13797,5 +13802,5 @@ Addon.Data.DefaultDatasets:Register({
         units = {},
         weaponTypes = {},
     },
-    version = 5,
+    version = 6,
 })
