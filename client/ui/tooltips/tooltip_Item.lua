@@ -33,7 +33,7 @@ ensureString = function(value, fallback)
     return tostring(value)
 end
 
-local TOOLTIP_CACHE_VERSION = "item-tooltip-v3"
+local TOOLTIP_CACHE_VERSION = "item-tooltip-v4"
 ItemTooltip.BuildCache = ItemTooltip.BuildCache or {}
 ItemTooltip.StaticBuildCache = ItemTooltip.StaticBuildCache or {}
 ItemTooltip.DatasetIndexCache = ItemTooltip.DatasetIndexCache or {}
@@ -899,6 +899,16 @@ local function getConsumableTraitTooltipData(item, payload, options)
     return buildTraitTooltipData(item, payload, options, "consumable")
 end
 
+local function buildAuraHeaderText(section)
+    local name = ensureString(type(section) == "table" and section.name, "Aura")
+    local icon = ensureString(type(section) == "table" and section.icon, "")
+    if icon == "" then
+        return name
+    end
+
+    return ("|T%s:14|t %s"):format(icon, name)
+end
+
 local function appendTraitAuraSections(lines, auraSections)
     for index = 1, #(auraSections or {}) do
         local section = auraSections[index]
@@ -906,7 +916,7 @@ local function appendTraitAuraSections(lines, auraSections)
         if descriptionText ~= "" then
             appendSpacerLine(lines)
             lines[#lines + 1] = {
-                text = ensureString(section.name, "Aura"),
+                text = buildAuraHeaderText(section),
                 r = 1,
                 g = 1,
                 b = 1,
