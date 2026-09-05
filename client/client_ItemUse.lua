@@ -330,128 +330,6 @@ local function commitItemUseSource(sourceContext)
     return false, "stale-source"
 end
 
--- client_Targeting.lua owns the existing targeting/cast path. Install a thin
--- source-context adapter around that path so every caller still uses the same
--- activation snapshot, targeting UI, and OnSpellcastStart lifecycle.
-local function installGenericSpellActivation()
-    if Client._itemUseGenericSpellActivationInstalled == true then
-        return
-    end
-
-    local baseActivateActionBarSpell = Client.ActivateActionBarSpell
-    local baseOnSpellcastStart = Client.OnSpellcastStart
-    local baseCancelSpellTargeting = Client.CancelSpellTargeting
-    local baseResetPendingSpellTargeting = Client.ResetPendingSpellTargeting
-    if type(baseActivateActionBarSpell) ~= "function" or type(baseOnSpellcastStart) ~= "function" then
-        return
-    end
-
-    Client._spellActivationSourceBySnapshot = Client._spellActivationSourceBySnapshot or {}
-
-    local function clearPendingSource(client, snapshot)
-        if type(snapshot) == "table" then
-            client._spellActivationSourceBySnapshot[snapshot] = nil
-        end
-        client._pendingImmediateSpellActivationSource = nil
-    end
-
-    function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
-        local source = type(activationSnapshot) == "table" and self._spellActivationSourceBySnapshot[activationSnapshot] or nil
-        if source == nil then
-            source = self._pendingImmediateSpellActivationSource
-        end
-
-        if type(source) == "table" and type(source.onBeforeCastAttempt) == "function" then
-            local sourceValid, sourceReason = source.onBeforeCastAttempt(source.sourceContext, spellRef, activationSnapshot)
-            if sourceValid ~= true then
-                clearPendingSource(self, activationSnapshot)
-                return false, sourceReason or "cast-rejected"
-            end
-        end
-
-        local accepted = baseOnSpellcastStart(self, spellRef, castTime, activationSnapshot)
-        if accepted ~= true then
-            clearPendingSource(self, activationSnapshot)
-            return false, "cast-rejected"
-        end
-
-        if type(source) == "table" and type(source.onCastAccepted) == "function" then
-            local committed, commitReason = source.onCastAccepted(source.sourceContext, spellRef, activationSnapshot)
-            clearPendingSource(self, activationSnapshot)
-            if committed == false then
-                return false, commitReason or "cast-rejected"
-            end
-        else
-            clearPendingSource(self, activationSnapshot)
-        end
-        return true
-    end
-
-    function Client:ActivateSpellReference(spellRef, options)
-        local source = type(options) == "table" and options or {}
-        source.spellRef = spellRef
-
-        local previousPending = self.PendingSpellTargeting
-        if type(previousPending) == "table" and type(previousPending.activationSnapshot) == "table" then
-            self._spellActivationSourceBySnapshot[previousPending.activationSnapshot] = nil
-        end
-
-        self._pendingImmediateSpellActivationSource = source
-        self._spellActivationStarting = true
-        local activated = baseActivateActionBarSpell(self, spellRef)
-        self._spellActivationStarting = false
-        if activated ~= true then
-            self._pendingImmediateSpellActivationSource = nil
-            return false, "cast-rejected"
-        end
-
-        local pending = self.PendingSpellTargeting
-        if type(pending) == "table" and tostring(pending.spellRef or "") == tostring(spellRef or "") then
-            pending.activationSource = source
-            if type(pending.activationSnapshot) == "table" then
-                self._spellActivationSourceBySnapshot[pending.activationSnapshot] = source
-            end
-            self._pendingImmediateSpellActivationSource = nil
-        end
-        return true
-    end
-
-    function Client:ActivateActionBarSpell(spellRef)
-        local activated = self:ActivateSpellReference(spellRef, {
-            sourceType = "action_bar",
-        })
-        return activated == true
-    end
-
-    if type(baseCancelSpellTargeting) == "function" then
-        function Client:CancelSpellTargeting(reason)
-            local pending = self.PendingSpellTargeting
-            if type(pending) == "table" and type(pending.activationSnapshot) == "table" then
-                self._spellActivationSourceBySnapshot[pending.activationSnapshot] = nil
-            end
-            if self._spellActivationStarting ~= true then
-                self._pendingImmediateSpellActivationSource = nil
-            end
-            return baseCancelSpellTargeting(self, reason)
-        end
-    end
-
-    if type(baseResetPendingSpellTargeting) == "function" then
-        function Client:ResetPendingSpellTargeting()
-            local pending = self.PendingSpellTargeting
-            if type(pending) == "table" and type(pending.activationSnapshot) == "table" then
-                self._spellActivationSourceBySnapshot[pending.activationSnapshot] = nil
-            end
-            self._pendingImmediateSpellActivationSource = nil
-            return baseResetPendingSpellTargeting(self)
-        end
-    end
-
-    Client._itemUseGenericSpellActivationInstalled = true
-end
-
-installGenericSpellActivation()
-
 function ItemUse:UseInventoryItem(sourceIndex, expectedStackIdentity)
     local resolved = resolveInventorySource(sourceIndex, expectedStackIdentity, nil)
     if not resolved then
@@ -490,6 +368,7 @@ function ItemUse:UseInventoryItem(sourceIndex, expectedStackIdentity)
         sourceContext = token,
         onBeforeCastAttempt = validateItemUseSource,
         onCastAccepted = commitItemUseSource,
+        targetingReason = "item-use-activate",
     })
 end
 
@@ -549,6 +428,7 @@ function ItemUse:UseEquippedItem(scope, slotKey)
         sourceContext = token,
         onBeforeCastAttempt = validateItemUseSource,
         onCastAccepted = commitItemUseSource,
+        targetingReason = "item-use-activate",
     })
 end
 
