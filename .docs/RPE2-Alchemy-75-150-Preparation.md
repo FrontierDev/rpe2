@@ -24,7 +24,7 @@ No gameplay implementation belongs in #207 itself. This document records both th
 
 ## 2. Approved RPE adaptation decisions
 
-These decisions are authoritative for #208–#210 even where they intentionally simplify vanilla behavior.
+These decisions were confirmed after the initial #207 research pass and are authoritative for #208–#210 even where they intentionally simplify vanilla behavior.
 
 1. **Large Venom Sac belongs in the existing Misc dataset** at `data/default/professions/misc.lua` (`3eb7e9bb`).
 2. **Fishing ingredients belong in a new packaged Fishing dataset** at `data/default/professions/fishing.lua`. This dataset must own:
