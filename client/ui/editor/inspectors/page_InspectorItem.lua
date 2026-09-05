@@ -136,6 +136,7 @@ function DataEditor:RefreshItemInspectorPage()
     local isItemLevelEligible = hasItem and ItemClass and ItemClass.IsItemLevelEligible and ItemClass.IsItemLevelEligible(item) or false
     local isConsumable = itemType == "consumable"
     local isMaterial = itemType == "material"
+    local supportsUseSpell = hasItem and (isConsumable or isWeapon or isArmor)
     local hasEmbeddedTrait = hasItem and itemSupportsEmbeddedTrait(item)
     local stackLocked = itemType == "weapon" or itemType == "armor" or itemType == "modification"
     local canEditStackSize = hasItem and item.canStack == true and not stackLocked
@@ -193,6 +194,31 @@ function DataEditor:RefreshItemInspectorPage()
     if self.ItemInspectorBindingFlagDropdown then
         self.ItemInspectorBindingFlagDropdown:SetSelectedValue(item and item.bindingFlag or "none", true)
         setDropdownEnabled(self.ItemInspectorBindingFlagDropdown, hasItem)
+    end
+
+    if self.ItemInspectorUseSpellLabel and self.ItemInspectorUseSpellLabel.GetFrame then
+        local frame = self.ItemInspectorUseSpellLabel:GetFrame()
+        if supportsUseSpell then
+            frame:Show()
+        else
+            frame:Hide()
+        end
+    end
+    if self.ItemInspectorUseSpellDropdown then
+        self.ItemInspectorUseSpellDropdown:SetItems(self:BuildReferenceItemsAcrossDatasets("spells", {
+            includeNone = true,
+            noneLabel = "None",
+        }))
+        self.ItemInspectorUseSpellDropdown:SetSelectedValue(item and item.useSpellRef or "", true)
+        setDropdownEnabled(self.ItemInspectorUseSpellDropdown, supportsUseSpell)
+        local frame = self.ItemInspectorUseSpellDropdown.GetFrame and self.ItemInspectorUseSpellDropdown:GetFrame() or nil
+        if frame then
+            if supportsUseSpell then
+                frame:Show()
+            else
+                frame:Hide()
+            end
+        end
     end
 
     if self.ItemInspectorCanStackCheckbox then
