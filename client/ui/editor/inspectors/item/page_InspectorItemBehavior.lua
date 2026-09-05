@@ -56,6 +56,27 @@ local function buildBehaviorPage(self, page)
     })
     root:AddChild(self.ItemInspectorBindingFlagDropdown)
 
+    self.ItemInspectorUseSpellLabel = buildLabel(root:GetFrame(), "RPEDataEditorItemInspectorUseSpellLabel", "On-Use Spell")
+    root:AddChild(self.ItemInspectorUseSpellLabel)
+    self.ItemInspectorUseSpellDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorItemInspectorUseSpellDropdown", {
+        width = FIELD_WIDTH,
+        height = 18,
+        items = self:BuildReferenceItemsAcrossDatasets("spells", {
+            includeNone = true,
+            noneLabel = "None",
+        }),
+        onValueChanged = function(value)
+            if self._refreshingItemInspector then
+                return
+            end
+
+            self:CommitSelectedItem(function(item)
+                item.useSpellRef = value ~= "" and value or nil
+            end)
+        end,
+    })
+    root:AddChild(self.ItemInspectorUseSpellDropdown)
+
     self.ItemInspectorCanStackCheckbox = createCheckbox(root:GetFrame(), "RPEDataEditorItemInspectorCanStackCheckbox", "Can Stack", true, function(checked)
         if self._refreshingItemInspector then
             return
