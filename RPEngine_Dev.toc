@@ -121,6 +121,7 @@ core/classes/WeaponType.lua
 core/classes/DamageSchool.lua
 core/classes/Loot.lua
 core/internal/database/DatasetSchema23.lua
+core/internal/database/DatasetSchema24.lua
 core/classes/Recipe.lua
 core/classes/Aura.lua
 core/classes/Interaction.lua
