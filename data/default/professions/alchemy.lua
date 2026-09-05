@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 3,
+    version = 4,
     dataset = {
         achievements = {},
         auras = {},
@@ -455,11 +455,18 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 consumableElixirType = "guardian",
                 consumableTrait = {
-                    description = "Regenerate 2 health every 5 seconds for 1 hour.",
+                    description = "Increases Spirit by 2 for 1 hour.",
                     phase = "event_start",
+                    statBonuses = {
+                        {
+                            operation = "flat",
+                            statRef = "f82db71a:kec9rhli",
+                            value = 2,
+                        },
+                    },
                 },
                 consumableType = "elixir",
-                description = "Regenerate 2 health every 5 seconds for 1 hour.",
+                description = "Increases Spirit by 2 for 1 hour.",
                 icon = "interface/icons/inv_potion_77.blp",
                 id = "m9t3h6rz",
                 itemLevel = 8,
