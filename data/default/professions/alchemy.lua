@@ -1037,7 +1037,7 @@ Addon.Data.DefaultDatasets:Register({
                 results = {},
                 skillRef = "f82db71a:pdyzyudy",
                 tags = {},
-                trainerCostCopper = 7004,
+                trainerCostCopper = 6455,
             },
             {
                 category = "",
@@ -1072,7 +1072,7 @@ Addon.Data.DefaultDatasets:Register({
                 results = {},
                 skillRef = "f82db71a:pdyzyudy",
                 tags = {},
-                trainerCostCopper = 8350,
+                trainerCostCopper = 7515,
             },
             {
                 category = "",
@@ -1107,7 +1107,7 @@ Addon.Data.DefaultDatasets:Register({
                 results = {},
                 skillRef = "f82db71a:pdyzyudy",
                 tags = {},
-                trainerCostCopper = 8350,
+                trainerCostCopper = 7515,
             },
         },
         resources = {},
@@ -1144,7 +1144,6 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Minor Healing Potion",
                 resourceCosts = {},
                 tags = {},
-                tooltipTemplate = true,
                 triggersGCD = false,
             },
             {
@@ -1178,7 +1177,6 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Minor Mana Potion",
                 resourceCosts = {},
                 tags = {},
-                tooltipTemplate = true,
                 triggersGCD = false,
             },
             {
@@ -1227,7 +1225,6 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Minor Rejuvenation Potion",
                 resourceCosts = {},
                 tags = {},
-                tooltipTemplate = true,
                 triggersGCD = false,
             },
             {
@@ -1261,7 +1258,6 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Discolored Healing Potion",
                 resourceCosts = {},
                 tags = {},
-                tooltipTemplate = true,
                 triggersGCD = false,
             },
             {
@@ -1295,7 +1291,6 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Lesser Healing Potion",
                 resourceCosts = {},
                 tags = {},
-                tooltipTemplate = true,
                 triggersGCD = false,
             },
             {
@@ -1329,7 +1324,6 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Rage Potion",
                 resourceCosts = {},
                 tags = {},
-                tooltipTemplate = true,
                 triggersGCD = false,
             },
         },
