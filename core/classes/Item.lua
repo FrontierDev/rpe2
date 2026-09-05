@@ -456,6 +456,7 @@ function Item:New(data)
         itemLevel = 0,
         canDisenchant = true,
         itemType = "none",
+        useSpellRef = nil,
         allowWowConversion = false,
         wowConversionSkillRef = nil,
         modificationKind = "generic",
@@ -529,6 +530,7 @@ function Item:Merge(data)
     self.bindingFlag = ensureString(self.bindingFlag)
     self.itemLevel = normalizeItemLevel(self.itemLevel)
     self.itemType = ensureString(self.itemType)
+    self.useSpellRef = normalizeRef(self.useSpellRef)
     self.allowWowConversion = self.allowWowConversion == true
     self.wowConversionSkillRef = normalizeRef(self.wowConversionSkillRef)
     self.modificationKind = normalizeModificationKind(self.modificationKind)
@@ -579,6 +581,9 @@ function Item:Merge(data)
     self.metaSockets = socketCounts.meta
     self.cogSockets = socketCounts.cogwheel
     self.prismaticSockets = socketCounts.prismatic
+    if self.itemType ~= "consumable" and self.itemType ~= "weapon" and self.itemType ~= "armor" then
+        self.useSpellRef = nil
+    end
     if self.itemType ~= "consumable" then
         self.consumableType = ""
         self.consumableElixirType = ""
@@ -665,6 +670,7 @@ function Item:ToTable()
         itemLevel = normalizeItemLevel(self.itemLevel),
         canDisenchant = self.canDisenchant,
         itemType = self.itemType,
+        useSpellRef = (self.itemType == "consumable" or self.itemType == "weapon" or self.itemType == "armor") and normalizeRef(self.useSpellRef) or nil,
         allowWowConversion = self.itemType == "material" and self.allowWowConversion == true or false,
         wowConversionSkillRef = self.itemType == "material" and normalizeRef(self.wowConversionSkillRef) or nil,
         modificationKind = self.itemType == "modification" and self.modificationKind or "generic",
