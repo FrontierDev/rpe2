@@ -637,7 +637,7 @@ local function refreshMovementSpeedEntry(page, cachedStatRow)
     if statRow == nil then
         statRow = statRef ~= "" and Profile.GetResolvedStatRow and Profile.GetResolvedStatRow(statRef) or nil
     end
-    local frame = movementEntry.GetFrame and movementEntry.GetFrame and movementEntry:GetFrame() or nil
+    local frame = movementEntry.GetFrame and movementEntry:GetFrame() or nil
     if not frame then
         return
     end
