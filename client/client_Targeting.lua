@@ -1288,7 +1288,37 @@ function Client:QueueTargetingWidgetRefresh(reason)
     return self:RefreshTargetingWidget(reason or "refresh")
 end
 
-local function executeConfirmedSpellTargeting(targetClient, spellRef, castTime, targetSelections, groupOrder)
+local function attemptSpellActivationCast(targetClient, spellRef, castTime, activationSnapshot, activationOptions)
+    if type(targetClient) ~= "table" then
+        return false, "cast-rejected"
+    end
+
+    local options = type(activationOptions) == "table" and activationOptions or nil
+    if options and type(options.onBeforeCastAttempt) == "function" then
+        local sourceValid, sourceReason = options.onBeforeCastAttempt(options.sourceContext, spellRef, activationSnapshot)
+        if sourceValid ~= true then
+            return false, sourceReason or "cast-rejected"
+        end
+    end
+
+    local accepted = targetClient.OnSpellcastStart
+        and targetClient:OnSpellcastStart(spellRef, castTime, activationSnapshot)
+        or false
+    if accepted ~= true then
+        return false, "cast-rejected"
+    end
+
+    if options and type(options.onCastAccepted) == "function" then
+        local committed, commitReason = options.onCastAccepted(options.sourceContext, spellRef, activationSnapshot)
+        if committed == false then
+            return false, commitReason or "cast-rejected"
+        end
+    end
+
+    return true
+end
+
+local function executeConfirmedSpellTargeting(targetClient, spellRef, castTime, targetSelections, groupOrder, activationSnapshot, activationOptions)
     if type(targetClient) ~= "table" then
         return false
     end
@@ -1297,11 +1327,7 @@ local function executeConfirmedSpellTargeting(targetClient, spellRef, castTime, 
         Spellcasting.QueueLocalSpellTargetSelection(targetClient, spellRef, targetSelections, groupOrder)
     end
 
-    local activationSnapshot = type(targetClient.PendingConfirmedSpellActivationSnapshot) == "table"
-        and targetClient.PendingConfirmedSpellActivationSnapshot
-        or nil
-    targetClient.PendingConfirmedSpellActivationSnapshot = nil
-    return targetClient.OnSpellcastStart and targetClient:OnSpellcastStart(spellRef, castTime, activationSnapshot) or false
+    return attemptSpellActivationCast(targetClient, spellRef, castTime, activationSnapshot, activationOptions)
 end
 
 function Client:RefreshTargetingWidget(reason)
@@ -1352,7 +1378,8 @@ function Client:ConfirmPendingSpellTargeting()
 
     local spellRef = pending.spellRef
     local castTime = pending.spell and (tonumber(pending.spell.totalTicks) or tonumber(pending.spell.castTime)) or nil
-    self.PendingConfirmedSpellActivationSnapshot = pending.activationSnapshot
+    local activationSnapshot = pending.activationSnapshot
+    local activationOptions = pending.activationOptions
     local targetSelections = {}
     local groupOrder = {}
     for index = 1, #(displayState.groups or {}) do
@@ -1379,12 +1406,29 @@ function Client:ConfirmPendingSpellTargeting()
     if self.HideTargetingWidget then
         self:HideTargetingWidget()
     end
-    local enqueued = enqueueTargetingWork(executeConfirmedSpellTargeting, self, spellRef, castTime, targetSelections, groupOrder)
+    local enqueued = enqueueTargetingWork(
+        executeConfirmedSpellTargeting,
+        self,
+        spellRef,
+        castTime,
+        targetSelections,
+        groupOrder,
+        activationSnapshot,
+        activationOptions
+    )
     if enqueued then
         return true
     end
 
-    return executeConfirmedSpellTargeting(self, spellRef, castTime, targetSelections, groupOrder)
+    return executeConfirmedSpellTargeting(
+        self,
+        spellRef,
+        castTime,
+        targetSelections,
+        groupOrder,
+        activationSnapshot,
+        activationOptions
+    )
 end
 
 function Client:CanConfirmPendingSpellTargeting(displayState)
@@ -1486,29 +1530,27 @@ function Client:TogglePendingSpellTarget(eventId)
     return self:QueueTargetingWidgetRefresh("target-toggle")
 end
 
-function Client:ActivateActionBarSpell(spellRef)
+function Client:ActivateSpellReference(spellRef, options)
     if type(self.CanPerformEventAction) == "function"
         and not self:CanPerformEventAction(self:GetEventState(), "spell-cast")
     then
-        return false
+        return false, "cast-rejected"
     end
     local activationSnapshot = self.ResolveSpellActivationSnapshot and self:ResolveSpellActivationSnapshot(spellRef, {
         includeTargetCandidates = true,
     }) or nil
     if not activationSnapshot or activationSnapshot.canCast ~= true then
-        return false
+        return false, "cast-rejected"
     end
 
+    local activationOptions = type(options) == "table" and options or nil
+    local castTime = tonumber(activationSnapshot.spell.totalTicks) or activationSnapshot.spell.castTime
     local targetGroups = activationSnapshot.targetGroups or {}
     if #targetGroups == 0 then
         if self.PendingSpellTargeting then
             self:CancelSpellTargeting("")
         end
-        return self:OnSpellcastStart(
-            spellRef,
-            tonumber(activationSnapshot.spell.totalTicks) or activationSnapshot.spell.castTime,
-            activationSnapshot
-        )
+        return attemptSpellActivationCast(self, spellRef, castTime, activationSnapshot, activationOptions)
     end
 
     local pendingGroups = {}
@@ -1521,7 +1563,7 @@ function Client:ActivateActionBarSpell(spellRef)
                 string.lower(tostring(group.label or "target")),
                 tostring(resolveSpellName(spellRef))
             )
-            return false
+            return false, "cast-rejected"
         end
         if #candidates > 0 then
             local selectedTargetEventIds = {}
@@ -1553,11 +1595,7 @@ function Client:ActivateActionBarSpell(spellRef)
         if self.PendingSpellTargeting then
             self:CancelSpellTargeting("")
         end
-        return self:OnSpellcastStart(
-            spellRef,
-            tonumber(activationSnapshot.spell.totalTicks) or activationSnapshot.spell.castTime,
-            activationSnapshot
-        )
+        return attemptSpellActivationCast(self, spellRef, castTime, activationSnapshot, activationOptions)
     end
 
     self.PendingSpellTargeting = {
@@ -1569,10 +1607,20 @@ function Client:ActivateActionBarSpell(spellRef)
         groups = pendingGroups,
         activeGroupKey = pendingGroups[1] and pendingGroups[1].key or nil,
         activationSnapshot = activationSnapshot,
+        activationOptions = activationOptions,
     }
     self:InvalidatePendingSpellTargetingDisplayState()
 
-    return self:RefreshTargetingWidget("action-bar-activate")
+    local targetingReason = activationOptions and activationOptions.targetingReason or "spell-activate"
+    return self:RefreshTargetingWidget(targetingReason)
+end
+
+function Client:ActivateActionBarSpell(spellRef)
+    local activated = self:ActivateSpellReference(spellRef, {
+        sourceType = "action_bar",
+        targetingReason = "action-bar-activate",
+    })
+    return activated == true
 end
 
 return Client
