@@ -30,7 +30,7 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 canDisenchant = false,
-                icon = "interface/icons/inv_misc_monsterhead_04.blp",
+                icon = "interface/icons/inv_misc_monsterhead_01.blp",
                 id = "c4v8n1zd",
                 itemLevel = 15,
                 itemType = "material",
