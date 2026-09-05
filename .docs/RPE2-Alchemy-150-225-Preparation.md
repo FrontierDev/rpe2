@@ -8,14 +8,14 @@
 
 ## 1. Purpose and scope
 
-This document is the implementation source of truth for the next vanilla Classic Alchemy slice. The included interval is **`(150,225]`**: recipes requiring Alchemy 151 through 225. Recipes requiring exactly 150 are already owned by the previous slice (#207–#210) and must not be duplicated.
+This document is the implementation source of truth for the next vanilla Classic Alchemy slice. The interval is **`(150,225]`**: recipes requiring Alchemy 151 through 225. Skill-150 recipes are already owned by #207–#210 and must not be duplicated.
 
-The validated vanilla set contains **28 recipes/outputs**. It includes trainer recipes, vendor/world-drop recipe items, quest/NPC-taught recipes, one Engineering-created recipe item, two transmutes, the Philosopher's Stone, direct-use potions, long-duration elixirs, weapon oils and one Engineering reagent.
+The validated vanilla set contains **28 recipes**. It includes trainer recipes, vendor/world-drop recipe items, quest/NPC-taught recipes, one Engineering-created recipe item, two transmutes, the Philosopher's Stone, direct-use potions, long-duration elixirs, weapon oils and one Engineering reagent.
 
 Implementation is split across:
 
 - #212 — item-use Spells and supporting Auras;
-- #213 — Items, intermediate outputs and any shared materials required by this slice;
+- #213 — Items, intermediate outputs and shared materials required by this slice;
 - #214 — Recipes.
 
 No gameplay/data implementation belongs in #211 itself.
@@ -30,13 +30,13 @@ The preparation was checked against current `dev` rather than assuming the code 
 
 `client/client_ItemUse.lua` accepts inventory `itemType = "consumable"` items with a valid `useSpellRef`, resolves the referenced Spell through the Registry, activates the generic Spell path, and consumes one inventory item only after cast acceptance.
 
-Manual-use potions that RPE can model should therefore use:
+Representable manual-use potions should therefore continue to use:
 
 ```text
 Item.useSpellRef -> generic Spell activation -> Spell components/Auras
 ```
 
-Long-duration passive stat elixirs should continue using the existing embedded `consumableTrait` model where it exactly represents the intended RPE effect.
+Long-duration stat elixirs should continue using `consumableTrait` where that accurately represents the intended RPE effect.
 
 ### 2.2 Item schema
 
@@ -54,16 +54,16 @@ The current generic Spell/Aura system can represent:
 
 - direct healing;
 - fixed resource restoration;
-- application of a supporting Aura;
+- application of supporting Auras;
 - flat stat changes through Auras/Traits;
 - normal item-use cooldowns and shared cooldown groups.
 
 It does **not** currently provide a clean generic representation for:
 
 - school-specific absorb pools;
-- invisibility or invisibility-detection/stealth-detection state;
+- invisibility or invisibility/stealth detection;
 - timed melee-weapon oils with on-hit proc Spells;
-- a self-centered periodic AoE damage aura such as Oil of Immolation;
+- self-centered periodic AoE pulses such as Oil of Immolation;
 - category/tag-based repeated dispelling for magic/curse/poison/disease;
 - school-specific spell-power bonuses such as Frost-only spell power;
 - recipe/transmutation cooldowns.
@@ -72,7 +72,7 @@ Blocked effects must not be approximated with unrelated mechanics.
 
 ### 2.4 Recipe semantics
 
-`core/classes/Recipe.lua` still supports:
+`core/classes/Recipe.lua` supports:
 
 ```text
 always_learned
@@ -107,11 +107,11 @@ Relevant values:
 | 215 | 80055 |
 | 225 | 87375 |
 
-As in the existing packaged data, non-trainer recipes may retain the calculated serialized `trainerCostCopper`; `learnMode` remains authoritative for whether they appear at a trainer.
+Non-trainer recipes may retain the calculated serialized `trainerCostCopper`; `learnMode` remains authoritative for trainer indexing.
 
 ### 2.5 Dependency limitation
 
-Current `core/internal/database/Dependecies.lua` recomputes dependencies from Items, Spells, Auras, Traits and other runtime objects, but does **not** inspect Recipe `input.itemRef` / `output.itemRef` fields. #214 should re-check this before implementation. Do not broaden the recipe issue into a dependency-system redesign unless the live runtime actually requires it.
+Current `core/internal/database/Dependecies.lua` recomputes dependencies from Items, Spells, Auras, Traits and other runtime objects, but does **not** inspect Recipe `input.itemRef` / `output.itemRef` fields. #214 must re-check this on live `dev`; do not broaden the recipe issue into a dependency-system redesign unless runtime behavior actually requires it.
 
 ---
 
@@ -119,52 +119,58 @@ Current `core/internal/database/Dependecies.lua` recomputes dependencies from It
 
 ### 3.1 Vanilla Classic data is authoritative
 
-Use Classic-era records for names, recipe identity, reagents, quantities, effects, required levels, item levels and stack sizes. Modern/TBC/Cata/SoD pages sometimes expose changed reagent lists, changed vial types, changed stack sizes, rescaled effects or later item behavior.
+Use Classic-era records for names, recipe identity, reagents, quantities, effects, required levels, item levels, icons and stack sizes. Modern/TBC/Cata/SoD pages can expose changed reagents, vial types, stacks or effect values.
 
-The principal source family used for this preparation is Wowhead Classic (`/classic/`), cross-checked against Warcraft Wiki/legacy Classic data where acquisition or historical behavior needed clarification.
+Principal source family: Wowhead Classic (`/classic/`), cross-checked against Warcraft Wiki and legacy Classic databases where acquisition or historical behavior required clarification.
 
 ### 3.2 Vial/version drift
 
-The following vanilla-era choices are deliberate:
+The following choices are deliberate:
 
-- Greater Healing Potion through Frost Oil use the Classic Leaded-Vial recipes where specified below.
-- **Frost Oil** is `4 Khadgar's Whisker + 2 Wintersbite + 1 Leaded Vial`; later pages can substitute Dragon's Teeth/Crystal Vial and must not be used.
+- Greater Healing Potion through Frost Oil use the vanilla Leaded-Vial recipes where listed below.
+- **Frost Oil** is `4 Khadgar's Whisker + 2 Wintersbite + 1 Leaded Vial`; later Dragon's Teeth/Crystal-Vial variants are not valid for this slice.
 - **Goblin Rocket Fuel** is `Firebloom + Volatile Rum + Leaded Vial`; modern pages can show Crystal Vial.
-- **Lesser Stoneshield Potion** uses a Leaded Vial in the Classic recipe.
+- **Lesser Stoneshield Potion** uses Leaded Vial.
 - Later recipes that genuinely use Crystal Vial retain Crystal Vial.
 
-### 3.3 Elixir of Greater Defense effect drift
+### 3.3 Elixir of Greater Defense drift
 
-Vanilla Classic Elixir of Greater Defense is **+250 Armor for 1 hour**. Later versions reduced/reworked this value. RPE should use +250 Armor.
+Vanilla Classic Elixir of Greater Defense is **+250 Armor for 1 hour**, not the later +100 value. Use +250 Armor. Its exact Classic icon is `inv_potion_65`.
 
 ### 3.4 Philosopher's Stone drift
 
-The vanilla Classic item represented by current Classic data is a **bind-on-pickup Alchemy tool** whose tooltip states that it is required for alchemical transmutation. The familiar trinket/+5-all-primary-stats form belongs to later Classic/TBC-era data and must **not** be backported into this vanilla slice.
+For this vanilla slice, Philosopher's Stone is the bind-on-pickup Alchemy transmutation tool. The later trinket/+5-all-primary-stats form must not be imported into this data.
 
-For RPE, the Philosopher's Stone should therefore be a non-consumable Alchemy material/tool item, bind on pickup, used as a `kind = "tool"` input by transmute recipes. It should not receive fabricated equipment stats.
+RPE representation:
+
+- non-consumable material/tool item;
+- bind on pickup;
+- no fabricated equipment stats;
+- reusable `kind = "tool"` input for transmute recipes.
+
+Exact icon: `inv_misc_orb_01`.
 
 ### 3.5 Transmute cooldowns
 
-Vanilla Classic data/comments establish different cooldowns for the two skill-225 transmutes:
+Vanilla Classic behavior:
 
-- Iron -> Gold: **24 hours**;
-- Mithril -> Truesilver: **48 hours**.
+- Iron -> Gold: **24-hour** cooldown;
+- Mithril -> Truesilver: **48-hour** cooldown;
+- both use the character transmutation cooldown family.
 
-They share the character's transmutation cooldown family.
-
-The current RPE Recipe schema has no recipe cooldown field, so #214 cannot reproduce these cooldowns without generic architecture work. The recipes should still require the Philosopher's Stone as a reusable tool. The missing transmute cooldown is an explicit representation blocker/non-goal for the data-only recipe implementation unless separately authorized.
+The current Recipe schema has no recipe cooldown field. #214 should implement the recipes and Philosopher's Stone tool requirement but must not fabricate cooldown behavior without a separate generic capability change.
 
 ### 3.6 Exclusions
 
 Do not add:
 
-- Elixir of Ogre's Strength or Free Action Potion (skill 150; already in previous slice);
-- Dreamless Sleep Potion and other recipes requiring >225;
+- Elixir of Ogre's Strength or Free Action Potion (skill 150; previous slice);
+- Dreamless Sleep Potion or any recipe requiring >225;
 - SoD-only recipes such as Mildly Irradiated Rejuvenation Potion;
 - Anniversary/seasonal additions that did not exist in vanilla Classic;
-- later-expansion reagent or effect revisions.
+- later-expansion reagent/effect revisions.
 
-**Elixir of Frost Power is included.** It is a vanilla Winter Veil-era recipe and part of the Classic recipe set despite its seasonal acquisition context.
+**Elixir of Frost Power is included.** It is a vanilla Winter Veil-era recipe despite seasonal acquisition.
 
 ---
 
@@ -209,8 +215,6 @@ Do not add:
 | Leaded Vial | `d6ffc4e2:jdxdj7eh` |
 | Crystal Vial | `d6ffc4e2:804x8qak` |
 
-### 4.3 Existing external ref
-
 Wildvine already belongs to Misc:
 
 ```text
@@ -221,32 +225,32 @@ Wildvine already belongs to Misc:
 
 ## 5. Material ownership decisions
 
-Searches of the current packaged repository did not find the following required shared materials. They must not be duplicated inside Alchemy.
+Repository searches found no existing packaged definitions for the following shared materials. #213 should re-check before writing and add them only if still absent.
 
 ### 5.1 Misc-owned world/creature materials
 
-Add to `data/default/professions/misc.lua` in #213 if still absent:
+Add to `data/default/professions/misc.lua`:
 
-| Material | Vanilla item ID | Ownership |
-|---|---:|---|
-| Small Flame Sac | 4402 | Misc (`3eb7e9bb`) |
-| Large Fang | 5637 | Misc (`3eb7e9bb`) |
-| Ichor of Undeath | 7972 | Misc (`3eb7e9bb`) |
-| Elemental Earth | 7067 | Misc (`3eb7e9bb`) |
-| Volatile Rum | 9260 | Misc (`3eb7e9bb`) |
-| Black Vitriol | 9262 | Misc (`3eb7e9bb`) |
+| Material | Vanilla item ID |
+|---|---:|
+| Small Flame Sac | 4402 |
+| Large Fang | 5637 |
+| Ichor of Undeath | 7972 |
+| Elemental Earth | 7067 |
+| Volatile Rum | 9260 |
+| Black Vitriol | 9262 |
 
 ### 5.2 Blacksmithing/mining-owned metals
 
-Add to `data/default/professions/blacksmithing.lua` in #213 if still absent:
+Add to `data/default/professions/blacksmithing.lua` if still absent:
 
-| Material | Vanilla item ID | Ownership |
-|---|---:|---|
-| Mithril Ore | 3858 | Blacksmithing/mining dataset |
-| Iron Bar | 3575 | Blacksmithing/mining dataset |
-| Mithril Bar | 3860 | Blacksmithing/mining dataset |
-| Gold Bar | 3577 | Blacksmithing/mining dataset |
-| Truesilver Bar | 6037 | Blacksmithing/mining dataset |
+| Material | Vanilla item ID |
+|---|---:|
+| Mithril Ore | 3858 |
+| Iron Bar | 3575 |
+| Mithril Bar | 3860 |
+| Gold Bar | 3577 |
+| Truesilver Bar | 6037 |
 
 Gold Bar and Truesilver Bar are transmute outputs but remain shared metal materials owned by Blacksmithing/mining rather than Alchemy.
 
@@ -256,9 +260,9 @@ Any packaged dataset modified for these materials must have its version bumped i
 
 ## 6. Authoritative recipe inventory
 
-All recipes below create quantity **1**. `skillRef` for every recipe is `f82db71a:pdyzyudy`.
+All recipes create quantity **1**. Every recipe uses `skillRef = "f82db71a:pdyzyudy"`.
 
-| Skill | Recipe/output | Acquisition | RPE learnMode | Exact vanilla inputs | Cross-dataset/new input | Cost field |
+| Skill | Recipe/output | Acquisition | RPE learnMode | Exact vanilla inputs | Cross-dataset/new input | Cost |
 |---:|---|---|---|---|---|---:|
 | 155 | Greater Healing Potion | Trainer | `trainer` | Liferoot; Kingsblood; Leaded Vial | — | 42855 |
 | 160 | Mana Potion | Trainer | `trainer` | Stranglekelp; Kingsblood; Leaded Vial | — | 45515 |
@@ -291,13 +295,11 @@ All recipes below create quantity **1**. `skillRef` for every recipe is `f82db71
 
 ### 6.1 Quest/NPC teaching mapping
 
-RPE has no dedicated `quest` learn mode. For this slice, recipes learned outside the profession trainer through a quest/NPC/manual mechanism use `book`, because the profile recipebook represents manually granted knowledge and keeps the recipe out of the trainer index.
-
-This applies to Mighty Troll's Blood Potion and Restorative Potion as well as physical recipe items.
+RPE has no dedicated `quest` learn mode. Recipes learned outside the profession trainer through quest/NPC/manual mechanisms use `book`, because profile recipebook knowledge keeps them out of the trainer index. This includes Mighty Troll's Blood Potion and Restorative Potion as well as physical recipe items.
 
 ### 6.2 Transmute tool input
 
-For both transmutes, serialize Philosopher's Stone as a reusable tool input rather than a consumed reagent:
+For both transmutes, Philosopher's Stone is a reusable tool:
 
 ```lua
 {
@@ -313,50 +315,55 @@ The metal bar remains the consumed `rpe_item` input.
 
 ## 7. Authoritative item/output inventory
 
-Serialize icon paths as `interface/icons/<icon>.blp`. Where the Classic icon name is listed below, use it exactly. Ordinary potions/elixirs/oils in this slice stack to **5**; Goblin Rocket Fuel stacks to **20**; shared bars use their Classic material stack conventions.
+Serialize icon paths as `interface/icons/<icon>.blp`.
 
-| Output | WoW ID | Icon | ilvl | Req. level | Quality / stack | RPE item classification | Vanilla effect / RPE representation |
+Classic stack rules for this slice:
+
+- ordinary potions/elixirs/oils: **5**;
+- Goblin Rocket Fuel: **20**;
+- shared bars: **20**;
+- Philosopher's Stone: **1**.
+
+| Output | WoW ID | Exact icon | ilvl | Req. level | Quality / stack | RPE classification | Vanilla effect / intended RPE representation |
 |---|---:|---|---:|---:|---|---|---|
-| Greater Healing Potion | 1710 | `inv_potion_52` | 31 | 21 | common / 5 | consumable / potion | Heal 455–585 -> `useSpellRef`, midpoint `baseHealing=520` |
+| Greater Healing Potion | 1710 | `inv_potion_52` | 31 | 21 | common / 5 | consumable / potion | Heal 455–585 -> `useSpellRef`, midpoint `baseHealing = 520` |
 | Mana Potion | 3827 | `inv_potion_72` | 32 | 22 | common / 5 | consumable / potion | Mana 455–585 -> `useSpellRef`, fixed 520 Mana |
 | Fire Protection Potion | 6049 | `inv_potion_16` | 33 | 23 | common / 5 | consumable / potion | Fire absorb -> blocked: no school absorb pool |
 | Lesser Invisibility Potion | 3823 | `inv_potion_18` | 33 | 23 | common / 5 | consumable / potion | Lesser invisibility 15 sec -> blocked: no invisibility state |
-| Shadow Oil | 3824 | `inv_potion_23` | 34 | 24 | common / 5 | consumable / enhancement | 30-min melee weapon oil, 15% Shadow Bolt III proc -> blocked: no timed weapon enhancement/on-hit proc consumable model |
-| Elixir of Fortitude | 3825 | `inv_potion_43` | 35 | 25 | common / 5 | consumable / elixir / guardian | +120 max Health 1h -> guardian Trait **+12 Stamina** following existing 10-health-per-Stamina approximation |
-| Great Rage Potion | 5633 | `inv_potion_21` | 35 | 25 | common / 5 | consumable / potion | 30–60 Rage -> `useSpellRef`, fixed midpoint **45 Rage** |
-| Mighty Troll's Blood Potion | 3826 | `inv_potion_79` | 36 | 26 | common / 5 | consumable / elixir / guardian | 12 Health/5 sec 1h -> guardian Trait **+12 Spirit**, extending existing Troll's Blood mapping |
+| Shadow Oil | 3824 | `inv_potion_23` | 34 | 24 | common / 5 | consumable / enhancement | 30-min melee weapon oil, 15% Shadow Bolt III proc -> blocked |
+| Elixir of Fortitude | 3825 | `inv_potion_43` | 35 | 25 | common / 5 | consumable / elixir / guardian | +120 max Health 1h -> guardian Trait +12 Stamina |
+| Great Rage Potion | 5633 | `inv_potion_21` | 35 | 25 | common / 5 | consumable / potion | 30–60 Rage -> `useSpellRef`, fixed midpoint 45 Rage |
+| Mighty Troll's Blood Potion | 3826 | `inv_potion_79` | 36 | 26 | common / 5 | consumable / elixir / guardian | 12 Health/5 sec 1h -> guardian Trait +12 Spirit |
 | Elixir of Agility | 8949 | `inv_potion_93` | 37 | 27 | common / 5 | consumable / elixir / battle | +15 Agility 1h -> battle Trait +15 Agility |
-| Elixir of Frost Power | 17708 | `inv_potion_03` | 38 | 28 | common / 5 | consumable / elixir / battle | +15 Frost spell power -> **blocked**, do not silently generalize to generic Spell Power |
-| Frost Protection Potion | 6050 | Classic Frost Protection icon | 38 | 28 | common / 5 | consumable / potion | 1350–2250 Frost absorb -> blocked: no school absorb pool |
-| Nature Protection Potion | 6052 | `inv_potion_06` | 38 | 28 | common / 5 | consumable / potion | 1350–2250 Nature absorb -> blocked: no school absorb pool |
-| Elixir of Detect Lesser Invisibility | 3828 | `inv_potion_01` | 39 | 29 | common / 5 | consumable / elixir / generic | Detect lesser invisibility 10 min -> blocked: no invisibility detection state |
-| Elixir of Greater Defense | 8951 | Classic Greater Defense icon | 39 | 29 | common / 5 | consumable / elixir / guardian | **+250 Armor** 1h -> guardian Trait +250 Armor |
-| Catseye Elixir | 10592 | `inv_potion_36` | 40 | 30 | common / 5 | consumable / elixir / guardian | Increased stealth detection 10 min -> blocked: no stealth-detection mechanic |
-| Frost Oil | 3829 | `inv_potion_20` | 40 | 30 | common / 5 | consumable / enhancement | 30-min melee weapon oil, 10% Frostbolt proc -> blocked: no timed weapon enhancement/on-hit proc consumable model |
-| Greater Mana Potion | 6149 | `inv_potion_73` | 41 | 31 | common / 5 | consumable / potion | Mana 700–900 -> `useSpellRef`, fixed **800 Mana** |
-| Oil of Immolation | 8956 | Classic Oil of Immolation icon | 41 | 31 | common / 5 | consumable / potion | 50 Fire AoE every 3 sec for 15 sec -> blocked: no self-centered periodic AoE Aura |
-| Goblin Rocket Fuel | 9061 | `inv_cask_02` | 42 | — | common / 20 | material | Engineering crafting reagent; no combat `useSpellRef` |
-| Magic Resistance Potion | 9036 | Classic Magic Resistance icon | 42 | 32 | common / 5 | consumable / potion | +50 all magic resistances 3 min -> supporting Aura +50 Fire/Frost/Nature/Arcane/Shadow for **10 RPE turns** |
-| Restorative Potion | 9030 | Classic Restorative icon | 42 | 32 | common / 5 | consumable / potion | Removes one magic/curse/poison/disease every 5 sec for 30 sec -> blocked: no category cleanse/repeated dispel |
-| Lesser Stoneshield Potion | 4623 | Classic Lesser Stoneshield icon | 43 | 33 | common / 5 | consumable / potion | +1000 Armor for 1.5 min -> supporting Aura +1000 Armor for **10 RPE turns** |
-| Elixir of Greater Water Breathing | 18294 | `inv_potion_05` | 45 | 35 | common / 5 | consumable / elixir / generic | Water breathing 1h -> gameplay effect deliberately ignored, following established project decision to ignore water-breathing effects |
-| Superior Healing Potion | 3928 | `inv_potion_53` | 45 | 35 | common / 5 | consumable / potion | Heal 700–900 -> `useSpellRef`, midpoint `baseHealing=800` |
-| Philosopher's Stone | 9149 | Classic Philosopher's Stone icon | 45 | — | common / 1 | material/tool, bind-on-pickup | Required for transmutation; **no vanilla equipment stats in this slice**; reusable Recipe `tool` input |
-| Wildvine Potion | 9144 | Classic Wildvine Potion icon | 45 | 35 | common / 5 | consumable / potion | 1–1500 Health + 1–1500 Mana -> `useSpellRef`, fixed midpoint **750 Health + 750 Mana** |
-| Gold Bar | 3577 | canonical Gold Bar icon | 30 | — | common / 20 | Blacksmithing/mining material | Transmute output; shared external item |
-| Truesilver Bar | 6037 | canonical Truesilver Bar icon | 50 | — | common / 20 | Blacksmithing/mining material | Transmute output; shared external item |
+| Elixir of Frost Power | 17708 | `inv_potion_03` | 38 | 28 | common / 5 | consumable / elixir / battle | +15 Frost spell power -> blocked; do not generalize without approval |
+| Frost Protection Potion | 6050 | `inv_potion_13` | 38 | 28 | common / 5 | consumable / potion | 1350–2250 Frost absorb -> blocked |
+| Nature Protection Potion | 6052 | `inv_potion_06` | 38 | 28 | common / 5 | consumable / potion | 1350–2250 Nature absorb -> blocked |
+| Elixir of Detect Lesser Invisibility | 3828 | `inv_potion_01` | 39 | 29 | common / 5 | consumable / elixir / generic | Detect lesser invisibility 10 min -> blocked |
+| Elixir of Greater Defense | 8951 | `inv_potion_65` | 39 | 29 | common / 5 | consumable / elixir / guardian | +250 Armor 1h -> guardian Trait +250 Armor |
+| Catseye Elixir | 10592 | `inv_potion_36` | 40 | 30 | common / 5 | consumable / elixir / guardian | Increased stealth detection 10 min -> blocked |
+| Frost Oil | 3829 | `inv_potion_20` | 40 | 30 | common / 5 | consumable / enhancement | 30-min melee weapon oil, 10% Frostbolt proc -> blocked |
+| Greater Mana Potion | 6149 | `inv_potion_73` | 41 | 31 | common / 5 | consumable / potion | Mana 700–900 -> `useSpellRef`, fixed 800 Mana |
+| Oil of Immolation | 8956 | `inv_potion_11` | 41 | 31 | common / 5 | consumable / potion | 50 Fire AoE every 3 sec for 15 sec -> blocked |
+| Goblin Rocket Fuel | 9061 | `inv_cask_02` | 42 | — | common / 20 | material | Engineering reagent; no combat `useSpellRef` |
+| Magic Resistance Potion | 9036 | `inv_potion_16` | 42 | 32 | common / 5 | consumable / potion | +50 all magic resistances 3 min -> supporting Aura for 10 RPE turns |
+| Restorative Potion | 9030 | `inv_potion_01` | 42 | 32 | common / 5 | consumable / potion | Removes one magic/curse/poison/disease every 5 sec for 30 sec -> blocked |
+| Lesser Stoneshield Potion | 4623 | `inv_potion_67` | 43 | 33 | common / 5 | consumable / potion | +1000 Armor for 1.5 min -> supporting Aura for **5 RPE turns** |
+| Elixir of Greater Water Breathing | 18294 | `inv_potion_05` | 45 | 35 | common / 5 | consumable / elixir / generic | Water breathing 1h -> gameplay effect deliberately ignored |
+| Superior Healing Potion | 3928 | `inv_potion_53` | 45 | 35 | common / 5 | consumable / potion | Heal 700–900 -> `useSpellRef`, midpoint `baseHealing = 800` |
+| Philosopher's Stone | 9149 | `inv_misc_orb_01` | 45 | — | common / 1 | material/tool, bind-on-pickup | Required for transmutation; reusable Recipe tool; no fabricated trinket stats |
+| Wildvine Potion | 9144 | `inv_potion_34` | 45 | 35 | common / 5 | consumable / potion | 1–1500 Health + 1–1500 Mana -> `useSpellRef`, floor midpoint 750 Health + 750 Mana |
+| Gold Bar | 3577 | canonical Gold Bar icon | 30 | — | common / 20 | Blacksmithing/mining material | Transmute output; shared external Item |
+| Truesilver Bar | 6037 | canonical Truesilver Bar icon | 50 | — | common / 20 | Blacksmithing/mining material | Transmute output; shared external Item |
 
-### 7.1 Icon implementation note
-
-Several Classic item pages expose the correct icon visually but not as stable text in the fetched source. #213 must use the exact Classic icon returned by the canonical item record for the rows marked `Classic ... icon`; do **not** infer a nearby potion-number icon or use a modern replacement. This is an implementation lookup, not a gameplay/design decision and does not alter the prepared inventory/effect mapping.
+Gold Bar and Truesilver Bar are owned externally; #213 should take their exact icon from the canonical Blacksmithing/mining material record when authoring that shared Item. Their icon lookup therefore belongs to the owning dataset definition rather than Alchemy Item data.
 
 ---
 
 ## 8. Spell/Aura implementation inventory for #212
 
-### 8.1 Directly representable manual-use Spells
+### 8.1 Directly representable item-use Spells
 
-All normal potion Spells below should follow the established item-only convention unless current code has changed:
+Unless current code changes before #212, all normal potion Spells use:
 
 ```text
 castTime = 0
@@ -378,7 +385,7 @@ target = caster
 | Superior Healing Potion | `heal`, `baseHealing = 800` |
 | Wildvine Potion | `heal`, `baseHealing = 750`; `resource`, Mana `amount = 750` |
 
-As with the earlier Rage Potion, preserve source class information in documentation but do not invent a hard-coded class ref merely to enforce the Warrior restriction unless current class refs make that unambiguously safe.
+As with the existing Rage Potion, do not invent a hard-coded Warrior class ref solely to enforce the source class restriction unless current class refs make that unambiguously safe.
 
 ### 8.2 Supporting-Aura Spells
 
@@ -388,7 +395,7 @@ Spell:
 
 - caster/self;
 - instant;
-- normal shared potion cooldown;
+- 10-turn shared potion cooldown;
 - applies supporting Aura for **10 turns**.
 
 Aura:
@@ -402,7 +409,7 @@ Aura:
 - +50 Arcane resistance;
 - +50 Shadow resistance.
 
-This deliberately extends the user-approved Minor Magic Resistance convention: a 3-minute magic-resistance potion maps to 10 RPE turns.
+This extends the user-approved Minor Magic Resistance convention: a 3-minute magic-resistance potion maps to 10 RPE turns.
 
 #### Lesser Stoneshield Potion
 
@@ -410,23 +417,23 @@ Spell:
 
 - caster/self;
 - instant;
-- normal shared potion cooldown;
-- applies supporting Aura for **10 turns**.
+- 10-turn shared potion cooldown;
+- applies supporting Aura for **5 turns**.
 
 Aura:
 
-- duration 10 turns;
+- duration 5 turns;
 - maxStacks 1;
 - refresh duration;
 - +1000 Armor using `f82db71a:v42albuv`.
 
-The 10-turn duration is the prepared RPE approximation for this 1.5-minute temporary defensive potion. If the project later establishes a different minute-to-turn conversion, update this decision before #212 rather than silently changing it during implementation.
+The source effect is 1.5 minutes. Using the established 3-minute -> 10-turn resistance conversion proportionally gives **5 turns**.
 
 ### 8.3 Long-duration consumable Traits
 
 These require no item-use Spell:
 
-| Item | Type | Trait |
+| Item | Elixir type | Trait |
 |---|---|---|
 | Elixir of Fortitude | Guardian | +12 Stamina |
 | Mighty Troll's Blood Potion | Guardian | +12 Spirit |
@@ -435,7 +442,7 @@ These require no item-use Spell:
 
 ### 8.4 Deliberately ignored gameplay effect
 
-**Elixir of Greater Water Breathing**: implement Item + Recipe only, with no Spell/Aura. The project previously chose to ignore water-breathing gameplay rather than add an environmental-breathing subsystem.
+**Elixir of Greater Water Breathing**: Item + Recipe only, no Spell/Aura. This carries forward the explicit project decision to ignore water-breathing gameplay instead of introducing an environmental breathing subsystem.
 
 ### 8.5 Explicit blockers
 
@@ -447,14 +454,14 @@ These require no item-use Spell:
 | Lesser Invisibility Potion | invisibility | visibility/invisibility state and targeting interaction |
 | Elixir of Detect Lesser Invisibility | detect invisibility | invisibility-detection state |
 | Catseye Elixir | stealth detection | stealth-detection state |
-| Shadow Oil | timed weapon enhancement + proc | consumable weapon enhancement/on-hit proc model |
-| Frost Oil | timed weapon enhancement + proc | consumable weapon enhancement/on-hit proc model |
-| Elixir of Frost Power | +15 Frost spell power | school-specific spell-power modifier/stat; **do not generalize without approval** |
-| Oil of Immolation | periodic self-centered Fire AoE | periodic AoE pulse centered on aura owner |
-| Restorative Potion | repeated category dispel | aura tag/category cleanse + periodic dispel |
+| Shadow Oil | timed weapon enhancement + Shadow Bolt proc | consumable weapon enhancement/on-hit proc model |
+| Frost Oil | timed weapon enhancement + Frostbolt proc | consumable weapon enhancement/on-hit proc model |
+| Elixir of Frost Power | +15 Frost spell power | school-specific spell-power modifier/stat; do not generalize without approval |
+| Oil of Immolation | periodic self-centered Fire AoE | periodic AoE pulse centered on Aura owner |
+| Restorative Potion | repeated category dispel | Aura tag/category cleanse + periodic dispel |
 | Transmutes | 24h/48h shared cooldown | Recipe/transmutation cooldown support |
 
-Blocked consumables still receive canonical Item and Recipe records in #213/#214, but no fake `useSpellRef`.
+Blocked consumables still receive canonical Item and Recipe records in #213/#214 but no fake `useSpellRef`.
 
 ---
 
@@ -484,13 +491,13 @@ Gold Bar; Truesilver Bar.
 
 ## 10. Source notes
 
-Principal Classic references used to resolve this slice include:
+Principal Classic references used to resolve this slice:
 
 - Classic Alchemy list: https://www.wowhead.com/classic/spells/professions/alchemy
 - Greater Healing Potion: https://www.wowhead.com/classic/spell=7181/greater-healing-potion
 - Mana Potion: https://www.wowhead.com/classic/item=3827/mana-potion
-- Lesser Invisibility Potion: https://www.wowhead.com/classic/item=3823/lesser-invisibility-potion
 - Fire Protection Potion recipe: https://www.wowhead.com/classic/item=6055/recipe-fire-protection-potion
+- Lesser Invisibility Potion: https://www.wowhead.com/classic/item=3823/lesser-invisibility-potion
 - Shadow Oil: https://www.wowhead.com/classic/item=3824/shadow-oil
 - Elixir of Fortitude: https://www.wowhead.com/classic/item=3825/elixir-of-fortitude
 - Great Rage Potion recipe: https://www.wowhead.com/classic/item=5643/recipe-great-rage-potion
@@ -501,6 +508,7 @@ Principal Classic references used to resolve this slice include:
 - Nature Protection Potion recipe: https://www.wowhead.com/classic/item=6057/recipe-nature-protection-potion
 - Elixir of Detect Lesser Invisibility recipe: https://www.wowhead.com/classic/item=3832/recipe-elixir-of-detect-lesser-invisibility
 - Elixir of Greater Defense: https://www.wowhead.com/classic/item=8951/elixir-of-greater-defense
+- Elixir of Greater Defense spell/icon cross-check: https://www.wowhead.com/classic/icon=134845/inv-potion-65
 - Catseye Elixir: https://www.wowhead.com/classic/item=10592/catseye-elixir
 - Frost Oil recipe: https://www.wowhead.com/classic/item=14634/recipe-frost-oil
 - Greater Mana Potion: https://www.wowhead.com/classic/spell=11448/greater-mana-potion
@@ -511,6 +519,7 @@ Principal Classic references used to resolve this slice include:
 - Elixir of Greater Water Breathing: https://www.wowhead.com/classic/spell=22808/elixir-of-greater-water-breathing
 - Lesser Stoneshield Potion recipe: https://www.wowhead.com/classic/item=4624/recipe-lesser-stoneshield-potion
 - Restorative Potion: https://www.wowhead.com/classic/item=9030/restorative-potion
+- Restorative Potion quest/source cross-check: https://warcraft.wiki.gg/wiki/Restorative_Potion
 - Superior Healing Potion: https://www.wowhead.com/classic/spell=11457/superior-healing-potion
 - Philosopher's Stone recipe: https://www.wowhead.com/classic/item=9303/recipe-philosophers-stone
 - Philosopher's Stone craft: https://www.wowhead.com/classic/spell=11459/philosophers-stone
@@ -518,14 +527,13 @@ Principal Classic references used to resolve this slice include:
 - Wildvine Potion craft: https://www.wowhead.com/classic/spell=11458/wildvine-potion
 - Iron -> Gold recipe: https://www.wowhead.com/classic/item=9304/recipe-transmute-iron-to-gold
 - Mithril -> Truesilver recipe: https://www.wowhead.com/classic/item=9305/recipe-transmute-mithril-to-truesilver
-- Mithril -> Truesilver Classic spell/cooldown: https://www.wowhead.com/classic/spell=11480/transmute-mithril-to-truesilver
-- Restorative Potion quest/source cross-check: https://warcraft.wiki.gg/wiki/Restorative_Potion
+- Mithril -> Truesilver cooldown: https://www.wowhead.com/classic/spell=11480/transmute-mithril-to-truesilver
 
-Where a later-version page contradicted a Classic page, the Classic record above is authoritative for implementation.
+Where later-version data contradicts a Classic record, the Classic record is authoritative for #212–#214.
 
 ---
 
-## 11. Downstream implementation order
+## 11. Downstream implementation scope
 
 ### #212 — Spells/Auras
 
@@ -546,38 +554,41 @@ Do not implement fake effects for the blocker list. Greater Water Breathing rema
 
 Implement:
 
-- all 26 Alchemy-owned outputs/items represented by the 28 recipes (the two transmutes output shared metal items rather than new Alchemy-owned items);
+- all 26 Alchemy-owned outputs represented by the 28 recipes;
 - approved `useSpellRef` values from #212;
-- four stat elixir Traits;
-- external Misc materials if absent;
-- external Blacksmithing/mining materials if absent;
-- exact Classic item icons, especially the rows whose textual source extraction did not expose the icon filename.
+- four stat-elixir Traits;
+- missing external Misc materials;
+- missing external Blacksmithing/mining materials, including Gold/Truesilver transmute outputs;
+- exact Classic item metadata/icons.
 
 Bump every packaged dataset modified.
 
 ### #214 — Recipes
 
-Implement all 28 recipes exactly as listed in §6, using final refs from #213. Use `kind="tool"` for Philosopher's Stone in both transmutes. Do not fabricate transmute cooldown behavior.
+Implement all 28 recipes exactly as listed in §6 using final refs from #213. Use `kind = "tool"` for Philosopher's Stone in both transmutes. Do not fabricate transmute cooldown behavior.
 
 ---
 
 ## 12. Validation checklist
 
-Before downstream implementation begins, this preparation establishes:
+This preparation establishes:
 
 - **28** recipes exactly in `(150,225]`;
 - no skill-150 duplicate from #210;
-- skill-225 recipes included;
+- all skill-225 recipes in scope included;
 - no >225 recipes;
-- vanilla Classic reagent/vial versions chosen explicitly;
-- trainer/vendor/drop/quest/NPC/Engineering acquisition mapped to current RPE learn modes;
-- exact output quantities (all 1);
+- vanilla Classic reagent/vial versions resolved explicitly;
+- acquisition modes mapped to current RPE semantics;
+- output quantity 1 for every recipe;
 - shared material ownership resolved;
 - representable manual effects defined with concrete RPE values;
-- long-duration stat elixirs assigned to existing Trait mechanics;
+- long-duration stat elixirs assigned to Trait mechanics;
+- Magic Resistance mapped to 10 turns;
+- Lesser Stoneshield mapped proportionally to **5 turns**;
 - water breathing deliberately ignored;
 - unsupported invisibility, detection, absorb, weapon-oil, school-spell-power, periodic-AoE, repeated-dispel and transmute-cooldown behavior recorded as blockers;
-- Classic stack sizes preserved rather than modern 20/200/1000 stack revisions;
-- Philosopher's Stone kept as the vanilla transmutation tool rather than importing later trinket stats.
+- Classic stack sizes retained instead of modern stack revisions;
+- Philosopher's Stone kept as the vanilla transmutation tool rather than importing later trinket stats;
+- no implementation data/runtime files changed by #211.
 
 This document is authoritative for #212–#214 unless the user explicitly changes a project-level adaptation decision before those issues are implemented.
