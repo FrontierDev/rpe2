@@ -8,6 +8,7 @@ local ProfileUI = Addon.Client.UI.Profile
 local UI = Addon.UI or {}
 local TooltipBuilders = Addon.Client.UI and Addon.Client.UI.Tooltips or {}
 local Combat = Addon.Client and Addon.Client.Combat or {}
+local ItemUse = Addon.Client.ItemUse or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
@@ -636,7 +637,7 @@ local function refreshMovementSpeedEntry(page, cachedStatRow)
     if statRow == nil then
         statRow = statRef ~= "" and Profile.GetResolvedStatRow and Profile.GetResolvedStatRow(statRef) or nil
     end
-    local frame = movementEntry.GetFrame and movementEntry:GetFrame() or nil
+    local frame = movementEntry.GetFrame and movementEntry.GetFrame and movementEntry:GetFrame() or nil
     if not frame then
         return
     end
@@ -1040,6 +1041,79 @@ function EquipmentStatsPage:RefreshEquipmentHeader(presentation)
     end
 end
 
+function EquipmentStatsPage:EnsureEquipmentContextMenu()
+    if self.EquipmentContextMenu then
+        return self.EquipmentContextMenu
+    end
+
+    self.EquipmentContextMenu = UI.ContextMenu:New({
+        name = "RPEProfileEquipmentItemContextMenu",
+        width = 132,
+        panelWidth = 132,
+        visibleRows = 2,
+        rowHeight = 18,
+        border = false,
+        onItemInvoked = function(item, menu)
+            local action = item and item.value or nil
+            local scope = self.ContextMenuEquipmentScope
+            local slotKey = self.ContextMenuEquipmentSlotKey
+
+            if action == "use" and scope == "character" and slotKey and ItemUse.UseEquippedItem then
+                ItemUse:UseEquippedItem("character", slotKey)
+            elseif action == "unequip" and slotKey and Profile.UnequipSlotToInventory then
+                local removed = Profile.UnequipSlotToInventoryByScope
+                    and Profile.UnequipSlotToInventoryByScope(scope, slotKey)
+                    or Profile.UnequipSlotToInventory(slotKey)
+                if removed and self.owner and self.owner.SelectedSlotKey == slotKey then
+                    self.owner.SelectedSlotKey = nil
+                end
+            end
+
+            if menu and menu.HideMenus then
+                menu:HideMenus()
+            end
+        end,
+    })
+    self.EquipmentContextMenu:SetParent(self.frame or UIParent)
+    self.EquipmentContextMenu:Create()
+    return self.EquipmentContextMenu
+end
+
+function EquipmentStatsPage:ShowEquipmentContextMenu(anchorFrame, slotKey, slotInfo)
+    if not anchorFrame or not slotKey or type(slotInfo) ~= "table" then
+        return
+    end
+    if tostring(slotInfo.itemRef or "") == "" then
+        return
+    end
+
+    local menu = self:EnsureEquipmentContextMenu()
+    self.ContextMenuEquipmentScope = "character"
+    self.ContextMenuEquipmentSlotKey = slotKey
+
+    local item = slotInfo.item
+    local canUse = slotInfo.isMissing ~= true
+        and slotInfo.isActive == true
+        and type(item) == "table"
+        and ensureString(item.useSpellRef, "") ~= ""
+        and ItemUse.UseEquippedItem ~= nil
+
+    local items = {}
+    if canUse then
+        items[#items + 1] = {
+            label = "Use",
+            value = "use",
+        }
+    end
+    items[#items + 1] = {
+        label = "Unequip",
+        value = "unequip",
+    }
+
+    menu:SetItems(items)
+    menu:ShowAt(anchorFrame)
+end
+
 function EquipmentStatsPage:EnsureSlotWidget(slotKey)
     self.SlotWidgets = self.SlotWidgets or {}
 
@@ -1065,12 +1139,16 @@ function EquipmentStatsPage:EnsureSlotWidget(slotKey)
         frame:HookScript("OnMouseUp", function(_, button)
             if button == "LeftButton" and owner and owner.SetSelectedSlotKey then
                 owner:SetSelectedSlotKey(slotKey)
-            elseif button == "RightButton" and Profile.UnequipSlotToInventory then
+            elseif button == "RightButton" then
                 local scope = self.GetActiveEquipmentScope and self:GetActiveEquipmentScope() or "character"
-                local removed = Profile.UnequipSlotToInventoryByScope and Profile.UnequipSlotToInventoryByScope(scope, slotKey) or Profile.UnequipSlotToInventory(slotKey)
-                if removed then
-                    if owner and owner.SelectedSlotKey == slotKey then
-                        owner.SelectedSlotKey = nil
+                if scope == "character" then
+                    self:ShowEquipmentContextMenu(frame, slotKey, slot.resolvedSlotInfo)
+                elseif Profile.UnequipSlotToInventory then
+                    local removed = Profile.UnequipSlotToInventoryByScope and Profile.UnequipSlotToInventoryByScope(scope, slotKey) or Profile.UnequipSlotToInventory(slotKey)
+                    if removed then
+                        if owner and owner.SelectedSlotKey == slotKey then
+                            owner.SelectedSlotKey = nil
+                        end
                     end
                 end
             end
