@@ -1,0 +1,33 @@
+name: Alchemy Dataset Version 20
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - .github/workflows/alchemy-version-20.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+      - name: Set Alchemy dataset version to 20
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=data/default/professions/alchemy.lua
+          test "$(grep -c '^    version = 18,$' "$file")" -eq 1
+          sed -i '0,/^    version = 18,$/s//    version = 20,/' "$file"
+          test "$(grep -c '^    version = 20,$' "$file")" -eq 1
+          test "$(git diff --name-only)" = "$file"
+          test "$(git diff --numstat -- "$file")" = $'1\t1\tdata/default/professions/alchemy.lua'
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$file"
+          git commit -m "Set Alchemy dataset version to 20"
+          git push origin dev
