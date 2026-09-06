@@ -1,0 +1,131 @@
+name: Alchemy V22 Mageblood
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - .github/workflows/alchemy-v22-mageblood.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+      - name: Apply Mageblood Spirit effect
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('data/default/professions/alchemy.lua')
+          text = path.read_text(encoding='utf-8')
+          original = text
+
+          assert text.count('    version = 21,') == 1
+          assert text.count('    version = 22,') == 0
+
+          def get_section(source, name, next_marker):
+              start_marker = f'        {name} = {{\n'
+              end_marker = f'        }},\n        {next_marker}'
+              start = source.index(start_marker) + len(start_marker)
+              end = source.index(end_marker, start)
+              return start, end, source[start:end]
+
+          def set_section(source, name, next_marker, inner):
+              start, end, _ = get_section(source, name, next_marker)
+              return source[:start] + inner + source[end:]
+
+          def records(inner):
+              found = re.findall(r'(?ms)^            \{\n.*?^            \},\n', inner)
+              assert ''.join(found) == inner
+              return found
+
+          def record_id(record):
+              match = re.search(r'^                id = "([^"]+)",$', record, flags=re.M)
+              assert match
+              return match.group(1)
+
+          # Current-state guards.
+          _, _, item_inner = get_section(text, 'items', 'loot =')
+          item_records = records(item_inner)
+          mageblood = [r for r in item_records if record_id(r) == 'd2dg98zl']
+          assert len(mageblood) == 1
+          assert 'name = "Mageblood Potion"' in mageblood[0]
+          assert 'useSpellRef' not in mageblood[0]
+
+          _, _, aura_inner = get_section(text, 'auras', 'authorName =')
+          assert 'id = "mg12spra"' not in aura_inner
+          _, _, spell_inner = get_section(text, 'spells', 'stats = {},')
+          assert 'id = "mg12sprs"' not in spell_inner
+
+          # Wire Mageblood to an item-use spell.
+          rewritten_items = []
+          changed = 0
+          for record in item_records:
+              if record_id(record) == 'd2dg98zl':
+                  needle = '                quality = "common",\n'
+                  assert record.count(needle) == 1
+                  record = record.replace(
+                      needle,
+                      needle + '                useSpellRef = "d6ffc4e2:mg12sprs",\n',
+                      1,
+                  )
+                  changed += 1
+              rewritten_items.append(record)
+          assert changed == 1
+          text = set_section(text, 'items', 'loot =', ''.join(rewritten_items))
+
+          # Mageblood: +12 Spirit for 3 turns.
+          aura_record = '''            {\n                description = "",\n                duration = 3,\n                effects = {\n                    {\n                        baseAmount = 12,\n                        operation = "flat",\n                        statRef = "f82db71a:kec9rhli",\n                        statScaling = {},\n                        type = "stat",\n                    },\n                },\n                events = {},\n                icon = "interface/icons/inv_potion_45.blp",\n                id = "mg12spra",\n                maxStacks = 1,\n                name = "Mageblood",\n                stackBehavior = "refresh_duration",\n                tags = {},\n            },\n'''
+          _, _, aura_inner = get_section(text, 'auras', 'authorName =')
+          text = set_section(text, 'auras', 'authorName =', aura_inner + aura_record)
+
+          spell_record = '''            {\n                castTime = 0,\n                charges = 0,\n                components = {\n                    {\n                        castPhase = "on_cast_end",\n                        castingGroup = "default",\n                        effect = {\n                            auraRef = "d6ffc4e2:mg12spra",\n                            basePower = 0,\n                            duration = 3,\n                            stacks = 1,\n                            targetEvents = {},\n                            type = "apply_aura",\n                        },\n                        key = "mageblood-potion-aura",\n                        target = {\n                            type = "caster",\n                        },\n                    },\n                },\n                conditions = {},\n                cooldown = 10,\n                cooldownGroup = "potion",\n                description = "",\n                icon = "interface/icons/inv_potion_45.blp",\n                id = "mg12sprs",\n                ignoreGCD = true,\n                learnMode = "unavailable",\n                name = "Mageblood Potion",\n                resourceCosts = {},\n                tags = {},\n                triggersGCD = false,\n            },\n'''
+          _, _, spell_inner = get_section(text, 'spells', 'stats = {},')
+          text = set_section(text, 'spells', 'stats = {},', spell_inner + spell_record)
+
+          text = text.replace('    version = 21,', '    version = 22,', 1)
+
+          # Deterministic final validation.
+          assert text.count('    version = 22,') == 1
+          _, _, final_items = get_section(text, 'items', 'loot =')
+          mageblood = next(r for r in records(final_items) if record_id(r) == 'd2dg98zl')
+          assert 'useSpellRef = "d6ffc4e2:mg12sprs"' in mageblood
+
+          _, _, final_auras = get_section(text, 'auras', 'authorName =')
+          aura = next(r for r in records(final_auras) if record_id(r) == 'mg12spra')
+          assert 'duration = 3,' in aura
+          assert 'baseAmount = 12,' in aura
+          assert 'statRef = "f82db71a:kec9rhli"' in aura
+
+          _, _, final_spells = get_section(text, 'spells', 'stats = {},')
+          spell = next(r for r in records(final_spells) if record_id(r) == 'mg12sprs')
+          assert 'auraRef = "d6ffc4e2:mg12spra"' in spell
+          assert 'duration = 3,' in spell
+          assert 'cooldown = 10,' in spell
+          assert 'cooldownGroup = "potion"' in spell
+          assert 'type = "caster"' in spell
+
+          # Recipe remains present and unchanged in acquisition mode.
+          _, _, final_recipes = get_section(text, 'recipes', 'resources =')
+          recipe = next(r for r in records(final_recipes) if record_id(r) == 'byrfajnz')
+          assert 'name = "Mageblood Potion"' in recipe
+          assert 'learnMode = "trainer"' in recipe
+
+          assert text != original
+          path.write_text(text, encoding='utf-8')
+          print('Validated Alchemy v22: Mageblood Potion grants +12 Spirit for 3 turns; potion cooldown remains 10 turns.')
+          PY
+          git diff --check
+          test "$(git diff --name-only)" = "data/default/professions/alchemy.lua"
+          git diff --stat -- data/default/professions/alchemy.lua
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/default/professions/alchemy.lua
+          git commit -m "Give Mageblood Potion Spirit"
+          git push origin dev
