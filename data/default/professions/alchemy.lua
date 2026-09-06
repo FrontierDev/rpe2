@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 16,
+    version = 17,
     dataset = {
         achievements = {},
         auras = {
@@ -2821,7 +2821,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of Minor Agility",
                 output = {
                     itemRef = "d6ffc4e2:b5k1s8yd",
@@ -2996,7 +2996,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Discolored Healing Potion",
                 output = {
                     itemRef = "d6ffc4e2:t4m7b2zk",
@@ -3061,7 +3061,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Swiftness Potion",
                 output = {
                     itemRef = "d6ffc4e2:x2d8n6jp",
@@ -3096,7 +3096,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Rage Potion",
                 output = {
                     itemRef = "d6ffc4e2:g5w1k7rc",
@@ -3161,7 +3161,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of Giant Growth",
                 output = {
                     itemRef = "d6ffc4e2:g4e8t1vx",
@@ -3266,7 +3266,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Holy Protection Potion",
                 output = {
                     itemRef = "d6ffc4e2:j7h4p9kd",
@@ -3371,7 +3371,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Minor Magic Resistance Potion",
                 output = {
                     itemRef = "d6ffc4e2:m1m7r3va",
@@ -3441,7 +3441,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of Poison Resistance",
                 output = {
                     itemRef = "d6ffc4e2:o3p9r5xc",
@@ -3576,7 +3576,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Shadow Protection Potion",
                 output = {
                     itemRef = "d6ffc4e2:s7s4p9bg",
@@ -3646,7 +3646,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of Lesser Agility",
                 output = {
                     itemRef = "d6ffc4e2:u9a6g2di",
@@ -3681,7 +3681,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of Ogre's Strength",
                 output = {
                     itemRef = "d6ffc4e2:v1o7s3ej",
@@ -3716,7 +3716,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Free Action Potion",
                 output = {
                     itemRef = "d6ffc4e2:w2f8a4gk",
@@ -3881,7 +3881,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Invisibility Potion",
                 output = {
                     itemRef = "d6ffc4e2:styd0av5",
@@ -3951,7 +3951,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Gift of Arthas",
                 output = {
                     itemRef = "d6ffc4e2:scmsuihq",
@@ -3981,7 +3981,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of Dream Vision",
                 output = {
                     itemRef = "d6ffc4e2:z356n5ox",
@@ -4016,7 +4016,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Ghost Dye",
                 output = {
                     itemRef = "d6ffc4e2:zmjnfuj5",
@@ -4051,7 +4051,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of Giants",
                 output = {
                     itemRef = "d6ffc4e2:ca61o5k3",
@@ -4146,7 +4146,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of Greater Firepower",
                 output = {
                     itemRef = "d6ffc4e2:882yp72p",
@@ -4176,7 +4176,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of Shadow Power",
                 output = {
                     itemRef = "d6ffc4e2:nwnyows7",
@@ -4211,7 +4211,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of Demonslaying",
                 output = {
                     itemRef = "d6ffc4e2:2hrtx9s4",
@@ -4246,7 +4246,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Limited Invulnerability Potion",
                 output = {
                     itemRef = "d6ffc4e2:kcf75b0d",
@@ -4276,7 +4276,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Mighty Rage Potion",
                 output = {
                     itemRef = "d6ffc4e2:jfrxly2n",
@@ -4311,7 +4311,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Superior Mana Potion",
                 output = {
                     itemRef = "d6ffc4e2:rwdksulz",
@@ -4346,7 +4346,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of Superior Defense",
                 output = {
                     itemRef = "d6ffc4e2:ow2mvgk5",
@@ -4381,7 +4381,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of the Sages",
                 output = {
                     itemRef = "d6ffc4e2:4ijotmb4",
@@ -4416,7 +4416,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Transmute: Arcanite",
                 output = {
                     itemRef = "61fdf3df:6hy57ood",
@@ -4451,7 +4451,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Major Healing Potion",
                 output = {
                     itemRef = "d6ffc4e2:2kunufor",
@@ -4486,7 +4486,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of Brute Force",
                 output = {
                     itemRef = "d6ffc4e2:x402hnc9",
@@ -4521,7 +4521,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Greater Dreamless Sleep Potion",
                 output = {
                     itemRef = "d6ffc4e2:bkpxpe3b",
@@ -4556,7 +4556,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Mageblood Potion",
                 output = {
                     itemRef = "d6ffc4e2:d2dg98zl",
@@ -4586,7 +4586,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Transmute: Air to Fire",
                 output = {
                     itemRef = "732368d4:50qj8dzw",
@@ -4616,7 +4616,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Transmute: Earth to Water",
                 output = {
                     itemRef = "732368d4:7z1lti71",
@@ -4646,7 +4646,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Transmute: Fire to Earth",
                 output = {
                     itemRef = "732368d4:tfwg197j",
@@ -4676,7 +4676,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Transmute: Water to Air",
                 output = {
                     itemRef = "732368d4:fiea7e66",
@@ -4706,7 +4706,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Transmute: Undeath to Water",
                 output = {
                     itemRef = "732368d4:7z1lti71",
@@ -4736,7 +4736,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Transmute: Water to Undeath",
                 output = {
                     itemRef = "732368d4:xtnbjwzj",
@@ -4766,7 +4766,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Transmute: Life to Earth",
                 output = {
                     itemRef = "732368d4:tfwg197j",
@@ -4796,7 +4796,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Transmute: Earth to Life",
                 output = {
                     itemRef = "732368d4:lxqnh3pp",
@@ -4831,7 +4831,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Elixir of the Mongoose",
                 output = {
                     itemRef = "d6ffc4e2:lq06z28h",
@@ -4866,7 +4866,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Greater Stoneshield Potion",
                 output = {
                     itemRef = "d6ffc4e2:upe7gu78",
@@ -4901,7 +4901,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Greater Arcane Elixir",
                 output = {
                     itemRef = "d6ffc4e2:nwftlu4o",
@@ -4941,7 +4941,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Living Action Potion",
                 output = {
                     itemRef = "d6ffc4e2:xqjio6t3",
@@ -4976,7 +4976,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Purification Potion",
                 output = {
                     itemRef = "d6ffc4e2:ipzmdw83",
@@ -5011,7 +5011,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Major Troll's Blood Potion",
                 output = {
                     itemRef = "d6ffc4e2:m7aqjcgd",
@@ -5046,7 +5046,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Greater Arcane Protection Potion",
                 output = {
                     itemRef = "d6ffc4e2:8nrjnyxg",
@@ -5081,7 +5081,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Greater Fire Protection Potion",
                 output = {
                     itemRef = "d6ffc4e2:w4yo4wsz",
@@ -5116,7 +5116,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Greater Frost Protection Potion",
                 output = {
                     itemRef = "d6ffc4e2:33j8eydr",
@@ -5151,7 +5151,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Greater Nature Protection Potion",
                 output = {
                     itemRef = "d6ffc4e2:83krrxa2",
@@ -5186,7 +5186,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Greater Shadow Protection Potion",
                 output = {
                     itemRef = "d6ffc4e2:ad3773v7",
@@ -5221,7 +5221,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                 },
-                learnMode = "book",
+                learnMode = "trainer",
                 name = "Major Mana Potion",
                 output = {
                     itemRef = "d6ffc4e2:4cli4txh",
