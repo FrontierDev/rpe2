@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 17,
+    version = 18,
     dataset = {
         achievements = {},
         auras = {
@@ -183,7 +183,7 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 description = "",
-                duration = 10,
+                duration = 3,
                 effects = {
                     {
                         baseAmount = 50,
@@ -203,7 +203,7 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 description = "",
-                duration = 10,
+                duration = 3,
                 effects = {
                     {
                         baseAmount = 50,
@@ -223,7 +223,7 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 description = "",
-                duration = 10,
+                duration = 3,
                 effects = {
                     {
                         baseAmount = 50,
@@ -243,7 +243,7 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 description = "",
-                duration = 10,
+                duration = 3,
                 effects = {
                     {
                         baseAmount = 50,
@@ -263,7 +263,7 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 description = "",
-                duration = 10,
+                duration = 3,
                 effects = {
                     {
                         baseAmount = 100,
@@ -283,7 +283,7 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 description = "",
-                duration = 10,
+                duration = 3,
                 effects = {
                     {
                         baseAmount = 100,
@@ -303,7 +303,7 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 description = "",
-                duration = 10,
+                duration = 3,
                 effects = {
                     {
                         baseAmount = 100,
@@ -323,7 +323,7 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 description = "",
-                duration = 10,
+                duration = 3,
                 effects = {
                     {
                         baseAmount = 100,
@@ -343,7 +343,7 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 description = "",
-                duration = 10,
+                duration = 3,
                 effects = {
                     {
                         baseAmount = 100,
@@ -6135,7 +6135,7 @@ Addon.Data.DefaultDatasets:Register({
                         effect = {
                             auraRef = "d6ffc4e2:p1shd50a",
                             basePower = 0,
-                            duration = 10,
+                            duration = 3,
                             stacks = 1,
                             targetEvents = {},
                             type = "apply_aura",
@@ -6169,7 +6169,7 @@ Addon.Data.DefaultDatasets:Register({
                         effect = {
                             auraRef = "d6ffc4e2:p2fir50a",
                             basePower = 0,
-                            duration = 10,
+                            duration = 3,
                             stacks = 1,
                             targetEvents = {},
                             type = "apply_aura",
@@ -6203,7 +6203,7 @@ Addon.Data.DefaultDatasets:Register({
                         effect = {
                             auraRef = "d6ffc4e2:p3frs50a",
                             basePower = 0,
-                            duration = 10,
+                            duration = 3,
                             stacks = 1,
                             targetEvents = {},
                             type = "apply_aura",
@@ -6237,7 +6237,7 @@ Addon.Data.DefaultDatasets:Register({
                         effect = {
                             auraRef = "d6ffc4e2:p4nat50a",
                             basePower = 0,
-                            duration = 10,
+                            duration = 3,
                             stacks = 1,
                             targetEvents = {},
                             type = "apply_aura",
@@ -6271,7 +6271,7 @@ Addon.Data.DefaultDatasets:Register({
                         effect = {
                             auraRef = "d6ffc4e2:ga100ara",
                             basePower = 0,
-                            duration = 10,
+                            duration = 3,
                             stacks = 1,
                             targetEvents = {},
                             type = "apply_aura",
@@ -6305,7 +6305,7 @@ Addon.Data.DefaultDatasets:Register({
                         effect = {
                             auraRef = "d6ffc4e2:gf100fia",
                             basePower = 0,
-                            duration = 10,
+                            duration = 3,
                             stacks = 1,
                             targetEvents = {},
                             type = "apply_aura",
@@ -6339,7 +6339,7 @@ Addon.Data.DefaultDatasets:Register({
                         effect = {
                             auraRef = "d6ffc4e2:gf100fra",
                             basePower = 0,
-                            duration = 10,
+                            duration = 3,
                             stacks = 1,
                             targetEvents = {},
                             type = "apply_aura",
@@ -6373,7 +6373,7 @@ Addon.Data.DefaultDatasets:Register({
                         effect = {
                             auraRef = "d6ffc4e2:gn100naa",
                             basePower = 0,
-                            duration = 10,
+                            duration = 3,
                             stacks = 1,
                             targetEvents = {},
                             type = "apply_aura",
@@ -6407,7 +6407,7 @@ Addon.Data.DefaultDatasets:Register({
                         effect = {
                             auraRef = "d6ffc4e2:gs100sha",
                             basePower = 0,
-                            duration = 10,
+                            duration = 3,
                             stacks = 1,
                             targetEvents = {},
                             type = "apply_aura",
