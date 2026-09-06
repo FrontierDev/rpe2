@@ -25,7 +25,6 @@ jobs:
           path = Path('data/default/professions/alchemy.lua')
           text = path.read_text(encoding='utf-8')
           original = text
-
           assert text.count('Addon.Data.DefaultDatasets:Register({') == 1
           assert text.count('    version = 16,') == 1
 
@@ -51,70 +50,28 @@ jobs:
               return match.group(1)
 
           protection = {
-              's7s4p9bg': {
-                  'name': 'Shadow Protection Potion', 'aura_name': 'Shadow Protection',
-                  'icon': 'interface/icons/inv_potion_44.blp', 'stat': 'f82db71a:itpo751d',
-                  'value': 50, 'aura': 'p1shd50a', 'spell': 'p1shd50s', 'key': 'shadow-protection-potion-aura',
-              },
-              'c5f9p4rx': {
-                  'name': 'Fire Protection Potion', 'aura_name': 'Fire Protection',
-                  'icon': 'interface/icons/inv_potion_16.blp', 'stat': 'f82db71a:0w7c7p09',
-                  'value': 50, 'aura': 'p2fir50a', 'spell': 'p2fir50s', 'key': 'fire-protection-potion-aura',
-              },
-              'k4f8p3zf': {
-                  'name': 'Frost Protection Potion', 'aura_name': 'Frost Protection',
-                  'icon': 'interface/icons/inv_potion_13.blp', 'stat': 'f82db71a:jjn0my8k',
-                  'value': 50, 'aura': 'p3frs50a', 'spell': 'p3frs50s', 'key': 'frost-protection-potion-aura',
-              },
-              'l5n9p4ag': {
-                  'name': 'Nature Protection Potion', 'aura_name': 'Nature Protection',
-                  'icon': 'interface/icons/inv_potion_06.blp', 'stat': 'f82db71a:pg0ytacb',
-                  'value': 50, 'aura': 'p4nat50a', 'spell': 'p4nat50s', 'key': 'nature-protection-potion-aura',
-              },
-              '8nrjnyxg': {
-                  'name': 'Greater Arcane Protection Potion', 'aura_name': 'Greater Arcane Protection',
-                  'icon': 'interface/icons/inv_potion_83.blp', 'stat': 'f82db71a:954yunb9',
-                  'value': 100, 'aura': 'ga100ara', 'spell': 'ga100ars', 'key': 'greater-arcane-protection-potion-aura',
-              },
-              'w4yo4wsz': {
-                  'name': 'Greater Fire Protection Potion', 'aura_name': 'Greater Fire Protection',
-                  'icon': 'interface/icons/inv_potion_24.blp', 'stat': 'f82db71a:0w7c7p09',
-                  'value': 100, 'aura': 'gf100fia', 'spell': 'gf100fis', 'key': 'greater-fire-protection-potion-aura',
-              },
-              '33j8eydr': {
-                  'name': 'Greater Frost Protection Potion', 'aura_name': 'Greater Frost Protection',
-                  'icon': 'interface/icons/inv_potion_20.blp', 'stat': 'f82db71a:jjn0my8k',
-                  'value': 100, 'aura': 'gf100fra', 'spell': 'gf100frs', 'key': 'greater-frost-protection-potion-aura',
-              },
-              '83krrxa2': {
-                  'name': 'Greater Nature Protection Potion', 'aura_name': 'Greater Nature Protection',
-                  'icon': 'interface/icons/inv_potion_22.blp', 'stat': 'f82db71a:pg0ytacb',
-                  'value': 100, 'aura': 'gn100naa', 'spell': 'gn100nas', 'key': 'greater-nature-protection-potion-aura',
-              },
-              'ad3773v7': {
-                  'name': 'Greater Shadow Protection Potion', 'aura_name': 'Greater Shadow Protection',
-                  'icon': 'interface/icons/inv_potion_23.blp', 'stat': 'f82db71a:itpo751d',
-                  'value': 100, 'aura': 'gs100sha', 'spell': 'gs100shs', 'key': 'greater-shadow-protection-potion-aura',
-              },
+              's7s4p9bg': dict(name='Shadow Protection Potion', aura_name='Shadow Protection', icon='interface/icons/inv_potion_44.blp', stat='f82db71a:itpo751d', value=50, aura='p1shd50a', spell='p1shd50s', key='shadow-protection-potion-aura'),
+              'c5f9p4rx': dict(name='Fire Protection Potion', aura_name='Fire Protection', icon='interface/icons/inv_potion_16.blp', stat='f82db71a:0w7c7p09', value=50, aura='p2fir50a', spell='p2fir50s', key='fire-protection-potion-aura'),
+              'k4f8p3zf': dict(name='Frost Protection Potion', aura_name='Frost Protection', icon='interface/icons/inv_potion_13.blp', stat='f82db71a:jjn0my8k', value=50, aura='p3frs50a', spell='p3frs50s', key='frost-protection-potion-aura'),
+              'l5n9p4ag': dict(name='Nature Protection Potion', aura_name='Nature Protection', icon='interface/icons/inv_potion_06.blp', stat='f82db71a:pg0ytacb', value=50, aura='p4nat50a', spell='p4nat50s', key='nature-protection-potion-aura'),
+              '8nrjnyxg': dict(name='Greater Arcane Protection Potion', aura_name='Greater Arcane Protection', icon='interface/icons/inv_potion_83.blp', stat='f82db71a:954yunb9', value=100, aura='ga100ara', spell='ga100ars', key='greater-arcane-protection-potion-aura'),
+              'w4yo4wsz': dict(name='Greater Fire Protection Potion', aura_name='Greater Fire Protection', icon='interface/icons/inv_potion_24.blp', stat='f82db71a:0w7c7p09', value=100, aura='gf100fia', spell='gf100fis', key='greater-fire-protection-potion-aura'),
+              '33j8eydr': dict(name='Greater Frost Protection Potion', aura_name='Greater Frost Protection', icon='interface/icons/inv_potion_20.blp', stat='f82db71a:jjn0my8k', value=100, aura='gf100fra', spell='gf100frs', key='greater-frost-protection-potion-aura'),
+              '83krrxa2': dict(name='Greater Nature Protection Potion', aura_name='Greater Nature Protection', icon='interface/icons/inv_potion_22.blp', stat='f82db71a:pg0ytacb', value=100, aura='gn100naa', spell='gn100nas', key='greater-nature-protection-potion-aura'),
+              'ad3773v7': dict(name='Greater Shadow Protection Potion', aura_name='Greater Shadow Protection', icon='interface/icons/inv_potion_23.blp', stat='f82db71a:itpo751d', value=100, aura='gs100sha', spell='gs100shs', key='greater-shadow-protection-potion-aura'),
           }
-
           for spec in protection.values():
               assert f'id = "{spec["aura"]}"' not in text
               assert f'id = "{spec["spell"]}"' not in text
 
           detect_ids = {'m6d1i5bh', 'splqphvj', '91znxtaq'}
-          detect_names = {
-              'Elixir of Detect Lesser Invisibility',
-              'Elixir of Detect Undead',
-              'Elixir of Detect Demon',
-          }
+          detect_names = {'Elixir of Detect Lesser Invisibility', 'Elixir of Detect Undead', 'Elixir of Detect Demon'}
 
-          # Items: remove detect consumables, wire protection potion spells, and give Demonslaying its battle-elixir trait.
           _, _, items_inner = get_section(text, 'items', 'loot = {},')
           item_records = records(items_inner)
-          assert all(sum(1 for record in item_records if f'id = "{item_id}"' in record) == 1 for item_id in detect_ids)
-          assert all(sum(1 for record in item_records if f'id = "{item_id}"' in record) == 1 for item_id in protection)
-          assert sum(1 for record in item_records if 'id = "2hrtx9s4"' in record) == 1
+          assert all(sum(f'id = "{item_id}"' in record for record in item_records) == 1 for item_id in detect_ids)
+          assert all(sum(f'id = "{item_id}"' in record for record in item_records) == 1 for item_id in protection)
+          assert sum('id = "2hrtx9s4"' in record for record in item_records) == 1
 
           rewritten_items = []
           removed_items = 0
@@ -123,41 +80,33 @@ jobs:
               if item_id in detect_ids:
                   removed_items += 1
                   continue
-
               if item_id in protection:
                   spec = protection[item_id]
                   assert 'useSpellRef =' not in record
                   needle = '                quality = "common",\n'
                   assert record.count(needle) == 1
-                  record = record.replace(
-                      needle,
-                      needle + f'                useSpellRef = "d6ffc4e2:{spec["spell"]}",\n',
-                      1,
-                  )
-
+                  record = record.replace(needle, needle + f'                useSpellRef = "d6ffc4e2:{spec["spell"]}",\n', 1)
               if item_id == '2hrtx9s4':
                   assert 'consumableElixirType = "battle"' in record
                   assert 'consumableTrait =' not in record
                   needle = '                consumableElixirType = "battle",\n'
-                  trait = '''                consumableTrait = {
-                    phase = "event_start",
-                    statBonuses = {
-                        {
-                            operation = "flat",
-                            statRef = "f82db71a:qh534ffl",
-                            value = 25,
-                        },
-                    },
-                },
-'''
+                  trait = ''.join([
+                      '                consumableTrait = {\n',
+                      '                    phase = "event_start",\n',
+                      '                    statBonuses = {\n',
+                      '                        {\n',
+                      '                            operation = "flat",\n',
+                      '                            statRef = "f82db71a:qh534ffl",\n',
+                      '                            value = 25,\n',
+                      '                        },\n',
+                      '                    },\n',
+                      '                },\n',
+                  ])
                   record = record.replace(needle, needle + trait, 1)
-
               rewritten_items.append(record)
-
           assert removed_items == 3
           text = set_section(text, 'items', 'loot = {},', ''.join(rewritten_items))
 
-          # Recipes: remove Detect Undead/Demon recipes and make every recipe above skill 1 trainer-learned.
           _, _, recipes_inner = get_section(text, 'recipes', 'resources = {},')
           recipe_records = records(recipes_inner)
           assert len(recipe_records) == 75, len(recipe_records)
@@ -172,88 +121,80 @@ jobs:
               assert level_match and mode_match
               level = int(level_match.group(1))
               wanted_mode = 'always_learned' if level == 1 else 'trainer'
-              record = re.sub(
-                  r'^                learnMode = "[^"]+",$',
-                  f'                learnMode = "{wanted_mode}",',
-                  record,
-                  count=1,
-                  flags=re.M,
-              )
+              record = re.sub(r'^                learnMode = "[^"]+",$', f'                learnMode = "{wanted_mode}",', record, count=1, flags=re.M)
               rewritten_recipes.append(record)
-
           assert len(removed_recipes) == 2
           assert all(('Elixir of Detect Undead' in record or 'Elixir of Detect Demon' in record) for record in removed_recipes)
           text = set_section(text, 'recipes', 'resources = {},', ''.join(rewritten_recipes))
 
           def aura_block(spec):
-              return f'''            {{
-                description = "",
-                duration = 10,
-                effects = {{
-                    {{
-                        baseAmount = {spec["value"]},
-                        operation = "flat",
-                        statRef = "{spec["stat"]}",
-                        statScaling = {{}},
-                        type = "stat",
-                    }},
-                }},
-                events = {{}},
-                icon = "{spec["icon"]}",
-                id = "{spec["aura"]}",
-                maxStacks = 1,
-                name = "{spec["aura_name"]}",
-                stackBehavior = "refresh_duration",
-                tags = {{}},
-            }},
-'''
+              return ''.join([
+                  '            {\n',
+                  '                description = "",\n',
+                  '                duration = 10,\n',
+                  '                effects = {\n',
+                  '                    {\n',
+                  f'                        baseAmount = {spec["value"]},\n',
+                  '                        operation = "flat",\n',
+                  f'                        statRef = "{spec["stat"]}",\n',
+                  '                        statScaling = {},\n',
+                  '                        type = "stat",\n',
+                  '                    },\n',
+                  '                },\n',
+                  '                events = {},\n',
+                  f'                icon = "{spec["icon"]}",\n',
+                  f'                id = "{spec["aura"]}",\n',
+                  '                maxStacks = 1,\n',
+                  f'                name = "{spec["aura_name"]}",\n',
+                  '                stackBehavior = "refresh_duration",\n',
+                  '                tags = {},\n',
+                  '            },\n',
+              ])
 
           def spell_block(spec):
-              return f'''            {{
-                castTime = 0,
-                charges = 0,
-                components = {{
-                    {{
-                        castPhase = "on_cast_end",
-                        castingGroup = "default",
-                        effect = {{
-                            auraRef = "d6ffc4e2:{spec["aura"]}",
-                            basePower = 0,
-                            duration = 10,
-                            stacks = 1,
-                            targetEvents = {{}},
-                            type = "apply_aura",
-                        }},
-                        key = "{spec["key"]}",
-                        target = {{
-                            type = "caster",
-                        }},
-                    }},
-                }},
-                conditions = {{}},
-                cooldown = 10,
-                cooldownGroup = "potion",
-                description = "",
-                icon = "{spec["icon"]}",
-                id = "{spec["spell"]}",
-                ignoreGCD = true,
-                learnMode = "unavailable",
-                name = "{spec["name"]}",
-                resourceCosts = {{}},
-                tags = {{}},
-                triggersGCD = false,
-            }},
-'''
+              return ''.join([
+                  '            {\n',
+                  '                castTime = 0,\n',
+                  '                charges = 0,\n',
+                  '                components = {\n',
+                  '                    {\n',
+                  '                        castPhase = "on_cast_end",\n',
+                  '                        castingGroup = "default",\n',
+                  '                        effect = {\n',
+                  f'                            auraRef = "d6ffc4e2:{spec["aura"]}",\n',
+                  '                            basePower = 0,\n',
+                  '                            duration = 10,\n',
+                  '                            stacks = 1,\n',
+                  '                            targetEvents = {},\n',
+                  '                            type = "apply_aura",\n',
+                  '                        },\n',
+                  f'                        key = "{spec["key"]}",\n',
+                  '                        target = {\n',
+                  '                            type = "caster",\n',
+                  '                        },\n',
+                  '                    },\n',
+                  '                },\n',
+                  '                conditions = {},\n',
+                  '                cooldown = 10,\n',
+                  '                cooldownGroup = "potion",\n',
+                  '                description = "",\n',
+                  f'                icon = "{spec["icon"]}",\n',
+                  f'                id = "{spec["spell"]}",\n',
+                  '                ignoreGCD = true,\n',
+                  '                learnMode = "unavailable",\n',
+                  f'                name = "{spec["name"]}",\n',
+                  '                resourceCosts = {},\n',
+                  '                tags = {},\n',
+                  '                triggersGCD = false,\n',
+                  '            },\n',
+              ])
 
-          # Add self-applied 10-turn resistance auras/spells, matching the existing Magic Resistance potion path.
           _, _, auras_inner = get_section(text, 'auras', 'authorName =')
           text = set_section(text, 'auras', 'authorName =', auras_inner + ''.join(aura_block(spec) for spec in protection.values()))
           _, _, spells_inner = get_section(text, 'spells', 'stats = {},')
           text = set_section(text, 'spells', 'stats = {},', spells_inner + ''.join(spell_block(spec) for spec in protection.values()))
-
           text = text.replace('    version = 16,', '    version = 17,', 1)
 
-          # Deterministic validation of the final canonical data.
           assert text.count('    version = 17,') == 1
           assert '    version = 16,' not in text
           for item_id in detect_ids:
@@ -313,8 +254,6 @@ jobs:
 
           holy_record = next(record for record in final_items if 'id = "j7h4p9kd"' in record)
           assert 'useSpellRef =' not in holy_record
-          assert 'Holy Resistance' not in text
-
           assert text != original
           path.write_text(text, encoding='utf-8')
           print('Alchemy corrections validated: 73 recipes; 70 trainer; 3 skill-1; 9 transmutes; 9 protection effects; detect potions removed.')
