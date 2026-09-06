@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 21,
+    version = 22,
     dataset = {
         achievements = {},
         auras = {
@@ -378,6 +378,26 @@ Addon.Data.DefaultDatasets:Register({
                 id = "li100dra",
                 maxStacks = 1,
                 name = "Limited Invulnerability",
+                stackBehavior = "refresh_duration",
+                tags = {},
+            },
+            {
+                description = "",
+                duration = 3,
+                effects = {
+                    {
+                        baseAmount = 12,
+                        operation = "flat",
+                        statRef = "f82db71a:kec9rhli",
+                        statScaling = {},
+                        type = "stat",
+                    },
+                },
+                events = {},
+                icon = "interface/icons/inv_potion_45.blp",
+                id = "mg12spra",
+                maxStacks = 1,
+                name = "Mageblood",
                 stackBehavior = "refresh_duration",
                 tags = {},
             },
@@ -2548,6 +2568,7 @@ Addon.Data.DefaultDatasets:Register({
                 maxStackSize = 5,
                 name = "Mageblood Potion",
                 quality = "common",
+                useSpellRef = "d6ffc4e2:mg12sprs",
             },
             {
                 canDisenchant = false,
@@ -6441,6 +6462,40 @@ Addon.Data.DefaultDatasets:Register({
                 ignoreGCD = true,
                 learnMode = "unavailable",
                 name = "Limited Invulnerability Potion",
+                resourceCosts = {},
+                tags = {},
+                triggersGCD = false,
+            },
+            {
+                castTime = 0,
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d6ffc4e2:mg12spra",
+                            basePower = 0,
+                            duration = 3,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura",
+                        },
+                        key = "mageblood-potion-aura",
+                        target = {
+                            type = "caster",
+                        },
+                    },
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "potion",
+                description = "",
+                icon = "interface/icons/inv_potion_45.blp",
+                id = "mg12sprs",
+                ignoreGCD = true,
+                learnMode = "unavailable",
+                name = "Mageblood Potion",
                 resourceCosts = {},
                 tags = {},
                 triggersGCD = false,
