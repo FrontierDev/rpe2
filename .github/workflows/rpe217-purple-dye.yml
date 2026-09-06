@@ -1,15 +1,12 @@
 name: RPE217 Purple Dye Patch
-
 on:
   push:
     branches:
       - dev
     paths:
       - .github/workflows/rpe217-purple-dye.yml
-
 permissions:
   contents: write
-
 jobs:
   patch:
     runs-on: ubuntu-latest
@@ -21,89 +18,11 @@ jobs:
       - name: Patch Tailoring dataset
         shell: bash
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path('data/default/professions/tailoring.lua')
-          text = path.read_text(encoding='utf-8')
-
-          if 'name = "Purple Dye"' in text:
-              raise SystemExit('Purple Dye already exists; refusing duplicate insertion')
-
-          marker = '                name = "Coarse Thread",'
-          marker_index = text.find(marker)
-          if marker_index < 0:
-              raise SystemExit('Coarse Thread marker not found')
-
-          insert_at = text.rfind('            {\n', 0, marker_index)
-          if insert_at < 0:
-              raise SystemExit('Could not locate Coarse Thread item block start')
-
-          purple_dye = '''            {
-              allowWowConversion = true,
-              armorWeight = "cosmetic",
-              bindingFlag = "none",
-              blueSockets = 0,
-              canDisenchant = false,
-              canSell = true,
-              canStack = true,
-              canTrade = true,
-              cogSockets = 0,
-              conditions = {},
-              consumableElixirType = "",
-              consumableType = "",
-              damageMode = "fixed",
-              damagePerTurn = 0,
-              description = "",
-              gemColor = "none",
-              genericModificationKey = "",
-              greenSockets = 0,
-              icon = "interface/icons/inv_potion_02.blp",
-              id = "8p3vdy2m",
-              isTwoHanded = false,
-              itemLevel = 0,
-              itemSetKey = "",
-              itemType = "material",
-              maxDamagePerTurn = 0,
-              maxGenericModificationCounts = {},
-              maxModificationCounts = {},
-              maxStackSize = 200,
-              metaSockets = 0,
-              minDamagePerTurn = 0,
-              modificationKind = "generic",
-              name = "Purple Dye",
-              prismaticSockets = 0,
-              quality = "common",
-              redSockets = 0,
-              sellPrice = 0,
-              skillBonuses = {},
-              socketTypes = {},
-              sockets = {},
-              stats = {},
-              tags = {},
-              targetArmorWeight = "none",
-              targetSlotRefs = {},
-              uniqueFlag = "none",
-              validSlotRefs = {},
-              wowConversionSkillRef = "f82db71a:goqp0alw",
-              yellowSockets = 0,
-          },
-'''
-
-          old_version = '    version = 6,\n})\n'
-          if text.count(old_version) != 1:
-              raise SystemExit(f'Expected exactly one Tailoring version 6 footer, found {text.count(old_version)}')
-
-          text = text[:insert_at] + purple_dye + text[insert_at:]
-          text = text.replace(old_version, '    version = 7,\n})\n', 1)
-          path.write_text(text, encoding='utf-8')
-          PY
-
+          echo 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCgpwYXRoID0gUGF0aCgiZGF0YS9kZWZhdWx0L3Byb2Zlc3Npb25zL3RhaWxvcmluZy5sdWEiKQp0ZXh0ID0gcGF0aC5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IikKaWYgJ25hbWUgPSAiUHVycGxlIER5ZSInIGluIHRleHQ6CiAgICByYWlzZSBTeXN0ZW1FeGl0KCJQdXJwbGUgRHllIGFscmVhZHkgZXhpc3RzOyByZWZ1c2luZyBkdXBsaWNhdGUgaW5zZXJ0aW9uIikKbWFya2VyID0gJyAgICAgICAgICAgICAgICBuYW1lID0gIkNvYXJzZSBUaHJlYWQiLCcKbWFya2VyX2luZGV4ID0gdGV4dC5maW5kKG1hcmtlcikKaWYgbWFya2VyX2luZGV4IDwgMDoKICAgIHJhaXNlIFN5c3RlbUV4aXQoIkNvYXJzZSBUaHJlYWQgbWFya2VyIG5vdCBmb3VuZCIpCmluc2VydF9hdCA9IHRleHQucmZpbmQoIiAgICAgICAgICAgIHtcbiIsIDAsIG1hcmtlcl9pbmRleCkKaWYgaW5zZXJ0X2F0IDwgMDoKICAgIHJhaXNlIFN5c3RlbUV4aXQoIkNvdWxkIG5vdCBsb2NhdGUgQ29hcnNlIFRocmVhZCBpdGVtIGJsb2NrIHN0YXJ0IikKcHVycGxlX2R5ZSA9ICIiIiAgICAgICAgICAgIHsKICAgICAgICAgICAgICAgIGFsbG93V293Q29udmVyc2lvbiA9IHRydWUsCiAgICAgICAgICAgICAgICBhcm1vcldlaWdodCA9ICJjb3NtZXRpYyIsCiAgICAgICAgICAgICAgICBiaW5kaW5nRmxhZyA9ICJub25lIiwKICAgICAgICAgICAgICAgIGJsdWVTb2NrZXRzID0gMCwKICAgICAgICAgICAgICAgIGNhbkRpc2VuY2hhbnQgPSBmYWxzZSwKICAgICAgICAgICAgICAgIGNhblNlbGwgPSB0cnVlLAogICAgICAgICAgICAgICAgY2FuU3RhY2sgPSB0cnVlLAogICAgICAgICAgICAgICAgY2FuVHJhZGUgPSB0cnVlLAogICAgICAgICAgICAgICAgY29nU29ja2V0cyA9IDAsCiAgICAgICAgICAgICAgICBjb25kaXRpb25zID0ge30sCiAgICAgICAgICAgICAgICBjb25zdW1hYmxlRWxpeGlyVHlwZSA9ICIiLAogICAgICAgICAgICAgICAgY29uc3VtYWJsZVR5cGUgPSAiIiwKICAgICAgICAgICAgICAgIGRhbWFnZU1vZGUgPSAiZml4ZWQiLAogICAgICAgICAgICAgICAgZGFtYWdlUGVyVHVybiA9IDAsCiAgICAgICAgICAgICAgICBkZXNjcmlwdGlvbiA9ICIiLAogICAgICAgICAgICAgICAgZ2VtQ29sb3IgPSAibm9uZSIsCiAgICAgICAgICAgICAgICBnZW5lcmljTW9kaWZpY2F0aW9uS2V5ID0gIiIsCiAgICAgICAgICAgICAgICBncmVlblNvY2tldHMgPSAwLAogICAgICAgICAgICAgICAgaWNvbiA9ICJpbnRlcmZhY2UvaWNvbnMvaW52X3BvdGlvbl8wMi5ibHAiLAogICAgICAgICAgICAgICAgaWQgPSAiOHAzdmR5Mm0iLAogICAgICAgICAgICAgICAgaXNUd29IYW5kZWQgPSBmYWxzZSwKICAgICAgICAgICAgICAgIGl0ZW1MZXZlbCA9IDAsCiAgICAgICAgICAgICAgICBpdGVtU2V0S2V5ID0gIiIsCiAgICAgICAgICAgICAgICBpdGVtVHlwZSA9ICJtYXRlcmlhbCIsCiAgICAgICAgICAgICAgICBtYXhEYW1hZ2VQZXJUdXJuID0gMCwKICAgICAgICAgICAgICAgIG1heEdlbmVyaWNNb2RpZmljYXRpb25Db3VudHMgPSB7fSwKICAgICAgICAgICAgICAgIG1heE1vZGlmaWNhdGlvbkNvdW50cyA9IHt9LAogICAgICAgICAgICAgICAgbWF4U3RhY2tTaXplID0gMjAwLAogICAgICAgICAgICAgICAgbWV0YVNvY2tldHMgPSAwLAogICAgICAgICAgICAgICAgbWluRGFtYWdlUGVyVHVybiA9IDAsCiAgICAgICAgICAgICAgICBtb2RpZmljYXRpb25LaW5kID0gImdlbmVyaWMiLAogICAgICAgICAgICAgICAgbmFtZSA9ICJQdXJwbGUgRHllIiwKICAgICAgICAgICAgICAgIHByaXNtYXRpY1NvY2tldHMgPSAwLAogICAgICAgICAgICAgICAgcXVhbGl0eSA9ICJjb21tb24iLAogICAgICAgICAgICAgICAgcmVkU29ja2V0cyA9IDAsCiAgICAgICAgICAgICAgICBzZWxsUHJpY2UgPSAwLAogICAgICAgICAgICAgICAgc2tpbGxCb251c2VzID0ge30sCiAgICAgICAgICAgICAgICBzb2NrZXRUeXBlcyA9IHt9LAogICAgICAgICAgICAgICAgc29ja2V0cyA9IHt9LAogICAgICAgICAgICAgICAgc3RhdHMgPSB7fSwKICAgICAgICAgICAgICAgIHRhZ3MgPSB7fSwKICAgICAgICAgICAgICAgIHRhcmdldEFybW9yV2VpZ2h0ID0gIm5vbmUiLAogICAgICAgICAgICAgICAgdGFyZ2V0U2xvdFJlZnMgPSB7fSwKICAgICAgICAgICAgICAgIHVuaXF1ZUZsYWcgPSAibm9uZSIsCiAgICAgICAgICAgICAgICB2YWxpZFNsb3RSZWZzID0ge30sCiAgICAgICAgICAgICAgICB3b3dDb252ZXJzaW9uU2tpbGxSZWYgPSAiZjgyZGI3MWE6Z29xcDBhbHciLAogICAgICAgICAgICAgICAgeWVsbG93U29ja2V0cyA9IDAsCiAgICAgICAgICAgIH0sCiIiIgpvbGRfdmVyc2lvbiA9ICIgICAgdmVyc2lvbiA9IDYsXG59KVxuIgppZiB0ZXh0LmNvdW50KG9sZF92ZXJzaW9uKSAhPSAxOgogICAgcmFpc2UgU3lzdGVtRXhpdChmIkV4cGVjdGVkIGV4YWN0bHkgb25lIFRhaWxvcmluZyB2ZXJzaW9uIDYgZm9vdGVyLCBmb3VuZCB7dGV4dC5jb3VudChvbGRfdmVyc2lvbil9IikKdGV4dCA9IHRleHRbOmluc2VydF9hdF0gKyBwdXJwbGVfZHllICsgdGV4dFtpbnNlcnRfYXQ6XQp0ZXh0ID0gdGV4dC5yZXBsYWNlKG9sZF92ZXJzaW9uLCAiICAgIHZlcnNpb24gPSA3LFxufSlcbiIsIDEpCnBhdGgud3JpdGVfdGV4dCh0ZXh0LCBlbmNvZGluZz0idXRmLTgiKQo=' | base64 -d | python3
           git diff --check
           test "$(grep -c 'name = \"Purple Dye\"' data/default/professions/tailoring.lua)" -eq 1
           test "$(grep -c 'id = \"8p3vdy2m\"' data/default/professions/tailoring.lua)" -eq 1
           grep -q 'version = 7,' data/default/professions/tailoring.lua
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/default/professions/tailoring.lua
