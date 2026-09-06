@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 20,
+    version = 21,
     dataset = {
         achievements = {},
         auras = {
@@ -358,6 +358,26 @@ Addon.Data.DefaultDatasets:Register({
                 id = "gs100sha",
                 maxStacks = 1,
                 name = "Greater Shadow Protection",
+                stackBehavior = "refresh_duration",
+                tags = {},
+            },
+            {
+                description = "",
+                duration = 1,
+                effects = {
+                    {
+                        baseAmount = 100,
+                        operation = "flat",
+                        statRef = "f82db71a:pu05li08",
+                        statScaling = {},
+                        type = "stat",
+                    },
+                },
+                events = {},
+                icon = "interface/icons/inv_potion_62.blp",
+                id = "li100dra",
+                maxStacks = 1,
+                name = "Limited Invulnerability",
                 stackBehavior = "refresh_duration",
                 tags = {},
             },
@@ -2252,6 +2272,16 @@ Addon.Data.DefaultDatasets:Register({
                     },
                 },
                 consumableElixirType = "battle",
+                consumableTrait = {
+                    phase = "event_start",
+                    statBonuses = {
+                        {
+                            operation = "flat",
+                            statRef = "f82db71a:7t7xgzcx",
+                            value = 40,
+                        },
+                    },
+                },
                 consumableType = "elixir",
                 icon = "interface/icons/inv_potion_60.blp",
                 id = "882yp72p",
@@ -2259,27 +2289,6 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "consumable",
                 maxStackSize = 5,
                 name = "Elixir of Greater Firepower",
-                quality = "common",
-            },
-            {
-                canDisenchant = false,
-                conditions = {
-                    {
-                        invert = false,
-                        minimumValue = 40,
-                        showOnTooltip = true,
-                        tooltipTextOverride = "",
-                        type = "level",
-                    },
-                },
-                consumableElixirType = "battle",
-                consumableType = "elixir",
-                icon = "interface/icons/inv_potion_46.blp",
-                id = "nwnyows7",
-                itemLevel = 50,
-                itemType = "consumable",
-                maxStackSize = 5,
-                name = "Elixir of Shadow Power",
                 quality = "common",
             },
             {
@@ -2332,6 +2341,7 @@ Addon.Data.DefaultDatasets:Register({
                 maxStackSize = 5,
                 name = "Limited Invulnerability Potion",
                 quality = "common",
+                useSpellRef = "d6ffc4e2:li100drs",
             },
             {
                 canDisenchant = false,
@@ -4226,36 +4236,6 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Elixir of Greater Firepower",
                 output = {
                     itemRef = "d6ffc4e2:882yp72p",
-                    maxQuantity = 1,
-                    minQuantity = 1,
-                },
-                reagents = {},
-                requiredSkillLevel = 250,
-                results = {},
-                skillRef = "f82db71a:pdyzyudy",
-                tags = {},
-                trainerCostCopper = 107075,
-            },
-            {
-                category = "",
-                description = "",
-                id = "thpzcwrk",
-                inputs = {
-                    {
-                        itemRef = "d6ffc4e2:u1agfqxe",
-                        kind = "rpe_item",
-                        quantity = 3,
-                    },
-                    {
-                        itemRef = "d6ffc4e2:804x8qak",
-                        kind = "rpe_item",
-                        quantity = 1,
-                    },
-                },
-                learnMode = "trainer",
-                name = "Elixir of Shadow Power",
-                output = {
-                    itemRef = "d6ffc4e2:nwnyows7",
                     maxQuantity = 1,
                     minQuantity = 1,
                 },
@@ -6427,6 +6407,40 @@ Addon.Data.DefaultDatasets:Register({
                 ignoreGCD = true,
                 learnMode = "unavailable",
                 name = "Greater Shadow Protection Potion",
+                resourceCosts = {},
+                tags = {},
+                triggersGCD = false,
+            },
+            {
+                castTime = 0,
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d6ffc4e2:li100dra",
+                            basePower = 0,
+                            duration = 1,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura",
+                        },
+                        key = "limited-invulnerability-potion-aura",
+                        target = {
+                            type = "caster",
+                        },
+                    },
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "potion",
+                description = "",
+                icon = "interface/icons/inv_potion_62.blp",
+                id = "li100drs",
+                ignoreGCD = true,
+                learnMode = "unavailable",
+                name = "Limited Invulnerability Potion",
                 resourceCosts = {},
                 tags = {},
                 triggersGCD = false,
