@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 5,
+    version = 6,
     dataset = {
         achievements = {},
         auras = {
@@ -416,26 +416,6 @@ Addon.Data.DefaultDatasets:Register({
                     "f82db71a:atsoi5vr",
                 },
             },
-            {
-                bindingFlag = "bind_on_use",
-                canDisenchant = false,
-                canSell = true,
-                canStack = false,
-                canTrade = true,
-                conditions = {},
-                description = "",
-                icon = "interface/icons/inv_crate_01.blp",
-                id = "jt1t0xsg",
-                itemLevel = 15,
-                itemType = "none",
-                maxStackSize = 1,
-                name = "Mechanical Squirrel Box",
-                quality = "common",
-                stats = {},
-                tags = {
-                    "cosmetic-companion",
-                },
-            },
         },
         recipes = {
             {
@@ -709,7 +689,7 @@ Addon.Data.DefaultDatasets:Register({
                         quantity = 1,
                     },
                     {
-                        itemRef = "af503002:f4bgzpfs",
+                        itemRef = "61fdf3df:518sbr8g",
                         kind = "tool",
                         quantity = 1,
                     },
@@ -745,11 +725,6 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         itemRef = "61fdf3df:518sbr8g",
-                        kind = "tool",
-                        quantity = 1,
-                    },
-                    {
-                        itemRef = "af503002:f4bgzpfs",
                         kind = "tool",
                         quantity = 1,
                     },
@@ -852,46 +827,6 @@ Addon.Data.DefaultDatasets:Register({
                 skillRef = "f82db71a:xprqs3y1",
                 tags = {},
                 trainerCostCopper = 11175,
-            },
-            {
-                category = "",
-                description = "",
-                id = "mitqdkfg",
-                inputs = {
-                    {
-                        itemRef = "61fdf3df:nntycdj5",
-                        kind = "rpe_item",
-                        quantity = 3,
-                    },
-                    {
-                        itemRef = "4999dcec:fcj318z0",
-                        kind = "rpe_item",
-                        quantity = 2,
-                    },
-                    {
-                        itemRef = "61fdf3df:518sbr8g",
-                        kind = "tool",
-                        quantity = 1,
-                    },
-                    {
-                        itemRef = "af503002:f4bgzpfs",
-                        kind = "tool",
-                        quantity = 1,
-                    },
-                },
-                learnMode = "book",
-                name = "Mechanical Squirrel Box",
-                output = {
-                    itemRef = "af503002:jt1t0xsg",
-                    maxQuantity = 1,
-                    minQuantity = 1,
-                },
-                reagents = {},
-                requiredSkillLevel = 75,
-                results = {},
-                skillRef = "f82db71a:xprqs3y1",
-                tags = {},
-                trainerCostCopper = 0,
             },
         },
         skills = {},
