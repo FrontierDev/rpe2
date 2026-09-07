@@ -1,22 +1,17 @@
 # RPE2 Engineering 1–75 Preparation
 
-## Purpose
+**Issue:** #226  
+**Target branch:** `dev`  
+**Downstream issues:** #227 Spells/Auras, #228 Items/materials, #229 Recipes  
+**Canonical Engineering dataset:** `data/default/professions/engineering.lua`  
+**Engineering dataset ID:** `af503002`  
+**Core Engineering skill:** `f82db71a:xprqs3y1`
 
-This document is the authoritative implementation inventory for the first vanilla Classic Engineering slice: recipes whose required Engineering skill is **1 through 75 inclusive**.
+## 1. Purpose and scope
 
-It is the implementation source of truth for:
+This document is the authoritative implementation source of truth for the first vanilla Classic Engineering slice: every legitimate Engineering recipe whose required skill is **1 through 75 inclusive**.
 
-- #227 — Engineering 1–75 Spells/Auras;
-- #228 — Engineering 1–75 Items and missing shared materials;
-- #229 — Engineering 1–75 Recipes.
-
-This document is preparation only. It does not itself add Engineering runtime data.
-
-## Scope and source-version decision
-
-The target is original/vanilla Classic Engineering data, not Retail, Cataclysm-remapped profession data, Season of Discovery additions, or a leveling-guide subset.
-
-The final source inventory contains **14 recipes**:
+The validated source set contains **14 recipes**:
 
 1. Rough Blasting Powder
 2. Rough Dynamite
@@ -33,27 +28,74 @@ The final source inventory contains **14 recipes**:
 13. Crafted Heavy Shot
 14. Mechanical Squirrel Box
 
-`Target Dummy` begins at Engineering 85 and is outside this slice. `Silver Contact` begins at 90. Later bombs, scopes, guns and devices are likewise outside this document.
+This is not a leveling-guide subset. Skill 1 and skill 75 are included; skill >75 is excluded. `Target Dummy` begins at Engineering 85 and `Silver Contact` at 90, so neither belongs in this slice.
 
-### Version-drift cases resolved
+No gameplay implementation belongs in #226. #227–#229 must re-read current source before implementation and treat this document as the prepared data source rather than assuming runtime code is unchanged.
 
-Several current databases expose later-era rewrites alongside Classic data. The following decisions are authoritative for RPE:
+---
 
-- **Coarse Blasting Powder** requires Engineering **75** for the vanilla/Classic profession progression used by RPE. Later profession-system pages may surface a remapped `Classic Engineering (65)` value; do not use that remap for this dataset.
-- **Coarse Dynamite** requires Engineering **75** and consumes **3 Coarse Blasting Powder + 1 Linen Cloth**, producing **1–3 Coarse Dynamite**. Later data changed the powder requirement to 1; that later value is excluded.
-- **Crude Scope** uses the original component recipe: **1 Copper Tube + 1 Malachite + 1 Handful of Copper Bolts**. Do not copy later recipes that directly replace those components with a different bar/gem count.
-- **Mechanical Squirrel Box** uses the vanilla recipe containing **Copper Modulator**. Patch 4.3 removed Copper Modulator and rewrote dependent recipes; that rewrite is excluded.
-- **Crafted Light Shot**, **Crafted Heavy Shot**, and **Copper Modulator** are retained even though later expansions removed or replaced them.
-- Classic stack sizes are used rather than later 200/1000-stack profession-material values.
-- Season of Discovery-specific supply mechanics and recipes are not part of this dataset.
+## 2. Version/source decisions
 
-Primary cross-checks were the Classic/TBC Classic versions of the relevant Wowhead item/spell records, Classic-era database records, and archived Classic profession pages. Later-version records were used only to identify drift, not as authoritative values where they disagree with vanilla data.
+Original/vanilla Classic data is authoritative. TBC-era records may be used when they preserve the original vanilla component model. Retail, Cataclysm-remapped profession data, Season of Discovery additions, Anniversary-only changes and later-expansion rewrites are excluded.
 
-## Current RPE architecture findings
+Resolved drift cases:
 
-The implementation issues must re-read the current files again before editing, but the `dev` state inspected for this preparation establishes the following architecture.
+- **Coarse Blasting Powder** requires Engineering **75** for the vanilla progression used here. Do not use later profession-system remaps that surface it at 65.
+- **Coarse Dynamite** requires Engineering **75**, consumes **3 Coarse Blasting Powder + 1 Linen Cloth**, and creates **1–3 Coarse Dynamite**. Later data that reduces the powder requirement is not authoritative.
+- **Crude Scope** uses the original component recipe: **1 Copper Tube + 1 Malachite + 1 Handful of Copper Bolts**.
+- **Mechanical Squirrel Box** uses the original recipe containing **Copper Modulator**. Patch 4.3 removed Copper Modulator and rewrote dependent recipes; that rewrite is excluded.
+- **Crafted Light Shot**, **Crafted Heavy Shot** and **Copper Modulator** remain in the source inventory even though later versions removed/replaced them.
+- Classic stack sizes are used rather than later 200/1000-stack profession-material conventions.
 
-### Existing Engineering skill
+For implementation cross-checking, the relevant vanilla recipe spell IDs are:
+
+```text
+3918  Rough Blasting Powder
+3919  Rough Dynamite
+3920  Crafted Light Shot
+3922  Handful of Copper Bolts
+3923  Rough Copper Bomb
+3924  Copper Tube
+3925  Rough Boomstick
+3926  Copper Modulator
+3928  Mechanical Squirrel
+3929  Coarse Blasting Powder
+3930  Crafted Heavy Shot
+3931  Coarse Dynamite
+3977  Crude Scope
+7430  Arclight Spanner
+```
+
+Relevant output/item IDs are:
+
+```text
+2840  Copper Bar
+2880  Weak Flux
+4357  Rough Blasting Powder
+4358  Rough Dynamite
+4359  Handful of Copper Bolts
+4360  Rough Copper Bomb
+4361  Copper Tube
+4362  Rough Boomstick
+4363  Copper Modulator
+4364  Coarse Blasting Powder
+4365  Coarse Dynamite
+4399  Wooden Stock
+4401  Mechanical Squirrel Box
+4405  Crude Scope
+4408  Schematic: Mechanical Squirrel
+6219  Arclight Spanner
+8067  Crafted Light Shot
+8068  Crafted Heavy Shot
+```
+
+---
+
+## 3. Current RPE architecture inspected
+
+The preparation was checked against current `dev`, including the required profession datasets, `Item.lua`, `Spell.lua`, `Aura.lua`, `Recipe.lua`, item use, crafting, description generation, item tooltips, dependency extraction, packaged dataset registration/install and `RPEngine_Dev.toc`.
+
+### 3.1 Engineering skill
 
 Core already defines Engineering:
 
@@ -61,47 +103,50 @@ Core already defines Engineering:
 f82db71a:xprqs3y1
 ```
 
-It is an always-available crafting skill. Do not create a second Engineering skill in the new dataset.
+It is an always-available crafting skill. The Engineering dataset must reference this skill and must not create a duplicate.
 
-### Current Item model
+### 3.2 Item/use architecture
 
-`core/classes/Item.lua` supports the relevant broad item types (`consumable`, `weapon`, `material`, `tool`, `modification`, etc.), equipment slots, weapon types, stats, skill bonuses and `useSpellRef`.
+`core/classes/Item.lua` supports the relevant broad types and fields, including weapons, consumables, materials, tools, modifications, equipment slots, stats, skill bonuses and `useSpellRef`.
 
-Manual-use Items should use:
-
-```text
-Item.useSpellRef -> Spell -> components / Auras
-```
-
-The inventory Item-use path currently executes only Items that have the normal usable-item shape; do not add Engineering-specific execution logic.
-
-Core already provides:
+Manual-use items follow:
 
 ```text
-Ranged slot: f82db71a:q8ve6n6t
-Ammo slot:   f82db71a:atsoi5vr
-Gun type:    f82db71a:anoo8qfp
-Fire school: f82db71a:esjguw6d
+Item.useSpellRef -> Spell -> components/effects/Auras
 ```
 
-### Current Spell/Aura model
+Do not add Engineering-specific execution behavior directly to Items.
 
-The generic Spell system can represent:
+Core refs used by this slice include:
 
-- direct damage;
-- healing/resources;
-- application/removal of known Auras;
-- interrupt/revert/summon-pet effects;
-- single targets and bounded multi-target selections;
-- cast time, range, cooldown and cooldown groups.
+```text
+Ranged slot:  f82db71a:q8ve6n6t
+Ammo slot:    f82db71a:atsoi5vr
+Main Hand:    f82db71a:d212x0h1
+Gun type:     f82db71a:anoo8qfp
+Fire school:  f82db71a:esjguw6d
+Physical:     f82db71a:v1azo4j6
+Engineering:  f82db71a:xprqs3y1
+```
 
-The generic Aura system can represent stat/skill/resource changes, periodic damage/healing, and control states including `preventCasting`, `movementRangeOverride` and `cancelOnDamage`.
+### 3.3 Spell/Aura capabilities
 
-It does **not** currently provide a geometric `N-yard radius around impact point` selector. A generic `multi` target is a bounded target count, not spatial AoE.
+Current generic Spells can represent direct damage, healing/resources, Aura application/removal, interrupt/revert/summon-pet effects, single targets and bounded non-spatial multi-target selections.
 
-The existing `summon_pet` Spell effect represents RPE combat pets and is not an appropriate substitute for a cosmetic WoW companion.
+Current Auras can represent stat/skill/resource changes, periodic effects and control fields such as:
 
-### Current recipe model
+```text
+cancelOnDamage
+preventCasting
+movementRangeOverride
+forceAutoHitAgainstTarget
+```
+
+Current generic targeting does **not** provide a geometric radius around an impact point. A bounded `multi` target is not equivalent to source bomb/dynamite AoE.
+
+Current `summon_pet` is a combat-pet mechanic and must not be used for the cosmetic Mechanical Squirrel companion.
+
+### 3.4 Recipe semantics
 
 `core/classes/Recipe.lua` supports:
 
@@ -110,17 +155,17 @@ learnMode = always_learned | trainer | book | unavailable
 input.kind = rpe_item | tool
 ```
 
-Reusable tools are therefore representable without consuming them.
+Reusable recipe tools are therefore representable and must not be consumed.
 
-The current trainer-cost formula in `client/client_Crafting.lua` is:
+Current trainer-cost calculation in `client/client_Crafting.lua` is:
 
 ```text
 floor(75 + requiredSkillLevel * 28 + requiredSkillLevel^2 * 1.6)
 ```
 
-Relevant results are:
+Relevant values:
 
-| Required skill | Trainer-cost formula result |
+| Skill | Trainer-cost field |
 |---:|---:|
 | 1 | 104 |
 | 30 | 2,355 |
@@ -129,31 +174,31 @@ Relevant results are:
 | 65 | 8,655 |
 | 75 | 11,175 |
 
-For `book` recipes the trainer cost is not used for acquisition.
+#229 must re-read the live function and recalculate these values before authoring in case the formula changes.
 
-### Packaged datasets and synchronization
+### 3.5 Packaged dataset behavior
 
-`DefaultDatasets:Register()` requires a unique non-empty dataset ID and positive integer packaged version. `data/default/Install.lua` synchronizes registered definitions automatically; a new profession does not require a hard-coded install entry once it is registered and loaded by the TOC.
+`DefaultDatasets:Register()` requires a unique dataset ID and positive integer version. Packaged definitions are synchronized by the normal default-dataset installation path. Packaged updates must not reactivate a dataset the user has disabled.
 
-The packaged update path must preserve an existing user's enabled/disabled state.
+---
 
-## Canonical Engineering dataset plan
+## 4. Canonical Engineering dataset plan
 
-Create the new canonical file in #227:
+#227 creates:
 
 ```text
 data/default/professions/engineering.lua
 ```
 
-Use this stable dataset ID:
+Stable dataset ID:
 
 ```text
 af503002
 ```
 
-A repository-wide collision search found no existing use of that ID at preparation time.
+No collision was found during preparation.
 
-The canonical definition should begin at packaged version `1` and use the same self-contained shape as the existing canonical profession datasets:
+Initial structure:
 
 ```lua
 Addon.Data.DefaultDatasets:Register({
@@ -189,162 +234,181 @@ Addon.Data.DefaultDatasets:Register({
 })
 ```
 
-The final dependency set above covers Core plus the packaged owners used by the prepared recipes:
+Dependencies represented in this prepared slice:
 
+- Core `f82db71a`;
 - Blacksmithing `61fdf3df`;
 - Tailoring `7259f1d3`;
 - Jewelcrafting `4999dcec`;
 - Misc `3eb7e9bb`.
 
-If the dependency extractor/current canonical conventions have changed by implementation time, retain only dependencies actually required by the current model; do not copy redundant dependencies blindly.
+If dependency derivation/current canonical conventions change before implementation, #227 must retain only dependencies genuinely required by the current model rather than copying redundant values blindly.
 
-Add `data/default/professions/engineering.lua` to `RPEngine_Dev.toc` through the normal packaged-default load sequence, after its shared owner datasets and before default-dataset installation/synchronization runs. No Engineering range/extension file should be introduced.
+Add `data/default/professions/engineering.lua` to the packaged-default section of `RPEngine_Dev.toc` in an order where shared owner datasets are available before Engineering data is consumed. Do not introduce range-specific Engineering extension/mutation files.
 
-# Material ownership
+---
 
-## Existing canonical inputs
+## 5. Shared material ownership
 
-The following required inputs already exist and must be reused rather than duplicated:
+Engineering must reuse existing packaged materials rather than create a parallel material economy. There is no Mining dataset.
 
-| Material/tool | Canonical owner | Ref | Notes |
+### 5.1 Existing canonical inputs
+
+| Material/tool | Owner | Qualified ref | Use in this slice |
 |---|---|---|---|
-| Rough Stone | Blacksmithing | `61fdf3df:c7urqe23` | Existing canonical raw stone. |
-| Coarse Stone | Blacksmithing | `61fdf3df:qcah9yrg` | Existing canonical raw stone. |
-| Bronze Bar | Blacksmithing | `61fdf3df:xegz4i5q` | Not consumed in 1–75 after final inventory, but this is the canonical owner/ref for the requested future `Bronze Framework -> Bronze Bar` policy. |
-| Blacksmith Hammer | Blacksmithing | `61fdf3df:518sbr8g` | Existing reusable tool; recipe input uses `kind = "tool"`. |
-| Linen Cloth | Tailoring | `7259f1d3:agzskvec` | Existing canonical cloth. |
-| Malachite | Jewelcrafting | `4999dcec:fcj318z0` | Existing canonical gem/material. |
+| Rough Stone | Blacksmithing | `61fdf3df:c7urqe23` | Starting explosives/powder; normalization target. |
+| Coarse Stone | Blacksmithing | `61fdf3df:qcah9yrg` | Skill-75 explosives/powder; normalization target. |
+| Bronze Bar | Blacksmithing | `61fdf3df:xegz4i5q` | Not consumed in 1–75 after normalization; canonical future `Bronze Framework -> Bronze Bar` target. |
+| Blacksmith Hammer | Blacksmithing | `61fdf3df:518sbr8g` | Reusable `tool` input where listed. |
+| Linen Cloth | Tailoring | `7259f1d3:agzskvec` | Explosives/components. |
+| Malachite | Jewelcrafting | `4999dcec:fcj318z0` | Crude Scope and Mechanical Squirrel. |
 
-No standalone Mining dataset is required.
+### 5.2 Missing shared material: Copper Bar
 
-## Missing shared inputs to add under #228
+Owner: **Blacksmithing** (`61fdf3df`). Do not place it in Engineering.
 
-### Copper Bar
-
-Canonical owner: **Blacksmithing** (`61fdf3df`).
-
-At preparation time Copper Bar is absent from the packaged Blacksmithing dataset even though later bars/stones exist.
-
-Source metadata:
-
-| Field | Value |
+| Field | Prepared value |
 |---|---|
 | WoW item ID | `2840` |
 | Name | Copper Bar |
-| Quality | common |
-| Item level | 10 |
-| Classic stack | 20 |
 | Icon | `interface/icons/inv_ingot_02.blp` |
-| RPE type | `material` |
-| Owner | Blacksmithing |
+| Item level | 10 |
+| Required level | none |
+| Quality | common |
+| Classic stack | 20 |
+| Binding | none |
+| Trade | tradeable |
+| RPE itemType | `material` |
 
-Use Blacksmithing's current material/conversion conventions. Do not define Copper Bar inside Engineering.
+#228 must follow Blacksmithing's current material/WoW-conversion conventions and increment the Blacksmithing packaged version monotonically.
 
-### Weak Flux
+### 5.3 Missing shared material: Weak Flux
 
-Canonical owner: **Misc** (`3eb7e9bb`). It is a general vendor trade material rather than an Engineering-crafted component.
+Owner: **Misc** (`3eb7e9bb`). It is a general vendor trade material, not an Engineering-crafted component.
 
-Source metadata:
-
-| Field | Value |
+| Field | Prepared value |
 |---|---|
 | WoW item ID | `2880` |
 | Name | Weak Flux |
-| Quality | common |
-| Item level | 5 |
-| Classic stack | 10 |
 | Icon | `interface/icons/inv_misc_ammo_gunpowder_02.blp` |
-| RPE type | `material` |
-| Owner | Misc |
+| Item level | 5 |
+| Required level | none |
+| Quality | common |
+| Classic stack | 10 |
+| Binding | none |
+| Trade | tradeable |
+| RPE itemType | `material` |
 
-### Wooden Stock
+### 5.4 Missing shared material: Wooden Stock
 
-Canonical owner: **Misc** (`3eb7e9bb`). It is a purchased general Engineering/blacksmith-supplies part rather than a crafted Engineering component.
+Owner: **Misc** (`3eb7e9bb`). It is a purchased Engineering/blacksmith-supplies part, not an Engineering-crafted component.
 
-Source metadata:
-
-| Field | Value |
+| Field | Prepared value |
 |---|---|
 | WoW item ID | `4399` |
 | Name | Wooden Stock |
-| Quality | common |
+| Icon | `interface/icons/inv_mace_11.blp` |
 | Item level | 10 |
+| Required level | none |
+| Quality | common |
 | Classic stack | 10 |
 | Binding | none |
-| RPE type | `material` |
-| Owner | Misc |
+| Trade | tradeable |
+| RPE itemType | `material` |
 
-The source databases used for this preparation expose the correct Wooden Stock item art but not a stable icon-file token in their text payload. #228 must obtain the exact Blizzard icon filename from the WoW item record before authoring the Item; do not guess an icon path.
+The icon token is resolved and is no longer an implementation blocker.
 
-This is the only missing metadata field in the shared-input inventory and is explicitly carried into the incomplete section below.
+---
 
-# Engineering component normalization
+## 6. Engineering component normalization
 
-## Rule
+### 6.1 Project rule
 
-Engineering component normalization is a **project substitution rule**, not recursive raw-cost expansion.
+Engineering component normalization is a **1:1 substitution rule**, not recursive raw-cost expansion.
 
-When a later Engineering recipe consumes an Engineering-only component, replace each unit of that component with the same quantity of its designated shared/base material unless this document explicitly states another quantity.
+When a dependent Engineering recipe consumes a mapped Engineering-only component, replace each unit of that component with the same quantity of the designated shared/base material unless explicitly stated otherwise.
 
 Examples:
 
 ```text
-2 Rough Blasting Powder -> 2 Rough Stone
+2 Rough Blasting Powder   -> 2 Rough Stone
 1 Handful of Copper Bolts -> 1 Copper Bar
-1 Copper Tube -> 1 Copper Bar
+1 Copper Tube             -> 1 Copper Bar
 ```
 
-Do **not** recursively charge all materials that were needed to craft the component. The component's own recipe still exists in the dataset because it is a legitimate source recipe; dependent recipes simply use the normalized substitute.
+Do not expand the full raw cost that was required to craft the component. The component recipe/output still exists for source completeness; downstream recipes simply do not require the component item where a normalization mapping exists.
 
-Reusable tools are not flattened. `Arclight Spanner` remains a tool when a recipe requires it.
+Reusable tools are not flattened.
 
-## 1–75 normalization table
+### 6.2 Authoritative normalization table
 
-| Engineering component | Normalized RPE material | Quantity rule | Applies to dependent recipes |
+| Engineering component | RPE normalized material | Quantity rule | Retain component Item/Recipe? |
 |---|---|---|---|
 | Rough Blasting Powder | Rough Stone | 1:1 | Yes |
 | Handful of Copper Bolts | Copper Bar | 1:1 | Yes |
 | Copper Tube | Copper Bar | 1:1 | Yes |
 | Copper Modulator | Copper Bar | 1:1 | Yes |
 | Coarse Blasting Powder | Coarse Stone | 1:1 | Yes |
-| Arclight Spanner | none | remains reusable tool | No flattening |
+| Arclight Spanner | none | remains reusable tool | Yes |
 
-Requested future-range policy marker:
+Future-range policy already fixed by the project:
 
 ```text
-Bronze Framework -> Bronze Bar (1:1 component substitution)
+Bronze Framework -> Bronze Bar, 1:1
 ```
 
-Bronze Framework is outside the 1–75 inventory, so no Bronze Framework Item/Recipe is added by #227–#229. The future Engineering range must preserve the 1:1 substitution rule above rather than requiring Bronze Framework as a dependent-recipe input.
+Bronze Framework itself is outside skill 1–75 and must not be introduced by #227–#229.
 
-# Recipe inventory
+---
 
-All source reagents below are vanilla/Classic quantities. `Normalized RPE inputs` is authoritative for #229.
+## 7. Authoritative recipe inventory
 
-| # | Recipe | Skill | Acquisition / RPE learn mode | Vanilla source reagents | Normalized RPE inputs | Output | Tools | Trainer-cost result |
-|---:|---|---:|---|---|---|---|---|---:|
-| 1 | Rough Blasting Powder | 1 | starting recipe / `always_learned` | Rough Stone x1 | Rough Stone x1 | Rough Blasting Powder x1 | none | 104 |
-| 2 | Rough Dynamite | 1 | starting recipe / `always_learned` | Rough Blasting Powder x2; Linen Cloth x1 | Rough Stone x2; Linen Cloth x1 | Rough Dynamite x2 | none | 104 |
-| 3 | Crafted Light Shot | 1 | starting recipe / `always_learned` | Rough Blasting Powder x1; Copper Bar x1 | Rough Stone x1; Copper Bar x1 | Crafted Light Shot x200 | none | 104 |
-| 4 | Handful of Copper Bolts | 30 | trainer / `trainer` | Copper Bar x1 | Copper Bar x1 | Handful of Copper Bolts x1 | Blacksmith Hammer | 2,355 |
-| 5 | Rough Copper Bomb | 30 | trainer / `trainer` | Copper Bar x1; Handful of Copper Bolts x1; Rough Blasting Powder x2; Linen Cloth x1 | Copper Bar x2; Rough Stone x2; Linen Cloth x1 | Rough Copper Bomb x2 | Blacksmith Hammer | 2,355 |
-| 6 | Arclight Spanner | 50 | trainer / `trainer` | Copper Bar x6 | Copper Bar x6 | Arclight Spanner x1 | Blacksmith Hammer | 5,475 |
-| 7 | Copper Tube | 50 | trainer / `trainer` | Copper Bar x2; Weak Flux x1 | Copper Bar x2; Weak Flux x1 | Copper Tube x1 | Blacksmith Hammer | 5,475 |
-| 8 | Rough Boomstick | 50 | trainer / `trainer` | Copper Tube x1; Handful of Copper Bolts x1; Wooden Stock x1 | Copper Bar x2; Wooden Stock x1 | Rough Boomstick x1 | Blacksmith Hammer | 5,475 |
-| 9 | Crude Scope | 60 | trainer / `trainer` | Copper Tube x1; Malachite x1; Handful of Copper Bolts x1 | Copper Bar x2; Malachite x1 | Crude Scope x1 | Arclight Spanner | 7,515 |
-| 10 | Copper Modulator | 65 | trainer / `trainer` | Handful of Copper Bolts x2; Copper Bar x1; Linen Cloth x2 | Copper Bar x3; Linen Cloth x2 | Copper Modulator x1 | Blacksmith Hammer; Arclight Spanner | 8,655 |
-| 11 | Coarse Blasting Powder | 75 | trainer / `trainer` | Coarse Stone x1 | Coarse Stone x1 | Coarse Blasting Powder x1 | none | 11,175 |
-| 12 | Coarse Dynamite | 75 | trainer / `trainer` | Coarse Blasting Powder x3; Linen Cloth x1 | Coarse Stone x3; Linen Cloth x1 | Coarse Dynamite x1–3 | none | 11,175 |
-| 13 | Crafted Heavy Shot | 75 | trainer / `trainer` | Coarse Blasting Powder x1; Copper Bar x1 | Coarse Stone x1; Copper Bar x1 | Crafted Heavy Shot x200 | none | 11,175 |
-| 14 | Mechanical Squirrel Box | 75 | world-drop `Schematic: Mechanical Squirrel` / `book` | Copper Modulator x1; Handful of Copper Bolts x1; Copper Bar x1; Malachite x2 | Copper Bar x3; Malachite x2 | Mechanical Squirrel Box x1 | Blacksmith Hammer; Arclight Spanner | — |
+The `Vanilla source inputs` column records the original Engineering recipe. `Normalized RPE inputs` is authoritative for #229.
 
-## Starting recipes
+| # | Skill | Recipe | Acquisition / learnMode | Vanilla source inputs | Normalized RPE inputs | Output | Reusable tools | Trainer cost |
+|---:|---:|---|---|---|---|---|---|---:|
+| 1 | 1 | Rough Blasting Powder | starting / `always_learned` | Rough Stone x1 | Rough Stone x1 | Rough Blasting Powder x1 | none | 104 |
+| 2 | 1 | Rough Dynamite | starting / `always_learned` | Rough Blasting Powder x2; Linen Cloth x1 | Rough Stone x2; Linen Cloth x1 | Rough Dynamite x2 | none | 104 |
+| 3 | 1 | Crafted Light Shot | starting / `always_learned` | Rough Blasting Powder x1; Copper Bar x1 | Rough Stone x1; Copper Bar x1 | Crafted Light Shot x200 | none | 104 |
+| 4 | 30 | Handful of Copper Bolts | trainer / `trainer` | Copper Bar x1 | Copper Bar x1 | Handful of Copper Bolts x1 | Blacksmith Hammer | 2,355 |
+| 5 | 30 | Rough Copper Bomb | trainer / `trainer` | Copper Bar x1; Handful of Copper Bolts x1; Rough Blasting Powder x2; Linen Cloth x1 | Copper Bar x2; Rough Stone x2; Linen Cloth x1 | Rough Copper Bomb x2 | Blacksmith Hammer | 2,355 |
+| 6 | 50 | Arclight Spanner | trainer / `trainer` | Copper Bar x6 | Copper Bar x6 | Arclight Spanner x1 | Blacksmith Hammer | 5,475 |
+| 7 | 50 | Copper Tube | trainer / `trainer` | Copper Bar x2; Weak Flux x1 | Copper Bar x2; Weak Flux x1 | Copper Tube x1 | Blacksmith Hammer | 5,475 |
+| 8 | 50 | Rough Boomstick | trainer / `trainer` | Copper Tube x1; Handful of Copper Bolts x1; Wooden Stock x1 | Copper Bar x2; Wooden Stock x1 | Rough Boomstick x1 | Blacksmith Hammer | 5,475 |
+| 9 | 60 | Crude Scope | trainer / `trainer` | Copper Tube x1; Malachite x1; Handful of Copper Bolts x1 | Copper Bar x2; Malachite x1 | Crude Scope x1 | Arclight Spanner | 7,515 |
+| 10 | 65 | Copper Modulator | trainer / `trainer` | Handful of Copper Bolts x2; Copper Bar x1; Linen Cloth x2 | Copper Bar x3; Linen Cloth x2 | Copper Modulator x1 | Blacksmith Hammer; Arclight Spanner | 8,655 |
+| 11 | 75 | Coarse Blasting Powder | trainer / `trainer` | Coarse Stone x1 | Coarse Stone x1 | Coarse Blasting Powder x1 | none | 11,175 |
+| 12 | 75 | Coarse Dynamite | trainer / `trainer` | Coarse Blasting Powder x3; Linen Cloth x1 | Coarse Stone x3; Linen Cloth x1 | Coarse Dynamite x1–3 | none | 11,175 |
+| 13 | 75 | Crafted Heavy Shot | trainer / `trainer` | Coarse Blasting Powder x1; Copper Bar x1 | Coarse Stone x1; Copper Bar x1 | Crafted Heavy Shot x200 | none | 11,175 |
+| 14 | 75 | Mechanical Squirrel Box | world-drop schematic / `book` | Copper Modulator x1; Handful of Copper Bolts x1; Copper Bar x1; Malachite x2 | Copper Bar x3; Malachite x2 | Mechanical Squirrel Box x1 | Blacksmith Hammer; Arclight Spanner | — |
 
-Rough Blasting Powder, Rough Dynamite and Crafted Light Shot are the three Apprentice Engineering starting recipes in the vanilla data set. They should use `always_learned`, matching the current RPE pattern for automatically known starting profession recipes.
+### 7.1 Qualified refs for external normalized inputs
 
-## Mechanical Squirrel acquisition
+Where already present on `dev`, #229 uses:
 
-The source recipe item is:
+```text
+Rough Stone      61fdf3df:c7urqe23
+Coarse Stone     61fdf3df:qcah9yrg
+Linen Cloth      7259f1d3:agzskvec
+Malachite        4999dcec:fcj318z0
+Blacksmith Hammer 61fdf3df:518sbr8g
+```
+
+Copper Bar, Weak Flux and Wooden Stock refs are assigned by #228 after the new canonical Items are authored. #229 must read those final refs rather than guessing IDs.
+
+### 7.2 Starting recipes
+
+The three starting recipes are:
+
+- Rough Blasting Powder;
+- Rough Dynamite;
+- Crafted Light Shot.
+
+Use `always_learned`, matching current RPE starting-profession semantics.
+
+### 7.3 Mechanical Squirrel acquisition
+
+Source recipe item:
 
 ```text
 Schematic: Mechanical Squirrel
@@ -355,366 +419,290 @@ requires Engineering 75
 source: rare world drop
 ```
 
-RPE should map the acquisition to the existing `book` recipe-learning path. Do not expose Mechanical Squirrel as a trainer recipe.
+Use RPE `learnMode = "book"`. Do not flatten this into a trainer recipe.
 
-A physical RPE schematic Item is not required merely to make `learnMode = "book"` valid unless the current book-learning flow at implementation time explicitly requires one. #229 must trace that flow before deciding whether a schematic Item record is necessary.
+#229 must trace the current book-learning path before deciding whether an explicit RPE schematic Item is required. If the current path can represent book acquisition without a physical schematic Item, no extra Item should be added solely for symmetry.
 
-## Anvil/workstation note
+### 7.4 Workstation abstraction
 
-Vanilla source records mark several low-level Engineering metalworking crafts as requiring an Anvil in addition to a tool. The current Recipe schema models reusable Items/tools but not a world workstation/environment requirement.
+Some source recipes require an Anvil. Current Recipe data models reusable Item tools but not a world workstation/environment requirement.
 
-For this slice:
+For 1–75:
 
-- preserve Blacksmith Hammer and Arclight Spanner as reusable `tool` inputs where listed;
-- do not create a consumed `Anvil` Item;
-- do not block the recipe solely because RPE has no workstation field;
-- treat the omitted Anvil requirement as an approved environmental abstraction.
+- preserve Blacksmith Hammer and Arclight Spanner as `kind = "tool"` where listed;
+- do not create/consume an Anvil Item;
+- do not block otherwise-valid recipes because the workstation requirement is not modeled;
+- treat the missing Anvil requirement as an approved environmental abstraction.
 
-# Item inventory
+---
 
-The table below records the crafted outputs that #228 must author in Engineering. Exact stable RPE Item IDs are generated during implementation unless a prior stable ID is found in repository history.
+## 8. Authoritative item inventory
 
-| Item | WoW ID | Classic metadata | Icon | Intended RPE representation |
+Use exact source item levels below. Do not replace known Engineering item levels with a generic `required level + 5` rule.
+
+| Item | WoW ID | Source metadata | Icon | RPE representation |
 |---|---:|---|---|---|
-| Rough Blasting Powder | 4357 | common; item level 5; stack 20; no character level | `interface/icons/inv_misc_dust_01.blp` | `material`; retained as a legitimate crafted output, but dependent recipes substitute Rough Stone. |
-| Rough Dynamite | 4358 | common; item level 10; stack 20; requires Engineering 1 to use; no character level | `interface/icons/inv_misc_bomb_06.blp` | `consumable` + `useSpellRef`; single-target RPE damage adaptation described below. |
-| Crafted Light Shot | 8067 | common; item level 10; requires level 5; stack 200; Ammo/Bullet; +2 DPS in WoW | `interface/icons/inv_ammo_bullet_02.blp` | retain exact ammo metadata; current RPE ammo combat bonus is blocked. |
-| Handful of Copper Bolts | 4359 | common; item level 8; stack 10 | `interface/icons/inv_misc_gear_06.blp` | `material`; retained output, dependent recipes substitute Copper Bar. |
-| Rough Copper Bomb | 4360 | common; item level 14; stack 10; requires Engineering 30 to use | `interface/icons/inv_misc_bomb_09.blp` | `consumable` + `useSpellRef`; damage + one-turn break-on-damage control adaptation. |
-| Arclight Spanner | 6219 | common; item level 10; Main Hand Miscellaneous; 5–8 damage; speed 2.40; requires Engineering 50 | `interface/icons/inv_misc_wrench_01.blp` | `weapon`, Main Hand; also referenced by recipes using `kind = "tool"`. RPE does not serialize WoW attack speed, so retain 5–8 weapon range and use current weapon abstraction. |
-| Copper Tube | 4361 | common; item level 10; stack 10 | `interface/icons/inv_gizmo_pipe_02.blp` | `material`; retained output, dependent recipes substitute Copper Bar. |
-| Rough Boomstick | 4362 | uncommon; item level 10; requires level 5; BoE; Ranged Gun; 6–13 damage; speed 2.30; durability 35 | `interface/icons/inv_weapon_rifle_03.blp` | `weapon`; `validSlotRefs = { f82db71a:q8ve6n6t }`; `weaponTypeRef = f82db71a:anoo8qfp`; physical weapon damage through current RPE weapon model. |
-| Crude Scope | 4405 | common; item level 12; requires level 5; stack 5; permanently adds +1 damage to bow/gun | `interface/icons/inv_misc_spyglass_02.blp` | `modification`; target ranged bows/guns. The +1 weapon-damage effect itself is currently unsupported and must not be faked. |
-| Copper Modulator | 4363 | common; item level 13; stack 10 | `interface/icons/inv_gizmo_03.blp` | `material`; retained output, dependent recipes substitute Copper Bar. |
-| Coarse Blasting Powder | 4364 | common; item level 15; stack 20 | `interface/icons/inv_misc_dust_02.blp` | `material`; retained output, dependent recipes substitute Coarse Stone. |
-| Coarse Dynamite | 4365 | common; item level 20; stack 20; requires Engineering 75 to use | `interface/icons/inv_misc_bomb_06.blp` | `consumable` + `useSpellRef`; single-target RPE damage adaptation described below. |
-| Crafted Heavy Shot | 8068 | common; item level 20; requires level 15; stack 200; Ammo/Bullet; +4.5 DPS in WoW | `interface/icons/inv_ammo_bullet_02.blp` | retain exact ammo metadata; current RPE ammo combat bonus is blocked. |
-| Mechanical Squirrel Box | 4401 | common; item level 15; binds when used; stack 1; cosmetic non-combat companion | `interface/icons/inv_crate_01.blp` | Item metadata can exist, but the use effect is blocked because current `summon_pet` is a combat-pet mechanic. |
+| Rough Blasting Powder | 4357 | common; ilvl 5; req level none; stack 20; nonbinding/tradeable | `interface/icons/inv_misc_dust_01.blp` | `material`; retained output, but dependent recipes use Rough Stone. |
+| Rough Dynamite | 4358 | common; ilvl 10; req level none; stack 20; nonbinding/tradeable; requires Engineering 1 to use | `interface/icons/inv_misc_bomb_06.blp` | `consumable` with #227 `useSpellRef`. |
+| Crafted Light Shot | 8067 | common; ilvl 10; req level 5; stack 200; Ammo/Bullet; +2 WoW ammo DPS; nonbinding/tradeable | `interface/icons/inv_ammo_bullet_02.blp` | Ammo item metadata; combat ammo effect blocked. |
+| Handful of Copper Bolts | 4359 | common; ilvl 8; req level none; stack 10; nonbinding/tradeable | `interface/icons/inv_misc_gear_06.blp` | `material`; retained output, dependent recipes use Copper Bar. |
+| Rough Copper Bomb | 4360 | common; ilvl 14; req level none; stack 10; nonbinding/tradeable; requires Engineering 30 to use | `interface/icons/inv_misc_bomb_09.blp` | `consumable` with #227 `useSpellRef`. |
+| Arclight Spanner | 6219 | common; ilvl 10; req level none; Main Hand Miscellaneous; 5–8 damage; speed 2.40; requires Engineering 50; nonbinding/tradeable | `interface/icons/inv_misc_wrench_01.blp` | Main-Hand `weapon`; also reusable recipe `tool`. Preserve 5–8 damage in current weapon abstraction; source attack speed is not serialized. |
+| Copper Tube | 4361 | common; ilvl 10; req level none; stack 10; nonbinding/tradeable | `interface/icons/inv_gizmo_pipe_02.blp` | `material`; retained output, dependent recipes use Copper Bar. |
+| Rough Boomstick | 4362 | uncommon; ilvl 10; req level 5; BoE; Ranged Gun; 6–13 damage; speed 2.30; durability 35 | `interface/icons/inv_weapon_rifle_03.blp` | `weapon`; Ranged slot `f82db71a:q8ve6n6t`; Gun `f82db71a:anoo8qfp`; physical damage. |
+| Crude Scope | 4405 | common; ilvl 12; req level 5; stack 5; nonbinding/tradeable; permanently adds +1 weapon damage to bow/gun | `interface/icons/inv_misc_spyglass_02.blp` | `modification` targeted to ranged bows/guns; +1 weapon-damage effect blocked. |
+| Copper Modulator | 4363 | common; ilvl 13; req level none; stack 10; nonbinding/tradeable | `interface/icons/inv_gizmo_03.blp` | `material`; retained output, dependent recipes use Copper Bar. |
+| Coarse Blasting Powder | 4364 | common; ilvl 15; req level none; stack 20; nonbinding/tradeable | `interface/icons/inv_misc_dust_02.blp` | `material`; retained output, dependent recipes use Coarse Stone. |
+| Coarse Dynamite | 4365 | common; ilvl 20; req level none; stack 20; nonbinding/tradeable; requires Engineering 75 to use | `interface/icons/inv_misc_bomb_06.blp` | `consumable` with #227 `useSpellRef`. |
+| Crafted Heavy Shot | 8068 | common; ilvl 20; req level 15; stack 200; Ammo/Bullet; +4.5 WoW ammo DPS; nonbinding/tradeable | `interface/icons/inv_ammo_bullet_02.blp` | Ammo item metadata; combat ammo effect blocked. |
+| Mechanical Squirrel Box | 4401 | common; ilvl 15; req level none; stack 1; binds when used; cosmetic non-combat companion | `interface/icons/inv_crate_01.blp` | Item metadata; companion use effect blocked rather than misusing combat `summon_pet`. |
 
-### RPE item-level rule for this slice
+### 8.1 Profession requirements on Items
 
-Use the exact source item levels above. Do not apply the equipment `required level + 5` convention to these Engineering records when doing so would overwrite a known source item level; #226 explicitly records exact Classic Engineering item metadata.
+Several source outputs require a minimum Engineering rank to use/equip. #228 must re-read the current generic Item condition system before authoring these restrictions. If it can express a crafting-skill requirement correctly, use it. If not, do not substitute a character-level condition; retain the source requirement in the validation report as an enforcement limitation.
 
-### WoW profession requirements on Items
+### 8.2 Component output retention
 
-Some explosive/tool source Items require an Engineering skill rank to use/equip. Current `Item` conditions must be re-read by #228 to determine whether the generic condition system can enforce a crafting-skill requirement on an Item. If the current condition model cannot express it, preserve the source requirement in data notes and flag the enforcement limitation rather than inventing a level condition.
+The following remain real Engineering Items and Recipes even though mapped dependent inputs do not consume them:
 
-# Spell and Aura inventory
+- Rough Blasting Powder;
+- Handful of Copper Bolts;
+- Copper Tube;
+- Copper Modulator;
+- Coarse Blasting Powder.
 
-Only three 1–75 outputs require an RPE combat-use Spell in the current implementation plan:
+This preserves the complete vanilla source inventory without forcing an Engineering-component dependency chain.
+
+---
+
+## 9. Spell/Aura design inventory
+
+Only three 1–75 outputs require RPE combat-use Spells in this slice:
 
 - Rough Dynamite;
 - Rough Copper Bomb;
 - Coarse Dynamite.
 
-Mechanical Squirrel Box has a source use effect, but that effect is deliberately blocked rather than mapped to a combat pet.
+Mechanical Squirrel Box has a source use effect but is deliberately blocked because current `summon_pet` means combat pet rather than cosmetic companion.
 
-## Shared Engineering explosive cooldown
+### 9.1 Shared Engineering explosive cooldown
 
-All three source explosives have a 1-minute shared-style Engineering cooldown.
-
-The current Alchemy implementation maps a normal 2-minute WoW potion cooldown to **10 RPE turns**. Preserve that project time mapping here:
+Source explosives use a one-minute shared-style Engineering cooldown. Preserve the project's turn-time mapping used by current item-use design:
 
 ```text
 1 minute source cooldown -> 5 RPE turns
 ```
 
-Use one generic cooldown group for these explosives:
+Use one shared cooldown group:
 
 ```text
 engineering_explosive
 ```
 
-Do not create separate item-local cooldown state.
-
-All three prepared Item-use Spells should use the current consumable convention:
+Prepared use-Spell defaults:
 
 ```text
 castTime = 0
+cooldown = 5
+cooldownGroup = "engineering_explosive"
 ignoreGCD = true
 triggersGCD = false
-learnMode = unavailable
+learnMode = "unavailable"
 ```
 
-The source throw/use time is much shorter than an RPE turn; treating the use as instant is an intentional turn-based adaptation.
+Do not add item-local cooldown execution.
 
-## Rough Dynamite Spell
+### 9.2 Rough Dynamite
 
 Source effect:
 
 ```text
 26–34 Fire damage in a 5-yard radius.
-1 minute cooldown.
 ```
 
-Current RPE cannot select a geometric 5-yard impact radius. Do not simulate that with an arbitrary `maxTargets` cap.
+Prepared RPE effect:
 
-Prepared RPE representation:
+- target: one enemy;
+- range: 30;
+- direct Fire damage;
+- `baseDamage = 30` midpoint;
+- damage school `f82db71a:esjguw6d`;
+- no stat scaling;
+- 5-turn shared Engineering explosive cooldown;
+- no Aura.
 
-| Field | Decision |
-|---|---|
-| Name/icon | Rough Dynamite / item icon |
-| Target | `single`, enemy |
-| Range | 30 |
-| Effect | direct Fire damage |
-| Base damage | 30 midpoint |
-| Damage school | `f82db71a:esjguw6d` |
-| Scaling | none |
-| Cast time | 0 turns |
-| Cooldown | 5 turns |
-| Cooldown group | `engineering_explosive` |
-| GCD | ignored / not triggered |
-| Aura | none |
+The source 5-yard radial AoE is **not** representable by current spatial targeting. Do not fake it with an arbitrary bounded `multi` target.
 
-Generated Item tooltip expectation through the Spell description path:
+Item tooltip must come from the generated Spell description through `useSpellRef`; do not duplicate a hand-authored effect description on the Item. Expected semantic form:
 
 ```text
 Use: Deal approximately 30 Fire damage to an enemy. (5 turn cooldown)
 ```
 
-The generated builder may show its normal ±10% damage range around the midpoint; do not hand-write a duplicate item description.
+The current description builder may render its normal damage variance rather than the literal midpoint.
 
-The missing radial AoE is explicitly flagged as a partial source-effect limitation below.
-
-## Rough Copper Bomb Spell + Aura
+### 9.3 Rough Copper Bomb
 
 Source effect:
 
 ```text
 22–28 Fire damage in a 3-yard radius.
-Incapacitates for 1 second; any damage breaks the effect.
+Incapacitates for 1 second; damage breaks the effect.
 Unreliable against targets above level 24.
-1 minute cooldown.
 ```
 
-Prepared RPE representation:
+Prepared RPE Spell:
 
-| Field | Decision |
-|---|---|
-| Name/icon | Rough Copper Bomb / item icon |
-| Target | `single`, enemy |
-| Range | 20 |
-| Component 1 | direct Fire damage, base 25 midpoint, no scaling |
-| Component 2 | apply Rough Copper Bomb control Aura |
-| Cooldown | 5 turns |
-| Cooldown group | `engineering_explosive` |
-| Cast time | 0 turns |
-| GCD | ignored / not triggered |
+- target: one enemy;
+- range: 20;
+- component 1: direct Fire damage, `baseDamage = 25`, no scaling;
+- component 2: apply the supporting control Aura below;
+- order damage **before** Aura application so the bomb's own damage cannot cancel the just-applied Aura;
+- 5-turn shared Engineering explosive cooldown;
+- ignore GCD.
 
-Order the damage component **before** the Aura application so the bomb's own damage cannot immediately cancel the break-on-damage Aura.
-
-Supporting Aura design:
+Supporting Aura:
 
 ```text
 Name: Rough Copper Bomb Incapacitation
 Duration: 1 turn
 maxStacks: 1
 stackBehavior: refresh_duration
-control.cancelOnDamage: true
-control.preventCasting: true
-control.movementRangeOverride: 0
-control.forceAutoHitAgainstTarget: false
+cancelOnDamage: true
+preventCasting: true
+movementRangeOverride: 0
+forceAutoHitAgainstTarget: false
 ```
 
-One RPE turn is intentionally coarser than the source one-second incapacitation.
+One RPE turn is the approved coarse adaptation of the source one-second incapacitation.
 
-Do not implement the source `unreliable against targets higher than level 24` behavior unless the current generic effect/condition layer has gained an exact reusable capability by #227. At preparation time there is no appropriate generic hit/reliability gate on an apply-Aura component.
+Not represented exactly:
 
-Do not fake the 3-yard radial AoE with bounded non-spatial multi-targeting.
+- source 3-yard radial AoE;
+- the source higher-level unreliability rule.
 
-## Coarse Dynamite Spell
+Do not invent an ad-hoc target-level reliability mechanic inside the Engineering dataset.
+
+### 9.4 Coarse Dynamite
 
 Source effect:
 
 ```text
 51–69 Fire damage in a 5-yard radius.
-1 minute cooldown.
 ```
 
-Prepared RPE representation:
+Prepared RPE effect:
 
-| Field | Decision |
-|---|---|
-| Name/icon | Coarse Dynamite / item icon |
-| Target | `single`, enemy |
-| Range | 30 |
-| Effect | direct Fire damage |
-| Base damage | 60 midpoint |
-| Damage school | `f82db71a:esjguw6d` |
-| Scaling | none |
-| Cast time | 0 turns |
-| Cooldown | 5 turns |
-| Cooldown group | `engineering_explosive` |
-| GCD | ignored / not triggered |
-| Aura | none |
+- target: one enemy;
+- range: 30;
+- direct Fire damage;
+- `baseDamage = 60` midpoint;
+- damage school `f82db71a:esjguw6d`;
+- no stat scaling;
+- 5-turn shared Engineering explosive cooldown;
+- no Aura.
 
-As with Rough Dynamite, the source radial AoE remains a known partial limitation rather than being approximated with a non-spatial target cap.
+The source 5-yard radial AoE remains blocked by missing spatial impact-radius targeting. Do not simulate it using an arbitrary max-target count.
 
-# Non-Spell gameplay representations
+### 9.5 Other gameplay classifications
 
-## Rough Boomstick
+| Output | Classification | Decision |
+|---|---|---|
+| Rough Boomstick | normal weapon | Represent through existing ranged weapon data, not a use Spell. |
+| Arclight Spanner | weapon + recipe tool | Represent through existing weapon/tool semantics. |
+| Crude Scope | modification | Item/targeting metadata is representable; +1 weapon damage modification is blocked. |
+| Crafted Light Shot | ammo | Item metadata representable; +2 DPS ammo combat semantics blocked. |
+| Crafted Heavy Shot | ammo | Item metadata representable; +4.5 DPS ammo combat semantics blocked. |
+| Mechanical Squirrel Box | cosmetic use | Do not use combat-pet `summon_pet`; metadata only until generic cosmetic companion support exists. |
+| Powders/bolts/tubes/modulator | materials | No Spell/Aura. |
 
-Represent directly as a normal RPE ranged weapon:
+---
 
-```text
-valid slot: f82db71a:q8ve6n6t
-weapon type: f82db71a:anoo8qfp
-physical damage range: 6–13
-```
+## 10. Downstream implementation plan
 
-WoW weapon speed is not a current RPE weapon field and is intentionally absorbed into the turn-based weapon abstraction.
+### #227 — Spells and supporting Aura
 
-## Arclight Spanner
+1. Re-read current `dev` Spell/Aura/item-use/description paths.
+2. Create canonical `engineering.lua` with dataset ID `af503002` and packaged version 1.
+3. Add the file to `RPEngine_Dev.toc` in the packaged-default section.
+4. Implement Rough Dynamite Spell.
+5. Implement Rough Copper Bomb Spell and one-turn incapacitation Aura.
+6. Implement Coarse Dynamite Spell.
+7. Use shared `engineering_explosive` cooldown semantics.
+8. Validate generated descriptions and do not add duplicate Item effect prose.
+9. Do not add spatial AoE, cosmetic companion or other generic-engine work under #227.
 
-Represent as a Main Hand weapon with the Classic 5–8 damage range, while also allowing recipe inputs to reference it as `kind = "tool"`.
+### #228 — Items and shared materials
 
-The Recipe schema's `tool` distinction belongs to the input row; the underlying Item does not need to be typed as a non-weapon merely to be reusable by crafting.
+1. Re-read final current owner datasets before writing.
+2. Reuse Rough Stone, Coarse Stone, Bronze Bar, Linen Cloth, Malachite and Blacksmith Hammer rather than duplicating them.
+3. Add Copper Bar to canonical Blacksmithing if still absent.
+4. Add Weak Flux and Wooden Stock to canonical Misc if still absent.
+5. Use Wooden Stock icon `interface/icons/inv_mace_11.blp`.
+6. Add all 14 prepared Engineering output Items to canonical `engineering.lua`.
+7. Attach only the three exact #227 `useSpellRef` values.
+8. Preserve component outputs as real Items even though dependent recipe inputs normalize them away.
+9. Preserve exact source item levels/icons/stack/binding/equipment metadata.
+10. Increment every modified packaged dataset monotonically without reactivating disabled datasets.
 
-## Crafted Light Shot / Crafted Heavy Shot
+### #229 — Recipes
 
-Core has an Ammo slot, but the current Item/combat architecture does not expose a complete ammo item model that adds source bullet DPS to gun attacks and consumes/uses ammunition appropriately.
-
-Do not convert +2 DPS / +4.5 DPS into an unrelated generic stat.
-
-# Crude Scope
-
-The current modification model can represent an Item that targets eligible equipment, but there is no canonical generic stat/effect for `permanently add +1 weapon damage to this bow/gun`.
-
-Do not substitute Attack Power, Ranged Attack Power, hit chance, or another stat. The Item/Recipe may be authored, but the actual +1 weapon-damage modification remains blocked until a generic weapon-damage modification capability exists.
-
-# Mechanical Squirrel Box
-
-The source Item summons a cosmetic non-combat companion. RPE's existing `summon_pet` Spell effect is part of the combat-pet system and would materially change the source behavior.
-
-Do not attach a `summon_pet` Spell merely to make the Item usable. The correct minimum follow-up is a generic cosmetic companion/non-combat summon capability, or an explicit project decision to keep the Item metadata-only.
-
-# Cross-dataset dependency and ownership summary
-
-By final #229 state, Engineering may reference:
-
-```text
-f82db71a  Core: skill, slots, Gun type, Fire school
-61fdf3df  Blacksmithing: stones, bars, Blacksmith Hammer
-7259f1d3  Tailoring: Linen Cloth
-4999dcec  Jewelcrafting: Malachite
-3eb7e9bb  Misc: Weak Flux, Wooden Stock
-```
-
-No 1–75 recipe needs Leatherworking, Enchanting or Fishing after the final inventory is normalized. Do not add dependencies that are not actually referenced.
-
-# Implementation sequencing
-
-## #227 — Spells/Auras
-
-1. Re-read current `dev` runtime files and this document.
-2. Create canonical `engineering.lua` with dataset ID `af503002`, packaged version 1 and normal TOC registration.
-3. Implement the three prepared explosive Spells.
-4. Implement the Rough Copper Bomb control Aura.
-5. Validate generated descriptions, target validation and shared cooldown behavior.
-6. Report the known partial/blocked effects listed below.
-
-## #228 — Items and shared materials
-
-1. Re-read the current new `engineering.lua` and final #227 refs.
-2. Add Copper Bar to canonical Blacksmithing if still missing.
-3. Add Weak Flux and Wooden Stock to Misc if still missing; obtain the exact Wooden Stock icon token before authoring.
-4. Add all 14 prepared Engineering output Items.
-5. Attach only the three exact #227 `useSpellRef` values.
-6. Preserve component outputs as real Items even though dependent recipes normalize their inputs.
-7. Bump every changed packaged dataset monotonically without reactivating a disabled dataset.
-
-## #229 — Recipes
-
-1. Re-read the final Item refs and current crafting code.
-2. Add all 14 recipes directly to canonical `engineering.lua`.
-3. Use the `Normalized RPE inputs` column, not source Engineering-component refs.
-4. Preserve `always_learned`, `trainer`, and `book` acquisition distinctions.
-5. Preserve output quantities, especially Rough Dynamite x2, Rough Copper Bomb x2, ammunition x200 and Coarse Dynamite x1–3.
+1. Re-read final current Item refs and crafting code.
+2. Implement all 14 prepared recipes directly in canonical `engineering.lua`.
+3. Use the `Normalized RPE inputs` column, not mapped Engineering-component refs.
+4. Preserve `always_learned`, `trainer` and `book` acquisition distinctions.
+5. Preserve output quantities exactly, especially Rough Dynamite x2, Rough Copper Bomb x2, ammunition x200 and Coarse Dynamite x1–3.
 6. Use Blacksmith Hammer/Arclight Spanner as reusable tool inputs where specified.
-7. Recalculate trainer cost from live code before authoring in case the formula changed.
+7. Recalculate trainer cost from live code before authoring.
+8. Compare the final implementation against all 14 source rows and explicitly report any omission or partial implementation.
 
-# Deterministic validation checklist
+---
 
-Before #226 is considered complete, this preparation has been checked against the following requirements:
+## 11. Deterministic validation completed for #226
 
-- [x] Full vanilla Classic Engineering 1–75 inventory is present: 14 recipes.
-- [x] Skill 1 recipes are included.
-- [x] Skill 75 recipes are included.
-- [x] No skill >75 recipe is included.
-- [x] Target Dummy (85) and later recipes are excluded.
-- [x] Acquisition mode is resolved for every recipe.
-- [x] The three starting recipes are separated from trainer recipes.
-- [x] Mechanical Squirrel is preserved as a world-drop/book recipe.
-- [x] Original source reagents and quantities are recorded for every recipe.
-- [x] RPE normalized inputs are separately recorded for every recipe.
-- [x] Component normalization is explicitly 1:1 substitution rather than implicit recursive expansion.
-- [x] `Rough Blasting Powder -> Rough Stone` is explicit.
-- [x] `Coarse Blasting Powder -> Coarse Stone` is explicit.
-- [x] `Bronze Framework -> Bronze Bar` is preserved as a future 1:1 policy marker.
-- [x] All 1–75 Engineering components have explicit substitute/retain decisions.
-- [x] Existing Rough Stone, Coarse Stone, Bronze Bar, Linen Cloth, Malachite and Blacksmith Hammer refs are resolved.
-- [x] Copper Bar is assigned to Blacksmithing rather than Engineering.
-- [x] Weak Flux and Wooden Stock are assigned to Misc rather than Engineering.
-- [x] No Mining dataset is proposed.
-- [x] Every output's WoW identity, item level, required character level, quality/category behavior and stack behavior is recorded.
-- [x] The exact new Engineering dataset ID and load plan are recorded.
-- [x] Every manual combat-use output has a Spell design or explicit blocker.
+- [x] Complete vanilla Classic Engineering 1–75 source inventory identified: **14 recipes**.
+- [x] Skill 1 included.
+- [x] Skill 75 included.
+- [x] No >75 recipe included.
+- [x] Starting, trainer and world-drop/book acquisition resolved for every recipe.
+- [x] Mechanical Squirrel preserved as a world-drop/book recipe.
+- [x] Original source reagents and quantities recorded separately from normalized RPE inputs.
+- [x] Output quantities resolved for every recipe.
+- [x] Every Engineering intermediate/component in the range has an explicit retain/flatten decision.
+- [x] Component normalization is explicit 1:1 project substitution, not recursive raw-cost expansion.
+- [x] `Rough Blasting Powder -> Rough Stone` explicit.
+- [x] `Coarse Blasting Powder -> Coarse Stone` explicit.
+- [x] Copper bolts/tube/modulator normalization to Copper Bar explicit.
+- [x] Future `Bronze Framework -> Bronze Bar` policy preserved.
+- [x] Existing Rough Stone, Coarse Stone, Bronze Bar, Linen Cloth, Malachite and Blacksmith Hammer refs resolved.
+- [x] Copper Bar assigned to Blacksmithing rather than Engineering.
+- [x] Weak Flux and Wooden Stock assigned to Misc rather than Engineering.
+- [x] Wooden Stock icon resolved to `interface/icons/inv_mace_11.blp`.
+- [x] No Mining dataset proposed.
+- [x] Every crafted output has prepared WoW ID, exact name/icon, item level, required character level, quality, Classic stack and binding/trade decision.
+- [x] Equipment slot/weapon metadata prepared where applicable.
+- [x] Manual-use outputs have concrete Spell/Aura designs or an explicit blocker.
 - [x] Unsupported spatial AoE is not disguised as bounded non-spatial multi-targeting.
 - [x] Mechanical Squirrel is not incorrectly mapped to a combat pet.
-- [x] Crude Scope is not approximated with an unrelated stat.
-- [x] Ammo DPS is not approximated with an unrelated stat.
-- [x] Classic/TBC component quantities are preserved where later versions changed them.
-- [x] No implementation code/data change is part of this issue.
-
-# Source notes for implementation cross-check
-
-The implementation issues should use the corresponding Classic item/spell records by WoW ID/spell ID, especially:
-
-```text
-3919  Rough Dynamite recipe
-3920  Crafted Light Shot recipe
-3922  Handful of Copper Bolts recipe
-3923  Rough Copper Bomb recipe
-3924  Copper Tube recipe
-3925  Rough Boomstick recipe
-3926  Copper Modulator recipe
-3928  Mechanical Squirrel recipe
-3929  Coarse Blasting Powder recipe
-3930  Crafted Heavy Shot recipe
-3931  Coarse Dynamite recipe
-3977  Crude Scope recipe
-7430  Arclight Spanner recipe
-
-4357  Rough Blasting Powder
-4358  Rough Dynamite
-4359  Handful of Copper Bolts
-4360  Rough Copper Bomb
-4361  Copper Tube
-4362  Rough Boomstick
-4363  Copper Modulator
-4364  Coarse Blasting Powder
-4365  Coarse Dynamite
-4401  Mechanical Squirrel Box
-4405  Crude Scope
-4408  Schematic: Mechanical Squirrel
-6219  Arclight Spanner
-8067  Crafted Light Shot
-8068  Crafted Heavy Shot
-```
-
-For any conflict, prefer the Classic/TBC Classic record whose reagent/component model still contains the original vanilla Engineering components. Do not silently substitute modern profession data.
+- [x] Crude Scope is not approximated using an unrelated stat.
+- [x] Ammo DPS is not approximated using an unrelated stat.
+- [x] Engineering dataset ID, skeleton, dependency and TOC/load plan are prepared.
+- [x] Packaged version/update behavior is documented.
+- [x] Later-era and seasonal drift is explicitly excluded.
+- [x] No implementation code/data change was made under #226.
 
 ## Incomplete / Blocked Items and Recipes
 
-The source recipe inventory itself is complete. The following implementation limitations must remain visible in the later implementation/validation reports:
+The **source-data preparation is complete**: there are no unresolved recipe identities, source reagent quantities, acquisition methods, normalized material mappings, shared-material owners, output quantities, item IDs, item icons, item levels, required character levels, qualities, stack sizes or binding decisions in the 1–75 inventory.
 
-| Item / recipe | Complete portion | Incomplete / blocked portion | Smallest follow-up |
+The following are deliberate **downstream engine/representation limitations**, and must remain flagged in #227–#229 implementation reports rather than being silently approximated:
+
+| Item / recipe | Complete prepared portion | Incomplete / blocked source behavior | Smallest generic follow-up |
 |---|---|---|---|
-| Rough Dynamite | Item, recipe, shared cooldown, single-target Fire damage | Original 5-yard radial AoE cannot be represented by current spatial targeting | Add generic impact-radius/spatial AoE targeting if exact source behavior is required. |
-| Rough Copper Bomb | Item, recipe, single-target Fire damage, one-turn break-on-damage incapacitation Aura, shared cooldown | Original 3-yard radial AoE and `unreliable against targets higher than level 24` rule are not representable exactly | Add spatial AoE targeting and a reusable target-level/reliability gate for effects. |
-| Coarse Dynamite | Item, recipe, shared cooldown, single-target Fire damage | Original 5-yard radial AoE cannot be represented by current spatial targeting | Add generic impact-radius/spatial AoE targeting if exact source behavior is required. |
-| Crafted Light Shot | Item metadata and recipe | +2 WoW ammo DPS / ammunition combat semantics have no complete RPE execution path | Add generic ammo equipment/consumption and ranged-damage contribution support. |
-| Crafted Heavy Shot | Item metadata and recipe | +4.5 WoW ammo DPS / ammunition combat semantics have no complete RPE execution path | Add generic ammo equipment/consumption and ranged-damage contribution support. |
-| Crude Scope | Item metadata, modification targeting and recipe | Permanent +1 bow/gun weapon damage cannot be represented by current generic modification stats | Add a generic weapon-damage modification effect/stat path. |
-| Mechanical Squirrel Box | Item metadata, world-drop/book recipe | Cosmetic non-combat companion use effect is not represented; current `summon_pet` would be incorrect | Add generic cosmetic companion/non-combat summon support, or explicitly approve metadata-only behavior. |
-| Wooden Stock shared material | ID/name/quality/item level/stack/ownership are resolved | Exact Blizzard icon filename was not exposed by the text sources available during preparation | #228 must resolve item 4399's icon token from an authoritative WoW item record before authoring it; do not guess. |
+| Rough Dynamite | Item, recipe, single-target Fire Spell, shared cooldown | Original 5-yard radial AoE | Add generic impact-radius/spatial AoE targeting. |
+| Rough Copper Bomb | Item, recipe, single-target Fire damage, one-turn break-on-damage incapacitation, shared cooldown | Original 3-yard radial AoE and higher-level unreliability rule | Add spatial AoE targeting and a reusable target-level/effect-reliability gate. |
+| Coarse Dynamite | Item, recipe, single-target Fire Spell, shared cooldown | Original 5-yard radial AoE | Add generic impact-radius/spatial AoE targeting. |
+| Crafted Light Shot | Item metadata and recipe | +2 WoW ammo DPS / ammunition combat semantics | Add generic ammo equipment/consumption and ranged-damage contribution support. |
+| Crafted Heavy Shot | Item metadata and recipe | +4.5 WoW ammo DPS / ammunition combat semantics | Add generic ammo equipment/consumption and ranged-damage contribution support. |
+| Crude Scope | Item metadata, modification targeting and recipe | Permanent +1 bow/gun weapon damage | Add a generic weapon-damage modification path. |
+| Mechanical Squirrel Box | Item metadata and book recipe | Cosmetic non-combat companion summon | Add generic cosmetic companion/non-combat summon support, or explicitly retain metadata-only behavior. |
