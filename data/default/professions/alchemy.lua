@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 22,
+    version = 23,
     dataset = {
         achievements = {},
         auras = {
@@ -6500,7 +6500,50 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 triggersGCD = false,
             },
+                    {
+    castTime = 0,
+    components = {
+        {
+            castPhase = "on_cast_end",
+            castingGroup = "default",
+            effect = {
+                amountMode = "flat",
+                baseHealing = 1600,
+                statScaling = {},
+                targetEvents = {},
+                type = "heal",
+            },
+            key = "major-rejuvenation-potion-heal",
+            target = { type = "caster" },
         },
+        {
+            castPhase = "on_cast_end",
+            castingGroup = "default",
+            effect = {
+                amount = 1600,
+                amountMode = "flat",
+                resourceRef = "f82db71a:4c8mfm99",
+                targetEvents = {},
+                type = "resource",
+            },
+            key = "major-rejuvenation-potion-mana",
+            target = { type = "caster" },
+        },
+    },
+    conditions = {},
+    cooldown = 10,
+    cooldownGroup = "potion",
+    description = "",
+    icon = "interface/icons/inv_potion_47.blp",
+    id = "mr1600hm",
+    ignoreGCD = true,
+    learnMode = "unavailable",
+    name = "Major Rejuvenation Potion",
+    resourceCosts = {},
+    tags = {},
+    triggersGCD = false,
+},
+},
         stats = {},
         traits = {},
         units = {},

@@ -185,7 +185,7 @@ All seven recipes require Alchemy 300 and must use RPE `learnMode = "trainer"`.
 | Flask of Supreme Power | 13521 | Ras Frostwhisper, Scholomance | 30 Dreamfoil; 10 Mountain Silversage; 1 Black Lotus; 1 Crystal Vial | 1 Flask of Supreme Power | Alchemy Lab | 152475 |
 | Flask of Chromatic Resistance | 13522 | Gyth, Upper Blackrock Spire | 30 Icecap; 10 Mountain Silversage; 1 Black Lotus; 1 Crystal Vial | 1 Flask of Chromatic Resistance | Alchemy Lab | 152475 |
 | Major Rejuvenation Potion | 18257 | Molten Core boss drop | 1 Heart of the Wild; 4 Golden Sansam; 4 Dreamfoil; 1 Imbued Vial | 1 Major Rejuvenation Potion | none | 152475 |
-| Transmute: Elemental Fire | 20761 | Lokhtos Darkbargainer, Blackrock Depths; Thorium Brotherhood Friendly | 1 Heart of Fire; Philosopher's Stone tool | 3 Elemental Fire | source 10-minute transmute cooldown | 152475 |
+| Transmute: Elemental Fire | 20761 | Lokhtos Darkbargainer, Blackrock Depths; Thorium Brotherhood Friendly | 1 Essence of Fire; Philosopher's Stone tool | 3 Elemental Fire | source 10-minute transmute cooldown | 152475 |
 
 ### 4.1 Acquisition evidence
 
@@ -365,7 +365,7 @@ Do not set an Aura duration just because the potion cooldown is 10 turns.
 
 ### 6.7 Transmute: Elemental Fire — Recipe only
 
-**Vanilla effect:** transmute 1 Heart of Fire into **3 Elemental Fire**, requiring a Philosopher's Stone.
+**Vanilla effect:** transmute 1 Essence of Fire into **3 Elemental Fire**, requiring a Philosopher's Stone.
 
 Original source:
 
@@ -385,7 +385,7 @@ RPE representation:
 ```text
 learnMode = "trainer"
 requiredSkillLevel = 300
-input: 1 Heart of Fire, kind = "rpe_item"
+input: 1 Essence of Fire, kind = "rpe_item"
 input: Philosopher's Stone, kind = "tool"
 output: 3 Elemental Fire
 trainerCostCopper = 152475
@@ -438,33 +438,19 @@ Reuse it for Major Rejuvenation Potion.
 
 Reuse it as the 3-unit output of Transmute: Elemental Fire. Do not create an Alchemy duplicate.
 
-### 7.4 Missing shared material: Heart of Fire
+### 7.4 Existing Enchanting material: Essence of Fire
 
-`Heart of Fire` is required by Transmute: Elemental Fire but is **not currently present** in the searched Alchemy, Misc, or Enchanting packaged data.
+`Essence of Fire` is the approved RPE input for Transmute: Elemental Fire and already exists in the packaged Enchanting dataset.
 
-Vanilla metadata:
+Canonical ref:
 
-- WoW item ID: **7077**
-- item level: **45**
-- quality: **common**
-- vanilla maximum stack: **10**
-- icon: `interface/icons/spell_fire_lavaspawn.blp`
-- type: shared elemental crafting material
+```text
+732368d4:50qj8dzw
+```
 
-Sources:
+Reuse this existing material. Do not add another Essence of Fire record to Alchemy, Enchanting, or Misc.
 
-- <https://www.wowhead.com/classic/item=7077/heart-of-fire>
-- <https://wowclassicdatabase.com/item/heart-of-fire>
-- <https://warcraft.wiki.gg/wiki/Heart_of_Fire>
-
-Ownership decision for #221:
-
-- add Heart of Fire to **Enchanting** dataset `732368d4`, because the current project already owns shared elemental/essence materials there;
-- preserve the exact vanilla metadata above;
-- bump Enchanting's packaged version independently when the canonical file is modified;
-- do not duplicate it in Alchemy or Misc.
-
-No other new shared material is required by this slice.
+No new shared material is required by this slice.
 
 ---
 
@@ -526,7 +512,7 @@ Apply the exact representations from §6:
 - Petrification: flask classification, no fake partial effect;
 - Major Rejuvenation: `useSpellRef` to the exact #220 Spell.
 
-Also add missing `Heart of Fire` to Enchanting `732368d4` with the §7.4 metadata and bump Enchanting independently.
+Reuse existing Enchanting `Essence of Fire` at `732368d4:50qj8dzw`. No shared-material dataset change is required by #221 for this reagent.
 
 Do not duplicate Elemental Fire; reuse `732368d4:sclalidn`.
 
@@ -574,7 +560,7 @@ Before the final Classic Alchemy slice is considered complete, verify:
 - Petrification is not reduced to a misleading partial invulnerability effect;
 - Heart of the Wild resolves to `3eb7e9bb:w2plwren`;
 - Elemental Fire resolves to `732368d4:sclalidn`;
-- Heart of Fire is added once to Enchanting, not duplicated across datasets;
+- Essence of Fire resolves to existing Enchanting `732368d4:50qj8dzw` and is not duplicated;
 - existing Alchemy/shared-material IDs are reused;
 - packaged dataset versions increase only in implementation issues that actually modify those datasets.
 
