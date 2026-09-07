@@ -158,7 +158,7 @@ Current dependency recomputation derives dependencies from Items, Traits, Spells
 |---|---|---|
 | Alchemy | `f82db71a:pdyzyudy` | Recipe skill |
 | Stamina | `f82db71a:ygjno50i` | Health source stat |
-| Intellect | `f82db71a:75y3a8ib` | Mana source stat, but has other derived effects |
+| Intellect | `f82db71a:75y3a8ib` | Mana source stat; approved Distilled Wisdom approximation despite derived side effects |
 | Spell Power | `f82db71a:7t7xgzcx` | Generic damaging-spell power |
 | Fire Resistance | `f82db71a:0w7c7p09` | |
 | Frost Resistance | `f82db71a:jjn0my8k` | |
@@ -275,19 +275,23 @@ This is an explicit RPE adaptation: the source effect modifies maximum health di
 
 No `useSpellRef` is required.
 
-### 6.3 Flask of Distilled Wisdom — blocked direct max-mana effect
+### 6.3 Flask of Distilled Wisdom — event-start Intellect approximation
 
 **Vanilla effect:** +2000 maximum mana for 2 hours; one flask; persists through death.
 
-Do **not** implement this as +200 Intellect. Although Mana derives from Intellect at ×10, Intellect also affects Spell Critical Strike and Intellect-derived skills. That would materially overstate the source effect.
+Current Core Mana is derived from Intellect at a multiplier of 10. The approved RPE approximation is therefore:
 
-Decision:
+```text
+consumableType = "flask"
+consumableTrait.phase = "event_start"
++200 Intellect (f82db71a:75y3a8ib)
+```
 
-- classify the Item later as `consumableType = "flask"`;
-- leave the gameplay bonus blocked under current data models;
-- do not add a fake Intellect trait.
+This yields +2000 maximum Mana in the current Core model and uses the existing one-flask/event-scoped trait system.
 
-Smallest missing generic capability: a flat **maximum-resource modifier** that can add maximum Mana without changing the source stat or unrelated derived values.
+This is a deliberate approximation rather than an exact semantic match: Intellect also contributes to other Intellect-derived values such as Spell Critical Strike and derived skills. That side effect is accepted for this implementation.
+
+No `useSpellRef` is required.
 
 ### 6.4 Flask of Supreme Power — event-start Spell Power trait
 
@@ -482,9 +486,9 @@ Decision: preserve source data in documentation, implement the representable rec
 
 Blocked because the current generic control model does not cleanly provide the complete vanilla combination of incoming immunity and inability to attack/move/cast.
 
-### 8.4 Flask of Distilled Wisdom
+### 8.4 Flask of Distilled Wisdom approximation
 
-Blocked because current Trait data has no flat max-resource modifier. Intellect is not an acceptable substitute because it changes unrelated derived values.
+The source effect is +2000 maximum Mana. RPE intentionally approximates that as +200 Intellect because Mana is derived at ×10. The resulting additional Intellect-derived bonuses are accepted as part of this approximation.
 
 ### 8.5 Recipe dependency discovery
 
@@ -503,7 +507,7 @@ Implement only:
 Do not create Spells/Auras for:
 
 - Titans — Trait-based;
-- Distilled Wisdom — blocked;
+- Distilled Wisdom — Trait-based;
 - Supreme Power — Trait-based;
 - Chromatic Resistance — Trait-based;
 - Petrification — blocked;
@@ -516,7 +520,7 @@ Add the five flask Items and Major Rejuvenation Potion using §5 metadata.
 Apply the exact representations from §6:
 
 - Titans: +120 Stamina event-start flask Trait;
-- Distilled Wisdom: flask classification, no fake bonus;
+- Distilled Wisdom: +200 Intellect event-start flask Trait, accepting Intellect-derived side effects;
 - Supreme Power: +150 Spell Power event-start flask Trait;
 - Chromatic Resistance: +25 five Core resistances event-start flask Trait;
 - Petrification: flask classification, no fake partial effect;
@@ -564,7 +568,7 @@ Before the final Classic Alchemy slice is considered complete, verify:
 - Major Rejuvenation uses **Imbued Vial**, not Crystal Vial;
 - Major Rejuvenation uses midpoint 1600 for both health and Mana in the approved RPE Spell representation;
 - Titans uses +120 Stamina as the deliberate +1200-Health adaptation;
-- Distilled Wisdom is not incorrectly converted to +200 Intellect;
+- Distilled Wisdom uses the approved +200 Intellect approximation, with its additional Intellect-derived bonuses explicitly accepted;
 - Supreme Power uses +150 Spell Power;
 - Chromatic Resistance uses +25 to the five existing Core resistance stats and does not invent Holy Resistance;
 - Petrification is not reduced to a misleading partial invulnerability effect;
@@ -582,14 +586,15 @@ The final vanilla Classic `(295,300]` implementation set is fixed at **7 recipes
 
 The data is ready for sequential implementation through #220, #221, and #222 without re-researching recipe identity or re-deciding gameplay representation.
 
-The two explicit gameplay blockers are:
+The one explicit gameplay blocker is:
 
 1. **Flask of Petrification** — complete immunity/action-lock semantics are not cleanly expressible by the current generic Aura control model.
-2. **Flask of Distilled Wisdom** — current Trait data lacks a direct flat maximum-resource modifier, and Intellect would introduce unrelated derived bonuses.
+
+Flask of Distilled Wisdom is no longer blocked: it uses the approved **+200 Intellect** approximation for +2000 maximum Mana, accepting the extra Intellect-derived effects in RPE.
 
 The two source crafting restrictions not currently expressible by Recipe data are:
 
 1. **Alchemy Lab** for all five flasks.
 2. **10-minute transmute cooldown** for Transmute: Elemental Fire.
 
-These limitations are documented rather than approximated with incorrect mechanics.
+These source restrictions are documented rather than approximated with incorrect crafting mechanics.
