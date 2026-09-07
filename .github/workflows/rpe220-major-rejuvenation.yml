@@ -39,7 +39,6 @@ jobs:
           assert alchemy_before.count('name = "Major Rejuvenation Potion"') == 0, 'Major Rejuvenation already exists'
           assert 'Heart of Fire' in doc, 'Preparation doc no longer contains Heart of Fire substitution target'
 
-          # Resolve the existing packaged Enchanting Essence of Fire record.
           essence_marker = 'name = "Essence of Fire"'
           assert enchanting.count(essence_marker) == 1, 'Expected exactly one Enchanting Essence of Fire item'
           essence_pos = enchanting.index(essence_marker)
@@ -87,7 +86,6 @@ jobs:
                   i += 1
               raise AssertionError(f'Unclosed {field_name} table')
 
-          # Snapshot top-level tables that Issue 220 must not touch.
           protected_before = {}
           for field in ('auras', 'items', 'recipes'):
               s, e = table_span(alchemy_before, field)
@@ -140,33 +138,32 @@ jobs:
               tags = {},
               triggersGCD = false,
           },
-'''
+          '''
 
           alchemy = alchemy_before.replace('    version = 22,', '    version = 23,', 1)
-          spell_start, spell_end = table_span(alchemy, 'spells')
+          _, spell_end = table_span(alchemy, 'spells')
           close_pos = spell_end - 1
           alchemy = alchemy[:close_pos] + spell_record + alchemy[close_pos:]
 
-          # Update the authoritative preparation doc per project decision.
           doc = doc.replace('Heart of Fire', 'Essence of Fire')
 
           replacement_74 = f'''### 7.4 Existing Enchanting material: Essence of Fire
 
-`Essence of Fire` is the approved RPE input for Transmute: Elemental Fire and already exists in the packaged Enchanting dataset.
+          `Essence of Fire` is the approved RPE input for Transmute: Elemental Fire and already exists in the packaged Enchanting dataset.
 
-Canonical ref:
+          Canonical ref:
 
-```text
-{essence_ref}
-```
+          ```text
+          {essence_ref}
+          ```
 
-Reuse this existing material. Do not add another Essence of Fire record to Alchemy, Enchanting, or Misc.
+          Reuse this existing material. Do not add another Essence of Fire record to Alchemy, Enchanting, or Misc.
 
-No new shared material is required by this slice.
+          No new shared material is required by this slice.
 
----
+          ---
 
-## 8. Unsupported source mechanics / downstream constraints'''
+          ## 8. Unsupported source mechanics / downstream constraints'''
           doc, n = re.subn(
               r'### 7\.4 .*?\n\n---\n\n## 8\. Unsupported source mechanics / downstream constraints',
               replacement_74,
@@ -187,7 +184,6 @@ No new shared material is required by this slice.
               f'- Essence of Fire resolves to existing Enchanting `{essence_ref}` and is not duplicated;'
           )
 
-          # Also remove any stale implication that Essence of Fire is missing/new.
           assert 'Heart of Fire' not in doc
           assert 'Missing shared material: Essence of Fire' not in doc
           assert 'add missing `Essence of Fire`' not in doc
@@ -196,7 +192,6 @@ No new shared material is required by this slice.
           alchemy_path.write_text(alchemy)
           doc_path.write_text(doc)
 
-          # Deterministic data validation.
           assert alchemy.count('version = 23,') == 1
           assert alchemy.count('id = "mr1600hm"') == 1
           assert alchemy.count('name = "Major Rejuvenation Potion"') == 1
@@ -205,8 +200,7 @@ No new shared material is required by this slice.
 
           ss, se = table_span(alchemy, 'spells')
           spells = alchemy[ss:se]
-          marker = 'id = "mr1600hm"'
-          mid = spells.index(marker)
+          mid = spells.index('id = "mr1600hm"')
           record_window = spells[max(0, mid - 1800):min(len(spells), mid + 1000)]
           assert 'baseHealing = 1600' in record_window
           assert 'amount = 1600' in record_window
@@ -219,12 +213,10 @@ No new shared material is required by this slice.
           assert record_window.count('type = "caster"') == 2
           assert 'icon = "interface/icons/inv_potion_47.blp"' in record_window
 
-          # No Aura, Item, or Recipe records changed in this issue.
           for field in ('auras', 'items', 'recipes'):
               s, e = table_span(alchemy, field)
               assert alchemy[s:e] == protected_before[field], f'Unexpected {field} modification'
 
-          # Representative completed <=295 spell IDs must survive unchanged.
           for stable_id in ('usnkss0q', 'k08wff6m', 'li100drs'):
               assert f'id = "{stable_id}"' in alchemy, f'Missing existing spell {stable_id}'
 
