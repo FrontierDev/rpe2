@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 1,
+    version = 2,
     dataset = {
         achievements = {},
         auras = {
@@ -66,11 +66,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 1,
+                            maxTargets = 5,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
-                            type = "single",
+                            type = "multi",
                         },
                     },
                 },
@@ -109,11 +109,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 1,
+                            maxTargets = 5,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
-                            type = "single",
+                            type = "multi",
                         },
                     },
                     {
@@ -131,11 +131,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 1,
+                            maxTargets = 5,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
-                            type = "single",
+                            type = "multi",
                         },
                     },
                 },
@@ -174,11 +174,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 1,
+                            maxTargets = 5,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
-                            type = "single",
+                            type = "multi",
                         },
                     },
                 },
