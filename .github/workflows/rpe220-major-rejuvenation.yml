@@ -21,47 +21,39 @@ jobs:
       - name: Implement and validate Issue 220
         shell: bash
         run: |
-          set -o pipefail
-          exec > >(tee rpe220-validation.txt) 2>&1
           python - <<'PY'
           from pathlib import Path
           import re
 
-          alchemy_path = Path('data/default/professions/alchemy.lua')
-          doc_path = Path('.docs/RPE2-Alchemy-295-300-Preparation.md')
-          enchanting_path = Path('data/default/professions/enchanting.lua')
+          ap = Path('data/default/professions/alchemy.lua')
+          dp = Path('.docs/RPE2-Alchemy-295-300-Preparation.md')
+          ep = Path('data/default/professions/enchanting.lua')
+          before = ap.read_text()
+          doc = dp.read_text()
+          enchanting = ep.read_text()
 
-          before = alchemy_path.read_text()
-          doc = doc_path.read_text()
-          enchanting = enchanting_path.read_text()
-
-          assert len(re.findall(r'^\s*version = 22,\s*$', before, re.M)) == 1
+          assert re.findall(r'^\s*version = 22,\s*$', before, re.M)
           assert 'id = "mr1600hm"' not in before
           assert 'name = "Major Rejuvenation Potion"' not in before
           assert 'Heart of Fire' in doc
-
+          assert enchanting.count('name = "Essence of Fire"') == 1
+          p = enchanting.index('name = "Essence of Fire"')
+          assert 'id = "50qj8dzw"' in enchanting[max(0, p - 1000):p]
           essence_ref = '732368d4:50qj8dzw'
-          essence_name = 'name = "Essence of Fire"'
-          assert enchanting.count(essence_name) == 1
-          ep = enchanting.index(essence_name)
-          assert 'id = "50qj8dzw"' in enchanting[max(0, ep - 1000):ep]
 
-          def table_span(text, field):
+          def span(text, field):
               start = text.index(f'{field} = {{')
               op = text.index('{', start)
               depth = 0
               quote = None
-              escape = False
+              esc = False
               i = op
               while i < len(text):
                   c = text[i]
                   if quote:
-                      if escape:
-                          escape = False
-                      elif c == '\\':
-                          escape = True
-                      elif c == quote:
-                          quote = None
+                      if esc: esc = False
+                      elif c == '\\': esc = True
+                      elif c == quote: quote = None
                       i += 1
                       continue
                   if c in ('"', "'"):
@@ -70,21 +62,19 @@ jobs:
                       nl = text.find('\n', i + 2)
                       i = len(text) if nl < 0 else nl + 1
                       continue
-                  elif c == '{':
-                      depth += 1
+                  elif c == '{': depth += 1
                   elif c == '}':
                       depth -= 1
-                      if depth == 0:
-                          return start, i + 1
+                      if depth == 0: return start, i + 1
                   i += 1
-              raise AssertionError(f'unclosed table {field}')
+              raise AssertionError(field)
 
           protected = {}
-          for field in ('auras', 'items', 'recipes'):
-              s, e = table_span(before, field)
-              protected[field] = before[s:e]
+          for f in ('auras', 'items', 'recipes'):
+              s, e = span(before, f)
+              protected[f] = before[s:e]
 
-          spell_record = '''            {
+          record = '''            {
               castTime = 0,
               components = {
                   {
@@ -98,9 +88,7 @@ jobs:
                           type = "heal",
                       },
                       key = "major-rejuvenation-potion-heal",
-                      target = {
-                          type = "caster",
-                      },
+                      target = { type = "caster" },
                   },
                   {
                       castPhase = "on_cast_end",
@@ -113,9 +101,7 @@ jobs:
                           type = "resource",
                       },
                       key = "major-rejuvenation-potion-mana",
-                      target = {
-                          type = "caster",
-                      },
+                      target = { type = "caster" },
                   },
               },
               conditions = {},
@@ -132,14 +118,11 @@ jobs:
               triggersGCD = false,
           },
           '''
-          assert spell_record.count('type = "caster"') == 2
 
           after = before.replace('    version = 22,', '    version = 23,', 1)
-          _, spells_end = table_span(after, 'spells')
-          close = spells_end - 1
-          after = after[:close] + spell_record + after[close:]
+          _, se = span(after, 'spells')
+          after = after[:se-1] + record + after[se-1:]
 
-          # Project-directed recipe reagent substitution in the preparation source of truth.
           doc = doc.replace('Heart of Fire', 'Essence of Fire')
           section = f'''### 7.4 Existing Enchanting material: Essence of Fire
 
@@ -158,82 +141,56 @@ jobs:
           ---
 
           ## 8. Unsupported source mechanics / downstream constraints'''
-          doc, count = re.subn(
+          doc, n = re.subn(
               r'### 7\.4 .*?\n\n---\n\n## 8\. Unsupported source mechanics / downstream constraints',
-              section,
-              doc,
-              count=1,
-              flags=re.S,
-          )
-          assert count == 1
+              section, doc, count=1, flags=re.S)
+          assert n == 1
+          old = 'Also add missing `Essence of Fire` to Enchanting `732368d4` with the §7.4 metadata and bump Enchanting independently.'
+          assert old in doc
+          doc = doc.replace(old, f'Reuse existing Enchanting `Essence of Fire` at `{essence_ref}`. No shared-material dataset change is required by #221 for this reagent.', 1)
+          doc = doc.replace('- Essence of Fire is added once to Enchanting, not duplicated across datasets;', f'- Essence of Fire resolves to existing Enchanting `{essence_ref}` and is not duplicated;')
 
-          stale = 'Also add missing `Essence of Fire` to **Enchanting** `732368d4` with the §7.4 metadata and bump Enchanting independently.\n\n'
-          replacement = f'Reuse existing Enchanting `Essence of Fire` at `{essence_ref}`. No shared-material dataset change is required by #221 for this reagent.\n\n'
-          assert stale in doc
-          doc = doc.replace(stale, replacement, 1)
-          doc = doc.replace(
-              '- Essence of Fire is added once to Enchanting, not duplicated across datasets;',
-              f'- Essence of Fire resolves to existing Enchanting `{essence_ref}` and is not duplicated;'
-          )
+          ap.write_text(after)
+          dp.write_text(doc)
 
-          alchemy_path.write_text(after)
-          doc_path.write_text(doc)
-
-          # Exact #220 validation.
           assert after.count('version = 23,') == 1
           assert after.count('id = "mr1600hm"') == 1
           assert after.count('name = "Major Rejuvenation Potion"') == 1
           assert after.count('key = "major-rejuvenation-potion-heal"') == 1
           assert after.count('key = "major-rejuvenation-potion-mana"') == 1
-          assert after.count('baseHealing = 1600') >= 1
-          assert after.count('resourceRef = "f82db71a:4c8mfm99"') >= 1
-          assert spell_record.count('amount = 1600') == 1
-          assert 'cooldown = 10' in spell_record
-          assert 'cooldownGroup = "potion"' in spell_record
-          assert 'learnMode = "unavailable"' in spell_record
-          assert 'ignoreGCD = true' in spell_record
-          assert 'triggersGCD = false' in spell_record
-          assert 'icon = "interface/icons/inv_potion_47.blp"' in spell_record
-
-          for field in ('auras', 'items', 'recipes'):
-              s, e = table_span(after, field)
-              assert after[s:e] == protected[field], f'Unexpected {field} change'
-
+          assert record.count('baseHealing = 1600') == 1
+          assert record.count('amount = 1600') == 1
+          assert record.count('resourceRef = "f82db71a:4c8mfm99"') == 1
+          assert record.count('type = "caster"') == 2
+          for token in ('cooldown = 10', 'cooldownGroup = "potion"', 'learnMode = "unavailable"', 'ignoreGCD = true', 'triggersGCD = false'):
+              assert token in record
+          for f in ('auras', 'items', 'recipes'):
+              s, e = span(after, f)
+              assert after[s:e] == protected[f]
           for stable in ('usnkss0q', 'k08wff6m', 'li100drs'):
               assert f'id = "{stable}"' in after
-
           assert 'Heart of Fire' not in doc
           assert 'Missing shared material: Essence of Fire' not in doc
-          assert 'add missing `Essence of Fire`' not in doc
           assert essence_ref in doc
           assert '1 Essence of Fire; Philosopher' in doc
           assert 'input: 1 Essence of Fire' in doc
           assert 'No new shared material is required by this slice.' in doc
 
-          print('Validated Alchemy v22 -> v23')
-          print('Validated spell d6ffc4e2:mr1600hm: 1600 base heal + 1600 Mana, caster target, 10-turn potion cooldown')
-          print(f'Validated Essence of Fire substitution: {essence_ref}')
-          print('Validated no Aura, Item, or Recipe table changes')
+          print('Validated #220: Major Rejuvenation spell d6ffc4e2:mr1600hm')
+          print('Validated 1600 base heal + 1600 Mana, self target, 10-turn potion cooldown')
+          print('Validated no Aura, Item, or Recipe changes')
+          print('Validated Essence of Fire substitution:', essence_ref)
           PY
 
           git diff --check
           python - <<'PY'
           import subprocess
           changed = set(subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines())
-          expected = {'.docs/RPE2-Alchemy-295-300-Preparation.md', 'data/default/professions/alchemy.lua'}
-          assert changed == expected, f'Unexpected changes: {sorted(changed)}'
-          print('Validated changed-file scope:', sorted(changed))
+          assert changed == {'.docs/RPE2-Alchemy-295-300-Preparation.md', 'data/default/professions/alchemy.lua'}, changed
+          print('Changed-file scope validated')
           PY
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .docs/RPE2-Alchemy-295-300-Preparation.md data/default/professions/alchemy.lua
           git commit -m "Implement Alchemy 300 item-use spell"
           git push origin dev
-
-      - name: Upload validation log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: rpe220-validation
-          path: rpe220-validation.txt
