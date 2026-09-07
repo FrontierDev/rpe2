@@ -1,0 +1,599 @@
+name: RPE222 Alchemy endgame recipes
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - .github/workflows/rpe222-endgame-recipes.yml
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Implement and validate Issue 222
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+
+          alchemy_path = Path('data/default/professions/alchemy.lua')
+          doc_path = Path('.docs/RPE2-Alchemy-295-300-Preparation.md')
+          recipe_class_path = Path('core/classes/Recipe.lua')
+          crafting_path = Path('client/client_Crafting.lua')
+          profile_path = Path('core/internal/profile/Profile.lua')
+          deps_path = Path('core/internal/database/Dependecies.lua')
+          enchanting_path = Path('data/default/professions/enchanting.lua')
+          misc_path = Path('data/default/professions/misc.lua')
+
+          before = alchemy_path.read_text()
+          doc = doc_path.read_text()
+          recipe_class = recipe_class_path.read_text()
+          crafting = crafting_path.read_text()
+          profile = profile_path.read_text()
+          deps = deps_path.read_text()
+          enchanting = enchanting_path.read_text()
+          misc = misc_path.read_text()
+
+          assert len(re.findall(r'^\s*version = 24,\s*$', before, re.M)) == 1, 'Expected live Alchemy v24 after #221'
+          assert 'id = "d6ffc4e2"' in before, 'Alchemy dataset ID missing'
+          assert 'kind ~= "rpe_item" and kind ~= "tool"' in recipe_class, 'Recipe input-kind schema changed'
+          assert 'mode == "always_learned" or mode == "trainer" or mode == "book" or mode == "unavailable"' in recipe_class, 'Recipe learn modes changed'
+          assert '75 + (level * 28) + (level * level * 1.6)' in crafting, 'Trainer cost formula changed'
+          assert int(75 + 300 * 28 + 300 * 300 * 1.6) == 152475
+          assert 'if row.kind == "tool" then' in crafting, 'Tool/material separation changed'
+          assert 'for index = 1, #(detail.materials or {}) do' in crafting, 'Material consumption path changed'
+          assert 'unknownTrainerRecipeRefsBySkill' in profile, 'Trainer recipe knowledge indexing changed'
+          assert 'getRecipeSourceRefs' not in deps, 'Dependency architecture changed; re-review required'
+
+          expected_names = [
+              'Flask of Petrification',
+              'Flask of the Titans',
+              'Flask of Distilled Wisdom',
+              'Flask of Supreme Power',
+              'Flask of Chromatic Resistance',
+              'Major Rejuvenation Potion',
+              'Transmute: Elemental Fire',
+          ]
+          for name in expected_names:
+              assert name in doc, f'Missing #219 source-of-truth entry: {name}'
+          for text in (
+              'trainerCostCopper = 152475',
+              'input: 1 Essence of Fire, kind = "rpe_item"',
+              'input: Philosopher\'s Stone, kind = "tool"',
+              'output: 3 Elemental Fire',
+              '3eb7e9bb:w2plwren',
+              '732368d4:50qj8dzw',
+              '732368d4:sclalidn',
+              'd6ffc4e2:y9p4s8nt',
+          ):
+              assert text in doc, f'Missing prepared decision: {text}'
+
+          def assert_named_id(text, item_id, name, radius=2600):
+              marker = f'id = "{item_id}"'
+              assert text.count(marker) == 1, f'Expected exactly one item ID {item_id}'
+              pos = text.index(marker)
+              window = text[max(0, pos - radius):min(len(text), pos + radius)]
+              assert f'name = "{name}"' in window, f'{item_id} does not resolve near {name}'
+
+          internal_refs = {
+              'rerdartb': 'Gromsblood',
+              'd4sw4y04': 'Stonescale Oil',
+              'usfyk84u': 'Dreamfoil',
+              'dvzvvc52': 'Mountain Silversage',
+              'irt83rqo': 'Icecap',
+              'm1cdfomm': 'Golden Sansam',
+              '804x8qak': 'Crystal Vial',
+              '5b2vp7y0': 'Imbued Vial',
+              '151j6hkf': 'Black Lotus',
+              'y9p4s8nt': "Philosopher's Stone",
+              '92h163gw': 'Flask of Petrification',
+              'fqzfqzvh': 'Flask of the Titans',
+              'qy3t5uyi': 'Flask of Distilled Wisdom',
+              '0ymoaskz': 'Flask of Supreme Power',
+              '9u6ogptd': 'Flask of Chromatic Resistance',
+              'fdz4n63z': 'Major Rejuvenation Potion',
+          }
+          for item_id, name in internal_refs.items():
+              assert_named_id(before, item_id, name)
+          assert_named_id(misc, 'w2plwren', 'Heart of the Wild')
+          assert_named_id(enchanting, '50qj8dzw', 'Essence of Fire')
+          assert_named_id(enchanting, 'sclalidn', 'Elemental Fire')
+
+          def table_span(text, field):
+              marker = f'        {field} = {{'
+              start = text.index(marker)
+              open_pos = text.index('{', start)
+              depth = 0
+              quote = None
+              escape = False
+              i = open_pos
+              while i < len(text):
+                  c = text[i]
+                  if quote is not None:
+                      if escape:
+                          escape = False
+                      elif c == '\\':
+                          escape = True
+                      elif c == quote:
+                          quote = None
+                      i += 1
+                      continue
+                  if c in ('"', "'"):
+                      quote = c
+                      i += 1
+                      continue
+                  if c == '-' and i + 1 < len(text) and text[i + 1] == '-':
+                      newline = text.find('\n', i + 2)
+                      if newline < 0:
+                          raise AssertionError(f'Unclosed {field} table')
+                      i = newline + 1
+                      continue
+                  if c == '{':
+                      depth += 1
+                  elif c == '}':
+                      depth -= 1
+                      if depth == 0:
+                          return start, i + 1
+                  i += 1
+              raise AssertionError(f'Unclosed {field} table')
+
+          def top_level_records(table_text):
+              open_pos = table_text.index('{')
+              depth = 0
+              quote = None
+              escape = False
+              record_start = None
+              spans = []
+              i = open_pos
+              while i < len(table_text):
+                  c = table_text[i]
+                  if quote is not None:
+                      if escape:
+                          escape = False
+                      elif c == '\\':
+                          escape = True
+                      elif c == quote:
+                          quote = None
+                      i += 1
+                      continue
+                  if c in ('"', "'"):
+                      quote = c
+                      i += 1
+                      continue
+                  if c == '-' and i + 1 < len(table_text) and table_text[i + 1] == '-':
+                      newline = table_text.find('\n', i + 2)
+                      if newline < 0:
+                          break
+                      i = newline + 1
+                      continue
+                  if c == '{':
+                      depth += 1
+                      if depth == 2:
+                          record_start = i
+                  elif c == '}':
+                      if depth == 2 and record_start is not None:
+                          spans.append((record_start, i + 1))
+                          record_start = None
+                      depth -= 1
+                  i += 1
+              return [table_text[s:e] for s, e in spans]
+
+          protected_before = {}
+          for field in ('auras', 'items', 'spells'):
+              s, e = table_span(before, field)
+              protected_before[field] = before[s:e]
+
+          rs, re_ = table_span(before, 'recipes')
+          recipes_before = before[rs:re_]
+          assert len(top_level_records(recipes_before)) > 0, 'No existing recipes found'
+          assert 'requiredSkillLevel = 300' not in recipes_before, 'Unexpected pre-existing skill-300 recipe'
+          for name in expected_names:
+              assert f'name = "{name}"' not in recipes_before, f'Pre-existing target recipe: {name}'
+          for forbidden in ('Alchemists\' Stone', 'Volatile Healing Potion', 'Onslaught Elixir', "Adept's Elixir"):
+              assert forbidden not in recipes_before, f'Out-of-scope recipe already present: {forbidden}'
+
+          new_ids = {
+              'Flask of Petrification': 'p6r3t9vx',
+              'Flask of the Titans': 't7n4s2qw',
+              'Flask of Distilled Wisdom': 'd8w5m3yk',
+              'Flask of Supreme Power': 's9p2r6hz',
+              'Flask of Chromatic Resistance': 'c4r8m1vn',
+              'Major Rejuvenation Potion': 'j5v7n2qx',
+              'Transmute: Elemental Fire': 'e6f3t8kw',
+          }
+          for recipe_id in new_ids.values():
+              assert f'id = "{recipe_id}"' not in before, f'Recipe ID collision: {recipe_id}'
+
+          recipe_records = '''            {
+              category = "",
+              description = "",
+              id = "p6r3t9vx",
+              inputs = {
+                  {
+                      itemRef = "d6ffc4e2:d4sw4y04",
+                      kind = "rpe_item",
+                      quantity = 30,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:dvzvvc52",
+                      kind = "rpe_item",
+                      quantity = 10,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:151j6hkf",
+                      kind = "rpe_item",
+                      quantity = 1,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:804x8qak",
+                      kind = "rpe_item",
+                      quantity = 1,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:y9p4s8nt",
+                      kind = "tool",
+                      quantity = 1,
+                  },
+              },
+              learnMode = "trainer",
+              name = "Flask of Petrification",
+              output = {
+                  itemRef = "d6ffc4e2:92h163gw",
+                  maxQuantity = 1,
+                  minQuantity = 1,
+              },
+              reagents = {},
+              requiredSkillLevel = 300,
+              results = {},
+              skillRef = "f82db71a:pdyzyudy",
+              tags = {},
+              trainerCostCopper = 152475,
+          },
+          {
+              category = "",
+              description = "",
+              id = "t7n4s2qw",
+              inputs = {
+                  {
+                      itemRef = "d6ffc4e2:rerdartb",
+                      kind = "rpe_item",
+                      quantity = 30,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:d4sw4y04",
+                      kind = "rpe_item",
+                      quantity = 10,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:151j6hkf",
+                      kind = "rpe_item",
+                      quantity = 1,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:804x8qak",
+                      kind = "rpe_item",
+                      quantity = 1,
+                  },
+              },
+              learnMode = "trainer",
+              name = "Flask of the Titans",
+              output = {
+                  itemRef = "d6ffc4e2:fqzfqzvh",
+                  maxQuantity = 1,
+                  minQuantity = 1,
+              },
+              reagents = {},
+              requiredSkillLevel = 300,
+              results = {},
+              skillRef = "f82db71a:pdyzyudy",
+              tags = {},
+              trainerCostCopper = 152475,
+          },
+          {
+              category = "",
+              description = "",
+              id = "d8w5m3yk",
+              inputs = {
+                  {
+                      itemRef = "d6ffc4e2:usfyk84u",
+                      kind = "rpe_item",
+                      quantity = 30,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:irt83rqo",
+                      kind = "rpe_item",
+                      quantity = 10,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:151j6hkf",
+                      kind = "rpe_item",
+                      quantity = 1,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:804x8qak",
+                      kind = "rpe_item",
+                      quantity = 1,
+                  },
+              },
+              learnMode = "trainer",
+              name = "Flask of Distilled Wisdom",
+              output = {
+                  itemRef = "d6ffc4e2:qy3t5uyi",
+                  maxQuantity = 1,
+                  minQuantity = 1,
+              },
+              reagents = {},
+              requiredSkillLevel = 300,
+              results = {},
+              skillRef = "f82db71a:pdyzyudy",
+              tags = {},
+              trainerCostCopper = 152475,
+          },
+          {
+              category = "",
+              description = "",
+              id = "s9p2r6hz",
+              inputs = {
+                  {
+                      itemRef = "d6ffc4e2:usfyk84u",
+                      kind = "rpe_item",
+                      quantity = 30,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:dvzvvc52",
+                      kind = "rpe_item",
+                      quantity = 10,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:151j6hkf",
+                      kind = "rpe_item",
+                      quantity = 1,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:804x8qak",
+                      kind = "rpe_item",
+                      quantity = 1,
+                  },
+              },
+              learnMode = "trainer",
+              name = "Flask of Supreme Power",
+              output = {
+                  itemRef = "d6ffc4e2:0ymoaskz",
+                  maxQuantity = 1,
+                  minQuantity = 1,
+              },
+              reagents = {},
+              requiredSkillLevel = 300,
+              results = {},
+              skillRef = "f82db71a:pdyzyudy",
+              tags = {},
+              trainerCostCopper = 152475,
+          },
+          {
+              category = "",
+              description = "",
+              id = "c4r8m1vn",
+              inputs = {
+                  {
+                      itemRef = "d6ffc4e2:irt83rqo",
+                      kind = "rpe_item",
+                      quantity = 30,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:dvzvvc52",
+                      kind = "rpe_item",
+                      quantity = 10,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:151j6hkf",
+                      kind = "rpe_item",
+                      quantity = 1,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:804x8qak",
+                      kind = "rpe_item",
+                      quantity = 1,
+                  },
+              },
+              learnMode = "trainer",
+              name = "Flask of Chromatic Resistance",
+              output = {
+                  itemRef = "d6ffc4e2:9u6ogptd",
+                  maxQuantity = 1,
+                  minQuantity = 1,
+              },
+              reagents = {},
+              requiredSkillLevel = 300,
+              results = {},
+              skillRef = "f82db71a:pdyzyudy",
+              tags = {},
+              trainerCostCopper = 152475,
+          },
+          {
+              category = "",
+              description = "",
+              id = "j5v7n2qx",
+              inputs = {
+                  {
+                      itemRef = "3eb7e9bb:w2plwren",
+                      kind = "rpe_item",
+                      quantity = 1,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:m1cdfomm",
+                      kind = "rpe_item",
+                      quantity = 4,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:usfyk84u",
+                      kind = "rpe_item",
+                      quantity = 4,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:5b2vp7y0",
+                      kind = "rpe_item",
+                      quantity = 1,
+                  },
+              },
+              learnMode = "trainer",
+              name = "Major Rejuvenation Potion",
+              output = {
+                  itemRef = "d6ffc4e2:fdz4n63z",
+                  maxQuantity = 1,
+                  minQuantity = 1,
+              },
+              reagents = {},
+              requiredSkillLevel = 300,
+              results = {},
+              skillRef = "f82db71a:pdyzyudy",
+              tags = {},
+              trainerCostCopper = 152475,
+          },
+          {
+              category = "",
+              description = "",
+              id = "e6f3t8kw",
+              inputs = {
+                  {
+                      itemRef = "732368d4:50qj8dzw",
+                      kind = "rpe_item",
+                      quantity = 1,
+                  },
+                  {
+                      itemRef = "d6ffc4e2:y9p4s8nt",
+                      kind = "tool",
+                      quantity = 1,
+                  },
+              },
+              learnMode = "trainer",
+              name = "Transmute: Elemental Fire",
+              output = {
+                  itemRef = "732368d4:sclalidn",
+                  maxQuantity = 3,
+                  minQuantity = 3,
+              },
+              reagents = {},
+              requiredSkillLevel = 300,
+              results = {},
+              skillRef = "f82db71a:pdyzyudy",
+              tags = {},
+              trainerCostCopper = 152475,
+          },
+'''
+
+          after = before.replace('    version = 24,', '    version = 25,', 1)
+          rs2, re2 = table_span(after, 'recipes')
+          close_char = re2 - 1
+          line_start = after.rfind('\n', 0, close_char) + 1
+          assert after[line_start:close_char].strip() == '', 'Recipe closing brace is not isolated'
+          insert_relative = line_start - rs2
+          expected_recipes_after = after[rs2:re2]
+          expected_recipes_after = expected_recipes_after[:insert_relative] + recipe_records + expected_recipes_after[insert_relative:]
+          after = after[:line_start] + recipe_records + after[line_start:]
+          alchemy_path.write_text(after)
+
+          assert len(re.findall(r'^\s*version = 25,\s*$', after, re.M)) == 1, 'Alchemy version did not become 25'
+          rs3, re3 = table_span(after, 'recipes')
+          recipes_after = after[rs3:re3]
+          assert recipes_after == expected_recipes_after, 'Existing recipe data changed outside the intended append'
+          old_count = len(top_level_records(recipes_before))
+          records_after = top_level_records(recipes_after)
+          assert len(records_after) == old_count + 7, 'Expected exactly seven new recipes'
+
+          for field, previous in protected_before.items():
+              s, e = table_span(after, field)
+              assert after[s:e] == previous, f'Unexpected change to {field} table'
+
+          recipe_by_name = {}
+          recipe_ids = []
+          recipe_names = []
+          for record in records_after:
+              name_match = re.search(r'\n\s*name = "([^"]+)",', record)
+              id_match = re.search(r'\n\s*id = "([^"]+)",', record)
+              if name_match:
+                  recipe_names.append(name_match.group(1))
+                  recipe_by_name[name_match.group(1)] = record
+              if id_match:
+                  recipe_ids.append(id_match.group(1))
+          assert len(recipe_names) == len(set(recipe_names)), 'Duplicate recipe name detected'
+          assert len(recipe_ids) == len(set(recipe_ids)), 'Duplicate recipe ID detected'
+          for name in expected_names:
+              assert recipe_names.count(name) == 1, f'Expected exactly one recipe named {name}'
+              record = recipe_by_name[name]
+              assert f'id = "{new_ids[name]}"' in record
+              assert 'learnMode = "trainer"' in record
+              assert 'requiredSkillLevel = 300' in record
+              assert 'skillRef = "f82db71a:pdyzyudy"' in record
+              assert 'trainerCostCopper = 152475' in record
+              assert 'reagents = {}' in record and 'results = {}' in record and 'tags = {}' in record
+
+          specs = {
+              'Flask of Petrification': {
+                  'inputs': [('d6ffc4e2:d4sw4y04','rpe_item',30), ('d6ffc4e2:dvzvvc52','rpe_item',10), ('d6ffc4e2:151j6hkf','rpe_item',1), ('d6ffc4e2:804x8qak','rpe_item',1), ('d6ffc4e2:y9p4s8nt','tool',1)],
+                  'output': ('d6ffc4e2:92h163gw',1,1),
+              },
+              'Flask of the Titans': {
+                  'inputs': [('d6ffc4e2:rerdartb','rpe_item',30), ('d6ffc4e2:d4sw4y04','rpe_item',10), ('d6ffc4e2:151j6hkf','rpe_item',1), ('d6ffc4e2:804x8qak','rpe_item',1)],
+                  'output': ('d6ffc4e2:fqzfqzvh',1,1),
+              },
+              'Flask of Distilled Wisdom': {
+                  'inputs': [('d6ffc4e2:usfyk84u','rpe_item',30), ('d6ffc4e2:irt83rqo','rpe_item',10), ('d6ffc4e2:151j6hkf','rpe_item',1), ('d6ffc4e2:804x8qak','rpe_item',1)],
+                  'output': ('d6ffc4e2:qy3t5uyi',1,1),
+              },
+              'Flask of Supreme Power': {
+                  'inputs': [('d6ffc4e2:usfyk84u','rpe_item',30), ('d6ffc4e2:dvzvvc52','rpe_item',10), ('d6ffc4e2:151j6hkf','rpe_item',1), ('d6ffc4e2:804x8qak','rpe_item',1)],
+                  'output': ('d6ffc4e2:0ymoaskz',1,1),
+              },
+              'Flask of Chromatic Resistance': {
+                  'inputs': [('d6ffc4e2:irt83rqo','rpe_item',30), ('d6ffc4e2:dvzvvc52','rpe_item',10), ('d6ffc4e2:151j6hkf','rpe_item',1), ('d6ffc4e2:804x8qak','rpe_item',1)],
+                  'output': ('d6ffc4e2:9u6ogptd',1,1),
+              },
+              'Major Rejuvenation Potion': {
+                  'inputs': [('3eb7e9bb:w2plwren','rpe_item',1), ('d6ffc4e2:m1cdfomm','rpe_item',4), ('d6ffc4e2:usfyk84u','rpe_item',4), ('d6ffc4e2:5b2vp7y0','rpe_item',1)],
+                  'output': ('d6ffc4e2:fdz4n63z',1,1),
+              },
+              'Transmute: Elemental Fire': {
+                  'inputs': [('732368d4:50qj8dzw','rpe_item',1), ('d6ffc4e2:y9p4s8nt','tool',1)],
+                  'output': ('732368d4:sclalidn',3,3),
+              },
+          }
+          input_pattern = re.compile(r'itemRef = "([^"]+)",\s*\n\s*kind = "([^"]+)",\s*\n\s*quantity = (\d+),')
+          output_pattern = re.compile(r'output = \{\s*\n\s*itemRef = "([^"]+)",\s*\n\s*maxQuantity = (\d+),\s*\n\s*minQuantity = (\d+),')
+          for name, spec in specs.items():
+              record = recipe_by_name[name]
+              actual_inputs = [(ref, kind, int(qty)) for ref, kind, qty in input_pattern.findall(record)]
+              assert actual_inputs == spec['inputs'], f'Input mismatch for {name}: {actual_inputs}'
+              output_match = output_pattern.search(record)
+              assert output_match, f'Missing output for {name}'
+              out_ref, out_max, out_min = output_match.groups()
+              expected_ref, expected_min, expected_max = spec['output']
+              assert (out_ref, int(out_min), int(out_max)) == (expected_ref, expected_min, expected_max), f'Output mismatch for {name}'
+
+          assert recipes_after.count('requiredSkillLevel = 300') == 7, 'Unexpected skill-300 recipe count'
+          assert recipes_after.count('learnMode = "book"') == 0, 'Project rule requires no book Alchemy recipes'
+          for forbidden in ('Alchemists\' Stone', 'Volatile Healing Potion', 'Onslaught Elixir', "Adept's Elixir"):
+              assert forbidden not in recipes_after, f'Out-of-scope recipe introduced: {forbidden}'
+
+          changed = subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()
+          assert changed == ['data/default/professions/alchemy.lua'], f'Unexpected changed files: {changed}'
+          subprocess.run(['git', 'diff', '--check'], check=True)
+          print(f'Validated Alchemy v25: {old_count} -> {old_count + 7} recipes; seven skill-300 trainer recipes; exact #219 inputs/outputs; tools retained; unsupported lab/cooldown constraints not faked.')
+          PY
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/default/professions/alchemy.lua
+          git commit -m "Implement Alchemy 300 endgame recipes"
+          git push origin HEAD:dev
