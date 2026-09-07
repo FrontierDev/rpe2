@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 23,
+    version = 24,
     dataset = {
         achievements = {},
         auras = {
@@ -2859,6 +2859,187 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Major Mana Potion",
                 quality = "common",
                 useSpellRef = "d6ffc4e2:k08wff6m",
+            },
+            {
+                canDisenchant = false,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableType = "flask",
+                icon = "interface/icons/inv_potion_26.blp",
+                id = "92h163gw",
+                itemLevel = 60,
+                itemType = "consumable",
+                maxStackSize = 5,
+                name = "Flask of Petrification",
+                quality = "common",
+            },
+            {
+                canDisenchant = false,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableTrait = {
+                    phase = "event_start",
+                    statBonuses = {
+                        {
+                            operation = "flat",
+                            statRef = "f82db71a:ygjno50i",
+                            value = 120,
+                        },
+                    },
+                },
+                consumableType = "flask",
+                icon = "interface/icons/inv_potion_62.blp",
+                id = "fqzfqzvh",
+                itemLevel = 60,
+                itemType = "consumable",
+                maxStackSize = 5,
+                name = "Flask of the Titans",
+                quality = "common",
+            },
+            {
+                canDisenchant = false,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableTrait = {
+                    phase = "event_start",
+                    statBonuses = {
+                        {
+                            operation = "flat",
+                            statRef = "f82db71a:75y3a8ib",
+                            value = 200,
+                        },
+                    },
+                },
+                consumableType = "flask",
+                icon = "interface/icons/inv_potion_97.blp",
+                id = "qy3t5uyi",
+                itemLevel = 60,
+                itemType = "consumable",
+                maxStackSize = 5,
+                name = "Flask of Distilled Wisdom",
+                quality = "common",
+            },
+            {
+                canDisenchant = false,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableTrait = {
+                    phase = "event_start",
+                    statBonuses = {
+                        {
+                            operation = "flat",
+                            statRef = "f82db71a:7t7xgzcx",
+                            value = 150,
+                        },
+                    },
+                },
+                consumableType = "flask",
+                icon = "interface/icons/inv_potion_41.blp",
+                id = "0ymoaskz",
+                itemLevel = 60,
+                itemType = "consumable",
+                maxStackSize = 5,
+                name = "Flask of Supreme Power",
+                quality = "common",
+            },
+            {
+                canDisenchant = false,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableTrait = {
+                    phase = "event_start",
+                    statBonuses = {
+                        {
+                            operation = "flat",
+                            statRef = "f82db71a:0w7c7p09",
+                            value = 25,
+                        },
+                        {
+                            operation = "flat",
+                            statRef = "f82db71a:jjn0my8k",
+                            value = 25,
+                        },
+                        {
+                            operation = "flat",
+                            statRef = "f82db71a:pg0ytacb",
+                            value = 25,
+                        },
+                        {
+                            operation = "flat",
+                            statRef = "f82db71a:954yunb9",
+                            value = 25,
+                        },
+                        {
+                            operation = "flat",
+                            statRef = "f82db71a:itpo751d",
+                            value = 25,
+                        },
+                    },
+                },
+                consumableType = "flask",
+                icon = "interface/icons/inv_potion_48.blp",
+                id = "9u6ogptd",
+                itemLevel = 60,
+                itemType = "consumable",
+                maxStackSize = 5,
+                name = "Flask of Chromatic Resistance",
+                quality = "common",
+            },
+            {
+                canDisenchant = false,
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 50,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level",
+                    },
+                },
+                consumableType = "potion",
+                icon = "interface/icons/inv_potion_47.blp",
+                id = "fdz4n63z",
+                itemLevel = 60,
+                itemType = "consumable",
+                maxStackSize = 5,
+                name = "Major Rejuvenation Potion",
+                quality = "common",
+                useSpellRef = "d6ffc4e2:mr1600hm",
             },
         },
         loot = {},
