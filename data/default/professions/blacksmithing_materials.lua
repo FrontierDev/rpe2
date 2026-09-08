@@ -5,8 +5,8 @@ if not definition or not definition.dataset then
     error("Blacksmithing default dataset must be registered before blacksmithing_materials.lua", 2)
 end
 
-if definition.version < 3 then
-    definition.version = 3
+if definition.version < 2 then
+    definition.version = 2
 end
 
 local items = definition.dataset.items
@@ -69,17 +69,6 @@ local materials = {
         itemType = "material",
         maxStackSize = 20,
         name = "Truesilver Bar",
-        quality = "common",
-    },
-    {
-        allowWowConversion = true,
-        canDisenchant = false,
-        icon = "interface/icons/inv_ingot_02.blp",
-        id = "nntycdj5",
-        itemLevel = 10,
-        itemType = "material",
-        maxStackSize = 20,
-        name = "Copper Bar",
         quality = "common",
     },
 }
