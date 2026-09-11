@@ -5,7 +5,6 @@ Addon.Client.UI = Addon.Client.UI or {}
 
 local Client = Addon.Client
 local EventWidget = Client.UI.EventWidget
-local Common = Addon.Utils and Addon.Utils.Common or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Ruleset = Addon.Internal and Addon.Internal.Ruleset or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
@@ -202,7 +201,13 @@ if type(EventWidget.RefreshPortraitSlot) == "function" then
             return nativeRefreshPortraitSlot(self, index, eventUnit, state, context, options)
         end)
 
-        local known, primaryRef = resolveKnownPrimary(eventUnit, state)
+        local hiddenForClient = type(eventUnit) == "table"
+            and eventUnit.hidden == true
+            and not (type(context) == "table" and context.isHost == true)
+        local known, primaryRef = false, nil
+        if not hiddenForClient then
+            known, primaryRef = resolveKnownPrimary(eventUnit, state)
+        end
         if known then
             local portrait = nil
             if type(options) == "table" and type(options.ensureSlot) == "function" then
