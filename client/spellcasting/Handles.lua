@@ -14,6 +14,30 @@ local function isLiveAuraContext(context)
         and eventState.startupReady == true
 end
 
+local function queueAuraStatusWithTeamColors(client, entry, nativeQueue)
+    if type(client) ~= "table" or type(entry) ~= "table" or type(nativeQueue) ~= "function" then
+        return false
+    end
+
+    local enriched = {}
+    for key, value in pairs(entry) do
+        enriched[key] = value
+    end
+
+    local eventState = type(client.GetEventState) == "function" and client:GetEventState() or client.EventState
+    if type(client.ResolveCombatLogTeamColors) == "function" then
+        local casterColor, targetColor = client:ResolveCombatLogTeamColors(enriched, eventState)
+        if enriched.casterColor == nil or tostring(enriched.casterColor or "") == "" then
+            enriched.casterColor = casterColor
+        end
+        if enriched.targetColor == nil or tostring(enriched.targetColor or "") == "" then
+            enriched.targetColor = targetColor
+        end
+    end
+
+    return nativeQueue(client, enriched)
+end
+
 local function callLiveAuraMutation(nativeHandler, manager, client, context, ...)
     if type(nativeHandler) ~= "function" or not isLiveAuraContext(context) then
         return nativeHandler(manager, client, context, ...)
@@ -36,7 +60,7 @@ local function callLiveAuraMutation(nativeHandler, manager, client, context, ...
         and type(nativeQueueCombatLogEntry) == "function"
     then
         client.QueueCombatLogEntryEmission = function(targetClient, entry)
-            return nativeQueueCombatLogEntry(targetClient, entry)
+            return queueAuraStatusWithTeamColors(targetClient, entry, nativeQueueCombatLogEntry)
         end
     end
 
@@ -124,12 +148,34 @@ if AuraManager and AuraManager._liveAuraMutationSyncInstalled ~= true then
     end
 end
 
+local function handleInboundAuraWithTeamColors(handler, client, arguments, sender)
+    if not AuraManager or type(handler) ~= "function" or type(client) ~= "table" then
+        return false
+    end
+
+    local nativeQueueCombatLogEntry = client.QueueCombatLogEntry
+    if type(nativeQueueCombatLogEntry) ~= "function" then
+        return handler(AuraManager, client, arguments, sender)
+    end
+
+    client.QueueCombatLogEntry = function(targetClient, entry)
+        return queueAuraStatusWithTeamColors(targetClient, entry, nativeQueueCombatLogEntry)
+    end
+    local ok, result = pcall(handler, AuraManager, client, arguments, sender)
+    client.QueueCombatLogEntry = nativeQueueCombatLogEntry
+
+    if not ok then
+        error(result, 0)
+    end
+    return result
+end
+
 function Client:HandleAuraApply(arguments, sender)
     if not AuraManager or type(AuraManager.HandleAuraApply) ~= "function" then
         return false
     end
 
-    return AuraManager:HandleAuraApply(self, arguments, sender)
+    return handleInboundAuraWithTeamColors(AuraManager.HandleAuraApply, self, arguments, sender)
 end
 
 function Client:HandleAuraDispel(arguments, sender)
@@ -137,7 +183,7 @@ function Client:HandleAuraDispel(arguments, sender)
         return false
     end
 
-    return AuraManager:HandleAuraDispel(self, arguments, sender)
+    return handleInboundAuraWithTeamColors(AuraManager.HandleAuraDispel, self, arguments, sender)
 end
 
 function Client:HandleAuraApplyBatch(arguments, sender)
@@ -145,7 +191,7 @@ function Client:HandleAuraApplyBatch(arguments, sender)
         return false
     end
 
-    return AuraManager:HandleAuraApplyBatch(self, arguments, sender)
+    return handleInboundAuraWithTeamColors(AuraManager.HandleAuraApplyBatch, self, arguments, sender)
 end
 
 function Client:HandleAuraDispelBatch(arguments, sender)
@@ -153,7 +199,7 @@ function Client:HandleAuraDispelBatch(arguments, sender)
         return false
     end
 
-    return AuraManager:HandleAuraDispelBatch(self, arguments, sender)
+    return handleInboundAuraWithTeamColors(AuraManager.HandleAuraDispelBatch, self, arguments, sender)
 end
 
 return Client
