@@ -37,7 +37,7 @@ local function findEventUnit(eventState, eventId)
     return nil
 end
 
-local function expectedAuraOwner(eventState, casterUnit)
+local function expectedRuntimeOwner(eventState, casterUnit)
     if type(casterUnit) ~= "table" then
         return ""
     end
@@ -50,8 +50,8 @@ local function expectedAuraOwner(eventState, casterUnit)
     return normalizeName(controller and (controller.ownerID or controller.controllerID or controller.name) or nil)
 end
 
-local function isLocalAuraOwner(eventState, casterUnit)
-    local expectedOwner = expectedAuraOwner(eventState, casterUnit)
+local function isLocalRuntimeOwner(eventState, casterUnit)
+    local expectedOwner = expectedRuntimeOwner(eventState, casterUnit)
     if expectedOwner ~= "" then
         return expectedOwner == localPlayerName()
     end
@@ -83,9 +83,29 @@ local function cloneAuraTickDispatches(values)
             or nil
         if aura then
             cloned[#cloned + 1] = {
-                turnNumber = math.max(1, math.floor(tonumber(value.turnNumber) or 1)),
-                tickNumber = math.max(1, math.floor(tonumber(value.tickNumber) or 1)),
+                eventId = tostring(type(value) == "table" and value.eventId or ""),
+                turnNumber = math.max(1, math.floor(tonumber(type(value) == "table" and value.turnNumber or nil) or 1)),
+                tickNumber = math.max(1, math.floor(tonumber(type(value) == "table" and value.tickNumber or nil) or 1)),
                 aura = aura,
+            }
+        end
+    end
+    return cloned
+end
+
+local function clonePendingSpellCompletions(values)
+    local cloned = {}
+    for index = 1, #(values or {}) do
+        local value = values[index]
+        local castEntry = type(CombatState.CloneCastEntry) == "function"
+            and CombatState.CloneCastEntry(type(value) == "table" and value.castEntry or nil)
+            or nil
+        if castEntry then
+            cloned[#cloned + 1] = {
+                eventId = tostring(type(value) == "table" and value.eventId or ""),
+                turnNumber = math.max(1, math.floor(tonumber(type(value) == "table" and value.turnNumber or nil) or 1)),
+                tickNumber = math.max(1, math.floor(tonumber(type(value) == "table" and value.tickNumber or nil) or 1)),
+                castEntry = castEntry,
             }
         end
     end
@@ -132,6 +152,7 @@ function CombatState.AdvanceAuraRecords(records, eventState, resolveOwnerPage)
                     and currentTick >= ownerPage
                 then
                     pendingTicks[#pendingTicks + 1] = {
+                        eventId = tostring(eventState.id or ""),
                         turnNumber = currentTurn,
                         tickNumber = currentTick,
                         aura = type(CombatState.CloneAuraRecord) == "function"
@@ -188,10 +209,64 @@ function CombatState.AdvanceAuraRecords(records, eventState, resolveOwnerPage)
     return changed, pendingTicks
 end
 
+-- Preserve the full pre-removal cast entry when the host's pure progression
+-- marks a persistent cast complete. server_EventCombatRuntimePost.lua already
+-- creates the one-shot completion expectation; this layer adds transient
+-- dispatch metadata required to execute the owner's completion after the turn
+-- commit has finished applying.
+do
+    local baseAdvanceCastBucket = CombatState.AdvanceCastBucket
+    if type(baseAdvanceCastBucket) == "function" then
+        function CombatState.AdvanceCastBucket(bucket, currentTurnNumber, isCasterTurnOnTick)
+            local before = type(CombatState.CloneCastBucket) == "function"
+                and CombatState.CloneCastBucket(bucket or {})
+                or {}
+            local changed, completed = baseAdvanceCastBucket(bucket, currentTurnNumber, isCasterTurnOnTick)
+
+            local runtime = Server.EventRuntime
+            local eventState = Server.EventState
+            if type(runtime) == "table"
+                and runtime.spellcasts == bucket
+                and type(eventState) == "table"
+                and eventState.active == true
+                and #((completed) or {}) > 0
+            then
+                local pending = {}
+                runtime.completedSpellcasts = runtime.completedSpellcasts or {}
+                for index = 1, #completed do
+                    local casterEventId = completed[index]
+                    local castEntry = before[tonumber(casterEventId) or casterEventId]
+                    if type(castEntry) == "table" then
+                        local clonedEntry = type(CombatState.CloneCastEntry) == "function"
+                            and CombatState.CloneCastEntry(castEntry)
+                            or castEntry
+                        pending[#pending + 1] = {
+                            eventId = tostring(eventState.id or ""),
+                            turnNumber = math.max(1, math.floor(tonumber(eventState.turnNumber) or 1)),
+                            tickNumber = math.max(1, math.floor(tonumber(eventState.tickNumber) or 1)),
+                            castEntry = clonedEntry,
+                        }
+                        local expectation = runtime.completedSpellcasts[tonumber(casterEventId) or casterEventId]
+                        if type(expectation) == "table" then
+                            expectation.castEntry = type(CombatState.CloneCastEntry) == "function"
+                                and CombatState.CloneCastEntry(clonedEntry)
+                                or clonedEntry
+                        end
+                    end
+                end
+                if #pending > 0 then
+                    runtime._pendingSpellCompletions = clonePendingSpellCompletions(pending)
+                end
+            end
+            return changed, completed
+        end
+    end
+end
+
 -- EventCombatState's runtime codec is also used by EVENT_RUNTIME_STATE. Extend
--- that envelope with transient, commit-local aura tick dispatch metadata. This
--- field is not stored in Server.EventRuntime and therefore is not part of a
--- later rejoin snapshot.
+-- that envelope with transient, commit-local aura tick and spell completion
+-- dispatch metadata. These fields are not canonical Server.EventRuntime state
+-- and are therefore absent from later rejoin snapshots.
 do
     local baseCloneRuntimeState = CombatState.CloneRuntimeState
     if type(baseCloneRuntimeState) == "function" then
@@ -199,6 +274,9 @@ do
             local cloned = baseCloneRuntimeState(value)
             if type(cloned) == "table" then
                 cloned.pendingAuraTicks = cloneAuraTickDispatches(type(value) == "table" and value.pendingAuraTicks or nil)
+                cloned.pendingSpellCompletions = clonePendingSpellCompletions(
+                    type(value) == "table" and value.pendingSpellCompletions or nil
+                )
             end
             return cloned
         end
@@ -243,9 +321,9 @@ do
     end
 end
 
--- Export the pending tick dispatch only into the runtime operation currently
--- being built, then clear it from the authoritative runtime. This keeps it out
--- of subsequent unrelated runtime commits and out of Issue #236 snapshots.
+-- Export transient turn-effect dispatches only into the runtime operation being
+-- built, then clear them from authoritative runtime. This prevents stale replay
+-- in subsequent commits and keeps them out of Issue #236 snapshots.
 do
     local baseExportEventCombatRuntime = Server.ExportEventCombatRuntime
     if type(baseExportEventCombatRuntime) == "function" then
@@ -253,18 +331,40 @@ do
             local exported = baseExportEventCombatRuntime(self, ...)
             if type(exported) == "table" and type(self.EventRuntime) == "table" then
                 exported.pendingAuraTicks = cloneAuraTickDispatches(self.EventRuntime._pendingAuraTicks)
+                exported.pendingSpellCompletions = clonePendingSpellCompletions(self.EventRuntime._pendingSpellCompletions)
                 self.EventRuntime._pendingAuraTicks = nil
+                self.EventRuntime._pendingSpellCompletions = nil
             end
             return exported
         end
     end
 end
 
--- HandleEventState normally queues AuraManager:AdvanceAuraEntry work. During a
--- host-stamped combat commit the server has already advanced canonical aura
--- duration state, so suppress that duplicate duration path. Periodic effects
--- are queued explicitly from EVENT_RUNTIME_STATE below after replacement.
+-- EVENT_RUNTIME_STATE is the canonical turn-progression result. Do not also
+-- advance client cast/cooldown/aura caches from EVENT_STATE while applying the
+-- same revision: that can double-advance state and can execute completion/tick
+-- effects re-entrantly while nested event-sync sends are suppressed.
 do
+    local baseAdvanceSpellcastState = Client.AdvanceSpellcastState
+    if type(baseAdvanceSpellcastState) == "function" then
+        function Client:AdvanceSpellcastState(...)
+            if self.EventSyncApplyingCommittedMutation == true then
+                return false
+            end
+            return baseAdvanceSpellcastState(self, ...)
+        end
+    end
+
+    local baseAdvanceCooldownState = Client.AdvanceCooldownState
+    if type(baseAdvanceCooldownState) == "function" then
+        function Client:AdvanceCooldownState(...)
+            if self.EventSyncApplyingCommittedMutation == true then
+                return false
+            end
+            return baseAdvanceCooldownState(self, ...)
+        end
+    end
+
     local baseAdvanceAuraState = Client.AdvanceAuraState
     if type(baseAdvanceAuraState) == "function" then
         function Client:AdvanceAuraState(...)
@@ -279,24 +379,24 @@ end
 local function executeAuthoritativeAuraTick(client, dispatch)
     local eventState = type(client) == "table" and type(client.GetEventState) == "function" and client:GetEventState() or nil
     local record = type(dispatch) == "table" and dispatch.aura or nil
-    if type(eventState) ~= "table" or eventState.active ~= true or type(record) ~= "table" then
+    if type(eventState) ~= "table" or eventState.active ~= true
+        or tostring(eventState.id or "") ~= tostring(type(dispatch) == "table" and dispatch.eventId or "")
+        or type(record) ~= "table"
+    then
         return false
     end
 
     local casterUnit = findEventUnit(eventState, record.casterEventId)
     local targetUnit = findEventUnit(eventState, record.targetEventId)
-    if not casterUnit or not targetUnit or not isLocalAuraOwner(eventState, casterUnit) then
+    if not casterUnit or not targetUnit or not isLocalRuntimeOwner(eventState, casterUnit) then
         return false
     end
 
-    local _, auraDefinition = type(AuraManager) == "table" and type(AuraManager.ResolveAuraDefinition) == "function"
-        and AuraManager:ResolveAuraDefinition(record.auraRef, { datasetId = record.datasetId })
-        or nil, nil
-    if type(AuraManager) == "table" and type(AuraManager.ResolveAuraDefinition) == "function" then
-        local _, resolved = AuraManager:ResolveAuraDefinition(record.auraRef, { datasetId = record.datasetId })
-        auraDefinition = resolved
+    if type(AuraManager) ~= "table" or type(AuraManager.ResolveAuraDefinition) ~= "function" or type(AuraManager.TickAura) ~= "function" then
+        return false
     end
-    if type(auraDefinition) ~= "table" or type(AuraManager.TickAura) ~= "function" then
+    local _, auraDefinition = AuraManager:ResolveAuraDefinition(record.auraRef, { datasetId = record.datasetId })
+    if type(auraDefinition) ~= "table" then
         return false
     end
 
@@ -305,28 +405,68 @@ local function executeAuthoritativeAuraTick(client, dispatch)
     return AuraManager:TickAura(client, eventState, tickEntry, casterUnit, targetUnit) == true
 end
 
-local function queueAuthoritativeAuraTicks(client, dispatches)
-    for index = 1, #(dispatches or {}) do
-        local dispatch = dispatches[index]
-        local eventState = type(client.GetEventState) == "function" and client:GetEventState() or nil
+local function executeAuthoritativeSpellCompletion(client, dispatch)
+    local eventState = type(client) == "table" and type(client.GetEventState) == "function" and client:GetEventState() or nil
+    local castEntry = type(dispatch) == "table" and dispatch.castEntry or nil
+    if type(eventState) ~= "table" or eventState.active ~= true
+        or tostring(eventState.id or "") ~= tostring(type(dispatch) == "table" and dispatch.eventId or "")
+        or type(castEntry) ~= "table"
+    then
+        return false
+    end
+
+    local casterUnit = findEventUnit(eventState, castEntry.casterEventId)
+    if not casterUnit or not isLocalRuntimeOwner(eventState, casterUnit) then
+        return false
+    end
+    if type(client.OnSpellcastComplete) ~= "function" then
+        return false
+    end
+    return client:OnSpellcastComplete(castEntry.spellRef, castEntry) == true
+end
+
+local function queueAuthoritativeTurnEffects(client, runtimeState)
+    local eventState = type(client) == "table" and type(client.GetEventState) == "function" and client:GetEventState() or nil
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return false
+    end
+
+    local queuedAny = false
+    for index = 1, #((runtimeState and runtimeState.pendingAuraTicks) or {}) do
+        local dispatch = runtimeState.pendingAuraTicks[index]
         local casterUnit = findEventUnit(eventState, dispatch and dispatch.aura and dispatch.aura.casterEventId)
-        if casterUnit and isLocalAuraOwner(eventState, casterUnit) then
+        if casterUnit and isLocalRuntimeOwner(eventState, casterUnit) then
             if type(Tasks.Enqueue) ~= "function" then
                 return false
             end
             Tasks:Enqueue(function(targetClient, pendingDispatch)
                 executeAuthoritativeAuraTick(targetClient, pendingDispatch)
             end, client, dispatch)
+            queuedAny = true
         end
     end
-    return true
+
+    for index = 1, #((runtimeState and runtimeState.pendingSpellCompletions) or {}) do
+        local dispatch = runtimeState.pendingSpellCompletions[index]
+        local casterUnit = findEventUnit(eventState, dispatch and dispatch.castEntry and dispatch.castEntry.casterEventId)
+        if casterUnit and isLocalRuntimeOwner(eventState, casterUnit) then
+            if type(Tasks.Enqueue) ~= "function" then
+                return false
+            end
+            Tasks:Enqueue(function(targetClient, pendingDispatch)
+                executeAuthoritativeSpellCompletion(targetClient, pendingDispatch)
+            end, client, dispatch)
+            queuedAny = true
+        end
+    end
+
+    return true, queuedAny
 end
 
--- EVENT_RUNTIME_STATE installs the post-turn canonical aura state first, then
--- queues the owner-only periodic effects using the pre-advance aura snapshot.
--- The queued job executes after EventSyncApplyingCommittedMutation is released,
--- so any resulting resource/aura mutations can enter the normal host proposal
--- pipeline instead of being suppressed as nested commit traffic.
+-- Runtime replacement installs the post-turn canonical aura/cast/cooldown state
+-- first. Owner-only periodic effects/completions are then queued from pre-turn
+-- records and run after EventSyncApplyingCommittedMutation is released, so any
+-- resulting resource/aura mutations use the normal host proposal path.
 do
     local baseHandleEventRuntimeState = Client.HandleEventRuntimeState
     if type(baseHandleEventRuntimeState) == "function" then
@@ -335,11 +475,12 @@ do
                 and CombatState.DeserializeRuntimeState(arguments and arguments[3] or "")
                 or nil
             local result = baseHandleEventRuntimeState(self, arguments, sender, ...)
-            if result == true
-                and type(decoded) == "table"
-                and #((decoded.pendingAuraTicks) or {}) > 0
-            then
-                if queueAuthoritativeAuraTicks(self, decoded.pendingAuraTicks) ~= true then
+            if result == true and type(decoded) == "table" then
+                local hasAuraTicks = #((decoded.pendingAuraTicks) or {}) > 0
+                local hasSpellCompletions = #((decoded.pendingSpellCompletions) or {}) > 0
+                if (hasAuraTicks or hasSpellCompletions)
+                    and queueAuthoritativeTurnEffects(self, decoded) ~= true
+                then
                     return false
                 end
             end
@@ -363,7 +504,7 @@ if type(AuraManager) == "table" and type(AuraManager.AdvanceAuraEntry) == "funct
             targetEventId = tonumber(entry.targetEventId) or 0,
         } or nil
         local casterUnit = previous and findEventUnit(eventState, previous.casterEventId) or nil
-        local isOwner = isLocalAuraOwner(eventState, casterUnit)
+        local isOwner = isLocalRuntimeOwner(eventState, casterUnit)
 
         local changed = baseAdvanceAuraEntry(self, client, eventId, auraKey, targetTurnNumber, targetTickNumber)
         if changed ~= true or type(previous) ~= "table" or not isOwner then
