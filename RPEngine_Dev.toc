@@ -223,6 +223,7 @@ client/autopilot/PlannerSnapshotUnitsPerformance.lua
 client/client_PendingChanges.lua
 server/server_Spellcasting.lua
 server/server_EventCombatRuntime.lua
+server/server_EventCombatRuntimePost.lua
 
 core/Sound.lua
 api/UI.lua
