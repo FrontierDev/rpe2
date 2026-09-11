@@ -16,16 +16,35 @@ local Common = Addon.Utils.Common or {}
 local Debug = Addon.Debug or {}
 local Spellcasting = Client.Spellcasting or {}
 local AuraManager = Spellcasting.AuraManager or (Addon.Internal and Addon.Internal.AuraManager) or nil
+local Combat = Client.Combat or {}
 
 local CLIENT_CONNECT_OPCODE = Operations.GetOpcode and Operations:GetOpcode("CLIENT_CONNECT") or nil
 local RESOURCE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("RESOURCE") or nil
 local RESOURCE_DELTA_OPCODE = Operations.GetOpcode and Operations:GetOpcode("RESOURCE_DELTA") or nil
 local RESOURCE_DELTA_BATCH_OPCODE = Operations.GetOpcode and Operations:GetOpcode("RESOURCE_DELTA_BATCH") or nil
+local AURA_APPLY_OPCODE = Operations.GetOpcode and Operations:GetOpcode("AURA_APPLY") or nil
+local AURA_DISPEL_OPCODE = Operations.GetOpcode and Operations:GetOpcode("AURA_DISPEL") or nil
+local AURA_APPLY_BATCH_OPCODE = Operations.GetOpcode and Operations:GetOpcode("AURA_APPLY_BATCH") or nil
+local AURA_DISPEL_BATCH_OPCODE = Operations.GetOpcode and Operations:GetOpcode("AURA_DISPEL_BATCH") or nil
+local SPELLCAST_START_OPCODE = Operations.GetOpcode and Operations:GetOpcode("SPELLCAST_START") or nil
+local SPELLCAST_COMPLETE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("SPELLCAST_COMPLETE") or nil
+local SPELLCAST_INTERRUPT_OPCODE = Operations.GetOpcode and Operations:GetOpcode("SPELLCAST_INTERRUPT") or nil
+local EVENT_DEFENSIVE_USE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("EVENT_DEFENSIVE_USE") or nil
+local EVENT_MUTATION_REQUEST_OPCODE = Operations.GetOpcode and Operations:GetOpcode("EVENT_MUTATION_REQUEST") or nil
 
-local FOUNDATION_RESOURCE_OPCODES = {
+local CLIENT_MUTATION_OPCODES = {
     [RESOURCE_OPCODE or -1] = true,
     [RESOURCE_DELTA_OPCODE or -2] = true,
     [RESOURCE_DELTA_BATCH_OPCODE or -3] = true,
+    [AURA_APPLY_OPCODE or -4] = true,
+    [AURA_DISPEL_OPCODE or -5] = true,
+    [AURA_APPLY_BATCH_OPCODE or -6] = true,
+    [AURA_DISPEL_BATCH_OPCODE or -7] = true,
+    [SPELLCAST_START_OPCODE or -8] = true,
+    [SPELLCAST_COMPLETE_OPCODE or -9] = true,
+    [SPELLCAST_INTERRUPT_OPCODE or -10] = true,
+    [EVENT_DEFENSIVE_USE_OPCODE or -11] = true,
+    [EVENT_MUTATION_REQUEST_OPCODE or -12] = true,
 }
 
 local function pack(...)
@@ -104,6 +123,7 @@ local function markEventSyncing(client, reason)
             if tostring(syncState.eventId or "") ~= "" and tostring(syncState.eventId or "") ~= eventId then
                 syncState.appliedRevision = 0
                 syncState.bufferedCommits = {}
+                syncState.repairRequested = false
             end
             syncState.eventId = eventId
         end
@@ -111,7 +131,6 @@ local function markEventSyncing(client, reason)
     syncState.status = "syncing"
     syncState.reason = tostring(reason or "event-sync")
     syncState.pipelineActive = true
-    syncState.repairRequested = false
     syncState.bufferedCommits = syncState.bufferedCommits or {}
     return syncState
 end
@@ -184,7 +203,6 @@ local function isExpectedSnapshotIdentity(client, snapshot)
     local eventState = getEventState(client)
     local syncState = getSyncState(client, false)
     local awaitingConnectSnapshot = client.EventSyncAwaitingConnectSnapshot == true
-
     if type(eventState) == "table" and eventState.active == true then
         if tostring(eventState.id or "") == eventId then
             return true
@@ -201,10 +219,9 @@ local function isExpectedSnapshotIdentity(client, snapshot)
         and tostring(syncState.eventId or "") == eventId
 end
 
--- CLIENT_CONNECT is the only point where a reloaded/reconnecting client may
--- legitimately accept a snapshot for an event ID different from stale local
--- state. Gate old state immediately and warm the resource bootstrap before the
--- inner #236 transport wrapper serializes CLIENT_CONNECT argument 6.
+-- Gate reconnect state and every client event-mutation domain at the final
+-- transport boundary. This prevents queued work from submitting proposals while
+-- a revision repair/snapshot is in progress.
 do
     local baseSendToChannel = Comms.SendToChannel
     if type(baseSendToChannel) == "function" then
@@ -224,13 +241,13 @@ do
                         markEventSyncing(Client, "reconnect")
                     end
                 end
-            elseif opcode and FOUNDATION_RESOURCE_OPCODES[opcode] == true
+            elseif opcode and CLIENT_MUTATION_OPCODES[opcode] == true
                 and type(metadata) == "table" and metadata.scope == "client"
             then
                 local syncState = getSyncState(Client, false)
                 if type(syncState) == "table" and syncState.status == "syncing" then
                     logInternal(
-                        "EventSync: blocked client resource mutation while syncing opcode=%s event=%s reason=%s.",
+                        "EventSync: blocked client mutation while syncing opcode=%s event=%s reason=%s.",
                         tostring(opcode),
                         tostring(syncState.eventId or ""),
                         tostring(syncState.reason or "syncing")
@@ -243,7 +260,27 @@ do
     end
 end
 
--- Repair is both a revision gate and a presentation/playability gate.
+-- Defensive consumption has one direct #235 proposal path that does not cross
+-- Comms.SendToChannel after it has been transformed. Block that entry point too.
+do
+    local baseConsumeDefensiveReactionUse = Combat.ConsumeDefensiveReactionUse
+    if type(baseConsumeDefensiveReactionUse) == "function" then
+        function Combat:ConsumeDefensiveReactionUse(entry, action)
+            local eventState = type(entry) == "table" and entry.eventState or getEventState(Client)
+            local syncState = getSyncState(Client, false)
+            if type(eventState) == "table" and eventState.active == true
+                and type(syncState) == "table" and syncState.status == "syncing"
+            then
+                return false, "event-syncing"
+            end
+            return baseConsumeDefensiveReactionUse(self, entry, action)
+        end
+    end
+end
+
+-- Repair is both a revision gate and a presentation/playability gate. Preserve
+-- an existing repairRequested flag so repeated buffered commits cannot spam
+-- duplicate snapshot requests.
 do
     local baseRequestEventSyncRepair = Client.RequestEventSyncRepair
     if type(baseRequestEventSyncRepair) == "function" then
