@@ -43,6 +43,7 @@ core/internal/comms/MessageQueue.lua
 core/internal/comms/Operations.lua
 core/internal/comms/Serialization.lua
 core/internal/comms/Core.lua
+core/internal/comms/EventSync.lua
 core/internal/comms/TransportDiagnostics.lua
 core/internal/comms/Channel.lua
 core/internal/comms/LootDelivery.lua
@@ -151,6 +152,8 @@ server/server_EventVariants.lua
 server/server_EventResourceIntegration.lua
 server/server_EventSpellEquipmentVariants.lua
 server/server_EventAutopilotSchedule.lua
+server/server_EventRuntime.lua
+client/client_EventSync.lua
 client/autopilot/Spatial.lua
 client/autopilot/SpellEvaluator.lua
 client/autopilot/ActionEconomy.lua
