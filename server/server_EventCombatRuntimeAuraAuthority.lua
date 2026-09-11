@@ -263,6 +263,56 @@ do
     end
 end
 
+-- The historical client progression removes a completed cast before the owner
+-- has passed completion-time conditions. Preserve the active host cast until a
+-- SPELLCAST_COMPLETE proposal is actually accepted. The owner still receives a
+-- post-commit completion dispatch for this turn; a failed completion therefore
+-- leaves the fully progressed cast present and eligible to retry on a later
+-- owner turn, matching the pre-authority behavior.
+do
+    local baseAdvanceCastBucket = CombatState.AdvanceCastBucket
+    if type(baseAdvanceCastBucket) == "function" then
+        function CombatState.AdvanceCastBucket(bucket, currentTurnNumber, isCasterTurnOnTick)
+            local runtime = Server.EventRuntime
+            local eventState = Server.EventState
+            local isAuthoritativeBucket = type(runtime) == "table"
+                and runtime.spellcasts == bucket
+                and type(eventState) == "table"
+                and eventState.active == true
+            local before = isAuthoritativeBucket and type(CombatState.CloneCastBucket) == "function"
+                and CombatState.CloneCastBucket(bucket or {})
+                or nil
+
+            local changed, completed = baseAdvanceCastBucket(bucket, currentTurnNumber, isCasterTurnOnTick)
+            if not isAuthoritativeBucket or #((completed) or {}) == 0 then
+                return changed, completed
+            end
+
+            for index = 1, #completed do
+                local casterEventId = tonumber(completed[index]) or completed[index]
+                local entry = type(before) == "table" and before[casterEventId] or nil
+                if type(entry) == "table" then
+                    local turnsTotal = math.max(1, math.floor(tonumber(entry.turnsTotal) or 1))
+                    entry.turnsElapsed = turnsTotal
+                    entry.turnsRemaining = 0
+                    entry.lastAdvancedTurnNumber = math.max(1, math.floor(tonumber(currentTurnNumber) or tonumber(eventState.turnNumber) or 1))
+                    bucket[casterEventId] = entry
+                end
+            end
+
+            Server.ActiveSpellcastsByEventId = Server.ActiveSpellcastsByEventId or {}
+            Server.ActiveSpellcastsByEventId[eventState.id] = type(CombatState.CloneCastBucket) == "function"
+                and CombatState.CloneCastBucket(bucket)
+                or bucket
+
+            -- The completion has already been captured as transient dispatch
+            -- metadata by the wrapped helper above. Return no removals to the
+            -- outer turn integrator so it does not delete the retained casts.
+            return changed, {}
+        end
+    end
+end
+
 -- EventCombatState's runtime codec is also used by EVENT_RUNTIME_STATE. Extend
 -- that envelope with transient, commit-local aura tick and spell completion
 -- dispatch metadata. These fields are not canonical Server.EventRuntime state
