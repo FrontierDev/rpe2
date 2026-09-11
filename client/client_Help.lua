@@ -89,9 +89,10 @@ local function resolveFrame(target)
 
     if type(target) == "table" and type(target.GetFrame) == "function" then
         local ok, frame = pcall(target.GetFrame, target)
-        if ok and frame ~= nil then
-            target = frame
+        if not ok or frame == nil then
+            return nil
         end
+        target = frame
     end
 
     if target == nil then
@@ -104,14 +105,19 @@ local function resolveFrame(target)
         if not ok or shown ~= true then
             return nil
         end
-    elseif type(target.IsVisible) == "function" then
-        local ok, visible = pcall(target.IsVisible, target)
+        return target
+    end
+
+    local isVisible = target.IsVisible
+    if type(isVisible) == "function" then
+        local ok, visible = pcall(isVisible, target)
         if not ok or visible ~= true then
             return nil
         end
+        return target
     end
 
-    return target
+    return nil
 end
 
 local function getHelpTipApi()
