@@ -225,6 +225,7 @@ server/server_Spellcasting.lua
 server/server_EventCombatRuntime.lua
 server/server_EventCombatRuntimePost.lua
 server/server_EventCombatRuntimeValidation.lua
+server/server_EventCombatRuntimeAuthorityMerge.lua
 
 core/Sound.lua
 api/UI.lua
