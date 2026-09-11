@@ -5,7 +5,6 @@ Addon.Internal = Addon.Internal or {}
 Addon.Utils = Addon.Utils or {}
 
 local Client = Addon.Client
-local Server = Addon.Server or {}
 local Comms = Addon.Internal.Comms or {}
 local EventSync = Comms.EventSync or {}
 local CombatState = Comms.EventCombatState or {}
@@ -86,6 +85,10 @@ local function setSyncLocked(client, eventId, reason)
         client.EventSyncState = syncState
     end
     if tostring(eventId or "") ~= "" then
+        if tostring(syncState.eventId or "") ~= "" and tostring(syncState.eventId or "") ~= tostring(eventId) then
+            syncState.appliedRevision = 0
+            syncState.bufferedCommits = {}
+        end
         syncState.eventId = tostring(eventId)
     end
     syncState.status = "syncing"
@@ -95,9 +98,9 @@ local function setSyncLocked(client, eventId, reason)
     return syncState
 end
 
--- CLIENT_CONNECT now carries the current local resource snapshot. The host uses
--- it only when the player is genuinely absent from the active roster; returning
--- units keep their host-authoritative current resources.
+-- CLIENT_CONNECT carries protocol capability and a current local resource
+-- snapshot. The host uses the resources only for a genuinely new roster entry;
+-- returning units keep their host-authoritative current resources.
 do
     local baseSendToChannel = Comms.SendToChannel
     if type(baseSendToChannel) == "function" then
@@ -148,6 +151,19 @@ function Client:AbortPendingEventWork(eventId, reason)
         Tasks:CancelScope("autopilot:" .. normalizedEventId, abortReason)
     end
 
+    local transition = self.EventTransition
+    if type(transition) == "table"
+        and tostring(transition.eventId or (transition.eventState and transition.eventState.id) or "") == normalizedEventId
+        and type(self.EndEventTransition) == "function"
+    then
+        self:EndEventTransition(
+            normalizedEventId,
+            transition.generation,
+            transition.eventState,
+            abortReason
+        )
+    end
+
     self.PendingDefensiveReactionUses = {}
     self.PendingRPEKillAchievements = {}
     self.PendingRPEHealthAchievements = {}
@@ -170,15 +186,14 @@ function Client:RequestEventSyncRepair(reason)
     then
         return false
     end
-
     if syncState.repairRequested == true then
         return true
     end
+
     local channelId = resolveChannelId(sessionState)
     if channelId == nil or channelId == "" then
         return false
     end
-
     local eventId = tostring(syncState.eventId or (eventState and eventState.id) or "")
     local payload = EventSync.SerializeSyncRequest({
         protocolVersion = EventSync.ProtocolVersion,
@@ -311,7 +326,7 @@ local function decodeSnapshot(snapshot, sender)
     if type(nextState) ~= "table" then
         return nil, "event-start-decode-failed"
     end
-    nextState.hostName = normalizeName(nextState.hostName ~= "" and nextState.hostName or sender)
+    nextState.hostName = normalizeName(sender)
     nextState.channelName = snapshot.channelName
     nextState.id = snapshot.eventId
     nextState.active = true
@@ -424,10 +439,22 @@ end
 
 local function restorePreviousRuntime(client, previousState, previousRuntime)
     if type(previousState) ~= "table" or type(previousRuntime) ~= "table" then
+        client.EventState = previousState
         return
     end
     client.EventState = previousState
     replaceRuntime(client, previousState, previousRuntime)
+end
+
+local function cleanupFailedInstall(client, nextState, previousState, previousRuntime, previousControlledEventUnitId)
+    if type(client.ResetSpellcastingState) == "function" then
+        client:ResetSpellcastingState(nextState and nextState.id or nil)
+    end
+    if type(Combat.ReplaceDefensiveReactionUseLedger) == "function" then
+        Combat:ReplaceDefensiveReactionUseLedger({})
+    end
+    restorePreviousRuntime(client, previousState, previousRuntime)
+    client.ControlledEventUnitId = previousControlledEventUnitId
 end
 
 local function installSnapshot(client, sessionState, decoded, revision)
@@ -459,8 +486,7 @@ local function installSnapshot(client, sessionState, decoded, revision)
     client.EventState = nextState
     local ok, replaced = pcall(replaceRuntime, client, nextState, runtimeState)
     if not ok or replaced ~= true then
-        restorePreviousRuntime(client, previousState, previousRuntime)
-        client.ControlledEventUnitId = previousControlledEventUnitId
+        cleanupFailedInstall(client, nextState, previousState, previousRuntime, previousControlledEventUnitId)
         return false, ok and "runtime-replace-failed" or tostring(replaced)
     end
 
@@ -493,6 +519,39 @@ local function installSnapshot(client, sessionState, decoded, revision)
 end
 
 local baseHandleCommittedEventMutation = Client.HandleCommittedEventMutation
+
+-- A commit can beat the whisper snapshot to a freshly reloaded/late-joining
+-- client. Buffer it even when no matching EventState exists yet; otherwise a
+-- valid R+1 commit could be dropped before snapshot R arrives.
+if type(baseHandleCommittedEventMutation) == "function" then
+    function Client:HandleCommittedEventMutation(payload, sender)
+        local commit = type(EventSync.DeserializeMutationCommit) == "function"
+            and EventSync.DeserializeMutationCommit(payload) or nil
+        local sessionState = type(self.GetState) == "function" and self:GetState() or self.State
+        local eventState = type(self.GetEventState) == "function" and self:GetEventState() or self.EventState
+        local noMatchingEvent = type(commit) == "table"
+            and (type(eventState) ~= "table"
+                or eventState.active ~= true
+                or tostring(eventState.id or "") ~= tostring(commit.eventId or ""))
+        if noMatchingEvent
+            and type(sessionState) == "table" and sessionState.active == true
+            and commit.channelName == tostring(sessionState.channelName or "")
+            and normalizeName(sender) == normalizeName(sessionState.hostName)
+            and type(EventSync.IsProtocolCompatible) == "function"
+            and EventSync.IsProtocolCompatible(commit.protocolVersion) == true
+        then
+            local syncState = setSyncLocked(self, commit.eventId, "pre-snapshot-commit")
+            local appliedRevision = tonumber(syncState.appliedRevision) or 0
+            if commit.revision > appliedRevision then
+                syncState.bufferedCommits[commit.revision] = commit
+            end
+            syncState.repairRequested = false
+            self:RequestEventSyncRepair("pre-snapshot-commit")
+            return true
+        end
+        return baseHandleCommittedEventMutation(self, payload, sender)
+    end
+end
 
 local function drainBufferedCommits(client, syncState, hostName)
     if type(baseHandleCommittedEventMutation) ~= "function" then
@@ -536,10 +595,106 @@ local function drainBufferedCommits(client, syncState, hostName)
     return true, nil
 end
 
+local function buildAuraLookup(runtimeState)
+    local lookup = {}
+    for index = 1, #(runtimeState and runtimeState.auras or {}) do
+        local aura = runtimeState.auras[index]
+        local key = table.concat({
+            tostring(aura and aura.auraRef or ""),
+            tostring(tonumber(aura and aura.casterEventId) or 0),
+            tostring(tonumber(aura and aura.targetEventId) or 0),
+        }, "\31")
+        lookup[key] = true
+    end
+    return lookup
+end
+
+local function buildAutomaticAuraSourceKey(sourceEntry, auraIndex)
+    return table.concat({
+        tostring(sourceEntry and sourceEntry.sourceType or ""),
+        tostring(sourceEntry and sourceEntry.traitRef or ""),
+        tostring(sourceEntry and sourceEntry.itemRef or ""),
+        tostring(sourceEntry and sourceEntry.datasetId or ""),
+        tostring(auraIndex or 0),
+    }, "\31")
+end
+
+local function rebuildTraitAuraOwnership(client, eventState, runtimeState)
+    if type(client.GetTraitRuntimeState) ~= "function" or type(client.ResolveLocalEventUnit) ~= "function" then
+        return false
+    end
+    local traitState = client:GetTraitRuntimeState(eventState.id, true)
+    local localUnit = client:ResolveLocalEventUnit(eventState)
+    local localEventId = tonumber(localUnit and localUnit.eventID) or 0
+    if type(traitState) ~= "table" or localEventId <= 0 then
+        return false
+    end
+
+    traitState.automaticAuraStateByKey = {}
+    traitState.appliedEventAuras = {}
+    local auraLookup = buildAuraLookup(runtimeState)
+
+    for entryIndex = 1, #(traitState.activeEntries or {}) do
+        local sourceEntry = traitState.activeEntries[entryIndex]
+        local payload = sourceEntry and sourceEntry.payload or nil
+        for auraIndex = 1, #(payload and payload.automaticAuras or {}) do
+            local automaticAura = payload.automaticAuras[auraIndex]
+            local auraRef = tostring(automaticAura and automaticAura.auraRef or "")
+            if type(AuraManager) == "table" and type(AuraManager.ResolveAuraDefinition) == "function" then
+                local _, _, qualified = AuraManager:ResolveAuraDefinition(auraRef, {
+                    dataset = sourceEntry and sourceEntry.dataset or nil,
+                    datasetId = sourceEntry and sourceEntry.datasetId or nil,
+                })
+                auraRef = tostring(qualified or auraRef)
+            end
+            local targets = type(client.ResolveTraitAutoAuraTargets) == "function"
+                and client:ResolveTraitAutoAuraTargets(eventState, localUnit, automaticAura and automaticAura.targetScope or "self")
+                or {}
+            local sourceKey = buildAutomaticAuraSourceKey(sourceEntry, auraIndex)
+            for targetIndex = 1, #targets do
+                local targetEventId = tonumber(targets[targetIndex] and targets[targetIndex].eventID) or 0
+                local identity = table.concat({ auraRef, tostring(localEventId), tostring(targetEventId) }, "\31")
+                if targetEventId > 0 and auraLookup[identity] == true then
+                    local stateKey = table.concat({ auraRef, tostring(localEventId), tostring(targetEventId), sourceKey }, "\31")
+                    traitState.automaticAuraStateByKey[stateKey] = {
+                        auraRef = auraRef,
+                        casterEventId = localEventId,
+                        targetEventId = targetEventId,
+                    }
+                end
+            end
+        end
+    end
+
+    local localTeam = tonumber(localUnit.team) or 0
+    for index = 1, #(eventState.eventAuras or {}) do
+        local entry = eventState.eventAuras[index]
+        local auraRef = tostring(entry and entry.auraRef or "")
+        local teamAllowed = true
+        local teams = type(entry) == "table" and (entry.teamIndices or entry.teams) or nil
+        if type(teams) == "table" and #teams > 0 then
+            teamAllowed = false
+            for teamIndex = 1, #teams do
+                if tonumber(teams[teamIndex]) == localTeam then
+                    teamAllowed = true
+                    break
+                end
+            end
+        end
+        local identity = table.concat({ auraRef, tostring(localEventId), tostring(localEventId) }, "\31")
+        if auraRef ~= "" and teamAllowed and auraLookup[identity] == true then
+            traitState.appliedEventAuras[("%s:%d"):format(auraRef, localEventId)] = auraRef
+        end
+    end
+    return true
+end
+
 local function rebuildDerivedAndVisualState(client, eventState)
     if type(client.RefreshTraitRuntimeEntries) == "function" then
         client:RefreshTraitRuntimeEntries(eventState)
     end
+    local runtimeState = exportCurrentRuntime(client, eventState) or {}
+    rebuildTraitAuraOwnership(client, eventState, runtimeState)
     if type(AuraManager) == "table" and type(AuraManager.RefreshLocalPlayerDerivedState) == "function" then
         AuraManager:RefreshLocalPlayerDerivedState(eventState, {
             suppressProfileRefresh = true,
@@ -586,8 +741,10 @@ local function sendSyncAck(client, sessionState, eventState, revision)
 end
 
 function Client:HandleEventSyncSnapshot(payload, sender)
-    local snapshot, decodeReason = type(EventSync.DeserializeSnapshotEnvelope) == "function"
-        and EventSync.DeserializeSnapshotEnvelope(payload) or nil, "codec-unavailable"
+    local snapshot, decodeReason = nil, "codec-unavailable"
+    if type(EventSync.DeserializeSnapshotEnvelope) == "function" then
+        snapshot, decodeReason = EventSync.DeserializeSnapshotEnvelope(payload)
+    end
     local sessionState = type(self.GetState) == "function" and self:GetState() or self.State
     if type(snapshot) ~= "table" then
         local syncState = setSyncLocked(self, nil, decodeReason or "snapshot-decode-failed")
@@ -596,6 +753,9 @@ function Client:HandleEventSyncSnapshot(payload, sender)
         return false
     end
 
+    local existingSyncState = type(self.GetEventSyncState) == "function" and self:GetEventSyncState(false) or self.EventSyncState
+    local previousSyncStatus = type(existingSyncState) == "table" and existingSyncState.status or "idle"
+    local previousAppliedRevision = type(existingSyncState) == "table" and tonumber(existingSyncState.appliedRevision) or 0
     local syncState = setSyncLocked(self, snapshot.eventId, "snapshot-received")
     syncState.repairRequested = false
     if type(sessionState) ~= "table" or sessionState.active ~= true
@@ -610,23 +770,31 @@ function Client:HandleEventSyncSnapshot(payload, sender)
         return false
     end
 
-    local appliedRevision = tonumber(syncState.appliedRevision) or 0
     local currentEventState = type(self.GetEventState) == "function" and self:GetEventState() or self.EventState
-    if type(currentEventState) == "table"
+    local sameCurrentEvent = type(currentEventState) == "table"
+        and currentEventState.active == true
         and tostring(currentEventState.id or "") == tostring(snapshot.eventId or "")
-        and snapshot.revision < appliedRevision
+    if sameCurrentEvent and snapshot.revision < previousAppliedRevision then
+        if previousSyncStatus == "syncing" then
+            syncState.status = "syncing"
+            syncState.reason = "stale-snapshot-during-repair"
+            syncState.repairRequested = false
+            self:RequestEventSyncRepair(syncState.reason)
+        else
+            syncState.status = "idle"
+            syncState.reason = nil
+            syncState.repairRequested = false
+        end
+        return true
+    end
+    if sameCurrentEvent
+        and snapshot.revision == previousAppliedRevision
+        and previousSyncStatus ~= "syncing"
     then
         syncState.status = "idle"
         syncState.reason = nil
         syncState.repairRequested = false
-        return true
-    end
-    if type(currentEventState) == "table"
-        and tostring(currentEventState.id or "") == tostring(snapshot.eventId or "")
-        and snapshot.revision == appliedRevision
-        and syncState.status ~= "syncing"
-    then
-        sendSyncAck(self, sessionState, currentEventState, appliedRevision)
+        sendSyncAck(self, sessionState, currentEventState, previousAppliedRevision)
         return true
     end
 
