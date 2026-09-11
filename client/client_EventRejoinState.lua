@@ -32,8 +32,8 @@ local function findUnit(eventState, eventId)
     return nil
 end
 
-local function installAuraSnapshot(client, eventState, records)
-    if type(Spellcasting.ResetAuraState) == "function" then
+local function installAuraSnapshot(client, eventState, records, replaceExisting)
+    if replaceExisting == true and type(Spellcasting.ResetAuraState) == "function" then
         Spellcasting.ResetAuraState(client, eventState.id)
     end
     if type(AuraManager) ~= "table" or type(AuraManager.UpsertAura) ~= "function" then
@@ -63,8 +63,8 @@ local function installAuraSnapshot(client, eventState, records)
     return installed, failed
 end
 
-local function installCastSnapshot(client, eventState, records)
-    if type(Spellcasting.ClearEventCastBucket) == "function" then
+local function installCastSnapshot(client, eventState, records, replaceExisting)
+    if replaceExisting == true and type(Spellcasting.ClearEventCastBucket) == "function" then
         Spellcasting.ClearEventCastBucket(client, eventState.id)
     end
     if type(Spellcasting.BuildCastEntry) ~= "function" or type(Spellcasting.SetCastEntry) ~= "function" then
@@ -124,8 +124,9 @@ function Client:ApplyEventRejoinState(eventId)
     end
 
     self.PendingEventRejoinStateByEventId[normalizedEventId] = nil
-    local auraInstalled, auraFailed = installAuraSnapshot(self, eventState, pending.auras)
-    local castInstalled, castFailed = installCastSnapshot(self, eventState, pending.casts)
+    local replaceExisting = pending.replaceExisting == true
+    local auraInstalled, auraFailed = installAuraSnapshot(self, eventState, pending.auras, replaceExisting)
+    local castInstalled, castFailed = installCastSnapshot(self, eventState, pending.casts, replaceExisting)
 
     if type(AuraManager) == "table" and type(AuraManager.RefreshLocalPlayerDerivedState) == "function" then
         AuraManager:RefreshLocalPlayerDerivedState(eventState)
@@ -136,14 +137,12 @@ function Client:ApplyEventRejoinState(eventId)
     if type(Spellcasting.RefreshVisiblePlayerTooltip) == "function" then
         Spellcasting.RefreshVisiblePlayerTooltip("event-rejoin-state")
     end
-    if type(self.QueueActionBarCompanionBarsRefresh) == "function" then
-        self:QueueActionBarCompanionBarsRefresh("event-rejoin-state")
-    end
 
     if type(Debug.Internal) == "function" then
         Debug.Internal(
-            "Event rejoin state applied: event=%s auras=%d failedAuras=%d casts=%d failedCasts=%d.",
+            "Event rejoin state applied: event=%s mode=%s auras=%d failedAuras=%d casts=%d failedCasts=%d.",
             normalizedEventId,
+            replaceExisting and "replace" or "merge",
             auraInstalled,
             auraFailed,
             castInstalled,
@@ -179,9 +178,11 @@ function Client:HandleEventRejoinState(arguments, sender)
         return false
     end
 
-    local snapshot, reason = type(EventRejoinState.DeserializeSnapshot) == "function"
-        and EventRejoinState.DeserializeSnapshot(arguments and arguments[3] or "")
-        or nil, "codec-unavailable"
+    local snapshot = nil
+    local reason = "codec-unavailable"
+    if type(EventRejoinState.DeserializeSnapshot) == "function" then
+        snapshot, reason = EventRejoinState.DeserializeSnapshot(arguments and arguments[3] or "")
+    end
     if type(snapshot) ~= "table" then
         if type(Debug.Error) == "function" then
             Debug.Error("Event rejoin state rejected: %s.", tostring(reason or "invalid-payload"))
@@ -189,6 +190,7 @@ function Client:HandleEventRejoinState(arguments, sender)
         return false
     end
 
+    snapshot.replaceExisting = tostring(arguments and arguments[4] or "") == "replace"
     self.PendingEventRejoinStateByEventId[eventId] = snapshot
     if eventState.startupReady == true then
         return self:ApplyEventRejoinState(eventId)
