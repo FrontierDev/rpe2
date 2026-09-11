@@ -434,3 +434,5 @@ client/ui/ruleset/window_Ruleset.lua
 data/default/Install.lua
 BagScanTest.lua
 RuneclothDeleteTest.lua
+server/server_EventRejoinSync.lua
+client/client_EventRejoinSync.lua
