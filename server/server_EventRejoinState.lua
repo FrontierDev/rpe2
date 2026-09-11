@@ -21,6 +21,23 @@ local function normalizeName(value)
     return tostring(value or "")
 end
 
+local function hasPlayerEventUnit(eventState, clientName)
+    local normalizedClientName = normalizeName(clientName)
+    if normalizedClientName == "" then
+        return false
+    end
+    for index = 1, #((eventState and eventState.units) or {}) do
+        local unit = eventState.units[index]
+        if type(unit) == "table" and unit.isPlayer == true then
+            local candidate = normalizeName(unit.ownerID or unit.controllerID or unit.name)
+            if candidate == normalizedClientName then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function buildAuraSnapshot(eventId)
     local records = {}
     local bucket = type(Client.ActiveAurasByEventId) == "table" and Client.ActiveAurasByEventId[eventId] or nil
@@ -70,7 +87,7 @@ local function buildCastSnapshot(eventId)
     return records
 end
 
-function Server:SendEventRejoinState(clientName)
+function Server:SendEventRejoinState(clientName, options)
     local eventState = self.EventState
     local normalizedClientName = normalizeName(clientName)
     if type(eventState) ~= "table"
@@ -99,6 +116,7 @@ function Server:SendEventRejoinState(clientName)
         return false
     end
 
+    local mode = type(options) == "table" and options.replaceExisting == true and "replace" or "merge"
     local sent = Comms:SendMessage(
         "WHISPER",
         EVENT_REJOIN_STATE_OPCODE,
@@ -106,6 +124,7 @@ function Server:SendEventRejoinState(clientName)
             channelName,
             eventId,
             payload,
+            mode,
         },
         normalizedClientName,
         {
@@ -116,9 +135,10 @@ function Server:SendEventRejoinState(clientName)
 
     if type(Debug.Internal) == "function" then
         Debug.Internal(
-            "Event rejoin state queued: client=%s event=%s auras=%d casts=%d queued=%s.",
+            "Event rejoin state queued: client=%s event=%s mode=%s auras=%d casts=%d queued=%s.",
             normalizedClientName,
             eventId,
+            mode,
             #auraRecords,
             #castRecords,
             tostring(sent)
@@ -131,10 +151,16 @@ if Server.EventRejoinStateReconcileWrapped ~= true and type(Server.ReconcileClie
     Server.EventRejoinStateReconcileWrapped = true
     local nativeReconcileClientEventSession = Server.ReconcileClientEventSession
     function Server:ReconcileClientEventSession(clientName)
+        local eventStateBefore = self.EventState
+        local returningPlayer = type(eventStateBefore) == "table"
+            and eventStateBefore.active == true
+            and hasPlayerEventUnit(eventStateBefore, clientName)
         local reconciled = nativeReconcileClientEventSession(self, clientName)
         local eventState = self.EventState
         if reconciled == true and type(eventState) == "table" and eventState.active == true then
-            self:SendEventRejoinState(clientName)
+            self:SendEventRejoinState(clientName, {
+                replaceExisting = returningPlayer == true,
+            })
         end
         return reconciled
     end
