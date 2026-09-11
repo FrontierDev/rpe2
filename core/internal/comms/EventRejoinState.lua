@@ -9,7 +9,7 @@ local EventRejoinState = Comms.EventRejoinState
 local Operations = Comms.Operations or {}
 
 EventRejoinState.ProtocolVersion = 1
-EventRejoinState.Opcode = 29
+EventRejoinState.Opcode = 31
 
 local function normalizeNonNegativeInteger(value)
     local numeric = tonumber(value)
@@ -331,7 +331,7 @@ end
 
 local existing = type(Operations.Get) == "function" and Operations:Get(EventRejoinState.Opcode) or nil
 if existing and tostring(existing.key or "") ~= "EVENT_REJOIN_STATE" then
-    error("EVENT_REJOIN_STATE opcode collision at 29.")
+    error("EVENT_REJOIN_STATE opcode collision at 31.")
 end
 
 local definition = {
