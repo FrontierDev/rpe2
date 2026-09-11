@@ -9,7 +9,7 @@ local Comms = Addon.Internal.Comms
 local EventSync = Comms.EventSync
 local Operations = Comms.Operations or {}
 
-EventSync.ProtocolVersion = 1
+EventSync.ProtocolVersion = 2
 
 local function normalizeNonNegativeInteger(value)
     local numeric = tonumber(value)
@@ -489,18 +489,18 @@ local function installOperation(opcode, key, name, handler)
     Operations.KeyIndex[string.upper(key)] = opcode
 end
 
-installOperation(28, "EVENT_SYNC_REQUEST", "event-sync-request", function(arguments, sender, distribution, target, message)
+installOperation(35, "EVENT_SYNC_REQUEST", "event-sync-request", function(arguments, sender, distribution, target, message)
     return dispatchTo("Server", "HandleEventSyncRequest", arguments, sender, distribution, target, message)
 end)
-installOperation(29, "EVENT_SYNC_SNAPSHOT", "event-sync-snapshot", function(arguments, sender, distribution, target, message)
+installOperation(36, "EVENT_SYNC_SNAPSHOT", "event-sync-snapshot", function(arguments, sender, distribution, target, message)
     return dispatchTo("Client", "HandleEventSyncSnapshot", arguments, sender, distribution, target, message)
 end)
-installOperation(30, "EVENT_SYNC_ACK", "event-sync-ack", function(arguments, sender, distribution, target, message)
+installOperation(37, "EVENT_SYNC_ACK", "event-sync-ack", function(arguments, sender, distribution, target, message)
     return dispatchTo("Server", "HandleEventSyncAck", arguments, sender, distribution, target, message)
 end)
-installOperation(31, "EVENT_MUTATION_REQUEST", "event-mutation-request", function(arguments, sender, distribution, target, message)
+installOperation(38, "EVENT_MUTATION_REQUEST", "event-mutation-request", function(arguments, sender, distribution, target, message)
     return dispatchTo("Server", "HandleEventMutationRequest", arguments, sender, distribution, target, message)
 end)
-installOperation(32, "EVENT_MUTATION_COMMIT", "event-mutation-commit", function(arguments, sender, distribution, target, message)
+installOperation(39, "EVENT_MUTATION_COMMIT", "event-mutation-commit", function(arguments, sender, distribution, target, message)
     return dispatchTo("Client", "HandleCommittedEventMutation", arguments, sender, distribution, target, message)
 end)
