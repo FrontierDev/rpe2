@@ -28,6 +28,10 @@ local FOUNDATION_RESOURCE_OPCODES = {
     [RESOURCE_DELTA_BATCH_OPCODE or -3] = true,
 }
 
+local function pack(...)
+    return { n = select("#", ...), ... }
+end
+
 local function normalizeName(value)
     if type(Common.NormalizeName) == "function" then
         return Common.NormalizeName(value)
@@ -73,34 +77,42 @@ local function getSyncState(client, createIfMissing)
     return client.EventSyncState
 end
 
+local function markEventPresentationSyncing(client)
+    local eventState = getEventState(client)
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return false
+    end
+    eventState.startupReady = false
+    eventState.startupPhase = "syncing"
+    if type(client.QueueEventWidgetRefresh) == "function" then
+        client:QueueEventWidgetRefresh("event-syncing")
+    end
+    return true
+end
+
 local function markEventSyncing(client, reason)
     local eventState = getEventState(client)
-    if type(eventState) == "table" and eventState.active == true then
-        eventState.startupReady = false
-        eventState.startupPhase = "syncing"
-        if type(client.QueueEventWidgetRefresh) == "function" then
-            client:QueueEventWidgetRefresh("event-syncing")
-        end
-    end
+    markEventPresentationSyncing(client)
 
     local syncState = getSyncState(client, true)
-    if type(syncState) == "table" then
-        if type(eventState) == "table" and eventState.active == true then
-            local eventId = tostring(eventState.id or "")
-            if eventId ~= "" then
-                if tostring(syncState.eventId or "") ~= "" and tostring(syncState.eventId or "") ~= eventId then
-                    syncState.appliedRevision = 0
-                    syncState.bufferedCommits = {}
-                end
-                syncState.eventId = eventId
-            end
-        end
-        syncState.status = "syncing"
-        syncState.reason = tostring(reason or "event-sync")
-        syncState.pipelineActive = true
-        syncState.repairRequested = false
-        syncState.bufferedCommits = syncState.bufferedCommits or {}
+    if type(syncState) ~= "table" then
+        return nil
     end
+    if type(eventState) == "table" and eventState.active == true then
+        local eventId = tostring(eventState.id or "")
+        if eventId ~= "" then
+            if tostring(syncState.eventId or "") ~= "" and tostring(syncState.eventId or "") ~= eventId then
+                syncState.appliedRevision = 0
+                syncState.bufferedCommits = {}
+            end
+            syncState.eventId = eventId
+        end
+    end
+    syncState.status = "syncing"
+    syncState.reason = tostring(reason or "event-sync")
+    syncState.pipelineActive = true
+    syncState.repairRequested = false
+    syncState.bufferedCommits = syncState.bufferedCommits or {}
     return syncState
 end
 
@@ -179,11 +191,9 @@ local function isExpectedSnapshotIdentity(client, snapshot)
         end
         return awaitingConnectSnapshot
     end
-
     if awaitingConnectSnapshot then
         return true
     end
-
     return type(syncState) == "table"
         and syncState.status == "syncing"
         and syncState.pipelineActive == true
@@ -191,11 +201,10 @@ local function isExpectedSnapshotIdentity(client, snapshot)
         and tostring(syncState.eventId or "") == eventId
 end
 
--- The profile resolver may still be cold when a freshly reloaded client sends
--- CLIENT_CONNECT. Warm it before the inner #236 transport wrapper snapshots the
--- local resources. A non-host client with an existing local event is also gated
--- immediately so stale state cannot submit mutations while the host snapshot is
--- in flight.
+-- CLIENT_CONNECT is the only point where a reloaded/reconnecting client may
+-- legitimately accept a snapshot for an event ID different from stale local
+-- state. Gate old state immediately and warm the resource bootstrap before the
+-- inner #236 transport wrapper serializes CLIENT_CONNECT argument 6.
 do
     local baseSendToChannel = Comms.SendToChannel
     if type(baseSendToChannel) == "function" then
@@ -208,7 +217,6 @@ do
                 then
                     Profile.WarmResolvedBootstrapState("event-sync-connect")
                 end
-
                 if not isLocalSessionHost(Client) then
                     Client.EventSyncAwaitingConnectSnapshot = true
                     local eventState = getEventState(Client)
@@ -235,18 +243,16 @@ do
     end
 end
 
--- Repair state is not only an action-legality gate. Mark the current event as
--- visibly syncing so event portraits/actions remain unavailable until a valid
--- snapshot plus any contiguous buffered commits are fully installed.
+-- Repair is both a revision gate and a presentation/playability gate.
 do
     local baseRequestEventSyncRepair = Client.RequestEventSyncRepair
     if type(baseRequestEventSyncRepair) == "function" then
         function Client:RequestEventSyncRepair(reason)
-            markEventSyncing(self, reason or "repair")
+            local syncState = markEventSyncing(self, reason or "repair")
             logInternal(
                 "EventSync: sync requested event=%s revision=%s reason=%s.",
-                tostring(self.EventSyncState and self.EventSyncState.eventId or ""),
-                tostring(self.EventSyncState and self.EventSyncState.appliedRevision or 0),
+                tostring(syncState and syncState.eventId or ""),
+                tostring(syncState and syncState.appliedRevision or 0),
                 tostring(reason or "repair")
             )
             return baseRequestEventSyncRepair(self, reason)
@@ -254,9 +260,8 @@ do
     end
 end
 
--- Pending work cleanup is deliberately bounded to transient client work. Keep
--- an INTERNAL trace so failed repair reports can distinguish discarded local
--- work from authoritative snapshot replacement.
+-- Keep bounded pending-work cleanup observable without adding new persistent
+-- state or transmitting anything that is being discarded.
 do
     local baseAbortPendingEventWork = Client.AbortPendingEventWork
     if type(baseAbortPendingEventWork) == "function" then
@@ -279,10 +284,8 @@ do
     end
 end
 
--- Reject commits for an absent/different event unless this client has actually
--- sent CLIENT_CONNECT and is awaiting the host's active-event snapshot. This
--- prevents delayed commits from an ended event from manufacturing a repair
--- context which could later accept an equally stale snapshot.
+-- A commit may beat an expected connect snapshot, but a delayed commit from a
+-- different/ended event must not manufacture a new repair context by itself.
 do
     local baseHandleCommittedEventMutation = Client.HandleCommittedEventMutation
     if type(baseHandleCommittedEventMutation) == "function" then
@@ -321,19 +324,19 @@ do
     end
 end
 
--- Measure only the expensive derived-state pieces when they execute inside
--- snapshot hydration. The main handler still owns all state transitions.
+-- Measure the derived-state portion of hydration while preserving every return
+-- value from the wrapped runtime APIs.
 do
     local baseRefreshTraitRuntimeEntries = Client.RefreshTraitRuntimeEntries
     if type(baseRefreshTraitRuntimeEntries) == "function" then
         function Client:RefreshTraitRuntimeEntries(...)
             local startedAt = self.EventSyncHydrationTimingActive == true and getNowMilliseconds() or nil
-            local result = baseRefreshTraitRuntimeEntries(self, ...)
+            local results = pack(baseRefreshTraitRuntimeEntries(self, ...))
             if startedAt then
                 self.EventSyncHydrationDerivedMilliseconds = (tonumber(self.EventSyncHydrationDerivedMilliseconds) or 0)
                     + math.max(0, getNowMilliseconds() - startedAt)
             end
-            return result
+            return unpack(results, 1, results.n)
         end
     end
 
@@ -342,21 +345,21 @@ do
         if type(baseRefreshLocalPlayerDerivedState) == "function" then
             function AuraManager:RefreshLocalPlayerDerivedState(...)
                 local startedAt = Client.EventSyncHydrationTimingActive == true and getNowMilliseconds() or nil
-                local result = baseRefreshLocalPlayerDerivedState(self, ...)
+                local results = pack(baseRefreshLocalPlayerDerivedState(self, ...))
                 if startedAt then
                     Client.EventSyncHydrationDerivedMilliseconds = (tonumber(Client.EventSyncHydrationDerivedMilliseconds) or 0)
                         + math.max(0, getNowMilliseconds() - startedAt)
                 end
-                return result
+                return unpack(results, 1, results.n)
             end
         end
     end
 end
 
--- Reject non-host, wrong-channel, incompatible, unsolicited cross-event, or
--- post-end snapshot envelopes before the main hydration handler can switch
--- EventSyncState identity. Expected connect snapshots may replace a stale local
--- event because reconnect can legitimately span an event boundary.
+-- Trust/identity validation happens before the main handler can change sync
+-- identity. Do not pre-mark a valid snapshot as syncing here: the main handler
+-- records its prior status first so duplicate/stale snapshot idempotency remains
+-- correct, then enters syncing synchronously itself.
 do
     local baseHandleEventSyncSnapshot = Client.HandleEventSyncSnapshot
     if type(baseHandleEventSyncSnapshot) == "function" then
@@ -397,7 +400,6 @@ do
                     )
                     return true
                 end
-                markEventSyncing(self, "snapshot-received")
             end
 
             local startedAt = getNowMilliseconds()
@@ -420,11 +422,15 @@ do
             end
 
             local eventState = getEventState(self)
+            local syncState = getSyncState(self, false)
+            if handled ~= true and type(syncState) == "table" and syncState.status == "syncing" then
+                markEventPresentationSyncing(self)
+            end
+
             local hydratedMembers = 0
             if handled == true and type(eventState) == "table" and eventState.active == true then
                 hydratedMembers = hydrateSessionMembersFromEvent(self, eventState)
             end
-            local syncState = getSyncState(self, false)
             if handled == true
                 and type(syncState) == "table"
                 and syncState.status == "idle"
@@ -453,10 +459,10 @@ do
     end
 end
 
--- A genuinely new EVENT_START supersedes a connect-snapshot expectation, but a
--- duplicate start for the same stale event must not. EVENT_END records the ended
--- identity while preserving the expectation that reconnect may return a newer
--- active event snapshot.
+-- A genuinely new EVENT_START supersedes an expected connect snapshot; a
+-- duplicate old start does not. EVENT_END remembers the ended identity so a
+-- delayed snapshot/commit cannot resurrect it while still allowing reconnect to
+-- accept a different, newer active event.
 do
     local baseHandleEventStart = Client.HandleEventStart
     if type(baseHandleEventStart) == "function" then
@@ -488,9 +494,9 @@ do
     end
 end
 
--- A newer repair snapshot supersedes acknowledgements for every older snapshot.
--- Accept an ACK at or beyond the most recently sent snapshot revision because
--- the client may have drained contiguous buffered commits before acknowledging.
+-- A newer repair snapshot supersedes every older ACK. ACK >= latest sent
+-- snapshot is valid because the client may drain contiguous buffered commits
+-- before acknowledging.
 do
     local baseHandleEventSyncAck = Server.HandleEventSyncAck
     if type(baseHandleEventSyncAck) == "function" then
@@ -532,22 +538,20 @@ do
     end
 end
 
--- Record coherent snapshot capture/serialization cost without changing the
--- synchronous capture boundary owned by BuildEventSyncSnapshot.
+-- Preserve synchronous coherent capture while recording its serialization cost.
 do
     local baseBuildEventSyncSnapshot = Server.BuildEventSyncSnapshot
     if type(baseBuildEventSyncSnapshot) == "function" then
         function Server:BuildEventSyncSnapshot(reason)
             local startedAt = getNowMilliseconds()
             local snapshot, failureReason = baseBuildEventSyncSnapshot(self, reason)
-            local elapsedMs = math.max(0, getNowMilliseconds() - startedAt)
             logInternal(
                 "EventSync: snapshot capture event=%s revision=%s sections=%s bytes=%s elapsedMs=%.2f reason=%s result=%s.",
                 tostring(snapshot and snapshot.eventId or self.EventState and self.EventState.id or ""),
                 tostring(snapshot and snapshot.revision or self.EventRuntime and self.EventRuntime.revision or 0),
                 tostring(snapshot and snapshot.sectionCount or 0),
                 tostring(snapshot and snapshot.byteCount or 0),
-                elapsedMs,
+                math.max(0, getNowMilliseconds() - startedAt),
                 tostring(reason or "rejoin"),
                 tostring(snapshot and "ok" or failureReason or "failed")
             )
@@ -556,26 +560,22 @@ do
     end
 end
 
--- Keep repair requests observable at INTERNAL level; the underlying handler
--- still performs all validation and snapshot response work.
-do
-    local baseHandleEventSyncRequest = Server.HandleEventSyncRequest
-    if type(baseHandleEventSyncRequest) == "function" then
-        function Server:HandleEventSyncRequest(payload, sender)
-            local request = type(EventSync.DeserializeSyncRequest) == "function"
-                and EventSync.DeserializeSyncRequest(payload)
-                or nil
-            local handled = baseHandleEventSyncRequest(self, payload, sender)
-            logInternal(
-                "EventSync: repair request client=%s event=%s revision=%s reason=%s handled=%s.",
-                normalizeName(sender),
-                tostring(request and request.eventId or ""),
-                tostring(request and request.appliedRevision or 0),
-                tostring(request and request.reason or "invalid"),
-                tostring(handled == true)
-            )
-            return handled
-        end
+local baseHandleEventSyncRequest = Server.HandleEventSyncRequest
+if type(baseHandleEventSyncRequest) == "function" then
+    function Server:HandleEventSyncRequest(payload, sender)
+        local request = type(EventSync.DeserializeSyncRequest) == "function"
+            and EventSync.DeserializeSyncRequest(payload)
+            or nil
+        local handled = baseHandleEventSyncRequest(self, payload, sender)
+        logInternal(
+            "EventSync: repair request client=%s event=%s revision=%s reason=%s handled=%s.",
+            normalizeName(sender),
+            tostring(request and request.eventId or ""),
+            tostring(request and request.appliedRevision or 0),
+            tostring(request and request.reason or "invalid"),
+            tostring(handled == true)
+        )
+        return handled
     end
 end
 
