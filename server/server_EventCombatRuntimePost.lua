@@ -268,7 +268,7 @@ do
             local casterEventId = tonumber(arguments and arguments[3]) or 0
             local spellRef = tostring(arguments and arguments[4] or "")
             local casterUnit = findEventUnit(eventState, casterEventId)
-            local _, spell = type(Registry.ResolveSpellReference) == "function" and Registry:ResolveSpellReference(spellRef) or nil, nil
+            local spell = nil
             if type(Registry.ResolveSpellReference) == "function" then
                 local _, resolvedSpell = Registry:ResolveSpellReference(spellRef)
                 spell = resolvedSpell
@@ -369,6 +369,38 @@ do
                 runtime.turnState.defensiveReactions = savedDefensive
             end
             return result
+        end
+    end
+end
+
+-- The host has already applied active-event aura/spell proposals before it
+-- emits EVENT_MUTATION_COMMIT. On host loopback, skip only the presentation
+-- domain operation and let EVENT_RUNTIME_STATE install the canonical result.
+-- Other clients still execute the domain operation once for normal presentation.
+do
+    local hostLoopbackHandlers = {
+        "HandleAuraApply",
+        "HandleAuraDispel",
+        "HandleAuraApplyBatch",
+        "HandleAuraDispelBatch",
+        "HandleSpellcastStart",
+        "HandleSpellcastComplete",
+        "HandleSpellcastInterrupt",
+    }
+    for index = 1, #hostLoopbackHandlers do
+        local handlerName = hostLoopbackHandlers[index]
+        local baseHandler = Client[handlerName]
+        if type(baseHandler) == "function" then
+            Client[handlerName] = function(self, arguments, sender, ...)
+                if self.EventSyncApplyingCommittedMutation == true
+                    and type(Server.EventRuntime) == "table"
+                    and type(Server.EventState) == "table"
+                    and Server.EventState.active == true
+                then
+                    return true
+                end
+                return baseHandler(self, arguments, sender, ...)
+            end
         end
     end
 end
