@@ -323,6 +323,8 @@ end
 
 -- A commit may beat an expected connect snapshot, but a delayed commit from a
 -- different/ended event must not manufacture a new repair context by itself.
+-- While already syncing, buffer every matching commit here so #234 and #235 use
+-- one repair-deduplication rule.
 do
     local baseHandleCommittedEventMutation = Client.HandleCommittedEventMutation
     if type(baseHandleCommittedEventMutation) == "function" then
@@ -354,6 +356,18 @@ do
                         tostring(commit.revision or "")
                     )
                     return true
+                end
+                if trusted and matchingEvent then
+                    local syncState = getSyncState(self, false)
+                    local appliedRevision = tonumber(syncState and syncState.appliedRevision) or 0
+                    if type(syncState) == "table" and syncState.status == "syncing" then
+                        if tonumber(commit.revision) > appliedRevision then
+                            syncState.bufferedCommits = syncState.bufferedCommits or {}
+                            syncState.bufferedCommits[commit.revision] = commit
+                        end
+                        self:RequestEventSyncRepair(syncState.reason or "revision-gap")
+                        return true
+                    end
                 end
             end
             return baseHandleCommittedEventMutation(self, payload, sender)
@@ -527,6 +541,25 @@ do
                 self.EventSyncEndedEventIds[eventId] = true
             end
             return result
+        end
+    end
+end
+
+-- Session teardown must also clear transient sync identity/expectation markers.
+do
+    local baseReset = Client.Reset
+    if type(baseReset) == "function" then
+        function Client:Reset(reason, options)
+            local results = pack(baseReset(self, reason, options))
+            if type(self.ResetEventSyncState) == "function" then
+                self:ResetEventSyncState(nil, reason or "session-reset")
+            end
+            self.EventSyncAwaitingConnectSnapshot = false
+            self.EventSyncEndedEventIds = {}
+            self.EventSyncHydrationTimingActive = false
+            self.EventSyncHydrationDerivedMilliseconds = nil
+            self.EventSyncApplyingCommittedMutation = false
+            return unpack(results, 1, results.n)
         end
     end
 end
