@@ -243,9 +243,9 @@ do
 end
 
 -- Validate lifecycle phase against canonical runtime state. Persistent complete
--- consumes the completion expectation produced by the authoritative turn
--- transition. Instant complete has no cast entry; it derives cooldown/GCD state
--- directly from spell metadata at completion and commits no persistent cast.
+-- and interrupt consume any completion expectation produced by authoritative
+-- turn progression. Instant complete has no cast entry; it derives cooldown/GCD
+-- state directly from spell metadata at completion and commits no persistent cast.
 do
     local baseHandleEventMutationRequest = Server.HandleEventMutationRequest
     if type(baseHandleEventMutationRequest) == "function" then
@@ -324,7 +324,11 @@ do
             end
 
             local result = baseHandleEventMutationRequest(self, payload, sender)
-            if result == true and request.opcode == SPELLCAST_COMPLETE_OPCODE and persistentTurns ~= nil then
+            if result == true
+                and persistentTurns ~= nil
+                and type(runtime.completedSpellcasts) == "table"
+                and (request.opcode == SPELLCAST_COMPLETE_OPCODE or request.opcode == SPELLCAST_INTERRUPT_OPCODE)
+            then
                 runtime.completedSpellcasts[casterEventId] = nil
             end
             return result
