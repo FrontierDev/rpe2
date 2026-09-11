@@ -436,3 +436,4 @@ BagScanTest.lua
 RuneclothDeleteTest.lua
 server/server_EventRejoinSync.lua
 client/client_EventRejoinSync.lua
+client/client_EventRejoinSyncGuard.lua
