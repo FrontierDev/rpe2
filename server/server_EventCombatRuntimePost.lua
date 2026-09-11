@@ -4,8 +4,24 @@ local Server = Addon.Server or {}
 local Client = Addon.Client or {}
 local Comms = Addon.Internal and Addon.Internal.Comms or {}
 local CombatState = Comms.EventCombatState or {}
+local Operations = Comms.Operations or {}
+local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Spellcasting = Client.Spellcasting or {}
 local Combat = Client.Combat or {}
+
+local SPELLCAST_START_OPCODE = Operations.GetOpcode and Operations:GetOpcode("SPELLCAST_START") or nil
+local EVENT_DEFENSIVE_USE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("EVENT_DEFENSIVE_USE") or nil
+
+local function findEventUnit(eventState, eventId)
+    local numericEventId = tonumber(eventId) or 0
+    for index = 1, #(type(eventState) == "table" and eventState.units or {}) do
+        local unit = eventState.units[index]
+        if tonumber(unit and unit.eventID) == numericEventId then
+            return unit
+        end
+    end
+    return nil
+end
 
 -- Keep derived cast fields complete even when the source entry predates the
 -- richer recovery representation.
@@ -59,6 +75,25 @@ do
     end
 end
 
+-- EVENT_DEFENSIVE_USE is a request-only opcode. The authoritative result is
+-- represented solely by EVENT_RUNTIME_STATE, so never leak the proposal opcode
+-- into a client commit (where direct dispatch is intentionally unsupported).
+do
+    local baseCommitEventMutation = Server.CommitEventMutation
+    if type(baseCommitEventMutation) == "function" then
+        function Server:CommitEventMutation(eventId, operations, applyFn, options)
+            local filtered = {}
+            for index = 1, #(operations or {}) do
+                local operation = operations[index]
+                if tonumber(operation and operation.opcode) ~= tonumber(EVENT_DEFENSIVE_USE_OPCODE) then
+                    filtered[#filtered + 1] = operation
+                end
+            end
+            return baseCommitEventMutation(self, eventId, filtered, applyFn, options)
+        end
+    end
+end
+
 -- A host-local defensive proposal is tentatively marked pending before it is
 -- synchronously validated by the host. The host validation must consult the
 -- committed ledger, not reject its own proposal because of that tentative bit.
@@ -74,6 +109,47 @@ do
                 return allowed, reason
             end
             return baseCanUseDefensiveReaction(self, entry, action)
+        end
+    end
+end
+
+-- Server-owned NPC casts do not carry a client proposal snapshot. Apply the
+-- existing cooldown transition locally before the #235 transport wrapper
+-- serializes the host runtime, while avoiding a second application when the
+-- state is already present.
+do
+    local baseSendToChannel = Comms.SendToChannel
+    if type(baseSendToChannel) == "function" then
+        Comms.SendToChannel = function(self, channelId, opcodeOrPayload, argumentsOrMetadata, metadata)
+            local opcode = tonumber(opcodeOrPayload)
+            if opcode == SPELLCAST_START_OPCODE
+                and type(metadata) == "table"
+                and metadata.scope == "server"
+                and type(Server.EventRuntime) == "table"
+            then
+                local eventState = Server.EventState
+                local casterEventId = tonumber(type(argumentsOrMetadata) == "table" and argumentsOrMetadata[3] or nil) or 0
+                local spellRef = tostring(type(argumentsOrMetadata) == "table" and argumentsOrMetadata[4] or "")
+                local casterUnit = findEventUnit(eventState, casterEventId)
+                local unitState = type(Spellcasting.GetUnitCooldownState) == "function"
+                    and Spellcasting.GetUnitCooldownState(Client, eventState and eventState.id or nil, casterEventId, false)
+                    or nil
+                local alreadyApplied = type(unitState) == "table"
+                    and type(unitState.spells) == "table"
+                    and type(unitState.spells[spellRef]) == "table"
+                if not alreadyApplied
+                    and type(casterUnit) == "table"
+                    and spellRef ~= ""
+                    and type(Registry.ResolveSpellReference) == "function"
+                    and type(Client.ApplyLocalSpellCooldown) == "function"
+                then
+                    local _, spell = Registry:ResolveSpellReference(spellRef)
+                    if type(spell) == "table" then
+                        Client:ApplyLocalSpellCooldown(eventState, casterUnit, spellRef, spell)
+                    end
+                end
+            end
+            return baseSendToChannel(self, channelId, opcodeOrPayload, argumentsOrMetadata, metadata)
         end
     end
 end
