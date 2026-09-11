@@ -8,6 +8,7 @@ local CombatState = Comms.EventCombatState or {}
 local Serialization = Comms.Serialization or {}
 local Operations = Comms.Operations or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
+local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Spellcasting = Client.Spellcasting or {}
 local AuraManager = Spellcasting.AuraManager or (Addon.Internal and Addon.Internal.AuraManager) or nil
 
@@ -208,6 +209,93 @@ local spellOpcodes = {
     [SPELLCAST_COMPLETE_OPCODE or -2] = true,
     [SPELLCAST_INTERRUPT_OPCODE or -3] = true,
 }
+
+local function normalizeCooldownTurns(spell)
+    local turns = type(Spellcasting.NormalizeTurnCount) == "function" and Spellcasting.NormalizeTurnCount(spell and spell.cooldown) or nil
+    return math.max(0, math.floor(tonumber(turns) or 0))
+end
+
+local function normalizedCooldownGroup(spell)
+    local value = tostring(type(spell) == "table" and spell.cooldownGroup or "")
+    return value ~= "" and value or nil
+end
+
+local function relationLockoutTurns(triggerSpell, relatedSpell)
+    if type(triggerSpell) ~= "table" or type(relatedSpell) ~= "table" then
+        return 0
+    end
+    local lockout = 0
+    local triggerGroup = normalizedCooldownGroup(triggerSpell)
+    if triggerGroup and triggerGroup == normalizedCooldownGroup(relatedSpell) then
+        lockout = math.max(lockout, normalizeCooldownTurns(triggerSpell))
+    end
+    if triggerSpell.ignoreGCD == true and relatedSpell.ignoreGCD == true then
+        lockout = math.max(lockout, 1)
+    end
+    return lockout
+end
+
+local function ensureRelatedCooldownState(unitState, spellRef, spell, lockoutTurns)
+    if type(unitState) ~= "table" or type(spellRef) ~= "string" or spellRef == "" or type(spell) ~= "table" or lockoutTurns <= 0 then
+        return false
+    end
+    unitState.spells = unitState.spells or {}
+    local state = unitState.spells[spellRef]
+    if type(state) ~= "table" then
+        local usesCharges = spell.useCooldownCharges == true
+        local maxCharges = usesCharges and math.max(1, math.floor(tonumber(spell.charges) or 1)) or nil
+        state = {
+            remainingTurns = 0,
+            lockoutRemainingTurns = 0,
+            currentCharges = usesCharges and maxCharges or nil,
+            maxCharges = maxCharges,
+            usesCharges = usesCharges,
+            cooldownTurns = usesCharges and math.max(1, normalizeCooldownTurns(spell)) or nil,
+        }
+        unitState.spells[spellRef] = state
+    end
+    local previous = math.max(0, math.floor(tonumber(state.lockoutRemainingTurns) or 0))
+    state.lockoutRemainingTurns = math.max(previous, lockoutTurns)
+    return state.lockoutRemainingTurns ~= previous
+end
+
+-- ApplyLocalSpellCooldown remains the canonical transition. For remote players
+-- the host does not possess their action-bar spell list, so use only the spell
+-- ref keys from the original submitted cooldown map to discover possible shared
+-- lockouts. Each key is resolved against host spell metadata and the submitted
+-- cooldown values themselves are ignored.
+do
+    local baseApplyLocalSpellCooldown = Client.ApplyLocalSpellCooldown
+    if type(baseApplyLocalSpellCooldown) == "function" then
+        function Client:ApplyLocalSpellCooldown(eventState, casterUnit, spellRef, spell)
+            local changed = baseApplyLocalSpellCooldown(self, eventState, casterUnit, spellRef, spell) == true
+            local original = Server.EventCombatOriginalProposalRuntime
+            local casterEventId = tonumber(casterUnit and casterUnit.eventID) or 0
+            local originalUnit = type(original) == "table" and type(original.cooldowns) == "table" and original.cooldowns[casterEventId] or nil
+            local candidateSpells = type(originalUnit) == "table" and originalUnit.spells or nil
+            if type(candidateSpells) ~= "table" or casterEventId <= 0 then
+                return changed
+            end
+            local unitState = type(Spellcasting.GetUnitCooldownState) == "function"
+                and Spellcasting.GetUnitCooldownState(self, eventState and eventState.id or nil, casterEventId, true)
+                or nil
+            if type(unitState) ~= "table" then
+                return changed
+            end
+            for candidateRef in pairs(candidateSpells) do
+                candidateRef = tostring(candidateRef or "")
+                if candidateRef ~= "" and candidateRef ~= tostring(spellRef or "") and type(Registry.ResolveSpellReference) == "function" then
+                    local _, relatedSpell = Registry:ResolveSpellReference(candidateRef)
+                    local lockoutTurns = relationLockoutTurns(spell, relatedSpell)
+                    if lockoutTurns > 0 then
+                        changed = ensureRelatedCooldownState(unitState, candidateRef, relatedSpell, lockoutTurns) or changed
+                    end
+                end
+            end
+            return changed
+        end
+    end
+end
 
 -- Sync only the domain the current proposal is allowed to mutate. The host UI
 -- cache can lag an already accepted remote commit, so copying every local
