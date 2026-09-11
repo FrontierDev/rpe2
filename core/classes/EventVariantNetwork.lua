@@ -101,6 +101,219 @@ local function resolveIdentity(unit)
     return normalizeVariantIndex(identitySource.presetIndex), normalizeVariantIndex(identitySource.appearanceIndex)
 end
 
+local function cloneNetworkUnit(unit)
+    if type(unit) ~= "table" or type(EventUnit.FromTable) ~= "function" then
+        return nil
+    end
+
+    if type(unit.ToTable) == "function" then
+        return EventUnit.FromTable(unit:ToTable())
+    end
+    return EventUnit.FromTable(unit)
+end
+
+local function countPlayerUnits(units)
+    local count = 0
+    for index = 1, #(units or {}) do
+        if units[index] and units[index].isPlayer == true then
+            count = count + 1
+        end
+    end
+    return count
+end
+
+local function normalizeResourceRows(resources)
+    if type(EventUnit.SerializeResourcesForNetwork) ~= "function"
+        or type(EventUnit.DeserializeResourcesFromNetwork) ~= "function"
+    then
+        return nil
+    end
+    return EventUnit.DeserializeResourcesFromNetwork(EventUnit.SerializeResourcesForNetwork(resources or {}))
+end
+
+local function normalizeStatRows(stats)
+    if type(EventUnit.SerializeStatsForNetwork) ~= "function"
+        or type(EventUnit.DeserializeStatsFromNetwork) ~= "function"
+    then
+        return nil
+    end
+    return EventUnit.DeserializeStatsFromNetwork(EventUnit.SerializeStatsForNetwork(stats or {}))
+end
+
+local function normalizeSpellRefs(spells)
+    if type(EventUnit.SerializeSpellRefsForNetwork) ~= "function"
+        or type(EventUnit.DeserializeSpellRefsFromNetwork) ~= "function"
+    then
+        return nil
+    end
+    return EventUnit.DeserializeSpellRefsFromNetwork(EventUnit.SerializeSpellRefsForNetwork(spells or {}))
+end
+
+local function resourceRowsEqual(left, right)
+    local normalizedLeft = normalizeResourceRows(left)
+    local normalizedRight = normalizeResourceRows(right)
+    if type(normalizedLeft) ~= "table" or type(normalizedRight) ~= "table" or #normalizedLeft ~= #normalizedRight then
+        return false
+    end
+
+    for index = 1, #normalizedLeft do
+        local leftEntry = normalizedLeft[index]
+        local rightEntry = normalizedRight[index]
+        if tostring(leftEntry and leftEntry.resourceRef or "") ~= tostring(rightEntry and rightEntry.resourceRef or "")
+            or tonumber(leftEntry and leftEntry.currentValue) ~= tonumber(rightEntry and rightEntry.currentValue)
+            or tonumber(leftEntry and leftEntry.maxValue) ~= tonumber(rightEntry and rightEntry.maxValue)
+        then
+            return false
+        end
+    end
+    return true
+end
+
+local function statRowsEqual(left, right)
+    local normalizedLeft = normalizeStatRows(left)
+    local normalizedRight = normalizeStatRows(right)
+    if type(normalizedLeft) ~= "table" or type(normalizedRight) ~= "table" or #normalizedLeft ~= #normalizedRight then
+        return false
+    end
+
+    for index = 1, #normalizedLeft do
+        local leftEntry = normalizedLeft[index]
+        local rightEntry = normalizedRight[index]
+        if tostring(leftEntry and leftEntry.statRef or "") ~= tostring(rightEntry and rightEntry.statRef or "")
+            or tonumber(leftEntry and leftEntry.value) ~= tonumber(rightEntry and rightEntry.value)
+            or tonumber(leftEntry and leftEntry.currentValue) ~= tonumber(rightEntry and rightEntry.currentValue)
+        then
+            return false
+        end
+    end
+    return true
+end
+
+local function spellRefsEqual(left, right)
+    local normalizedLeft = normalizeSpellRefs(left)
+    local normalizedRight = normalizeSpellRefs(right)
+    if type(normalizedLeft) ~= "table" or type(normalizedRight) ~= "table" or #normalizedLeft ~= #normalizedRight then
+        return false
+    end
+
+    for index = 1, #normalizedLeft do
+        if tostring(normalizedLeft[index] or "") ~= tostring(normalizedRight[index] or "") then
+            return false
+        end
+    end
+    return true
+end
+
+local function resolveReceiverBaseResources(unit, playerCount)
+    if type(EventUnit.BuildResolvedResources) ~= "function" then
+        return nil
+    end
+    local probe = cloneNetworkUnit(unit)
+    if not probe then
+        return nil
+    end
+    probe.resources = {}
+    probe._networkResourceMode = nil
+    local ok, resources = pcall(EventUnit.BuildResolvedResources, probe, playerCount)
+    return ok and type(resources) == "table" and resources or nil
+end
+
+local function resolveReceiverBaseStats(unit)
+    if type(EventUnit.BuildResolvedStats) ~= "function" then
+        return nil
+    end
+    local probe = cloneNetworkUnit(unit)
+    if not probe then
+        return nil
+    end
+    probe.stats = {}
+    probe._networkStatMode = nil
+    local ok, stats = pcall(EventUnit.BuildResolvedStats, probe)
+    return ok and type(stats) == "table" and stats or nil
+end
+
+local function resolveReceiverBaseSpells(unit)
+    if type(EventUnit.BuildResolvedSpellRefs) ~= "function" then
+        return nil
+    end
+    local probe = cloneNetworkUnit(unit)
+    if not probe then
+        return nil
+    end
+    probe.spells = {}
+    probe._networkSpellMode = nil
+    local ok, spells = pcall(EventUnit.BuildResolvedSpellRefs, probe)
+    return ok and type(spells) == "table" and spells or nil
+end
+
+local function compactSnapshotUnit(unit, playerCount)
+    if type(unit) ~= "table" or unit.isPlayer == true or tostring(unit.registryID or "") == "" then
+        return unit
+    end
+    local resolvedUnit = type(unit.GetResolvedUnit) == "function" and unit:GetResolvedUnit() or nil
+    if type(resolvedUnit) ~= "table" then
+        return unit
+    end
+
+    local compact = cloneNetworkUnit(unit)
+    if not compact then
+        return unit
+    end
+
+    compact._networkResourceMode = nil
+    if type(EventUnit.BuildResourceDeltas) == "function" and type(EventUnit.ApplyResourceDeltas) == "function" then
+        local baseResources = resolveReceiverBaseResources(compact, playerCount)
+        if type(baseResources) == "table" then
+            local resourceDeltas = EventUnit.BuildResourceDeltas(baseResources, unit.resources or {})
+            local reconstructed = EventUnit.ApplyResourceDeltas(baseResources, resourceDeltas)
+            if resourceRowsEqual(reconstructed, unit.resources or {}) then
+                compact.resources = resourceDeltas
+                compact._networkResourceMode = "delta"
+            end
+        end
+    end
+
+    local presetIndex = normalizeVariantIndex(unit.presetIndex)
+    compact._networkSpellMode = nil
+    compact._networkStatMode = nil
+    if presetIndex == 0 then
+        local baseSpells = resolveReceiverBaseSpells(compact)
+        if type(baseSpells) == "table" and spellRefsEqual(baseSpells, unit.spells or {}) then
+            compact.spells = {}
+            compact._networkSpellMode = "inherit"
+        end
+
+        local baseStats = resolveReceiverBaseStats(compact)
+        if type(baseStats) == "table" and statRowsEqual(baseStats, unit.stats or {}) then
+            compact.stats = {}
+            compact._networkStatMode = "inherit"
+        end
+    end
+
+    return compact
+end
+
+local function buildSnapshotSerializationEvent(eventState)
+    local server = Addon.Server
+    if type(eventState) ~= "table"
+        or type(server) ~= "table"
+        or server.EventState ~= eventState
+        or eventState.active ~= true
+    then
+        return eventState
+    end
+
+    local compactUnits = {}
+    local playerCount = countPlayerUnits(eventState.units)
+    for index = 1, #((eventState.units) or {}) do
+        compactUnits[index] = compactSnapshotUnit(eventState.units[index], playerCount)
+    end
+
+    return {
+        units = compactUnits,
+    }
+end
+
 local function makePresetMechanicsExplicit(fields, sourceUnit, presetIndex)
     if type(fields) ~= "table" or type(sourceUnit) ~= "table" then
         return fields
@@ -111,10 +324,12 @@ local function makePresetMechanicsExplicit(fields, sourceUnit, presetIndex)
         return fields
     end
 
-    -- Resources are always host-materialized. In particular, Ruleset-owned
-    -- player-count Health scaling cannot be reconstructed from the Unit
-    -- definition on a receiving client, including for Base (preset 0) summons.
-    if type(EventUnit.SerializeResourcesForNetwork) == "function" then
+    -- Ordinary serialization keeps resources host-materialized. A snapshot
+    -- compaction copy explicitly marked as resource delta has already proved
+    -- lossless receiver reconstruction and must retain that mode.
+    if tostring(sourceUnit._networkResourceMode or "") ~= "delta"
+        and type(EventUnit.SerializeResourcesForNetwork) == "function"
+    then
         fields[11] = EventUnit.SerializeResourcesForNetwork(runtimeUnit.resources or {})
         fields[18] = ""
     end
@@ -193,7 +408,8 @@ end
 
 local baseSerializeUnitsForNetwork = Event.SerializeUnitsForNetwork
 function Event:SerializeUnitsForNetwork()
-    local serialized = baseSerializeUnitsForNetwork and baseSerializeUnitsForNetwork(self) or ""
+    local serializationEvent = buildSnapshotSerializationEvent(self)
+    local serialized = baseSerializeUnitsForNetwork and baseSerializeUnitsForNetwork(serializationEvent) or ""
     if serialized == "" then
         return serialized
     end
@@ -201,7 +417,7 @@ function Event:SerializeUnitsForNetwork()
     local records = splitPreservingEmpty(serialized, UNIT_RECORD_SEPARATOR)
     for index = 1, #records do
         if records[index] ~= "" then
-            records[index] = appendVariantIdentity(records[index], self.units and self.units[index] or nil)
+            records[index] = appendVariantIdentity(records[index], serializationEvent.units and serializationEvent.units[index] or nil)
         end
     end
     return table.concat(records, UNIT_RECORD_SEPARATOR)
@@ -220,6 +436,15 @@ function Event.DeserializeUnitsFromNetwork(unitsText)
         if records[index] ~= "" then
             unitIndex = unitIndex + 1
             applyVariantIdentity(units[unitIndex], records[index])
+        end
+    end
+
+    if type(EventUnit.HydrateNetworkUnit) == "function" then
+        local playerCount = countPlayerUnits(units)
+        for index = 1, #units do
+            units[index] = EventUnit.HydrateNetworkUnit(units[index], {
+                playerCount = playerCount,
+            })
         end
     end
     return units

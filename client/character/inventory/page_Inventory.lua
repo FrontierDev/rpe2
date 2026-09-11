@@ -6,6 +6,7 @@ Addon.Client.UI.Inventory = Addon.Client.UI.Inventory or {}
 
 local InventoryUI = Addon.Client.UI.Inventory
 local Inventory = Addon.Client.Inventory or {}
+local ItemUse = Addon.Client.ItemUse or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
@@ -664,12 +665,13 @@ function InventoryGridPage:EnsureItemContextMenu()
         onItemInvoked = function(item, menu)
             local action = item and item.value or nil
             local resolved = self.ContextMenuResolvedItem
-            local data = item and item.data or nil
             if not resolved then
                 return
             end
 
-            if action == "equip" and resolved.sourceIndex and Inventory.EquipItem then
+            if action == "use" and resolved.sourceIndex and resolved.stackIdentity and ItemUse.UseInventoryItem then
+                ItemUse:UseInventoryItem(resolved.sourceIndex, resolved.stackIdentity)
+            elseif action == "equip" and resolved.sourceIndex and Inventory.EquipItem then
                 Inventory.EquipItem(resolved.sourceIndex, buildInventoryEquipOptions())
             elseif action == "modify" and resolved.sourceIndex then
                 local modificationWindow = InventoryUI and InventoryUI.ModificationWindow or nil
@@ -702,6 +704,14 @@ function InventoryGridPage:ShowItemContextMenu(anchorFrame, resolved)
     self.ContextMenuResolvedItem = resolved
     local itemType = resolved and tostring(resolved.itemType or "none") or "none"
     local isEquipmentItem = itemType == "weapon" or itemType == "armor"
+    local canUse = resolved.isMissing ~= true
+        and resolved.isActive == true
+        and itemType == "consumable"
+        and resolved.item ~= nil
+        and trimString(resolved.item.useSpellRef) ~= ""
+        and resolved.sourceIndex ~= nil
+        and trimString(resolved.stackIdentity) ~= ""
+        and ItemUse.UseInventoryItem ~= nil
     local canEquip = resolved.isMissing ~= true
         and resolved.isActive == true
         and isEquipmentItem
@@ -714,6 +724,12 @@ function InventoryGridPage:ShowItemContextMenu(anchorFrame, resolved)
         and resolved.sourceIndex ~= nil
 
     local items = {}
+    if canUse then
+        items[#items + 1] = {
+            label = "Use",
+            value = "use",
+        }
+    end
     if canEquip then
         items[#items + 1] = {
             label = "Equip",

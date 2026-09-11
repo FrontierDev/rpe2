@@ -454,7 +454,10 @@ local function refreshEventStartupPhase(eventState, runtime)
     if eventState.startupReady == true then
         return setEventStartupPhase(eventState, runtime, "ready")
     end
-    if eventState.unitsReady ~= true then
+    local readiness = type(ResourceSync.GetEventReadinessState) == "function"
+        and ResourceSync.GetEventReadinessState(eventState)
+        or nil
+    if type(readiness) ~= "table" or readiness.rosterComplete ~= true then
         return setEventStartupPhase(eventState, runtime, "waiting-units")
     end
     if type(runtime) ~= "table" or runtime.startupStateReceived ~= true then
@@ -478,6 +481,9 @@ local function refreshEventStartupPhase(eventState, runtime)
     end
     if runtime.resourceSyncQueued ~= true then
         return setEventStartupPhase(eventState, runtime, "resource-sync")
+    end
+    if type(readiness) ~= "table" or readiness.resourcesReady ~= true then
+        return setEventStartupPhase(eventState, runtime, "waiting-resources")
     end
     if runtime.consumablesQueued ~= true then
         return setEventStartupPhase(eventState, runtime, "consumable-prompts")
@@ -882,7 +888,10 @@ local function runEventStartupStep(targetClient, queuedEventId, queuedGeneration
         return false
     end
 
-    if eventState.unitsReady ~= true then
+    local readiness = type(ResourceSync.GetEventReadinessState) == "function"
+        and ResourceSync.GetEventReadinessState(eventState)
+        or nil
+    if type(readiness) ~= "table" or readiness.rosterComplete ~= true then
         setEventStartupPhase(eventState, runtime, "waiting-units")
         targetClient:SetEventTransitionPhase("waiting-units", eventState)
         return true
@@ -1083,6 +1092,15 @@ local function runEventStartupStep(targetClient, queuedEventId, queuedGeneration
         if not runtime.resourceSyncQueued then
             return true
         end
+        return true
+    end
+
+    readiness = type(ResourceSync.GetEventReadinessState) == "function"
+        and ResourceSync.GetEventReadinessState(eventState)
+        or nil
+    if type(readiness) ~= "table" or readiness.resourcesReady ~= true then
+        setEventStartupPhase(eventState, runtime, "waiting-resources")
+        targetClient:SetEventTransitionPhase("waiting-resources", eventState)
         return true
     end
 
@@ -2726,6 +2744,39 @@ local function queueEventEndWork(client, eventState, transition, reason, work)
     return true
 end
 
+local function hydrateLocalHostAuthoritativeRoster(eventState)
+    if type(eventState) ~= "table" then
+        return false
+    end
+
+    local localPlayerName = Common.GetPlayerName and Common.GetPlayerName() or nil
+    localPlayerName = Common.NormalizeName and Common.NormalizeName(localPlayerName) or tostring(localPlayerName or "")
+    local eventHostName = Common.NormalizeName and Common.NormalizeName(eventState.hostName) or tostring(eventState.hostName or "")
+    if localPlayerName == "" or eventHostName == "" or eventHostName ~= localPlayerName then
+        return false
+    end
+
+    local serverEventState = Addon.Server and Addon.Server.EventState or nil
+    if type(serverEventState) ~= "table"
+        or serverEventState.active ~= true
+        or tostring(serverEventState.id or "") ~= tostring(eventState.id or "")
+        or type(serverEventState.SerializeUnitsForNetwork) ~= "function"
+        or type(Event.DeserializeUnitsFromNetwork) ~= "function"
+    then
+        return false
+    end
+
+    local units = Event.DeserializeUnitsFromNetwork(serverEventState:SerializeUnitsForNetwork())
+    if type(units) ~= "table" or #units == 0 then
+        return false
+    end
+
+    eventState.units = units
+    eventState.rosterReady = true
+    eventState.unitsChunkReceived = eventState.unitsChunkExpected or eventState.unitsChunkReceived or 0
+    return true
+end
+
 function Client:HandleEventStart(arguments, sender)
     local totalStartTime = getTimingNowMilliseconds()
     local timingParts = totalStartTime > 0 and {} or nil
@@ -2752,7 +2803,22 @@ function Client:HandleEventStart(arguments, sender)
     nextState.turnNumber = math.max(1, tonumber(nextState.turnNumber) or 1)
     nextState.tickNumber = math.max(1, tonumber(nextState.tickNumber) or 1)
     nextState.totalTicks = math.max(1, tonumber(nextState.totalTicks) or 1)
-    nextState.rosterReady = true
+
+    local currentEventState = self.EventState
+    if type(currentEventState) == "table"
+        and currentEventState.active == true
+        and tostring(currentEventState.id or "") ~= ""
+        and tostring(currentEventState.id or "") == tostring(nextState.id or "")
+    then
+        if timer then
+            stopEventTiming(timer, currentEventState, {
+                eventId = currentEventState.id,
+                duplicateStart = 1,
+            })
+        end
+        return true
+    end
+    nextState.rosterReady = false
     nextState.unitsReady = false
     nextState.unitsChunkReceived = 0
     nextState.unitsChunkExpected = 0
@@ -2762,6 +2828,8 @@ function Client:HandleEventStart(arguments, sender)
             cancelReason = "event-replaced",
         })
     end
+
+    hydrateLocalHostAuthoritativeRoster(nextState)
 
     local hydrateStartTime = timingParts and getTimingNowMilliseconds() or nil
     if ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
@@ -3093,7 +3161,7 @@ function Client:HandleInboundChunkProgress(packet, receivedCount, distribution, 
     end
 
     local eventState = self.EventState
-    if not eventState or eventState.active ~= true or eventState.ending == true or eventState.unitsReady == true then
+    if not eventState or eventState.active ~= true or eventState.ending == true or eventState.rosterReady == true then
         return false
     end
 

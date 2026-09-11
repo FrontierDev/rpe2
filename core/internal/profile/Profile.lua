@@ -1348,13 +1348,21 @@ local function buildEffectiveActiveTraitRefs()
         appendUniqueRef(refs, seen, raceRefs[index])
     end
     for index = 1, #classRefs do
-        local detail = Profile.GetKnownTraitDetails and Profile.GetKnownTraitDetails(classRefs[index]) or nil
-        if detail and detail.origin == "class" and detail.typeCategory == "talent" then
-            if inactiveLookup[classRefs[index]] ~= true then
-                appendUniqueRef(refs, seen, classRefs[index])
+        local traitRef = classRefs[index]
+        local registry = getRegistry()
+        local trait = nil
+        if type(registry.ResolveTraitReference) == "function" then
+            local _, resolvedTrait = registry:ResolveTraitReference(traitRef)
+            trait = resolvedTrait
+        end
+        local origin = getKnownTraitOrigin(traitRef)
+        local typeCategory = getTraitSourceCategory(trait)
+        if origin == "class" and typeCategory == "talent" then
+            if inactiveLookup[traitRef] ~= true then
+                appendUniqueRef(refs, seen, traitRef)
             end
         else
-            appendUniqueRef(refs, seen, classRefs[index])
+            appendUniqueRef(refs, seen, traitRef)
         end
     end
 
@@ -1382,6 +1390,37 @@ local function isTraitDetailVisibleToProfile(detail)
     end
 
     return (tonumber(detail.unlockLevel) or 1) <= getProfileLevel()
+end
+
+local function isTraitRefVisibleToProfileWithoutConditions(traitRef)
+    local normalizedRef = ensureString(traitRef)
+    if normalizedRef == "" then
+        return false
+    end
+
+    local registry = getRegistry()
+    local trait = nil
+    if type(registry.ResolveTraitReference) == "function" then
+        local _, resolvedTrait = registry:ResolveTraitReference(normalizedRef)
+        trait = resolvedTrait
+    end
+    if type(trait) ~= "table" then
+        return true
+    end
+    if trait.isEnvironmental == true then
+        return false
+    end
+
+    local origin = getKnownTraitOrigin(normalizedRef) or "manual"
+    local typeCategory = getTraitSourceCategory(trait)
+    if typeCategory == "race" and origin ~= "race" then
+        return false
+    end
+    if typeCategory == "class" and origin ~= "class" then
+        return false
+    end
+
+    return getTraitUnlockLevel(trait) <= getProfileLevel()
 end
 
 local function buildTraitCountSummary()
@@ -2894,10 +2933,10 @@ function Profile.IsTraitActive(traitRef)
         return false
     end
 
-    local activeTraits = Profile.ListActiveTraits and Profile.ListActiveTraits() or {}
-    for index = 1, #activeTraits do
-        if ensureString(activeTraits[index] and activeTraits[index].traitRef) == normalizedRef then
-            return true
+    local activeTraitRefs = buildEffectiveActiveTraitRefs()
+    for index = 1, #activeTraitRefs do
+        if ensureString(activeTraitRefs[index]) == normalizedRef then
+            return isTraitRefVisibleToProfileWithoutConditions(normalizedRef)
         end
     end
 

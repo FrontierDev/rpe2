@@ -282,6 +282,11 @@ function DataEditor:BuildDatasetsPane(parent)
     toolbar:AddChild(self.ImportDatasetButton)
     root:AddChild(toolbar)
 
+    self.ExportAllDatasetsButton = UI.CreateButton(root:GetFrame(), "RPEDataEditorExportAllDatasetsButton", "Export All", 160, function()
+        self:ExportActiveDatasetsToClipboard()
+    end)
+    root:AddChild(self.ExportAllDatasetsButton)
+
     local listPanel = UI.CreatePanel(root:GetFrame(), "RPEDataEditorDatasetListPanel", {
         width = 160,
         height = 300,

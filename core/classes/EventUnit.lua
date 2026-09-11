@@ -240,6 +240,64 @@ local function cloneResources(resources)
     return normalizeResources(resources)
 end
 
+local function buildResourceDeltas(baseResources, resolvedResources)
+    local baseByRef = {}
+    local normalizedBase = cloneResources(baseResources)
+    for index = 1, #normalizedBase do
+        local entry = normalizedBase[index]
+        baseByRef[entry.resourceRef] = entry
+    end
+
+    local deltas = {}
+    local normalizedResolved = cloneResources(resolvedResources)
+    for index = 1, #normalizedResolved do
+        local entry = normalizedResolved[index]
+        local baseEntry = baseByRef[entry.resourceRef]
+        if not baseEntry
+            or tonumber(baseEntry.currentValue) ~= tonumber(entry.currentValue)
+            or tonumber(baseEntry.maxValue) ~= tonumber(entry.maxValue)
+        then
+            deltas[#deltas + 1] = entry
+        end
+    end
+
+    return deltas
+end
+
+local function applyResourceDeltas(baseResources, deltas)
+    local resolved = cloneResources(baseResources)
+    local indexByRef = {}
+
+    for index = 1, #resolved do
+        local resourceRef = normalizeRef(resolved[index] and resolved[index].resourceRef)
+        if resourceRef and indexByRef[resourceRef] == nil then
+            indexByRef[resourceRef] = index
+        end
+    end
+
+    local normalizedDeltas = cloneResources(deltas)
+    for index = 1, #normalizedDeltas do
+        local delta = normalizedDeltas[index]
+        local resourceRef = normalizeRef(delta and delta.resourceRef)
+        if resourceRef then
+            local replacement = {
+                resourceRef = resourceRef,
+                currentValue = tonumber(delta.currentValue) or 0,
+                maxValue = tonumber(delta.maxValue) or 0,
+            }
+            local existingIndex = indexByRef[resourceRef]
+            if existingIndex then
+                resolved[existingIndex] = replacement
+            else
+                resolved[#resolved + 1] = replacement
+                indexByRef[resourceRef] = #resolved
+            end
+        end
+    end
+
+    return resolved
+end
+
 local function cloneSpellRefs(spellRefs)
     return normalizeSpellRefs(spellRefs)
 end
@@ -724,6 +782,14 @@ function EventUnit.BuildResolvedResources(eventUnit, playerCount)
     return buildResolvedResources(eventUnit, playerCount)
 end
 
+function EventUnit.BuildResourceDeltas(baseResources, resolvedResources)
+    return buildResourceDeltas(baseResources, resolvedResources)
+end
+
+function EventUnit.ApplyResourceDeltas(baseResources, deltas)
+    return applyResourceDeltas(baseResources, deltas)
+end
+
 function EventUnit.BuildResolvedSpellRefs(eventUnit, fallback)
     return buildResolvedSpellRefs(eventUnit, fallback)
 end
@@ -749,6 +815,14 @@ function EventUnit.HydrateNetworkUnit(unit, options)
 
     if resourceMode == "inherit" then
         hydrated.resources = buildResolvedResources(hydrated, playerCount)
+    elseif resourceMode == "delta" then
+        local resourceDeltas = cloneResources(hydrated.resources)
+        hydrated.resources = {}
+        local resolver = EventUnit.BuildResolvedResources
+        local baseResources = type(resolver) == "function"
+                and resolver(hydrated, playerCount, options)
+            or buildResolvedResources(hydrated, playerCount)
+        hydrated.resources = applyResourceDeltas(baseResources, resourceDeltas)
     end
     if spellMode == "inherit" then
         hydrated.spells = buildResolvedSpellRefs(hydrated)

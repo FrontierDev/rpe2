@@ -266,7 +266,12 @@ function Server:AddEventNpcUnit(data)
     local unit = baseAddEventNpcUnit and baseAddEventNpcUnit(self, data) or nil
     if unit and hasVariantIdentity then
         applyRuntimeVariantIdentity(unit, data.presetIndex, data.appearanceIndex)
-        applyIdentityToDraftCopy(self, unit.eventID, data.presetIndex, data.appearanceIndex)
+        -- Pre-start draft refreshes can rebuild and renumber EventUnits before
+        -- baseAddEventNpcUnit returns. The canonical constructor now preserves
+        -- variant identity, so only mirror by eventID when live IDs are stable.
+        if self.IsEventActive and self:IsEventActive() then
+            applyIdentityToDraftCopy(self, unit.eventID, data.presetIndex, data.appearanceIndex)
+        end
     end
 
     self.PendingNpcVariantMaterialization = previousPending

@@ -142,6 +142,7 @@ local CONFIGURATION_CHANGE_CLASSIFICATION = {
     ["ruleset-rename"] = "authored configuration",
     ["ruleset-update"] = "authored configuration",
     ["dataset-activation"] = "authored configuration",
+    ["dataset-default-sync"] = "authored configuration",
     ["dataset-import"] = "authored configuration",
     ["dataset-delete"] = "authored configuration",
     ["dataset-rename"] = "authored configuration",
@@ -187,6 +188,24 @@ local function deepCopy(value)
     local copy = {}
     for key, nestedValue in pairs(value) do
         copy[key] = deepCopy(nestedValue)
+    end
+
+    return copy
+end
+
+local function copyAuthoredConfiguration(value)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local copy = {}
+    for key, nestedValue in pairs(value) do
+        -- Underscore-prefixed fields are runtime/private state. Dataset records
+        -- are live SavedVariables tables, so lookup caches can otherwise leak
+        -- into exports and make identical authored data hash differently.
+        if type(key) ~= "string" or string.sub(key, 1, 1) ~= "_" then
+            copy[copyAuthoredConfiguration(key)] = copyAuthoredConfiguration(nestedValue)
+        end
     end
 
     return copy
@@ -643,6 +662,47 @@ local function normalizeRulesetRecordPreservingExtras(record, fallbackId, fallba
     end
 
     return merged
+end
+
+local function buildCompleteRulesetExportRecord(record, fallbackId, fallbackName)
+    local exported = normalizeRulesetRecordPreservingExtras(record, fallbackId, fallbackName)
+    exported.rules = deepCopy(ensureTable(exported.rules))
+
+    local rulesetLogic = Addon.Internal and Addon.Internal.Ruleset or nil
+    local rules = type(rulesetLogic) == "table" and rulesetLogic.Rules or nil
+    local categoryDefinitions = type(rules) == "table" and rules.Definitions or nil
+
+    for categoryIndex = 1, #(categoryDefinitions or {}) do
+        local categoryDefinition = categoryDefinitions[categoryIndex]
+        local categoryKey = type(categoryDefinition) == "table" and categoryDefinition.key or nil
+        if type(categoryKey) == "string" and categoryKey ~= "" then
+            local categoryRules = exported.rules[categoryKey]
+            if type(categoryRules) ~= "table" then
+                categoryRules = {}
+                exported.rules[categoryKey] = categoryRules
+            end
+
+            local ruleDefinitions = categoryDefinition.rules
+            for ruleIndex = 1, #(ruleDefinitions or {}) do
+                local ruleDefinition = ruleDefinitions[ruleIndex]
+                local ruleKey = type(ruleDefinition) == "table" and ruleDefinition.key or nil
+                if type(ruleKey) == "string" and ruleKey ~= "" then
+                    local value = categoryRules[ruleKey]
+                    if type(rulesetLogic.GetRulesetRuleValue) == "function" then
+                        value = rulesetLogic.GetRulesetRuleValue(exported, categoryKey, ruleDefinition)
+                    elseif value == nil then
+                        value = ruleDefinition.default
+                    end
+
+                    if value ~= nil then
+                        categoryRules[ruleKey] = deepCopy(value)
+                    end
+                end
+            end
+        end
+    end
+
+    return copyAuthoredConfiguration(exported)
 end
 
 local function normalizeProfileEquipmentEntry(record)
@@ -1630,7 +1690,7 @@ local function normalizeRulesetsCollection(root)
             fallbackName = key
         end
 
-        local ruleset = normalizeRulesetRecord(value, fallbackId, fallbackName)
+        local ruleset = normalizeRulesetRecordPreservingExtras(value, fallbackId, fallbackName)
         if ruleset.id == "" then
             ruleset.id = fallbackId or ""
         end
@@ -1656,7 +1716,7 @@ local function normalizeRulesetsCollection(root)
     return root.rulesets
 end
 
-local function normalizeActivatedDatasets(root)
+local function normalizeActivatedDatasets(root, preserveMissing)
     local values = ensureTable(root and root.activatedDatasets)
     local normalized = {}
     local seen = {}
@@ -1670,7 +1730,10 @@ local function normalizeActivatedDatasets(root)
             datasetId = ensureString(key, "")
         end
 
-        if datasetId ~= "" and datasets[datasetId] ~= nil and not seen[datasetId] then
+        if datasetId ~= ""
+            and (preserveMissing == true or datasets[datasetId] ~= nil)
+            and not seen[datasetId]
+        then
             normalized[#normalized + 1] = datasetId
             seen[datasetId] = true
         end
@@ -3186,19 +3249,149 @@ function Database.EnsureDatasets()
         datasets = {},
         activeByChar = {},
         activatedDatasets = {},
+        defaultDatasetVersions = {},
         nextId = 1,
     })
 
     datasets.currentByChar = nil
     datasets.activeByChar = ensureTable(datasets.activeByChar)
+    datasets.defaultDatasetVersions = ensureTable(datasets.defaultDatasetVersions)
     normalizeDatasetsCollection(datasets)
-    normalizeActivatedDatasets(datasets)
+    -- Preserve activation IDs whose record is temporarily missing so a known
+    -- packaged default can be restored later in the same startup without being
+    -- mistaken for a first installation. Public activation reads still filter
+    -- IDs which do not resolve to a current dataset record.
+    normalizeActivatedDatasets(datasets, true)
     Database.Datasets = datasets
     if Dependecies and Dependecies.RecomputeAllDatasetDependencies then
         Dependecies.RecomputeAllDatasetDependencies()
     end
 
     return datasets
+end
+
+local function isPositiveInteger(value)
+    return type(value) == "number"
+        and value > 0
+        and value == math.floor(value)
+end
+
+local function logDefaultDatasetSyncDiagnostic(definitionKey, message)
+    local debug = Addon.Debug or nil
+    if debug and type(debug.Internal) == "function" then
+        debug.Internal(
+            "Skipping packaged default dataset '%s': %s",
+            tostring(definitionKey),
+            tostring(message)
+        )
+    end
+end
+
+local function hasActivatedDatasetId(root, datasetId)
+    for key, value in pairs(ensureTable(root and root.activatedDatasets)) do
+        local activatedId = ""
+        if type(key) == "number" then
+            activatedId = ensureString(value, "")
+        elseif value == true then
+            activatedId = ensureString(key, "")
+        end
+
+        if activatedId == datasetId then
+            return true
+        end
+    end
+
+    return false
+end
+
+function Database.SyncDefaultDatasets(defaultDefinitions)
+    local changedDatasetIds = {}
+    local skippedDefinitions = 0
+
+    if type(defaultDefinitions) ~= "table" then
+        logDefaultDatasetSyncDiagnostic("<definitions>", "definitions must be a table")
+        return changedDatasetIds, 1
+    end
+
+    local root = Database.Datasets
+    if type(root) ~= "table" then
+        root = Database.EnsureDatasets()
+    end
+    root.datasets = ensureTable(root.datasets)
+    root.activatedDatasets = ensureTable(root.activatedDatasets)
+    root.defaultDatasetVersions = ensureTable(root.defaultDatasetVersions)
+
+    local definitionKeys = {}
+    for definitionKey in pairs(defaultDefinitions) do
+        definitionKeys[#definitionKeys + 1] = definitionKey
+    end
+    table.sort(definitionKeys, function(left, right)
+        return tostring(left) < tostring(right)
+    end)
+
+    local seenDatasetIds = {}
+    for index = 1, #definitionKeys do
+        local definitionKey = definitionKeys[index]
+        local definition = defaultDefinitions[definitionKey]
+        local dataset = type(definition) == "table" and definition.dataset or nil
+        local datasetId = type(dataset) == "table" and ensureString(dataset.id, "") or ""
+        local packagedVersion = type(definition) == "table" and definition.version or nil
+        local validationError = nil
+
+        if type(definition) ~= "table" then
+            validationError = "definition must be a table"
+        elseif type(dataset) ~= "table" then
+            validationError = "definition must contain a dataset table"
+        elseif datasetId == "" then
+            validationError = "dataset must have a non-empty id"
+        elseif not isPositiveInteger(packagedVersion) then
+            validationError = "packaged version must be a positive integer"
+        elseif seenDatasetIds[datasetId] then
+            validationError = "dataset id is duplicated in packaged definitions"
+        end
+
+        if validationError then
+            skippedDefinitions = skippedDefinitions + 1
+            logDefaultDatasetSyncDiagnostic(definitionKey, validationError)
+        else
+            seenDatasetIds[datasetId] = true
+
+            local installedVersion = root.defaultDatasetVersions[datasetId]
+            local existingDataset = root.datasets[datasetId]
+            local firstInstall = installedVersion == nil
+            local needsWrite = existingDataset == nil or installedVersion ~= packagedVersion
+
+            if needsWrite then
+                local installedDataset = normalizeDatasetRecord(
+                    deepCopy(dataset),
+                    datasetId,
+                    dataset.name
+                )
+                installedDataset.id = datasetId
+
+                root.datasets[datasetId] = installedDataset
+                root.defaultDatasetVersions[datasetId] = packagedVersion
+
+                if firstInstall and not hasActivatedDatasetId(root, datasetId) then
+                    root.activatedDatasets[#root.activatedDatasets + 1] = datasetId
+                end
+
+                changedDatasetIds[#changedDatasetIds + 1] = datasetId
+            end
+        end
+    end
+
+    for index = 1, #changedDatasetIds do
+        if Dependecies and Dependecies.RecomputeDatasetDependencies then
+            Dependecies.RecomputeDatasetDependencies(changedDatasetIds[index])
+        end
+    end
+
+    if #changedDatasetIds > 0 then
+        notifyConfigurationChanged("dataset-default-sync")
+    end
+
+    return changedDatasetIds, skippedDefinitions
 end
 
 function Database.GetDatasetDisplayName(dataset)
@@ -3228,8 +3421,21 @@ function Database.GetRulesetDisplayName(ruleset)
     return tostring(name)
 end
 
+local function getInitializedRulesetRoot()
+    local root = Database.Rulesets
+    if type(root) == "table"
+        and root == rawget(_G, "RPEngineRulesetDB")
+        and type(root.rulesets) == "table"
+        and type(root.activeByChar) == "table"
+    then
+        return root
+    end
+
+    return Database.EnsureRulesets()
+end
+
 function Database.ListRulesets()
-    local root = Database.EnsureRulesets()
+    local root = getInitializedRulesetRoot()
     local entries = {}
 
     for _, ruleset in pairs(root.rulesets or {}) do
@@ -3254,12 +3460,12 @@ function Database.GetRulesetByID(rulesetId)
         return nil
     end
 
-    local root = Database.EnsureRulesets()
+    local root = getInitializedRulesetRoot()
     return root.rulesets and root.rulesets[tostring(rulesetId)] or nil
 end
 
 function Database.GetActiveRulesetId()
-    local root = Database.EnsureRulesets()
+    local root = getInitializedRulesetRoot()
     local activeRulesetId = resolveCharacterScopedActiveId(root, "activeByChar")
     return activeRulesetId
 end
@@ -3322,7 +3528,7 @@ function Database.ExportRuleset(rulesetId)
     local payload = {
         format = "rpe-ruleset",
         version = 2,
-        ruleset = normalizeRulesetRecordPreservingExtras(ruleset, ruleset.id, ruleset.name),
+        ruleset = buildCompleteRulesetExportRecord(ruleset, ruleset.id, ruleset.name),
     }
 
     return "RPE_RULESET_V2\n" .. serializeLuaValue(payload)
@@ -3435,8 +3641,22 @@ function Database.UpdateRulesetMetadata(rulesetId, metadata)
     return ruleset
 end
 
+local function getInitializedDatasetRoot()
+    local root = Database.Datasets
+    if type(root) == "table"
+        and root == rawget(_G, "RPEngineDatasetDB")
+        and type(root.datasets) == "table"
+        and type(root.activeByChar) == "table"
+        and type(root.activatedDatasets) == "table"
+    then
+        return root
+    end
+
+    return Database.EnsureDatasets()
+end
+
 function Database.ListDatasets()
-    local root = Database.EnsureDatasets()
+    local root = getInitializedDatasetRoot()
     local entries = {}
 
     for _, dataset in pairs(root.datasets or {}) do
@@ -3480,7 +3700,7 @@ function Database.GetDatasetByID(datasetId)
         return nil
     end
 
-    local root = Database.EnsureDatasets()
+    local root = getInitializedDatasetRoot()
     return root.datasets and root.datasets[tostring(datasetId)] or nil
 end
 
@@ -3513,7 +3733,7 @@ function Database.ResolveModelFilePath(displayId, fileDataId)
 end
 
 function Database.GetActiveDatasetId()
-    local root = Database.EnsureDatasets()
+    local root = getInitializedDatasetRoot()
     local activeDatasetId = resolveCharacterScopedActiveId(root, "activeByChar")
     return activeDatasetId
 end
@@ -3537,7 +3757,7 @@ function Database.SetActiveDatasetId(datasetId)
 end
 
 function Database.ListActivatedDatasetIds()
-    local root = Database.EnsureDatasets()
+    local root = getInitializedDatasetRoot()
     return normalizeActivatedDatasets(root)
 end
 
@@ -3659,10 +3879,96 @@ function Database.ExportDataset(datasetId)
     local payload = {
         format = "rpe-dataset",
         version = 1,
-        dataset = normalizeDatasetRecord(deepCopy(dataset), dataset.id, dataset.name),
+        dataset = normalizeDatasetRecord(copyAuthoredConfiguration(dataset), dataset.id, dataset.name),
     }
 
     return "RPE_DATASET_V1\n" .. serializeLuaValue(payload)
+end
+
+function Database.ExportDatasets(datasetIds)
+    if type(datasetIds) ~= "table" or #datasetIds == 0 then
+        return nil
+    end
+
+    local datasets = {}
+    for index = 1, #datasetIds do
+        local dataset = Database.GetDatasetByID(datasetIds[index])
+        if dataset then
+            datasets[#datasets + 1] = normalizeDatasetRecord(copyAuthoredConfiguration(dataset), dataset.id, dataset.name)
+        end
+    end
+
+    if #datasets == 0 then
+        return nil
+    end
+
+    local payload = {
+        format = "rpe-datasets",
+        version = 1,
+        datasets = datasets,
+    }
+
+    return "RPE_DATASETS_V1\n" .. serializeLuaValue(payload)
+end
+
+function Database.ExportDatasetsInChunks(datasetIds, maximumChunkSize)
+    local exportText = Database.ExportDatasets(datasetIds)
+    if not exportText then
+        return nil
+    end
+
+    local chunkSize = math.max(1024, math.floor(tonumber(maximumChunkSize) or (100 * 1024)))
+    local exportId = ("datasets-%d-%06d"):format(
+        math.floor((type(time) == "function" and time() or 0)),
+        math.random(0, 999999)
+    )
+    local payloads = {}
+    local startIndex = 1
+    while startIndex <= #exportText do
+        local endIndex = math.min(#exportText, startIndex + chunkSize - 1)
+        -- Do not split a UTF-8 code point across clipboard chunks.
+        while endIndex > startIndex do
+            local nextByte = exportText:byte(endIndex + 1)
+            if not nextByte or nextByte < 128 or nextByte > 191 then
+                break
+            end
+            endIndex = endIndex - 1
+        end
+        payloads[#payloads + 1] = exportText:sub(startIndex, endIndex)
+        startIndex = endIndex + 1
+    end
+
+    local total = #payloads
+    local chunks = {}
+    for index = 1, total do
+        local payload = payloads[index]
+        chunks[index] = ("RPE_DATASET_CHUNK_V1\nid=%s\nindex=%d\ntotal=%d\n\n%s"):format(exportId, index, total, payload)
+    end
+
+    return {
+        id = exportId,
+        total = total,
+        chunks = chunks,
+    }
+end
+
+function Database.ParseDatasetImportChunk(text)
+    local normalizedText = ensureString(text, ""):gsub("\r\n", "\n"):gsub("\r", "\n")
+    local exportId, indexText, totalText, payload = normalizedText:match(
+        "^RPE_DATASET_CHUNK_V1\nid=([^\n]+)\nindex=(%d+)\ntotal=(%d+)\n\n(.*)$"
+    )
+    local index = tonumber(indexText)
+    local total = tonumber(totalText)
+    if not exportId or exportId == "" or not index or not total or index < 1 or total < 1 or index > total or payload == "" then
+        return nil, "Import text is not a valid dataset export chunk."
+    end
+
+    return {
+        id = exportId,
+        index = index,
+        total = total,
+        payload = payload,
+    }
 end
 
 function Database.ExportDatasetEntry(datasetId, collectionKey, entryIdOrIndex)
@@ -3682,7 +3988,7 @@ function Database.ExportDatasetEntry(datasetId, collectionKey, entryIdOrIndex)
         version = 1,
         collectionKey = collectionKey,
         datasetId = dataset.id,
-        entry = normalizeDatasetEntryRecord(dataset, collectionKey, entry, entry.id),
+        entry = copyAuthoredConfiguration(normalizeDatasetEntryRecord(dataset, collectionKey, entry, entry.id)),
     }
 
     return "RPE_DATASET_ENTRY_V1\n" .. serializeLuaValue(payload)
@@ -3749,6 +4055,90 @@ function Database.ImportDataset(text)
     notifyConfigurationChanged("dataset-import")
 
     return imported
+end
+
+function Database.PrepareDatasetImport(text)
+    local normalizedText = ensureString(text, "")
+    normalizedText = normalizedText:gsub("^%s+", ""):gsub("%s+$", "")
+    if normalizedText == "" then
+        return nil, "Import text is empty."
+    end
+
+    -- Keep the import window backwards compatible with exports made before
+    -- multi-dataset export was introduced.
+    if not startsWith(normalizedText, "RPE_DATASETS_V1") then
+        return { datasetTexts = { normalizedText } }
+    end
+
+    local body = normalizedText:sub(#"RPE_DATASETS_V1" + 1)
+    if startsWith(body, "\r\n") then
+        body = body:sub(3)
+    elseif startsWith(body, "\n") or startsWith(body, "\r") then
+        body = body:sub(2)
+    end
+
+    local payload, decodeError = deserializeLuaValue(body)
+    if type(payload) ~= "table"
+        or payload.format ~= "rpe-datasets"
+        or tonumber(payload.version) ~= 1
+        or type(payload.datasets) ~= "table"
+    then
+        return nil, decodeError or "Import text is not a supported multi-dataset export."
+    end
+
+    if #payload.datasets == 0 then
+        return nil, "The export does not contain any datasets."
+    end
+
+    for index = 1, #payload.datasets do
+        if type(payload.datasets[index]) ~= "table" then
+            return nil, ("Dataset %d is invalid."):format(index)
+        end
+    end
+
+    return { datasets = payload.datasets }
+end
+
+function Database.ImportPreparedDataset(importBatch, index)
+    if type(importBatch) ~= "table" then
+        return nil, "Dataset import is unavailable."
+    end
+
+    local datasetIndex = math.max(1, math.floor(tonumber(index) or 1))
+    local datasetText = type(importBatch.datasetTexts) == "table" and importBatch.datasetTexts[datasetIndex] or nil
+    if type(datasetText) == "string" then
+        return Database.ImportDataset(datasetText)
+    end
+
+    local payloadDataset = type(importBatch.datasets) == "table" and importBatch.datasets[datasetIndex] or nil
+    if type(payloadDataset) ~= "table" then
+        return nil, ("Dataset %d is invalid."):format(datasetIndex)
+    end
+
+    return Database.ImportDataset("RPE_DATASET_V1\n" .. serializeLuaValue({
+        format = "rpe-dataset",
+        version = 1,
+        dataset = payloadDataset,
+    }))
+end
+
+function Database.ImportDatasets(text)
+    local importBatch, prepareError = Database.PrepareDatasetImport(text)
+    if not importBatch then
+        return nil, prepareError
+    end
+
+    local pendingDatasets = importBatch.datasetTexts or importBatch.datasets or {}
+    local importedDatasets = {}
+    for index = 1, #pendingDatasets do
+        local dataset, err = Database.ImportPreparedDataset(importBatch, index)
+        if not dataset then
+            return nil, err or ("Dataset %d failed to import."):format(index)
+        end
+        importedDatasets[#importedDatasets + 1] = dataset
+    end
+
+    return importedDatasets
 end
 
 function Database.ImportDatasetEntry(datasetId, collectionKey, text)

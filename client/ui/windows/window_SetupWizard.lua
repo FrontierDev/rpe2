@@ -1117,7 +1117,7 @@ function SetupWizard:BuildFinalizePage(page)
     })
     local finalizeApplyFrame = self.FinalizeApplyButton.GetFrame and self.FinalizeApplyButton:GetFrame() or nil
     if finalizeApplyFrame then
-        finalizeApplyFrame:SetPoint("TOP", self.FinalizeSummaryPanel:GetFrame(), "BOTTOM", 0, -8)
+        finalizeApplyFrame:SetPoint("BOTTOM", self.FinalizePageRoot, "BOTTOM", 0, 0)
     end
 
     local finalizeSummaryFrame = self.FinalizeSummaryPanel.GetFrame and self.FinalizeSummaryPanel:GetFrame() or nil
@@ -1125,8 +1125,7 @@ function SetupWizard:BuildFinalizePage(page)
         finalizeSummaryFrame:ClearAllPoints()
         finalizeSummaryFrame:SetPoint("TOPLEFT", self.FinalizeHintText:GetFrame(), "BOTTOMLEFT", 0, -6)
         finalizeSummaryFrame:SetPoint("TOPRIGHT", self.FinalizePageRoot, "TOPRIGHT", 0, 0)
-        finalizeSummaryFrame:SetPoint("BOTTOMLEFT", finalizeApplyFrame, "TOPLEFT", 0, 8)
-        finalizeSummaryFrame:SetPoint("BOTTOMRIGHT", finalizeApplyFrame, "TOPRIGHT", 0, 8)
+        finalizeSummaryFrame:SetPoint("BOTTOM", finalizeApplyFrame, "TOP", 0, 8)
     end
 end
 

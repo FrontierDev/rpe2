@@ -570,6 +570,18 @@ function Client:HandleCombatLog(arguments, sender, distribution, target, message
         return false
     end
 
+    local localPlayerName = Common.NormalizeName and Common.NormalizeName(Common.GetPlayerName and Common.GetPlayerName() or "")
+        or tostring(Common.GetPlayerName and Common.GetPlayerName() or "")
+    local normalizedSender = Common.NormalizeName and Common.NormalizeName(sender) or tostring(sender or "")
+    if (distribution == "PARTY" or distribution == "RAID")
+        and localPlayerName ~= ""
+        and normalizedSender == localPlayerName
+    then
+        -- EmitCombatLogEntry already queues the host-local ticker entry before broadcasting.
+        -- Ignore the transport's physical self-copy so the ticker/history only receive it once.
+        return true
+    end
+
     local entryType = normalizeEntryType(arguments and arguments[2])
     local normalized = self:NormalizeCombatLogEntry({
         eventId = arguments and arguments[1],
@@ -586,6 +598,7 @@ function Client:HandleCombatLog(arguments, sender, distribution, target, message
         casterColor = arguments and arguments[12],
         targetColor = arguments and arguments[13],
         detailText = arguments and arguments[14],
+        turnNumber = arguments and arguments[15],
     })
     if not normalized or normalized.eventId ~= tostring(eventState.id or "") then
         return false

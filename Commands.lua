@@ -280,9 +280,6 @@ Commands:RegisterCommand({ "debug", "timings" }, function(context)
         enabled = true
     end
 
-    if Debug.SetLevelEnabled then
-        Debug.SetLevelEnabled("internal", enabled)
-    end
     if Timings and type(Timings.SetEnabled) == "function" then
         Timings:SetEnabled(enabled)
     else
@@ -293,7 +290,31 @@ Commands:RegisterCommand({ "debug", "timings" }, function(context)
     context.router:Print("Debug timings %s.", nil, enabled and "enabled" or "disabled")
     return true
 end, {
-    description = "Toggle internal timing debug output. Use /rpe debug timings on or off.",
+    description = "Toggle timing collection. Internal messages are controlled separately with /rpe debug internal.",
+})
+
+Commands:RegisterCommand({ "debug", "internal" }, function(context)
+    local requestedState = context and context.args and context.args[1] or nil
+    local enabled = nil
+
+    if requestedState == "on" or requestedState == "1" or requestedState == "true" then
+        enabled = true
+    elseif requestedState == "off" or requestedState == "0" or requestedState == "false" then
+        enabled = false
+    elseif Debug.IsLevelEnabled then
+        enabled = not Debug.IsLevelEnabled("internal")
+    else
+        enabled = true
+    end
+
+    if Debug.SetLevelEnabled then
+        Debug.SetLevelEnabled("internal", enabled)
+    end
+
+    context.router:Print("Internal debug messages %s.", nil, enabled and "shown" or "hidden")
+    return true
+end, {
+    description = "Show or hide RPE INTERNAL messages. Use /rpe debug internal on or off.",
 })
 
 Commands:RegisterCommand({ "debug", "perf" }, function(context)

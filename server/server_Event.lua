@@ -96,10 +96,28 @@ local function findActivatedUnitDefinition(registryId)
 end
 
 local function buildSendMetadata(opcode)
-    return {
+    local metadata = {
         opcode = opcode,
         scope = "server",
     }
+    local operation = Operations and Operations.Get and Operations:Get(opcode) or nil
+    if type(operation) == "table" and tostring(operation.key or "") == "EVENT_STATE" then
+        local eventState = Server.EventState
+        local eventId = tostring(eventState and eventState.id or "")
+        if eventId ~= "" then
+            local turnNumber = math.max(0, math.floor(tonumber(eventState.turnNumber) or 0))
+            local tickNumber = math.max(0, math.floor(tonumber(eventState.tickNumber) or 0))
+            metadata.replaceKey = ("event-state:%s:%d:%d"):format(eventId, turnNumber, tickNumber)
+        end
+    end
+    return metadata
+end
+
+local function buildEventSnapshotSendMetadata(opcode)
+    local metadata = buildSendMetadata(opcode)
+    metadata.priority = "CRITICAL"
+    metadata.replaceKey = nil
+    return metadata
 end
 
 local function buildEventId()
@@ -551,6 +569,8 @@ local function buildNpcUnit(unitData, ownerName, nextEventUnitId, playerCount)
         eventID = nextEventUnitId,
         isPlayer = false,
         registryID = values.registryID,
+        presetIndex = values.presetIndex,
+        appearanceIndex = values.appearanceIndex,
         raidMarker = tonumber(values.raidMarker) or 0,
         team = math.max(1, math.floor(tonumber(values.team) or 1)),
         ownerID = values.ownerID or ownerName,
@@ -919,6 +939,212 @@ local function buildEventStateArguments(eventState)
     }
 end
 
+local function buildEventSnapshot(eventState)
+    local definitions = {
+        { key = "start", opcode = EVENT_START_OPCODE, arguments = buildStartArguments(eventState) },
+        { key = "units", opcode = EVENT_UNITS_OPCODE, arguments = buildEventUnitsArguments(eventState) },
+        { key = "state", opcode = EVENT_STATE_OPCODE, arguments = buildEventStateArguments(eventState) },
+    }
+    local snapshot = {}
+
+    for index = 1, #definitions do
+        local definition = definitions[index]
+        local metadata = buildEventSnapshotSendMetadata(definition.opcode)
+        local opcode, payload = Comms:BuildOutboundMessage(definition.opcode, definition.arguments, nil, metadata)
+        if not opcode or type(payload) ~= "string" then
+            return nil
+        end
+        snapshot[index] = {
+            key = definition.key,
+            opcode = opcode,
+            payload = payload,
+            metadata = metadata,
+        }
+    end
+
+    return snapshot
+end
+
+local function getEventSnapshotRecipients(sessionState)
+    local recipients = {}
+    local seen = {}
+    local clientsByName = type(sessionState) == "table" and sessionState.clientsByName or nil
+
+    for index = 1, #(type(sessionState) == "table" and sessionState.clientOrder or {}) do
+        local clientName = Common.NormalizeName(sessionState.clientOrder[index])
+        if clientName ~= "" and not seen[clientName] and type(clientsByName) == "table" and clientsByName[clientName] then
+            seen[clientName] = true
+            recipients[#recipients + 1] = clientName
+        end
+    end
+
+    local hostName = Common.NormalizeName(Common.GetPlayerName())
+    if hostName ~= "" and not seen[hostName] then
+        table.insert(recipients, 1, hostName)
+    end
+
+    return recipients
+end
+
+local function getVerifiedEventSnapshotRecipients(server, sessionState, recipients)
+    local verifiedRecipients = {}
+    local hostName = Common.NormalizeName(Common.GetPlayerName())
+
+    for index = 1, #(recipients or {}) do
+        local clientName = Common.NormalizeName(recipients[index])
+        if clientName ~= ""
+            and (
+                clientName == hostName
+                or (
+                    type(server) == "table"
+                    and type(server.ClientHashesMatch) == "function"
+                    and server:ClientHashesMatch(clientName, sessionState) == true
+                )
+            )
+        then
+            verifiedRecipients[#verifiedRecipients + 1] = clientName
+        end
+    end
+
+    return verifiedRecipients
+end
+
+local function resolveInitialEventSnapshotChannel(server, sessionState, recipients)
+    if type(server) ~= "table"
+        or type(sessionState) ~= "table"
+        or sessionState.active ~= true
+        or type(server.GetState) ~= "function"
+        or server:GetState() ~= sessionState
+    then
+        return nil, "session-not-current"
+    end
+
+    local channelName = tostring(sessionState.channelName or "")
+    local channelId = type(Comms.ResolveChannelId) == "function" and Comms:ResolveChannelId(channelName) or nil
+    channelId = tonumber(channelId)
+    if channelName == "" or channelId == nil or channelId <= 0 then
+        return nil, "channel-not-resolved"
+    end
+
+    if type(server.IsHostClientReady) ~= "function" or server:IsHostClientReady(sessionState) ~= true then
+        return nil, "host-channel-not-ready"
+    end
+
+    local localClientState = Client and type(Client.GetState) == "function" and Client:GetState() or nil
+    if type(localClientState) ~= "table"
+        or localClientState.active ~= true
+        or localClientState.channelName ~= channelName
+        or tonumber(localClientState.channelId) ~= channelId
+    then
+        return nil, "host-session-not-current"
+    end
+
+    if type(server.HasClientHashMismatch) == "function" and server:HasClientHashMismatch(sessionState) then
+        return nil, "client-hash-mismatch"
+    end
+
+    local hostName = Common.NormalizeName(Common.GetPlayerName())
+    local clientsByName = sessionState.clientsByName or {}
+    for index = 1, #(recipients or {}) do
+        local clientName = Common.NormalizeName(recipients[index])
+        if clientName ~= "" and clientName ~= hostName then
+            local clientState = clientsByName[clientName]
+            if type(clientState) ~= "table" or clientState.hashesReceived ~= true then
+                return nil, "client-handshake-incomplete:" .. clientName
+            end
+            if type(server.ClientHashesMatch) ~= "function" or server:ClientHashesMatch(clientName, sessionState) ~= true then
+                return nil, "client-hash-unverified:" .. clientName
+            end
+        end
+    end
+
+    sessionState.channelId = channelId
+    return channelId, nil
+end
+
+local function getEventSnapshotPacketCount(snapshot)
+    local total = 0
+    for index = 1, #(snapshot or {}) do
+        local message = snapshot[index]
+        if type(message) ~= "table" or type(message.payload) ~= "string" then
+            return nil
+        end
+        local _, partCount = Comms:ResolveChunkPlan(message.payload, message.opcode)
+        if not partCount then
+            return nil
+        end
+        total = total + partCount
+    end
+    return total > 0 and total or nil
+end
+
+local function canQueueEventSnapshot(snapshot)
+    local queue = Comms and Comms.MessageQueue or nil
+    local packetCount = getEventSnapshotPacketCount(snapshot)
+    if not packetCount then
+        return false
+    end
+    if type(queue) == "table" and type(queue.CanAccept) == "function" then
+        return queue:CanAccept(packetCount) == true
+    end
+    return true
+end
+
+local function sendBuiltEventSnapshot(distribution, target, snapshot, onMessageFailed)
+    if type(snapshot) ~= "table" or #snapshot == 0 then
+        return false, "snapshot-unavailable"
+    end
+
+    for index = 1, #snapshot do
+        local message = snapshot[index]
+        local metadata = message and message.metadata or nil
+        local failureCallbackInvoked = false
+        if type(onMessageFailed) == "function" and type(metadata) == "table" then
+            local sendMetadata = {}
+            for key, value in pairs(metadata) do
+                sendMetadata[key] = value
+            end
+            sendMetadata.onFailed = function(item, result)
+                failureCallbackInvoked = true
+                onMessageFailed(message, item, result)
+            end
+            metadata = sendMetadata
+        end
+
+        if type(message) ~= "table"
+            or Comms:SendMessage(distribution, message.opcode, message.payload, target, metadata) ~= true
+        then
+            if not failureCallbackInvoked then
+                return false, tostring(message and message.key or "snapshot") .. "-send-rejected"
+            end
+        end
+    end
+
+    return true, nil
+end
+
+local function recordInitialEventSnapshotDelivery(eventState, mode, recipients, channelId, fallbackReason, expectedLogicalMessages, repairLogicalMessages)
+    local diagnostics = Comms and Comms.Diagnostics or nil
+    local store = type(diagnostics) == "table"
+        and type(diagnostics.GetTransportDiagnosticsStore) == "function"
+        and diagnostics:GetTransportDiagnosticsStore()
+        or nil
+    if type(store) ~= "table" then
+        return false
+    end
+
+    store.lastEventStartupDelivery = {
+        eventSessionId = tostring(eventState and eventState.id or ""),
+        mode = tostring(mode or ""),
+        recipientCount = #(recipients or {}),
+        channelId = channelId,
+        fallbackReason = tostring(fallbackReason or ""),
+        expectedLogicalMessages = math.max(0, math.floor(tonumber(expectedLogicalMessages) or 0)),
+        repairLogicalMessages = math.max(0, math.floor(tonumber(repairLogicalMessages) or 0)),
+    }
+    return true
+end
+
 local function buildEventUnitDeltaBatchArguments(eventState, entries)
     return {
         eventState and eventState.channelName or "",
@@ -1014,16 +1240,110 @@ function Server:CopyLiveEventToDraftState()
     return copyLiveEventToDraft(self, self.EventState)
 end
 
-local function sendEventSnapshotToClient(eventState, clientName)
+local function sendEventSnapshotToClient(eventState, clientName, snapshot)
     local normalizedClientName = Common.NormalizeName(clientName)
     if not eventState or eventState.active ~= true or normalizedClientName == "" then
         return false
     end
 
-    local sentStart = Comms:SendMessage("WHISPER", EVENT_START_OPCODE, buildStartArguments(eventState), normalizedClientName, buildSendMetadata(EVENT_START_OPCODE))
-    Comms:SendMessage("WHISPER", EVENT_UNITS_OPCODE, buildEventUnitsArguments(eventState), normalizedClientName, buildSendMetadata(EVENT_UNITS_OPCODE))
-    Comms:SendMessage("WHISPER", EVENT_STATE_OPCODE, buildEventStateArguments(eventState), normalizedClientName, buildSendMetadata(EVENT_STATE_OPCODE))
-    return sentStart and true or false
+    local resolvedSnapshot = snapshot or buildEventSnapshot(eventState)
+    return sendBuiltEventSnapshot("WHISPER", normalizedClientName, resolvedSnapshot)
+end
+
+local function sendInitialEventSnapshot(server, sessionState, eventState)
+    local snapshot = buildEventSnapshot(eventState)
+    local recipients = getEventSnapshotRecipients(sessionState)
+    local verifiedRecipients = getVerifiedEventSnapshotRecipients(server, sessionState, recipients)
+    local fallbackLogicalMessages = #verifiedRecipients * 3
+    if not snapshot then
+        recordInitialEventSnapshotDelivery(
+            eventState,
+            "WHISPER",
+            verifiedRecipients,
+            nil,
+            "snapshot-build-failed",
+            fallbackLogicalMessages,
+            0
+        )
+        return false
+    end
+
+    local channelId, fallbackReason = resolveInitialEventSnapshotChannel(server, sessionState, recipients)
+    if #recipients <= 1 then
+        channelId = nil
+        fallbackReason = "single-recipient-whisper"
+    end
+    if channelId and canQueueEventSnapshot(snapshot) then
+        local hostName = Common.NormalizeName(Common.GetPlayerName())
+        local repairLogicalMessages = 0
+        local repairFailed = false
+        local lastChannelFailureReason = ""
+        local function repairFailedChannelMessage(message, _, result)
+            if Server.EventState ~= eventState or eventState.active ~= true then
+                return
+            end
+            lastChannelFailureReason = ("channel-%s-delivery-failed:%s"):format(
+                tostring(message and message.key or "snapshot"),
+                tostring(result or "unknown")
+            )
+            for index = 1, #recipients do
+                local recipient = Common.NormalizeName(recipients[index])
+                if recipient ~= "" and recipient ~= hostName then
+                    repairLogicalMessages = repairLogicalMessages + 1
+                    if Comms:SendMessage("WHISPER", message.opcode, message.payload, recipient, message.metadata) ~= true then
+                        repairFailed = true
+                    end
+                end
+            end
+            recordInitialEventSnapshotDelivery(
+                eventState,
+                "CHANNEL_REPAIR",
+                recipients,
+                channelId,
+                lastChannelFailureReason,
+                3 + repairLogicalMessages,
+                repairLogicalMessages
+            )
+        end
+
+        local sent, failureReason = sendBuiltEventSnapshot(
+            "CHANNEL",
+            channelId,
+            snapshot,
+            repairFailedChannelMessage
+        )
+        if sent then
+            local repaired = repairLogicalMessages > 0
+            recordInitialEventSnapshotDelivery(
+                eventState,
+                repaired and "CHANNEL_REPAIR" or "CHANNEL",
+                recipients,
+                channelId,
+                repaired and lastChannelFailureReason or "",
+                3 + repairLogicalMessages,
+                repairLogicalMessages
+            )
+            return repairFailed ~= true
+        end
+        fallbackReason = "channel-" .. tostring(failureReason or "send-rejected")
+    elseif channelId then
+        fallbackReason = "channel-queue-capacity"
+    end
+
+    local sentAll = #verifiedRecipients > 0
+    for index = 1, #verifiedRecipients do
+        sentAll = sendEventSnapshotToClient(eventState, verifiedRecipients[index], snapshot) and sentAll
+    end
+    recordInitialEventSnapshotDelivery(
+        eventState,
+        "WHISPER",
+        verifiedRecipients,
+        channelId,
+        fallbackReason or "channel-not-safe",
+        fallbackLogicalMessages,
+        0
+    )
+    return sentAll
 end
 
 Server.EventState = Server.EventState or nil
@@ -1635,34 +1955,12 @@ function Server:StartEvent(data)
     })
     stopTiming(buildDraftTimer)
 
-    local broadcasted = false
-    if sessionState.channelId then
-        local broadcastTimer = startTiming("broadcastEventStart", {
-            context = "event-start",
-            thresholdMs = 15,
-        })
-        broadcasted = Comms:SendToChannel(
-            sessionState.channelId,
-            EVENT_START_OPCODE,
-            buildStartArguments(eventState),
-            buildSendMetadata(EVENT_START_OPCODE)
-        ) and true or false
-
-        Comms:SendToChannel(
-            sessionState.channelId,
-            EVENT_UNITS_OPCODE,
-            buildEventUnitsArguments(eventState),
-            buildSendMetadata(EVENT_UNITS_OPCODE)
-        )
-
-        Comms:SendToChannel(
-            sessionState.channelId,
-            EVENT_STATE_OPCODE,
-            buildEventStateArguments(eventState),
-            buildSendMetadata(EVENT_STATE_OPCODE)
-        )
-        stopTiming(broadcastTimer)
-    end
+    local broadcastTimer = startTiming("broadcastEventStart", {
+        context = "event-start",
+        thresholdMs = 15,
+    })
+    local broadcasted = sendInitialEventSnapshot(self, sessionState, eventState)
+    stopTiming(broadcastTimer)
 
     eventState.broadcasted = broadcasted
     refreshEventManagePage()

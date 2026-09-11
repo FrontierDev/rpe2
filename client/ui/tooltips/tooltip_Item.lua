@@ -7,6 +7,7 @@ Addon.Client.Traits = Addon.Client.Traits or {}
 
 local Tooltips = Addon.Client.UI.Tooltips
 local Traits = Addon.Client.Traits or {}
+local Spellcasting = Addon.Client and Addon.Client.Spellcasting or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Dependencies = Database and Database.Dependecies or {}
@@ -18,10 +19,7 @@ local ModificationService = Profile and Profile.Modifications or {}
 local Common = Addon.Utils and Addon.Utils.Common or nil
 local TraitClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Trait or nil
 local Conditions = Addon.Client and Addon.Client.Conditions or {}
-local DescriptionBuilder = Addon.Client
-    and Addon.Client.Spellcasting
-    and Addon.Client.Spellcasting.DescriptionBuilder
-    or {}
+local DescriptionBuilder = Spellcasting.DescriptionBuilder or {}
 
 local ItemTooltip = Tooltips.Item or {}
 Tooltips.Item = ItemTooltip
@@ -35,7 +33,7 @@ ensureString = function(value, fallback)
     return tostring(value)
 end
 
-local TOOLTIP_CACHE_VERSION = "item-tooltip-v2"
+local TOOLTIP_CACHE_VERSION = "item-tooltip-v4"
 ItemTooltip.BuildCache = ItemTooltip.BuildCache or {}
 ItemTooltip.StaticBuildCache = ItemTooltip.StaticBuildCache or {}
 ItemTooltip.DatasetIndexCache = ItemTooltip.DatasetIndexCache or {}
@@ -837,50 +835,102 @@ local function getTraitSummaryText(payload)
     return #parts > 0 and table.concat(parts, ", ") or "No effects"
 end
 
-local function getEquipmentTraitDescription(item, payload, options)
+local function buildTraitTooltipData(item, payload, options, sourceType)
     if type(payload) ~= "table" then
-        return ""
+        return {
+            descriptionText = "",
+            auraSections = {},
+        }
     end
 
-    local authoredDescription = ensureString(payload.description)
-    if authoredDescription ~= "" then
-        return authoredDescription
+    local tooltipOptions = options or {}
+    local dataset = tooltipOptions.dataset
+    if not dataset and ensureString(tooltipOptions.datasetId) ~= "" then
+        dataset = getDatasetByIdCached(tooltipOptions.datasetId)
+    end
+
+    local isEquipment = sourceType == "equipment"
+    local detailName = isEquipment and ensureString(payload.name) or ensureString(item and item.name, "Consumable")
+    if detailName == "" then
+        detailName = ensureString(item and item.name, isEquipment and "Equipment Trait" or "Consumable")
+    end
+
+    local detail = {
+        sourceType = sourceType,
+        category = sourceType,
+        name = detailName,
+        item = item,
+        itemName = ensureString(item and item.name, ""),
+        payload = payload,
+        authoredDescriptionText = ensureString(payload.description),
+        summaryText = getTraitSummaryText(payload),
+        dataset = dataset,
+        datasetId = tooltipOptions.datasetId or (dataset and dataset.id) or nil,
+    }
+    if isEquipment then
+        detail.traitPayload = payload
+    else
+        detail.consumableTrait = payload
     end
 
     local descriptionBuilder = Traits and Traits.DescriptionBuilder or nil
-    if type(descriptionBuilder) == "table" and type(descriptionBuilder.BuildDescription) == "function" then
-        local tooltipOptions = options or {}
-        local dataset = tooltipOptions.dataset
-        local detailName = ensureString(payload.name)
-        if detailName == "" then
-            detailName = ensureString(item and item.name) ~= "" and ensureString(item and item.name) or "Equipment Trait"
-        end
-        if not dataset and ensureString(tooltipOptions.datasetId) ~= "" then
-            dataset = getDatasetByIdCached(tooltipOptions.datasetId)
-        end
-
-        local descriptionText = descriptionBuilder:BuildDescription({
-            sourceType = "equipment",
-            category = "equipment",
-            name = detailName,
-            item = item,
-            itemName = ensureString(item and item.name, ""),
-            payload = payload,
-            traitPayload = payload,
-            authoredDescriptionText = "",
-            summaryText = getTraitSummaryText(payload),
-            dataset = dataset,
-            datasetId = tooltipOptions.datasetId or (dataset and dataset.id) or nil,
-        }, {
+    if type(descriptionBuilder) == "table" and type(descriptionBuilder.BuildTooltipData) == "function" then
+        local tooltipData = descriptionBuilder:BuildTooltipData(detail, {
             deferGeneration = false,
         })
-        descriptionText = ensureString(descriptionText)
-        if descriptionText ~= "" then
-            return descriptionText
+        if type(tooltipData) == "table" then
+            tooltipData.descriptionText = ensureString(tooltipData.descriptionText, "")
+            tooltipData.auraSections = type(tooltipData.auraSections) == "table" and tooltipData.auraSections or {}
+            return tooltipData
         end
     end
 
-    return getTraitSummaryText(payload)
+    return {
+        descriptionText = ensureString(payload.description, getTraitSummaryText(payload)),
+        auraSections = {},
+    }
+end
+
+local function getEquipmentTraitTooltipData(item, payload, options)
+    return buildTraitTooltipData(item, payload, options, "equipment")
+end
+
+local function getConsumableTraitTooltipData(item, payload, options)
+    return buildTraitTooltipData(item, payload, options, "consumable")
+end
+
+local function buildAuraHeaderText(section)
+    local name = ensureString(type(section) == "table" and section.name, "Aura")
+    local icon = ensureString(type(section) == "table" and section.icon, "")
+    if icon == "" then
+        return name
+    end
+
+    return ("|T%s:14|t %s"):format(icon, name)
+end
+
+local function appendTraitAuraSections(lines, auraSections)
+    for index = 1, #(auraSections or {}) do
+        local section = auraSections[index]
+        local descriptionText = type(section) == "table" and ensureString(section.descriptionText) or ""
+        if descriptionText ~= "" then
+            appendSpacerLine(lines)
+            lines[#lines + 1] = {
+                text = buildAuraHeaderText(section),
+                r = 1,
+                g = 1,
+                b = 1,
+                wrap = true,
+            }
+            lines[#lines + 1] = {
+                text = descriptionText,
+                r = 1,
+                g = 0.82,
+                b = 0,
+                wrap = true,
+            }
+        end
+    end
 end
 
 local function buildFormattedStatText(value, label, statDefinition)
@@ -907,60 +957,18 @@ local function appendEquipLine(lines, item, options)
         return
     end
 
-    local description = getEquipmentTraitDescription(item, equipmentTrait, options)
-    if description == "" then
-        return
+    local tooltipData = getEquipmentTraitTooltipData(item, equipmentTrait, options)
+    local description = ensureString(tooltipData and tooltipData.descriptionText)
+    if description ~= "" then
+        lines[#lines + 1] = {
+            text = ("Equip: %s"):format(description),
+            r = 0.12,
+            g = 1.0,
+            b = 0.0,
+            wrap = true,
+        }
     end
-
-    lines[#lines + 1] = {
-        text = ("Equip: %s"):format(description),
-        r = 0.12,
-        g = 1.0,
-        b = 0.0,
-        wrap = true,
-    }
-end
-
-local function getConsumableTraitDescription(item, payload, options)
-    if type(payload) ~= "table" then
-        return ""
-    end
-
-    local authoredDescription = ensureString(payload.description)
-    if authoredDescription ~= "" then
-        return authoredDescription
-    end
-
-    local descriptionBuilder = Traits and Traits.DescriptionBuilder or nil
-    if type(descriptionBuilder) == "table" and type(descriptionBuilder.BuildDescription) == "function" then
-        local tooltipOptions = options or {}
-        local dataset = tooltipOptions.dataset
-        if not dataset and ensureString(tooltipOptions.datasetId) ~= "" then
-            dataset = getDatasetByIdCached(tooltipOptions.datasetId)
-        end
-
-        local descriptionText = descriptionBuilder:BuildDescription({
-            sourceType = "consumable",
-            category = "consumable",
-            name = ensureString(item and item.name, "Consumable"),
-            item = item,
-            itemName = ensureString(item and item.name, ""),
-            payload = payload,
-            consumableTrait = payload,
-            authoredDescriptionText = "",
-            summaryText = getTraitSummaryText(payload),
-            dataset = dataset,
-            datasetId = tooltipOptions.datasetId or (dataset and dataset.id) or nil,
-        }, {
-            deferGeneration = false,
-        })
-        descriptionText = ensureString(descriptionText)
-        if descriptionText ~= "" then
-            return descriptionText
-        end
-    end
-
-    return getTraitSummaryText(payload)
+    appendTraitAuraSections(lines, tooltipData and tooltipData.auraSections or {})
 end
 
 local function appendUseLine(lines, item, options)
@@ -973,13 +981,98 @@ local function appendUseLine(lines, item, options)
         return
     end
 
-    local description = getConsumableTraitDescription(item, consumableTrait, options)
-    if description == "" then
+    local tooltipData = getConsumableTraitTooltipData(item, consumableTrait, options)
+    local description = ensureString(tooltipData and tooltipData.descriptionText)
+    if description ~= "" then
+        lines[#lines + 1] = {
+            text = ("Use: %s"):format(description),
+            r = 0.12,
+            g = 1.0,
+            b = 0.0,
+            wrap = true,
+        }
+    end
+    appendTraitAuraSections(lines, tooltipData and tooltipData.auraSections or {})
+end
+
+local function ensureSentencePunctuation(text)
+    local normalized = ensureString(text):gsub("^%s+", ""):gsub("%s+$", "")
+    if normalized == "" then
+        return ""
+    end
+
+    local finalCharacter = normalized:sub(-1)
+    if finalCharacter ~= "." and finalCharacter ~= "!" and finalCharacter ~= "?" then
+        normalized = normalized .. "."
+    end
+    return normalized
+end
+
+local function resolveAuthoredCooldownTurns(spell)
+    local turns = type(Spellcasting.NormalizeTurnCount) == "function"
+        and Spellcasting.NormalizeTurnCount(spell and spell.cooldown)
+        or nil
+    if turns == nil then
+        turns = math.floor(tonumber(spell and spell.cooldown) or 0)
+    end
+    return math.max(0, math.floor(tonumber(turns) or 0))
+end
+
+local function appendOnUseSpellLine(lines, item)
+    local spellRef = type(item) == "table" and ensureString(item.useSpellRef) or ""
+    if spellRef == "" then
         return
     end
 
+    local dataset, spell = nil, nil
+    if type(Registry.ResolveSpellReference) == "function" then
+        dataset, spell = Registry:ResolveSpellReference(spellRef)
+    end
+    if type(dataset) ~= "table" or type(spell) ~= "table" then
+        lines[#lines + 1] = {
+            text = "Use: Spell unavailable.",
+            r = 1,
+            g = 0.25,
+            b = 0.25,
+            wrap = true,
+        }
+        return
+    end
+
+    local tooltipData = nil
+    if type(DescriptionBuilder) == "table" and type(DescriptionBuilder.BuildTooltipData) == "function" then
+        tooltipData = DescriptionBuilder:BuildTooltipData({
+            name = ensureString(spell.name, spellRef),
+            spellRef = spellRef,
+            spell = spell,
+            dataset = dataset,
+            datasetId = dataset.id,
+            authoredDescriptionText = spell.description,
+        }, {
+            deferGeneration = false,
+        })
+    end
+
+    local description = ensureSentencePunctuation(type(tooltipData) == "table" and tooltipData.descriptionText or "")
+    if description == "" then
+        lines[#lines + 1] = {
+            text = "Use: Spell effect unavailable.",
+            r = 1,
+            g = 0.25,
+            b = 0.25,
+            wrap = true,
+        }
+        return
+    end
+
+    local cooldownTurns = resolveAuthoredCooldownTurns(spell)
+    local text = ("Use: %s"):format(description)
+    if cooldownTurns > 0 then
+        text = ("%s (%d turn cooldown)"):format(text, cooldownTurns)
+    end
+
     lines[#lines + 1] = {
-        text = ("Use: %s"):format(description),
+        text = text,
         r = 0.12,
         g = 1.0,
         b = 0.0,
@@ -1400,7 +1493,8 @@ local function hasRenderedEquipText(item, options)
         return false
     end
 
-    return getEquipmentTraitDescription(item, equipmentTrait, options) ~= ""
+    local tooltipData = getEquipmentTraitTooltipData(item, equipmentTrait, options)
+    return ensureString(tooltipData and tooltipData.descriptionText) ~= ""
 end
 
 local function joinLabels(labels)
@@ -1701,6 +1795,11 @@ local function buildInactiveTooltip(item, options)
     }
 end
 
+local function traitHasDynamicAuraSections(payload)
+    return type(payload) == "table"
+        and (#(payload.automaticAuras or {}) > 0 or #(payload.events or {}) > 0)
+end
+
 local function hasDynamicTooltipContent(item)
     if type(item) ~= "table" then
         return false
@@ -1710,17 +1809,21 @@ local function hasDynamicTooltipContent(item)
         return true
     end
 
+    if ensureString(item.useSpellRef) ~= "" then
+        return true
+    end
+
     local itemType = tostring(item.itemType or "none")
     if itemType == "weapon" or itemType == "armor" or itemType == "modification" then
         local equipmentTrait = normalizeEquipmentTrait(item.equipmentTrait)
-        if equipmentTrait and ensureString(equipmentTrait.description) == "" then
+        if equipmentTrait and (ensureString(equipmentTrait.description) == "" or traitHasDynamicAuraSections(equipmentTrait)) then
             return true
         end
     end
 
     if itemType == "consumable" then
         local consumableTrait = normalizeConsumableTrait(item.consumableTrait)
-        if consumableTrait and ensureString(consumableTrait.description) == "" then
+        if consumableTrait and (ensureString(consumableTrait.description) == "" or traitHasDynamicAuraSections(consumableTrait)) then
             return true
         end
     end
@@ -1827,12 +1930,13 @@ function ItemTooltip:Build(item, options)
     if renderedPlainStats and (hasRenderedSkillBonusLines(item) or hasRenderedEquipText(item, values)) then
         appendSpacerLine(lines)
     end
-    appendSkillBonusLines(lines, item)
     appendConditionLines(lines, item, values, true)
-    appendEquipLine(lines, item, values)
     if itemType ~= "modification" or modificationKind == "gem" then
         appendEquipStatLines(lines, item)
     end
+    appendSkillBonusLines(lines, item)
+    appendEquipLine(lines, item, values)
+    appendOnUseSpellLine(lines, item)
     appendUseLine(lines, item, values)
     appendAppliedModificationLines(lines, item, values)
     appendDescriptionLine(lines, item)

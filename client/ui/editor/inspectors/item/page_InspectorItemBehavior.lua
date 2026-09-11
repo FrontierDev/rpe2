@@ -13,6 +13,51 @@ local UNIQUE_FLAG_ITEMS = Shared.UNIQUE_FLAG_ITEMS or {}
 local BINDING_FLAG_ITEMS = Shared.BINDING_FLAG_ITEMS or {}
 local buildLabel = Shared.buildLabel
 local createCheckbox = Shared.createCheckbox
+local getSelectedItemAndDataset = Shared.getSelectedItemAndDataset
+local setDropdownEnabled = Shared.setDropdownEnabled
+
+local function itemSupportsUseSpell(item)
+    local itemType = type(item) == "table" and tostring(item.itemType or "none") or "none"
+    return itemType == "consumable" or itemType == "weapon" or itemType == "armor"
+end
+
+local function refreshUseSpellControl(self)
+    if not self.ItemInspectorUseSpellDropdown then
+        return
+    end
+
+    local _, item = getSelectedItemAndDataset(self)
+    local supported = itemSupportsUseSpell(item)
+
+    self.ItemInspectorUseSpellDropdown:SetItems(self:BuildReferenceItemsAcrossDatasets("spells", {
+        includeNone = true,
+        noneLabel = "None",
+    }))
+    self.ItemInspectorUseSpellDropdown:SetSelectedValue(item and item.useSpellRef or "", true)
+    setDropdownEnabled(self.ItemInspectorUseSpellDropdown, supported)
+
+    local labelFrame = self.ItemInspectorUseSpellLabel and self.ItemInspectorUseSpellLabel.GetFrame
+        and self.ItemInspectorUseSpellLabel:GetFrame()
+        or nil
+    if labelFrame then
+        if supported then
+            labelFrame:Show()
+        else
+            labelFrame:Hide()
+        end
+    end
+
+    local dropdownFrame = self.ItemInspectorUseSpellDropdown.GetFrame
+        and self.ItemInspectorUseSpellDropdown:GetFrame()
+        or nil
+    if dropdownFrame then
+        if supported then
+            dropdownFrame:Show()
+        else
+            dropdownFrame:Hide()
+        end
+    end
+end
 
 local function buildBehaviorPage(self, page)
     local root = UI.CreateLayout(UI.VerticalLayoutGroup, page, "RPEDataEditorItemInspectorBehaviorLayout", {
@@ -55,6 +100,27 @@ local function buildBehaviorPage(self, page)
         end,
     })
     root:AddChild(self.ItemInspectorBindingFlagDropdown)
+
+    self.ItemInspectorUseSpellLabel = buildLabel(root:GetFrame(), "RPEDataEditorItemInspectorUseSpellLabel", "On-Use Spell")
+    root:AddChild(self.ItemInspectorUseSpellLabel)
+    self.ItemInspectorUseSpellDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorItemInspectorUseSpellDropdown", {
+        width = FIELD_WIDTH,
+        height = 18,
+        items = self:BuildReferenceItemsAcrossDatasets("spells", {
+            includeNone = true,
+            noneLabel = "None",
+        }),
+        onValueChanged = function(value)
+            if self._refreshingItemInspector then
+                return
+            end
+
+            self:CommitSelectedItem(function(item)
+                item.useSpellRef = value ~= "" and value or nil
+            end)
+        end,
+    })
+    root:AddChild(self.ItemInspectorUseSpellDropdown)
 
     self.ItemInspectorCanStackCheckbox = createCheckbox(root:GetFrame(), "RPEDataEditorItemInspectorCanStackCheckbox", "Can Stack", true, function(checked)
         if self._refreshingItemInspector then
@@ -172,6 +238,14 @@ local function buildBehaviorPage(self, page)
         end,
     })
     root:AddChild(self.ItemInspectorWowConversionSkillDropdown)
+
+    if not self._itemUseSpellRefreshHookInstalled and type(hooksecurefunc) == "function" then
+        hooksecurefunc(self, "RefreshItemInspectorPage", function(editor)
+            refreshUseSpellControl(editor)
+        end)
+        self._itemUseSpellRefreshHookInstalled = true
+    end
+    refreshUseSpellControl(self)
 end
 
 function DataEditor:BuildItemInspectorBehaviorPage(page)

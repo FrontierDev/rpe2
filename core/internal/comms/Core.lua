@@ -14,7 +14,8 @@ local Serialization = Addon.Internal.Comms.Serialization or {}
 
 Comms.Prefix = Comms.Prefix or Constants.AddonMessagePrefix or "RPE"
 Comms.MaxAddonMessageLength = Comms.MaxAddonMessageLength or 255
-Comms.SafeChunkLength = Comms.SafeChunkLength or 180
+-- Optional compatibility cap. Nil uses the full header-adjusted addon-message payload budget.
+Comms.SafeChunkLength = tonumber(Comms.SafeChunkLength)
 Comms.IncomingChunks = Comms.IncomingChunks or {}
 Comms.IncomingChunkTimeout = Comms.IncomingChunkTimeout or 30
 Comms.MaxIncomingChunkEntries = Comms.MaxIncomingChunkEntries or 128
@@ -162,6 +163,86 @@ local function cleanupIncomingChunks(self, now)
     end
 end
 
+local function normalizeRecentLocalEchoEntry(self, key)
+    local stored = self.RecentLocalEchoes and self.RecentLocalEchoes[key] or nil
+    if stored == nil then
+        return nil
+    end
+
+    if type(stored) == "table" then
+        stored.pendingCount = math.max(0, math.floor(tonumber(stored.pendingCount) or 0))
+        stored.sentCount = math.max(0, math.floor(tonumber(stored.sentCount) or 0))
+        stored.recordedAt = tonumber(stored.recordedAt) or tonumber(stored.sentAt) or 0
+        stored.sentAt = tonumber(stored.sentAt)
+        return stored
+    end
+
+    local timestamp = tonumber(stored)
+    if timestamp == nil then
+        self.RecentLocalEchoes[key] = nil
+        return nil
+    end
+
+    local entry = {
+        pendingCount = 0,
+        sentCount = 1,
+        recordedAt = timestamp,
+        sentAt = timestamp,
+    }
+    self.RecentLocalEchoes[key] = entry
+    return entry
+end
+
+local function recordRecentLocalEcho(self, prefix, message, distribution, sender, target, now, pending)
+    local key = buildRecentLocalEchoKey(prefix, message, distribution, sender, target)
+    local entry = normalizeRecentLocalEchoEntry(self, key)
+    if not entry then
+        entry = {
+            pendingCount = 0,
+            sentCount = 0,
+            recordedAt = tonumber(now) or 0,
+            sentAt = nil,
+        }
+        self.RecentLocalEchoes[key] = entry
+    end
+
+    entry.recordedAt = tonumber(now) or entry.recordedAt or 0
+    if pending == true then
+        entry.pendingCount = entry.pendingCount + 1
+    else
+        entry.sentCount = entry.sentCount + 1
+        entry.sentAt = tonumber(now) or entry.recordedAt or 0
+    end
+    return key, entry
+end
+
+local function markRecentLocalEchoSent(self, prefix, message, distribution, sender, target, now)
+    local key = buildRecentLocalEchoKey(prefix, message, distribution, sender, target)
+    local entry = normalizeRecentLocalEchoEntry(self, key)
+    if not entry or entry.pendingCount <= 0 then
+        return false
+    end
+
+    entry.pendingCount = entry.pendingCount - 1
+    entry.sentCount = entry.sentCount + 1
+    entry.sentAt = tonumber(now) or entry.recordedAt or 0
+    return true
+end
+
+local function releasePendingRecentLocalEcho(self, prefix, message, distribution, sender, target)
+    local key = buildRecentLocalEchoKey(prefix, message, distribution, sender, target)
+    local entry = normalizeRecentLocalEchoEntry(self, key)
+    if not entry or entry.pendingCount <= 0 then
+        return false
+    end
+
+    entry.pendingCount = entry.pendingCount - 1
+    if entry.pendingCount <= 0 and entry.sentCount <= 0 then
+        self.RecentLocalEchoes[key] = nil
+    end
+    return true
+end
+
 local function cleanupRecentLocalEchoes(self, now)
     local timeoutSeconds = tonumber(self.RecentLocalEchoTimeout) or 0
     local maxEntries = tonumber(self.MaxRecentLocalEchoes) or 0
@@ -169,15 +250,28 @@ local function cleanupRecentLocalEchoes(self, now)
     local oldestKey = nil
     local oldestAt = nil
 
-    for key, receivedAt in pairs(self.RecentLocalEchoes or {}) do
-        local numericReceivedAt = tonumber(receivedAt) or 0
-        if timeoutSeconds > 0 and (now - numericReceivedAt) > timeoutSeconds then
-            self.RecentLocalEchoes[key] = nil
-        else
-            entryCount = entryCount + 1
-            if maxEntries > 0 and (oldestAt == nil or numericReceivedAt < oldestAt) then
-                oldestAt = numericReceivedAt
-                oldestKey = key
+    for key in pairs(self.RecentLocalEchoes or {}) do
+        local entry = normalizeRecentLocalEchoEntry(self, key)
+        if entry then
+            local pendingCount = math.max(0, tonumber(entry.pendingCount) or 0)
+            local sentCount = math.max(0, tonumber(entry.sentCount) or 0)
+            if pendingCount <= 0 and sentCount <= 0 then
+                self.RecentLocalEchoes[key] = nil
+            elseif pendingCount <= 0 then
+                local referenceAt = tonumber(entry.sentAt) or tonumber(entry.recordedAt) or 0
+                if timeoutSeconds > 0 and (now - referenceAt) > timeoutSeconds then
+                    self.RecentLocalEchoes[key] = nil
+                else
+                    entryCount = entryCount + 1
+                    if maxEntries > 0 and (oldestAt == nil or referenceAt < oldestAt) then
+                        oldestAt = referenceAt
+                        oldestKey = key
+                    end
+                end
+            else
+                -- A pending entry maps to a physical packet that is still queued/throttled.
+                -- Pending entries are never age-expired or size-evicted.
+                entryCount = entryCount + 1
             end
         end
     end
@@ -185,14 +279,16 @@ local function cleanupRecentLocalEchoes(self, now)
     while maxEntries > 0 and entryCount >= maxEntries and oldestKey do
         self.RecentLocalEchoes[oldestKey] = nil
         entryCount = entryCount - 1
-
         oldestKey = nil
         oldestAt = nil
-        for key, receivedAt in pairs(self.RecentLocalEchoes or {}) do
-            local numericReceivedAt = tonumber(receivedAt) or 0
-            if oldestAt == nil or numericReceivedAt < oldestAt then
-                oldestAt = numericReceivedAt
-                oldestKey = key
+        for key in pairs(self.RecentLocalEchoes or {}) do
+            local entry = normalizeRecentLocalEchoEntry(self, key)
+            if entry and (tonumber(entry.pendingCount) or 0) <= 0 and (tonumber(entry.sentCount) or 0) > 0 then
+                local referenceAt = tonumber(entry.sentAt) or tonumber(entry.recordedAt) or 0
+                if oldestAt == nil or referenceAt < oldestAt then
+                    oldestAt = referenceAt
+                    oldestKey = key
+                end
             end
         end
     end
@@ -202,7 +298,6 @@ local function shouldSkipDuplicateLocalEcho(self, prefix, message, distribution,
     if type(options) == "table" and options.localEcho == true then
         return false
     end
-
     if distribution ~= "CHANNEL" then
         return false
     end
@@ -214,12 +309,25 @@ local function shouldSkipDuplicateLocalEcho(self, prefix, message, distribution,
     end
 
     local key = buildRecentLocalEchoKey(prefix, message, distribution, sender, target)
-    if self.RecentLocalEchoes[key] then
-        self.RecentLocalEchoes[key] = nil
-        return true
+    local entry = normalizeRecentLocalEchoEntry(self, key)
+    if not entry then
+        return false
     end
 
-    return false
+    if entry.sentCount > 0 then
+        entry.sentCount = entry.sentCount - 1
+    elseif entry.pendingCount > 0 then
+        -- If the self-copy arrives before the send-success callback, consume the pending slot.
+        entry.pendingCount = entry.pendingCount - 1
+    else
+        self.RecentLocalEchoes[key] = nil
+        return false
+    end
+
+    if entry.pendingCount <= 0 and entry.sentCount <= 0 then
+        self.RecentLocalEchoes[key] = nil
+    end
+    return true
 end
 
 local function buildSendMetadata(opcode, metadata)
@@ -241,22 +349,38 @@ end
 
 function Comms:ResolveChunkPlan(argumentsText, opcode)
     local payloadLength = #(argumentsText or "")
-    local maxLength = tonumber(self.MaxAddonMessageLength) or 255
-    local chunkLength = math.max(1, math.min(tonumber(self.SafeChunkLength) or maxLength, maxLength))
-    local partCount = math.max(1, math.ceil(payloadLength / chunkLength))
+    local optionalCap = tonumber(self.SafeChunkLength)
+    if optionalCap ~= nil then
+        optionalCap = math.floor(optionalCap)
+        if optionalCap < 1 then
+            optionalCap = nil
+        end
+    end
 
+    local partCount = 1
+    local seenPartCounts = {}
     while true do
-        local packetPayloadLimit = self:GetPacketPayloadLimit(opcode, partCount)
+        if seenPartCounts[partCount] then
+            return nil
+        end
+        seenPartCounts[partCount] = true
+
+        local packetPayloadLimit = math.floor(tonumber(self:GetPacketPayloadLimit(opcode, partCount)) or 0)
         if packetPayloadLimit < 1 then
             return nil
         end
 
-        if chunkLength <= packetPayloadLimit then
+        local chunkLength = optionalCap and math.min(packetPayloadLimit, optionalCap) or packetPayloadLimit
+        if chunkLength < 1 then
+            return nil
+        end
+
+        local requiredPartCount = math.max(1, math.ceil(payloadLength / chunkLength))
+        if requiredPartCount == partCount then
             return chunkLength, partCount
         end
 
-        chunkLength = packetPayloadLimit
-        partCount = math.max(1, math.ceil(payloadLength / chunkLength))
+        partCount = requiredPartCount
     end
 end
 
@@ -343,7 +467,7 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
         return false
     end
 
-    if not MessageQueue or not MessageQueue.EnqueueAddonMessage or not C_ChatInfo or not C_ChatInfo.SendAddonMessage then
+    if not MessageQueue or not MessageQueue.EnqueueLogicalMessage or not C_ChatInfo or not C_ChatInfo.SendAddonMessage then
         if Diagnostics.RecordSendFailure then
             Diagnostics:RecordSendFailure("missing-api")
         end
@@ -361,26 +485,19 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
         return false
     end
 
-    local queueCheckStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
-    if MessageQueue.CanAccept and not MessageQueue:CanAccept(partCount) then
-        if Diagnostics.RecordSendFailure then
-            Diagnostics:RecordSendFailure("queue-full")
-        end
-        return false
+    if Diagnostics.RecordChunkPlan then
+        Diagnostics:RecordChunkPlan(
+            diagnosticsMetadata,
+            distribution,
+            target,
+            #argumentsText,
+            chunkLength,
+            partCount,
+            self:GetPacketPayloadLimit(opcode, partCount)
+        )
     end
-    local queueCheckElapsedMs = queueCheckStartTime and (getTimingNowMilliseconds() - queueCheckStartTime) or 0
 
-    local sendState = {
-        failed = false,
-        pendingParts = partCount,
-        timedOpcodeKey = timedOpcodeKey,
-        totalStartTime = totalStartTime,
-        enqueueElapsedMs = 0,
-        chunkPlanElapsedMs = chunkPlanElapsedMs,
-        queueCheckElapsedMs = queueCheckElapsedMs,
-        immediateLocalEcho = shouldDeliverImmediateLocalEcho(distribution, target, opcode),
-    }
-
+    local packets = {}
     for partIndex = 1, partCount do
         local chunkToken = Serialization:BuildChunkToken(partIndex, partCount)
         local rangeStart = ((partIndex - 1) * chunkLength) + 1
@@ -398,84 +515,142 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
             end
             return false
         end
+        packets[partIndex] = packet
+    end
 
-        if sendState.immediateLocalEcho == true then
+    local queueCheckStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
+    if MessageQueue.CanAccept and not MessageQueue:CanAccept(
+        partCount,
+        diagnosticsMetadata and diagnosticsMetadata.replaceKey or nil,
+        self.Prefix,
+        opcode,
+        distribution,
+        target
+    ) then
+        if Diagnostics.RecordSendFailure then
+            Diagnostics:RecordSendFailure("queue-full")
+        end
+        return false
+    end
+    local queueCheckElapsedMs = queueCheckStartTime and (getTimingNowMilliseconds() - queueCheckStartTime) or 0
+
+    local localEchoSender = Common.GetPlayerName and Common.GetPlayerName() or (getPlayerName and getPlayerName() or "")
+    local sendState = {
+        failed = false,
+        timedOpcodeKey = timedOpcodeKey,
+        totalStartTime = totalStartTime,
+        enqueueElapsedMs = 0,
+        chunkPlanElapsedMs = chunkPlanElapsedMs,
+        queueCheckElapsedMs = queueCheckElapsedMs,
+        immediateLocalEcho = shouldDeliverImmediateLocalEcho(distribution, target, opcode),
+    }
+
+    if sendState.immediateLocalEcho == true then
+        for partIndex = 1, partCount do
             self:ReceiveMessage(
                 self.Prefix,
-                packet,
+                packets[partIndex],
                 distribution,
-                Common.GetPlayerName and Common.GetPlayerName() or (getPlayerName and getPlayerName() or ""),
+                localEchoSender,
                 target,
                 { localEcho = true, immediateLocalEcho = true }
             )
         end
+    end
 
-        local enqueueStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
-        MessageQueue:EnqueueAddonMessage(self.Prefix, packet, distribution, target, {
-            chunkPartIndex = partIndex,
-            chunkPartCount = partCount,
-            shouldSkip = function()
-                return sendState.failed
-            end,
-            onSent = function(item, result)
-                if sendState.failed then
-                    return
-                end
-
-                if sendState.immediateLocalEcho ~= true and shouldEchoOutboundChannel(distribution, target) then
-                    self:ReceiveMessage(
-                        self.Prefix,
-                        item.payload,
-                        distribution,
-                        Common.GetPlayerName and Common.GetPlayerName() or (getPlayerName and getPlayerName() or ""),
-                        target,
-                        { localEcho = true }
-                    )
-                end
-
-                sendState.pendingParts = sendState.pendingParts - 1
-                if sendState.pendingParts == 0 then
-                    if Diagnostics.RecordSendSuccess then
-                        Diagnostics:RecordSendSuccess(diagnosticsMetadata, distribution, target, argumentsText, partCount)
-                    end
-
-                    if sendState.timedOpcodeKey then
-                        local deliveredElapsedMs = getTimingNowMilliseconds() - sendState.totalStartTime
-                        logTimingParts(
-                            ("%s chunks=%d"):format(sendState.timedOpcodeKey, partCount),
-                            "event-send",
-                            {
-                                { label = "chunk-plan", elapsedMs = sendState.chunkPlanElapsedMs },
-                                { label = "queue-check", elapsedMs = sendState.queueCheckElapsedMs },
-                                { label = "enqueue", elapsedMs = sendState.enqueueElapsedMs },
-                            },
-                            deliveredElapsedMs,
-                            sendState.timedOpcodeKey == "EVENT_UNITS" and 25 or 15
-                        )
-                    end
-
-                    Common.InvokeCallback(deliveredCallback, item, result)
-                end
-            end,
-            onFailed = function(item, result)
-                if sendState.failed then
-                    return
-                end
-
-                sendState.failed = true
-                if Diagnostics.RecordSendFailure then
-                    Diagnostics:RecordSendFailure(result)
-                end
-
-                Common.InvokeCallback(failedCallback, item, result)
-            end,
-        })
-        if enqueueStartTime then
-            sendState.enqueueElapsedMs = sendState.enqueueElapsedMs + (getTimingNowMilliseconds() - enqueueStartTime)
+    local function releasePendingImmediateLocalEchoes()
+        if sendState.immediateLocalEcho ~= true then
+            return
+        end
+        for partIndex = 1, partCount do
+            releasePendingRecentLocalEcho(
+                self,
+                self.Prefix,
+                packets[partIndex],
+                distribution,
+                localEchoSender,
+                target
+            )
         end
     end
 
-    return true
+    local enqueueStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
+    local queued = MessageQueue:EnqueueLogicalMessage(self.Prefix, opcode, packets, distribution, target, {
+        onChunkSent = function(item, packet, result)
+            if sendState.failed then
+                return
+            end
+
+            if sendState.immediateLocalEcho == true then
+                markRecentLocalEchoSent(
+                    self,
+                    self.Prefix,
+                    packet,
+                    distribution,
+                    localEchoSender,
+                    target,
+                    getTimestamp()
+                )
+            elseif shouldEchoOutboundChannel(distribution, target) then
+                self:ReceiveMessage(
+                    self.Prefix,
+                    packet,
+                    distribution,
+                    localEchoSender,
+                    target,
+                    { localEcho = true }
+                )
+            end
+        end,
+        onDelivered = function(item, result)
+            if sendState.failed then
+                return
+            end
+
+            if Diagnostics.RecordSendSuccess then
+                Diagnostics:RecordSendSuccess(diagnosticsMetadata, distribution, target, argumentsText, partCount)
+            end
+
+            if sendState.timedOpcodeKey then
+                local deliveredElapsedMs = getTimingNowMilliseconds() - sendState.totalStartTime
+                logTimingParts(
+                    ("%s chunks=%d"):format(sendState.timedOpcodeKey, partCount),
+                    "event-send",
+                    {
+                        { label = "chunk-plan", elapsedMs = sendState.chunkPlanElapsedMs },
+                        { label = "queue-check", elapsedMs = sendState.queueCheckElapsedMs },
+                        { label = "enqueue", elapsedMs = sendState.enqueueElapsedMs },
+                    },
+                    deliveredElapsedMs,
+                    sendState.timedOpcodeKey == "EVENT_UNITS" and 25 or 15
+                )
+            end
+
+            Common.InvokeCallback(deliveredCallback, item, result)
+        end,
+        onFailed = function(item, result)
+            if sendState.failed then
+                return
+            end
+
+            sendState.failed = true
+            releasePendingImmediateLocalEchoes()
+            if result ~= "superseded" and Diagnostics.RecordSendFailure then
+                Diagnostics:RecordSendFailure(result)
+            end
+
+            Common.InvokeCallback(failedCallback, item, result)
+        end,
+    }, diagnosticsMetadata)
+    if enqueueStartTime then
+        sendState.enqueueElapsedMs = getTimingNowMilliseconds() - enqueueStartTime
+    end
+
+    if queued == nil then
+        releasePendingImmediateLocalEchoes()
+    end
+
+    return queued ~= nil
 end
 
 function Comms:SendToChannel(channelId, opcodeOrPayload, argumentsOrMetadata, metadata)
@@ -541,8 +716,16 @@ function Comms:ReceiveMessage(prefix, message, distribution, sender, target, opt
     end
 
     if type(options) == "table" and options.localEcho == true then
-        local echoKey = buildRecentLocalEchoKey(prefix, message, distribution, sender, target)
-        self.RecentLocalEchoes[echoKey] = now
+        recordRecentLocalEcho(
+            self,
+            prefix,
+            message,
+            distribution,
+            sender,
+            target,
+            now,
+            options.immediateLocalEcho == true
+        )
     end
 
     local packet = Serialization:DeserializePacket(message)

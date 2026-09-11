@@ -32,6 +32,8 @@ local DEFAULT_MAX_EVENT_UNITS = 5
 local DEFAULT_TARGET_SELECTION_GROUP = "default"
 local SPELLCAST_SLOW_TOTAL_MS = 100
 local SPELLCAST_SLOW_HELPER_MS = 25
+local EMPTY_RESOURCE_COSTS = {}
+local SPELL_RESOURCE_COSTS_BY_PHASE_CACHE = setmetatable({}, { __mode = "k" })
 
 local function getTimings()
     return Addon.Debug and Addon.Debug.Timings or nil
@@ -1416,21 +1418,35 @@ function Spellcasting.GetSpellResourceCostsForPhase(spell, phase)
         return {}
     end
 
-    spell._resourceCostsByPhase = spell._resourceCostsByPhase or {}
-    if type(spell._resourceCostsByPhase[targetPhase]) == "table" then
-        return spell._resourceCostsByPhase[targetPhase]
+    local resourceCosts = type(spell.resourceCosts) == "table" and spell.resourceCosts or EMPTY_RESOURCE_COSTS
+    local revision = math.max(0, math.floor(tonumber(Addon.Internal.ConfigurationRevision) or 0))
+    local cached = SPELL_RESOURCE_COSTS_BY_PHASE_CACHE[spell]
+    if type(cached) ~= "table"
+        or cached.resourceCosts ~= resourceCosts
+        or cached.revision ~= revision
+    then
+        cached = {
+            resourceCosts = resourceCosts,
+            revision = revision,
+            byPhase = {},
+        }
+        SPELL_RESOURCE_COSTS_BY_PHASE_CACHE[spell] = cached
+    end
+
+    if type(cached.byPhase[targetPhase]) == "table" then
+        return cached.byPhase[targetPhase]
     end
 
     local costs = {}
 
-    for index = 1, #(spell and spell.resourceCosts or {}) do
-        local cost = spell.resourceCosts[index]
+    for index = 1, #resourceCosts do
+        local cost = resourceCosts[index]
         if type(cost) == "table" and tostring(cost.castPhase or "on_cast_end") == targetPhase then
             costs[#costs + 1] = cost
         end
     end
 
-    spell._resourceCostsByPhase[targetPhase] = costs
+    cached.byPhase[targetPhase] = costs
     return costs
 end
 
