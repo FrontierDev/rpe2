@@ -244,10 +244,10 @@ do
     end
 end
 
--- Seed the host execution cache from canonical state before applying a remote
--- aura proposal. For a host-local aura proposal, rebuild canonical state then
--- apply that exact validated operation silently because the ordinary inbound
--- handler deliberately treats local sender packets as echoes and no-ops them.
+-- Seed host execution caches from canonical runtime state before applying a
+-- proposal. Aura proposals require special handling for the host-local sender:
+-- their ordinary inbound handler intentionally treats local packets as echoes,
+-- so the exact validated operation is applied silently to the canonical base.
 do
     local baseHandleEventMutationRequest = Server.HandleEventMutationRequest
     if type(baseHandleEventMutationRequest) == "function" then
@@ -283,6 +283,23 @@ do
                         and CombatState.DeserializeDomainProposal(request.payload) or nil
                     local arguments = proposal and Serialization:DeserializeArguments(proposal.domainPayload or "") or nil
                     prepared = type(arguments) == "table" and applyHostLocalAuraScratch(request.opcode, arguments, sender) == true
+                end
+            elseif domain == "spell" and type(self.EventRuntime) == "table" and type(self.EventState) == "table" then
+                if type(Spellcasting.ReplaceEventCastState) == "function" then
+                    prepared = Spellcasting.ReplaceEventCastState(
+                        Client,
+                        self.EventState.id,
+                        self.EventRuntime.spellcasts or {},
+                        { refresh = false }
+                    ) == true and prepared
+                end
+                if type(Spellcasting.ReplaceEventCooldownState) == "function" then
+                    prepared = Spellcasting.ReplaceEventCooldownState(
+                        Client,
+                        self.EventState.id,
+                        self.EventRuntime.cooldowns or {},
+                        { refresh = false }
+                    ) == true and prepared
                 end
             end
 
