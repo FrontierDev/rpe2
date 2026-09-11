@@ -6,10 +6,6 @@ Addon.Client.Spellcasting = Addon.Client.Spellcasting or {}
 local Client = Addon.Client
 local Spellcasting = Client.Spellcasting
 local Lookup = Addon.Utils and Addon.Utils.Lookup or {}
-local CombatState = Addon.Internal
-    and Addon.Internal.Comms
-    and Addon.Internal.Comms.EventCombatState
-    or {}
 
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
@@ -119,59 +115,71 @@ function Client:AdvanceSpellcastState(previousTurnNumber, previousTickNumber)
         end
         return false
     end
-    if type(CombatState.AdvanceCastBucket) ~= "function" then
-        return false
+
+    local changed = false
+    local advanced = false
+    local toComplete = {}
+    for casterEventId, entry in pairs(bucket) do
+        local turnsTotal = type(entry) == "table" and Spellcasting.NormalizeTurnCount and Spellcasting.NormalizeTurnCount(entry.turnsTotal) or nil
+        if turnsTotal ~= nil and Spellcasting.IsCasterTurnOnTick and Spellcasting.IsCasterTurnOnTick(eventState, casterEventId) then
+            local lastAdvancedTurnNumber = math.max(1, math.floor(tonumber(entry.lastAdvancedTurnNumber) or tonumber(entry.startedOnTurnNumber) or currentTurnNumber))
+            if currentTurnNumber > lastAdvancedTurnNumber then
+                local advancedTurns = currentTurnNumber - lastAdvancedTurnNumber
+                local elapsedTurns = math.max(0, math.floor(tonumber(entry.turnsElapsed) or 0)) + advancedTurns
+                if elapsedTurns > turnsTotal then
+                    elapsedTurns = turnsTotal
+                end
+                entry.turnsElapsed = elapsedTurns
+                entry.lastAdvancedTurnNumber = currentTurnNumber
+                changed = true
+                advanced = true
+
+                if elapsedTurns >= turnsTotal then
+                    toComplete[#toComplete + 1] = tonumber(casterEventId) or 0
+                end
+            end
+        end
     end
 
-    local before = type(CombatState.CloneCastBucket) == "function"
-        and CombatState.CloneCastBucket(bucket)
-        or {}
-    local changed, completed = CombatState.AdvanceCastBucket(
-        bucket,
-        currentTurnNumber,
-        function(casterEventId)
-            return type(Spellcasting.IsCasterTurnOnTick) == "function"
-                and Spellcasting.IsCasterTurnOnTick(eventState, casterEventId) == true
-        end
-    )
-    completed = type(completed) == "table" and completed or {}
-
-    if changed == true and Spellcasting.BumpEventCastRevision then
+    if advanced and Spellcasting.BumpEventCastRevision then
         Spellcasting.BumpEventCastRevision(self, eventId)
     end
 
-    for index = 1, #completed do
-        local casterEventId = tonumber(completed[index]) or 0
-        local previous = before[casterEventId]
-        if type(previous) == "table" then
-            if self:IsLocalSpellcaster(eventId, casterEventId) then
-                if previous.spellRef and type(self.OnSpellcastComplete) == "function" then
-                    self:OnSpellcastComplete(previous.spellRef, previous)
+    for index = 1, #toComplete do
+        local casterEventId = toComplete[index]
+        local existing = Spellcasting.GetCastEntry and Spellcasting.GetCastEntry(self, eventId, casterEventId) or nil
+        local isLocalCaster = self:IsLocalSpellcaster(eventId, casterEventId)
+        if existing then
+            changed = true
+            if isLocalCaster then
+                if existing.spellRef and type(self.OnSpellcastComplete) == "function" then
+                    self:OnSpellcastComplete(existing.spellRef, existing)
                 end
             else
+                local previous = Spellcasting.RemoveCastEntry and Spellcasting.RemoveCastEntry(self, eventId, casterEventId) or nil
                 local casterUnit = Lookup.FindEventUnitById and Lookup.FindEventUnitById(eventState.units, casterEventId) or nil
                 Spellcasting.LogLifecycle(
                     "complete",
-                    previous.authorityType or "player",
+                    (previous and previous.authorityType) or "player",
                     casterUnit and casterUnit.name or "unknown",
-                    previous.spellName or (Spellcasting.ResolveSpellName and Spellcasting.ResolveSpellName(previous.spellRef) or previous.spellRef)
+                    (previous and previous.spellName) or (Spellcasting.ResolveSpellName and Spellcasting.ResolveSpellName(existing.spellRef) or existing.spellRef)
                 )
             end
         end
     end
 
-    if changed == true then
+    if changed then
         Spellcasting.RefreshVisiblePlayerTooltip("event-state")
     end
 
     if timer then
         stopTiming(timer, {
             activeCasts = countEntries(bucket),
-            completedCasts = #completed,
+            completedCasts = #toComplete,
             eventUnits = type(eventState.units) == "table" and #eventState.units or 0,
         })
     end
-    return changed == true
+    return changed
 end
 
 function Client:AdvanceAuraState(previousTurnNumber, previousTickNumber)
