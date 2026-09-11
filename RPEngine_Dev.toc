@@ -226,6 +226,7 @@ server/server_EventCombatRuntime.lua
 server/server_EventCombatRuntimePost.lua
 server/server_EventCombatRuntimeValidation.lua
 server/server_EventCombatRuntimeAuthorityMerge.lua
+server/server_EventCombatRuntimeAuraAuthority.lua
 
 core/Sound.lua
 api/UI.lua
@@ -307,7 +308,6 @@ client/ui/tooltips/tooltip_Player.lua
 client/ui/tooltips/tooltip_Item.lua
 client/ui/tooltips/tooltip_Achievement.lua
 client/ui/windows/window_IconFinder.lua
-client/ui/windows/window_ModelFinder.lua
 client/ui/windows/window_LauncherMenu.lua
 client/ui/windows/window_SetupWizard.lua
 client/ui/windows/window_SetupWizard_ChoiceTooltips.lua
