@@ -324,6 +324,9 @@ local function appendPrimaryMetadata(record, sourceUnit)
         fields[#fields + 1] = ""
     end
     local known, primaryRef = resolveUnitMetadata(sourceUnit)
+    if type(sourceUnit) == "table" and sourceUnit.isPlayer == true then
+        setUnitMetadata(sourceUnit, known, primaryRef)
+    end
     fields[PRIMARY_KNOWN_FIELD] = known and "1" or "0"
     fields[PRIMARY_REF_FIELD] = known and tostring(primaryRef or "") or ""
     return table.concat(fields, UNIT_FIELD_SEPARATOR)
