@@ -6,93 +6,122 @@ Addon.Client.Spellcasting = Addon.Client.Spellcasting or {}
 local Client = Addon.Client
 local AuraManager = Addon.Client.Spellcasting and Addon.Client.Spellcasting.AuraManager or nil
 
-local function flushLiveAuraApply(client, context)
-    if type(AuraManager) ~= "table"
-        or type(AuraManager.FlushOutboundAuraOperations) ~= "function"
-        or type(client) ~= "table"
-        or type(context) ~= "table"
-        or context.immediate == true
-    then
-        return false
-    end
-
-    local eventState = context.eventState
-    if type(eventState) ~= "table"
-        or eventState.active ~= true
-        or eventState.ending == true
-        or eventState.startupReady ~= true
-    then
-        return false
-    end
-
-    local scope = tostring(context.pendingScope or context.scope or "turn") == "reaction"
-        and "reaction"
-        or "turn"
-
-    return AuraManager:FlushOutboundAuraOperations(
-        client,
-        scope,
-        eventState,
-        math.floor(tonumber(eventState.turnNumber) or 0),
-        math.floor(tonumber(eventState.tickNumber) or 0)
-    ) == true
+local function isLiveAuraContext(context)
+    local eventState = type(context) == "table" and context.eventState or nil
+    return type(eventState) == "table"
+        and eventState.active == true
+        and eventState.ending ~= true
+        and eventState.startupReady == true
 end
 
--- Live aura state must reach the other event clients when the local aura is
--- applied, rather than waiting for the next turn-commit barrier. Keep the
--- existing pending/flush implementation so a send which is still in flight is
--- still visible to the turn commit and must complete before the step advances.
-if AuraManager and AuraManager._liveAuraApplyFlushInstalled ~= true then
-    AuraManager._liveAuraApplyFlushInstalled = true
+local function callLiveAuraMutation(nativeHandler, manager, client, context, ...)
+    if type(nativeHandler) ~= "function" or not isLiveAuraContext(context) then
+        return nativeHandler(manager, client, context, ...)
+    end
+
+    -- A live aura mutation should use its own aura packet as the remote
+    -- presentation boundary. Make the existing outbound aura queue flush now
+    -- instead of waiting for End Turn / Advance.
+    local previousImmediate = context.immediate
+    context.immediate = true
+
+    -- The aura manager also emits a COMBAT_LOG status entry locally. Keep that
+    -- local ticker entry, but do not broadcast a second independent message:
+    -- remote clients will create the same ticker entry when they install the
+    -- inbound AURA_APPLY/AURA_DISPEL packet. This keeps state and presentation
+    -- ordered together and prevents duplicate ticker entries.
+    local nativeQueueCombatLogEntryEmission = client.QueueCombatLogEntryEmission
+    local nativeQueueCombatLogEntry = client.QueueCombatLogEntry
+    if type(nativeQueueCombatLogEntryEmission) == "function"
+        and type(nativeQueueCombatLogEntry) == "function"
+    then
+        client.QueueCombatLogEntryEmission = function(targetClient, entry)
+            return nativeQueueCombatLogEntry(targetClient, entry)
+        end
+    end
+
+    local ok, firstResult, secondResult = pcall(nativeHandler, manager, client, context, ...)
+
+    context.immediate = previousImmediate
+    client.QueueCombatLogEntryEmission = nativeQueueCombatLogEntryEmission
+
+    if not ok then
+        error(firstResult, 0)
+    end
+    return firstResult, secondResult
+end
+
+-- Keep live aura changes synchronized immediately. Startup reconciliation keeps
+-- its original deferred behavior because eventState.startupReady is still false.
+if AuraManager and AuraManager._liveAuraMutationSyncInstalled ~= true then
+    AuraManager._liveAuraMutationSyncInstalled = true
 
     if type(AuraManager.ApplyAuraFromContext) == "function" then
         local nativeApplyAuraFromContext = AuraManager.ApplyAuraFromContext
         function AuraManager:ApplyAuraFromContext(client, context, ...)
-            local applied, entry = nativeApplyAuraFromContext(self, client, context, ...)
-            if applied == true then
-                flushLiveAuraApply(client, context)
-            end
-            return applied, entry
+            return callLiveAuraMutation(nativeApplyAuraFromContext, self, client, context, ...)
         end
     end
 
     if type(AuraManager.RemoveAuraStacksFromContext) == "function" then
         local nativeRemoveAuraStacksFromContext = AuraManager.RemoveAuraStacksFromContext
         function AuraManager:RemoveAuraStacksFromContext(client, context, ...)
-            local changed, entry = nativeRemoveAuraStacksFromContext(self, client, context, ...)
-            if changed == true then
-                flushLiveAuraApply(client, context)
-            end
-            return changed, entry
+            return callLiveAuraMutation(nativeRemoveAuraStacksFromContext, self, client, context, ...)
         end
     end
-end
 
--- The aura owner already emits the status entry through COMBAT_LOG when the
--- local aura changes. The inbound AURA_APPLY handler also queues an equivalent
--- local status entry after installing the remote state. Suppress only that
--- second presentation entry; the authoritative aura mutation and all display /
--- derived-state refreshes still run normally.
-local function handleInboundAuraApplyWithoutDuplicateTicker(handler, arguments, sender)
-    if not AuraManager or type(handler) ~= "function" then
-        return false
+    if type(AuraManager.DispelAuraFromContext) == "function" then
+        local nativeDispelAuraFromContext = AuraManager.DispelAuraFromContext
+        function AuraManager:DispelAuraFromContext(client, context, ...)
+            local changed = callLiveAuraMutation(nativeDispelAuraFromContext, self, client, context, ...)
+            return changed
+        end
     end
 
-    local nativeQueueCombatLogEntry = Client.QueueCombatLogEntry
-    if type(nativeQueueCombatLogEntry) ~= "function" then
-        return handler(AuraManager, Client, arguments, sender)
-    end
+    -- A live aura flush may already have removed its operation from the pending
+    -- table while its sliceable flush job is still completing. The turn commit
+    -- must regard that matching in-flight job as pending rather than advance the
+    -- event step early.
+    if type(AuraManager.HasPendingOutboundAuraOperations) == "function" then
+        local nativeHasPendingOutboundAuraOperations = AuraManager.HasPendingOutboundAuraOperations
+        function AuraManager:HasPendingOutboundAuraOperations(client, scopeOverride, eventStateOverride, sourceTurnNumber, sourceTickNumber)
+            if nativeHasPendingOutboundAuraOperations(
+                self,
+                client,
+                scopeOverride,
+                eventStateOverride,
+                sourceTurnNumber,
+                sourceTickNumber
+            ) == true then
+                return true
+            end
 
-    Client.QueueCombatLogEntry = function()
-        return true
-    end
-    local ok, result = pcall(handler, AuraManager, Client, arguments, sender)
-    Client.QueueCombatLogEntry = nativeQueueCombatLogEntry
+            local scope = tostring(scopeOverride or "turn") == "reaction" and "reaction" or "turn"
+            local job = type(client) == "table"
+                and type(client.PendingOutboundAuraFlushJobsByScope) == "table"
+                and client.PendingOutboundAuraFlushJobsByScope[scope]
+                or nil
+            local state = type(job) == "table" and job.state or nil
+            if type(job) ~= "table"
+                or job.finalized == true
+                or job.cancelled == true
+                or type(state) ~= "table"
+            then
+                return false
+            end
 
-    if not ok then
-        error(result, 0)
+            if eventStateOverride ~= nil and state.expectedEventState ~= eventStateOverride then
+                return false
+            end
+            if sourceTurnNumber ~= nil and tonumber(state.sourceTurnNumber) ~= tonumber(sourceTurnNumber) then
+                return false
+            end
+            if sourceTickNumber ~= nil and tonumber(state.sourceTickNumber) ~= tonumber(sourceTickNumber) then
+                return false
+            end
+            return true
+        end
     end
-    return result
 end
 
 function Client:HandleAuraApply(arguments, sender)
@@ -100,7 +129,7 @@ function Client:HandleAuraApply(arguments, sender)
         return false
     end
 
-    return handleInboundAuraApplyWithoutDuplicateTicker(AuraManager.HandleAuraApply, arguments, sender)
+    return AuraManager:HandleAuraApply(self, arguments, sender)
 end
 
 function Client:HandleAuraDispel(arguments, sender)
@@ -116,7 +145,7 @@ function Client:HandleAuraApplyBatch(arguments, sender)
         return false
     end
 
-    return handleInboundAuraApplyWithoutDuplicateTicker(AuraManager.HandleAuraApplyBatch, arguments, sender)
+    return AuraManager:HandleAuraApplyBatch(self, arguments, sender)
 end
 
 function Client:HandleAuraDispelBatch(arguments, sender)
