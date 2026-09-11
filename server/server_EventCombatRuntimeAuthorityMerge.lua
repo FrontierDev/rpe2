@@ -248,6 +248,9 @@ end
 -- proposal. Aura proposals require special handling for the host-local sender:
 -- their ordinary inbound handler intentionally treats local packets as echoes,
 -- so the exact validated operation is applied silently to the canonical base.
+-- For spell proposals, retain the original client runtime only as untrusted
+-- metadata: downstream validation may inspect spell-ref keys to reconstruct
+-- shared lockouts, but never accepts the submitted cooldown values.
 do
     local baseHandleEventMutationRequest = Server.HandleEventMutationRequest
     if type(baseHandleEventMutationRequest) == "function" then
@@ -267,7 +270,17 @@ do
             end
 
             local previousDomain = self.EventCombatProposalDomain
+            local previousOriginalRuntime = self.EventCombatOriginalProposalRuntime
             self.EventCombatProposalDomain = domain
+            self.EventCombatOriginalProposalRuntime = nil
+            if domain == "spell" and type(CombatState.DeserializeDomainProposal) == "function" then
+                local originalProposal = CombatState.DeserializeDomainProposal(request.payload)
+                if type(originalProposal) == "table" and type(originalProposal.runtimeState) == "table" then
+                    self.EventCombatOriginalProposalRuntime = type(CombatState.CloneRuntimeState) == "function"
+                        and CombatState.CloneRuntimeState(originalProposal.runtimeState)
+                        or originalProposal.runtimeState
+                end
+            end
 
             local prepared = true
             if domain == "aura" and type(AuraManager) == "table" and type(AuraManager.ReplaceEventAuraState) == "function" then
@@ -301,6 +314,14 @@ do
                         { refresh = false }
                     ) == true and prepared
                 end
+                if type(AuraManager) == "table" and type(AuraManager.ReplaceEventAuraState) == "function" then
+                    prepared = AuraManager:ReplaceEventAuraState(
+                        Client,
+                        self.EventState,
+                        self.EventRuntime.auras or {},
+                        { refresh = false }
+                    ) == true and prepared
+                end
             end
 
             local ok, result
@@ -310,6 +331,7 @@ do
                 ok, result = true, false
             end
             self.EventCombatProposalDomain = previousDomain
+            self.EventCombatOriginalProposalRuntime = previousOriginalRuntime
             if not ok then
                 error(result, 0)
             end
