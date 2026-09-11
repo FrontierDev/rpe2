@@ -5,7 +5,6 @@ Addon.Internal = Addon.Internal or {}
 Addon.Utils = Addon.Utils or {}
 
 local Server = Addon.Server
-local Client = Addon.Client or {}
 local Comms = Addon.Internal.Comms or {}
 local EventSync = Comms.EventSync or {}
 local CombatState = Comms.EventCombatState or {}
@@ -15,7 +14,6 @@ local Operations = Comms.Operations or {}
 local Common = Addon.Utils.Common or {}
 local Debug = Addon.Debug or {}
 
-local CLIENT_CONNECT_OPCODE = Operations.GetOpcode and Operations:GetOpcode("CLIENT_CONNECT") or nil
 local EVENT_START_OPCODE = Operations.GetOpcode and Operations:GetOpcode("EVENT_START") or nil
 local EVENT_UNITS_OPCODE = Operations.GetOpcode and Operations:GetOpcode("EVENT_UNITS") or nil
 local EVENT_STATE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("EVENT_STATE") or nil
@@ -55,6 +53,19 @@ local function findPlayerUnit(eventState, playerName)
         end
     end
     return nil
+end
+
+local function hasResourceRef(resources, resourceRef)
+    local expected = tostring(resourceRef or "")
+    if expected == "" then
+        return true
+    end
+    for index = 1, #(resources or {}) do
+        if tostring(resources[index] and resources[index].resourceRef or "") == expected then
+            return true
+        end
+    end
+    return false
 end
 
 local function cloneCanonicalRuntime(runtime)
@@ -214,10 +225,8 @@ function Server:SendEventSyncSnapshotToClient(clientName, reason)
     return sent
 end
 
--- The legacy active-event reconcile path emits EVENT_START/EVENT_UNITS/EVENT_STATE
--- directly to the reconnecting client. Suppress only those three messages for
--- the exact target while the #236 reconcile wrapper is running. Fresh event
--- startup is outside this narrow guard and remains unchanged.
+-- Suppress only the old active-event recovery triplet for the exact reconnecting
+-- target. Fresh event startup is outside this narrow guard and remains unchanged.
 do
     local baseSendMessage = Comms.SendMessage
     if type(baseSendMessage) == "function" then
@@ -236,9 +245,8 @@ do
     end
 end
 
--- Make protocol/resource data visible during the nested ReconcileClientEventSession
--- call. server_EventRuntime's older CLIENT_CONNECT wrapper records protocol data
--- only after server_Session returns, which is too late for #236 reconciliation.
+-- Expose protocol/resource data while server_Session's CLIENT_CONNECT handler is
+-- synchronously inside ReconcileClientEventSession.
 do
     local baseHandleClientConnect = Server.HandleClientConnect
     if type(baseHandleClientConnect) == "function" then
@@ -264,9 +272,9 @@ do
     end
 end
 
--- Reconciliation now performs roster insertion through the existing #234 wrapped
--- mutation path, suppresses the old three-message recovery snapshot, then sends
--- one full snapshot captured after any insertion commit has allocated its revision.
+-- Reconcile through the existing #234 mutation wrapper, suppress the old three
+-- recovery messages, then capture the full snapshot after any roster insertion
+-- has committed and allocated its revision.
 do
     local baseReconcileClientEventSession = Server.ReconcileClientEventSession
     if type(baseReconcileClientEventSession) == "function" then
@@ -299,6 +307,17 @@ do
                 return false
             end
 
+            -- Host reload recovery is intentionally unsupported. Avoid turning an
+            -- ordinary host CLIENT_CONNECT refresh into a destructive self-rejoin.
+            local localHostName = normalizeName(type(Common.GetPlayerName) == "function" and Common.GetPlayerName() or nil)
+            if localHostName ~= ""
+                and normalizedClientName == localHostName
+                and normalizeName(eventState.hostName) == localHostName
+            then
+                clientState.eventSyncSynchronized = true
+                return true
+            end
+
             local existingBefore = findPlayerUnit(eventState, normalizedClientName)
             if not existingBefore then
                 if type(connectContext) ~= "table"
@@ -307,6 +326,12 @@ do
                 then
                     clientState.eventSyncSynchronized = false
                     logInternal("EventSync: late join rejected without connect resource snapshot client=%s.", normalizedClientName)
+                    return false
+                end
+                local healthResourceRef = tostring(eventState.healthResourceRef or "")
+                if healthResourceRef ~= "" and not hasResourceRef(connectContext.resources, healthResourceRef) then
+                    clientState.eventSyncSynchronized = false
+                    logInternal("EventSync: late join rejected incomplete resources client=%s missing=%s.", normalizedClientName, healthResourceRef)
                     return false
                 end
                 clientState.resources = type(ResourceSync.CloneResources) == "function"
