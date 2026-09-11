@@ -3,6 +3,8 @@ local _, Addon = ...
 local Server = Addon.Server or {}
 local Client = Addon.Client or {}
 local Comms = Addon.Internal and Addon.Internal.Comms or {}
+local EventSync = Comms.EventSync or {}
+local Serialization = Comms.Serialization or {}
 local CombatState = Comms.EventCombatState or {}
 local Operations = Comms.Operations or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
@@ -10,6 +12,8 @@ local Spellcasting = Client.Spellcasting or {}
 local Combat = Client.Combat or {}
 
 local SPELLCAST_START_OPCODE = Operations.GetOpcode and Operations:GetOpcode("SPELLCAST_START") or nil
+local SPELLCAST_COMPLETE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("SPELLCAST_COMPLETE") or nil
+local SPELLCAST_INTERRUPT_OPCODE = Operations.GetOpcode and Operations:GetOpcode("SPELLCAST_INTERRUPT") or nil
 local EVENT_DEFENSIVE_USE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("EVENT_DEFENSIVE_USE") or nil
 
 local function findEventUnit(eventState, eventId)
@@ -21,6 +25,69 @@ local function findEventUnit(eventState, eventId)
         end
     end
     return nil
+end
+
+local function getCooldownSpellState(unitState, spellRef)
+    return type(unitState) == "table"
+        and type(unitState.spells) == "table"
+        and unitState.spells[spellRef]
+        or nil
+end
+
+local function spellUsesGlobalCooldown(spell)
+    return type(Spellcasting.SpellUsesGlobalCooldown) == "function"
+        and Spellcasting.SpellUsesGlobalCooldown(spell) == true
+end
+
+local function canStartFromCanonicalCooldown(eventState, casterEventId, spellRef, spell)
+    local runtime = Server.EventRuntime
+    local unitState = type(runtime) == "table" and type(runtime.cooldowns) == "table"
+        and runtime.cooldowns[tonumber(casterEventId) or 0] or nil
+    local spellState = getCooldownSpellState(unitState, spellRef)
+    if spellUsesGlobalCooldown(spell)
+        and math.max(0, math.floor(tonumber(unitState and unitState.globalCooldownRemaining) or 0)) > 0
+    then
+        return false
+    end
+    if math.max(0, math.floor(tonumber(spellState and spellState.lockoutRemainingTurns) or 0)) > 0 then
+        return false
+    end
+    if type(spell) == "table" and spell.useCooldownCharges == true then
+        local maxCharges = math.max(1, math.floor(tonumber(spell.charges) or 1))
+        local currentCharges = spellState and math.max(0, math.floor(tonumber(spellState.currentCharges) or maxCharges)) or maxCharges
+        return currentCharges > 0
+    end
+    return math.max(0, math.floor(tonumber(spellState and spellState.remainingTurns) or 0)) <= 0
+end
+
+local function deriveInstantCooldownCandidate(eventState, casterUnit, spellRef, spell, runtimeState)
+    if type(eventState) ~= "table" or type(casterUnit) ~= "table" or type(runtimeState) ~= "table" then
+        return false
+    end
+    local eventId = tostring(eventState.id or "")
+    local casterEventId = tonumber(casterUnit.eventID) or 0
+    if eventId == "" or casterEventId <= 0 or type(Client.ApplyLocalSpellCooldown) ~= "function" then
+        return false
+    end
+
+    local savedBucket = Client.CooldownsByEventId and Client.CooldownsByEventId[eventId] or nil
+    local savedQueued = Client.ActionBarRefreshQueued
+    local savedReason = Client.PendingActionBarRefreshReason
+    Client.CooldownsByEventId = Client.CooldownsByEventId or {}
+    Client.CooldownsByEventId[eventId] = type(CombatState.CloneCooldownBucket) == "function"
+        and CombatState.CloneCooldownBucket(Server.EventRuntime and Server.EventRuntime.cooldowns or {})
+        or {}
+
+    Client:ApplyLocalSpellCooldown(eventState, casterUnit, spellRef, spell)
+    local derived = type(CombatState.CloneCooldownBucket) == "function"
+        and CombatState.CloneCooldownBucket(Client.CooldownsByEventId[eventId] or {})
+        or (Client.CooldownsByEventId[eventId] or {})
+
+    Client.CooldownsByEventId[eventId] = savedBucket
+    Client.ActionBarRefreshQueued = savedQueued
+    Client.PendingActionBarRefreshReason = savedReason
+    runtimeState.cooldowns = derived
+    return true
 end
 
 -- Keep derived cast fields complete even when the source entry predates the
@@ -45,14 +112,23 @@ do
     end
 end
 
--- The #235 integration consumes the changed flag from the shared helper. Make
--- completion removal an intrinsic part of the pure transition as well, so a
--- caller cannot accidentally leave a fully elapsed cast active by ignoring the
--- helper's second return value.
+-- Completion is a two-stage authoritative transition: the turn commit advances
+-- and removes a fully elapsed persistent cast, then the owner executes effects
+-- and sends SPELLCAST_COMPLETE. Keep a one-shot server expectation so that
+-- completion can be validated even though the cast is no longer active and is
+-- therefore never retained in a recovery snapshot.
 do
     local baseAdvanceCastBucket = CombatState.AdvanceCastBucket
     if type(baseAdvanceCastBucket) == "function" then
         function CombatState.AdvanceCastBucket(bucket, currentTurnNumber, isCasterTurnOnTick)
+            local before = {}
+            for casterEventId, entry in pairs(type(bucket) == "table" and bucket or {}) do
+                before[tonumber(casterEventId) or casterEventId] = {
+                    spellRef = tostring(entry and entry.spellRef or ""),
+                    authorityType = tostring(entry and entry.authorityType or ""),
+                }
+            end
+
             local changed, completed = baseAdvanceCastBucket(bucket, currentTurnNumber, isCasterTurnOnTick)
             for index = 1, #(completed or {}) do
                 bucket[completed[index]] = nil
@@ -65,6 +141,18 @@ do
                 and type(eventState) == "table"
                 and eventState.active == true
             then
+                runtime.completedSpellcasts = runtime.completedSpellcasts or {}
+                for index = 1, #(completed or {}) do
+                    local casterEventId = completed[index]
+                    local previous = before[casterEventId]
+                    if type(previous) == "table" and previous.spellRef ~= "" then
+                        runtime.completedSpellcasts[casterEventId] = {
+                            spellRef = previous.spellRef,
+                            authorityType = previous.authorityType,
+                            completedOnTurnNumber = math.max(1, math.floor(tonumber(eventState.turnNumber) or 1)),
+                        }
+                    end
+                end
                 Server.ActiveSpellcastsByEventId = Server.ActiveSpellcastsByEventId or {}
                 Server.ActiveSpellcastsByEventId[eventState.id] = CombatState.CloneCastBucket(bucket)
                 runtime._deterministicRuntimeTurnNumber = math.max(0, math.floor(tonumber(eventState.turnNumber) or 0))
@@ -150,6 +238,96 @@ do
                 end
             end
             return baseSendToChannel(self, channelId, opcodeOrPayload, argumentsOrMetadata, metadata)
+        end
+    end
+end
+
+-- Validate lifecycle phase against canonical runtime state. Persistent complete
+-- consumes the completion expectation produced by the authoritative turn
+-- transition. Instant complete has no cast entry; it derives cooldown/GCD state
+-- directly from spell metadata at completion and commits no persistent cast.
+do
+    local baseHandleEventMutationRequest = Server.HandleEventMutationRequest
+    if type(baseHandleEventMutationRequest) == "function" then
+        function Server:HandleEventMutationRequest(payload, sender)
+            local request = type(EventSync.DeserializeMutationRequest) == "function"
+                and EventSync.DeserializeMutationRequest(payload) or nil
+            if type(request) ~= "table"
+                or (request.opcode ~= SPELLCAST_START_OPCODE
+                    and request.opcode ~= SPELLCAST_COMPLETE_OPCODE
+                    and request.opcode ~= SPELLCAST_INTERRUPT_OPCODE)
+            then
+                return baseHandleEventMutationRequest(self, payload, sender)
+            end
+
+            local proposal = type(CombatState.DeserializeDomainProposal) == "function"
+                and CombatState.DeserializeDomainProposal(request.payload) or nil
+            local arguments = proposal and Serialization:DeserializeArguments(proposal.domainPayload or "") or nil
+            local eventState = self.EventState
+            local runtime = self.EventRuntime
+            local casterEventId = tonumber(arguments and arguments[3]) or 0
+            local spellRef = tostring(arguments and arguments[4] or "")
+            local casterUnit = findEventUnit(eventState, casterEventId)
+            local _, spell = type(Registry.ResolveSpellReference) == "function" and Registry:ResolveSpellReference(spellRef) or nil, nil
+            if type(Registry.ResolveSpellReference) == "function" then
+                local _, resolvedSpell = Registry:ResolveSpellReference(spellRef)
+                spell = resolvedSpell
+            end
+            if type(proposal) ~= "table" or type(arguments) ~= "table"
+                or type(eventState) ~= "table" or eventState.active ~= true
+                or type(runtime) ~= "table" or not casterUnit or type(spell) ~= "table"
+            then
+                return false
+            end
+
+            local persistentTurns = type(Spellcasting.ResolvePersistentCastTurns) == "function"
+                and Spellcasting.ResolvePersistentCastTurns(spell, nil) or nil
+            local activeCast = type(runtime.spellcasts) == "table" and runtime.spellcasts[casterEventId] or nil
+            local expectation = type(runtime.completedSpellcasts) == "table" and runtime.completedSpellcasts[casterEventId] or nil
+
+            if request.opcode == SPELLCAST_START_OPCODE then
+                if persistentTurns == nil or type(activeCast) == "table" or type(expectation) == "table"
+                    or canStartFromCanonicalCooldown(eventState, casterEventId, spellRef, spell) ~= true
+                then
+                    return false
+                end
+            elseif request.opcode == SPELLCAST_INTERRUPT_OPCODE then
+                if persistentTurns == nil or type(activeCast) ~= "table" or tostring(activeCast.spellRef or "") ~= spellRef then
+                    return false
+                end
+            elseif persistentTurns ~= nil then
+                if type(expectation) ~= "table" or tostring(expectation.spellRef or "") ~= spellRef then
+                    return false
+                end
+            else
+                if type(activeCast) == "table" or type(expectation) == "table"
+                    or canStartFromCanonicalCooldown(eventState, casterEventId, spellRef, spell) ~= true
+                then
+                    return false
+                end
+                proposal.runtimeState = type(proposal.runtimeState) == "table"
+                    and CombatState.CloneRuntimeState(proposal.runtimeState) or CombatState.CloneRuntimeState({})
+                if deriveInstantCooldownCandidate(eventState, casterUnit, spellRef, spell, proposal.runtimeState) ~= true then
+                    return false
+                end
+                local proposalPayload = CombatState.SerializeDomainProposal(proposal.domainPayload, proposal.runtimeState)
+                payload = EventSync.SerializeMutationRequest({
+                    protocolVersion = request.protocolVersion,
+                    channelName = request.channelName,
+                    eventId = request.eventId,
+                    opcode = request.opcode,
+                    payload = proposalPayload,
+                })
+                if not payload then
+                    return false
+                end
+            end
+
+            local result = baseHandleEventMutationRequest(self, payload, sender)
+            if result == true and request.opcode == SPELLCAST_COMPLETE_OPCODE and persistentTurns ~= nil then
+                runtime.completedSpellcasts[casterEventId] = nil
+            end
+            return result
         end
     end
 end
