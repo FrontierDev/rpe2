@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 3,
+    version = 6,
     dataset = {
         achievements = {},
         auras = {},
@@ -583,6 +583,28 @@ Addon.Data.DefaultDatasets:Register({
                 maxStackSize = 20,
                 name = "Black Vitriol",
                 quality = "common",
+            },
+            {
+                allowWowConversion = true,
+                canDisenchant = false,
+                icon = "interface/icons/inv_misc_ammo_gunpowder_02.blp",
+                id = "3yvy546j",
+                itemLevel = 5,
+                itemType = "material",
+                maxStackSize = 10,
+                name = "Weak Flux",
+                quality = "common"
+            },
+            {
+                allowWowConversion = true,
+                canDisenchant = false,
+                icon = "interface/icons/inv_mace_11.blp",
+                id = "4wc5b4tv",
+                itemLevel = 10,
+                itemType = "material",
+                maxStackSize = 10,
+                name = "Wooden Stock",
+                quality = "common"
             }
         },
         loot = {},

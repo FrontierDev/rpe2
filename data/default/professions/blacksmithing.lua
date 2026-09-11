@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 1,
+    version = 3,
     dataset = {
         achievements = {},
         auras = {
@@ -16727,6 +16727,17 @@ Addon.Data.DefaultDatasets:Register({
                     "f82db71a:wasvuom2"
                 },
                 yellowSockets = 0
+            },
+            {
+                allowWowConversion = true,
+                canDisenchant = false,
+                icon = "interface/icons/inv_ingot_02.blp",
+                id = "nntycdj5",
+                itemLevel = 10,
+                itemType = "material",
+                maxStackSize = 20,
+                name = "Copper Bar",
+                quality = "common"
             }
         },
         loot = {},

@@ -43,6 +43,8 @@ core/internal/comms/MessageQueue.lua
 core/internal/comms/Operations.lua
 core/internal/comms/Serialization.lua
 core/internal/comms/Core.lua
+core/internal/comms/EventSync.lua
+core/internal/comms/EventCombatState.lua
 core/internal/comms/TransportDiagnostics.lua
 core/internal/comms/Channel.lua
 core/internal/comms/LootDelivery.lua
@@ -151,6 +153,8 @@ server/server_EventVariants.lua
 server/server_EventResourceIntegration.lua
 server/server_EventSpellEquipmentVariants.lua
 server/server_EventAutopilotSchedule.lua
+server/server_EventRuntime.lua
+client/client_EventSync.lua
 client/autopilot/Spatial.lua
 client/autopilot/SpellEvaluator.lua
 client/autopilot/ActionEconomy.lua
@@ -218,6 +222,11 @@ client/autopilot/PlannerPreparationPerformance.lua
 client/autopilot/PlannerSnapshotUnitsPerformance.lua
 client/client_PendingChanges.lua
 server/server_Spellcasting.lua
+server/server_EventCombatRuntime.lua
+server/server_EventCombatRuntimePost.lua
+server/server_EventCombatRuntimeValidation.lua
+server/server_EventCombatRuntimeAuthorityMerge.lua
+server/server_EventCombatRuntimeAuraAuthority.lua
 
 core/Sound.lua
 api/UI.lua
@@ -299,7 +308,6 @@ client/ui/tooltips/tooltip_Player.lua
 client/ui/tooltips/tooltip_Item.lua
 client/ui/tooltips/tooltip_Achievement.lua
 client/ui/windows/window_IconFinder.lua
-client/ui/windows/window_ModelFinder.lua
 client/ui/windows/window_LauncherMenu.lua
 client/ui/windows/window_SetupWizard.lua
 client/ui/windows/window_SetupWizard_ChoiceTooltips.lua
@@ -426,3 +434,6 @@ client/ui/ruleset/window_Ruleset.lua
 data/default/Install.lua
 BagScanTest.lua
 RuneclothDeleteTest.lua
+server/server_EventRejoinSync.lua
+client/client_EventRejoinSync.lua
+client/client_EventRejoinSyncGuard.lua
