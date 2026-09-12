@@ -26,7 +26,7 @@ end
 
 local function isContribution(setting)
     if type(Contributions.IsContribution) == "function" then return Contributions.IsContribution(setting) end
-    return type(setting) == "table" and trim(setting.shopContributionTargetRef) ~= ""
+    return type(setting) == "table" and trim(setting.targetGuildSettingRef) ~= ""
 end
 
 local function datasets()
@@ -196,8 +196,8 @@ function DataEditor:RefreshGuildShopContributionsPage()
     self.GuildShopContributionList:SetItems(displayRows)
 
     self.GuildShopContributionNameInput:SetText(contribution and contribution.name or "")
-    self.GuildShopContributionTargetDropdown:SetItems(targetItems(contribution and contribution.shopContributionTargetRef))
-    self.GuildShopContributionTargetDropdown:SetSelectedValue(contribution and contribution.shopContributionTargetRef or "", true)
+    self.GuildShopContributionTargetDropdown:SetItems(targetItems(contribution and contribution.targetGuildSettingRef))
+    self.GuildShopContributionTargetDropdown:SetSelectedValue(contribution and contribution.targetGuildSettingRef or "", true)
 
     local requisitions = contribution and contribution.requisitions or {}
     if (tonumber(self.SelectedGuildShopContributionRequisitionIndex) or 0) > #requisitions then self.SelectedGuildShopContributionRequisitionIndex = nil end
@@ -206,9 +206,9 @@ function DataEditor:RefreshGuildShopContributionsPage()
     self.GuildShopContributionReqIdInput:SetText(req and req.id or "")
     self.GuildShopContributionItemRefInput:SetText(req and req.itemRef or "")
     self.GuildShopContributionQuantityInput:SetText(req and tostring(req.quantity or 1) or "")
-    self.GuildShopContributionCategoryDropdown:SetItems(categoryItems(contribution and contribution.shopContributionTargetRef, req and req.shopCategoryId))
+    self.GuildShopContributionCategoryDropdown:SetItems(categoryItems(contribution and contribution.targetGuildSettingRef, req and req.shopCategoryId))
     self.GuildShopContributionCategoryDropdown:SetSelectedValue(req and req.shopCategoryId or "", true)
-    self.GuildShopContributionRoleDropdown:SetItems(roleItems(contribution and contribution.shopContributionTargetRef, req and req.roleIds))
+    self.GuildShopContributionRoleDropdown:SetItems(roleItems(contribution and contribution.targetGuildSettingRef, req and req.roleIds))
     self.GuildShopContributionRoleDropdown:SetSelectedValue("", true)
 
     local roles = {}
@@ -226,7 +226,7 @@ function DataEditor:BuildGuildShopContributionsPage(page)
     self.GuildShopContributionList = UI.ScrollLayout:New({ name = "RPEGuildShopContributionList", height = 54, visibleRows = 3, rowHeight = 18, border = true, rowElementClass = UI.ScrollListEntry, categoryWidth = 130, statusWidth = 160 })
     self.GuildShopContributionList:SetParent(root:GetFrame())
     self.GuildShopContributionList:SetRowRenderer(function(row, value, index)
-        row:SetCategory(trim(value.name) ~= "" and value.name or value.id or "Contribution"); row:SetStatus(value.shopContributionTargetRef or "")
+        row:SetCategory(trim(value.name) ~= "" and value.name or value.id or "Contribution"); row:SetStatus(value.targetGuildSettingRef or "")
         local frame = row:GetFrame(); frame:EnableMouse(true); frame:SetScript("OnMouseUp", function(_, button) if button == "LeftButton" then self.SelectedGuildShopContributionIndex = index; self.SelectedGuildShopContributionRequisitionIndex = nil; self:RefreshGuildShopContributionsPage() end end)
     end)
     self.GuildShopContributionList:Create(); root:AddChild(self.GuildShopContributionList)
@@ -235,7 +235,7 @@ function DataEditor:BuildGuildShopContributionsPage(page)
     buttons:AddChild(UI.CreateButton(buttons:GetFrame(), "RPEGuildShopContributionNew", "New Contribution", 106, function()
         local dataset = self:GetSelectedDataset(); if not dataset then return end
         dataset.guildSettings = dataset.guildSettings or {}
-        local setting = { id = nextId(dataset.guildSettings, "shop_contribution_"), name = "New Shop Contribution", guildName = Contributions.SentinelGuildName or "__RPE_SHOP_CONTRIBUTION__", shopContributionTargetRef = "__missing_target__", general = { enableRequisitions = false, enableDailyRewards = false }, roles = {}, shopCategories = {}, requisitions = {}, dailyRewards = {}, tags = {} }
+        local setting = { id = nextId(dataset.guildSettings, "shop_contribution_"), name = "New Shop Contribution", guildName = Contributions.SentinelGuildName or "__RPE_SHOP_CONTRIBUTION__", targetGuildSettingRef = "__missing_target__", general = { enableRequisitions = false, enableDailyRewards = false }, roles = {}, shopCategories = {}, requisitions = {}, dailyRewards = {}, tags = {} }
         dataset.guildSettings[#dataset.guildSettings + 1] = setting
         self.SelectedGuildShopContributionIndex = #contributionRows(dataset); self.SelectedGuildShopContributionRequisitionIndex = nil
         changed(self, "shop-contribution-create"); self:RefreshGuildShopContributionsPage()
@@ -252,7 +252,7 @@ function DataEditor:BuildGuildShopContributionsPage(page)
     local targetRow = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEGuildShopContributionTargetRow", { height = 20, expandWidth = true, spacing = 4, fitChildrenWidth = true }); root:AddChild(targetRow)
     targetRow:AddChild(UI.CreateText(targetRow:GetFrame(), "RPEGuildShopContributionTargetLabel", "Target Setting", { width = 90, height = 20, justifyH = "LEFT" }))
     self.GuildShopContributionTargetDropdown = UI.CreateDropdown(targetRow:GetFrame(), "RPEGuildShopContributionTargetDropdown", { width = 0, height = 20, expandWidth = true, weight = 1, items = {}, onValueChanged = function(value)
-        local _, c = selectedContribution(self); if c and trim(value) ~= "" then c.shopContributionTargetRef = value; c.guildName = Contributions.SentinelGuildName or "__RPE_SHOP_CONTRIBUTION__"; changed(self, "shop-contribution-target"); self:RefreshGuildShopContributionsPage() end
+        local _, c = selectedContribution(self); if c and trim(value) ~= "" then c.targetGuildSettingRef = value; c.guildName = Contributions.SentinelGuildName or "__RPE_SHOP_CONTRIBUTION__"; changed(self, "shop-contribution-target"); self:RefreshGuildShopContributionsPage() end
     end }); targetRow:AddChild(self.GuildShopContributionTargetDropdown)
 
     self.GuildShopContributionRequisitionList = UI.ScrollLayout:New({ name = "RPEGuildShopContributionRequisitionList", height = 54, visibleRows = 3, rowHeight = 18, border = true, rowElementClass = UI.ScrollListEntry, categoryWidth = 110, statusWidth = 180 })
