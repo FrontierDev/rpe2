@@ -166,6 +166,10 @@ function ActionBarWidget:UpdateFirstPlayerTurnHelp()
         return false
     end
 
+    if type(Help.IsAcknowledged) == "function" and Help:IsAcknowledged(FIRST_EVENT_HELP_ID) ~= true then
+        return false
+    end
+
     if Help.ActiveTipId == FIRST_PLAYER_TURN_HELP_ID then
         self._firstPlayerTurnHelpPresentedForActionableState = true
         return true
