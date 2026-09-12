@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 7,
+    version = 8,
     dataset = {
         achievements = {},
         auras = {},
@@ -615,6 +615,17 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "material",
                 maxStackSize = 10,
                 name = "Heavy Stock",
+                quality = "common"
+            },
+            {
+                allowWowConversion = true,
+                canDisenchant = false,
+                icon = "interface/icons/inv_potion_15.blp",
+                id = "0d209ced",
+                itemLevel = 40,
+                itemType = "material",
+                maxStackSize = 20,
+                name = "Flask of Mojo",
                 quality = "common"
             }
         },
