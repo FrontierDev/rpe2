@@ -6,6 +6,7 @@ Addon.Client.UI.Guild = Addon.Client.UI.Guild or {}
 
 local GuildUI = Addon.Client.UI.Guild
 local Client = Addon.Client
+local Guild = Client.Guild
 local UI = Addon.UI or {}
 
 local Page = GuildUI.AdminPage
@@ -17,6 +18,35 @@ local OldRefreshActionControls = Page.RefreshActionControls
 
 local function trim(value)
     return tostring(value or ""):match("^%s*(.-)%s*$") or ""
+end
+
+-- #268 final cleanup: the base Admin/Requisitions source files still contain
+-- dormant pre-Role compatibility branches, but their public runtime facades are
+-- no longer exposed after the Role UI has loaded.
+if Guild then
+    Guild.GetAssignedGuildRankRef = nil
+    Guild.GetAssignedGuildRankStatus = nil
+    Guild.GetAssignedGuildRank = nil
+    Guild.GetApplicableGuildRanks = nil
+    Guild.GetEligibleGuildRanksForWoWRank = nil
+    Guild.SetGuildRankForMember = nil
+    Guild.ClearGuildRankForMember = nil
+
+    -- Protocol v2 query responses are Role-based. Remove the local
+    -- assignedRankRef compatibility alias before UI consumers see the result.
+    local OldQueryGuildAdminMember = Guild.QueryGuildAdminMember
+    if type(OldQueryGuildAdminMember) == "function" then
+        function Guild:QueryGuildAdminMember(targetName, callback)
+            return OldQueryGuildAdminMember(self, targetName, function(response)
+                if type(response) == "table" then
+                    response.assignedRankRef = nil
+                end
+                if type(callback) == "function" then
+                    callback(response)
+                end
+            end)
+        end
+    end
 end
 
 local function roleMapsRank(role, rankIndex)
@@ -81,10 +111,18 @@ local function rowCanMutate(page, row)
         and trim(state.activeSettingRef) ~= ""
 end
 
+local function isNonRoleMutationAck(state)
+    if type(state) ~= "table" then return false end
+    local operation = trim(state.operation)
+    return operation == "grant_achievement"
+        or operation == "adjust_skill"
+        or operation == "give_item"
+end
+
 function Page:GetRoleAdminSetting()
-    local Guild = Client.Guild
-    if not Guild or type(Guild.GetActiveGuildSetting) ~= "function" then return nil, nil end
-    local ok, setting, resolution = pcall(Guild.GetActiveGuildSetting, Guild)
+    local service = Client.Guild
+    if not service or type(service.GetActiveGuildSetting) ~= "function" then return nil, nil end
+    local ok, setting, resolution = pcall(service.GetActiveGuildSetting, service)
     if not ok then return nil, nil end
     return setting, resolution
 end
@@ -143,7 +181,7 @@ end
 
 function Page:MutateSelectedMemberRole(roleRow)
     if not rowCanMutate(self, roleRow) then return false end
-    local Guild = Client.Guild
+    local service = Client.Guild
     local member = self.SelectedMember
     local state = self.SelectedMemberAdminState
     local settingRef = trim(state.activeSettingRef)
@@ -163,6 +201,7 @@ function Page:MutateSelectedMemberRole(roleRow)
             self.AdminActionMessage = roleRow.manual
                 and ("Role removal acknowledged: %s"):format(roleRow.name)
                 or ("Role assignment acknowledged: %s"):format(roleRow.name)
+            -- Force a fresh query; Role mutations are never applied optimistically.
             self.SelectedMemberAdminState = nil
             self.SelectedMemberProfileState = { achievements = {}, skills = {} }
             self.SelectedMemberQueryPending = false
@@ -172,9 +211,9 @@ function Page:MutateSelectedMemberRole(roleRow)
         self:Refresh()
     end
 
-    local sender = roleRow.manual and Guild and Guild.RemoveGuildRoleForMember or Guild and Guild.AssignGuildRoleForMember
+    local sender = roleRow.manual and service and service.RemoveGuildRoleForMember or service and service.AssignGuildRoleForMember
     if type(sender) ~= "function" then finish({ success = false, reason = "incompatible-protocol" }); return false end
-    return sender(Guild, member.name, settingRef, roleId, finish) == true
+    return sender(service, member.name, settingRef, roleId, finish) == true
 end
 
 function Page:RefreshRoleAdminPanel()
@@ -204,13 +243,42 @@ function Page:RefreshActionControls()
 end
 
 function Page:Refresh()
+    -- The base page treats all Admin mutation ACKs as if they were full query
+    -- snapshots. Preserve the last authoritative query state across the
+    -- Achievement/Skill/Item ACK paths so the Role panel and subsequent actions
+    -- do not lose manual Role state or active-setting identity.
+    local memberKeyBefore = trim(self.SelectedMemberKey)
+    if self._roleAdminQueryMemberKey ~= memberKeyBefore then
+        self._roleAdminQueryMemberKey = memberKeyBefore
+        self._roleAdminQueryState = nil
+    end
+    if isNonRoleMutationAck(self.SelectedMemberAdminState)
+        and type(self._roleAdminQueryState) == "table"
+        and trim(self._roleAdminQueryMemberKey) == memberKeyBefore then
+        self.SelectedMemberAdminState = self._roleAdminQueryState
+    end
+
     local frame = OldRefresh(self)
     if not self.frame then return frame end
+
+    local currentMemberKey = trim(self.SelectedMemberKey)
+    if self._roleAdminQueryMemberKey ~= currentMemberKey then
+        self._roleAdminQueryMemberKey = currentMemberKey
+        self._roleAdminQueryState = nil
+    end
+    local state = self.SelectedMemberAdminState
+    if type(state) == "table"
+        and state.success == true
+        and trim(state.activeSettingRef) ~= ""
+        and type(state.manualRoleIds) == "table" then
+        self._roleAdminQueryState = state
+    end
+
     self:RefreshRoleAdminPanel()
 
     local identity = Client.Guild and Client.Guild:GetLocalGuildIdentity() or { inGuild = false }
     local member = self.SelectedMember
-    local state = self.SelectedMemberAdminState
+    state = self.SelectedMemberAdminState
     local text
     if not identity.inGuild then
         text = "Admin access requires membership in a guild."
