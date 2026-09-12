@@ -7,6 +7,7 @@ Addon.Client.UI.Guild = Addon.Client.UI.Guild or {}
 local GuildUI = Addon.Client.UI.Guild
 local Client = Addon.Client
 local Guild = Client.Guild
+local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local UI = Addon.UI or {}
 
 local Page = GuildUI.AdminPage
@@ -21,12 +22,81 @@ local function trim(value)
 end
 
 local function roleMapsRank(role, rankIndex)
+    if role and role.autoGive ~= true then return false end
     local target = tonumber(rankIndex)
     if target == nil then return false end
     for index = 1, #(role and role.wowGuildRankIndices or {}) do
         if tonumber(role.wowGuildRankIndices[index]) == target then return true end
     end
     return false
+end
+
+local function findRole(setting, roleId)
+    local wanted = trim(roleId)
+    if wanted == "" then return nil end
+    for index = 1, #(setting and setting.roles or {}) do
+        local role = setting.roles[index]
+        if trim(role and role.id) == wanted then return role end
+    end
+    return nil
+end
+
+-- The base Guild service predates the explicit Role autoGive flag. Keep the
+-- public API stable, but derive mapped Roles only when that flag is enabled.
+-- Manual assignments always remain effective and can coexist with an automatic
+-- grant of the same Role.
+function Guild:GetEffectiveRoles()
+    local setting, resolution = self:GetActiveGuildSetting()
+    local result = {
+        status = resolution and resolution.status or "unavailable",
+        reason = resolution and resolution.reason or "unavailable",
+        resolution = resolution,
+        setting = setting,
+        settingRef = resolution and resolution.ref or nil,
+        guildKey = resolution and resolution.guildKey or "",
+        roles = {},
+        byId = {},
+        manualRoleIds = {},
+        mappedRoleIds = {},
+    }
+    if not setting or result.status ~= "active" then return result.roles, result end
+
+    local manual = {}
+    if type(Profile.GetAssignedGuildRoles) == "function" and result.guildKey ~= "" then
+        local ok, assignments = pcall(Profile.GetAssignedGuildRoles, result.guildKey)
+        if ok and type(assignments) == "table" then
+            for _, assignment in pairs(assignments) do
+                if type(assignment) == "table" and trim(assignment.guildSettingRef) == result.settingRef then
+                    local roleId = trim(assignment.roleId)
+                    if findRole(setting, roleId) then manual[roleId] = true end
+                end
+            end
+        end
+    end
+
+    for index = 1, #(setting.roles or {}) do
+        local role = setting.roles[index]
+        local roleId = trim(role and role.id)
+        if roleId ~= "" then
+            local isManual = manual[roleId] == true
+            local isMapped = roleMapsRank(role, resolution.identity and resolution.identity.guildRankIndex)
+            if isManual or isMapped then
+                local entry = {
+                    role = role,
+                    roleId = roleId,
+                    name = trim(role.name) ~= "" and trim(role.name) or roleId,
+                    manual = isManual,
+                    mapped = isMapped,
+                    source = isManual and isMapped and "manual+mapped" or (isManual and "manual" or "mapped-from-wow-rank"),
+                }
+                result.roles[#result.roles + 1] = entry
+                result.byId[roleId] = entry
+                if isManual then result.manualRoleIds[#result.manualRoleIds + 1] = roleId end
+                if isMapped then result.mappedRoleIds[#result.mappedRoleIds + 1] = roleId end
+            end
+        end
+    end
+    return result.roles, result
 end
 
 local function manualSet(state)
@@ -49,9 +119,8 @@ local function buildRoleRows(setting, state, member)
         if roleId ~= "" then
             local manual = assigned[roleId] == true
             local mapped = roleMapsRank(role, rankIndex)
-            local source = manual and mapped and "Manual + WoW Rank"
-                or (manual and "Manual" or (mapped and "WoW Rank" or "—"))
-            local action = manual and "Remove Manual" or (mapped and "Mapped" or "Assign")
+            local source = manual and mapped and "Manual + Automatic"
+                or (manual and "Manual" or (mapped and "Automatic (WoW Rank)" or "—"))
             rows[#rows + 1] = {
                 role = role,
                 roleId = roleId,
@@ -60,8 +129,8 @@ local function buildRoleRows(setting, state, member)
                 mapped = mapped,
                 effective = manual or mapped,
                 source = source,
-                action = action,
-                actionable = manual or not mapped,
+                action = manual and "Remove Manual" or "Assign Manual",
+                actionable = true,
             }
         end
     end
@@ -110,7 +179,7 @@ function Page:BuildRoleAdminPanel()
     self.ClearGuildRankButton = nil
 
     self.RoleAdminPanel = UI.CreatePanel(self.AdminControlsLayout:GetFrame(), "RPEGuildAdminRolePanel", {
-        width = 512, height = 78, expandWidth = true, contentInset = 0,
+        width = 512, height = 96, expandWidth = true, contentInset = 0,
         showBorder = false, panelBackgroundColor = { r = 0, g = 0, b = 0, a = 0 },
     })
     self.AdminControlsLayout:AddChild(self.RoleAdminPanel)
@@ -118,16 +187,16 @@ function Page:BuildRoleAdminPanel()
         spacing = 2, fitChildrenWidth = true, fitChildrenHeight = true,
     })
     UI.Utils.AnchorFill(self.RoleAdminLayout, self.RoleAdminPanel:GetContentFrame(), 0, 0, 0, 0)
-    self.RoleAdminTitle = UI.CreateText(self.RoleAdminLayout:GetFrame(), "RPEGuildAdminRoleTitle", "Roles", {
+    self.RoleAdminTitle = UI.CreateText(self.RoleAdminLayout:GetFrame(), "RPEGuildAdminRoleTitle", "Roles — click a row to assign/remove its manual Role", {
         width = 512, height = 14, expandWidth = true, justifyH = "LEFT",
         textColor = UI.ResolveColor(nil, "text.primary"),
     })
     self.RoleAdminLayout:AddChild(self.RoleAdminTitle)
     self.RoleAdminList = UI.ScrollLayout:New({
-        name = "RPEGuildAdminRoleList", width = 512, height = 60, visibleRows = 3,
+        name = "RPEGuildAdminRoleList", width = 512, height = 78, visibleRows = 4,
         rowHeight = 18, rowSpacing = 1, autoFitRows = true, minVisibleRows = 1,
         expandWidth = true, expandHeight = true, border = false, rowElementClass = UI.ScrollListEntry,
-        categoryWidth = 150, statusWidth = 92, categoryInsetLeft = 4, statusInsetRight = 4,
+        categoryWidth = 150, statusWidth = 110, categoryInsetLeft = 4, statusInsetRight = 4,
     })
     self.RoleAdminList:SetParent(self.RoleAdminLayout:GetFrame())
     self.RoleAdminList:SetRowRenderer(function(row, roleRow)
@@ -139,7 +208,7 @@ function Page:BuildRoleAdminPanel()
         if frame then
             local enabled = rowCanMutate(self, roleRow)
             frame:EnableMouse(enabled)
-            if frame.SetAlpha then frame:SetAlpha((roleRow and roleRow.action == "Mapped") and 0.65 or 1) end
+            if frame.SetAlpha then frame:SetAlpha(enabled and 1 or 0.65) end
             frame:SetScript("OnMouseUp", function(_, button)
                 if button == "LeftButton" and rowCanMutate(self, roleRow) then self:MutateSelectedMemberRole(roleRow) end
             end)
@@ -161,7 +230,7 @@ function Page:MutateSelectedMemberRole(roleRow)
     local generation = self.SelectionGeneration
     local operation = roleRow.manual and "remove_guild_role" or "assign_guild_role"
     self.PendingAdminAction = operation .. ":" .. roleId
-    self.AdminActionMessage = roleRow.manual and ("Removing %s..."):format(roleRow.name) or ("Assigning %s..."):format(roleRow.name)
+    self.AdminActionMessage = roleRow.manual and ("Removing manual %s..."):format(roleRow.name) or ("Assigning manual %s..."):format(roleRow.name)
     self:Refresh()
 
     local function finish(response)
@@ -170,9 +239,8 @@ function Page:MutateSelectedMemberRole(roleRow)
         local normalized = response or { success = false, reason = "unknown-error" }
         if normalized.success == true then
             self.AdminActionMessage = roleRow.manual
-                and ("Role removal acknowledged: %s"):format(roleRow.name)
-                or ("Role assignment acknowledged: %s"):format(roleRow.name)
-            -- Force a fresh query; Role mutations are never applied optimistically.
+                and ("Manual Role removal acknowledged: %s"):format(roleRow.name)
+                or ("Manual Role assignment acknowledged: %s"):format(roleRow.name)
             self.SelectedMemberAdminState = nil
             self.SelectedMemberProfileState = { achievements = {}, skills = {} }
             self.SelectedMemberQueryPending = false
@@ -214,10 +282,6 @@ function Page:RefreshActionControls()
 end
 
 function Page:Refresh()
-    -- The base page treats all Admin mutation ACKs as if they were full query
-    -- snapshots. Preserve the last authoritative query state across the
-    -- Achievement/Skill/Item ACK paths so the Role panel and subsequent actions
-    -- do not lose manual Role state or active-setting identity.
     local memberKeyBefore = trim(self.SelectedMemberKey)
     if self._roleAdminQueryMemberKey ~= memberKeyBefore then
         self._roleAdminQueryMemberKey = memberKeyBefore
