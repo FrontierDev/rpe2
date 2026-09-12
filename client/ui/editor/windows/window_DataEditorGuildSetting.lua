@@ -13,9 +13,10 @@ local Contributions = Addon.Internal and Addon.Internal.GuildShopContributions o
 local OldGetEntryDefinition = DataEditor.GetEntryDefinition
 local OldGetContentPageDefinitions = DataEditor.GetContentPageDefinitions
 local OldRefreshContentPageByKey = DataEditor.RefreshContentPageByKey
+local OldBuildRequisitionsPage = DataEditor.BuildGuildSettingInspectorRequisitionsPage
 local OldBuildRolesPage = DataEditor.BuildGuildSettingInspectorRolesPage
 local OldRefreshRolesPage = DataEditor.RefreshGuildSettingRolesPage
-local OldBuildRequisitionsPage = DataEditor.BuildGuildSettingInspectorRequisitionsPage
+local OldBuildGuildSettingInspectorPage = DataEditor.BuildGuildSettingInspectorPage
 
 local GUILD_SETTING_ENTRY_DEFINITION = {
     className = "GuildSetting", singular = "Guild Setting", buttonLabel = "New Guild Setting",
@@ -83,11 +84,11 @@ local function roleItems(targetRef, selected)
     for index = 1, #(setting and setting.roles or {}) do
         local role = setting.roles[index]
         local id = trim(role.id)
-        if id ~= "" then items[#items + 1] = { label = trim(role.name) ~= "" and trim(role.name) or id, value = id }; seen[id] = true end
+        if id ~= "" then items[#items + 1] = { label = trim(role.name) ~= "" and trim(role.name) or "Role", value = id }; seen[id] = true end
     end
     for index = 1, #(selected or {}) do
         local id = trim(selected[index])
-        if id ~= "" and not seen[id] then items[#items + 1] = { label = "Missing Role: " .. id, value = id }; seen[id] = true end
+        if id ~= "" and not seen[id] then items[#items + 1] = { label = "Missing Role", value = id }; seen[id] = true end
     end
     return items
 end
@@ -98,10 +99,10 @@ local function categoryItems(targetRef, current)
     for index = 1, #(setting and setting.shopCategories or {}) do
         local category = setting.shopCategories[index]
         local id = trim(category.id)
-        if id ~= "" then items[#items + 1] = { label = trim(category.name) ~= "" and trim(category.name) or id, value = id }; seen[id] = true end
+        if id ~= "" then items[#items + 1] = { label = trim(category.name) ~= "" and trim(category.name) or "Category", value = id }; seen[id] = true end
     end
     current = trim(current)
-    if current ~= "" and not seen[current] then items[#items + 1] = { label = "Missing Category: " .. current, value = current } end
+    if current ~= "" and not seen[current] then items[#items + 1] = { label = "Missing Category", value = current } end
     return items
 end
 
@@ -205,7 +206,6 @@ function DataEditor:RefreshGuildShopContributionsPage()
     if (tonumber(self.SelectedGuildShopContributionRequisitionIndex) or 0) > #requisitions then self.SelectedGuildShopContributionRequisitionIndex = nil end
     self.GuildShopContributionRequisitionList:SetItems(requisitions)
     local _, req = selectedRequisition(self)
-    self.GuildShopContributionReqIdInput:SetText(req and req.id or "")
     self.GuildShopContributionItemRefInput:SetText(req and req.itemRef or "")
     self.GuildShopContributionQuantityInput:SetText(req and tostring(req.quantity or 1) or "")
     self.GuildShopContributionCategoryDropdown:SetItems(categoryItems(contribution and contribution.targetGuildSettingRef, req and req.shopCategoryId))
@@ -228,7 +228,7 @@ function DataEditor:BuildGuildShopContributionsPage(page)
     self.GuildShopContributionList = UI.ScrollLayout:New({ name = "RPEGuildShopContributionList", height = 54, visibleRows = 3, rowHeight = 18, border = true, rowElementClass = UI.ScrollListEntry, categoryWidth = 130, statusWidth = 160 })
     self.GuildShopContributionList:SetParent(root:GetFrame())
     self.GuildShopContributionList:SetRowRenderer(function(row, value, index)
-        row:SetCategory(trim(value.name) ~= "" and value.name or value.id or "Contribution"); row:SetStatus(value.targetGuildSettingRef or "")
+        row:SetCategory(trim(value.name) ~= "" and value.name or "Contribution"); row:SetStatus(value.targetGuildSettingRef or "")
         local frame = row:GetFrame(); frame:EnableMouse(true); frame:SetScript("OnMouseUp", function(_, button) if button == "LeftButton" then self.SelectedGuildShopContributionIndex = index; self.SelectedGuildShopContributionRequisitionIndex = nil; self:RefreshGuildShopContributionsPage() end end)
     end)
     self.GuildShopContributionList:Create(); root:AddChild(self.GuildShopContributionList)
@@ -259,7 +259,7 @@ function DataEditor:BuildGuildShopContributionsPage(page)
 
     self.GuildShopContributionRequisitionList = UI.ScrollLayout:New({ name = "RPEGuildShopContributionRequisitionList", height = 54, visibleRows = 3, rowHeight = 18, border = true, rowElementClass = UI.ScrollListEntry, categoryWidth = 110, statusWidth = 180 })
     self.GuildShopContributionRequisitionList:SetParent(root:GetFrame()); self.GuildShopContributionRequisitionList:SetRowRenderer(function(row, req, index)
-        row:SetCategory(req.id or ""); row:SetStatus(req.itemRef or ""); local frame = row:GetFrame(); frame:EnableMouse(true); frame:SetScript("OnMouseUp", function(_, button) if button == "LeftButton" then self.SelectedGuildShopContributionRequisitionIndex = index; self:RefreshGuildShopContributionsPage() end end)
+        row:SetCategory(trim(req.itemRef) ~= "" and req.itemRef or "Unassigned Item"); row:SetStatus(("x%d"):format(math.max(1, math.floor(tonumber(req.quantity) or 1)))); local frame = row:GetFrame(); frame:EnableMouse(true); frame:SetScript("OnMouseUp", function(_, button) if button == "LeftButton" then self.SelectedGuildShopContributionRequisitionIndex = index; self:RefreshGuildShopContributionsPage() end end)
     end); self.GuildShopContributionRequisitionList:Create(); root:AddChild(self.GuildShopContributionRequisitionList)
 
     local reqButtons = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEGuildShopContributionReqButtons", { height = 20, spacing = 4 }); root:AddChild(reqButtons)
@@ -272,17 +272,8 @@ function DataEditor:BuildGuildShopContributionsPage(page)
         local c, _, index = selectedRequisition(self); if c and index then table.remove(c.requisitions, index); self.SelectedGuildShopContributionRequisitionIndex = nil; changed(self, "shop-contribution-item-delete"); self:RefreshGuildShopContributionsPage() end
     end, { height = 20, fontSize = 8 }))
 
-    self.GuildShopContributionReqIdInput = inputRow(root, "RPEGuildShopContributionReqId", "Item ID")
     self.GuildShopContributionItemRefInput = inputRow(root, "RPEGuildShopContributionItemRef", "Item Ref")
     self.GuildShopContributionQuantityInput = inputRow(root, "RPEGuildShopContributionQuantity", "Quantity")
-    self.GuildShopContributionReqIdInput:SetScript("OnEditFocusLost", function()
-        local contribution, requisition, index = selectedRequisition(self)
-        if requisition then
-            requisition.id = uniqueRequestedId(contribution.requisitions, index, self.GuildShopContributionReqIdInput:GetText(), "shop_item_")
-            changed(self, "shop-contribution-item-id")
-            self:RefreshGuildShopContributionsPage()
-        end
-    end)
     self.GuildShopContributionItemRefInput:SetScript("OnEditFocusLost", function() local _, r = selectedRequisition(self); if r then r.itemRef = trim(self.GuildShopContributionItemRefInput:GetText()); changed(self, "shop-contribution-item-ref"); self:RefreshGuildShopContributionsPage() end end)
     self.GuildShopContributionQuantityInput:SetScript("OnEditFocusLost", function() local _, r = selectedRequisition(self); if r then r.quantity = math.max(1, math.floor(tonumber(self.GuildShopContributionQuantityInput:GetText()) or 1)); r.characterLimit = 0; changed(self, "shop-contribution-quantity"); self:RefreshGuildShopContributionsPage() end end)
 
@@ -313,6 +304,7 @@ function DataEditor:BuildGuildShopContributionsPage(page)
     return root
 end
 
+-- Roles can retain WoW-rank mappings without those mappings automatically granting the Role.
 if type(OldBuildRolesPage) == "function" then
     function DataEditor:BuildGuildSettingInspectorRolesPage(parent)
         local page = OldBuildRolesPage(self, parent)
@@ -371,7 +363,138 @@ if type(OldRefreshRolesPage) == "function" then
     end
 end
 
--- #272: refresh Shop Category visibility immediately when Character Limit changes.
+local function collapseLayoutChild(root, elementName)
+    if not root or type(root.children) ~= "table" then return end
+    for index = 1, #root.children do
+        local child = root.children[index]
+        local frame = child and child.GetFrame and child:GetFrame() or nil
+        local name = child and child.name or (frame and frame.GetName and frame:GetName())
+        if name == elementName then
+            child.options = child.options or {}
+            child.options.height = 0
+            child.options.weight = 0
+            if child.SetHeight then child:SetHeight(0) end
+            if frame then
+                if frame.SetHeight then frame:SetHeight(0) end
+                if frame.Hide then frame:Hide() end
+            end
+        end
+    end
+    if root.RefreshLayout then root:RefreshLayout() end
+end
+
+local function wrapRowRendererWithoutInternalId(scroll, categoryBuilder, detailBuilder, statusBuilder)
+    if not scroll or scroll._internalIdPresentationWrapped == true then return end
+    local original = scroll.rowRenderer
+    if type(original) ~= "function" then return end
+    scroll._internalIdPresentationWrapped = true
+    scroll:SetRowRenderer(function(row, value, index)
+        original(row, value, index)
+        if categoryBuilder and row.SetCategory then row:SetCategory(categoryBuilder(value, index)) end
+        if detailBuilder and row.SetDetail then row:SetDetail(detailBuilder(value, index)) end
+        if statusBuilder and row.SetStatus then row:SetStatus(statusBuilder(value, index)) end
+    end)
+end
+
+local function sanitizeMissingReferenceLabels(dropdown)
+    if not dropdown or type(dropdown.rawItems) ~= "table" or type(dropdown.SetItems) ~= "function" then return end
+    local function copyItems(items)
+        local out = {}
+        for index = 1, #(items or {}) do
+            local source = items[index]
+            if type(source) == "table" then
+                local item = {}
+                for key, value in pairs(source) do item[key] = value end
+                local label = tostring(item.label or "")
+                if label:match("^Missing Role:") then item.label = "Missing Role"
+                elseif label:match("^Missing Category:") then item.label = "Missing Category" end
+                if type(item.children) == "table" then item.children = copyItems(item.children) end
+                out[#out + 1] = item
+            else
+                out[#out + 1] = source
+            end
+        end
+        return out
+    end
+    dropdown:SetItems(copyItems(dropdown.rawItems))
+end
+
+function DataEditor:ApplyGuildSettingInternalIdEditorPolicy()
+    local roleRoot = self.GuildSettingInspectorRolesPage and self.GuildSettingInspectorRolesPage._guildSettingPageScrollShell and self.GuildSettingInspectorRolesPage._guildSettingPageScrollShell.root
+    local categoryRoot = self.GuildSettingInspectorShopCategoriesPage and self.GuildSettingInspectorShopCategoriesPage._guildSettingPageScrollShell and self.GuildSettingInspectorShopCategoriesPage._guildSettingPageScrollShell.root
+    local requisitionRoot = self.GuildSettingInspectorRequisitionsPage and self.GuildSettingInspectorRequisitionsPage._guildSettingPageScrollShell and self.GuildSettingInspectorRequisitionsPage._guildSettingPageScrollShell.root
+    local rewardRoot = self.GuildSettingInspectorDailyRewardsPage and self.GuildSettingInspectorDailyRewardsPage._guildSettingPageScrollShell and self.GuildSettingInspectorDailyRewardsPage._guildSettingPageScrollShell.root
+
+    collapseLayoutChild(roleRoot, "RPEDataEditorGuildSettingInspectorRoleIdLabel")
+    collapseLayoutChild(roleRoot, "RPEDataEditorGuildSettingInspectorRoleIdInput")
+    collapseLayoutChild(categoryRoot, "RPEDataEditorGuildSettingInspectorShopCategoryIdLabel")
+    collapseLayoutChild(categoryRoot, "RPEDataEditorGuildSettingInspectorShopCategoryIdInput")
+    collapseLayoutChild(requisitionRoot, "RPEDataEditorGuildSettingInspectorRequisitionIdLabel")
+    collapseLayoutChild(requisitionRoot, "RPEDataEditorGuildSettingInspectorRequisitionIdInput")
+    collapseLayoutChild(rewardRoot, "RPEDataEditorGuildSettingInspectorDailyRewardIdLabel")
+    collapseLayoutChild(rewardRoot, "RPEDataEditorGuildSettingInspectorDailyRewardIdInput")
+
+    wrapRowRendererWithoutInternalId(self.GuildSettingInspectorRoleScroll, nil, function() return "" end)
+    wrapRowRendererWithoutInternalId(self.GuildSettingInspectorShopCategoryScroll, nil, function() return "" end)
+    wrapRowRendererWithoutInternalId(self.GuildSettingInspectorRequisitionScroll,
+        function(value)
+            local ref = trim(value and value.itemRef)
+            return ref ~= "" and ref or "Unassigned Item"
+        end,
+        function() return "" end)
+    wrapRowRendererWithoutInternalId(self.GuildSettingInspectorDailyRewardScroll,
+        function(value)
+            local ref = trim(value and value.ref)
+            return ref ~= "" and ref or "Unassigned Reward"
+        end,
+        nil)
+
+    sanitizeMissingReferenceLabels(self.GuildSettingInspectorAllowedRolesDropdown)
+    sanitizeMissingReferenceLabels(self.GuildSettingInspectorShopCategoryDropdown)
+
+    wrapRowRendererWithoutInternalId(self.GuildShopContributionRequisitionList,
+        function(value)
+            local ref = trim(value and value.itemRef)
+            return ref ~= "" and ref or "Unassigned Item"
+        end,
+        nil,
+        function(value) return ("x%d"):format(math.max(1, math.floor(tonumber(value and value.quantity) or 1))) end)
+    wrapRowRendererWithoutInternalId(self.GuildShopContributionRoleList,
+        function(value)
+            local wanted = trim(value and value.id)
+            local contribution = select(2, selectedContribution(self))
+            local _, target = resolveTarget(contribution and contribution.targetGuildSettingRef)
+            for index = 1, #(target and target.roles or {}) do
+                local role = target.roles[index]
+                if trim(role and role.id) == wanted then
+                    local name = trim(role and role.name)
+                    return name ~= "" and name or "Role"
+                end
+            end
+            return "Missing Role"
+        end,
+        function() return "" end)
+    sanitizeMissingReferenceLabels(self.GuildShopContributionRoleDropdown)
+    sanitizeMissingReferenceLabels(self.GuildShopContributionCategoryDropdown)
+end
+
+if type(OldBuildGuildSettingInspectorPage) == "function" then
+    function DataEditor:BuildGuildSettingInspectorPage(parent)
+        local page = OldBuildGuildSettingInspectorPage(self, parent)
+        self:ApplyGuildSettingInternalIdEditorPolicy()
+        return page
+    end
+end
+
+local OldRefreshGuildShopContributionsPage = DataEditor.RefreshGuildShopContributionsPage
+if type(OldRefreshGuildShopContributionsPage) == "function" then
+    function DataEditor:RefreshGuildShopContributionsPage(...)
+        local result = OldRefreshGuildShopContributionsPage(self, ...)
+        self:ApplyGuildSettingInternalIdEditorPolicy()
+        return result
+    end
+end
+
 if type(OldBuildRequisitionsPage) == "function" then
     function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
         local page = OldBuildRequisitionsPage(self, parent)
