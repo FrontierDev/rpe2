@@ -108,7 +108,7 @@ Elemental Fire           732368d4:sclalidn
 Elemental Earth          3eb7e9bb:d9e5e2sy
 Heavy Stock              3eb7e9bb:u7rzoqvg
 Catseye Elixir           d6ffc4e2:o8c3e7dj
-Goblin Rocket Fuel       d6ffc4e2:s3g7r2hn
+Goblin Rocket Fuel       d6ffc4e2:q1g5m9fl
 Black Mageweave Boots    7259f1d3:t9oha2l3
 Dusky Belt               538a54a0:rfhy92ax
 Green Tinted Goggles     af503002:c5cbkans
