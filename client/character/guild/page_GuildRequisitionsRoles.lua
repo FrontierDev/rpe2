@@ -25,8 +25,8 @@ local SHOP_PAGE_TEXT_WIDTH = 96
 local SHOP_PAGE_NAV_SPACING = 4
 local SHOP_PAGINATION_WIDTH = (SHOP_PAGE_BUTTON_WIDTH * 2) + SHOP_PAGE_TEXT_WIDTH + (SHOP_PAGE_NAV_SPACING * 2)
 local CATEGORY_NAV_HEIGHT = 20
-local CATEGORY_BUTTON_WIDTH = 72
-local CATEGORY_OVERFLOW_WIDTH = 112
+local CATEGORY_BUTTON_WIDTH = 68
+local CATEGORY_OVERFLOW_WIDTH = 104
 local CATEGORY_NAV_SPACING = 4
 local MAX_VISIBLE_CATEGORY_BUTTONS = 5
 local TOOLBAR_HEIGHT = 22
@@ -109,6 +109,23 @@ local function setFrameShown(element, shown)
     local frame = element and element.GetFrame and element:GetFrame() or nil
     if not frame then return end
     if shown and frame.Show then frame:Show() elseif not shown and frame.Hide then frame:Hide() end
+end
+
+local function collapseLayoutChild(element)
+    if not element then return end
+    setFrameShown(element, false)
+    if type(element.options) == "table" then
+        element.options.height = 0
+        element.options.expandHeight = false
+        element.options.fillHeight = false
+        element.options.weight = 0
+    end
+end
+
+local function setHorizontalNavElementShown(element, shown, width)
+    if not element then return end
+    if type(element.options) == "table" then element.options.width = shown and width or 0 end
+    setFrameShown(element, shown)
 end
 
 local function setCategoryButtonState(button, category, selected)
@@ -271,10 +288,10 @@ function Page:RefreshCategoryList()
         if button and category then
             button._categoryId = category.id
             setCategoryButtonState(button, category, category.id == selected)
-            setFrameShown(button, true)
+            setHorizontalNavElementShown(button, true, CATEGORY_BUTTON_WIDTH)
         elseif button then
             button._categoryId = nil
-            setFrameShown(button, false)
+            setHorizontalNavElementShown(button, false, CATEGORY_BUTTON_WIDTH)
         end
     end
 
@@ -291,8 +308,9 @@ function Page:RefreshCategoryList()
         self.ShopCategoryOverflowDropdown:SetItems(overflowItems)
         self.ShopCategoryOverflowDropdown:SetSelectedValue(selectedOverflow, true)
         self._refreshingShopCategoryOverflow = false
-        setFrameShown(self.ShopCategoryOverflowDropdown, hasOverflow)
+        setHorizontalNavElementShown(self.ShopCategoryOverflowDropdown, hasOverflow, CATEGORY_OVERFLOW_WIDTH)
     end
+    if self.ShopCategoryNav and self.ShopCategoryNav.RefreshLayout then self.ShopCategoryNav:RefreshLayout() end
 end
 
 function Page:SelectShopCategory(categoryId)
@@ -304,8 +322,8 @@ end
 function Page:BuildShopBrowser()
     if not self.GuildShopHost or self.ShopBrowserBuilt then return end
     self.ShopBrowserBuilt = true
-    if self.ShopLayout and self.ShopLayout.Hide then self.ShopLayout:Hide() end
-    if self.GuildShopHeader then setFrameShown(self.GuildShopHeader, false) end
+    collapseLayoutChild(self.ShopLayout)
+    collapseLayoutChild(self.GuildShopHeader)
 
     self.ShopBrowseLayout = UI.CreateLayout(UI.VerticalLayoutGroup, self.GuildShopHost:GetFrame(), "RPEGuildShopBrowseLayout", {
         expandWidth = true, expandHeight = true, weight = 1, spacing = 4,
@@ -337,7 +355,7 @@ function Page:BuildShopBrowser()
         end,
     })
     self.ShopCategoryNav:AddChild(self.ShopCategoryOverflowDropdown)
-    setFrameShown(self.ShopCategoryOverflowDropdown, false)
+    setHorizontalNavElementShown(self.ShopCategoryOverflowDropdown, false, CATEGORY_OVERFLOW_WIDTH)
 
     self.ShopToolbar = UI.CreateLayout(UI.HorizontalLayoutGroup, self.ShopBrowseLayout:GetFrame(), "RPEGuildShopToolbar", {
         height = TOOLBAR_HEIGHT, expandWidth = true, spacing = 4, fitChildrenWidth = true, fitChildrenHeight = false,
@@ -402,6 +420,7 @@ function Page:BuildShopBrowser()
     self.ShopNextButton:Create()
     self.ShopNextButton:SetScript("OnClick", function() self:NextShopPage() end)
     self.ShopPaginationLayout:AddChild(self.ShopNextButton)
+    if self.GuildShopHost and self.GuildShopHost.RefreshLayout then self.GuildShopHost:RefreshLayout() end
 end
 
 function Page:Build(parent, owner)
