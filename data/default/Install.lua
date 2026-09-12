@@ -1,5 +1,27 @@
 local addonName, Addon = ...
 
+-- The old cross-dataset Shop Contribution authoring page is no longer part of
+-- the Data Editor. Keep the runtime compatibility code for already-authored
+-- data, but do not expose the obsolete container as an author-facing data type.
+local DataEditor = Addon.Client
+    and Addon.Client.UI
+    and Addon.Client.UI.Editor
+    or nil
+if type(DataEditor) == "table" and type(DataEditor.GetContentPageDefinitions) == "function" then
+    local getContentPageDefinitions = DataEditor.GetContentPageDefinitions
+    function DataEditor:GetContentPageDefinitions(...)
+        local definitions = getContentPageDefinitions(self, ...) or {}
+        local visible = {}
+        for index = 1, #definitions do
+            local definition = definitions[index]
+            if type(definition) ~= "table" or definition.key ~= "guildShopContributions" then
+                visible[#visible + 1] = definition
+            end
+        end
+        return visible
+    end
+end
+
 -- Defaults are stored in SavedVariables. This migration replaces older copies
 -- that were installed from packages whose contents changed without a matching
 -- per-dataset version bump, so all clients converge on this release's data.
