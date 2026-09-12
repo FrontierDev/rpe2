@@ -512,4 +512,340 @@ function Client:HideProfileWindow()
     return ProfileWindow:Get():Hide()
 end
 
+-- Issue #251: contextual Skills-page and Crafting first-run guidance.
+local SkillsPage = ProfileUI.SkillsPage
+local PROFILE_SKILLS_HELP_ID = "profile.skills"
+local SKILL_TYPE_HELP_SEQUENCE = {
+    {
+        id = "profile.skills.weapon",
+        key = "weapon",
+        text = "Weapon Skills track proficiency with a specific weapon type. They use weapon-skill progression and are not rollable or bindable to the Skills Action Bar.",
+    },
+    {
+        id = "profile.skills.noncombat",
+        key = "noncombat",
+        text = "Non-Combat Skills are the rollable skill type. Rollable skills can use derived stat bonuses and can be placed on the Skills Action Bar for quick rolls.",
+    },
+    {
+        id = "profile.skills.crafting",
+        key = "crafting",
+        text = "Crafting Skills represent professions. Select a crafting skill and use Open to enter its recipe, materials and trainer interface.",
+    },
+    {
+        id = "profile.skills.language",
+        key = "language",
+        text = "Language Skills track language proficiency as a separate progression category. They are not rollable and do not use the Skills Action Bar.",
+    },
+}
+local CRAFTING_HELP_SEQUENCE = {
+    {
+        id = "crafting.skill-overview",
+        anchorKey = "skill-overview",
+        text = "This shows the selected crafting skill and its current level. Use the selector to move between your available crafting professions.",
+    },
+    {
+        id = "crafting.recipes",
+        anchorKey = "recipes",
+        text = "Known recipes for this crafting skill are listed here and grouped by output category. Select a recipe to inspect it.",
+    },
+    {
+        id = "crafting.recipe-details",
+        anchorKey = "recipe-details",
+        text = "The selected recipe shows its output and required skill information here. Recipe availability follows your current crafting skill and learning state.",
+    },
+    {
+        id = "crafting.materials",
+        anchorKey = "materials",
+        text = "Required materials are listed here with the amount needed, the amount you own and whether each requirement is satisfied.",
+    },
+    {
+        id = "crafting.material-conversion",
+        anchorKey = "material-conversion",
+        text = "Convert Materials opens the material-conversion view for compatible crafting materials in your bags.",
+    },
+    {
+        id = "crafting.craft-action",
+        anchorKey = "craft-action",
+        text = "Use Craft X to choose a quantity, or Craft All to queue as many copies as your current materials allow. Unavailable recipes or missing materials disable crafting.",
+    },
+    {
+        id = "crafting.learning",
+        anchorKey = "learning",
+        text = "The trainer view lists trainer-learned recipes for this profession. Required skill and copper determine whether a trainer recipe can be learned.",
+    },
+}
+local SKILLS_CONTEXT_HELP_IDS = {}
+for index = 1, #SKILL_TYPE_HELP_SEQUENCE do
+    SKILLS_CONTEXT_HELP_IDS[SKILL_TYPE_HELP_SEQUENCE[index].id] = true
+end
+for index = 1, #CRAFTING_HELP_SEQUENCE do
+    SKILLS_CONTEXT_HELP_IDS[CRAFTING_HELP_SEQUENCE[index].id] = true
+end
+
+local function getHelpFrame(element)
+    if type(element) == "table" and type(element.GetFrame) == "function" then
+        return element:GetFrame()
+    end
+    return element
+end
+
+local function isHelpFrameShown(element)
+    local frame = getHelpFrame(element)
+    return frame ~= nil and type(frame.IsShown) == "function" and frame:IsShown() == true
+end
+
+local function getSkillCategoryRow(page, categoryKey)
+    local navRows = type(page and page.NavRows) == "table" and page.NavRows or {}
+    for index = 1, #navRows do
+        local row = navRows[index]
+        if tostring(row and row.key or "") == tostring(categoryKey or "") then
+            return row, index
+        end
+    end
+    return nil, nil
+end
+
+if type(SkillsPage) == "table" then
+    function SkillsPage:RegisterFirstRunHelp(owner)
+        if type(Help.Register) ~= "function" then
+            return false
+        end
+
+        local function continueSkillsHelp()
+            if owner and owner.IsVisible and owner:IsVisible() and owner:GetActiveTabKey() == "skills" then
+                owner:ShowHelpForTab("skills")
+            end
+        end
+
+        for index = 1, #SKILL_TYPE_HELP_SEQUENCE do
+            local definition = SKILL_TYPE_HELP_SEQUENCE[index]
+            Help:Register(definition.id, {
+                text = definition.text,
+                onAcknowledgeCallback = continueSkillsHelp,
+            })
+        end
+        for index = 1, #CRAFTING_HELP_SEQUENCE do
+            local definition = CRAFTING_HELP_SEQUENCE[index]
+            Help:Register(definition.id, {
+                text = definition.text,
+                onAcknowledgeCallback = continueSkillsHelp,
+            })
+        end
+        return true
+    end
+
+    function SkillsPage:GetSkillTypeHelpAnchor(categoryKey)
+        local row, index = getSkillCategoryRow(self, categoryKey)
+        if not row or (tonumber(row.count) or 0) <= 0 then
+            return nil
+        end
+
+        local visualRow = self.NavList and self.NavList.rows and self.NavList.rows[index] or nil
+        local frame = getHelpFrame(visualRow)
+        return isHelpFrameShown(frame) and frame or nil
+    end
+
+    function SkillsPage:IsCraftingWalkthroughVisible()
+        return self.ShowCraftingUI == true
+            and tostring(self.SelectedCategoryKey or "") == "crafting"
+            and isHelpFrameShown(self.CraftingRoot)
+    end
+
+    function SkillsPage:GetCraftingHelpAnchor(anchorKey)
+        local anchors = {
+            ["skill-overview"] = self.CraftingSkillDropdown or self.CraftingSkillProgressBar,
+            recipes = self.CraftingRecipePanel,
+            ["recipe-details"] = self.CraftingDetailPanel,
+            materials = self.CraftingMaterialsTable,
+            ["material-conversion"] = self.CraftingConvertButton,
+            ["craft-action"] = self.CraftingActions,
+            learning = self.CraftingTrainerButton,
+        }
+        local anchor = anchors[tostring(anchorKey or "")]
+        local frame = getHelpFrame(anchor)
+        return isHelpFrameShown(frame) and frame or nil
+    end
+
+    function SkillsPage:GetFirstRunHelpAnchor(helpId)
+        for index = 1, #SKILL_TYPE_HELP_SEQUENCE do
+            local definition = SKILL_TYPE_HELP_SEQUENCE[index]
+            if definition.id == helpId then
+                return self:GetSkillTypeHelpAnchor(definition.key)
+            end
+        end
+        for index = 1, #CRAFTING_HELP_SEQUENCE do
+            local definition = CRAFTING_HELP_SEQUENCE[index]
+            if definition.id == helpId then
+                if not self:IsCraftingWalkthroughVisible() then
+                    return nil
+                end
+                return self:GetCraftingHelpAnchor(definition.anchorKey)
+            end
+        end
+        return nil
+    end
+
+    function SkillsPage:HideFirstRunHelp()
+        if SKILLS_CONTEXT_HELP_IDS[Help.ActiveTipId] ~= true or type(Help.Hide) ~= "function" then
+            return false
+        end
+        return Help:Hide(Help.ActiveTipId)
+    end
+
+    function SkillsPage:ShowNextFirstRunHelp(owner)
+        if not owner
+            or not owner.IsVisible
+            or not owner:IsVisible()
+            or owner:GetActiveTabKey() ~= "skills"
+            or type(Help.IsAcknowledged) ~= "function"
+            or type(Help.Show) ~= "function"
+        then
+            self:HideFirstRunHelp()
+            return false
+        end
+
+        self:RegisterFirstRunHelp(owner)
+
+        local activeTipId = Help.ActiveTipId
+        if SKILLS_CONTEXT_HELP_IDS[activeTipId] == true then
+            local activeAnchor = self:GetFirstRunHelpAnchor(activeTipId)
+            if activeAnchor ~= nil then
+                return true
+            end
+            self:HideFirstRunHelp()
+            activeTipId = nil
+        elseif activeTipId ~= nil then
+            return false
+        end
+
+        if Help:IsAcknowledged(PROFILE_SKILLS_HELP_ID) ~= true then
+            return false
+        end
+
+        for index = 1, #SKILL_TYPE_HELP_SEQUENCE do
+            local definition = SKILL_TYPE_HELP_SEQUENCE[index]
+            local categoryRow = getSkillCategoryRow(self, definition.key)
+            if categoryRow and (tonumber(categoryRow.count) or 0) > 0 and not Help:IsAcknowledged(definition.id) then
+                local anchor = self:GetSkillTypeHelpAnchor(definition.key)
+                if anchor ~= nil then
+                    return Help:Show(definition.id, anchor) == true
+                end
+                return false
+            end
+        end
+
+        if not self:IsCraftingWalkthroughVisible() then
+            return false
+        end
+
+        for index = 1, #CRAFTING_HELP_SEQUENCE do
+            local definition = CRAFTING_HELP_SEQUENCE[index]
+            if not Help:IsAcknowledged(definition.id) then
+                local anchor = self:GetCraftingHelpAnchor(definition.anchorKey)
+                if anchor ~= nil then
+                    return Help:Show(definition.id, anchor) == true
+                end
+                return false
+            end
+        end
+
+        return false
+    end
+
+    local baseRefreshSelectedSkillState = SkillsPage.RefreshSelectedSkillState
+    if type(baseRefreshSelectedSkillState) == "function" then
+        function SkillsPage:RefreshSelectedSkillState(...)
+            local result = baseRefreshSelectedSkillState(self, ...)
+            if self.owner and self.owner.GetActiveTabKey and self.owner:GetActiveTabKey() == "skills" then
+                self.owner:ShowHelpForTab("skills")
+            end
+            return result
+        end
+    end
+
+    local baseHandleFooterAction = SkillsPage.HandleFooterAction
+    if type(baseHandleFooterAction) == "function" then
+        function SkillsPage:HandleFooterAction(skillRef, ...)
+            local row = self.FindSkillRow and self:FindSkillRow(skillRef, self.AllSkillRows) or nil
+            if not row and Addon.Internal and Addon.Internal.Profile and Addon.Internal.Profile.GetResolvedSkillRow then
+                row = Addon.Internal.Profile.GetResolvedSkillRow(skillRef)
+            end
+            local isCraftingSkill = type(row) == "table" and tostring(row.skillType or "") == "crafting"
+            local result = baseHandleFooterAction(self, skillRef, ...)
+            if isCraftingSkill and self.ShowCraftingUI == true and type(Help.Acknowledge) == "function" then
+                Help:Acknowledge("profile.skills.crafting")
+            end
+            if self.owner and self.owner.GetActiveTabKey and self.owner:GetActiveTabKey() == "skills" then
+                self.owner:ShowHelpForTab("skills")
+            end
+            return result
+        end
+    end
+end
+
+local baseRegisterHelpTips = ProfileWindow.RegisterHelpTips
+local baseHideHelpTip = ProfileWindow.HideHelpTip
+local baseShowHelpForTab = ProfileWindow.ShowHelpForTab
+
+function ProfileWindow:RegisterHelpTips()
+    local result = type(baseRegisterHelpTips) == "function" and baseRegisterHelpTips(self) or true
+    if type(Help.Register) == "function" then
+        Help:Register(PROFILE_SKILLS_HELP_ID, {
+            text = PROFILE_HELP_BY_TAB.skills.text,
+            onAcknowledgeCallback = function()
+                if self:IsVisible() and self:GetActiveTabKey() == "skills" then
+                    self:ShowHelpForTab("skills")
+                end
+            end,
+        })
+    end
+    if self.skillsPage and self.skillsPage.RegisterFirstRunHelp then
+        self.skillsPage:RegisterFirstRunHelp(self)
+    end
+    return result ~= false
+end
+
+function ProfileWindow:HideHelpTip()
+    if SKILLS_CONTEXT_HELP_IDS[Help.ActiveTipId] == true and type(Help.Hide) == "function" then
+        return Help:Hide(Help.ActiveTipId)
+    end
+    return type(baseHideHelpTip) == "function" and baseHideHelpTip(self) or false
+end
+
+function ProfileWindow:ShowHelpForTab(tabKey)
+    local normalizedKey = tostring(tabKey or self:GetActiveTabKey())
+    if normalizedKey ~= "skills" then
+        if SKILLS_CONTEXT_HELP_IDS[Help.ActiveTipId] == true and type(Help.Hide) == "function" then
+            Help:Hide(Help.ActiveTipId)
+        end
+        return type(baseShowHelpForTab) == "function" and baseShowHelpForTab(self, normalizedKey) or false
+    end
+
+    if not self:IsVisible() or type(Help.IsAcknowledged) ~= "function" or type(Help.Show) ~= "function" then
+        return false
+    end
+
+    self:RegisterHelpTips()
+
+    if Help.ActiveTipId == PROFILE_SKILLS_HELP_ID then
+        return true
+    end
+
+    if Help:IsAcknowledged(PROFILE_SKILLS_HELP_ID) ~= true then
+        if SKILLS_CONTEXT_HELP_IDS[Help.ActiveTipId] == true then
+            self:HideHelpTip()
+        elseif Help.ActiveTipId ~= nil then
+            return false
+        end
+        local anchor = self:GetHelpAnchor("skills")
+        return anchor ~= nil and Help:Show(PROFILE_SKILLS_HELP_ID, anchor) == true or false
+    end
+
+    if self.skillsPage and self.skillsPage.ShowNextFirstRunHelp then
+        return self.skillsPage:ShowNextFirstRunHelp(self)
+    end
+
+    return false
+end
+
 return ProfileWindow
