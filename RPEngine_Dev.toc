@@ -405,6 +405,7 @@ client/ui/editor/inspectors/page_InspectorLoot.lua
 client/ui/editor/inspectors/page_InspectorLootDiagnostics.lua
 client/ui/editor/inspectors/page_InspectorAchievement.lua
 client/ui/editor/inspectors/page_InspectorGuildSetting.lua
+client/ui/editor/inspectors/page_InspectorGuildSettingRoles.lua
 client/ui/editor/inspectors/aura/page_InspectorAuraShared.lua
 client/ui/editor/inspectors/aura/page_InspectorAuraGeneral.lua
 client/ui/editor/inspectors/aura/page_InspectorAuraEffects.lua
