@@ -181,6 +181,10 @@ function ProfileWindow:ShowHelpForTab(tabKey)
         return false
     end
 
+    if Help.ActiveTipId == definition.id then
+        return true
+    end
+
     self:HideHelpTip()
     self:RegisterHelpTips()
 
@@ -475,7 +479,7 @@ function ProfileWindow:Show()
     if timer then
         stopTiming(timer, {
             activeTab = activeTab,
-            profilePages = 5,
+            profilePages = 4,
         })
     end
     return window
