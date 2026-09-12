@@ -21,6 +21,20 @@ local function normalizeGuildClubId(value)
     return clubId
 end
 
+local function normalizeReference(value)
+    local reference = tostring(value or "")
+    reference = reference:gsub("^%s+", ""):gsub("%s+$", "")
+    return reference
+end
+
+local function normalizeRoleId(value)
+    return normalizeReference(value)
+end
+
+local function normalizeRequisitionId(value)
+    return normalizeReference(value)
+end
+
 local function cloneGuildValue(value)
     if type(value) ~= "table" then
         return value
@@ -101,16 +115,10 @@ local function getLegacyGuildKeys(identity)
     if realmName ~= "" then
         appendUniqueGuildRealm(realms, realmName)
     else
-        -- GetRealmName() is migration-only context. The pre-#35 client used
-        -- it when GetGuildInfo() did not provide a same-realm guild realm, so
-        -- probe that old qualified bucket without changing the current
-        -- fallback key.
         appendUniqueGuildRealm(realms, identity and identity.legacyRealmName)
         appendUniqueGuildRealm(realms, identity and identity.localRealmName)
     end
 
-    -- The realm-qualified form is newer than the original name-only form,
-    -- so it wins when both legacy buckets contain conflicting fields.
     for index = 1, #realms do
         appendUniqueGuildKey(keys, guildName .. "-" .. realms[index])
     end
@@ -136,8 +144,6 @@ local function migrateLegacyGuildBucket(identity, guildKey)
 
     local targetBucket = byGuild[guildKey]
     if targetBucket ~= nil and type(targetBucket) ~= "table" then
-        -- Never replace an existing non-table value while recovering legacy
-        -- state. Keep the legacy bucket intact for compatibility recovery.
         return
     end
 
@@ -163,9 +169,6 @@ local function migrateLegacyGuildBucket(identity, guildKey)
     Profile.SetGuildState(state)
 end
 
--- C_Club.GetGuildClubId is the strongest stable guild identity exposed by
--- the target interface. Keep the name/realm and name-only forms as
--- deterministic compatibility fallbacks.
 function Profile.GetGuildKey(identity)
     if type(identity) ~= "table" then
         return normalizeGuildKey(identity)
@@ -208,16 +211,26 @@ function Profile.GetGuildKey(identity)
     return guildKey
 end
 
-local function normalizeGuildRankRef(value)
-    local reference = tostring(value or "")
-    reference = reference:gsub("^%s+", ""):gsub("%s+$", "")
-    return reference
+function Profile.MakeGuildRoleKey(guildSettingRef, roleId)
+    local normalizedSettingRef = normalizeReference(guildSettingRef)
+    local normalizedRoleId = normalizeRoleId(roleId)
+    if normalizedSettingRef == "" or normalizedRoleId == "" then
+        return nil
+    end
+
+    return normalizedSettingRef .. "#" .. normalizedRoleId
 end
 
-local function normalizeRequisitionId(value)
-    local requisitionId = tostring(value or "")
-    requisitionId = requisitionId:gsub("^%s+", ""):gsub("%s+$", "")
-    return requisitionId
+function Profile.ParseGuildRoleKey(roleKey)
+    local normalized = normalizeReference(roleKey)
+    local guildSettingRef, roleId = normalized:match("^(.+)#([^#]+)$")
+    guildSettingRef = normalizeReference(guildSettingRef)
+    roleId = normalizeRoleId(roleId)
+    if guildSettingRef == "" or roleId == "" then
+        return nil, nil
+    end
+
+    return guildSettingRef, roleId
 end
 
 local function normalizeRequisitionUsage(value)
@@ -255,7 +268,7 @@ local function normalizeDailyRewardTransaction(value)
     end
 
     local dateKey = normalizeDailyRewardDate(value.date)
-    local rankRef = normalizeGuildRankRef(value.rankRef)
+    local settingRef = normalizeReference(value.settingRef or value.rankRef)
     local status = tostring(value.status or "")
     if status ~= "in-progress" and status ~= "failed" then
         status = "failed"
@@ -264,7 +277,8 @@ local function normalizeDailyRewardTransaction(value)
     return {
         status = status,
         date = dateKey,
-        rankRef = rankRef,
+        settingRef = settingRef,
+        rankRef = settingRef,
         reason = tostring(value.reason or ""),
     }
 end
@@ -285,6 +299,86 @@ function Profile.SetGuildState(state)
     return nil
 end
 
+local function resolveLegacyRole(guildSettingRef)
+    local Registry = Addon.Internal and Addon.Internal.Registry or nil
+    if not Registry or type(Registry.ResolveGuildSettingReference) ~= "function" then
+        return nil
+    end
+
+    local ok, _, setting = pcall(Registry.ResolveGuildSettingReference, Registry, guildSettingRef)
+    if not ok or type(setting) ~= "table" then
+        return nil
+    end
+
+    local roles = type(setting.roles) == "table" and setting.roles or {}
+    if #roles ~= 1 then
+        return nil
+    end
+
+    local roleId = normalizeRoleId(roles[1] and roles[1].id)
+    if roleId == "" then
+        return nil
+    end
+
+    return roleId
+end
+
+local function migrateBucketState(bucket)
+    if type(bucket) ~= "table" then
+        return false
+    end
+
+    local changed = false
+    bucket.roles = type(bucket.roles) == "table" and bucket.roles or {}
+
+    local legacyRankRef = normalizeReference(bucket.assignedRankRef)
+    if legacyRankRef ~= "" then
+        local roleId = resolveLegacyRole(legacyRankRef)
+        if roleId then
+            local roleKey = Profile.MakeGuildRoleKey(legacyRankRef, roleId)
+            if roleKey and type(bucket.roles[roleKey]) ~= "table" then
+                bucket.roles[roleKey] = {
+                    guildSettingRef = legacyRankRef,
+                    roleId = roleId,
+                    assignedAt = bucket.assignedRankAt,
+                    assignedBy = bucket.assignedRankBy,
+                }
+                changed = true
+            end
+
+            bucket.assignedRankRef = nil
+            bucket.assignedRankAt = nil
+            bucket.assignedRankBy = nil
+            changed = true
+        end
+    end
+
+    local legacyRewardRef = normalizeReference(bucket.dailyRewardRankRef)
+    if normalizeReference(bucket.dailyRewardSettingRef) == "" and legacyRewardRef ~= "" then
+        bucket.dailyRewardSettingRef = legacyRewardRef
+        changed = true
+    end
+    if bucket.dailyRewardRankRef ~= nil then
+        bucket.dailyRewardRankRef = nil
+        changed = true
+    end
+
+    local transaction = bucket.dailyRewardTransaction
+    if type(transaction) == "table" then
+        local legacyTransactionRef = normalizeReference(transaction.rankRef)
+        if normalizeReference(transaction.settingRef) == "" and legacyTransactionRef ~= "" then
+            transaction.settingRef = legacyTransactionRef
+            changed = true
+        end
+        if transaction.rankRef ~= nil then
+            transaction.rankRef = nil
+            changed = true
+        end
+    end
+
+    return changed
+end
+
 function Profile.GetGuildBucket(guildKey)
     local normalizedGuildKey = normalizeGuildKey(guildKey)
     if normalizedGuildKey == "" then
@@ -294,22 +388,42 @@ function Profile.GetGuildBucket(guildKey)
     local state = Profile.GetGuildState()
     local byGuild = type(state) == "table" and state.byGuild or nil
     local bucket = type(byGuild) == "table" and byGuild[normalizedGuildKey] or nil
-    if type(bucket) == "table" then
-        return bucket
+    if type(bucket) ~= "table" then
+        return {}
     end
 
-    return {}
+    if migrateBucketState(bucket) then
+        state.byGuild[normalizedGuildKey] = bucket
+        local persisted = Profile.SetGuildState(state)
+        local persistedByGuild = type(persisted) == "table" and persisted.byGuild or nil
+        bucket = type(persistedByGuild) == "table" and persistedByGuild[normalizedGuildKey] or bucket
+    end
+
+    return bucket
 end
 
-function Profile.GetAssignedGuildRank(guildKey)
+function Profile.GetAssignedGuildRoles(guildKey)
     local bucket = Profile.GetGuildBucket(guildKey)
-    return bucket and bucket.assignedRankRef or nil
+    local roles = type(bucket) == "table" and bucket.roles or nil
+    return type(roles) == "table" and cloneGuildValue(roles) or {}
 end
 
-function Profile.SetAssignedGuildRank(guildKey, guildRankRef, metadata)
+function Profile.HasAssignedGuildRole(guildKey, guildSettingRef, roleId)
+    local roleKey = Profile.MakeGuildRoleKey(guildSettingRef, roleId)
+    if not roleKey then
+        return false
+    end
+
+    local roles = Profile.GetAssignedGuildRoles(guildKey)
+    return type(roles[roleKey]) == "table"
+end
+
+function Profile.AssignGuildRole(guildKey, guildSettingRef, roleId, metadata)
     local normalizedGuildKey = normalizeGuildKey(guildKey)
-    local normalizedRankRef = normalizeGuildRankRef(guildRankRef)
-    if normalizedGuildKey == "" or normalizedRankRef == "" then
+    local normalizedSettingRef = normalizeReference(guildSettingRef)
+    local normalizedRoleId = normalizeRoleId(roleId)
+    local roleKey = Profile.MakeGuildRoleKey(normalizedSettingRef, normalizedRoleId)
+    if normalizedGuildKey == "" or not roleKey then
         return nil
     end
 
@@ -318,16 +432,111 @@ function Profile.SetAssignedGuildRank(guildKey, guildRankRef, metadata)
     local bucket = type(state.byGuild[normalizedGuildKey]) == "table"
         and state.byGuild[normalizedGuildKey]
         or {}
+    migrateBucketState(bucket)
+    bucket.roles = type(bucket.roles) == "table" and bucket.roles or {}
+
     local assignmentMetadata = type(metadata) == "table" and metadata or {}
+    local existing = type(bucket.roles[roleKey]) == "table" and bucket.roles[roleKey] or {}
+    bucket.roles[roleKey] = {
+        guildSettingRef = normalizedSettingRef,
+        roleId = normalizedRoleId,
+        assignedAt = assignmentMetadata.assignedAt ~= nil
+            and assignmentMetadata.assignedAt
+            or assignmentMetadata.assignedRankAt ~= nil
+            and assignmentMetadata.assignedRankAt
+            or existing.assignedAt,
+        assignedBy = assignmentMetadata.assignedBy ~= nil
+            and assignmentMetadata.assignedBy
+            or assignmentMetadata.assignedRankBy ~= nil
+            and assignmentMetadata.assignedRankBy
+            or existing.assignedBy,
+    }
 
-    bucket.assignedRankRef = normalizedRankRef
-    bucket.assignedRankAt = assignmentMetadata.assignedRankAt
-    bucket.assignedRankBy = assignmentMetadata.assignedRankBy
     state.byGuild[normalizedGuildKey] = bucket
-
     local persistedState = Profile.SetGuildState(state)
     local persistedByGuild = type(persistedState) == "table" and persistedState.byGuild or nil
-    return type(persistedByGuild) == "table" and persistedByGuild[normalizedGuildKey] or nil
+    local persistedBucket = type(persistedByGuild) == "table" and persistedByGuild[normalizedGuildKey] or nil
+    local persistedRoles = type(persistedBucket) == "table" and persistedBucket.roles or nil
+    return type(persistedRoles) == "table" and cloneGuildValue(persistedRoles[roleKey]) or nil
+end
+
+function Profile.RemoveGuildRole(guildKey, guildSettingRef, roleId)
+    local normalizedGuildKey = normalizeGuildKey(guildKey)
+    local roleKey = Profile.MakeGuildRoleKey(guildSettingRef, roleId)
+    if normalizedGuildKey == "" or not roleKey then
+        return false
+    end
+
+    local state = Profile.GetGuildState()
+    local byGuild = type(state) == "table" and state.byGuild or nil
+    local bucket = type(byGuild) == "table" and byGuild[normalizedGuildKey] or nil
+    if type(bucket) ~= "table" then
+        return false
+    end
+
+    migrateBucketState(bucket)
+    local roles = type(bucket.roles) == "table" and bucket.roles or nil
+    if type(roles) ~= "table" or roles[roleKey] == nil then
+        return false
+    end
+
+    roles[roleKey] = nil
+    bucket.roles = roles
+    local persistedState = Profile.SetGuildState(state)
+    return type(persistedState) == "table"
+end
+
+function Profile.GetAssignedGuildRank(guildKey)
+    local bucket = Profile.GetGuildBucket(guildKey)
+    if type(bucket) ~= "table" then
+        return nil
+    end
+
+    local unresolvedLegacyRef = normalizeReference(bucket.assignedRankRef)
+    if unresolvedLegacyRef ~= "" then
+        return unresolvedLegacyRef
+    end
+
+    local roles = type(bucket.roles) == "table" and bucket.roles or {}
+    local settingRefs = {}
+    local seen = {}
+    for _, assignment in pairs(roles) do
+        local settingRef = normalizeReference(type(assignment) == "table" and assignment.guildSettingRef)
+        if settingRef ~= "" and not seen[settingRef] then
+            settingRefs[#settingRefs + 1] = settingRef
+            seen[settingRef] = true
+        end
+    end
+    table.sort(settingRefs)
+    return settingRefs[1]
+end
+
+function Profile.SetAssignedGuildRank(guildKey, guildRankRef, metadata)
+    local normalizedGuildKey = normalizeGuildKey(guildKey)
+    local normalizedRankRef = normalizeReference(guildRankRef)
+    if normalizedGuildKey == "" or normalizedRankRef == "" then
+        return nil
+    end
+
+    local roleId = resolveLegacyRole(normalizedRankRef)
+    if not roleId then
+        return nil
+    end
+
+    local state = Profile.GetGuildState()
+    state.byGuild = type(state.byGuild) == "table" and state.byGuild or {}
+    local bucket = type(state.byGuild[normalizedGuildKey]) == "table"
+        and state.byGuild[normalizedGuildKey]
+        or {}
+    bucket.roles = {}
+    bucket.assignedRankRef = nil
+    bucket.assignedRankAt = nil
+    bucket.assignedRankBy = nil
+    state.byGuild[normalizedGuildKey] = bucket
+    Profile.SetGuildState(state)
+
+    Profile.AssignGuildRole(normalizedGuildKey, normalizedRankRef, roleId, metadata)
+    return Profile.GetGuildBucket(normalizedGuildKey)
 end
 
 function Profile.ClearAssignedGuildRank(guildKey)
@@ -346,6 +555,7 @@ function Profile.ClearAssignedGuildRank(guildKey)
     local hadAssignment = bucket.assignedRankRef ~= nil
         or bucket.assignedRankAt ~= nil
         or bucket.assignedRankBy ~= nil
+        or (type(bucket.roles) == "table" and next(bucket.roles) ~= nil)
     if not hadAssignment then
         return false
     end
@@ -353,29 +563,30 @@ function Profile.ClearAssignedGuildRank(guildKey)
     bucket.assignedRankRef = nil
     bucket.assignedRankAt = nil
     bucket.assignedRankBy = nil
+    bucket.roles = {}
     local persistedState = Profile.SetGuildState(state)
     return type(persistedState) == "table"
 end
 
-function Profile.GetGuildRequisitionUsage(guildKey, guildRankRef, requisitionId)
+function Profile.GetGuildRequisitionUsage(guildKey, guildSettingRef, requisitionId)
     local normalizedGuildKey = normalizeGuildKey(guildKey)
-    local normalizedRankRef = normalizeGuildRankRef(guildRankRef)
+    local normalizedSettingRef = normalizeReference(guildSettingRef)
     local normalizedRequisitionId = normalizeRequisitionId(requisitionId)
-    if normalizedGuildKey == "" or normalizedRankRef == "" or normalizedRequisitionId == "" then
+    if normalizedGuildKey == "" or normalizedSettingRef == "" or normalizedRequisitionId == "" then
         return 0
     end
 
     local bucket = Profile.GetGuildBucket(normalizedGuildKey)
     local requisitions = type(bucket) == "table" and bucket.requisitions or nil
-    local rankLedger = type(requisitions) == "table" and requisitions[normalizedRankRef] or nil
-    return normalizeRequisitionUsage(type(rankLedger) == "table" and rankLedger[normalizedRequisitionId] or 0)
+    local settingLedger = type(requisitions) == "table" and requisitions[normalizedSettingRef] or nil
+    return normalizeRequisitionUsage(type(settingLedger) == "table" and settingLedger[normalizedRequisitionId] or 0)
 end
 
-function Profile.SetGuildRequisitionUsage(guildKey, guildRankRef, requisitionId, usage)
+function Profile.SetGuildRequisitionUsage(guildKey, guildSettingRef, requisitionId, usage)
     local normalizedGuildKey = normalizeGuildKey(guildKey)
-    local normalizedRankRef = normalizeGuildRankRef(guildRankRef)
+    local normalizedSettingRef = normalizeReference(guildSettingRef)
     local normalizedRequisitionId = normalizeRequisitionId(requisitionId)
-    if normalizedGuildKey == "" or normalizedRankRef == "" or normalizedRequisitionId == "" then
+    if normalizedGuildKey == "" or normalizedSettingRef == "" or normalizedRequisitionId == "" then
         return nil
     end
 
@@ -386,14 +597,14 @@ function Profile.SetGuildRequisitionUsage(guildKey, guildRankRef, requisitionId,
         and state.byGuild[normalizedGuildKey]
         or {}
     bucket.requisitions = type(bucket.requisitions) == "table" and bucket.requisitions or {}
-    bucket.requisitions[normalizedRankRef] = type(bucket.requisitions[normalizedRankRef]) == "table"
-        and bucket.requisitions[normalizedRankRef]
+    bucket.requisitions[normalizedSettingRef] = type(bucket.requisitions[normalizedSettingRef]) == "table"
+        and bucket.requisitions[normalizedSettingRef]
         or {}
 
     if normalizedUsage > 0 then
-        bucket.requisitions[normalizedRankRef][normalizedRequisitionId] = normalizedUsage
+        bucket.requisitions[normalizedSettingRef][normalizedRequisitionId] = normalizedUsage
     else
-        bucket.requisitions[normalizedRankRef][normalizedRequisitionId] = nil
+        bucket.requisitions[normalizedSettingRef][normalizedRequisitionId] = nil
     end
 
     state.byGuild[normalizedGuildKey] = bucket
@@ -402,12 +613,12 @@ function Profile.SetGuildRequisitionUsage(guildKey, guildRankRef, requisitionId,
         return nil
     end
 
-    return Profile.GetGuildRequisitionUsage(normalizedGuildKey, normalizedRankRef, normalizedRequisitionId)
+    return Profile.GetGuildRequisitionUsage(normalizedGuildKey, normalizedSettingRef, normalizedRequisitionId)
 end
 
-function Profile.IncrementGuildRequisitionUsage(guildKey, guildRankRef, requisitionId)
-    local currentUsage = Profile.GetGuildRequisitionUsage(guildKey, guildRankRef, requisitionId)
-    return Profile.SetGuildRequisitionUsage(guildKey, guildRankRef, requisitionId, currentUsage + 1)
+function Profile.IncrementGuildRequisitionUsage(guildKey, guildSettingRef, requisitionId)
+    local currentUsage = Profile.GetGuildRequisitionUsage(guildKey, guildSettingRef, requisitionId)
+    return Profile.SetGuildRequisitionUsage(guildKey, guildSettingRef, requisitionId, currentUsage + 1)
 end
 
 function Profile.GetDailyRewardClaim(guildKey)
@@ -418,22 +629,20 @@ function Profile.GetDailyRewardClaim(guildKey)
 
     local bucket = Profile.GetGuildBucket(normalizedGuildKey)
     local dateKey = normalizeDailyRewardDate(bucket and bucket.dailyRewardDate)
-    local rankRef = normalizeGuildRankRef(bucket and bucket.dailyRewardRankRef)
-    local claimSemantics = normalizeDailyRewardClaimSemantics(
-        bucket and bucket.dailyRewardClaimSemantics
-    )
+    local settingRef = normalizeReference(bucket and (bucket.dailyRewardSettingRef or bucket.dailyRewardRankRef))
+    local claimSemantics = normalizeDailyRewardClaimSemantics(bucket and bucket.dailyRewardClaimSemantics)
     if dateKey == "" then
-        return nil, rankRef ~= "" and rankRef or nil, claimSemantics
+        return nil, settingRef ~= "" and settingRef or nil, claimSemantics
     end
 
-    return dateKey, rankRef ~= "" and rankRef or nil, claimSemantics
+    return dateKey, settingRef ~= "" and settingRef or nil, claimSemantics
 end
 
-function Profile.SetDailyRewardClaim(guildKey, dateKey, guildRankRef, claimSemantics)
+function Profile.SetDailyRewardClaim(guildKey, dateKey, guildSettingRef, claimSemantics)
     local normalizedGuildKey = normalizeGuildKey(guildKey)
     local normalizedDateKey = normalizeDailyRewardDate(dateKey)
-    local normalizedRankRef = normalizeGuildRankRef(guildRankRef)
-    if normalizedGuildKey == "" or normalizedDateKey == "" or normalizedRankRef == "" then
+    local normalizedSettingRef = normalizeReference(guildSettingRef)
+    if normalizedGuildKey == "" or normalizedDateKey == "" or normalizedSettingRef == "" then
         return nil
     end
 
@@ -446,7 +655,8 @@ function Profile.SetDailyRewardClaim(guildKey, dateKey, guildRankRef, claimSeman
         and normalizeDailyRewardClaimSemantics(bucket.dailyRewardClaimSemantics)
         or normalizeDailyRewardClaimSemantics(claimSemantics)
     bucket.dailyRewardDate = normalizedDateKey
-    bucket.dailyRewardRankRef = normalizedRankRef
+    bucket.dailyRewardSettingRef = normalizedSettingRef
+    bucket.dailyRewardRankRef = nil
     bucket.dailyRewardClaimSemantics = normalizedClaimSemantics
     state.byGuild[normalizedGuildKey] = bucket
 
@@ -465,14 +675,14 @@ function Profile.GetDailyRewardTransaction(guildKey)
     return normalizeDailyRewardTransaction(bucket and bucket.dailyRewardTransaction)
 end
 
-function Profile.SetDailyRewardTransaction(guildKey, dateKey, guildRankRef, status, reason)
+function Profile.SetDailyRewardTransaction(guildKey, dateKey, guildSettingRef, status, reason)
     local normalizedGuildKey = normalizeGuildKey(guildKey)
     local normalizedDateKey = normalizeDailyRewardDate(dateKey)
-    local normalizedRankRef = normalizeGuildRankRef(guildRankRef)
+    local normalizedSettingRef = normalizeReference(guildSettingRef)
     local normalizedStatus = tostring(status or "")
     if normalizedGuildKey == ""
         or normalizedDateKey == ""
-        or normalizedRankRef == ""
+        or normalizedSettingRef == ""
         or (normalizedStatus ~= "in-progress" and normalizedStatus ~= "failed") then
         return nil
     end
@@ -485,7 +695,7 @@ function Profile.SetDailyRewardTransaction(guildKey, dateKey, guildRankRef, stat
     bucket.dailyRewardTransaction = {
         status = normalizedStatus,
         date = normalizedDateKey,
-        rankRef = normalizedRankRef,
+        settingRef = normalizedSettingRef,
         reason = tostring(reason or ""),
     }
     state.byGuild[normalizedGuildKey] = bucket
