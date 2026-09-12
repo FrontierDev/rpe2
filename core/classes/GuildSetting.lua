@@ -136,13 +136,23 @@ end
 
 local function normalizeRole(value, index, usedIds)
     local source = type(value) == "table" and value or {}
+    local wowGuildRankIndices = normalizeWowGuildRankIndices(source.wowGuildRankIndices)
+    local autoGive = source.autoGive
+    if autoGive == nil then
+        -- Preserve the pre-autoGive behaviour for existing authored data:
+        -- roles that already mapped one or more WoW ranks were automatic.
+        autoGive = #wowGuildRankIndices > 0
+    else
+        autoGive = autoGive == true
+    end
 
     return {
         id = normalizeStableId(source.id, index, "role", usedIds),
         name = ensureString(source.name),
         description = ensureString(source.description),
         icon = normalizeIcon(source.icon),
-        wowGuildRankIndices = normalizeWowGuildRankIndices(source.wowGuildRankIndices),
+        autoGive = autoGive,
+        wowGuildRankIndices = wowGuildRankIndices,
     }
 end
 
@@ -170,12 +180,14 @@ local function buildLegacyRole(source)
         roleId = "legacy_rank"
     end
 
+    local wowGuildRankIndices = normalizeWowGuildRankIndices(source.wowGuildRankIndices)
     return {
         id = roleId,
         name = ensureString(source.name),
         description = ensureString(source.description),
         icon = normalizeIcon(source.icon),
-        wowGuildRankIndices = normalizeWowGuildRankIndices(source.wowGuildRankIndices),
+        autoGive = #wowGuildRankIndices > 0,
+        wowGuildRankIndices = wowGuildRankIndices,
     }
 end
 
