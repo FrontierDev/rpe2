@@ -8,6 +8,7 @@ local Client = Addon.Client
 local ProfileUI = Addon.Client.UI.Profile
 local UI = Addon.UI or {}
 local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
+local Help = Addon.Client and Addon.Client.Help or {}
 
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
@@ -45,6 +46,34 @@ local PAGE_PADDING_TOP = 2
 local WINDOW_WIDTH = 524
 local WINDOW_HEIGHT = 420
 
+local PROFILE_HELP_BY_TAB = {
+    equipment = {
+        id = "profile.equipment",
+        text = "Equip RPE items here. Your resolved health, resources and combat stats are shown alongside your equipment.",
+    },
+    spellbook = {
+        id = "profile.spellbook",
+        text = "Your available RPE spells are listed here. Spells can be placed on the RPE Action Bar for use during events.",
+    },
+    traits = {
+        id = "profile.traits",
+        text = "Traits provide passive character effects. Active traits and their effects are shown here.",
+    },
+    skills = {
+        id = "profile.skills",
+        text = "Skills determine your modifiers for RPE skill rolls. Skills may also be placed on the Action Bar when using the skills bar mode.",
+    },
+    achievements = {
+        id = "profile.achievements",
+        text = "Your RPE achievements and their progress are tracked here.",
+    },
+}
+
+local PROFILE_HELP_BY_ID = {}
+for tabKey, definition in pairs(PROFILE_HELP_BY_TAB) do
+    PROFILE_HELP_BY_ID[definition.id] = tabKey
+end
+
 local function refreshPageOnShow(page, refreshFn)
     if not page or type(refreshFn) ~= "function" or not page.SetScript then
         return
@@ -65,6 +94,7 @@ local function createInstance()
         skillsPage = ProfileUI.SkillsPage,
         achievementsPage = ProfileUI.AchievementsPage,
         runtimeChangeListenerHandle = nil,
+        helpAnchors = {},
     }, ProfileWindow)
 end
 
@@ -107,6 +137,59 @@ function ProfileWindow:GetTabIndex(tabKey)
     end
 
     return 1
+end
+
+function ProfileWindow:RegisterHelpTips()
+    if type(Help.Register) ~= "function" then
+        return false
+    end
+
+    for _, definition in pairs(PROFILE_HELP_BY_TAB) do
+        Help:Register(definition.id, {
+            text = definition.text,
+        })
+    end
+    return true
+end
+
+function ProfileWindow:SetHelpAnchor(tabKey, frame)
+    local normalizedKey = tostring(tabKey or "")
+    if normalizedKey == "" or not PROFILE_HELP_BY_TAB[normalizedKey] then
+        return false
+    end
+
+    self.helpAnchors[normalizedKey] = frame
+    return true
+end
+
+function ProfileWindow:GetHelpAnchor(tabKey)
+    return self.helpAnchors[tostring(tabKey or "")]
+end
+
+function ProfileWindow:HideHelpTip()
+    local activeTipId = Help.ActiveTipId
+    if type(activeTipId) ~= "string" or not PROFILE_HELP_BY_ID[activeTipId] or type(Help.Hide) ~= "function" then
+        return false
+    end
+    return Help:Hide(activeTipId)
+end
+
+function ProfileWindow:ShowHelpForTab(tabKey)
+    local normalizedKey = tostring(tabKey or self:GetActiveTabKey())
+    local definition = PROFILE_HELP_BY_TAB[normalizedKey]
+    if not definition or not self:IsVisible() or type(Help.Show) ~= "function" then
+        return false
+    end
+
+    self:HideHelpTip()
+    self:RegisterHelpTips()
+
+    local anchor = self:GetHelpAnchor(normalizedKey)
+    if anchor == nil then
+        return false
+    end
+
+    return Help:Show(definition.id, anchor)
 end
 
 function ProfileWindow:RefreshTab(tabKey)
@@ -264,15 +347,20 @@ function ProfileWindow:BuildWindow()
         contentInsetTop = WINDOW_CONTENT_INSET_TOP,
         contentInsetBottom = WINDOW_CONTENT_INSET_BOTTOM,
         pagePaddingTop = PAGE_PADDING_TOP,
+        onClose = function()
+            self:HideHelpTip()
+        end,
         tabs = {
             {
                 name = "equipment",
                 label = "Equipment & Stats",
                 width = 118,
                 builder = function(page)
+                    self:SetHelpAnchor("equipment", page)
                     self.equipmentStatsPage:Build(page, self)
                     refreshPageOnShow(page, function()
                         self:RefreshTab("equipment")
+                        self:ShowHelpForTab("equipment")
                     end)
                 end,
             },
@@ -281,9 +369,11 @@ function ProfileWindow:BuildWindow()
                 label = "Spellbook",
                 width = 70,
                 builder = function(page)
+                    self:SetHelpAnchor("spellbook", page)
                     self.spellbookPage:Build(page, self)
                     refreshPageOnShow(page, function()
                         self:RefreshTab("spellbook")
+                        self:ShowHelpForTab("spellbook")
                     end)
                 end,
             },
@@ -292,9 +382,11 @@ function ProfileWindow:BuildWindow()
                 label = "Traits",
                 width = 60,
                 builder = function(page)
+                    self:SetHelpAnchor("traits", page)
                     self.traitsPage:Build(page, self)
                     refreshPageOnShow(page, function()
                         self:RefreshTab("traits")
+                        self:ShowHelpForTab("traits")
                     end)
                 end,
             },
@@ -303,9 +395,11 @@ function ProfileWindow:BuildWindow()
                 label = "Skills",
                 width = 60,
                 builder = function(page)
+                    self:SetHelpAnchor("skills", page)
                     self.skillsPage:Build(page, self)
                     refreshPageOnShow(page, function()
                         self:RefreshTab("skills")
+                        self:ShowHelpForTab("skills")
                     end)
                 end,
             },
@@ -314,9 +408,11 @@ function ProfileWindow:BuildWindow()
                 label = "Achievements",
                 width = 96,
                 builder = function(page)
+                    self:SetHelpAnchor("achievements", page)
                     self.achievementsPage:Build(page, self)
                     refreshPageOnShow(page, function()
                         self:RefreshTab("achievements")
+                        self:ShowHelpForTab("achievements")
                     end)
                 end,
             },
@@ -328,6 +424,7 @@ function ProfileWindow:BuildWindow()
     if frame and frame.SetSize then
         frame:SetSize(WINDOW_WIDTH, WINDOW_HEIGHT)
     end
+    self:RegisterHelpTips()
     self:EnsureChangeListeners()
 
     return self.window
@@ -360,7 +457,9 @@ function ProfileWindow:ShowTab(tabKey)
     if window and window.Show then
         window:Show()
     end
-    self:RefreshTab(self:GetActiveTabKey())
+    local activeTabKey = self:GetActiveTabKey()
+    self:RefreshTab(activeTabKey)
+    self:ShowHelpForTab(activeTabKey)
     return window
 end
 
@@ -371,17 +470,19 @@ function ProfileWindow:Show()
         window:Show()
     end
     self:Refresh()
+    local activeTab = self:GetActiveTabKey() or "profile"
+    self:ShowHelpForTab(activeTab)
     if timer then
-        local activeTab = self:GetActiveTabKey() or "profile"
         stopTiming(timer, {
             activeTab = activeTab,
-            profilePages = 4,
+            profilePages = 5,
         })
     end
     return window
 end
 
 function ProfileWindow:Hide()
+    self:HideHelpTip()
     if Client.Crafting and Client.Crafting.HandleProfileWindowClosed then
         Client.Crafting:HandleProfileWindowClosed()
     end
