@@ -67,6 +67,7 @@ core/internal/ruleset/Rules.lua
 core/internal/ruleset/Ruleset.lua
 core/internal/ruleset/NpcDifficulty.lua
 core/internal/Registry.lua
+core/internal/profile/GuildRoleMigration.lua
 core/internal/RegistryLoot.lua
 core/internal/Loot.lua
 core/internal/LootDiagnostics.lua
