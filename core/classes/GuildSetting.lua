@@ -243,8 +243,12 @@ local function normalizeRoleIds(value)
     return roleIds
 end
 
-local function normalizeRequisition(value, index, usedIds)
+local function normalizeRequisition(value, index, usedIds, legacyRoleId)
     local source = type(value) == "table" and value or {}
+    local roleIds = normalizeRoleIds(source.roleIds)
+    if source.roleIds == nil and trimText(legacyRoleId) ~= "" then
+        roleIds = { trimText(legacyRoleId) }
+    end
 
     return {
         id = normalizeStableId(source.id, index, "requisition", usedIds),
@@ -252,12 +256,12 @@ local function normalizeRequisition(value, index, usedIds)
         quantity = normalizeInteger(source.quantity, 1, 1),
         costs = normalizeCosts(source.costs),
         characterLimit = normalizeCharacterLimit(source.characterLimit),
-        roleIds = normalizeRoleIds(source.roleIds),
+        roleIds = roleIds,
         shopCategoryId = trimText(source.shopCategoryId),
     }
 end
 
-local function normalizeRequisitions(value)
+local function normalizeRequisitions(value, legacyRoleId)
     if type(value) ~= "table" then
         return {}
     end
@@ -265,7 +269,7 @@ local function normalizeRequisitions(value)
     local requisitions = {}
     local usedIds = {}
     for index = 1, #value do
-        requisitions[index] = normalizeRequisition(value[index], index, usedIds)
+        requisitions[index] = normalizeRequisition(value[index], index, usedIds, legacyRoleId)
     end
 
     return requisitions
@@ -320,6 +324,11 @@ end
 
 function GuildSetting:Merge(data)
     local legacyRole = buildLegacyRole(data)
+    local legacyRoleId = legacyRole and trimText(legacyRole.id) or ""
+    local legacyHasDailyRewards = legacyRole ~= nil
+        and type(data) == "table"
+        and type(data.dailyRewards) == "table"
+        and #data.dailyRewards > 0
 
     if type(data) == "table" then
         for key, value in pairs(data) do
@@ -336,8 +345,16 @@ function GuildSetting:Merge(data)
         self.roles = normalizeRoles({ legacyRole })
     end
     self.shopCategories = normalizeShopCategories(self.shopCategories)
-    self.requisitions = normalizeRequisitions(self.requisitions)
+    self.requisitions = normalizeRequisitions(self.requisitions, legacyRoleId)
     self.dailyRewards = normalizeDailyRewards(self.dailyRewards)
+
+    -- Legacy rank-scoped Daily Rewards cannot be represented safely by the
+    -- GuildSetting-level reward model. Preserve the authored rewards for
+    -- inspection/recovery, but leave them disabled until the author explicitly
+    -- enables Daily Rewards on the migrated GuildSetting.
+    if legacyHasDailyRewards then
+        self.general.enableDailyRewards = false
+    end
 
     -- Legacy fields are consumed only to build the Role-based model above.
     -- They are not retained on the live object and are never serialized.
