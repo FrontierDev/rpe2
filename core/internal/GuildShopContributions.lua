@@ -4,9 +4,8 @@ Addon.Internal = Addon.Internal or {}
 Addon.Client = Addon.Client or {}
 
 local Database = Addon.Internal.Database or {}
-local Registry = Addon.Internal.Registry or {}
+local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Dependecies = Database.Dependecies or {}
-local Profile = Addon.Internal.Profile or {}
 local Guild = Addon.Client.Guild or {}
 local Classes = Database.Classes or {}
 local GuildSetting = Classes.GuildSetting
@@ -33,7 +32,7 @@ local function normalizeCharacterLimit(value)
 end
 
 local function isContribution(setting)
-    return type(setting) == "table" and trim(setting.shopContributionTargetRef) ~= ""
+    return type(setting) == "table" and trim(setting.targetGuildSettingRef) ~= ""
 end
 
 local function normalizeContributionRequisitions(setting)
@@ -50,9 +49,9 @@ if GuildSetting and type(GuildSetting.Merge) == "function" and type(GuildSetting
 
     function GuildSetting:Merge(data)
         OriginalMerge(self, data)
-        local targetRef = trim(type(data) == "table" and data.shopContributionTargetRef or self.shopContributionTargetRef)
+        local targetRef = trim(type(data) == "table" and data.targetGuildSettingRef or self.targetGuildSettingRef)
         if targetRef ~= "" then
-            self.shopContributionTargetRef = targetRef
+            self.targetGuildSettingRef = targetRef
             self.guildName = CONTRIBUTION_GUILD_SENTINEL
             self.general = { enableRequisitions = false, enableDailyRewards = false }
             self.roles = {}
@@ -60,16 +59,16 @@ if GuildSetting and type(GuildSetting.Merge) == "function" and type(GuildSetting
             self.dailyRewards = {}
             normalizeContributionRequisitions(self)
         else
-            self.shopContributionTargetRef = nil
+            self.targetGuildSettingRef = nil
         end
         return self
     end
 
     function GuildSetting:ToTable()
         local data = OriginalToTable(self)
-        local targetRef = trim(self.shopContributionTargetRef)
+        local targetRef = trim(self.targetGuildSettingRef)
         if targetRef ~= "" then
-            data.shopContributionTargetRef = targetRef
+            data.targetGuildSettingRef = targetRef
             data.guildName = CONTRIBUTION_GUILD_SENTINEL
             data.general = { enableRequisitions = false, enableDailyRewards = false }
             data.roles = {}
@@ -103,7 +102,7 @@ local function getActiveContributionRows(self)
         local datasetId = trim(dataset and dataset.id)
         for settingIndex = 1, #(dataset and dataset.guildSettings or {}) do
             local contribution = dataset.guildSettings[settingIndex]
-            if isContribution(contribution) and trim(contribution.shopContributionTargetRef) == targetRef then
+            if isContribution(contribution) and trim(contribution.targetGuildSettingRef) == targetRef then
                 local contributionId = trim(contribution.id)
                 for requisitionIndex = 1, #(contribution.requisitions or {}) do
                     local authored = contribution.requisitions[requisitionIndex]
@@ -166,7 +165,7 @@ if type(Guild.GetRequisitionEligibility) == "function" then
         if trim(guildSettingRef) ~= "" and trim(guildSettingRef) ~= trim(resolution.ref) then
             return false, "setting-mismatch", { activeSettingRef = resolution.ref, requestedSettingRef = guildSettingRef }
         end
-        if trim(contributionRow.contribution.shopContributionTargetRef) ~= trim(resolution.ref) then
+        if trim(contributionRow.contribution.targetGuildSettingRef) ~= trim(resolution.ref) then
             return false, "contribution-target-mismatch", { activeSettingRef = resolution.ref }
         end
 
@@ -213,7 +212,7 @@ if type(Dependecies.RecomputeDatasetDependencies) == "function" then
         for index = 1, #(dataset.guildSettings or {}) do
             local contribution = dataset.guildSettings[index]
             if isContribution(contribution) then
-                local targetDatasetId = trim(contribution.shopContributionTargetRef):match("^([^:]+):[^:]+$")
+                local targetDatasetId = trim(contribution.targetGuildSettingRef):match("^([^:]+):[^:]+$")
                 local targetExists = targetDatasetId and type(Database.GetDatasetByID) == "function" and Database.GetDatasetByID(targetDatasetId) or nil
                 if targetDatasetId and targetDatasetId ~= trim(dataset.id) and targetExists and not seen[targetDatasetId] then
                     dependencies[#dependencies + 1] = targetDatasetId
