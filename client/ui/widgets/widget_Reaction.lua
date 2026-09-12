@@ -419,4 +419,322 @@ if initializer then
     end)
 end
 
+-- Issue #252: contextual combat interaction HelpTips. This module loads after
+-- Targeting and Action Bar Skills and before ReactionPerformance, so the
+-- wrappers below observe the existing rendered state without duplicating
+-- combat or targeting policy.
+local Help = Addon.Client and Addon.Client.Help or {}
+local TargetingWidget = ClientUI.TargetingWidget
+local ActionBarWidget = ClientUI.ActionBarWidget
+
+local TARGETING_HELP_SEQUENCE = {
+    { id = "targeting.overview", key = "overview", text = "This targeting window belongs to the spell or action you are activating. Complete its target requirements before casting." },
+    { id = "targeting.target-group", key = "target-group", text = "Some actions have more than one target group. Use these controls to choose which group you are currently filling." },
+    { id = "targeting.candidates", key = "candidates", text = "Eligible targets for the current target group appear here. Select or deselect a portrait to change the action's targets." },
+    { id = "targeting.selection", key = "selection", text = "Your current selection and target requirement are shown here, while the detail panel describes the selected target." },
+    { id = "targeting.confirm", key = "confirm", text = "Cast becomes available when the current targeting requirements are satisfied. Click it to confirm the selected targets and continue the action." },
+    { id = "targeting.cancel", key = "cancel", text = "Cancel closes targeting without casting the pending spell or action." },
+}
+local TARGETING_HELP_IDS = {}
+for index = 1, #TARGETING_HELP_SEQUENCE do
+    TARGETING_HELP_IDS[TARGETING_HELP_SEQUENCE[index].id] = true
+end
+
+local REACTION_HELP_SEQUENCE = {
+    { id = "reaction.overview", key = "overview", text = "A Reaction prompt appears when an incoming combat action gives you an immediate defensive choice." },
+    { id = "reaction.incoming-action", key = "incoming-action", text = "The attacker you are defending against is shown here." },
+    { id = "reaction.result-preview", key = "result-preview", text = "When available, this preview shows what the incoming action is expected to do if your reaction does not stop it." },
+    { id = "reaction.options", key = "options", text = "Choose one of the available reaction options here. Selecting an enabled option resolves that reaction immediately." },
+}
+local REACTION_HELP_IDS = {}
+for index = 1, #REACTION_HELP_SEQUENCE do
+    REACTION_HELP_IDS[REACTION_HELP_SEQUENCE[index].id] = true
+end
+
+local function getHelpFrame(element)
+    if type(element) == "table" and type(element.GetFrame) == "function" then
+        return element:GetFrame()
+    end
+    return element
+end
+
+local function isHelpFrameShown(element)
+    local frame = getHelpFrame(element)
+    return frame ~= nil and type(frame.IsShown) == "function" and frame:IsShown() == true
+end
+
+local function getWindowFrame(widget)
+    local window = widget and widget.window or nil
+    return window and window.GetFrame and window:GetFrame() or nil
+end
+
+if type(TargetingWidget) == "table" and type(TargetingWidget.Refresh) == "function" then
+    function TargetingWidget:RegisterFirstRunHelp()
+        if type(Help.Register) ~= "function" then
+            return false
+        end
+        for index = 1, #TARGETING_HELP_SEQUENCE do
+            local definition = TARGETING_HELP_SEQUENCE[index]
+            Help:Register(definition.id, {
+                text = definition.text,
+                onAcknowledgeCallback = function()
+                    self:UpdateFirstRunHelp(self.lastDisplayState)
+                end,
+            })
+        end
+        return true
+    end
+
+    function TargetingWidget:IsFirstRunHelpApplicable(key, displayState)
+        local state = type(displayState) == "table" and displayState or self.lastDisplayState
+        if type(state) ~= "table" then
+            return false
+        end
+        if key == "target-group" then
+            return #(state.groups or {}) > 1
+        end
+        if key == "candidates" or key == "selection" then
+            return #(state.candidates or {}) > 0
+        end
+        return key == "overview" or key == "confirm" or key == "cancel"
+    end
+
+    function TargetingWidget:GetHelpAnchor(key, displayState)
+        if not self:IsFirstRunHelpApplicable(key, displayState) then
+            return nil
+        end
+        local anchors = {
+            overview = self.headerRow or self.rootLayout,
+            ["target-group"] = self.groupPanel,
+            candidates = self.gridPanel,
+            selection = self.detailPanel or self.headerSelectionText,
+            confirm = self.castButton,
+            cancel = self.cancelButton,
+        }
+        local frame = getHelpFrame(anchors[tostring(key or "")])
+        return isHelpFrameShown(frame) and frame or nil
+    end
+
+    function TargetingWidget:HideFirstRunHelp()
+        if TARGETING_HELP_IDS[Help.ActiveTipId] ~= true or type(Help.Hide) ~= "function" then
+            return false
+        end
+        return Help:Hide(Help.ActiveTipId)
+    end
+
+    function TargetingWidget:UpdateFirstRunHelp(displayState)
+        local state = type(displayState) == "table" and displayState or self.lastDisplayState
+        if type(state) ~= "table" or not isHelpFrameShown(getWindowFrame(self)) then
+            self:HideFirstRunHelp()
+            return false
+        end
+        if type(Help.IsAcknowledged) ~= "function" or type(Help.Show) ~= "function" then
+            return false
+        end
+
+        self:RegisterFirstRunHelp()
+        local activeId = Help.ActiveTipId
+        if TARGETING_HELP_IDS[activeId] == true then
+            local activeDefinition = nil
+            for index = 1, #TARGETING_HELP_SEQUENCE do
+                if TARGETING_HELP_SEQUENCE[index].id == activeId then
+                    activeDefinition = TARGETING_HELP_SEQUENCE[index]
+                    break
+                end
+            end
+            if activeDefinition and self:GetHelpAnchor(activeDefinition.key, state) ~= nil then
+                return true
+            end
+            self:HideFirstRunHelp()
+        elseif activeId ~= nil then
+            return false
+        end
+
+        for index = 1, #TARGETING_HELP_SEQUENCE do
+            local definition = TARGETING_HELP_SEQUENCE[index]
+            if not Help:IsAcknowledged(definition.id) and self:IsFirstRunHelpApplicable(definition.key, state) then
+                local anchor = self:GetHelpAnchor(definition.key, state)
+                if anchor == nil then
+                    return false
+                end
+                return Help:Show(definition.id, anchor) == true
+            end
+        end
+        return false
+    end
+
+    local baseTargetingRefresh = TargetingWidget.Refresh
+    function TargetingWidget:Refresh(...)
+        local result = baseTargetingRefresh(self, ...)
+        self:UpdateFirstRunHelp(self.lastDisplayState)
+        return result
+    end
+
+    local baseTargetingHide = TargetingWidget.Hide
+    if type(baseTargetingHide) == "function" then
+        function TargetingWidget:Hide(...)
+            self:HideFirstRunHelp()
+            return baseTargetingHide(self, ...)
+        end
+    end
+end
+
+if type(ReactionWidget) == "table" then
+    function ReactionWidget:RegisterFirstRunHelp()
+        if type(Help.Register) ~= "function" then
+            return false
+        end
+        for index = 1, #REACTION_HELP_SEQUENCE do
+            local definition = REACTION_HELP_SEQUENCE[index]
+            Help:Register(definition.id, {
+                text = definition.text,
+                onAcknowledgeCallback = function()
+                    local state = Client.GetReactionDisplayState and Client:GetReactionDisplayState() or nil
+                    self:UpdateFirstRunHelp(state)
+                end,
+            })
+        end
+        return true
+    end
+
+    function ReactionWidget:IsFirstRunHelpApplicable(key, displayState)
+        local state = type(displayState) == "table" and displayState or nil
+        if type(state) ~= "table" then
+            return false
+        end
+        if key == "result-preview" then
+            return tostring(state.failurePreviewText or "") ~= ""
+        end
+        if key == "options" then
+            return #(state.actions or {}) > 0
+        end
+        return key == "overview" or key == "incoming-action"
+    end
+
+    function ReactionWidget:GetHelpAnchor(key, displayState)
+        if not self:IsFirstRunHelpApplicable(key, displayState) then
+            return nil
+        end
+        local anchors = {
+            overview = self.rootLayout,
+            ["incoming-action"] = self.headerRow,
+            ["result-preview"] = self.failurePreviewRow,
+            options = self.actionsLayout,
+        }
+        local frame = getHelpFrame(anchors[tostring(key or "")])
+        return isHelpFrameShown(frame) and frame or nil
+    end
+
+    function ReactionWidget:HideFirstRunHelp()
+        if REACTION_HELP_IDS[Help.ActiveTipId] ~= true or type(Help.Hide) ~= "function" then
+            return false
+        end
+        return Help:Hide(Help.ActiveTipId)
+    end
+
+    function ReactionWidget:UpdateFirstRunHelp(displayState)
+        local state = type(displayState) == "table" and displayState or nil
+        if type(state) ~= "table" or not isHelpFrameShown(getWindowFrame(self)) then
+            self:HideFirstRunHelp()
+            return false
+        end
+        if type(Help.IsAcknowledged) ~= "function" or type(Help.Show) ~= "function" then
+            return false
+        end
+
+        self:RegisterFirstRunHelp()
+        local activeId = Help.ActiveTipId
+        if REACTION_HELP_IDS[activeId] == true then
+            local activeDefinition = nil
+            for index = 1, #REACTION_HELP_SEQUENCE do
+                if REACTION_HELP_SEQUENCE[index].id == activeId then
+                    activeDefinition = REACTION_HELP_SEQUENCE[index]
+                    break
+                end
+            end
+            if activeDefinition and self:GetHelpAnchor(activeDefinition.key, state) ~= nil then
+                return true
+            end
+            self:HideFirstRunHelp()
+        elseif activeId ~= nil then
+            return false
+        end
+
+        for index = 1, #REACTION_HELP_SEQUENCE do
+            local definition = REACTION_HELP_SEQUENCE[index]
+            if not Help:IsAcknowledged(definition.id) and self:IsFirstRunHelpApplicable(definition.key, state) then
+                local anchor = self:GetHelpAnchor(definition.key, state)
+                if anchor == nil then
+                    return false
+                end
+                return Help:Show(definition.id, anchor) == true
+            end
+        end
+        return false
+    end
+
+    local baseReactionShow = ReactionWidget.Show
+    if type(baseReactionShow) == "function" then
+        function ReactionWidget:Show(...)
+            local result = baseReactionShow(self, ...)
+            local presentation = self.reactionPresentationState
+            if type(presentation) == "table"
+                and presentation.phase == "show"
+                and type(presentation.displayState) == "table"
+            then
+                self:UpdateFirstRunHelp(presentation.displayState)
+            end
+            return result
+        end
+    end
+
+    local baseReactionRefresh = ReactionWidget.Refresh
+    if type(baseReactionRefresh) == "function" then
+        function ReactionWidget:Refresh(...)
+            local result = baseReactionRefresh(self, ...)
+            local state = Client.GetReactionDisplayState and Client:GetReactionDisplayState() or nil
+            self:UpdateFirstRunHelp(state)
+            return result
+        end
+    end
+
+    local baseReactionHide = ReactionWidget.Hide
+    if type(baseReactionHide) == "function" then
+        function ReactionWidget:Hide(...)
+            self:HideFirstRunHelp()
+            return baseReactionHide(self, ...)
+        end
+    end
+
+    local baseEnsureReactionActionSlot = ReactionWidget.EnsureActionSlot
+    if type(baseEnsureReactionActionSlot) == "function" then
+        function ReactionWidget:EnsureActionSlot(index)
+            local slot = baseEnsureReactionActionSlot(self, index)
+            if type(slot) == "table" and slot._firstRunHelpHookInstalled ~= true then
+                local frame = slot.button and slot.button.GetFrame and slot.button:GetFrame() or nil
+                if frame and type(frame.HookScript) == "function" then
+                    frame:HookScript("OnClick", function()
+                        if slot.actionId ~= nil and type(Help.Acknowledge) == "function" then
+                            Help:Acknowledge("reaction.options")
+                        end
+                    end)
+                    slot._firstRunHelpHookInstalled = true
+                end
+            end
+            return slot
+        end
+    end
+end
+
+if type(ActionBarWidget) == "table" and type(ActionBarWidget.RegisterFirstPlayerTurnHelp) == "function" then
+    function ActionBarWidget:RegisterFirstPlayerTurnHelp()
+        if type(Help.Register) ~= "function" then
+            return false
+        end
+        return Help:Register("event.first-player-turn", {
+            text = "When you are finished acting, click End Turn to pass play to the next unit.",
+        })
+    end
+end
+
 return ReactionWidget
