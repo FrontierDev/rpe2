@@ -13,6 +13,8 @@ local Contributions = Addon.Internal and Addon.Internal.GuildShopContributions o
 local OldGetEntryDefinition = DataEditor.GetEntryDefinition
 local OldGetContentPageDefinitions = DataEditor.GetContentPageDefinitions
 local OldRefreshContentPageByKey = DataEditor.RefreshContentPageByKey
+local OldBuildRolesPage = DataEditor.BuildGuildSettingInspectorRolesPage
+local OldRefreshRolesPage = DataEditor.RefreshGuildSettingRolesPage
 local OldBuildRequisitionsPage = DataEditor.BuildGuildSettingInspectorRequisitionsPage
 
 local GUILD_SETTING_ENTRY_DEFINITION = {
@@ -309,6 +311,64 @@ function DataEditor:BuildGuildShopContributionsPage(page)
 
     self:RefreshGuildShopContributionsPage()
     return root
+end
+
+if type(OldBuildRolesPage) == "function" then
+    function DataEditor:BuildGuildSettingInspectorRolesPage(parent)
+        local page = OldBuildRolesPage(self, parent)
+        if self.GuildSettingInspectorRoleWowRankHint and self.GuildSettingInspectorRoleWowRankHint.SetText then
+            self.GuildSettingInspectorRoleWowRankHint:SetText(
+                "Select the WoW guild ranks associated with this Role. Mappings are retained even when automatic granting is disabled."
+            )
+        end
+
+        if not self.GuildSettingInspectorRoleAutoGiveCheckbox then
+            local shell = parent and parent._guildSettingPageScrollShell or nil
+            local root = shell and shell.root or nil
+            if root then
+                self.GuildSettingInspectorRoleAutoGiveCheckbox = UI.Checkbox:New({
+                    name = "RPEDataEditorGuildSettingInspectorRoleAutoGiveCheckbox",
+                    width = 320,
+                    height = 18,
+                    text = "Automatically grant from mapped WoW Guild Rank",
+                    checked = false,
+                    border = false,
+                    onValueChanged = function(value)
+                        if self._refreshingGuildSettingInspector then return end
+                        local selectedIndex = tonumber(self.SelectedGuildSettingRoleIndex)
+                        if not selectedIndex then return end
+                        self:CommitSelectedGuildSetting(function(setting)
+                            local role = setting.roles and setting.roles[selectedIndex]
+                            if role then role.autoGive = value == true end
+                        end)
+                        self:RefreshGuildSettingRolesPage()
+                    end,
+                })
+                self.GuildSettingInspectorRoleAutoGiveCheckbox:SetParent(root:GetFrame())
+                self.GuildSettingInspectorRoleAutoGiveCheckbox:Create()
+                root:AddChild(self.GuildSettingInspectorRoleAutoGiveCheckbox)
+            end
+        end
+        self:RefreshGuildSettingRolesPage()
+        return page
+    end
+end
+
+if type(OldRefreshRolesPage) == "function" then
+    function DataEditor:RefreshGuildSettingRolesPage(...)
+        local result = OldRefreshRolesPage(self, ...)
+        local setting = self:GetSelectedGuildSetting()
+        local selectedIndex = tonumber(self.SelectedGuildSettingRoleIndex)
+        local role = selectedIndex and setting and setting.roles and setting.roles[selectedIndex] or nil
+        local checkbox = self.GuildSettingInspectorRoleAutoGiveCheckbox
+        if checkbox then
+            checkbox:SetChecked(role and role.autoGive == true or false, true)
+            if checkbox.SetEnabled then checkbox:SetEnabled(role ~= nil) end
+            local frame = checkbox.GetFrame and checkbox:GetFrame() or nil
+            if frame and frame.SetAlpha then frame:SetAlpha(role and 1 or 0.5) end
+        end
+        return result
+    end
 end
 
 -- #272: refresh Shop Category visibility immediately when Character Limit changes.
