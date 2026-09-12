@@ -183,11 +183,12 @@ local function migrateLegacyUsage(guildKey, settingRef, bucket)
     for legacyRef, legacyLedger in pairs(bucket.requisitions) do
         if legacyRef ~= settingRef and type(legacyLedger) == "table" then
             local legacyDatasetId, legacySettingId = parseReference(legacyRef)
-            local _, stillCurrentRoot = resolveGuildSetting(legacyRef)
+            local resolvedTargetRef, resolvedRoleId = resolveLegacyRoleTarget(legacyRef)
             if legacyDatasetId == shape.datasetId
                 and legacySettingId
                 and shape.roleIds[legacySettingId]
-                and stillCurrentRoot == nil then
+                and resolvedTargetRef == settingRef
+                and resolvedRoleId == legacySettingId then
                 for requisitionId, rawUsage in pairs(legacyLedger) do
                     local normalizedId = trim(requisitionId)
                     local usage = tonumber(rawUsage)
