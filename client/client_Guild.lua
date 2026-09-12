@@ -28,7 +28,8 @@ end
 
 local function trimText(value)
     local text = ensureString(value)
-    return text:gsub("^%s+", ""):gsub("%s+$", "")
+    local trimmed = text:gsub("^%s+", ""):gsub("%s+$", "")
+    return trimmed
 end
 
 local function normalizeInteger(value, minimum, maximum)
