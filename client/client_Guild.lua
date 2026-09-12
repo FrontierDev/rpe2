@@ -21,7 +21,6 @@ local DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE = "reset-cycle"
 
 Guild._guildAdminPending = Guild._guildAdminPending or {}
 Guild._guildAdminRequestSequence = tonumber(Guild._guildAdminRequestSequence) or 0
-Guild._guildAdminMemberRoles = Guild._guildAdminMemberRoles or {}
 
 local function ensureString(value)
     return value == nil and "" or tostring(value)
@@ -1104,8 +1103,6 @@ function Guild:HandleGuildAdminQueryResponse(arguments, sender, distribution)
         skills = parsed.profileState.skills,
         sender = sender,
     }
-    self._guildAdminMemberRoles[normalizePlayerName(sender)] = { settingRef = parsed.activeSettingRef, roleIds = parsed.manualRoleIds }
-    if #parsed.manualRoleIds == 1 and type(Profile.MakeGuildRoleKey) == "function" then response.assignedRankRef = Profile.MakeGuildRoleKey(parsed.activeSettingRef, parsed.manualRoleIds[1]) or "" else response.assignedRankRef = "" end
     return completePending(self, requestId, response)
 end
 
@@ -1271,60 +1268,6 @@ function Guild:HandleRuntimeEvent(event)
     local _, roles = self:GetEffectiveRoles()
     self:RefreshWindow()
     return roles
-end
-
--- Transitional facades for the pre-#267 Guild pages only. New runtime/business
--- logic does not use these APIs.
-function Guild:GetAssignedGuildRankRef()
-    local _, resolution = self:GetActiveGuildSetting()
-    return resolution and resolution.status == "active" and resolution.ref or nil
-end
-
-function Guild:GetAssignedGuildRankStatus()
-    local setting, resolution = self:GetActiveGuildSetting()
-    if not setting then
-        return { status = resolution and resolution.status or "unavailable", reason = resolution and resolution.reason or "unavailable", assignedRankRef = nil, rank = nil, setting = nil, resolution = resolution }
-    end
-    return { status = "valid", reason = "valid", assignedRankRef = resolution.ref, activeSettingRef = resolution.ref, rank = setting, setting = setting, dataset = resolution.dataset, guildKey = resolution.guildKey, resolution = resolution }
-end
-
-function Guild:GetAssignedGuildRank()
-    local status = self:GetAssignedGuildRankStatus()
-    return status.status == "valid" and status.setting or nil, status
-end
-
-function Guild:GetApplicableGuildRanks()
-    local setting, resolution = self:GetActiveGuildSetting()
-    if not setting then return {}, resolution end
-    local rows = {}
-    for _, role in ipairs(setting.roles or {}) do
-        local roleId = trimText(role and role.id)
-        if roleId ~= "" then
-            local ref = type(Profile.MakeGuildRoleKey) == "function" and Profile.MakeGuildRoleKey(resolution.ref, roleId) or (resolution.ref .. "#" .. roleId)
-            rows[#rows + 1] = { dataset = resolution.dataset, setting = role, rank = role, datasetId = resolution.datasetId, settingId = roleId, ref = ref, datasetName = getDatasetLabel(resolution.dataset), settingName = trimText(role.name) ~= "" and trimText(role.name) or roleId, guildName = resolution.guildName, roleId = roleId, guildSettingRef = resolution.ref }
-        end
-    end
-    return rows, resolution
-end
-
-function Guild:GetEligibleGuildRanksForWoWRank()
-    return self:GetApplicableGuildRanks()
-end
-
-function Guild:SetGuildRankForMember(targetName, roleKey, callback)
-    if type(Profile.ParseGuildRoleKey) ~= "function" then return false, "incompatible-protocol" end
-    local settingRef, roleId = Profile.ParseGuildRoleKey(roleKey)
-    if not settingRef or not roleId then return false, "unknown-role" end
-    return self:AssignGuildRoleForMember(targetName, settingRef, roleId, callback)
-end
-
-function Guild:ClearGuildRankForMember(targetName, callback)
-    local cached = self._guildAdminMemberRoles[normalizePlayerName(targetName)]
-    if not cached or #cached.roleIds ~= 1 then
-        invokeCallback({ callback = callback }, { success = false, operation = "remove_guild_role", reason = "ambiguous-role-selection" })
-        return false, "ambiguous-role-selection"
-    end
-    return self:RemoveGuildRoleForMember(targetName, cached.settingRef, cached.roleIds[1], callback)
 end
 
 return Guild
