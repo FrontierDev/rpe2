@@ -8,11 +8,23 @@ if not definition or not definition.dataset then
     error("Core default dataset must be registered before core_guild_settings.lua", 2)
 end
 
-if definition.version < 2 then
-    definition.version = 2
+if definition.version < 3 then
+    definition.version = 3
 end
 
 local dataset = definition.dataset
+
+-- Copper is a built-in currency and should be used directly by requisition
+-- costs. Remove the obsolete authored Spark of Inspiration currency from Core.
+dataset.currencies = dataset.currencies or {}
+for index = #dataset.currencies, 1, -1 do
+    local currency = dataset.currencies[index]
+    if type(currency) == "table"
+        and (tostring(currency.id or "") == "k3aulg3o"
+            or tostring(currency.name or "") == "Spark of Inspiration") then
+        table.remove(dataset.currencies, index)
+    end
+end
 
 -- Role IDs are stable implementation details. The Data Editor presents Role
 -- names and does not expose these identifiers to authors.
