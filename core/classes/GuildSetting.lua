@@ -339,15 +339,9 @@ function GuildSetting:Merge(data)
     self.requisitions = normalizeRequisitions(self.requisitions)
     self.dailyRewards = normalizeDailyRewards(self.dailyRewards)
 
-    -- Transitional live-object projection for the pre-Role Guild runtime.
-    -- Task #265 removes callers of this field. It is intentionally omitted
-    -- from ToTable(), so newly serialized GuildSettings are Role-based only.
-    self.wowGuildRankIndices = #self.roles == 1
-        and normalizeWowGuildRankIndices(self.roles[1].wowGuildRankIndices)
-        or {}
-
-    -- Discard removed/legacy active fields. They may be consumed above only
-    -- to produce the normalized Role model.
+    -- Legacy fields are consumed only to build the Role-based model above.
+    -- They are not retained on the live object and are never serialized.
+    self.wowGuildRankIndices = nil
     self.requiredGuildRankIndex = nil
     self.progression = nil
     self.tags = normalizeTags(self.tags)
