@@ -51,15 +51,6 @@ local function normalizeCharacterLimit(value)
     return math.max(1, math.floor(numeric))
 end
 
-local function normalizeOptionalRankIndex(value)
-    local numeric = tonumber(value)
-    if not isFiniteNumber(numeric) or numeric < 0 then
-        return nil
-    end
-
-    return math.floor(numeric)
-end
-
 local function normalizeWowGuildRankIndices(value)
     if type(value) ~= "table" then
         return {}
@@ -131,6 +122,87 @@ local function normalizeGeneral(value)
     }
 end
 
+local function normalizeIcon(value)
+    if type(value) == "number" and isFiniteNumber(value) and value > 0 then
+        return value
+    end
+
+    if type(value) == "string" then
+        return trimText(value)
+    end
+
+    return ""
+end
+
+local function normalizeRole(value, index, usedIds)
+    local source = type(value) == "table" and value or {}
+
+    return {
+        id = normalizeStableId(source.id, index, "role", usedIds),
+        name = ensureString(source.name),
+        description = ensureString(source.description),
+        icon = normalizeIcon(source.icon),
+        wowGuildRankIndices = normalizeWowGuildRankIndices(source.wowGuildRankIndices),
+    }
+end
+
+local function normalizeRoles(value)
+    if type(value) ~= "table" then
+        return {}
+    end
+
+    local roles = {}
+    local usedIds = {}
+    for index = 1, #value do
+        roles[index] = normalizeRole(value[index], index, usedIds)
+    end
+
+    return roles
+end
+
+local function buildLegacyRole(source)
+    if type(source) ~= "table" or source.roles ~= nil or source.wowGuildRankIndices == nil then
+        return nil
+    end
+
+    local roleId = trimText(source.id)
+    if roleId == "" then
+        roleId = "legacy_rank"
+    end
+
+    return {
+        id = roleId,
+        name = ensureString(source.name),
+        description = ensureString(source.description),
+        icon = normalizeIcon(source.icon),
+        wowGuildRankIndices = normalizeWowGuildRankIndices(source.wowGuildRankIndices),
+    }
+end
+
+local function normalizeShopCategory(value, index, usedIds)
+    local source = type(value) == "table" and value or {}
+
+    return {
+        id = normalizeStableId(source.id, index, "shop_category", usedIds),
+        name = ensureString(source.name),
+        order = normalizeInteger(source.order, index * 10, -2147483648),
+    }
+end
+
+local function normalizeShopCategories(value)
+    if type(value) ~= "table" then
+        return {}
+    end
+
+    local categories = {}
+    local usedIds = {}
+    for index = 1, #value do
+        categories[index] = normalizeShopCategory(value[index], index, usedIds)
+    end
+
+    return categories
+end
+
 local function normalizeCost(value)
     local source = type(value) == "table" and value or {}
 
@@ -153,6 +225,24 @@ local function normalizeCosts(value)
     return costs
 end
 
+local function normalizeRoleIds(value)
+    if type(value) ~= "table" then
+        return {}
+    end
+
+    local roleIds = {}
+    local seen = {}
+    for index = 1, #value do
+        local roleId = trimText(value[index])
+        if roleId ~= "" and not seen[roleId] then
+            roleIds[#roleIds + 1] = roleId
+            seen[roleId] = true
+        end
+    end
+
+    return roleIds
+end
+
 local function normalizeRequisition(value, index, usedIds)
     local source = type(value) == "table" and value or {}
 
@@ -161,9 +251,9 @@ local function normalizeRequisition(value, index, usedIds)
         itemRef = normalizeReference(source.itemRef),
         quantity = normalizeInteger(source.quantity, 1, 1),
         costs = normalizeCosts(source.costs),
-        -- Legacy compatibility field; the new Guild Rank mapping is not inferred from it.
-        requiredGuildRankIndex = normalizeOptionalRankIndex(source.requiredGuildRankIndex),
         characterLimit = normalizeCharacterLimit(source.characterLimit),
+        roleIds = normalizeRoleIds(source.roleIds),
+        shopCategoryId = trimText(source.shopCategoryId),
     }
 end
 
@@ -216,11 +306,12 @@ function GuildSetting:New(data)
         name = "",
         description = "",
         guildName = "",
-        wowGuildRankIndices = {},
         general = {
             enableRequisitions = false,
             enableDailyRewards = false,
         },
+        roles = {},
+        shopCategories = {},
         requisitions = {},
         dailyRewards = {},
         tags = {},
@@ -228,6 +319,8 @@ function GuildSetting:New(data)
 end
 
 function GuildSetting:Merge(data)
+    local legacyRole = buildLegacyRole(data)
+
     if type(data) == "table" then
         for key, value in pairs(data) do
             self[key] = value
@@ -237,12 +330,25 @@ function GuildSetting:Merge(data)
     self.name = ensureString(self.name)
     self.description = ensureString(self.description)
     self.guildName = ensureString(self.guildName)
-    self.wowGuildRankIndices = normalizeWowGuildRankIndices(self.wowGuildRankIndices)
     self.general = normalizeGeneral(self.general)
+    self.roles = normalizeRoles(self.roles)
+    if #self.roles == 0 and legacyRole then
+        self.roles = normalizeRoles({ legacyRole })
+    end
+    self.shopCategories = normalizeShopCategories(self.shopCategories)
     self.requisitions = normalizeRequisitions(self.requisitions)
     self.dailyRewards = normalizeDailyRewards(self.dailyRewards)
-    -- Discard the removed Guild Progression definition, including legacy data
-    -- copied onto an existing GuildSetting before normalization.
+
+    -- Transitional live-object projection for the pre-Role Guild runtime.
+    -- Task #265 removes callers of this field. It is intentionally omitted
+    -- from ToTable(), so newly serialized GuildSettings are Role-based only.
+    self.wowGuildRankIndices = #self.roles == 1
+        and normalizeWowGuildRankIndices(self.roles[1].wowGuildRankIndices)
+        or {}
+
+    -- Discard removed/legacy active fields. They may be consumed above only
+    -- to produce the normalized Role model.
+    self.requiredGuildRankIndex = nil
     self.progression = nil
     self.tags = normalizeTags(self.tags)
 
@@ -255,8 +361,9 @@ function GuildSetting:ToTable()
         name = ensureString(self.name),
         description = ensureString(self.description),
         guildName = ensureString(self.guildName),
-        wowGuildRankIndices = normalizeWowGuildRankIndices(self.wowGuildRankIndices),
         general = normalizeGeneral(self.general),
+        roles = normalizeRoles(self.roles),
+        shopCategories = normalizeShopCategories(self.shopCategories),
         requisitions = normalizeRequisitions(self.requisitions),
         dailyRewards = normalizeDailyRewards(self.dailyRewards),
         tags = normalizeTags(self.tags),
