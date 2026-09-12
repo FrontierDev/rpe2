@@ -4,7 +4,9 @@ Addon.Internal = Addon.Internal or {}
 Addon.Internal.Profile = Addon.Internal.Profile or {}
 
 local Profile = Addon.Internal.Profile
+local Database = Addon.Internal.Database or {}
 local Registry = Addon.Internal.Registry or {}
+local Runtime = Addon.Internal.Runtime or {}
 
 local OldGetGuildBucket = Profile.GetGuildBucket
 local OldGetGuildRequisitionUsage = Profile.GetGuildRequisitionUsage
@@ -12,6 +14,112 @@ local OldGetDailyRewardTransaction = Profile.GetDailyRewardTransaction
 
 local function trim(value)
     return tostring(value or ""):match("^%s*(.-)%s*$") or ""
+end
+
+local function clone(value)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    local copy = {}
+    for key, nestedValue in pairs(value) do
+        copy[key] = clone(nestedValue)
+    end
+    return copy
+end
+
+local function equal(left, right, seen)
+    if left == right then
+        return true
+    end
+    if type(left) ~= type(right) or type(left) ~= "table" then
+        return false
+    end
+
+    seen = seen or {}
+    seen[left] = seen[left] or {}
+    if seen[left][right] then
+        return true
+    end
+    seen[left][right] = true
+
+    for key, value in pairs(left) do
+        if not equal(value, right[key], seen) then
+            return false
+        end
+    end
+    for key in pairs(right) do
+        if left[key] == nil then
+            return false
+        end
+    end
+    return true
+end
+
+local function normalizeOptionalText(value)
+    local text = trim(value)
+    return text ~= "" and text or nil
+end
+
+local function normalizeTimestamp(value)
+    local numeric = tonumber(value)
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge or numeric < 0 then
+        return nil
+    end
+    return math.floor(numeric)
+end
+
+local function normalizeGuildBucket(record)
+    local source = type(record) == "table" and record or {}
+    local normalized = clone(source)
+    normalized.assignedRankRef = normalizeOptionalText(source.assignedRankRef)
+    normalized.assignedRankAt = normalizeTimestamp(source.assignedRankAt)
+    normalized.assignedRankBy = normalizeOptionalText(source.assignedRankBy)
+    return normalized
+end
+
+local function normalizeGuildState(record)
+    local source = type(record) == "table" and record or {}
+    local normalized = clone(source)
+    normalized.byGuild = {}
+    for guildKey, bucket in pairs(type(source.byGuild) == "table" and source.byGuild or {}) do
+        normalized.byGuild[guildKey] = normalizeGuildBucket(bucket)
+    end
+    return normalized
+end
+
+-- #271: Guild profile data is runtime character state, not authored
+-- configuration. Keep the public classification accurate for diagnostics, and
+-- persist through the existing runtime transaction/revision infrastructure so
+-- Role/ledger/reward writes cannot enter configuration/resource synchronization.
+if type(Database.ConfigurationChangeClassification) == "table" then
+    Database.ConfigurationChangeClassification["profile-guild"] = "runtime/profile state"
+end
+
+if type(Database.GetOrCreateActiveProfile) == "function"
+    and type(Runtime) == "table"
+    and type(Runtime.RunTransaction) == "function"
+    and type(Runtime.BumpRevision) == "function"
+then
+    function Database.SetProfileGuildState(state)
+        local profile = Database.GetOrCreateActiveProfile()
+        local normalized = normalizeGuildState(state)
+        local current = normalizeGuildState(profile.guild)
+
+        -- Lazy migration and repeated transaction bookkeeping may attempt to
+        -- persist an already-canonical value. Do not create a runtime revision
+        -- or any other invalidation when nothing actually changed.
+        if equal(current, normalized) then
+            profile.guild = current
+            return clone(current)
+        end
+
+        return Runtime:RunTransaction("profile-guild", function()
+            profile.guild = normalized
+            Runtime:BumpRevision("ProfileStateRevision")
+            return clone(profile.guild)
+        end)
+    end
 end
 
 local function parseReference(reference)
