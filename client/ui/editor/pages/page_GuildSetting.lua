@@ -14,7 +14,7 @@ end
 
 local function isShopContribution(guildSetting)
     return type(guildSetting) == "table"
-        and tostring(guildSetting.shopContributionTargetRef or ""):match("^%s*(.-)%s*$") ~= ""
+        and tostring(guildSetting.targetGuildSettingRef or ""):match("^%s*(.-)%s*$") ~= ""
 end
 
 function DataEditor:BuildGuildSettingPage(page)
