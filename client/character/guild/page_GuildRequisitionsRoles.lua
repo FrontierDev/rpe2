@@ -91,9 +91,27 @@ local function appendRoleRequirement(tooltip, setting, requisition, reason)
     if type(spec) ~= "table" then
         spec = { type = "custom", title = resolveItemName(requisition), lines = {} }
     end
-    spec.lines = type(spec.lines) == "table" and spec.lines or {}
-    spec.lines[#spec.lines + 1] = { left = line, colorToken = "danger" }
-    return spec
+    -- Item tooltips are cached. Copy the specification and its line list before
+    -- adding guild-specific content so hovering cannot mutate the cached item
+    -- tooltip and add the same requirement again on every display.
+    local result = {}
+    for key, value in pairs(spec) do
+        result[key] = value
+    end
+
+    result.lines = {}
+    for index = 1, #(spec.lines or {}) do
+        result.lines[index] = spec.lines[index]
+    end
+    result.lines[#result.lines + 1] = {
+        left = line,
+        colorToken = "danger",
+        r = 0.95,
+        g = 0.35,
+        b = 0.35,
+        a = 1,
+    }
+    return result
 end
 
 local function buildRolesTooltip(roles)
@@ -186,11 +204,12 @@ end
 
 function Page:BindShopEntry(entry, requisition)
     OldBindShopEntry(self, entry, requisition)
-    if entry.resolvedEligibilityReason == "missing-required-role" then
+    local eligibilityReason = entry.resolvedEligibilityReason
+    if eligibilityReason == "missing-required-role" then
         local previous = entry:GetTooltip()
         entry:SetTooltip(function()
             local spec = type(previous) == "function" and previous() or previous
-            return appendRoleRequirement(spec, self.ActiveGuildSetting, requisition, entry.resolvedEligibilityReason)
+            return appendRoleRequirement(spec, self.ActiveGuildSetting, requisition, eligibilityReason)
         end)
     end
 end
