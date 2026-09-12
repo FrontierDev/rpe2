@@ -137,6 +137,38 @@ local function migrateLegacyAssignment(guildKey, bucket)
     return true
 end
 
+local function migrateLegacyDailyRewardIdentity(bucket)
+    if type(bucket) ~= "table" then
+        return false
+    end
+
+    local changed = false
+    local claimRef = trim(bucket.dailyRewardSettingRef or bucket.dailyRewardRankRef)
+    if claimRef ~= "" then
+        local settingRef = resolveLegacyRoleTarget(claimRef)
+        if settingRef and settingRef ~= claimRef then
+            bucket.dailyRewardSettingRef = settingRef
+            bucket.dailyRewardRankRef = nil
+            changed = true
+        end
+    end
+
+    local transaction = bucket.dailyRewardTransaction
+    if type(transaction) == "table" then
+        local transactionRef = trim(transaction.settingRef or transaction.rankRef)
+        if transactionRef ~= "" then
+            local settingRef = resolveLegacyRoleTarget(transactionRef)
+            if settingRef and settingRef ~= transactionRef then
+                transaction.settingRef = settingRef
+                transaction.rankRef = nil
+                changed = true
+            end
+        end
+    end
+
+    return changed
+end
+
 local function currentSettingShape(settingRef)
     local dataset, setting = resolveGuildSetting(settingRef)
     if not setting then
@@ -216,8 +248,14 @@ if type(OldGetGuildBucket) == "function" then
     function Profile.GetGuildBucket(guildKey)
         local normalizedGuildKey = trim(guildKey)
         local bucket = OldGetGuildBucket(guildKey)
-        if normalizedGuildKey ~= "" and type(bucket) == "table" and migrateLegacyAssignment(normalizedGuildKey, bucket) then
-            persistBucket(normalizedGuildKey, bucket)
+        if normalizedGuildKey ~= "" and type(bucket) == "table" then
+            local changed = migrateLegacyAssignment(normalizedGuildKey, bucket)
+            if migrateLegacyDailyRewardIdentity(bucket) then
+                changed = true
+            end
+            if changed then
+                persistBucket(normalizedGuildKey, bucket)
+            end
         end
         return bucket
     end
