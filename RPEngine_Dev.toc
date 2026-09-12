@@ -433,6 +433,7 @@ client/ui/editor/inspectors/page_InspectorRace.lua
 client/ui/editor/inspectors/page_InspectorClass.lua
 client/ui/editor/windows/window_DataEditor.lua
 client/ui/editor/windows/window_DataEditorGuildSetting.lua
+client/ui/editor/windows/window_DataEditorGuildSettingRequisitions.lua
 client/ui/ruleset/inspectors/page_InspectorRuleset.lua
 client/ui/ruleset/window_Ruleset.lua
 
