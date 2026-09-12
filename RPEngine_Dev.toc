@@ -134,6 +134,7 @@ core/classes/Aura.lua
 core/classes/Interaction.lua
 core/classes/Achievement.lua
 core/classes/GuildSetting.lua
+core/internal/GuildShopContributions.lua
 core/classes/Currency.lua
 core/classes/Event.lua
 core/classes/EventAutopilotMode.lua
@@ -324,6 +325,7 @@ client/character/profile/page_ProfileAchievements.lua
 client/character/profile/window_Profile.lua
 client/character/guild/page_GuildRequisitions.lua
 client/character/guild/page_GuildRequisitionsRoles.lua
+client/character/guild/page_GuildRequisitionsContributions.lua
 client/character/guild/page_GuildAdmin.lua
 client/character/guild/page_GuildAdminRoles.lua
 client/character/guild/window_Guild.lua
