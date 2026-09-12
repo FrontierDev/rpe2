@@ -34,6 +34,36 @@ local MINIMAP_DEFAULT_ANGLE = 220
 local MINIMAP_BUTTON_SIZE = 32
 local MINIMAP_RADIUS_OFFSET = 2
 
+local LAUNCHER_HELP_SEQUENCE = {
+    "launcher.profile",
+    "launcher.event",
+    "launcher.content",
+}
+
+local LAUNCHER_HELP = {
+    ["launcher.profile"] = {
+        groupKey = "profile",
+        anchorLabel = "Equipment",
+        text = "Character tools are here. View your equipment, spells, skills, inventory, setup and guild features.",
+    },
+    ["launcher.event"] = {
+        groupKey = "event",
+        anchorLabel = "Event Manager",
+        text = "Event tools are here. Event hosts can configure and manage RPE events, and you can show or hide your Action Bar.",
+    },
+    ["launcher.content"] = {
+        groupKey = "settings",
+        anchorLabel = "Data Editor",
+        text = "Create or import RPE data and rules here. These tools are mainly for campaign and ruleset authors.",
+    },
+}
+
+local LAUNCHER_HELP_BY_GROUP = {
+    profile = "launcher.profile",
+    event = "launcher.event",
+    settings = "launcher.content",
+}
+
 local GROUPS = {
     {
         key = "profile",
@@ -107,6 +137,73 @@ function LauncherMenu:IsVisible()
     return frame and frame.IsShown and frame:IsShown() == true or false
 end
 
+function LauncherMenu:RegisterHelpTips()
+    if type(Help.Register) ~= "function" then
+        return false
+    end
+
+    for index = 1, #LAUNCHER_HELP_SEQUENCE do
+        local tipId = LAUNCHER_HELP_SEQUENCE[index]
+        local definition = LAUNCHER_HELP[tipId]
+        local tipText = definition and definition.text or nil
+        Help:Register(tipId, {
+            text = tipText,
+            onAcknowledgeCallback = function()
+                if self:IsVisible() then
+                    self:ShowNextHelpTip()
+                end
+            end,
+        })
+    end
+
+    return true
+end
+
+function LauncherMenu:GetHelpAnchor(tipId)
+    local definition = LAUNCHER_HELP[tipId]
+    if not definition then
+        return nil
+    end
+    return self.buttons[definition.anchorLabel]
+end
+
+function LauncherMenu:ShowNextHelpTip()
+    if not self:IsVisible() or type(Help.IsAcknowledged) ~= "function" or type(Help.Show) ~= "function" then
+        return false
+    end
+
+    self:RegisterHelpTips()
+
+    for index = 1, #LAUNCHER_HELP_SEQUENCE do
+        local tipId = LAUNCHER_HELP_SEQUENCE[index]
+        if not Help:IsAcknowledged(tipId) then
+            local anchor = self:GetHelpAnchor(tipId)
+            if anchor == nil then
+                return false
+            end
+            return Help:Show(tipId, anchor)
+        end
+    end
+
+    return false
+end
+
+function LauncherMenu:HideHelpTip()
+    local activeTipId = Help.ActiveTipId
+    if type(activeTipId) ~= "string" or not LAUNCHER_HELP[activeTipId] or type(Help.Hide) ~= "function" then
+        return false
+    end
+    return Help:Hide(activeTipId)
+end
+
+function LauncherMenu:AcknowledgeGroupHelp(groupKey)
+    local tipId = LAUNCHER_HELP_BY_GROUP[groupKey]
+    if not tipId or type(Help.Acknowledge) ~= "function" then
+        return false
+    end
+    return Help:Acknowledge(tipId)
+end
+
 function LauncherMenu:BuildWindow()
     if self.window then
         return self.window
@@ -129,6 +226,9 @@ function LauncherMenu:BuildWindow()
         contentInsetRight = CONTENT_INSET_RIGHT,
         contentInsetTop = CONTENT_INSET_TOP,
         contentInsetBottom = CONTENT_INSET_BOTTOM,
+        onClose = function()
+            self:HideHelpTip()
+        end,
     })
     window:SetTitle(("|T%s:12:12:0:0|t RPE"):format(HEADER_ICON))
     window:Create()
@@ -167,6 +267,7 @@ function LauncherMenu:BuildWindow()
                 local action = type(Client) == "table" and Client[entry.action] or nil
                 if type(action) == "function" then
                     action(Client)
+                    self:AcknowledgeGroupHelp(group.key)
                 end
                 self:Hide()
             end, {
@@ -178,6 +279,7 @@ function LauncherMenu:BuildWindow()
         end
     end
 
+    self:RegisterHelpTips()
     return window
 end
 
@@ -186,10 +288,12 @@ function LauncherMenu:Show()
     if window and window.Show then
         window:Show()
     end
+    self:ShowNextHelpTip()
     return window
 end
 
 function LauncherMenu:Hide()
+    self:HideHelpTip()
     if self.window and self.window.Hide then
         self.window:Hide()
     end
