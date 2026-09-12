@@ -20,35 +20,6 @@ local function trim(value)
     return tostring(value or ""):match("^%s*(.-)%s*$") or ""
 end
 
--- #268 final cleanup: the base Admin/Requisitions source files still contain
--- dormant pre-Role compatibility branches, but their public runtime facades are
--- no longer exposed after the Role UI has loaded.
-if Guild then
-    Guild.GetAssignedGuildRankRef = nil
-    Guild.GetAssignedGuildRankStatus = nil
-    Guild.GetAssignedGuildRank = nil
-    Guild.GetApplicableGuildRanks = nil
-    Guild.GetEligibleGuildRanksForWoWRank = nil
-    Guild.SetGuildRankForMember = nil
-    Guild.ClearGuildRankForMember = nil
-
-    -- Protocol v2 query responses are Role-based. Remove the local
-    -- assignedRankRef compatibility alias before UI consumers see the result.
-    local OldQueryGuildAdminMember = Guild.QueryGuildAdminMember
-    if type(OldQueryGuildAdminMember) == "function" then
-        function Guild:QueryGuildAdminMember(targetName, callback)
-            return OldQueryGuildAdminMember(self, targetName, function(response)
-                if type(response) == "table" then
-                    response.assignedRankRef = nil
-                end
-                if type(callback) == "function" then
-                    callback(response)
-                end
-            end)
-        end
-    end
-end
-
 local function roleMapsRank(role, rankIndex)
     local target = tonumber(rankIndex)
     if target == nil then return false end
