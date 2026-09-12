@@ -12,6 +12,7 @@ local Contributions = Addon.Internal and Addon.Internal.GuildShopContributions o
 
 local OldGetEntryDefinition = DataEditor.GetEntryDefinition
 local OldGetContentPageDefinitions = DataEditor.GetContentPageDefinitions
+local OldRefreshContentPageByKey = DataEditor.RefreshContentPageByKey
 local OldBuildRequisitionsPage = DataEditor.BuildGuildSettingInspectorRequisitionsPage
 
 local GUILD_SETTING_ENTRY_DEFINITION = {
@@ -110,6 +111,24 @@ local function nextId(entries, prefix)
     return prefix .. number
 end
 
+local function uniqueRequestedId(entries, currentIndex, requested, prefix)
+    local base = trim(requested)
+    if base == "" then base = nextId(entries, prefix) end
+    local seen = {}
+    for index = 1, #(entries or {}) do
+        if index ~= currentIndex then
+            local id = trim(entries[index] and entries[index].id)
+            if id ~= "" then seen[id] = true end
+        end
+    end
+    local candidate, suffix = base, 2
+    while seen[candidate] do
+        candidate = base .. "_" .. suffix
+        suffix = suffix + 1
+    end
+    return candidate
+end
+
 local function contributionRows(dataset)
     local rows = {}
     for index = 1, #(dataset and dataset.guildSettings or {}) do
@@ -161,6 +180,11 @@ function DataEditor:GetContentPageDefinitions()
     end
     if not found then definitions[#definitions + 1] = { key = "guildShopContributions", label = "Shop Contributions", builder = "BuildGuildShopContributionsPage" } end
     return definitions
+end
+
+function DataEditor:RefreshContentPageByKey(pageKey)
+    if pageKey == "guildShopContributions" then return self:RefreshGuildShopContributionsPage() end
+    return OldRefreshContentPageByKey(self, pageKey)
 end
 
 function DataEditor:RefreshGuildShopContributionsPage()
@@ -249,7 +273,14 @@ function DataEditor:BuildGuildShopContributionsPage(page)
     self.GuildShopContributionReqIdInput = inputRow(root, "RPEGuildShopContributionReqId", "Item ID")
     self.GuildShopContributionItemRefInput = inputRow(root, "RPEGuildShopContributionItemRef", "Item Ref")
     self.GuildShopContributionQuantityInput = inputRow(root, "RPEGuildShopContributionQuantity", "Quantity")
-    self.GuildShopContributionReqIdInput:SetScript("OnEditFocusLost", function() local _, r = selectedRequisition(self); if r and trim(self.GuildShopContributionReqIdInput:GetText()) ~= "" then r.id = trim(self.GuildShopContributionReqIdInput:GetText()); changed(self, "shop-contribution-item-id"); self:RefreshGuildShopContributionsPage() end end)
+    self.GuildShopContributionReqIdInput:SetScript("OnEditFocusLost", function()
+        local contribution, requisition, index = selectedRequisition(self)
+        if requisition then
+            requisition.id = uniqueRequestedId(contribution.requisitions, index, self.GuildShopContributionReqIdInput:GetText(), "shop_item_")
+            changed(self, "shop-contribution-item-id")
+            self:RefreshGuildShopContributionsPage()
+        end
+    end)
     self.GuildShopContributionItemRefInput:SetScript("OnEditFocusLost", function() local _, r = selectedRequisition(self); if r then r.itemRef = trim(self.GuildShopContributionItemRefInput:GetText()); changed(self, "shop-contribution-item-ref"); self:RefreshGuildShopContributionsPage() end end)
     self.GuildShopContributionQuantityInput:SetScript("OnEditFocusLost", function() local _, r = selectedRequisition(self); if r then r.quantity = math.max(1, math.floor(tonumber(self.GuildShopContributionQuantityInput:GetText()) or 1)); r.characterLimit = 0; changed(self, "shop-contribution-quantity"); self:RefreshGuildShopContributionsPage() end end)
 
