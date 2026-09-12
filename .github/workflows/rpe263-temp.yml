@@ -18,12 +18,14 @@ jobs:
         with:
           ref: dev
           fetch-depth: 0
+      - name: Apply resolver fix
+        run: python .github/rpe263_fix.py
       - name: Apply and validate #263
         run: python .github/rpe263_apply.py
       - name: Commit scoped result
         run: |
           git diff --check
-          git rm .github/rpe263_apply.py .github/workflows/rpe263-temp.yml
+          git rm .github/rpe263_apply.py .github/rpe263_fix.py .github/workflows/rpe263-temp.yml
           git config user.name "ortellus"
           git config user.email "elvetgames@gmail.com"
           git add data/default/professions/engineering.lua
