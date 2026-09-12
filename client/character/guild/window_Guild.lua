@@ -29,41 +29,34 @@ local function refreshPageOnShow(page, refreshFn)
     end)
 end
 
-local function getAssignedRankLabel(status)
-    local rank = status and status.rank or nil
-    local rankName = tostring(rank and rank.name or "")
-    if rankName ~= "" then
-        return rankName
+local function describeEffectiveRoles(roles, state)
+    local status = tostring(state and state.status or "unavailable")
+    if status == "not-in-guild" then
+        return "Roles: Not in a guild"
+    elseif status == "guild-loading" then
+        return "Roles: Guild information is still loading"
+    elseif status == "conflict" then
+        return "Roles: Guild configuration conflict"
+    elseif status ~= "active" then
+        return "Roles: Unavailable"
     end
 
-    local rankId = tostring(rank and rank.id or "")
-    if rankId ~= "" then
-        return rankId
+    local names = {}
+    for index = 1, #(roles or {}) do
+        local entry = roles[index]
+        local name = tostring(entry and (entry.name or entry.roleId) or "")
+        if name ~= "" then
+            names[#names + 1] = name
+        end
     end
 
-    local assignedRankRef = tostring(status and status.assignedRankRef or "")
-    return assignedRankRef ~= "" and assignedRankRef or "Unknown"
-end
-
-local function describeAssignedRankStatus(status)
-    local statusKey = tostring(status and status.status or "not-in-guild")
-    if statusKey == "valid" then
-        return "Guild Rank: " .. getAssignedRankLabel(status)
-    elseif statusKey == "unassigned" then
-        return "Guild Rank: Not assigned"
-    elseif statusKey == "not-eligible-for-current-wow-rank" then
-        return "Guild Rank: " .. getAssignedRankLabel(status) .. " (no longer valid for current WoW rank)"
-    elseif statusKey == "not-applicable" then
-        return "Guild Rank: " .. getAssignedRankLabel(status) .. " (not applicable to this guild)"
-    elseif statusKey == "unknown-rank" then
-        return "Guild Rank: Unknown assignment"
-    elseif statusKey == "guild-loading" then
-        return "Guild Rank: Guild information is still loading"
-    elseif statusKey == "not-in-guild" then
-        return "Guild Rank: Not in a guild"
+    if #names == 0 then
+        return "Roles: None"
     end
-
-    return "Guild Rank: Unavailable"
+    if #names <= 3 then
+        return "Roles: " .. table.concat(names, ", ")
+    end
+    return ("Roles: %d Roles"):format(#names)
 end
 
 local function createInstance()
@@ -105,16 +98,16 @@ function GuildWindow:GetTabIndex(tabKey)
     return 1
 end
 
-function GuildWindow:GetAssignedGuildRankDisplay()
+function GuildWindow:GetEffectiveRolesDisplay()
     local Guild = Client.Guild
-    local status = {
-        status = "not-in-guild",
-    }
-    if Guild and type(Guild.GetAssignedGuildRankStatus) == "function" then
-        status = Guild:GetAssignedGuildRankStatus() or status
+    local roles, state = {}, { status = "unavailable" }
+    if Guild and type(Guild.GetEffectiveRoles) == "function" then
+        local resolvedRoles, resolvedState = Guild:GetEffectiveRoles()
+        roles = type(resolvedRoles) == "table" and resolvedRoles or roles
+        state = type(resolvedState) == "table" and resolvedState or state
     end
 
-    return status, describeAssignedRankStatus(status)
+    return roles, state, describeEffectiveRoles(roles, state)
 end
 
 function GuildWindow:RefreshTab(tabKey)
