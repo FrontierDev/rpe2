@@ -75,7 +75,7 @@ local DATASET_ENTRY_DEFINITIONS = {
     auras = { className = "Aura", singular = "Aura", assignsId = true },
     interactions = { className = "Interaction", singular = "Interaction", assignsId = true },
     achievements = { className = "Achievement", singular = "Achievement", assignsId = true },
-    guildSettings = { className = "GuildSetting", singular = "Guild Rank", assignsId = true },
+    guildSettings = { className = "GuildSetting", singular = "Guild Setting", assignsId = true },
     currencies = { className = "Currency", singular = "Currency", assignsId = true },
 }
 
@@ -527,22 +527,14 @@ local function normalizeGuildSettingEntry(record)
         local instance = guildSettingClass.FromTable(deepCopy(source))
         local normalized = guildSettingClass.ToTable(instance)
         if type(normalized) == "table" then
-            local merged = deepCopy(source)
-            for key, value in pairs(normalized) do
-                merged[key] = value
-            end
-            return merged
+            return deepCopy(normalized)
         end
     end
 
-    -- GuildSetting.lua loads after Database.lua. This keeps old records safe
-    -- during Database.Initialize; later normalizations apply the full class
-    -- contract once the class is available.
-    local normalized = deepCopy(source)
-    if normalized.wowGuildRankIndices == nil then
-        normalized.wowGuildRankIndices = {}
-    end
-    return normalized
+    -- GuildSetting.lua loads after Database.lua. Preserve the source exactly
+    -- during the first initialization pass; later normalizations apply the
+    -- authoritative class contract once the class is available.
+    return deepCopy(source)
 end
 
 local function normalizeGuildSettings(value)
@@ -3313,7 +3305,6 @@ function Database.SyncDefaultDatasets(defaultDefinitions, options)
         logDefaultDatasetSyncDiagnostic("<definitions>", "definitions must be a table")
         return changedDatasetIds, 1
     end
-
     local root = Database.Datasets
     if type(root) ~= "table" then
         root = Database.EnsureDatasets()
