@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 6,
+    version = 7,
     dataset = {
         achievements = {},
         auras = {},
@@ -604,6 +604,17 @@ Addon.Data.DefaultDatasets:Register({
                 itemType = "material",
                 maxStackSize = 10,
                 name = "Wooden Stock",
+                quality = "common"
+            },
+            {
+                allowWowConversion = true,
+                canDisenchant = false,
+                icon = "interface/icons/inv_mace_11.blp",
+                id = "u7rzoqvg",
+                itemLevel = 25,
+                itemType = "material",
+                maxStackSize = 10,
+                name = "Heavy Stock",
                 quality = "common"
             }
         },
