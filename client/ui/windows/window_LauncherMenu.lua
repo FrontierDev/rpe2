@@ -226,6 +226,9 @@ function LauncherMenu:BuildWindow()
         contentInsetRight = CONTENT_INSET_RIGHT,
         contentInsetTop = CONTENT_INSET_TOP,
         contentInsetBottom = CONTENT_INSET_BOTTOM,
+        onClose = function()
+            self:HideHelpTip()
+        end,
     })
     window:SetTitle(("|T%s:12:12:0:0|t RPE"):format(HEADER_ICON))
     window:Create()
