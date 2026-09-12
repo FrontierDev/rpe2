@@ -57,6 +57,7 @@ Season of Discovery-only recipes such as Polished Truesilver Gears and the radia
 - Reusable Engineering Recipe tools may use only Blacksmith Hammer `61fdf3df:518sbr8g`; never author Arclight Spanner or Gyromatic Micro-Adjustor as `tool` inputs.
 - A recipe only gets the Blacksmith Hammer tool when its Classic source recipe actually uses Blacksmith Hammer; do not replace every historical Engineering tool with a hammer.
 - Manually activated item/equipment effects use `Item.useSpellRef -> Spell` only when the generic Spell/Aura system can represent them accurately.
+- Ice Deflector intentionally follows the established Flame Deflector RPE abstraction rather than literal vanilla absorb semantics: self-targeted +50 school Resistance for 3 turns, 10-turn `potion` cooldown.
 - Explosive direct damage uses the existing multi-target model (`target.type = "multi"`, 1–5 enemies) and the shared `engineering_explosive` cooldown group used by the prior slice.
 - Bomb/incapacitate effects that break on damage use a one-turn control Aura with `cancelOnDamage = true`, `preventCasting = true`, `movementRangeOverride = 0`.
 - Guns use Core Ranged slot `f82db71a:q8ve6n6t`, Gun type `f82db71a:anoo8qfp`, Physical school `f82db71a:v1azo4j6`, and one generic modification slot.
@@ -89,6 +90,7 @@ Spirit                   f82db71a:kec9rhli
 Intellect                f82db71a:75y3a8ib
 Spell Power              f82db71a:7t7xgzcx
 Fire Resistance          f82db71a:0w7c7p09
+Frost Resistance         f82db71a:jjn0my8k
 Ranged Attack Power      f82db71a:v2rs9cpy
 
 Heavy Stone              61fdf3df:u8qtuhfq
@@ -208,7 +210,7 @@ All implementation-stage recipes use `skillRef = "f82db71a:xprqs3y1"` and `learn
 
 ### Defensive consumable exception
 
-- **Ice Deflector** — item level 31, required level 21, 5 charges in Classic. RPE should follow the same general item-use family as Flame Deflector rather than model literal charges. Its source effect absorbs 600 Frost damage for 1 minute on a 15-minute cooldown. The current generic Aura schema has no damage-absorb/shield effect, so the exact active effect is blocked; do not substitute Frost Resistance because that changes semantics.
+- **Ice Deflector** — item level 31, required level 21, source item uses charges in vanilla Classic. For RPE, intentionally mirror Flame Deflector rather than literal source absorb semantics: potion-like consumable with `useSpellRef`, self-targeted instant Spell, 10-turn cooldown in cooldown group `potion`, applying an Aura for 3 turns that grants **+50 Frost Resistance** via `f82db71a:jjn0my8k`. Use the same stack behavior as Flame Deflector (`maxStacks = 1`, `refresh_duration`). The inventory item is consumed only after the cast is accepted. This is an explicit project abstraction and is not blocked.
 
 ### Explosives
 
@@ -250,30 +252,31 @@ All wearable armour receives one generic modification slot unless the live Item 
 
 Representable active effects:
 
-1. Solid Dynamite — 250 Fire, multi 1–5.
-2. Iron Grenade — 175 Fire + one-turn break-on-damage control.
-3. Big Iron Bomb — 175 Fire + one-turn break-on-damage control.
-4. EZ-Thro Dynamite II — 250 Fire, multi 1–5, no Engineering-use condition.
-5. Goblin Sapper Charge — 600 Fire to enemy multi 1–5 plus 500 Fire self-damage to caster.
-6. Mithril Frag Bomb — 175 Fire + one-turn break-on-damage control.
+1. Ice Deflector — self-targeted instant Spell; applies a 3-turn Aura granting +50 Frost Resistance (`f82db71a:jjn0my8k`); cooldown 10, cooldown group `potion`; unavailable as a learned/action-bar Spell; ignore GCD, matching Flame Deflector.
+2. Solid Dynamite — 250 Fire, multi 1–5.
+3. Iron Grenade — 175 Fire + one-turn break-on-damage control.
+4. Big Iron Bomb — 175 Fire + one-turn break-on-damage control.
+5. EZ-Thro Dynamite II — 250 Fire, multi 1–5, no Engineering-use condition.
+6. Goblin Sapper Charge — 600 Fire to enemy multi 1–5 plus 500 Fire self-damage to caster.
+7. Mithril Frag Bomb — 175 Fire + one-turn break-on-damage control.
 
 Potentially no Spell is needed for passive equipment stats.
 
-Do **not** implement inaccurate substitute effects for Ice Deflector, Flash Bomb, Goblin Construction Helmet, Gnomish Harm Prevention Belt, Catseye Ultra Goggles, the two Rocket Boots, or Parachute Cloak. Their limitations are recorded below.
+Do **not** implement inaccurate substitute effects for Flash Bomb, Goblin Construction Helmet, Gnomish Harm Prevention Belt, Catseye Ultra Goggles, the two Rocket Boots, or Parachute Cloak. Their limitations are recorded below.
 
 ## Current-code findings relevant to implementation
 
 - `Recipe.lua` still accepts only `rpe_item` and `tool` inputs; tools are structurally separate from consumed reagents.
 - `client_Crafting.lua` still calculates trainer cost from skill level at runtime, indexes `trainer` recipes by skill, checks tools separately, consumes only `rpe_item` inputs, and produces the configured output quantity.
 - `client_ItemUse.lua` supports consumables from inventory and weapon/armor use effects from equipped items through `useSpellRef`; inventory consumables are removed only after the cast is accepted, while equipped items are not consumed.
-- Current `Aura.lua` supports damage/heal/stat/skill/control/apply-aura/resource effects but no absorb/shield primitive and no creature-family/fear behavior.
+- Current `Aura.lua` supports damage/heal/stat/skill/control/apply-aura/resource effects. Ice Deflector uses the supported stat-Aura abstraction already established by Flame Deflector; absorb/shield support is still absent for unrelated source effects such as Goblin Construction Helmet and Gnomish Harm Prevention Belt.
 - Current Item schema supports equipment stats, skill bonuses, slots, modifications, and `useSpellRef`; it does not provide a generic stealth-detection or slow-fall mechanic.
 - Dependency discovery follows qualified refs, so #262/#263 must add any newly referenced owner datasets and must not duplicate shared materials inside Engineering.
 - Packaged default synchronization remains version-driven and preserves activation state; later implementation issues must increment only datasets they actually modify.
 
 ## Source audit
 
-Source verification uses vanilla Classic Engineering recipe/item data. The range boundary is determined by **recipe skill**, not a later/current item-use Engineering requirement. This is why `Mithril Frag Bomb` belongs at recipe skill 215 and `Spellpower Goggles Xtreme` belongs at recipe skill 225, while `Explosive Sheep` (150) and `The Big One` (235) are excluded. Ice Deflector and Goblin Sapper Charge are explicit user-requested inclusions within the `(150,225]` band.
+Source verification uses vanilla Classic Engineering recipe/item data. The range boundary is determined by **recipe skill**, not a later/current item-use Engineering requirement. This is why `Mithril Frag Bomb` belongs at recipe skill 215 and `Spellpower Goggles Xtreme` belongs at recipe skill 225, while `Explosive Sheep` (150) and `The Big One` (235) are excluded. Ice Deflector and Goblin Sapper Charge are explicit user-requested inclusions within the `(150,225]` band. Ice Deflector intentionally uses the same RPE resistance-buff abstraction as Flame Deflector instead of reproducing its literal vanilla absorb effect.
 
 ## Incomplete / Blocked Items and Recipes
 
@@ -281,7 +284,6 @@ The **23 Item and Recipe identities/source rows are complete** for the focused s
 
 | Item | Complete | Missing behavior | Blocker | Smallest follow-up |
 | --- | --- | --- | --- | --- |
-| Ice Deflector | item/recipe/source effect | absorb 600 Frost damage | no generic absorb/shield Aura effect | add a generic absorb effect with school filtering |
 | Flash Bomb | item/recipe/source effect | fear only Beast targets | no creature-family target predicate/fear movement | generic creature-family condition + fear control behavior |
 | Goblin Construction Helmet | wearable stats/recipe | 300–500 Fire absorb | no generic absorb/shield Aura effect | generic school-filtered absorb effect |
 | Goblin Mining Helmet | wearable stats/recipe | +5 Mining | no packaged Mining skill | add Mining only if professions are intentionally expanded to include it |
@@ -291,4 +293,4 @@ The **23 Item and Recipe identities/source rows are complete** for the focused s
 | Goblin Rocket Boots | wearable stats/recipe | exact speed boost + explosion malfunction | active/failure semantics are not generically defined | same |
 | Parachute Cloak | wearable stats/recipe | slow fall | no fall/movement-physics model | no change unless non-combat movement effects are introduced |
 
-No Recipe is blocked from being authored solely because its active effect is blocked; #261 should omit inaccurate Spells and #262 can still author the canonical Item metadata without a false `useSpellRef`.
+No Recipe is blocked from being authored solely because its active effect is blocked; #261 should omit inaccurate Spells only for the remaining blocked entries, while #262 can still author their canonical Item metadata without a false `useSpellRef`.
