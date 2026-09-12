@@ -393,11 +393,4 @@ if type(OldGetDailyRewardTransaction) == "function" then
     end
 end
 
--- #268 final cleanup: these singular-rank APIs were transitional facades for
--- pre-Role callers. Legacy SavedVariables are still consumed by the migration
--- paths above/original Guild.lua, but new runtime code cannot assign one RPE rank.
-Profile.GetAssignedGuildRank = nil
-Profile.SetAssignedGuildRank = nil
-Profile.ClearAssignedGuildRank = nil
-
 return Profile
