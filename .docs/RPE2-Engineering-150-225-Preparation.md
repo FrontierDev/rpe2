@@ -10,16 +10,17 @@ The exact skill boundary is:
 required Engineering skill > 150 and <= 225
 ```
 
-The product scope is intentionally the same focused subset directed for the preceding Engineering slice. **Only these output categories are in scope:**
+The product scope is intentionally the same focused subset directed for the preceding Engineering slice, with two explicit user-requested exceptions. **Only these output categories are in scope:**
 
-- bombs, grenades and dynamite;
+- bombs, grenades and dynamite, including Goblin Sapper Charge;
 - guns;
 - armour / goggles and other wearable armour pieces;
-- ammunition.
+- ammunition;
+- Ice Deflector as an explicit defensive-consumable exception.
 
 Everything else in vanilla Classic Engineering `(150,225]` is deliberately out of scope even when it is a valid recipe in the band.
 
-The final scoped inventory is **21 Recipes / 21 crafted outputs**.
+The final scoped inventory is **23 Recipes / 23 crafted outputs**.
 
 ## Explicit exclusions
 
@@ -32,9 +33,9 @@ Do not implement components, modifications, or generic devices merely for source
 - standalone trinkets and devices;
 - mortars;
 - mines, including Goblin Land Mine;
-- seaforium and sapper charges, including Goblin Sapper Charge;
+- seaforium charges other than the explicitly included Goblin Sapper Charge;
 - repair kits;
-- reflectors / deflectors, including Ice Deflector;
+- reflectors / deflectors other than the explicitly included Ice Deflector;
 - fireworks;
 - other utility outputs that are not wearable armour.
 
@@ -55,7 +56,7 @@ Season of Discovery-only recipes such as Polished Truesilver Gears and the radia
 - Finished wearable items deliberately used as ingredients remain real item dependencies when both items are meaningful equipment, matching the Green Tinted Goggles precedent.
 - Reusable Engineering Recipe tools may use only Blacksmith Hammer `61fdf3df:518sbr8g`; never author Arclight Spanner or Gyromatic Micro-Adjustor as `tool` inputs.
 - A recipe only gets the Blacksmith Hammer tool when its Classic source recipe actually uses Blacksmith Hammer; do not replace every historical Engineering tool with a hammer.
-- Manually activated wearable effects use `Item.useSpellRef -> Spell` only when the generic Spell/Aura system can represent them accurately.
+- Manually activated item/equipment effects use `Item.useSpellRef -> Spell` only when the generic Spell/Aura system can represent them accurately.
 - Explosive direct damage uses the existing multi-target model (`target.type = "multi"`, 1–5 enemies) and the shared `engineering_explosive` cooldown group used by the prior slice.
 - Bomb/incapacitate effects that break on damage use a one-turn control Aura with `cancelOnDamage = true`, `preventCasting = true`, `movementRangeOverride = 0`.
 - Guns use Core Ranged slot `f82db71a:q8ve6n6t`, Gun type `f82db71a:anoo8qfp`, Physical school `f82db71a:v1azo4j6`, and one generic modification slot.
@@ -76,6 +77,7 @@ Misc                     3eb7e9bb
 
 Physical school          f82db71a:v1azo4j6
 Fire school              f82db71a:esjguw6d
+Frost school             f82db71a:hx7pnwv4
 Ranged slot              f82db71a:q8ve6n6t
 Ammo slot                f82db71a:atsoi5vr
 Head slot                f82db71a:bgvs1zx6
@@ -107,6 +109,7 @@ Star Ruby                4999dcec:mr1cbt76
 Elemental Fire           732368d4:sclalidn
 Elemental Earth          3eb7e9bb:d9e5e2sy
 Heavy Stock              3eb7e9bb:u7rzoqvg
+Frost Oil                d6ffc4e2:p9f4o8ek
 Catseye Elixir           d6ffc4e2:o8c3e7dj
 Goblin Rocket Fuel       d6ffc4e2:q1g5m9fl
 Black Mageweave Boots    7259f1d3:t9oha2l3
@@ -134,6 +137,7 @@ The following source Engineering components are not added as dependent-recipe re
 | --- | --- |
 | Heavy Blasting Powder | Heavy Stone `61fdf3df:u8qtuhfq` 1:1 |
 | Solid Blasting Powder | Solid Stone `61fdf3df:o1ogtdcq` 1:1 |
+| Whirring Bronze Gizmo | Bronze Bar `61fdf3df:xegz4i5q` 1:1 |
 | Silver Contact | Silver Bar `61fdf3df:nvc1anz9` 1:1 |
 | Mithril Tube | Mithril Bar `61fdf3df:i5m1b7xd` 1:1 |
 | Mithril Casing | Mithril Bar `61fdf3df:i5m1b7xd` 1:1 |
@@ -159,6 +163,7 @@ floor(75 + requiredSkillLevel * 28 + requiredSkillLevel^2 * 1.6)
 
 | Skill | Cost copper |
 | ---: | ---: |
+| 155 | 42,855 |
 | 175 | 53,975 |
 | 185 | 60,015 |
 | 190 | 63,155 |
@@ -175,6 +180,7 @@ All implementation-stage recipes use `skillRef = "f82db71a:xprqs3y1"` and `learn
 
 | Skill | Output | WoW ID | Original Classic source | Original reagents | Normalized RPE inputs | Qty | Cost |
 | ---: | --- | ---: | --- | --- | --- | ---: | ---: |
+| 155 | Ice Deflector | 4386 | Schematic 13308, limited vendor | Whirring Bronze Gizmo x1; Frost Oil x1 | Bronze Bar x1; Frost Oil x1; Blacksmith Hammer tool | 1 | 42,855 |
 | 175 | Solid Dynamite | 10507 | Trainer | Solid Blasting Powder x1; Silk Cloth x1 | Solid Stone x1; Silk Cloth x1 | 2 | 53,975 |
 | 175 | Iron Grenade | 4390 | Trainer | Iron Bar x1; Heavy Blasting Powder x1; Silk Cloth x1 | Iron Bar x1; Heavy Stone x1; Silk Cloth x1; Blacksmith Hammer tool | 2 | 53,975 |
 | 175 | Bright-Eye Goggles | 10499 | Schematic 10601, world drop | Heavy Leather x6; Citrine x2 | same | 1 | 53,975 |
@@ -186,6 +192,7 @@ All implementation-stage recipes use `skillRef = "f82db71a:xprqs3y1"` and `learn
 | 205 | Goblin Construction Helmet | 10543 | Goblin Engineering trainer | Mithril Bar x8; Citrine x1; Elemental Fire x4 | same; Blacksmith Hammer tool | 1 | 73,055 |
 | 205 | Goblin Mining Helmet | 10542 | Goblin Engineering trainer | Mithril Bar x8; Citrine x1; Elemental Earth x4 | same; Blacksmith Hammer tool | 1 | 73,055 |
 | 205 | Mithril Blunderbuss | 10508 | Trainer | Mithril Tube x1; Unstable Trigger x1; Heavy Stock x1; Mithril Bar x4; Elemental Fire x2 | Mithril Bar x6; Heavy Stock x1; Elemental Fire x2; Blacksmith Hammer tool | 1 | 73,055 |
+| 205 | Goblin Sapper Charge | 10646 | Goblin Engineering trainer | Mageweave Cloth x1; Solid Blasting Powder x3; Unstable Trigger x1 | Mageweave Cloth x1; Solid Stone x3; Mithril Bar x1 | 1 | 73,055 |
 | 210 | Gnomish Goggles | 10545 | Gnomish Engineering trainer | Fire Goggles x1; Mithril Tube x1; Gold Power Core x2; Flask of Mojo x2; Heavy Leather x2 | Fire Goggles x1; Mithril Bar x1; Gold Bar x2; Flask of Mojo x2; Heavy Leather x2 | 1 | 76,515 |
 | 210 | Hi-Impact Mithril Slugs | 10512 | Trainer | Mithril Bar x1; Solid Blasting Powder x1 | Mithril Bar x1; Solid Stone x1; Blacksmith Hammer tool | 200 | 76,515 |
 | 215 | Mithril Frag Bomb | 10514 | Trainer | Mithril Casing x1; Unstable Trigger x1; Solid Blasting Powder x1 | Mithril Bar x2; Solid Stone x1; Blacksmith Hammer tool | 3 | 80,055 |
@@ -199,6 +206,10 @@ All implementation-stage recipes use `skillRef = "f82db71a:xprqs3y1"` and `learn
 
 ## Item representation and effect preparation
 
+### Defensive consumable exception
+
+- **Ice Deflector** — item level 31, required level 21, 5 charges in Classic. RPE should follow the same general item-use family as Flame Deflector rather than model literal charges. Its source effect absorbs 600 Frost damage for 1 minute on a 15-minute cooldown. The current generic Aura schema has no damage-absorb/shield effect, so the exact active effect is blocked; do not substitute Frost Resistance because that changes semantics.
+
 ### Explosives
 
 - **Solid Dynamite** — item level 35, common, stack 20, Engineering 175. Source effect deals 213–287 Fire damage in a 5-yard radius. RPE: midpoint `250 Fire`, multi-target 1–5, shared 5-turn `engineering_explosive` cooldown.
@@ -206,6 +217,7 @@ All implementation-stage recipes use `skillRef = "f82db71a:xprqs3y1"` and `learn
 - **Flash Bomb** — item level 37, required level 27, common, stack 5. Source causes Beasts in the radius to flee for 10 seconds. RPE currently has no creature-family predicate / fear-movement behavior that can reproduce this without affecting non-Beasts, so active behavior is blocked rather than generalized inaccurately.
 - **Big Iron Bomb** — item level 43, common, stack 10, Engineering 190. Source effect deals 149–201 Fire damage and incapacitates/stuns targets for about 3 seconds, breaking on damage. RPE: midpoint `175 Fire`, multi-target 1–5, one-turn break-on-damage control Aura, shared explosive cooldown.
 - **EZ-Thro Dynamite II** — required level 30, common, stack 20. It is the non-engineer dynamite analogue and should have no Engineering-use condition. RPE: midpoint `250 Fire` from the vanilla 213–287 source range, multi-target 1–5, shared explosive cooldown.
+- **Goblin Sapper Charge** — item level 41, common, stack 10, Engineering 205. Source deals 450–750 Fire damage to nearby enemies and 375–625 Fire damage to the user. RPE: midpoint `600 Fire` to enemy multi-target 1–5 plus midpoint `500 Fire` self-damage to the caster, sharing the 5-turn `engineering_explosive` cooldown.
 - **Mithril Frag Bomb** — item level 43, common, stack 10; recipe skill 215 (the crafted item itself has a lower Engineering-use threshold). Source effect deals 149–201 Fire damage and incapacitates/stuns for about 2 seconds, breaking on damage. RPE: midpoint `175 Fire`, multi-target 1–5, one-turn break-on-damage control Aura, shared explosive cooldown.
 
 ### Guns
@@ -242,11 +254,12 @@ Representable active effects:
 2. Iron Grenade — 175 Fire + one-turn break-on-damage control.
 3. Big Iron Bomb — 175 Fire + one-turn break-on-damage control.
 4. EZ-Thro Dynamite II — 250 Fire, multi 1–5, no Engineering-use condition.
-5. Mithril Frag Bomb — 175 Fire + one-turn break-on-damage control.
+5. Goblin Sapper Charge — 600 Fire to enemy multi 1–5 plus 500 Fire self-damage to caster.
+6. Mithril Frag Bomb — 175 Fire + one-turn break-on-damage control.
 
 Potentially no Spell is needed for passive equipment stats.
 
-Do **not** implement inaccurate substitute effects for Flash Bomb, Goblin Construction Helmet, Gnomish Harm Prevention Belt, Catseye Ultra Goggles, the two Rocket Boots, or Parachute Cloak. Their limitations are recorded below.
+Do **not** implement inaccurate substitute effects for Ice Deflector, Flash Bomb, Goblin Construction Helmet, Gnomish Harm Prevention Belt, Catseye Ultra Goggles, the two Rocket Boots, or Parachute Cloak. Their limitations are recorded below.
 
 ## Current-code findings relevant to implementation
 
@@ -260,14 +273,15 @@ Do **not** implement inaccurate substitute effects for Flash Bomb, Goblin Constr
 
 ## Source audit
 
-Source verification uses vanilla Classic Engineering recipe/item data. The range boundary is determined by **recipe skill**, not a later/current item-use Engineering requirement. This is why `Mithril Frag Bomb` belongs at recipe skill 215 and `Spellpower Goggles Xtreme` belongs at recipe skill 225, while `Explosive Sheep` (150) and `The Big One` (235) are excluded.
+Source verification uses vanilla Classic Engineering recipe/item data. The range boundary is determined by **recipe skill**, not a later/current item-use Engineering requirement. This is why `Mithril Frag Bomb` belongs at recipe skill 215 and `Spellpower Goggles Xtreme` belongs at recipe skill 225, while `Explosive Sheep` (150) and `The Big One` (235) are excluded. Ice Deflector and Goblin Sapper Charge are explicit user-requested inclusions within the `(150,225]` band.
 
 ## Incomplete / Blocked Items and Recipes
 
-The **21 Item and Recipe identities/source rows are complete** for the focused scope. The following gameplay effects cannot currently be represented exactly and must remain explicit implementation blockers rather than receiving inaccurate substitutes:
+The **23 Item and Recipe identities/source rows are complete** for the focused scope. The following gameplay effects cannot currently be represented exactly and must remain explicit implementation blockers rather than receiving inaccurate substitutes:
 
 | Item | Complete | Missing behavior | Blocker | Smallest follow-up |
 | --- | --- | --- | --- | --- |
+| Ice Deflector | item/recipe/source effect | absorb 600 Frost damage | no generic absorb/shield Aura effect | add a generic absorb effect with school filtering |
 | Flash Bomb | item/recipe/source effect | fear only Beast targets | no creature-family target predicate/fear movement | generic creature-family condition + fear control behavior |
 | Goblin Construction Helmet | wearable stats/recipe | 300–500 Fire absorb | no generic absorb/shield Aura effect | generic school-filtered absorb effect |
 | Goblin Mining Helmet | wearable stats/recipe | +5 Mining | no packaged Mining skill | add Mining only if professions are intentionally expanded to include it |
