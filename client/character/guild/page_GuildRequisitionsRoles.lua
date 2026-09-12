@@ -24,7 +24,11 @@ local SHOP_PAGE_BUTTON_WIDTH = 22
 local SHOP_PAGE_TEXT_WIDTH = 96
 local SHOP_PAGE_NAV_SPACING = 4
 local SHOP_PAGINATION_WIDTH = (SHOP_PAGE_BUTTON_WIDTH * 2) + SHOP_PAGE_TEXT_WIDTH + (SHOP_PAGE_NAV_SPACING * 2)
-local CATEGORY_WIDTH = 118
+local CATEGORY_NAV_HEIGHT = 20
+local CATEGORY_BUTTON_WIDTH = 72
+local CATEGORY_OVERFLOW_WIDTH = 112
+local CATEGORY_NAV_SPACING = 4
+local MAX_VISIBLE_CATEGORY_BUTTONS = 5
 local TOOLBAR_HEIGHT = 22
 local AVAILABILITY_ITEMS = {
     { label = "All Items", value = "all" },
@@ -101,10 +105,20 @@ local function buildRolesTooltip(roles)
     return { type = "custom", title = "Effective Roles", lines = lines }
 end
 
-local function setCategorySelection(row, selected)
-    if not row or not row.entryBackground or not row.entryBackground.SetColorTexture then return end
-    local color = UI.ResolveColor(nil, selected and "list.rowHover" or "list.rowBackground")
-    row.entryBackground:SetColorTexture(color.r or 0.08, color.g or 0.09, color.b or 0.11, color.a or 0.85)
+local function setFrameShown(element, shown)
+    local frame = element and element.GetFrame and element:GetFrame() or nil
+    if not frame then return end
+    if shown and frame.Show then frame:Show() elseif not shown and frame.Hide then frame:Hide() end
+end
+
+local function setCategoryButtonState(button, category, selected)
+    if not button then return end
+    local name = category and category.name or ""
+    button:SetText(selected and ("[ %s ]"):format(name) or name)
+    local color = UI.ResolveColor(nil, selected and "text.primary" or "text.secondary")
+    if button.SetLabelColor and color then
+        button:SetLabelColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
+    end
 end
 
 function Page:GetActiveSettingContext()
@@ -122,11 +136,8 @@ function Page:PartitionRequisitions()
     for index = 1, #(setting and setting.requisitions or {}) do
         local requisition = setting.requisitions[index]
         if type(requisition) == "table" then
-            if normalizeCharacterLimit(requisition.characterLimit) == 0 then
-                shopRows[#shopRows + 1] = requisition
-            else
-                limitedRows[#limitedRows + 1] = requisition
-            end
+            if normalizeCharacterLimit(requisition.characterLimit) == 0 then shopRows[#shopRows + 1] = requisition
+            else limitedRows[#limitedRows + 1] = requisition end
         end
     end
     return shopRows, limitedRows
@@ -251,7 +262,37 @@ function Page:ApplyShopFilters(resetPage)
 end
 
 function Page:RefreshCategoryList()
-    if self.ShopCategoryList then self.ShopCategoryList:SetItems(self.ShopCategoryRows or {}) end
+    local rows = self.ShopCategoryRows or {}
+    local selected = self.SelectedShopCategory or "__all"
+    local buttons = self.ShopCategoryButtons or {}
+    for index = 1, MAX_VISIBLE_CATEGORY_BUTTONS do
+        local button = buttons[index]
+        local category = rows[index]
+        if button and category then
+            button._categoryId = category.id
+            setCategoryButtonState(button, category, category.id == selected)
+            setFrameShown(button, true)
+        elseif button then
+            button._categoryId = nil
+            setFrameShown(button, false)
+        end
+    end
+
+    local overflowItems = { { label = "More...", value = "" } }
+    local selectedOverflow = ""
+    for index = MAX_VISIBLE_CATEGORY_BUTTONS + 1, #rows do
+        local category = rows[index]
+        overflowItems[#overflowItems + 1] = { label = category.name, value = category.id }
+        if category.id == selected then selectedOverflow = category.id end
+    end
+    if self.ShopCategoryOverflowDropdown then
+        local hasOverflow = #overflowItems > 1
+        self._refreshingShopCategoryOverflow = true
+        self.ShopCategoryOverflowDropdown:SetItems(overflowItems)
+        self.ShopCategoryOverflowDropdown:SetSelectedValue(selectedOverflow, true)
+        self._refreshingShopCategoryOverflow = false
+        setFrameShown(self.ShopCategoryOverflowDropdown, hasOverflow)
+    end
 end
 
 function Page:SelectShopCategory(categoryId)
@@ -264,12 +305,39 @@ function Page:BuildShopBrowser()
     if not self.GuildShopHost or self.ShopBrowserBuilt then return end
     self.ShopBrowserBuilt = true
     if self.ShopLayout and self.ShopLayout.Hide then self.ShopLayout:Hide() end
+    if self.GuildShopHeader then setFrameShown(self.GuildShopHeader, false) end
 
     self.ShopBrowseLayout = UI.CreateLayout(UI.VerticalLayoutGroup, self.GuildShopHost:GetFrame(), "RPEGuildShopBrowseLayout", {
         expandWidth = true, expandHeight = true, weight = 1, spacing = 4,
         fitChildrenWidth = true, fitChildrenHeight = true,
     })
     self.GuildShopHost:AddChild(self.ShopBrowseLayout)
+
+    self.ShopCategoryNav = UI.CreateLayout(UI.HorizontalLayoutGroup, self.ShopBrowseLayout:GetFrame(), "RPEGuildShopCategoryNav", {
+        height = CATEGORY_NAV_HEIGHT, expandWidth = true, spacing = CATEGORY_NAV_SPACING,
+        fitChildrenWidth = true, fitChildrenHeight = false,
+    })
+    self.ShopBrowseLayout:AddChild(self.ShopCategoryNav)
+    self.ShopCategoryButtons = {}
+    for index = 1, MAX_VISIBLE_CATEGORY_BUTTONS do
+        local button
+        button = UI.CreateButton(self.ShopCategoryNav:GetFrame(), "RPEGuildShopCategoryButton" .. index, "", CATEGORY_BUTTON_WIDTH, function()
+            local categoryId = button and button._categoryId or nil
+            if categoryId then self:SelectShopCategory(categoryId) end
+        end, { height = CATEGORY_NAV_HEIGHT, fontSize = 8 })
+        self.ShopCategoryButtons[index] = button
+        self.ShopCategoryNav:AddChild(button)
+    end
+    self.ShopCategoryOverflowDropdown = UI.CreateDropdown(self.ShopCategoryNav:GetFrame(), "RPEGuildShopCategoryOverflowDropdown", {
+        width = CATEGORY_OVERFLOW_WIDTH, height = CATEGORY_NAV_HEIGHT,
+        items = { { label = "More...", value = "" } }, selectedValue = "",
+        onValueChanged = function(value)
+            if self._refreshingShopCategoryOverflow or not value or value == "" then return end
+            self:SelectShopCategory(value)
+        end,
+    })
+    self.ShopCategoryNav:AddChild(self.ShopCategoryOverflowDropdown)
+    setFrameShown(self.ShopCategoryOverflowDropdown, false)
 
     self.ShopToolbar = UI.CreateLayout(UI.HorizontalLayoutGroup, self.ShopBrowseLayout:GetFrame(), "RPEGuildShopToolbar", {
         height = TOOLBAR_HEIGHT, expandWidth = true, spacing = 4, fitChildrenWidth = true, fitChildrenHeight = false,
@@ -293,41 +361,11 @@ function Page:BuildShopBrowser()
     })
     self.ShopToolbar:AddChild(self.ShopAvailabilityDropdown)
 
-    self.ShopContentRow = UI.CreateLayout(UI.HorizontalLayoutGroup, self.ShopBrowseLayout:GetFrame(), "RPEGuildShopContentRow", {
-        expandWidth = true, expandHeight = true, weight = 1, spacing = 6,
-        fitChildrenWidth = true, fitChildrenHeight = true,
-    })
-    self.ShopBrowseLayout:AddChild(self.ShopContentRow)
-
-    self.ShopCategoryList = UI.ScrollLayout:New({
-        name = "RPEGuildShopCategoryList", width = CATEGORY_WIDTH, rowHeight = 20, rowSpacing = 1,
-        visibleRows = 10, autoFitRows = true, minVisibleRows = 1, expandHeight = true,
-        border = false, rowElementClass = UI.ScrollListEntry, categoryWidth = CATEGORY_WIDTH - 8,
-        statusWidth = 0, categoryInsetLeft = 4,
-    })
-    self.ShopCategoryList:SetParent(self.ShopContentRow:GetFrame())
-    self.ShopCategoryList:SetRowRenderer(function(row, category)
-        row:SetCategory(category and category.name or "")
-        row:SetTestName("")
-        row:SetStatus("")
-        row:SetDetail("")
-        local frame = row.GetFrame and row:GetFrame() or nil
-        if frame then
-            frame:EnableMouse(true)
-            frame:SetScript("OnMouseUp", function(_, button)
-                if button == "LeftButton" then self:SelectShopCategory(category and category.id or "__all") end
-            end)
-        end
-        setCategorySelection(row, category and category.id == (self.SelectedShopCategory or "__all"))
-    end)
-    self.ShopCategoryList:Create()
-    self.ShopContentRow:AddChild(self.ShopCategoryList)
-
-    self.ShopResultsLayout = UI.CreateLayout(UI.VerticalLayoutGroup, self.ShopContentRow:GetFrame(), "RPEGuildShopResultsLayout", {
+    self.ShopResultsLayout = UI.CreateLayout(UI.VerticalLayoutGroup, self.ShopBrowseLayout:GetFrame(), "RPEGuildShopResultsLayout", {
         expandWidth = true, expandHeight = true, weight = 1, spacing = 4,
         fitChildrenWidth = true, fitChildrenHeight = true,
     })
-    self.ShopContentRow:AddChild(self.ShopResultsLayout)
+    self.ShopBrowseLayout:AddChild(self.ShopResultsLayout)
 
     self.ShopGrid = UI.CreateLayout(UI.GridLayoutGroup, self.ShopResultsLayout:GetFrame(), "RPEGuildShopFilteredGrid", {
         columns = SHOP_COLUMNS, spacingX = SHOP_GRID_SPACING_X, spacingY = SHOP_GRID_SPACING_Y,
