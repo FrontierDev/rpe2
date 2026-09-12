@@ -350,7 +350,9 @@ function Commands:Run(message)
         return true
     end
 
-    if tokens[1] == "help" then
+    -- Only the bare help command prints the command list. Subcommands such as
+    -- "/rpe help reset" are registered commands and must reach the router.
+    if tokens[1] == "help" and #tokens == 1 then
         self:PrintHelp()
         return true
     end

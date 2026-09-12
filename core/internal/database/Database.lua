@@ -3304,9 +3304,10 @@ local function hasActivatedDatasetId(root, datasetId)
     return false
 end
 
-function Database.SyncDefaultDatasets(defaultDefinitions)
+function Database.SyncDefaultDatasets(defaultDefinitions, options)
     local changedDatasetIds = {}
     local skippedDefinitions = 0
+    local forceSync = type(options) == "table" and options.force == true
 
     if type(defaultDefinitions) ~= "table" then
         logDefaultDatasetSyncDiagnostic("<definitions>", "definitions must be a table")
@@ -3359,7 +3360,7 @@ function Database.SyncDefaultDatasets(defaultDefinitions)
             local installedVersion = root.defaultDatasetVersions[datasetId]
             local existingDataset = root.datasets[datasetId]
             local firstInstall = installedVersion == nil
-            local needsWrite = existingDataset == nil or installedVersion ~= packagedVersion
+            local needsWrite = forceSync or existingDataset == nil or installedVersion ~= packagedVersion
 
             if needsWrite then
                 local installedDataset = normalizeDatasetRecord(

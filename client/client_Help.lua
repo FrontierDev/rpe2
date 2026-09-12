@@ -139,6 +139,9 @@ local function resolveButtonStyle(api, value)
 end
 
 local function resolveTargetPoint(api, value)
+    if type(value) == "string" and type(api.Point) == "table" then
+        return api.Point[value]
+    end
     if value ~= nil then
         return value
     end

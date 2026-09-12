@@ -1,5 +1,10 @@
 local addonName, Addon = ...
 
+-- Defaults are stored in SavedVariables. This migration replaces older copies
+-- that were installed from packages whose contents changed without a matching
+-- per-dataset version bump, so all clients converge on this release's data.
+local PACKAGED_DEFAULT_SYNC_REVISION = 1
+
 local function logInstallDiagnostic(message)
     local debug = Addon.Debug or nil
     if debug and type(debug.Internal) == "function" then
@@ -61,7 +66,15 @@ local function syncDefaultDatasets()
     end
 
     applyPackagedVersionCorrections(DefaultDatasets.Definitions)
-    Database.SyncDefaultDatasets(DefaultDatasets.Definitions)
+
+    local installedRevision = math.max(0, math.floor(tonumber(savedRoot.defaultDatasetSyncRevision) or 0))
+    local forceSync = installedRevision < PACKAGED_DEFAULT_SYNC_REVISION
+    local _, skippedDefinitions = Database.SyncDefaultDatasets(DefaultDatasets.Definitions, {
+        force = forceSync,
+    })
+    if skippedDefinitions == 0 then
+        savedRoot.defaultDatasetSyncRevision = PACKAGED_DEFAULT_SYNC_REVISION
+    end
     return true
 end
 

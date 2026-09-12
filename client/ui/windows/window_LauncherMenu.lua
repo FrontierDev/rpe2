@@ -16,6 +16,7 @@ LauncherMenu.__index = LauncherMenu
 MinimapButton.__index = MinimapButton
 
 local HEADER_ICON = "Interface\\AddOns\\RPEngine_Dev\\data\\textures\\ui\\rpe.png"
+local MINIMAP_ICON = "Interface\\AddOns\\RPEngine_Dev\\data\\textures\\ui\\rpe_logo.png"
 
 local WINDOW_WIDTH = 172
 local BUTTON_WIDTH = 136
@@ -430,6 +431,7 @@ function MinimapButton:ShowFirstRunHelp()
 
     Help:Register(MINIMAP_HELP_ID, {
         text = "Click the RPE icon to open the RPE menu.",
+        targetPoint = "LeftEdgeCenter",
     })
     return Help:Show(MINIMAP_HELP_ID, self.frame)
 end
@@ -449,17 +451,11 @@ function MinimapButton:Create()
     button:SetMovable(true)
     button:EnableMouse(true)
 
-    local icon = button:CreateTexture(nil, "BACKGROUND")
-    icon:SetTexture(HEADER_ICON)
-    icon:SetSize(20, 20)
+    local icon = button:CreateTexture(nil, "ARTWORK")
+    icon:SetTexture(MINIMAP_ICON)
+    icon:SetSize(MINIMAP_BUTTON_SIZE, MINIMAP_BUTTON_SIZE)
     icon:SetPoint("CENTER", button, "CENTER", 0, 0)
     button.icon = icon
-
-    local border = button:CreateTexture(nil, "OVERLAY")
-    border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-    border:SetSize(54, 54)
-    border:SetPoint("TOPLEFT", button, "TOPLEFT", -11, 11)
-    button.border = border
 
     local highlight = button:CreateTexture(nil, "HIGHLIGHT")
     highlight:SetTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
