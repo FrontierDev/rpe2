@@ -50,7 +50,7 @@ Do not interpret this document as admitting TBC Engineering recipes that also st
 ## Current RPE implementation rules
 
 - Engineering dataset: `af503002`.
-- Engineering packaged version after spell preparation: `19`.
+- Engineering packaged version after item implementation: `21`.
 - Engineering skill: `f82db71a:xprqs3y1`.
 - Every eventual Recipe uses `learnMode = "trainer"`; original drop/vendor/reputation acquisition remains provenance only.
 - Trainer cost at skill 300 uses the current RPE formula and is `152475` copper.
@@ -154,14 +154,14 @@ Do not silently substitute them. Recipes depending on them remain blocked until 
 
 | Skill | Output | WoW item ID | Category | Classic source | RPE status |
 | ---: | --- | ---: | --- | --- | --- |
-| 300 | Arcane Bomb | 16040 | Bomb | World-drop schematic | Item representable; use effect implemented as 900 mana drain + 1-turn silence; Recipe blocked only by Ironweb Spider Silk |
-| 300 | Ultra-Flash Shadow Reflector | 18639 | Trinket | Stratholme schematic drop | Item + resistance abstraction + Recipe implementable |
-| 300 | Core Marksman Rifle | 18282 | Weapon | Molten Core schematic | Weapon metadata representable; Recipe blocked only by Ironweb Spider Silk |
-| 300 | Force Reactive Disk | 18168 | Armour/shield | Molten Core schematic | Base item representable; omit the block-triggered proc for now; Recipe blocked only by Ironweb Spider Silk |
-| 300 | Bloodvine Goggles | 19999 | Armour/head | Zandalar Tribe Honored schematic | Passive item mostly representable; Recipe blocked by Ironweb Spider Silk + Powerful Mojo |
-| 300 | Bloodvine Lens | 19998 | Armour/head | Zandalar Tribe Friendly schematic | Base item mostly representable; Recipe blocked by Ironweb Spider Silk + Powerful Mojo |
-| 300 | Flawless Arcanite Rifle | 16007 | Weapon | World-drop schematic | Item and Recipe material-complete; verify Guns skill mapping |
-| 300 | Biznicks 247x128 Accurascope | 18283 | Modification/scope | Molten Core schematic | Modification model supported; Recipe blocked only by Ironweb Spider Silk |
+| 300 | Arcane Bomb | 16040 | Bomb | World-drop schematic | Item + use effect implemented; Recipe blocked only by Ironweb Spider Silk |
+| 300 | Ultra-Flash Shadow Reflector | 18639 | Trinket | Stratholme schematic drop | Item + resistance abstraction implemented; Recipe material-complete |
+| 300 | Core Marksman Rifle | 18282 | Weapon | Molten Core schematic | Item implemented; Recipe blocked only by Ironweb Spider Silk |
+| 300 | Force Reactive Disk | 18168 | Armour/shield | Molten Core schematic | Base item implemented; source block value and block-triggered proc omitted for now; Recipe blocked only by Ironweb Spider Silk |
+| 300 | Bloodvine Goggles | 19999 | Armour/head | Zandalar Tribe Honored schematic | Item implemented; 9 mana/5 sec is represented as +9 Spirit; Recipe blocked by Ironweb Spider Silk + Powerful Mojo |
+| 300 | Bloodvine Lens | 19998 | Armour/head | Zandalar Tribe Friendly schematic | Item implemented except stealth detection; Recipe blocked by Ironweb Spider Silk + Powerful Mojo |
+| 300 | Flawless Arcanite Rifle | 16007 | Weapon | World-drop schematic | Item implemented with canonical +4 Guns skill bonus; Recipe material-complete |
+| 300 | Biznicks 247x128 Accurascope | 18283 | Modification/scope | Molten Core schematic | Modification implemented as +3% ranged hit on the Ranged slot; Recipe blocked only by Ironweb Spider Silk |
 
 ## Item and effect details
 
@@ -229,7 +229,7 @@ https://www.wowhead.com/classic/item=19999/bloodvine-goggles
 
 Item Level 65; BoE Cloth Head; 75 Armor; level 60; +2% spell hit; +1% spell crit; 9 mana/5 sec.
 
-RPE decision: armour/hit/crit through existing stats. Only represent mana regeneration if the current Core stat semantics map it consistently; otherwise omit only that passive.
+RPE decision: armour/hit/crit use existing stats. Under the Engineering conversion rule, 9 mana per 5 sec is represented as +9 Spirit (`f82db71a:kec9rhli`).
 
 ### Bloodvine Lens
 
@@ -309,12 +309,12 @@ Source Blacksmith Hammer requirements are retained. Arclight Spanner and Gyromat
 
 | Entry | Complete | Missing / blocker | Type | Smallest follow-up |
 | --- | --- | --- | --- | --- |
-| Arcane Bomb | Item metadata, BOM, silence model | Ironweb Spider Silk; coupled variable drain -> damage | Material + Spell semantics | Add/substitute silk; add generic coupled resource/damage support or approve simplification |
-| Ultra-Flash Shadow Reflector | Item, Spell/Aura abstraction, BOM | None | None | Ready |
-| Core Marksman Rifle | Item metadata, BOM | Ironweb Spider Silk | Material | Add/substitute silk |
-| Force Reactive Disk | Base item, BOM | Ironweb Spider Silk; successful-block trigger | Material + runtime event | Add/substitute silk; add generic block event for proc |
-| Bloodvine Goggles | Item metadata, BOM | Ironweb Spider Silk; Powerful Mojo; verify mana regeneration mapping | Material + possible stat semantics | Add/substitute leaves; verify Core stat |
-| Bloodvine Lens | Item metadata, BOM | Ironweb Spider Silk; Powerful Mojo; stealth detection | Material + unsupported passive | Add/substitute leaves; omit stealth detection unless supported |
+| Arcane Bomb | Item + simplified use effect + BOM | Ironweb Spider Silk | Material | Add/substitute silk |
+| Ultra-Flash Shadow Reflector | Item + Spell/Aura abstraction + BOM | None | None | Ready |
+| Core Marksman Rifle | Item + BOM | Ironweb Spider Silk | Material | Add/substitute silk |
+| Force Reactive Disk | Base item + BOM | Ironweb Spider Silk; 44 block-value stat and successful-block proc omitted | Material + unsupported stat/event | Add/substitute silk; optionally add generic block-value/event support later |
+| Bloodvine Goggles | Item + BOM | Ironweb Spider Silk; Powerful Mojo | Material | Add/substitute leaves |
+| Bloodvine Lens | Item + BOM | Ironweb Spider Silk; Powerful Mojo; stealth detection omitted | Material + unsupported passive | Add/substitute leaves; optionally add stealth-detection support later unless supported |
 | Flawless Arcanite Rifle | Item metadata, material-complete BOM | Verify canonical Guns skill | Possible skill ref | Resolve Guns skill or omit only that bonus |
 | Biznicks 247x128 Accurascope | Modification metadata/effect, BOM | Ironweb Spider Silk; verify bow+gun targeting can be expressed without broadening | Material + modification targeting | Add/substitute silk; use/extend generic modification targeting if necessary |
 
