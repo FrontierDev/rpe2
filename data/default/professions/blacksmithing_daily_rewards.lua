@@ -26,7 +26,6 @@ if type(dataset) == "table" then
         { id = "silver", name = "Silver Bar", weight = 2, minQuantity = 1, maxQuantity = 2 },
         { id = "gold", name = "Gold Bar", weight = 1, minQuantity = 1, maxQuantity = 2 },
         { id = "truesilver", name = "Truesilver Bar", weight = 1, minQuantity = 1, maxQuantity = 1 },
-        { id = "arcanite", name = "Arcanite Bar", weight = 1, minQuantity = 1, maxQuantity = 1 },
     }
 
     local entries = {}
@@ -53,7 +52,7 @@ if type(dataset) == "table" then
         if type(loot) == "table" and tostring(loot.id or "") == lootId then
             dataset.loot[index] = {
                 conditions = {},
-                description = "Daily Blacksmithing material cache. Guarantees one bar reward, weighted toward ordinary metal bars with uncommon precious and transmuted bar outcomes.",
+                description = "Daily Blacksmithing material cache. Guarantees one bar reward, weighted toward ordinary metal bars with uncommon precious bar outcomes.",
                 drawCount = 1,
                 entries = entries,
                 id = lootId,
@@ -69,7 +68,7 @@ if type(dataset) == "table" then
     if not replaced then
         dataset.loot[#dataset.loot + 1] = {
             conditions = {},
-            description = "Daily Blacksmithing material cache. Guarantees one bar reward, weighted toward ordinary metal bars with uncommon precious and transmuted bar outcomes.",
+            description = "Daily Blacksmithing material cache. Guarantees one bar reward, weighted toward ordinary metal bars with uncommon precious bar outcomes.",
             drawCount = 1,
             entries = entries,
             id = lootId,
@@ -79,5 +78,5 @@ if type(dataset) == "table" then
         }
     end
 
-    blacksmithing.version = math.max(5, math.floor(tonumber(blacksmithing.version) or 1))
+    blacksmithing.version = math.max(6, math.floor(tonumber(blacksmithing.version) or 1))
 end
