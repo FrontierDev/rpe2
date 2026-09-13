@@ -2,20 +2,22 @@ local _, Addon = ...
 
 local CORE_DATASET_ID = "f82db71a"
 local CORE_GUILD_SETTING_ID = "g6mh7pla"
+local REAGENTS_CATEGORY_ID = "l8r4h2xn"
 
 local definition = Addon.Data.DefaultDatasets.Definitions[CORE_DATASET_ID]
 if not definition or not definition.dataset then
     error("Core default dataset must be registered before core_guild_settings.lua", 2)
 end
 
-if definition.version < 3 then
-    definition.version = 3
+if definition.version < 4 then
+    definition.version = 4
 end
 
 local dataset = definition.dataset
 
--- Copper is a built-in currency and should be used directly by requisition
--- costs. Remove the obsolete authored Spark of Inspiration currency from Core.
+-- Copper and Justice are built-in currencies and should be referenced directly
+-- by requisition costs. Remove the obsolete authored Spark of Inspiration
+-- currency from Core.
 dataset.currencies = dataset.currencies or {}
 for index = #dataset.currencies, 1, -1 do
     local currency = dataset.currencies[index]
@@ -24,6 +26,20 @@ for index = #dataset.currencies, 1, -1 do
             or tostring(currency.name or "") == "Spark of Inspiration") then
         table.remove(dataset.currencies, index)
     end
+end
+
+-- Reagent requisitions reference the packaged Miscellaneous Items dataset.
+-- Keep that relationship explicit for dependency activation/validation.
+dataset.dependencies = dataset.dependencies or {}
+local hasMiscDependency = false
+for _, dependencyId in ipairs(dataset.dependencies) do
+    if tostring(dependencyId or "") == "3eb7e9bb" then
+        hasMiscDependency = true
+        break
+    end
+end
+if not hasMiscDependency then
+    dataset.dependencies[#dataset.dependencies + 1] = "3eb7e9bb"
 end
 
 -- Role IDs are stable implementation details. The Data Editor presents Role
@@ -78,6 +94,111 @@ for _, role in ipairs(professionRoles) do
     roles[#roles + 1] = role
 end
 
+-- These unlimited Guild Shop entries are intentionally limited to exceptional
+-- legacy/special reagents. Normal gathering and crafting materials remain part
+-- of the ordinary acquisition economy rather than the Guild Shop.
+local requisitions = {
+    {
+        id = "w1v4r3ag",
+        itemRef = "3eb7e9bb:2hbdmyj4", -- Wildvine
+        quantity = 1,
+        costs = {
+            { currencyRef = "copper", amount = 400 }, -- 4s
+        },
+        characterLimit = 0,
+        roleIds = { "xzn8ikd5", "tx7n3n76", "7lqa25jv" },
+        shopCategoryId = REAGENTS_CATEGORY_ID,
+    },
+    {
+        id = "h7w2r9kt",
+        itemRef = "3eb7e9bb:w2plwren", -- Heart of the Wild
+        quantity = 1,
+        costs = {
+            { currencyRef = "copper", amount = 400 }, -- 4s
+        },
+        characterLimit = 0,
+        roleIds = { "5jz51hqf", "7lqa25jv" },
+        shopCategoryId = REAGENTS_CATEGORY_ID,
+    },
+    {
+        id = "d6m4r8un",
+        itemRef = "3eb7e9bb:qivy73u4", -- Demonic Rune
+        quantity = 1,
+        costs = {
+            { currencyRef = "copper", amount = 600 }, -- 6s
+        },
+        characterLimit = 0,
+        roleIds = { "xzn8ikd5", "7lqa25jv" },
+        shopCategoryId = REAGENTS_CATEGORY_ID,
+    },
+    {
+        id = "d4r7r2un",
+        itemRef = "3eb7e9bb:c1i4aecn", -- Dark Rune
+        quantity = 1,
+        costs = {
+            { currencyRef = "copper", amount = 2000 }, -- 20s
+        },
+        characterLimit = 0,
+        roleIds = { "xzn8ikd5", "7lqa25jv" },
+        shopCategoryId = REAGENTS_CATEGORY_ID,
+    },
+    {
+        id = "g8a3r5dn",
+        itemRef = "3eb7e9bb:hq608hly", -- Guardian Stone
+        quantity = 1,
+        costs = {
+            { currencyRef = "copper", amount = 10000 }, -- 1g
+        },
+        characterLimit = 0,
+        roleIds = { "xzn8ikd5", "tx7n3n76", "7lqa25jv" },
+        shopCategoryId = REAGENTS_CATEGORY_ID,
+    },
+    {
+        id = "b9v2r6ne",
+        itemRef = "3eb7e9bb:8eummju4", -- Bloodvine
+        quantity = 1,
+        costs = {
+            { currencyRef = "justice", amount = 75 },
+        },
+        characterLimit = 0,
+        roleIds = { "xzn8ikd5", "tx7n3n76", "7lqa25jv" },
+        shopCategoryId = REAGENTS_CATEGORY_ID,
+    },
+    {
+        id = "f3c8r1re",
+        itemRef = "3eb7e9bb:e0tarf0p", -- Fiery Core
+        quantity = 1,
+        costs = {
+            { currencyRef = "justice", amount = 110 },
+        },
+        characterLimit = 0,
+        roleIds = { "xzn8ikd5", "tx7n3n76", "7lqa25jv" },
+        shopCategoryId = REAGENTS_CATEGORY_ID,
+    },
+    {
+        id = "l4c7r2re",
+        itemRef = "3eb7e9bb:g3ytywfw", -- Lava Core
+        quantity = 1,
+        costs = {
+            { currencyRef = "justice", amount = 110 },
+        },
+        characterLimit = 0,
+        roleIds = { "xzn8ikd5", "tx7n3n76", "7lqa25jv" },
+        shopCategoryId = REAGENTS_CATEGORY_ID,
+    },
+    {
+        id = "f9r5r0ne",
+        itemRef = "3eb7e9bb:06vxv3hh", -- Frozen Rune
+        quantity = 1,
+        costs = {
+            { currencyRef = "justice", amount = 200 },
+        },
+        characterLimit = 0,
+        roleIds = { "xzn8ikd5", "tx7n3n76", "7lqa25jv" },
+        shopCategoryId = REAGENTS_CATEGORY_ID,
+    },
+}
+
 local guildSetting = {
     id = CORE_GUILD_SETTING_ID,
     name = "Base Guild Settings",
@@ -85,12 +206,18 @@ local guildSetting = {
     -- Blank means this is the generic fallback Guild Setting for any guild.
     guildName = "",
     general = {
-        enableRequisitions = false,
+        enableRequisitions = true,
         enableDailyRewards = false,
     },
     roles = roles,
-    shopCategories = {},
-    requisitions = {},
+    shopCategories = {
+        {
+            id = REAGENTS_CATEGORY_ID,
+            name = "Reagents",
+            order = 10,
+        },
+    },
+    requisitions = requisitions,
     dailyRewards = {},
     tags = {},
 }
