@@ -3728,6 +3728,38 @@ function Profile.ClearStatBonus(statRef)
     return false
 end
 
+function Profile.ListSkillPermanentBonuses()
+    if Database.ListProfileSkillPermanentBonuses then
+        return Database.ListProfileSkillPermanentBonuses()
+    end
+
+    return {}
+end
+
+function Profile.GetSkillPermanentBonus(skillRef)
+    if Database.GetProfileSkillPermanentBonus then
+        return Database.GetProfileSkillPermanentBonus(skillRef)
+    end
+
+    return 0
+end
+
+function Profile.SetSkillPermanentBonus(skillRef, value)
+    if Database.SetProfileSkillPermanentBonus then
+        return Database.SetProfileSkillPermanentBonus(skillRef, value)
+    end
+
+    return nil
+end
+
+function Profile.ClearSkillPermanentBonus(skillRef)
+    if Database.ClearProfileSkillPermanentBonus then
+        return Database.ClearProfileSkillPermanentBonus(skillRef)
+    end
+
+    return false
+end
+
 function Profile.ListSkillLevels()
     if Database.ListProfileSkillLevels then
         return Database.ListProfileSkillLevels()

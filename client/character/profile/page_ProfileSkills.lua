@@ -34,6 +34,7 @@ local CRAFTING_RECIPE_ASYNC_BATCH_SIZE = 12
 local CRAFTING_TRAINER_SYNC_OVERSCAN = 4
 local CRAFTING_TRAINER_ASYNC_BATCH_SIZE = 12
 local CRAFTING_UI_INTERNAL_TRACE = false
+local SKILL_BONUS_POPUP_KEY = "RPE_PROFILE_SKILL_PERMANENT_BONUS"
 
 local function getConfigurationRevision()
     return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
@@ -575,6 +576,200 @@ local function showCraftCountPopup(page, detail)
             Crafting:QueueRecipe(detail.recipeRef, count)
         end,
     })
+end
+
+function SkillsPage:RefreshAfterSkillManualAdjustment()
+    self.SkillListSession = nil
+    self:MarkDirty()
+    self:Refresh()
+end
+
+function SkillsPage:AddPermanentSkillBonus(skillRef, amount)
+    local normalizedAmount = math.max(0, math.floor(tonumber(amount) or 0))
+    if normalizedAmount <= 0 or type(Profile.SetSkillPermanentBonus) ~= "function" then
+        return false
+    end
+
+    local current = type(Profile.GetSkillPermanentBonus) == "function"
+        and math.max(0, math.floor(tonumber(Profile.GetSkillPermanentBonus(skillRef)) or 0))
+        or 0
+    if Profile.SetSkillPermanentBonus(skillRef, current + normalizedAmount) == nil then
+        return false
+    end
+
+    self:RefreshAfterSkillManualAdjustment()
+    return true
+end
+
+function SkillsPage:ResetSkillPermanentBonus(skillRef)
+    if type(Profile.ClearSkillPermanentBonus) ~= "function" then
+        return false
+    end
+
+    local changed = Profile.ClearSkillPermanentBonus(skillRef) == true
+    if changed then
+        self:RefreshAfterSkillManualAdjustment()
+    end
+    return changed
+end
+
+function SkillsPage:ResetSkillGainedLevels(skillRef)
+    if type(Profile.ClearSkillLevel) ~= "function" then
+        return false
+    end
+
+    local changed = Profile.ClearSkillLevel(skillRef) == true
+    if changed then
+        self:RefreshAfterSkillManualAdjustment()
+    end
+    return changed
+end
+
+function SkillsPage:ResetSkillBonusAndGainedLevels(skillRef)
+    local bonusChanged = type(Profile.ClearSkillPermanentBonus) == "function"
+        and Profile.ClearSkillPermanentBonus(skillRef) == true
+        or false
+    local levelChanged = type(Profile.ClearSkillLevel) == "function"
+        and Profile.ClearSkillLevel(skillRef) == true
+        or false
+
+    if bonusChanged or levelChanged then
+        self:RefreshAfterSkillManualAdjustment()
+        return true
+    end
+    return false
+end
+
+function SkillsPage:EnsureSkillBonusPopup()
+    if type(StaticPopupDialogs) ~= "table" then
+        return false
+    end
+    if StaticPopupDialogs[SKILL_BONUS_POPUP_KEY] then
+        return true
+    end
+
+    StaticPopupDialogs[SKILL_BONUS_POPUP_KEY] = {
+        text = "Add permanent bonus to %s:",
+        button1 = ACCEPT,
+        button2 = CANCEL,
+        hasEditBox = true,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        OnShow = function(dialog)
+            if dialog and dialog.editBox then
+                dialog.editBox:SetText("1")
+                dialog.editBox:HighlightText()
+                dialog.editBox:SetFocus()
+            end
+        end,
+        OnAccept = function(dialog)
+            local data = dialog and dialog.data or nil
+            local page = data and data.page or nil
+            local skillRef = data and data.skillRef or nil
+            local amount = dialog and dialog.editBox and tonumber(dialog.editBox:GetText()) or nil
+            amount = math.floor(tonumber(amount) or 0)
+            if page and skillRef and amount > 0 then
+                page:AddPermanentSkillBonus(skillRef, amount)
+            end
+        end,
+        EditBoxOnEnterPressed = function(editBox)
+            local dialog = editBox and editBox:GetParent() or nil
+            if dialog and dialog.button1 and dialog.button1.Click then
+                dialog.button1:Click()
+            end
+        end,
+        EditBoxOnEscapePressed = function(editBox)
+            local dialog = editBox and editBox:GetParent() or nil
+            if dialog and dialog.Hide then
+                dialog:Hide()
+            end
+        end,
+    }
+    return true
+end
+
+function SkillsPage:PromptPermanentSkillBonus(skillRef)
+    if type(StaticPopup_Show) ~= "function" or not self:EnsureSkillBonusPopup() then
+        return false
+    end
+
+    local row = self:FindSkillRow(skillRef, self.AllSkillRows)
+    local skillName = tostring(row and row.name or "Skill")
+    local popup = StaticPopup_Show(SKILL_BONUS_POPUP_KEY, skillName)
+    if not popup then
+        return false
+    end
+
+    popup.data = {
+        page = self,
+        skillRef = skillRef,
+    }
+    return true
+end
+
+function SkillsPage:EnsureSkillContextMenu()
+    if self.SkillContextMenu then
+        return self.SkillContextMenu
+    end
+
+    self.SkillContextMenu = UI.ContextMenu:New({
+        name = "RPEProfileSkillsSkillContextMenu",
+        width = 210,
+        panelWidth = 210,
+        visibleRows = 4,
+        rowHeight = 18,
+        border = false,
+        onItemInvoked = function(item, menu)
+            local action = item and item.value or nil
+            local skillRef = self.ContextMenuSkillRef
+            if not action or not skillRef then
+                return
+            end
+
+            if menu and menu.HideMenus then
+                menu:HideMenus()
+            end
+
+            if action == "add-permanent-bonus" then
+                self:PromptPermanentSkillBonus(skillRef)
+            elseif action == "reset-permanent-bonus" then
+                self:ResetSkillPermanentBonus(skillRef)
+            elseif action == "reset-gained-levels" then
+                self:ResetSkillGainedLevels(skillRef)
+            elseif action == "reset-bonus-and-levels" then
+                self:ResetSkillBonusAndGainedLevels(skillRef)
+            end
+        end,
+    })
+    self.SkillContextMenu:SetParent(self.frame or UIParent)
+    self.SkillContextMenu:Create()
+    return self.SkillContextMenu
+end
+
+function SkillsPage:ShowSkillContextMenu(anchorFrame, row)
+    if not anchorFrame or type(row) ~= "table" or not row.ref then
+        return
+    end
+
+    local permanentBonus = type(Profile.GetSkillPermanentBonus) == "function"
+        and math.max(0, math.floor(tonumber(Profile.GetSkillPermanentBonus(row.ref)) or 0))
+        or 0
+    local storedLevel = type(Profile.GetSkillLevel) == "function"
+        and math.max(0, math.floor(tonumber(Profile.GetSkillLevel(row.ref)) or 0))
+        or 0
+    local hasBonus = permanentBonus > 0
+    local hasGainedLevels = storedLevel > 0
+
+    self.ContextMenuSkillRef = row.ref
+    local menu = self:EnsureSkillContextMenu()
+    menu:SetItems({
+        { label = "Add Permanent Bonus...", value = "add-permanent-bonus" },
+        { label = "Reset Permanent Bonus", value = "reset-permanent-bonus", enabled = hasBonus },
+        { label = "Reset Gained Levels", value = "reset-gained-levels", enabled = hasGainedLevels },
+        { label = "Reset Bonus & Gained Levels", value = "reset-bonus-and-levels", enabled = hasBonus or hasGainedLevels },
+    })
+    menu:ShowAt(anchorFrame)
 end
 
 function SkillsPage:GetSelectedRows()
@@ -2124,6 +2319,10 @@ function SkillsPage:BuildSkillEntryRenderer()
         if frame then
             frame:EnableMouse(true)
             frame:SetScript("OnMouseUp", function(_, button)
+                if button == "RightButton" and row and row.ref then
+                    self:ShowSkillContextMenu(frame, row)
+                    return
+                end
                 if button == "LeftButton" and row and row.ref then
                     if tostring(row.ref or "") == tostring(self.SelectedSkillRef or "") then
                         return

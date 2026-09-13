@@ -1709,6 +1709,14 @@ function Dependecies.HandleDatasetDeleted(datasetId)
                     end
                 end
             end
+            if type(profile) == "table" and type(profile.skillPermanentBonuses) == "table" then
+                for skillRef in pairs(profile.skillPermanentBonuses) do
+                    local sourceDatasetId = Dependecies.ParseSourceStatRef(skillRef)
+                    if sourceDatasetId == datasetId then
+                        profile.skillPermanentBonuses[skillRef] = nil
+                    end
+                end
+            end
             if type(profile) == "table" and type(profile.skillActionBar) == "table" then
                 for slotIndex, skillRef in pairs(profile.skillActionBar) do
                     local sourceDatasetId = Dependecies.ParseSourceStatRef(skillRef)
@@ -2031,6 +2039,9 @@ function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
             for _, profile in pairs(profiles) do
                 if type(profile) == "table" and type(profile.skillLevels) == "table" then
                     profile.skillLevels[deletedRef] = nil
+                end
+                if type(profile) == "table" and type(profile.skillPermanentBonuses) == "table" then
+                    profile.skillPermanentBonuses[deletedRef] = nil
                 end
                 if type(profile) == "table" and type(profile.skillActionBar) == "table" then
                     for slotIndex, skillRef in pairs(profile.skillActionBar) do

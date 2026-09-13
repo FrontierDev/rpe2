@@ -962,6 +962,20 @@ local function normalizeProfileRecipeKnowledge(record)
     }
 end
 
+local function normalizeProfileSkillPermanentBonuses(record)
+    local normalized = {}
+
+    for skillRef, storedValue in pairs(ensureTable(record)) do
+        local normalizedSkillRef = ensureString(skillRef, "")
+        local normalizedValue = math.max(0, math.floor(tonumber(storedValue) or 0))
+        if normalizedSkillRef ~= "" and normalizedValue > 0 then
+            normalized[normalizedSkillRef] = normalizedValue
+        end
+    end
+
+    return normalized
+end
+
 local function normalizeProfileSkillLevels(record)
     local normalized = {}
 
@@ -1210,6 +1224,7 @@ local function normalizeProfileRecord(record, fallbackCharacterKey, fallbackName
         activeTraits = normalizeProfileActiveTraits(data.activeTraits ~= nil and data.activeTraits or data.traits),
         inactiveTraits = normalizeProfileActiveTraits(data.inactiveTraits),
         skillLevels = normalizeProfileSkillLevels(data.skillLevels),
+        skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(data.skillPermanentBonuses),
         preferredConsumables = normalizeProfilePreferredConsumables(data.preferredConsumables),
         actionBar = normalizeProfileActionBar(data.actionBar),
         skillActionBar = normalizeProfileActionBar(data.skillActionBar),
@@ -3165,6 +3180,65 @@ function Database.SetProfileGuildState(state)
     profile.guild = normalizeProfileGuildState(state)
     notifyConfigurationChanged("profile-guild")
     return deepCopy(profile.guild)
+end
+
+function Database.ListProfileSkillPermanentBonuses()
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(profile.skillPermanentBonuses)
+
+    local copy = {}
+    for skillRef, value in pairs(profile.skillPermanentBonuses) do
+        copy[skillRef] = value
+    end
+    return copy
+end
+
+function Database.GetProfileSkillPermanentBonus(skillRef)
+    local normalizedSkillRef = ensureString(skillRef, "")
+    if normalizedSkillRef == "" then
+        return 0
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(profile.skillPermanentBonuses)
+    return math.max(0, math.floor(tonumber(profile.skillPermanentBonuses[normalizedSkillRef]) or 0))
+end
+
+function Database.SetProfileSkillPermanentBonus(skillRef, value)
+    local normalizedSkillRef = ensureString(skillRef, "")
+    if normalizedSkillRef == "" then
+        return nil
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(profile.skillPermanentBonuses)
+    local previousValue = math.max(0, math.floor(tonumber(profile.skillPermanentBonuses[normalizedSkillRef]) or 0))
+    local normalizedValue = math.max(0, math.floor(tonumber(value) or 0))
+    if normalizedValue > 0 then
+        profile.skillPermanentBonuses[normalizedSkillRef] = normalizedValue
+    else
+        profile.skillPermanentBonuses[normalizedSkillRef] = nil
+    end
+    if previousValue ~= normalizedValue then
+        notifyConfigurationChanged("profile-skills")
+    end
+    return normalizedValue
+end
+
+function Database.ClearProfileSkillPermanentBonus(skillRef)
+    local normalizedSkillRef = ensureString(skillRef, "")
+    if normalizedSkillRef == "" then
+        return false
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(profile.skillPermanentBonuses)
+    local existed = profile.skillPermanentBonuses[normalizedSkillRef] ~= nil
+    profile.skillPermanentBonuses[normalizedSkillRef] = nil
+    if existed then
+        notifyConfigurationChanged("profile-skills")
+    end
+    return existed
 end
 
 function Database.ListProfileSkillLevels()
