@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 25,
+    version = 26,
     dataset = {
         name = "Engineering",
         achievements = {},
@@ -3024,11 +3024,11 @@ Addon.Data.DefaultDatasets:Register({
                     minQuantity = 1,
                 },
                 reagents = {},
-                requiredSkillLevel = 20,
+                requiredSkillLevel = 1,
                 results = {},
                 skillRef = "f82db71a:xprqs3y1",
                 tags = {},
-                trainerCostCopper = 1275,
+                trainerCostCopper = 104,
             },
             {
                 category = "",
@@ -3064,11 +3064,11 @@ Addon.Data.DefaultDatasets:Register({
                     minQuantity = 2,
                 },
                 reagents = {},
-                requiredSkillLevel = 30,
+                requiredSkillLevel = 20,
                 results = {},
                 skillRef = "f82db71a:xprqs3y1",
                 tags = {},
-                trainerCostCopper = 2355,
+                trainerCostCopper = 1275,
             },
             {
                 category = "",
@@ -3094,11 +3094,11 @@ Addon.Data.DefaultDatasets:Register({
                     minQuantity = 1,
                 },
                 reagents = {},
-                requiredSkillLevel = 50,
+                requiredSkillLevel = 30,
                 results = {},
                 skillRef = "f82db71a:xprqs3y1",
                 tags = {},
-                trainerCostCopper = 5475,
+                trainerCostCopper = 2355,
             },
             {
                 category = "",
