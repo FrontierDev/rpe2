@@ -31,6 +31,7 @@ data/default/professions/enchanting.lua
 data/default/professions/enchanting_daily_rewards.lua
 data/default/professions/inscription.lua
 data/default/professions/jewelcrafting.lua
+data/default/professions/jewelcrafting_daily_rewards.lua
 data/default/professions/leatherworking.lua
 data/default/professions/leatherworking_daily_rewards.lua
 data/default/professions/misc.lua
