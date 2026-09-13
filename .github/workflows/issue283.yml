@@ -1,0 +1,69 @@
+name: Implement issue 283
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/issue283.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+      - name: Apply patch
+        run: python .github/scripts/issue283_patch.py
+      - name: Validate protocol ownership and scope
+        run: |
+          git diff --check
+          test "$(git diff --name-only | wc -l)" -eq 2
+          git diff --name-only | grep -qx 'core/internal/comms/Operations.lua'
+          git diff --name-only | grep -qx 'server/ui/eventmanage/page_EventManageActions.lua'
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          operations = Path('core/internal/comms/Operations.lua').read_text(encoding='utf-8')
+          actions = Path('server/ui/eventmanage/page_EventManageActions.lua').read_text(encoding='utf-8')
+          loot = Path('core/internal/comms/LootDelivery.lua').read_text(encoding='utf-8')
+          rejoin = Path('core/internal/comms/EventRejoinState.lua').read_text(encoding='utf-8')
+          primary = Path('core/internal/comms/PrimaryResourceSync.lua').read_text(encoding='utf-8')
+
+          static = {int(v) for v in re.findall(r'^\s*\[(\d+)\]\s*=\s*\{', operations, re.M)}
+          assert 28 in static and 33 in static
+          assert operations.count('key = "ACHIEVEMENT_ANNOUNCEMENT"') == 1
+          assert operations.count('key = "SKILL_ROLL_REQUEST"') == 1
+          assert 'HandleAchievementAnnouncement(arguments, sender, distribution, target, message)' in operations
+          assert 'HandleSkillRollRequest(arguments, sender, distribution, target, message)' in operations
+
+          occupied_dynamic = {
+              int(re.search(r'Protocol\.DeliveryOpcode\s*=\s*(\d+)', loot).group(1)),
+              int(re.search(r'Protocol\.ResponseOpcode\s*=\s*(\d+)', loot).group(1)),
+              int(re.search(r'EventRejoinState\.Opcode\s*=\s*(\d+)', rejoin).group(1)),
+              int(re.search(r'PRIMARY_RESOURCE_METADATA_OPCODE\s*=\s*(\d+)', primary).group(1)),
+          }
+          assert occupied_dynamic == {29, 30, 31, 32}
+          assert 33 not in occupied_dynamic
+          assert 28 != 33
+
+          assert 'registerSkillRequestOpcode' not in actions
+          assert 'Operations.Opcodes[' not in actions
+          assert 'Operations.KeyIndex.' not in actions
+          assert actions.count('Operations:GetOpcode("SKILL_ROLL_REQUEST")') == 1
+          assert 'Comms:SendMessage("WHISPER",SKILL_REQUEST_OPCODE' in actions
+          assert 'ProcessedSkillRollRequestIds' in actions
+          assert 'normName(sender)~=normName(ev.hostName)' in actions
+          assert 'ResolveControlledEventUnit' in actions
+          PY
+      - name: Commit fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add core/internal/comms/Operations.lua server/ui/eventmanage/page_EventManageActions.lua
+          git commit -m 'Centralize skill roll request opcode'
+          git push origin HEAD:dev
