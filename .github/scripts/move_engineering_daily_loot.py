@@ -1,0 +1,67 @@
+from pathlib import Path
+import re
+
+engineering_path = Path('data/default/professions/engineering.lua')
+toc_path = Path('RPEngine_Dev.toc')
+helper_path = Path('data/default/professions/engineering_daily_rewards.lua')
+
+text = engineering_path.read_text(encoding='utf-8')
+
+loot_block = '''        loot = {
+            {
+                conditions = {},
+                description = "Daily Engineering material cache. Guarantees one explicitly weighted metal bar or mining stone reward, with common low-tier materials more frequent and valuable high-tier bars progressively rarer.",
+                drawCount = 1,
+                entries = {
+                    { id = "copper_bar", maxQuantity = 10, minQuantity = 6, ref = "61fdf3df:nntycdj5", type = "item", weight = 20 },
+                    { id = "rough_stone", maxQuantity = 10, minQuantity = 6, ref = "3eb7e9bb:5yoczz9j", type = "item", weight = 20 },
+                    { id = "bronze_bar", maxQuantity = 10, minQuantity = 6, ref = "61fdf3df:6v7ryoxb", type = "item", weight = 18 },
+                    { id = "coarse_stone", maxQuantity = 10, minQuantity = 6, ref = "3eb7e9bb:3yvy546j", type = "item", weight = 18 },
+                    { id = "iron_bar", maxQuantity = 8, minQuantity = 5, ref = "61fdf3df:632e8bj3", type = "item", weight = 16 },
+                    { id = "heavy_stone", maxQuantity = 8, minQuantity = 5, ref = "3eb7e9bb:4wc5b4tv", type = "item", weight = 16 },
+                    { id = "steel_bar", maxQuantity = 7, minQuantity = 4, ref = "61fdf3df:8ig169x3", type = "item", weight = 14 },
+                    { id = "solid_stone", maxQuantity = 7, minQuantity = 4, ref = "3eb7e9bb:oc7kz1qi", type = "item", weight = 14 },
+                    { id = "mithril_bar", maxQuantity = 7, minQuantity = 4, ref = "61fdf3df:ha5o5yc1", type = "item", weight = 12 },
+                    { id = "dense_stone", maxQuantity = 7, minQuantity = 4, ref = "3eb7e9bb:cpv8nn2j", type = "item", weight = 12 },
+                    { id = "thorium_bar", maxQuantity = 5, minQuantity = 3, ref = "61fdf3df:5m4zt99z", type = "item", weight = 10 },
+                    { id = "silver_bar", maxQuantity = 2, minQuantity = 1, ref = "61fdf3df:nj54s0n1", type = "item", weight = 4 },
+                    { id = "gold_bar", maxQuantity = 2, minQuantity = 1, ref = "61fdf3df:2xe6dcfv", type = "item", weight = 3 },
+                    { id = "truesilver_bar", maxQuantity = 2, minQuantity = 1, ref = "61fdf3df:ufv4fdnf", type = "item", weight = 2 },
+                    { id = "dark_iron_bar", maxQuantity = 2, minQuantity = 1, ref = "61fdf3df:pb24e7k5", type = "item", weight = 1 },
+                    { id = "arcanite_bar", maxQuantity = 1, minQuantity = 1, ref = "61fdf3df:6hy57ood", type = "item", weight = 1 },
+                },
+                icon = "interface/icons/inv_gizmo_03.blp",
+                id = "n6r3k8vz",
+                items = {},
+                name = "Engineering Daily Material Cache",
+                tags = {},
+            },
+        },'''
+
+marker = '        loot = {},'
+count = text.count(marker)
+if count != 1:
+    raise RuntimeError(f'Expected exactly one Engineering loot marker, found {count}')
+text = text.replace(marker, loot_block, 1)
+
+m = re.search(r'Addon\.Data\.DefaultDatasets:Register\(\{\s*\n\s*version = (\d+),', text)
+if not m:
+    raise RuntimeError('Engineering dataset version not found')
+old_version = int(m.group(1))
+new_version = max(30, old_version + 1)
+text = text[:m.start(1)] + str(new_version) + text[m.end(1):]
+engineering_path.write_text(text, encoding='utf-8')
+
+toc = toc_path.read_text(encoding='utf-8')
+helper_line = 'data/default/professions/engineering_daily_rewards.lua\n'
+if helper_line not in toc:
+    raise RuntimeError('Engineering daily rewards helper is not listed in TOC')
+toc_path.write_text(toc.replace(helper_line, '', 1), encoding='utf-8')
+
+if not helper_path.exists():
+    raise RuntimeError('Engineering daily rewards helper file is missing')
+helper_path.unlink()
+
+print(f'Engineering dataset version: {old_version} -> {new_version}')
+print('Serialized Engineering Daily Material Cache into engineering.lua')
+print('Removed engineering_daily_rewards.lua and TOC entry')
