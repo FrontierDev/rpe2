@@ -77,24 +77,30 @@ if type(blacksmithingDefinition) == "table" then
     blacksmithingDefinition.version = math.max(4, math.floor(tonumber(blacksmithingDefinition.version) or 1))
 end
 
+local refsByName = buildBlacksmithingItemRefsByName(blacksmithing)
+local replacements = {
+    ["61fdf3df:h4i9b6wc"] = refsByName["Steel Bar"],
+    ["61fdf3df:i5m1b7xd"] = refsByName["Mithril Bar"],
+    ["61fdf3df:j6g2b8ye"] = refsByName["Gold Bar"],
+    ["61fdf3df:k7t3b9zf"] = refsByName["Truesilver Bar"],
+}
+
+for legacyRef, canonicalRef in pairs(replacements) do
+    if trim(canonicalRef) == "" then
+        error(("Unable to resolve canonical Blacksmithing material for legacy reference '%s'."):format(legacyRef), 2)
+    end
+end
+
+-- Any packaged dataset that happened to use one of the short-lived duplicate
+-- Blacksmithing material IDs should follow the canonical item instead.
+for _, definition in pairs(definitions) do
+    if type(definition) == "table" and type(definition.dataset) == "table" then
+        replaceReferences(definition.dataset, replacements)
+    end
+end
+
 if type(engineering) == "table" then
     engineering.name = "Engineering"
-
-    local refsByName = buildBlacksmithingItemRefsByName(blacksmithing)
-    local replacements = {
-        ["61fdf3df:h4i9b6wc"] = refsByName["Steel Bar"],
-        ["61fdf3df:i5m1b7xd"] = refsByName["Mithril Bar"],
-        ["61fdf3df:j6g2b8ye"] = refsByName["Gold Bar"],
-        ["61fdf3df:k7t3b9zf"] = refsByName["Truesilver Bar"],
-    }
-
-    for legacyRef, canonicalRef in pairs(replacements) do
-        if trim(canonicalRef) == "" then
-            error(("Unable to resolve canonical Blacksmithing material for legacy Engineering reference '%s'."):format(legacyRef), 2)
-        end
-    end
-
-    replaceReferences(engineering, replacements)
 end
 
 if type(engineeringDefinition) == "table" then
