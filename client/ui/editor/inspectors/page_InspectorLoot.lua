@@ -5,6 +5,7 @@ Addon.Client.UI = Addon.Client.UI or {}
 Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 
 local DataEditor = Addon.Client.UI.Editor
+local Client = Addon.Client
 local UI = Addon.UI or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
@@ -12,6 +13,7 @@ local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local SIDE_PADDING = 8
 local FIELD_WIDTH = 236
 local CONTROL_HEIGHT = 20
+local DEFAULT_LOOT_ICON = "Interface\\Icons\\INV_Misc_Chest_04"
 local PAGE_DEFINITIONS = {
     { key = "general", label = "General" },
     { key = "entries", label = "Entries" },
@@ -491,6 +493,32 @@ function DataEditor:BuildLootInspectorGeneralPage(parent)
     self.LootInspectorIdText = makeLabel(root:GetFrame(), "RPEDataEditorLootInspectorId", "ID: -")
     root:AddChild(self.LootInspectorIdText)
 
+    root:AddChild(makeLabel(root:GetFrame(), "RPEDataEditorLootInspectorIconLabel", "Icon"))
+    self.LootInspectorIconField = UI.EditorIconField:New({
+        name = "RPEDataEditorLootInspectorIconField",
+        width = FIELD_WIDTH,
+        height = CONTROL_HEIGHT,
+        buttonText = "Select Icon",
+        labelText = "-",
+        iconTexture = DEFAULT_LOOT_ICON,
+        border = false,
+    })
+    self.LootInspectorIconField:SetParent(root:GetFrame())
+    self.LootInspectorIconField:Create()
+    local iconButton = self.LootInspectorIconField:GetButton()
+    if iconButton and iconButton.SetScript then
+        iconButton:SetScript("OnClick", function()
+            local loot = self:GetSelectedLoot()
+            if not loot or not Client.OpenIconFinder then return end
+            Client:OpenIconFinder(function(_, filePath)
+                self:CommitSelectedLoot(function(selectedLoot)
+                    selectedLoot.icon = filePath or ""
+                end)
+            end, { filter = loot.icon or "" })
+        end)
+    end
+    root:AddChild(self.LootInspectorIconField)
+
     root:AddChild(makeLabel(root:GetFrame(), "RPEDataEditorLootInspectorDrawCountLabel", "Draw Count"))
     self.LootInspectorDrawCountInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorLootInspectorDrawCountInput", { width = FIELD_WIDTH, height = CONTROL_HEIGHT, text = "1" })
     local commitDrawCount = function()
@@ -756,6 +784,12 @@ function DataEditor:RefreshLootInspectorGeneral()
     local enabled = loot ~= nil
     if self.LootInspectorNameInput then self.LootInspectorNameInput:SetText(loot and (loot.name or "") or ""); setTextEnabled(self.LootInspectorNameInput, enabled) end
     if self.LootInspectorIdText then self.LootInspectorIdText:SetText(("ID: %s"):format(loot and tostring(loot.id or "") or "-")) end
+    if self.LootInspectorIconField then
+        local icon = loot and loot.icon or ""
+        self.LootInspectorIconField:SetIcon(icon ~= "" and icon or DEFAULT_LOOT_ICON)
+        self.LootInspectorIconField:SetLabelText(icon ~= "" and icon or "-")
+        self.LootInspectorIconField:SetEnabled(enabled)
+    end
     if self.LootInspectorDrawCountInput then self.LootInspectorDrawCountInput:SetText(loot and tostring(loot.drawCount or "") or ""); setTextEnabled(self.LootInspectorDrawCountInput, enabled) end
     if self.LootInspectorTagsInput then self.LootInspectorTagsInput:SetText(loot and formatTags(loot.tags) or ""); setTextEnabled(self.LootInspectorTagsInput, enabled) end
     if self.LootInspectorDescriptionInput then self.LootInspectorDescriptionInput:SetText(loot and (loot.description or "") or ""); setTextEnabled(self.LootInspectorDescriptionInput, enabled) end

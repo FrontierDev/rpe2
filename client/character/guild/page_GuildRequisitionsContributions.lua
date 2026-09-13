@@ -578,6 +578,7 @@ local function resolveLootDisplay(requisition)
         display.name = trim(lootTable.name) ~= "" and trim(lootTable.name) or "Loot Table"
         display.description = trim(lootTable.description)
         display.drawCount = positiveInteger(lootTable.drawCount, 1)
+        display.icon = trim(lootTable.icon) ~= "" and lootTable.icon or display.icon
     end
     return display
 end

@@ -18,9 +18,12 @@ GuildUI.RequisitionsPage = RequisitionsPage
 RequisitionsPage.__index = RequisitionsPage
 
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
-local DAILY_REWARD_ICON = "Interface\\Icons\\INV_Misc_Gift_01"
-local HEADER_HEIGHT = 42
+local DAILY_REWARD_AVAILABLE_ICON = 2026009
+local DAILY_REWARD_WAITING_ICON = 6883015
+local HEADER_HEIGHT = 34
 local DAILY_REWARD_BUTTON_SIZE = HEADER_HEIGHT
+local DAILY_REWARD_ENTRY_SIZE = 28
+local DAILY_REWARD_ENTRY_SPACING = 3
 local SHOP_COLUMNS = 2
 local SHOP_ROWS = 7
 local SHOP_ENTRIES_PER_PAGE = SHOP_COLUMNS * SHOP_ROWS
@@ -300,6 +303,15 @@ local function formatDailyReset(secondsRemaining)
     return ("Daily Reset in %02d:%02d:%02d"):format(hours, minutes, remainder)
 end
 
+local function resolveRewardIcon(value)
+    if type(value) == "number" and value > 0 then
+        return value
+    end
+
+    local icon = trimText(value)
+    return icon ~= "" and icon or nil
+end
+
 local function resolveRewardDisplay(reward)
     local rewardType = trimText(reward and reward.type):lower()
     local ref = trimText(reward and reward.ref)
@@ -307,7 +319,24 @@ local function resolveRewardDisplay(reward)
     local icon = DEFAULT_ICON
     local currencyKey = nil
 
-    if rewardType == "currency" then
+    if rewardType == "loot_table" then
+        local lootTable = nil
+        if type(Registry.ResolveLootReference) == "function" then
+            local resolveOk, _, resolvedLootTable = pcall(Registry.ResolveLootReference, Registry, reward and reward.ref or ref)
+            if resolveOk and type(resolvedLootTable) == "table" then
+                lootTable = resolvedLootTable
+            end
+        end
+
+        name = "Missing loot table"
+        icon = "Interface\\Icons\\INV_Misc_Chest_04"
+        if lootTable then
+            name = trimText(lootTable.name) ~= "" and trimText(lootTable.name) or "Loot Table"
+            icon = resolveRewardIcon(lootTable.icon) or icon
+        elseif ref ~= "" then
+            name = "Missing loot table"
+        end
+    elseif rewardType == "currency" then
         local currencyRef = reward and reward.ref or ref
         currencyKey = normalizeCurrencyRef(currencyRef)
 
@@ -315,7 +344,7 @@ local function resolveRewardDisplay(reward)
             local resolveOk, definition = pcall(Profile.ResolveCurrencyDefinition, currencyKey)
             if resolveOk and type(definition) == "table" and definition.isMissing ~= true then
                 name = trimText(definition.name) ~= "" and trimText(definition.name) or name
-                icon = trimText(definition.icon) ~= "" and definition.icon or icon
+                icon = resolveRewardIcon(definition.icon) or icon
             end
         end
 
@@ -333,7 +362,7 @@ local function resolveRewardDisplay(reward)
 
         if item then
             name = trimText(item.name) ~= "" and trimText(item.name) or name
-            icon = trimText(item.icon) ~= "" and item.icon or icon
+            icon = resolveRewardIcon(item.icon) or icon
         end
 
         if name == "Unknown item" and type(Registry.ResolveItemName) == "function" then
@@ -353,7 +382,18 @@ local function resolveRewardDisplay(reward)
         icon = icon,
         amount = normalizeRewardAmount(reward and reward.amount),
         currencyKey = currencyKey,
+        rewardType = rewardType,
     }
+end
+
+function RequisitionsPage:GetDailyRewards()
+    local status = self.DailyRewardStatus
+    local rewards = status and status.rewards or nil
+    if type(rewards) ~= "table" or #rewards == 0 then
+        local rank = status and status.rank or nil
+        rewards = rank and rank.dailyRewards or rewards
+    end
+    return type(rewards) == "table" and rewards or {}
 end
 
 function RequisitionsPage:BuildDailyRewardTooltip()
@@ -362,36 +402,91 @@ function RequisitionsPage:BuildDailyRewardTooltip()
         title = "Daily Rewards",
         lines = {},
     }
-    local status = self.DailyRewardStatus
-    local rewards = status and status.rewards or nil
-    if type(rewards) ~= "table" or #rewards == 0 then
-        local rank = status and status.rank or nil
-        rewards = rank and rank.dailyRewards or rewards
+    local status = self.DailyRewardStatus and self.DailyRewardStatus.status or "unavailable"
+    local message = status == "available-today" and "Click to claim today's rewards."
+        or status == "received-today" and "Today's rewards have already been claimed."
+        or "Daily rewards are currently unavailable."
+    spec.lines[1] = { left = message, colorToken = "text.secondary" }
+
+    return spec
+end
+
+function RequisitionsPage:BuildDailyRewardEntryTooltip(display)
+    local amount = ("x%d"):format(display.amount)
+    if display.currencyKey == "copper" then
+        amount = Common:FormatCopper(display.amount)
     end
 
-    if type(rewards) == "table" then
-        for index = 1, #rewards do
-            local display = resolveRewardDisplay(rewards[index])
-            local rightText = ("x%d"):format(display.amount)
-            if display.currencyKey == "copper" then
-                rightText = Common:FormatCopper(display.amount)
-            end
-            local line = {
-                left = display.name,
-                right = rightText,
-                colorToken = "text.secondary",
-                rightColorToken = "text.primary",
-            }
-            if type(display.icon) == "number" then
-                line.left = ("|T%d:16:16|t %s"):format(display.icon, display.name)
-            else
-                line.icon = display.icon
-            end
-            spec.lines[#spec.lines + 1] = line
+    return {
+        type = "custom",
+        title = display.name,
+        lines = {
+            { left = "Daily Reward", colorToken = "text.secondary" },
+            { left = amount, colorToken = "text.primary" },
+        },
+    }
+end
+
+function RequisitionsPage:RefreshDailyRewardList()
+    local layout = self.DailyRewardIconList
+    if not layout then
+        return
+    end
+
+    local rewards = self:GetDailyRewards()
+    self.DailyRewardIconButtons = self.DailyRewardIconButtons or {}
+    local visibleButtons = {}
+
+    for index = 1, #rewards do
+        local display = resolveRewardDisplay(rewards[index])
+        local button = self.DailyRewardIconButtons[index]
+        if not button then
+            button = UI.ImageButton:New({
+                name = "RPEGuildDailyRewardEntry" .. index,
+                width = DAILY_REWARD_ENTRY_SIZE,
+                height = DAILY_REWARD_ENTRY_SIZE,
+                border = false,
+            })
+            button:SetParent(layout:GetFrame())
+            button:Create()
+            self.DailyRewardIconButtons[index] = button
+        end
+
+        button:SetNormalTexture(display.icon)
+        button:SetHighlightTexture(display.icon)
+        button:SetPushedTexture(display.icon)
+        button:SetDisabledTexture(display.icon)
+        button:SetEnabled(true)
+        button:SetTooltip(function()
+            return self:BuildDailyRewardEntryTooltip(display)
+        end)
+        local buttonFrame = button:GetFrame()
+        if buttonFrame then
+            buttonFrame:Show()
+        end
+        visibleButtons[#visibleButtons + 1] = button
+    end
+
+    for index = #rewards + 1, #self.DailyRewardIconButtons do
+        local buttonFrame = self.DailyRewardIconButtons[index]:GetFrame()
+        if buttonFrame then
+            buttonFrame:Hide()
         end
     end
 
-    return spec
+    layout.children = visibleButtons
+    local count = #visibleButtons
+    layout.options.width = count > 0
+        and (count * DAILY_REWARD_ENTRY_SIZE) + ((count - 1) * DAILY_REWARD_ENTRY_SPACING)
+        or 0
+    local layoutFrame = layout:GetFrame()
+    if layoutFrame then
+        layoutFrame:SetShown(count > 0)
+    end
+    layout:RefreshLayout()
+    if self.HeaderLayout and self.HeaderLayout.RefreshLayout then
+        self.HeaderLayout:RefreshLayout()
+    end
 end
 
 function RequisitionsPage:UpdateDailyRewardVisualState()
@@ -399,7 +494,15 @@ function RequisitionsPage:UpdateDailyRewardVisualState()
         return
     end
 
+    local status = self.DailyRewardStatus and self.DailyRewardStatus.status or "unavailable"
+    local available = status == "available-today" and self.DailyRewardPending ~= true
+    local icon = available and DAILY_REWARD_AVAILABLE_ICON or DAILY_REWARD_WAITING_ICON
     local alpha = self:GetDailyRewardVisualAlpha()
+
+    self.DailyRewardButton:SetNormalTexture(icon)
+    self.DailyRewardButton:SetHighlightTexture(icon)
+    self.DailyRewardButton:SetPushedTexture(icon)
+    self.DailyRewardButton:SetDisabledTexture(icon)
 
     local buttonFrame = self.DailyRewardButton:GetFrame()
     if buttonFrame then
@@ -411,6 +514,11 @@ function RequisitionsPage:UpdateDailyRewardVisualState()
         if buttonFrame.SetAlpha then
             buttonFrame:SetAlpha(alpha)
         end
+    end
+
+    local glowFrame = self.DailyRewardGlow and self.DailyRewardGlow:GetFrame() or nil
+    if glowFrame and glowFrame.SetShown then
+        glowFrame:SetShown(available)
     end
 end
 
@@ -848,10 +956,10 @@ function RequisitionsPage:Build(parent, owner)
         width = DAILY_REWARD_BUTTON_SIZE,
         height = DAILY_REWARD_BUTTON_SIZE,
         border = false,
-        normalTexture = DAILY_REWARD_ICON,
-        highlightTexture = DAILY_REWARD_ICON,
-        pushedTexture = DAILY_REWARD_ICON,
-        disabledTexture = DAILY_REWARD_ICON,
+        normalTexture = DAILY_REWARD_WAITING_ICON,
+        highlightTexture = DAILY_REWARD_WAITING_ICON,
+        pushedTexture = DAILY_REWARD_WAITING_ICON,
+        disabledTexture = DAILY_REWARD_WAITING_ICON,
     })
     self.DailyRewardButton:SetParent(self.HeaderLayout:GetFrame())
     self.DailyRewardTooltip = function()
@@ -884,6 +992,23 @@ function RequisitionsPage:Build(parent, owner)
     self.DailyRewardButton:SetScript("OnClick", function()
         self:TryClaimDailyReward()
     end)
+
+    self.DailyRewardGlow = UI.CreatePanel(self.DailyRewardButton:GetFrame(), "RPEGuildDailyRewardGlow", {
+        width = DAILY_REWARD_BUTTON_SIZE,
+        height = DAILY_REWARD_BUTTON_SIZE,
+        contentInset = 0,
+        showBorder = true,
+        panelBorderSize = 2,
+        panelBorderColor = { r = 1, g = 0.82, b = 0.15, a = 0.9 },
+        panelBackgroundColor = { r = 0, g = 0, b = 0, a = 0 },
+    })
+    local dailyGlowFrame = self.DailyRewardGlow:GetFrame()
+    if dailyGlowFrame then
+        dailyGlowFrame:ClearAllPoints()
+        dailyGlowFrame:SetAllPoints(self.DailyRewardButton:GetFrame())
+        dailyGlowFrame:EnableMouse(false)
+        dailyGlowFrame:Hide()
+    end
     self.HeaderLayout:AddChild(self.DailyRewardButton)
 
     self.RankResetLayout = UI.CreateLayout(UI.VerticalLayoutGroup, self.HeaderLayout:GetFrame(), "RPEGuildRankResetLayout", {
@@ -897,7 +1022,7 @@ function RequisitionsPage:Build(parent, owner)
     self.HeaderLayout:AddChild(self.RankResetLayout)
 
     self.GuildRankText = UI.CreateText(self.RankResetLayout:GetFrame(), "RPEGuildRankText", "", {
-        height = 20,
+        height = 16,
         expandWidth = true,
         justifyH = "LEFT",
         textColor = UI.ResolveColor(nil, "text.primary"),
@@ -905,12 +1030,21 @@ function RequisitionsPage:Build(parent, owner)
     self.RankResetLayout:AddChild(self.GuildRankText)
 
     self.DailyResetText = UI.CreateText(self.RankResetLayout:GetFrame(), "RPEGuildDailyResetText", "", {
-        height = 20,
+        height = 16,
         expandWidth = true,
         justifyH = "LEFT",
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
     self.RankResetLayout:AddChild(self.DailyResetText)
+
+    self.DailyRewardIconList = UI.CreateLayout(UI.HorizontalLayoutGroup, self.HeaderLayout:GetFrame(), "RPEGuildDailyRewardIconList", {
+        width = 0,
+        height = HEADER_HEIGHT,
+        spacing = DAILY_REWARD_ENTRY_SPACING,
+        fitChildrenWidth = false,
+        fitChildrenHeight = false,
+    })
+    self.HeaderLayout:AddChild(self.DailyRewardIconList)
 
     self.MainContentLayout = UI.CreateLayout(UI.HorizontalLayoutGroup, self.RootLayout:GetFrame(), "RPEGuildMainContentLayout", {
         expandWidth = true,
@@ -1177,6 +1311,7 @@ function RequisitionsPage:Refresh()
     self.AssignedRankStatus = assignment
     self.DailyRewardStatus = dailyStatus
     self.DailyRewardButton:SetTooltip(self.DailyRewardTooltip)
+    self:RefreshDailyRewardList()
     self.GuildRankText:SetText("Guild Rank: " .. resolveRankName(assignment))
     self:UpdateResetText(dailyStatus.resetState and dailyStatus.resetState.secondsRemaining or 0)
     self:UpdateDailyRewardVisualState()

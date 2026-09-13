@@ -491,6 +491,7 @@ function Page:Refresh()
     end
     self:UpdateResetText(dailyStatus.resetState and dailyStatus.resetState.secondsRemaining or 0)
     self:UpdateDailyRewardVisualState()
+    self:RefreshDailyRewardList()
 
     local shop, limited = self:PartitionRequisitions()
     self.LimitedRequisitions = limited

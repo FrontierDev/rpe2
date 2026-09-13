@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 3,
+    version = 4,
     dataset = {
         achievements = {},
         auras = {
@@ -1780,7 +1780,7 @@ Addon.Data.DefaultDatasets:Register({
                 metaSockets = 0,
                 minDamagePerTurn = 0,
                 modificationKind = "generic",
-                name = "Gold Ingot",
+                name = "Gold Bar",
                 prismaticSockets = 0,
                 quality = "uncommon",
                 redSockets = 0,
@@ -1878,7 +1878,7 @@ Addon.Data.DefaultDatasets:Register({
                 metaSockets = 0,
                 minDamagePerTurn = 0,
                 modificationKind = "generic",
-                name = "Truesilver Ingot",
+                name = "Truesilver Bar",
                 prismaticSockets = 0,
                 quality = "uncommon",
                 redSockets = 0,
@@ -1927,7 +1927,7 @@ Addon.Data.DefaultDatasets:Register({
                 metaSockets = 0,
                 minDamagePerTurn = 0,
                 modificationKind = "generic",
-                name = "Dark Iron Ingot",
+                name = "Dark Iron Bar",
                 prismaticSockets = 0,
                 quality = "uncommon",
                 redSockets = 0,

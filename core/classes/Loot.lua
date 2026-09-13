@@ -110,6 +110,7 @@ function Loot:New(data)
         id = nil,
         name = "",
         description = "",
+        icon = "Interface\\Icons\\INV_Misc_Chest_04",
         drawCount = 1,
         entries = {},
 
@@ -133,6 +134,7 @@ function Loot:Merge(data)
 
     self.name = ensureString(self.name)
     self.description = ensureString(self.description)
+    self.icon = ensureString(self.icon)
     self.drawCount = normalizePositiveIntegerOrOriginal(self.drawCount, 1)
     self.entries = normalizeEntries(self.entries)
     self.items = ensureTableCopy(self.items)
@@ -147,6 +149,7 @@ function Loot:ToTable()
         id = self.id,
         name = self.name,
         description = self.description,
+        icon = self.icon,
         drawCount = self.drawCount,
         entries = normalizeEntries(self.entries),
         items = ensureTableCopy(self.items),

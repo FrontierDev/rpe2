@@ -9678,6 +9678,25 @@ Addon.Data.DefaultDatasets:Register({
         loot = {
             {
                 conditions = {},
+                description = "Daily Tailoring material cache. Guarantees one cloth reward, weighted toward ordinary cloth with rare Felcloth and Mooncloth outcomes.",
+                drawCount = 1,
+                entries = {
+                    { id = "linen", maxQuantity = 10, minQuantity = 6, ref = "7259f1d3:agzskvec", type = "item", weight = 20 },
+                    { id = "wool", maxQuantity = 10, minQuantity = 6, ref = "7259f1d3:1wssn0qp", type = "item", weight = 18 },
+                    { id = "silk", maxQuantity = 8, minQuantity = 5, ref = "7259f1d3:jt6ktqiu", type = "item", weight = 16 },
+                    { id = "mageweave", maxQuantity = 7, minQuantity = 4, ref = "7259f1d3:edth2zu1", type = "item", weight = 14 },
+                    { id = "runecloth", maxQuantity = 7, minQuantity = 4, ref = "7259f1d3:dx7zh3l2", type = "item", weight = 12 },
+                    { id = "felcloth", maxQuantity = 2, minQuantity = 1, ref = "7259f1d3:8dc72367", type = "item", weight = 4 },
+                    { id = "mooncloth", maxQuantity = 1, minQuantity = 1, ref = "7259f1d3:xnx0kwlv", type = "item", weight = 1 },
+                },
+                id = "q8m2v7kc",
+                icon = "interface/icons/inv_fabric_moonrag_01.blp",
+                items = {},
+                name = "Tailoring Daily Cloth Cache",
+                tags = {},
+            },
+            {
+                conditions = {},
                 description = "Equal-weighting roll table for classic cloths (quantities 1-5). No roll (50%).",
                 drawCount = 1,
                 entries = {
@@ -13851,5 +13870,5 @@ Addon.Data.DefaultDatasets:Register({
         units = {},
         weaponTypes = {},
     },
-    version = 7,
+    version = 9,
 })

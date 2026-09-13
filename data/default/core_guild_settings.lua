@@ -9,8 +9,8 @@ if not definition or not definition.dataset then
     error("Core default dataset must be registered before core_guild_settings.lua", 2)
 end
 
-if definition.version < 4 then
-    definition.version = 4
+if definition.version < 5 then
+    definition.version = 5
 end
 
 local dataset = definition.dataset
@@ -40,6 +40,17 @@ for _, dependencyId in ipairs(dataset.dependencies) do
 end
 if not hasMiscDependency then
     dataset.dependencies[#dataset.dependencies + 1] = "3eb7e9bb"
+end
+
+local hasTailoringDependency = false
+for _, dependencyId in ipairs(dataset.dependencies) do
+    if tostring(dependencyId or "") == "7259f1d3" then
+        hasTailoringDependency = true
+        break
+    end
+end
+if not hasTailoringDependency then
+    dataset.dependencies[#dataset.dependencies + 1] = "7259f1d3"
 end
 
 -- Role IDs are stable implementation details. The Data Editor presents Role
@@ -207,7 +218,7 @@ local guildSetting = {
     guildName = "",
     general = {
         enableRequisitions = true,
-        enableDailyRewards = false,
+        enableDailyRewards = true,
     },
     roles = roles,
     shopCategories = {
@@ -218,7 +229,14 @@ local guildSetting = {
         },
     },
     requisitions = requisitions,
-    dailyRewards = {},
+    dailyRewards = {
+        {
+            id = "q8m2v7kc",
+            type = "loot_table",
+            ref = "7259f1d3:q8m2v7kc",
+            amount = 1,
+        },
+    },
     tags = {},
 }
 
