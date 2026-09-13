@@ -2,7 +2,8 @@ name: Fix event addon roster gating
 
 on:
   push:
-    branches: [dev]
+    branches:
+      - dev
     paths:
       - .github/workflows/fix-event-addon-roster-gating.yml
 
@@ -11,7 +12,6 @@ permissions:
 
 jobs:
   fix:
-    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +19,7 @@ jobs:
           ref: dev
           fetch-depth: 0
 
-      - name: Apply event roster/hash gating fix
+      - name: Apply event roster and hash gating fix
         shell: bash
         run: |
           python - <<'PY'
@@ -86,8 +86,8 @@ jobs:
         end
     end
 '''
-          new_roster = '''    -- Only clients that completed the addon session handshake are event participants.
-    -- Ordinary WoW party/raid members that do not run RPE never enter clientOrder and are ignored.
+          new_roster = '''    -- Only clients that joined the RPE session are event participants.
+    -- Ordinary WoW party/raid members without the addon never enter clientOrder and are ignored.
     for index = 1, #((sessionState and sessionState.clientOrder) or {}) do
         local playerName = Common.NormalizeName(sessionState.clientOrder[index])
         local clientState = playerName ~= ""
@@ -134,9 +134,8 @@ jobs:
         return nil, "host-session-not-current"
     end
 
-    -- recipients are derived from the addon session's clientOrder, not the WoW
-    -- party roster. Non-addon party members are therefore intentionally absent,
-    -- while every connected addon client must have a complete, matching hash handshake.
+    -- These recipients come from the RPE session, not the raw WoW group roster.
+    -- Non-addon group members are absent; connected addon clients must be hash-compatible.
     if type(server.HasClientHashMismatch) == "function" and server:HasClientHashMismatch(sessionState) then
         return nil, "client-hash-mismatch"
     end
@@ -165,12 +164,13 @@ jobs:
           path.write_text(text, encoding='utf-8')
           PY
 
-      - name: Validate
+      - name: Validate and commit
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
           text = Path('server/server_Event.lua').read_text(encoding='utf-8')
+
           start = text.index('local function buildEventUnits(')
           end = text.index('\nlocal function buildLivePlayerUnit', start)
           build = text[start:end]
@@ -191,28 +191,23 @@ jobs:
           starter = text[start:end]
           assert 'self:HasClientHashMismatch(sessionState)' in starter
 
-          # Deterministic model of the intended participant boundary.
           def participants(client_order, clients_by_name, host):
               result = []
               seen = set()
               for name in client_order:
                   if name and name in clients_by_name and name not in seen:
-                      result.append(name); seen.add(name)
+                      result.append(name)
+                      seen.add(name)
               if host not in seen:
                   result.append(host)
               return result
 
           assert participants(['Host'], {'Host': {}}, 'Host') == ['Host']
           assert participants(['Host', 'Addon'], {'Host': {}, 'Addon': {}}, 'Host') == ['Host', 'Addon']
-          # A non-addon party member is never present in client_order/clients_by_name.
-          assert participants(['Host'], {'Host': {}}, 'Host') == ['Host']
           PY
+
           git diff --check
           git diff -- server/server_Event.lua
-
-      - name: Commit
-        shell: bash
-        run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add server/server_Event.lua
