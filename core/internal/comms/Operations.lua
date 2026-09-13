@@ -518,6 +518,18 @@ Operations.Opcodes = Operations.Opcodes or {
             return client:HandleAchievementAnnouncement(arguments, sender, distribution, target, message)
         end,
     },
+    [33] = {
+        key = "SKILL_ROLL_REQUEST",
+        name = "skill-roll-request",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleSkillRollRequest) ~= "function" then
+                return false
+            end
+
+            return client:HandleSkillRollRequest(arguments, sender, distribution, target, message)
+        end,
+    },
 }
 
 Operations:ResetRegistry()
