@@ -25,6 +25,7 @@ data/default/classes/warrior.lua
 data/default/professions/fishing.lua
 data/default/professions/alchemy.lua
 data/default/professions/blacksmithing.lua
+data/default/professions/blacksmithing_daily_rewards.lua
 data/default/professions/enchanting.lua
 data/default/professions/inscription.lua
 data/default/professions/jewelcrafting.lua
