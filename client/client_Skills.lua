@@ -175,6 +175,14 @@ local function isLocalPlayerEventUnit(eventState, eventUnit)
     return localEventId > 0 and localEventId == requestedEventId
 end
 
+local function isLocalPlayerSkillProgressionSource(eventState, eventUnit)
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return type(eventUnit) ~= "table"
+    end
+
+    return isLocalPlayerEventUnit(eventState, eventUnit)
+end
+
 local function resolveRuntimeStatValue(eventUnit, statRef)
     local normalizedStatRef = normalizeRef(statRef)
     if type(eventUnit) ~= "table" or not normalizedStatRef then
@@ -406,6 +414,7 @@ function Client:RollSkill(skillRef, options)
     if type(progression) == "table"
         and type(progression.TryGain) == "function"
         and type(progression.GetRulesetChance) == "function"
+        and isLocalPlayerSkillProgressionSource(eventState, eventUnit)
     then
         progression:TryGain(
             normalizedSkillRef,
