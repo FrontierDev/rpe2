@@ -1,0 +1,223 @@
+name: Engineering dataset cleanup
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - .github/workflows/engineering-dataset-cleanup.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Clean Engineering dataset
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          path = Path('data/default/professions/engineering.lua')
+          text = path.read_text(encoding='utf-8')
+
+          targets = {
+              'Goblin Rocket Boots',
+              'Gnomish Battle Chicken',
+              'Goblin Bomb Dispenser',
+              'Gnomish Death Ray',
+              'Goblin Dragon Gun',
+              'Mithril Mechanical Dragonling',
+              'Dimensional Ripper - Everlook',
+              'Ultrasafe Transporter: Gadgetzan',
+          }
+
+          def find_matching_brace(s, open_pos):
+              depth = 0
+              in_string = False
+              escape = False
+              for i in range(open_pos, len(s)):
+                  ch = s[i]
+                  if in_string:
+                      if escape:
+                          escape = False
+                      elif ch == '\\':
+                          escape = True
+                      elif ch == '"':
+                          in_string = False
+                      continue
+                  if ch == '"':
+                      in_string = True
+                  elif ch == '{':
+                      depth += 1
+                  elif ch == '}':
+                      depth -= 1
+                      if depth == 0:
+                          return i
+              raise RuntimeError('Unmatched brace')
+
+          def section_bounds(s, section):
+              marker = f'        {section} = {{'
+              start = s.index(marker)
+              open_pos = s.index('{', start)
+              close_pos = find_matching_brace(s, open_pos)
+              return open_pos, close_pos
+
+          def top_level_entries(section_text):
+              entries = []
+              i = 0
+              while i < len(section_text):
+                  if section_text[i] != '{':
+                      i += 1
+                      continue
+                  end = find_matching_brace(section_text, i)
+                  j = end + 1
+                  while j < len(section_text) and section_text[j] in ' \t':
+                      j += 1
+                  if j < len(section_text) and section_text[j] == ',':
+                      j += 1
+                  if j < len(section_text) and section_text[j] == '\r':
+                      j += 1
+                  if j < len(section_text) and section_text[j] == '\n':
+                      j += 1
+                  entries.append((i, j, section_text[i:j]))
+                  i = j
+              return entries
+
+          removed_item_ids = set()
+          removed_spell_ids = set()
+
+          # Remove requested items and capture any item-use spell refs.
+          open_pos, close_pos = section_bounds(text, 'items')
+          body = text[open_pos + 1:close_pos]
+          kept = []
+          cursor = 0
+          removed_names = set()
+          for start, end, entry in top_level_entries(body):
+              kept.append(body[cursor:start])
+              name_match = re.search(r'\n\s*name = "([^"]+)",', entry)
+              name = name_match.group(1) if name_match else None
+              if name in targets:
+                  removed_names.add(name)
+                  id_match = re.search(r'\n\s*id = "([^"]+)",', entry)
+                  if id_match:
+                      removed_item_ids.add('af503002:' + id_match.group(1))
+                  spell_match = re.search(r'\n\s*useSpellRef = "([^"]+)",', entry)
+                  if spell_match:
+                      removed_spell_ids.add(spell_match.group(1))
+              else:
+                  # Correct every Engineering ammo item: source ammo DPS -> RAP at 14 RAP per DPS.
+                  if '"ammo"' in entry and 'sourceStatRef = "f82db71a:v2rs9cpy"' in entry:
+                      def scale_rap(match):
+                          value = float(match.group(1)) * 14
+                          rendered = str(int(value)) if value.is_integer() else str(value)
+                          return match.group(0).replace(match.group(1), rendered)
+                      entry, count = re.subn(
+                          r'(sourceStatRef = "f82db71a:v2rs9cpy",\s*\n\s*value = )(-?\d+(?:\.\d+)?)(,)',
+                          lambda m: m.group(1) + (str(int(float(m.group(2)) * 14)) if (float(m.group(2)) * 14).is_integer() else str(float(m.group(2)) * 14)) + m.group(3),
+                          entry,
+                          count=1,
+                      )
+                      if count != 1:
+                          raise RuntimeError(f'Failed RAP conversion for ammo item {name}')
+                  kept.append(entry)
+              cursor = end
+          kept.append(body[cursor:])
+          if removed_names != targets:
+              missing = sorted(targets - removed_names)
+              raise RuntimeError(f'Requested Engineering items not found: {missing}')
+          text = text[:open_pos + 1] + ''.join(kept) + text[close_pos:]
+
+          # Remove recipes that produce or otherwise reference the removed items.
+          open_pos, close_pos = section_bounds(text, 'recipes')
+          body = text[open_pos + 1:close_pos]
+          kept = []
+          cursor = 0
+          removed_recipe_names = set()
+          for start, end, entry in top_level_entries(body):
+              kept.append(body[cursor:start])
+              if any(ref in entry for ref in removed_item_ids):
+                  name_match = re.search(r'\n\s*name = "([^"]+)",', entry)
+                  if name_match:
+                      removed_recipe_names.add(name_match.group(1))
+              else:
+                  kept.append(entry)
+              cursor = end
+          kept.append(body[cursor:])
+          text = text[:open_pos + 1] + ''.join(kept) + text[close_pos:]
+
+          # Remove any explicitly linked use spells, plus same-name spells if present.
+          open_pos, close_pos = section_bounds(text, 'spells')
+          body = text[open_pos + 1:close_pos]
+          kept = []
+          cursor = 0
+          for start, end, entry in top_level_entries(body):
+              kept.append(body[cursor:start])
+              name_match = re.search(r'\n\s*name = "([^"]+)",', entry)
+              id_match = re.search(r'\n\s*id = "([^"]+)",', entry)
+              name = name_match.group(1) if name_match else None
+              qid = 'af503002:' + id_match.group(1) if id_match else None
+              if name in targets or qid in removed_spell_ids:
+                  pass
+              else:
+                  kept.append(entry)
+              cursor = end
+          kept.append(body[cursor:])
+          text = text[:open_pos + 1] + ''.join(kept) + text[close_pos:]
+
+          # Bump packaged dataset version monotonically.
+          version_match = re.search(r'(Addon\.Data\.DefaultDatasets:Register\(\{\s*\n\s*version = )(\d+)(,)', text)
+          if not version_match:
+              raise RuntimeError('Engineering dataset version not found')
+          old_version = int(version_match.group(2))
+          text = text[:version_match.start(2)] + str(old_version + 1) + text[version_match.end(2):]
+
+          # Validation: no removed item refs/names remain; all ammo RAP values are now integral x14 conversions.
+          for name in targets:
+              if f'name = "{name}"' in text:
+                  raise RuntimeError(f'Removed name still present: {name}')
+          for ref in removed_item_ids:
+              if ref in text:
+                  raise RuntimeError(f'Removed item ref still present: {ref}')
+          for ref in removed_spell_ids:
+              if ref in text:
+                  raise RuntimeError(f'Removed spell ref still present: {ref}')
+
+          expected_ammo = {
+              'Crafted Light Shot': 28,
+              'Crafted Heavy Shot': 63,
+              'Crafted Solid Shot': 119,
+              'Hi-Impact Mithril Slugs': 175,
+          }
+          for name, expected in expected_ammo.items():
+              idx = text.index(f'name = "{name}"')
+              block_start = text.rfind('{', 0, idx)
+              block_end = find_matching_brace(text, block_start)
+              entry = text[block_start:block_end + 1]
+              if f'value = {expected},' not in entry:
+                  raise RuntimeError(f'{name} did not resolve to {expected} RAP')
+
+          path.write_text(text, encoding='utf-8')
+          print(f'Removed items: {sorted(removed_names)}')
+          print(f'Removed recipes: {sorted(removed_recipe_names)}')
+          print(f'Dataset version: {old_version} -> {old_version + 1}')
+          PY
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/default/professions/engineering.lua
+          git diff --cached --check
+          git diff --cached --quiet && exit 0
+          git commit -m "Clean up Engineering devices and ammo scaling"
+          git push origin HEAD:dev
