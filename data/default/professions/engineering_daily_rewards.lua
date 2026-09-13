@@ -41,6 +41,11 @@ local function buildItemIndex()
     return itemsByRef
 end
 
+local function isEligibleBaseMaterial(item)
+    local name = tostring(item and item.name or "")
+    return name:match(" Bar$") ~= nil or name:match(" Stone$") ~= nil
+end
+
 if type(dataset) == "table" then
     dataset.loot = type(dataset.loot) == "table" and dataset.loot or {}
 
@@ -92,7 +97,14 @@ if type(dataset) == "table" then
     local itemsByRef = buildItemIndex()
     local materialRefs = {}
     for itemRef in pairs(flattenedMaterials) do
-        materialRefs[#materialRefs + 1] = itemRef
+        local item = itemsByRef[itemRef]
+        if type(item) ~= "table" then
+            error(("Engineering daily rewards could not resolve flattened material '%s'."):format(itemRef), 2)
+        end
+
+        if isEligibleBaseMaterial(item) then
+            materialRefs[#materialRefs + 1] = itemRef
+        end
     end
 
     table.sort(materialRefs, function(left, right)
@@ -115,10 +127,6 @@ if type(dataset) == "table" then
     local entries = {}
     for _, itemRef in ipairs(materialRefs) do
         local item = itemsByRef[itemRef]
-        if type(item) ~= "table" then
-            error(("Engineering daily rewards could not resolve flattened material '%s'."):format(itemRef), 2)
-        end
-
         local weight, minQuantity, maxQuantity = getRewardBand(item.itemLevel)
         local maxStackSize = math.max(1, math.floor(tonumber(item.maxStackSize) or maxQuantity))
         maxQuantity = math.min(maxQuantity, maxStackSize)
@@ -135,13 +143,13 @@ if type(dataset) == "table" then
     end
 
     if #entries == 0 then
-        error("Engineering daily rewards could not resolve any flattened recipe materials.", 2)
+        error("Engineering daily rewards could not resolve any flattened metal bars or stone.", 2)
     end
 
     local lootId = "n6r3k8vz"
     local definition = {
         conditions = {},
-        description = "Daily Engineering material cache. Rewards flattened base materials used by Engineering recipes, such as metals, cloth, stone, leather, gems and elemental materials, instead of crafted Engineering components.",
+        description = "Daily Engineering material cache. Rewards flattened metal bars and stone used by Engineering recipes, excluding crafted Engineering components and other material types.",
         drawCount = 1,
         entries = entries,
         icon = "interface/icons/inv_gizmo_03.blp",
@@ -165,5 +173,5 @@ if type(dataset) == "table" then
         dataset.loot[#dataset.loot + 1] = definition
     end
 
-    engineering.version = math.max(27, math.floor(tonumber(engineering.version) or 1))
+    engineering.version = math.max(28, math.floor(tonumber(engineering.version) or 1))
 end
