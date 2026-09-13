@@ -25,7 +25,6 @@ data/default/classes/warrior.lua
 data/default/professions/fishing.lua
 data/default/professions/alchemy.lua
 data/default/professions/blacksmithing.lua
-data/default/professions/blacksmithing_materials.lua
 data/default/professions/enchanting.lua
 data/default/professions/inscription.lua
 data/default/professions/jewelcrafting.lua
@@ -35,6 +34,7 @@ data/default/professions/misc_213_cleanup.lua
 data/default/professions/tailoring.lua
 data/default/professions/tailoring_daily_rewards.lua
 data/default/professions/engineering.lua
+data/default/professions/profession_default_corrections.lua
 
 utils/Common.lua
 utils/Dice.lua
