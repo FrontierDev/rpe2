@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 26,
+    version = 30,
     dataset = {
         name = "Engineering",
         achievements = {},
@@ -2912,6 +2912,35 @@ Addon.Data.DefaultDatasets:Register({
                 targetSlotRefs = {
                     "f82db71a:q8ve6n6t",
                 },
+            },
+        },
+        loot = {
+            {
+                conditions = {},
+                description = "Daily Engineering material cache. Guarantees one explicitly weighted metal bar or mining stone reward, with common low-tier materials more frequent and valuable high-tier bars progressively rarer.",
+                drawCount = 1,
+                entries = {
+                    { id = "copper_bar", maxQuantity = 10, minQuantity = 6, ref = "61fdf3df:nntycdj5", type = "item", weight = 20 },
+                    { id = "rough_stone", maxQuantity = 10, minQuantity = 6, ref = "61fdf3df:c7urqe23", type = "item", weight = 20 },
+                    { id = "bronze_bar", maxQuantity = 10, minQuantity = 6, ref = "61fdf3df:xegz4i5q", type = "item", weight = 18 },
+                    { id = "coarse_stone", maxQuantity = 10, minQuantity = 6, ref = "61fdf3df:qcah9yrg", type = "item", weight = 18 },
+                    { id = "heavy_stone", maxQuantity = 8, minQuantity = 5, ref = "61fdf3df:u8qtuhfq", type = "item", weight = 16 },
+                    { id = "steel_bar", maxQuantity = 7, minQuantity = 4, ref = "61fdf3df:ov027km6", type = "item", weight = 14 },
+                    { id = "solid_stone", maxQuantity = 7, minQuantity = 4, ref = "61fdf3df:o1ogtdcq", type = "item", weight = 14 },
+                    { id = "mithril_bar", maxQuantity = 7, minQuantity = 4, ref = "61fdf3df:225h536c", type = "item", weight = 12 },
+                    { id = "dense_stone", maxQuantity = 7, minQuantity = 4, ref = "61fdf3df:a4kj24o4", type = "item", weight = 12 },
+                    { id = "thorium_bar", maxQuantity = 5, minQuantity = 3, ref = "61fdf3df:5m4zt99z", type = "item", weight = 10 },
+                    { id = "silver_bar", maxQuantity = 2, minQuantity = 1, ref = "61fdf3df:nvc1anz9", type = "item", weight = 4 },
+                    { id = "gold_bar", maxQuantity = 2, minQuantity = 1, ref = "61fdf3df:hqook9xe", type = "item", weight = 3 },
+                    { id = "truesilver_bar", maxQuantity = 2, minQuantity = 1, ref = "61fdf3df:ufv4fdnf", type = "item", weight = 2 },
+                    { id = "dark_iron_bar", maxQuantity = 2, minQuantity = 1, ref = "61fdf3df:pb24e7k5", type = "item", weight = 1 },
+                    { id = "arcanite_bar", maxQuantity = 1, minQuantity = 1, ref = "61fdf3df:6hy57ood", type = "item", weight = 1 },
+                },
+                icon = "interface/icons/inv_gizmo_03.blp",
+                id = "n6r3k8vz",
+                items = {},
+                name = "Engineering Daily Material Cache",
+                tags = {},
             },
         },
         recipes = {

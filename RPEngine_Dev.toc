@@ -39,7 +39,6 @@ data/default/professions/misc.lua
 data/default/professions/tailoring.lua
 data/default/professions/tailoring_daily_rewards_cleanup.lua
 data/default/professions/engineering.lua
-data/default/professions/engineering_daily_rewards.lua
 
 utils/Common.lua
 utils/Dice.lua
