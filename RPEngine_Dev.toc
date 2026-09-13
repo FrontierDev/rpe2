@@ -28,6 +28,7 @@ data/default/professions/alchemy_daily_rewards.lua
 data/default/professions/blacksmithing.lua
 data/default/professions/blacksmithing_daily_rewards.lua
 data/default/professions/enchanting.lua
+data/default/professions/enchanting_daily_rewards.lua
 data/default/professions/inscription.lua
 data/default/professions/jewelcrafting.lua
 data/default/professions/leatherworking.lua
