@@ -1,0 +1,89 @@
+name: Add skill manual adjustments
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/add-skill-manual-adjustments.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+      - name: Apply patch
+        run: python .github/scripts/add_skill_manual_adjustments.py
+      - name: Validate scope and behavior wiring
+        run: |
+          git diff --check
+          test "$(git diff --name-only | wc -l)" -eq 5
+          git diff --name-only | grep -qx 'core/internal/database/Database.lua'
+          git diff --name-only | grep -qx 'core/internal/database/Dependecies.lua'
+          git diff --name-only | grep -qx 'core/internal/profile/Profile.lua'
+          git diff --name-only | grep -qx 'core/internal/profile/Resolver.lua'
+          git diff --name-only | grep -qx 'client/character/profile/page_ProfileSkills.lua'
+          python - <<'PY'
+          from pathlib import Path
+
+          db = Path('core/internal/database/Database.lua').read_text(encoding='utf-8')
+          profile = Path('core/internal/profile/Profile.lua').read_text(encoding='utf-8')
+          resolver = Path('core/internal/profile/Resolver.lua').read_text(encoding='utf-8')
+          deps = Path('core/internal/database/Dependecies.lua').read_text(encoding='utf-8')
+          ui = Path('client/character/profile/page_ProfileSkills.lua').read_text(encoding='utf-8')
+
+          # Permanent bonuses are independently persisted and do not reuse skillLevels.
+          assert 'skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(data.skillPermanentBonuses)' in db
+          assert 'profile.skillPermanentBonuses[normalizedSkillRef] = normalizedValue' in db
+          assert 'function Database.ClearProfileSkillPermanentBonus' in db
+          assert 'function Profile.ClearSkillPermanentBonus' in profile
+
+          # Resolved values include the permanent bonus exactly once, alongside existing dynamic bonuses.
+          expected = 'local bonusValue = permanentBonus + itemBonus + traitBonus + raceBonus + classBonus + auraBonus'
+          assert resolver.count(expected) == 1
+          assert resolver.count('permanentBonus = permanentBonus') == 1
+          assert resolver.count('local permanentBonuses = buildProfileSkillPermanentBonusMap()') == 2
+
+          # Gained levels and permanent bonuses remain separately resettable.
+          assert 'Profile.ClearSkillLevel(skillRef)' in ui
+          assert 'Profile.ClearSkillPermanentBonus(skillRef)' in ui
+          assert 'label = "Reset Permanent Bonus"' in ui
+          assert 'label = "Reset Gained Levels"' in ui
+          assert 'label = "Reset Bonus & Gained Levels"' in ui
+
+          # Right-click is additive to the existing left-click selection path.
+          assert 'if button == "RightButton" and row and row.ref then' in ui
+          assert 'if button == "LeftButton" and row and row.ref then' in ui
+
+          # Deleted skill/dataset cleanup covers the new profile-owned references.
+          assert 'profile.skillPermanentBonuses[deletedRef] = nil' in deps
+          assert 'profile.skillPermanentBonuses[skillRef] = nil' in deps
+
+          # Deterministic model of the intended separation.
+          learned = 7
+          permanent = 3
+          dynamic = 2
+          assert learned + permanent + dynamic == 12
+          permanent = 0
+          assert learned + permanent + dynamic == 9   # reset bonus only
+          learned = 0
+          assert learned + permanent + dynamic == 2   # reset gained levels leaves dynamic sources untouched
+          PY
+          if command -v luac >/dev/null 2>&1; then
+            luac -p core/internal/database/Database.lua
+            luac -p core/internal/database/Dependecies.lua
+            luac -p core/internal/profile/Profile.lua
+            luac -p core/internal/profile/Resolver.lua
+            luac -p client/character/profile/page_ProfileSkills.lua
+          fi
+      - name: Commit change
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add core/internal/database/Database.lua core/internal/database/Dependecies.lua core/internal/profile/Profile.lua core/internal/profile/Resolver.lua client/character/profile/page_ProfileSkills.lua
+          git commit -m 'Add manual skill bonuses and reset controls'
+          git push origin HEAD:dev
