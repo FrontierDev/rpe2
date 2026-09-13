@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 16,
+    version = 17,
     dataset = {
         name = "Engineering",
         achievements = {},
@@ -5720,6 +5720,66 @@ Addon.Data.DefaultDatasets:Register({
                 skillRef = "f82db71a:xprqs3y1",
                 tags = {},
                 trainerCostCopper = 142755,
+            },
+            {
+                category = "",
+                description = "",
+                id = "b79fbce6",
+                inputs = {
+                    {
+                        itemRef = "61fdf3df:225h536c",
+                        kind = "rpe_item",
+                        quantity = 17,
+                    },
+                    {
+                        itemRef = "61fdf3df:ufv4fdnf",
+                        kind = "rpe_item",
+                        quantity = 5,
+                    },
+                    {
+                        itemRef = "61fdf3df:hqook9xe",
+                        kind = "rpe_item",
+                        quantity = 1,
+                    },
+                    {
+                        itemRef = "732368d4:ku9j8vhw",
+                        kind = "rpe_item",
+                        quantity = 8,
+                    },
+                    {
+                        itemRef = "732368d4:2616xh4v",
+                        kind = "rpe_item",
+                        quantity = 2,
+                    },
+                    {
+                        itemRef = "732368d4:vlwvpmfx",
+                        kind = "rpe_item",
+                        quantity = 2,
+                    },
+                    {
+                        itemRef = "4999dcec:5nrqhg0t",
+                        kind = "rpe_item",
+                        quantity = 4,
+                    },
+                    {
+                        itemRef = "61fdf3df:518sbr8g",
+                        kind = "tool",
+                        quantity = 1,
+                    },
+                },
+                learnMode = "trainer",
+                name = "Ultrasafe Transporter: Gadgetzan",
+                output = {
+                    itemRef = "af503002:900984f6",
+                    maxQuantity = 1,
+                    minQuantity = 1,
+                },
+                reagents = {},
+                requiredSkillLevel = 260,
+                results = {},
+                skillRef = "f82db71a:xprqs3y1",
+                tags = {},
+                trainerCostCopper = 115515,
             },
         },
         skills = {},

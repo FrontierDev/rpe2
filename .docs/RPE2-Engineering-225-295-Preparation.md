@@ -95,6 +95,8 @@ These are authoritative:
 
 - source `Ichor of Undeath` -> `Essence of Undeath` `732368d4:xtnbjwzj`;
 - source `Heart of Fire` -> `Elemental Fire` `732368d4:sclalidn`;
+- source `Core of Earth` -> `Elemental Earth`;
+- source `Globe of Water` -> `Elemental Water`;
 - Solid Stone is Blacksmithing `61fdf3df:o1ogtdcq` and is not a blocker.
 
 ## Component expansion rules
@@ -213,7 +215,7 @@ The selected inventory is **25 outputs**.
 | 250 | High-Powered Flashlight | Thorium Bar x12; Runecloth x4; Truesilver Bar x6; Essence of Fire x6; Hammer | 1 |
 | 260 | Gyrofreeze Ice Reflector | Thorium Bar x18; Runecloth x6; Truesilver Bar x4; Elemental Earth x4; Elemental Air x2; Blue Sapphire x2; Essence of Fire x4; Frost Oil x2; Icecap x4; Hammer | 1 |
 | 260 | Dimensional Ripper - Everlook | Mithril Bar x14; Truesilver Bar x2; Elemental Earth x2; Elemental Air x1; Elemental Fire x4; Star Ruby x2; Goblin Rocket Fuel x1; Solid Stone x8; Silk Cloth x3; Mageweave Cloth x1; Hammer | 1 |
-| 260 | Ultrasafe Transporter: Gadgetzan | Mithril Bar x17; Truesilver Bar x5; Gold Bar x1; Elemental Earth x4; Elemental Air x2; Core of Earth x4; Globe of Water x2; Aquamarine x4; Hammer | 1, **blocked** |
+| 260 | Ultrasafe Transporter: Gadgetzan | Mithril Bar x17; Truesilver Bar x5; Gold Bar x1; Elemental Earth x8; Elemental Air x2; Elemental Water x2; Aquamarine x4; Hammer | 1 |
 | 260 | Thorium Grenade | Thorium Bar x6; Dense Stone x6; Runecloth x4; Hammer | 3 |
 | 260 | Thorium Rifle | Mithril Bar x15; Thorium Bar x10; Runecloth x2; Aquamarine x2; Thick Leather x2; Hammer | 1 |
 | 265 | Goblin Jumper Cables XL | Thorium Bar x6; Runecloth x2; Truesilver Bar x4; Elemental Earth x4; Elemental Air x2; Fused Wiring x2; Ironweb Spider Silk x2; Star Ruby x2; Hammer | 1, **blocked** |
@@ -229,8 +231,6 @@ The selected inventory is **25 outputs**.
 
 Only these normalized leaves are absent from the current packaged owner datasets and therefore block Recipe implementation under this issue sequence:
 
-- `Core of Earth`;
-- `Globe of Water`;
 - `Fused Wiring`;
 - `Ironweb Spider Silk`.
 
@@ -306,7 +306,6 @@ Generated Spell/Aura descriptions are authoritative for Item `Use:` text.
 
 | Item / Recipe | Blocker | Smallest follow-up |
 | --- | --- | --- |
-| Ultrasafe Transporter: Gadgetzan Recipe | Missing packaged `Core of Earth` and `Globe of Water` | Keep Recipe blocked unless those materials independently exist before #280 |
 | Goblin Jumper Cables XL Recipe | Missing packaged `Fused Wiring` and `Ironweb Spider Silk` | Keep Recipe blocked |
 | Voice Amplification Modulator Recipe | Missing packaged `Ironweb Spider Silk` | Keep Recipe blocked |
 | Gnomish Battle Chicken / Goblin Bomb Dispenser / Mithril Mechanical Dragonling actives | Need summonable RPE Unit definitions | Item/Recipe may be authored; no use Spell unless suitable Units already exist |
