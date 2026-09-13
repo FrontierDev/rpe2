@@ -92,10 +92,23 @@ jobs:
                   i = j
               return entries
 
+          def item_name(entry):
+              match = re.search(r'\n\s*name = "([^"]+)",', entry)
+              return match.group(1) if match else None
+
+          def rap_value(entry):
+              stat_match = re.search(
+                  r'\{\s*sourceStatRef = "f82db71a:v2rs9cpy",\s*value = (-?\d+(?:\.\d+)?)\s*,?\s*\}',
+                  entry,
+                  flags=re.S,
+              )
+              return float(stat_match.group(1)) if stat_match else None
+
           removed_item_ids = set()
           removed_spell_ids = set()
+          ammo_values = {}
 
-          # Remove requested items and capture any item-use spell refs.
+          # Remove requested items and capture any item-use spell refs. Correct all ammo DPS -> RAP.
           open_pos, close_pos = section_bounds(text, 'items')
           body = text[open_pos + 1:close_pos]
           kept = []
@@ -103,8 +116,7 @@ jobs:
           removed_names = set()
           for start, end, entry in top_level_entries(body):
               kept.append(body[cursor:start])
-              name_match = re.search(r'\n\s*name = "([^"]+)",', entry)
-              name = name_match.group(1) if name_match else None
+              name = item_name(entry)
               if name in targets:
                   removed_names.add(name)
                   id_match = re.search(r'\n\s*id = "([^"]+)",', entry)
@@ -114,29 +126,24 @@ jobs:
                   if spell_match:
                       removed_spell_ids.add(spell_match.group(1))
               else:
-                  # Correct every Engineering ammo item: source ammo DPS -> RAP at 14 RAP per DPS.
                   if '"ammo"' in entry and 'sourceStatRef = "f82db71a:v2rs9cpy"' in entry:
-                      def scale_rap(match):
-                          value = float(match.group(1)) * 14
-                          rendered = str(int(value)) if value.is_integer() else str(value)
-                          return match.group(0).replace(match.group(1), rendered)
-                      entry, count = re.subn(
-                          r'(sourceStatRef = "f82db71a:v2rs9cpy",\s*\n\s*value = )(-?\d+(?:\.\d+)?)(,)',
-                          lambda m: m.group(1) + (str(int(float(m.group(2)) * 14)) if (float(m.group(2)) * 14).is_integer() else str(float(m.group(2)) * 14)) + m.group(3),
-                          entry,
-                          count=1,
-                      )
+                      pattern = r'(\{\s*sourceStatRef = "f82db71a:v2rs9cpy",\s*value = )(-?\d+(?:\.\d+)?)(\s*,?\s*\})'
+                      def scale(match):
+                          scaled = float(match.group(2)) * 14
+                          rendered = str(int(scaled)) if scaled.is_integer() else str(scaled)
+                          return match.group(1) + rendered + match.group(3)
+                      entry, count = re.subn(pattern, scale, entry, count=1, flags=re.S)
                       if count != 1:
                           raise RuntimeError(f'Failed RAP conversion for ammo item {name}')
+                      ammo_values[name] = rap_value(entry)
                   kept.append(entry)
               cursor = end
           kept.append(body[cursor:])
           if removed_names != targets:
-              missing = sorted(targets - removed_names)
-              raise RuntimeError(f'Requested Engineering items not found: {missing}')
+              raise RuntimeError(f'Requested Engineering items not found: {sorted(targets - removed_names)}')
           text = text[:open_pos + 1] + ''.join(kept) + text[close_pos:]
 
-          # Remove recipes that produce or otherwise reference the removed items.
+          # Remove any recipe that references a removed item.
           open_pos, close_pos = section_bounds(text, 'recipes')
           body = text[open_pos + 1:close_pos]
           kept = []
@@ -145,42 +152,43 @@ jobs:
           for start, end, entry in top_level_entries(body):
               kept.append(body[cursor:start])
               if any(ref in entry for ref in removed_item_ids):
-                  name_match = re.search(r'\n\s*name = "([^"]+)",', entry)
-                  if name_match:
-                      removed_recipe_names.add(name_match.group(1))
+                  name = item_name(entry)
+                  if name:
+                      removed_recipe_names.add(name)
               else:
                   kept.append(entry)
               cursor = end
           kept.append(body[cursor:])
           text = text[:open_pos + 1] + ''.join(kept) + text[close_pos:]
 
-          # Remove any explicitly linked use spells, plus same-name spells if present.
+          # Remove linked or same-name spells if any exist.
           open_pos, close_pos = section_bounds(text, 'spells')
           body = text[open_pos + 1:close_pos]
           kept = []
           cursor = 0
+          removed_spell_names = set()
           for start, end, entry in top_level_entries(body):
               kept.append(body[cursor:start])
-              name_match = re.search(r'\n\s*name = "([^"]+)",', entry)
+              name = item_name(entry)
               id_match = re.search(r'\n\s*id = "([^"]+)",', entry)
-              name = name_match.group(1) if name_match else None
               qid = 'af503002:' + id_match.group(1) if id_match else None
               if name in targets or qid in removed_spell_ids:
-                  pass
+                  if name:
+                      removed_spell_names.add(name)
               else:
                   kept.append(entry)
               cursor = end
           kept.append(body[cursor:])
           text = text[:open_pos + 1] + ''.join(kept) + text[close_pos:]
 
-          # Bump packaged dataset version monotonically.
+          # Bump packaged dataset version.
           version_match = re.search(r'(Addon\.Data\.DefaultDatasets:Register\(\{\s*\n\s*version = )(\d+)(,)', text)
           if not version_match:
               raise RuntimeError('Engineering dataset version not found')
           old_version = int(version_match.group(2))
           text = text[:version_match.start(2)] + str(old_version + 1) + text[version_match.end(2):]
 
-          # Validation: no removed item refs/names remain; all ammo RAP values are now integral x14 conversions.
+          # Validate removals and corrected ammo values.
           for name in targets:
               if f'name = "{name}"' in text:
                   raise RuntimeError(f'Removed name still present: {name}')
@@ -197,17 +205,14 @@ jobs:
               'Crafted Solid Shot': 119,
               'Hi-Impact Mithril Slugs': 175,
           }
-          for name, expected in expected_ammo.items():
-              idx = text.index(f'name = "{name}"')
-              block_start = text.rfind('{', 0, idx)
-              block_end = find_matching_brace(text, block_start)
-              entry = text[block_start:block_end + 1]
-              if f'value = {expected},' not in entry:
-                  raise RuntimeError(f'{name} did not resolve to {expected} RAP')
+          if ammo_values != {name: float(value) for name, value in expected_ammo.items()}:
+              raise RuntimeError(f'Unexpected ammo RAP values: {ammo_values}')
 
           path.write_text(text, encoding='utf-8')
           print(f'Removed items: {sorted(removed_names)}')
           print(f'Removed recipes: {sorted(removed_recipe_names)}')
+          print(f'Removed spells: {sorted(removed_spell_names)}')
+          print(f'Ammo RAP: {ammo_values}')
           print(f'Dataset version: {old_version} -> {old_version + 1}')
           PY
 
