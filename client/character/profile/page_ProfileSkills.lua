@@ -451,6 +451,10 @@ local function getCraftingRecipeLevelColor(detail)
 end
 
 local function getCraftingSkillUpChance(detail)
+    if Crafting and type(Crafting.GetRecipeSkillUpChance) == "function" then
+        return Crafting:GetRecipeSkillUpChance(detail)
+    end
+
     local skillLevel = math.max(0, tonumber(detail and detail.skillLevel) or 0)
     local requiredLevel = math.max(0, tonumber(detail and detail.requiredSkillLevel) or 0)
     local delta = skillLevel - requiredLevel

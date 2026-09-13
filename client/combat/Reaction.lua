@@ -1433,6 +1433,12 @@ function Combat:CompleteHitCheck(entry, resultToken, reason)
     Client:ClearPendingCombatHitCheck(entry.checkId)
     self:LogAttackAttempt(entry, normalizedResult, entry.lastResolution)
     self:PrintHitCheckResult(normalizedResult)
+    if normalizedResult == RESULT_PASS
+        and type(Client.SkillProgression) == "table"
+        and type(Client.SkillProgression.TryGainWeaponSkillsForHit) == "function"
+    then
+        Client.SkillProgression:TryGainWeaponSkillsForHit(entry)
+    end
     return true, buildCombatResult(entry, normalizedResult, reason or normalizedResult)
 end
 

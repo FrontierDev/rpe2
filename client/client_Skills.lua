@@ -402,6 +402,18 @@ function Client:RollSkill(skillRef, options)
     }
 
     emitSkillRollCombatLog(result, skill, eventState, options)
+    local progression = Client.SkillProgression
+    if type(progression) == "table"
+        and type(progression.TryGain) == "function"
+        and type(progression.GetRulesetChance) == "function"
+    then
+        progression:TryGain(
+            normalizedSkillRef,
+            "noncombat-roll",
+            progression:GetRulesetChance("noncombat_skill_gain_chance_on_roll", 0),
+            options
+        )
+    end
     return result
 end
 

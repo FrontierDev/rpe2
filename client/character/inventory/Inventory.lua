@@ -1003,7 +1003,7 @@ function Inventory.SetItems(items, changeType, detail, notificationToken)
     return result
 end
 
-local function addItemInternal(normalized, itemDefinition)
+local function addItemInternal(normalized, itemDefinition, options)
     local timer = startTiming("Inventory.AddItem", 4, "inventory-add")
     local inventory = Inventory.GetCharacterInventory()
     local characterKey = getCharacterKey()
@@ -1058,7 +1058,8 @@ local function addItemInternal(normalized, itemDefinition)
         addedRefs = { getItemRef(normalized.dataset, normalized.id) },
         slots = affectedSlots,
         addedStackCount = addedStackCount,
-        source = "inventory-add",
+        source = type(options) == "table" and tostring(options.source or "inventory-add") or "inventory-add",
+        suppressLootNotification = type(options) == "table" and options.suppressLootNotification == true,
     }, CANONICAL_ADD_NOTIFICATION)
 
     if timer then
@@ -1072,7 +1073,7 @@ local function addItemInternal(normalized, itemDefinition)
     return normalized, #items
 end
 
-function Inventory.AddItem(itemRecord)
+function Inventory.AddItem(itemRecord, options)
     local normalized = Inventory.NormalizeInventoryItem(itemRecord)
     if not normalized then
         return nil
@@ -1085,7 +1086,7 @@ function Inventory.AddItem(itemRecord)
     end
 
     return runMutation("inventory:add", function()
-        return addItemInternal(normalized, itemDefinition)
+        return addItemInternal(normalized, itemDefinition, options)
     end)
 end
 

@@ -789,24 +789,6 @@ function Client:UnregisterLootReceivedListener(listenerId)
     return true
 end
 
-local function resolveRewardDisplayName(reward)
-    if type(reward) ~= "table" then
-        return "Reward"
-    end
-    if reward.type == "item" and type(Registry.ResolveItemReference) == "function" then
-        local ok, _, item = pcall(Registry.ResolveItemReference, Registry, reward.ref)
-        if ok and type(item) == "table" and trim(item.name) ~= "" then
-            return trim(item.name)
-        end
-    elseif reward.type == "currency" and type(Profile.ResolveCurrencyDefinition) == "function" then
-        local ok, definition = pcall(Profile.ResolveCurrencyDefinition, reward.ref)
-        if ok and type(definition) == "table" and trim(definition.name) ~= "" then
-            return trim(definition.name)
-        end
-    end
-    return trim(reward.ref) ~= "" and trim(reward.ref) or "Reward"
-end
-
 function Client:NotifyLootReceived(response, payload)
     local notification = {
         deliveryId = payload and payload.deliveryId or response and response.deliveryId,
@@ -820,14 +802,6 @@ function Client:NotifyLootReceived(response, payload)
         end
     end
 
-    if DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function" then
-        for index = 1, #notification.rewards do
-            local reward = notification.rewards[index]
-            local appliedAmount = math.max(0, math.floor(tonumber(reward.appliedAmount) or 0))
-            local name = resolveRewardDisplayName(reward)
-            DEFAULT_CHAT_FRAME:AddMessage(("|cff00ccffRPE:|r You received %d %s."):format(appliedAmount, name))
-        end
-    end
     return true
 end
 

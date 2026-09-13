@@ -7,6 +7,8 @@ local Common = Addon.Utils and Addon.Utils.Common or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
+local Comms = Addon.Internal and Addon.Internal.Comms or {}
+local Operations = Comms.Operations or {}
 local Debug = Addon.Debug or {}
 
 local function startTiming(label, thresholdMs, context)
@@ -284,36 +286,63 @@ local function refreshProfileUI()
     end
 end
 
-local function sendVisibleChatMessage(message, chatType)
-    if type(SendChatMessage) ~= "function" or message == "" then
+local function announceAchievement(achievementRef, achievement)
+    local playerName = getLocalPlayerName()
+    local notifications = Client.LootNotifications or nil
+    if type(notifications) == "table" and type(notifications.NotifyAchievementEarned) == "function" then
+        notifications:NotifyAchievementEarned(achievementRef, achievement)
+    end
+
+    local opcode = type(Operations.GetOpcode) == "function"
+        and Operations:GetOpcode("ACHIEVEMENT_ANNOUNCEMENT")
+        or nil
+    if playerName ~= ""
+        and opcode ~= nil
+        and type(IsInGuild) == "function"
+        and IsInGuild() == true
+        and type(Comms.SendMessage) == "function" then
+        Comms:SendMessage("GUILD", opcode, { playerName, achievementRef }, nil, {
+            opcode = opcode,
+            scope = "client",
+        })
+    end
+end
+
+function Client:HandleAchievementAnnouncement(arguments, sender, distribution, target, message)
+    if distribution ~= "GUILD" or type(arguments) ~= "table" then
         return false
     end
 
-    local callOk = pcall(SendChatMessage, message, chatType)
-    return callOk
-end
-
-local function announceAchievement(achievement)
-    local achievementName = trimText(achievement and achievement.name)
-    if achievementName == "" then
-        achievementName = trimText(achievement and achievement.id)
-    end
-    if achievementName == "" then
-        achievementName = "Unnamed Achievement"
-    end
-
-    local playerName = getLocalPlayerName()
-    if playerName == "" then
-        playerName = "A player"
+    local announcedPlayerName = normalizeName(arguments[1])
+    local senderName = normalizeName(sender)
+    local achievementRef = trimText(arguments[2])
+    local localPlayerName = getLocalPlayerName()
+    if announcedPlayerName == ""
+        or senderName == ""
+        or announcedPlayerName ~= senderName
+        or achievementRef == ""
+    then
+        return false
     end
 
-    local message = ("[RPE] %s has earned the achievement [%s]!"):format(playerName, achievementName)
-    if type(IsInGuild) == "function" and IsInGuild() == true then
-        sendVisibleChatMessage(message, "GUILD")
+    if localPlayerName ~= "" and senderName == localPlayerName then
+        return true
     end
-    if type(IsInRaid) == "function" and IsInRaid() == true then
-        sendVisibleChatMessage(message, "RAID")
+
+    if type(Registry.ResolveAchievementReference) ~= "function" then
+        return false
     end
+
+    local achievement = select(2, Registry:ResolveAchievementReference(achievementRef))
+    local notifications = Client.LootNotifications or nil
+    if type(achievement) ~= "table"
+        or type(notifications) ~= "table"
+        or type(notifications.NotifyGuildAchievementEarned) ~= "function"
+    then
+        return false
+    end
+
+    return notifications:NotifyGuildAchievementEarned(announcedPlayerName, achievementRef, achievement)
 end
 
 local function persistAchievementState(achievementRef, state)
@@ -417,7 +446,7 @@ local function queueAchievementAnnouncement(transactionState, achievementRef, ac
 
     transactionState.queuedAnnouncements[achievementRef] = true
     queueAfterCommit(function()
-        announceAchievement(achievement)
+        announceAchievement(achievementRef, achievement)
     end)
 end
 
@@ -706,7 +735,7 @@ function Achievements:Announce(achievementRef)
     end
 
     if type(achievement) == "table" then
-        announceAchievement(achievement)
+        announceAchievement(achievementRef, achievement)
         return true
     end
 

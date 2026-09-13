@@ -2157,7 +2157,7 @@ function Profile.EquipInventoryItem(slotIndex, record, options)
                     id = previousEntry.itemId,
                     modifications = previousEntry.modifications,
                     soulbound = previousEntry.soulbound == true,
-                })
+                }, { suppressLootNotification = true })
             end
 
             local itemClass = getItemClass()
@@ -2197,7 +2197,7 @@ function Profile.UnequipSlotToInventoryByScope(scope, slotKey)
                     id = equippedEntry.itemId,
                     modifications = equippedEntry.modifications,
                     soulbound = equippedEntry.soulbound == true,
-                })
+                }, { suppressLootNotification = true })
             end
 
             return Equipment.UnequipItemInScope and Equipment.UnequipItemInScope(scope, slotKey) or false

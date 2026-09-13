@@ -159,6 +159,24 @@ local function getSkillLevelAndCap(skillRef)
     return math.max(0, tonumber(row and row.value) or 0), math.max(0, tonumber(row and row.maxValue) or 0), row
 end
 
+local function getRecipeSkillUpChance(detail)
+    local skillLevel = math.max(0, tonumber(detail and detail.skillLevel) or 0)
+    local requiredLevel = math.max(0, tonumber(detail and detail.requiredSkillLevel) or 0)
+    local delta = skillLevel - requiredLevel
+
+    if delta < 0 then
+        return 100
+    end
+    if delta <= 4 then
+        return 75
+    end
+    if delta <= 14 then
+        return 35
+    end
+
+    return 0
+end
+
 local function buildRecipeSummaryLiveContext(skillRef, options)
     local normalizedSkillRef = ensureString(skillRef)
     local values = type(options) == "table" and options or {}
@@ -799,6 +817,11 @@ function Crafting:NotifyChanged(reason)
         state.detailCache = {}
         state.inventoryCountCache = {}
         state.inventoryCountRevision = -1
+        state.pendingDetailPrimes = {}
+    end
+    if changeReason == "skill-gain" then
+        state.summaryCache = {}
+        state.detailCache = {}
         state.pendingDetailPrimes = {}
     end
     if changeReason == "trainer-learned" then
@@ -1549,6 +1572,10 @@ function Crafting:GetMaxCraftableCount(recipeRef)
     return math.max(0, tonumber(maxCrafts) or 0)
 end
 
+function Crafting:GetRecipeSkillUpChance(detail)
+    return getRecipeSkillUpChance(detail)
+end
+
 function Crafting:ConsumeRecipeInputsOnce(detail)
     if not detail or detail.canCraft ~= true then
         return false
@@ -1617,6 +1644,21 @@ function Crafting:QueueRecipe(recipeRef, count)
             break
         end
         completedCount = completedCount + 1
+
+        local progression = Client.SkillProgression
+        if type(progression) == "table" and type(progression.TryGain) == "function" then
+            progression:TryGain(
+                currentDetail.skillRef,
+                "craft-recipe",
+                self:GetRecipeSkillUpChance(currentDetail),
+                {
+                    recipeRef = currentDetail.recipeRef,
+                    onGain = function()
+                        self:NotifyChanged("skill-gain")
+                    end,
+                }
+            )
+        end
     end
 
     if completedCount <= 0 then

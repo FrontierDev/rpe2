@@ -39,6 +39,12 @@
         "StaticPopupDialogs",
         "StaticPopup_Show",
         "ACCEPT",
-        "CANCEL"
+        "CANCEL",
+        "LOOT_ITEM_SELF_MULTIPLE",
+        "CURRENCY_GAINED_MULTIPLE",
+        "LOOT_ITEM_SELF",
+        "CURRENCY_GAINED",
+        "ChatFrame_OnEvent",
+        "NUM_CHAT_WINDOWS"
     ]
 }
