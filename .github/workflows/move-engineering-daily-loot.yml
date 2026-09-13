@@ -6,6 +6,7 @@ on:
       - dev
     paths:
       - .github/workflows/move-engineering-daily-loot.yml
+      - .github/scripts/move_engineering_daily_loot.py
 
 permissions:
   contents: write
