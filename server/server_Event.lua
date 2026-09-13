@@ -681,12 +681,9 @@ local function buildEventUnits(sessionState, sourceUnits, hostName)
     local nextEventUnitId = 1
     local seenPlayers = {}
     local playerOrder = {}
-    local groupedPlayerOrder = {}
-    local trackedPlayerOrder = {}
-    local trackedPlayersSeen = {}
+    local playerOrderSeen = {}
     local sourcePlayerUnitsByName = {}
     local sourceNpcUnits = {}
-    local groupedPlayers = Common.GetGroupMemberNames and Common.GetGroupMemberNames() or {}
     local playerCount = 0
     local playerEventIds = {}
 
@@ -700,13 +697,18 @@ local function buildEventUnits(sessionState, sourceUnits, hostName)
         target[#target + 1] = normalizedName
     end
 
-    for index = 1, #groupedPlayers do
-        appendUniqueName(groupedPlayerOrder, seenPlayers, groupedPlayers[index])
-    end
-
-    seenPlayers = {}
+    -- Only clients that joined the RPE session are event participants.
+    -- Ordinary WoW party/raid members without the addon never enter clientOrder and are ignored.
     for index = 1, #((sessionState and sessionState.clientOrder) or {}) do
-        appendUniqueName(trackedPlayerOrder, trackedPlayersSeen, sessionState.clientOrder[index])
+        local playerName = Common.NormalizeName(sessionState.clientOrder[index])
+        local clientState = playerName ~= ""
+            and sessionState
+            and sessionState.clientsByName
+            and sessionState.clientsByName[playerName]
+            or nil
+        if clientState then
+            appendUniqueName(playerOrder, playerOrderSeen, playerName)
+        end
     end
 
     for index = 1, #((sourceUnits) or {}) do
@@ -718,20 +720,6 @@ local function buildEventUnits(sessionState, sourceUnits, hostName)
             end
         elseif unit then
             sourceNpcUnits[#sourceNpcUnits + 1] = unit
-        end
-    end
-
-    if #trackedPlayerOrder > 1 then
-        for index = 1, #trackedPlayerOrder do
-            playerOrder[#playerOrder + 1] = trackedPlayerOrder[index]
-        end
-    else
-        local playerOrderSeen = {}
-        for index = 1, #groupedPlayerOrder do
-            appendUniqueName(playerOrder, playerOrderSeen, groupedPlayerOrder[index])
-        end
-        for index = 1, #trackedPlayerOrder do
-            appendUniqueName(playerOrder, playerOrderSeen, trackedPlayerOrder[index])
         end
     end
 
@@ -1038,6 +1026,27 @@ local function resolveInitialEventSnapshotChannel(server, sessionState, recipien
         or tonumber(localClientState.channelId) ~= channelId
     then
         return nil, "host-session-not-current"
+    end
+
+    -- These recipients come from the RPE session, not the raw WoW group roster.
+    -- Non-addon group members are absent; connected addon clients must be hash-compatible.
+    if type(server.HasClientHashMismatch) == "function" and server:HasClientHashMismatch(sessionState) then
+        return nil, "client-hash-mismatch"
+    end
+
+    local hostName = Common.NormalizeName(Common.GetPlayerName())
+    local clientsByName = sessionState.clientsByName or {}
+    for index = 1, #(recipients or {}) do
+        local clientName = Common.NormalizeName(recipients[index])
+        if clientName ~= "" and clientName ~= hostName then
+            local clientState = clientsByName[clientName]
+            if type(clientState) ~= "table" or clientState.hashesReceived ~= true then
+                return nil, "client-handshake-incomplete:" .. clientName
+            end
+            if type(server.ClientHashesMatch) ~= "function" or server:ClientHashesMatch(clientName, sessionState) ~= true then
+                return nil, "client-hash-unverified:" .. clientName
+            end
+        end
     end
 
     sessionState.channelId = channelId
