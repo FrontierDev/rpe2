@@ -305,6 +305,20 @@ local function buildRollDetailText(baseRoll, modifier, total)
     )
 end
 
+local function emitSkillRollChatMessage(result)
+    if not (DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function") then
+        return false
+    end
+
+    local message = ("%s rolls %s: %s."):format(
+        tostring(result.unitName or "Unknown"),
+        tostring(result.skillName or result.skillRef or "Skill"),
+        buildRollDetailText(result.baseRoll, result.modifier, result.total)
+    )
+    DEFAULT_CHAT_FRAME:AddMessage(message, 0.6, 0.6, 0.6)
+    return true
+end
+
 local function emitSkillRollCombatLog(result, skill, eventState, options)
     if type(eventState) ~= "table" or eventState.active ~= true then
         return false
@@ -409,6 +423,7 @@ function Client:RollSkill(skillRef, options)
         total = total,
     }
 
+    emitSkillRollChatMessage(result)
     emitSkillRollCombatLog(result, skill, eventState, options)
     local progression = Client.SkillProgression
     if type(progression) == "table"
