@@ -17,7 +17,9 @@ if old not in text:
     raise SystemExit('roll emission anchor missing')
 text = text.replace(old, new, 1)
 
-if text.count('emitSkillRollChatMessage(result)') != 1:
+if text.count('local function emitSkillRollChatMessage(result)') != 1:
+    raise SystemExit('unexpected chat helper count')
+if text.count('    emitSkillRollChatMessage(result)\n') != 1:
     raise SystemExit('unexpected chat emission count')
 
 path.write_text(text, encoding='utf-8')
