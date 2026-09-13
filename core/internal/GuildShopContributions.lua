@@ -226,6 +226,234 @@ if type(Dependecies.RecomputeDatasetDependencies) == "function" then
     end
 end
 
+-- Requisitions and Daily Rewards can use a Loot Table as their reward source.
+-- Preserve the source metadata that the base GuildSetting normalizer does not
+-- yet know about, while leaving direct-item behaviour unchanged.
+if GuildSetting
+    and GuildSetting._lootTableRewardsInstalled ~= true
+    and type(GuildSetting.Merge) == "function"
+    and type(GuildSetting.ToTable) == "function"
+then
+    local LootBaseMerge = GuildSetting.Merge
+    local LootBaseToTable = GuildSetting.ToTable
+
+    local function normalizeRequisitionSourceType(requisition)
+        local sourceType = string.lower(trim(requisition and requisition.sourceType))
+        if sourceType == "loot" or sourceType == "table" or sourceType == "loot_table" then return "loot_table" end
+        if trim(requisition and requisition.lootRef) ~= "" and trim(requisition and requisition.itemRef) == "" then return "loot_table" end
+        return "item"
+    end
+
+    local function normalizeDailyRewardType(reward)
+        local rewardType = string.lower(trim(reward and reward.type))
+        if rewardType == "loot" or rewardType == "table" or rewardType == "loot_table" then return "loot_table" end
+        if rewardType == "currency" then return "currency" end
+        return "item"
+    end
+
+    local function mapRowsById(rows)
+        local byId = {}
+        for index = 1, #(rows or {}) do
+            local row = rows[index]
+            local id = trim(type(row) == "table" and row.id)
+            if id ~= "" and byId[id] == nil then byId[id] = row end
+        end
+        return byId
+    end
+
+    local function sourceRow(rows, byId, normalizedRow, index)
+        local id = trim(type(normalizedRow) == "table" and normalizedRow.id)
+        if id ~= "" and byId[id] ~= nil then return byId[id] end
+        return type(rows) == "table" and rows[index] or nil
+    end
+
+    function GuildSetting:Merge(data)
+        local requisitionSources = type(data) == "table" and type(data.requisitions) == "table" and data.requisitions or self.requisitions
+        local dailyRewardSources = type(data) == "table" and type(data.dailyRewards) == "table" and data.dailyRewards or self.dailyRewards
+        local requisitionsById = mapRowsById(requisitionSources)
+        local dailyRewardsById = mapRowsById(dailyRewardSources)
+
+        LootBaseMerge(self, data)
+
+        for index = 1, #(self.requisitions or {}) do
+            local requisition = self.requisitions[index]
+            local source = sourceRow(requisitionSources, requisitionsById, requisition, index) or {}
+            requisition.sourceType = normalizeRequisitionSourceType(source)
+            requisition.lootRef = trim(source.lootRef)
+        end
+        for index = 1, #(self.dailyRewards or {}) do
+            local reward = self.dailyRewards[index]
+            local source = sourceRow(dailyRewardSources, dailyRewardsById, reward, index) or {}
+            if normalizeDailyRewardType(source) == "loot_table" then
+                reward.type = "loot_table"
+                reward.ref = trim(source.ref)
+            end
+        end
+        return self
+    end
+
+    function GuildSetting:ToTable()
+        local data = LootBaseToTable(self)
+        for index = 1, #(data.requisitions or {}) do
+            local requisition = self.requisitions and self.requisitions[index] or nil
+            data.requisitions[index].sourceType = normalizeRequisitionSourceType(requisition)
+            data.requisitions[index].lootRef = trim(requisition and requisition.lootRef)
+        end
+        for index = 1, #(data.dailyRewards or {}) do
+            local reward = self.dailyRewards and self.dailyRewards[index] or nil
+            if normalizeDailyRewardType(reward) == "loot_table" then
+                data.dailyRewards[index].type = "loot_table"
+                data.dailyRewards[index].ref = trim(reward and reward.ref)
+            end
+        end
+        return data
+    end
+
+    GuildSetting._lootTableRewardsInstalled = true
+end
+
+-- Add active GuildSetting -> Loot Table references to dependency tracking, and
+-- clear them if a referenced Loot Table/dataset is deleted.
+if Dependecies._guildSettingLootDependencyIntegrationInstalled ~= true
+    and type(Dependecies.RecomputeDatasetDependencies) == "function"
+then
+    local LootBaseRecomputeDatasetDependencies = Dependecies.RecomputeDatasetDependencies
+    local LootBaseHandleDatasetDeleted = Dependecies.HandleDatasetDeleted
+    local LootBaseHandleDatasetEntryDeleted = Dependecies.HandleDatasetEntryDeleted
+
+    local function getDatasetRoot()
+        return Database.Datasets or rawget(_G or {}, "RPEngineDatasetDB")
+    end
+
+    local function parseDatasetId(reference)
+        local datasetId = trim(reference):match("^([^:]+):.+$")
+        return datasetId and trim(datasetId) or nil
+    end
+
+    local function requisitionUsesLootTable(requisition)
+        local sourceType = string.lower(trim(requisition and requisition.sourceType))
+        if sourceType == "loot" or sourceType == "table" or sourceType == "loot_table" then return true end
+        return trim(requisition and requisition.lootRef) ~= "" and trim(requisition and requisition.itemRef) == ""
+    end
+
+    local function dailyRewardUsesLootTable(reward)
+        local rewardType = string.lower(trim(reward and reward.type))
+        return rewardType == "loot" or rewardType == "table" or rewardType == "loot_table"
+    end
+
+    local function appendGuildLootDependencies(dataset, dependencies)
+        if type(dataset) ~= "table" or type(dependencies) ~= "table" then return dependencies end
+        local seen = {}
+        for index = 1, #dependencies do
+            local dependencyId = trim(dependencies[index])
+            if dependencyId ~= "" then seen[dependencyId] = true end
+        end
+        local ownId = trim(dataset.id)
+        local function append(reference)
+            local dependencyId = parseDatasetId(reference)
+            if dependencyId and dependencyId ~= ownId and not seen[dependencyId] then
+                dependencies[#dependencies + 1] = dependencyId
+                seen[dependencyId] = true
+            end
+        end
+        for settingIndex = 1, #(dataset.guildSettings or {}) do
+            local setting = dataset.guildSettings[settingIndex]
+            for requisitionIndex = 1, #(setting and setting.requisitions or {}) do
+                local requisition = setting.requisitions[requisitionIndex]
+                if type(requisition) == "table" and requisitionUsesLootTable(requisition) then append(requisition.lootRef) end
+            end
+            for rewardIndex = 1, #(setting and setting.dailyRewards or {}) do
+                local reward = setting.dailyRewards[rewardIndex]
+                if type(reward) == "table" and dailyRewardUsesLootTable(reward) then append(reward.ref) end
+            end
+        end
+        table.sort(dependencies, function(left, right) return tostring(left or "") < tostring(right or "") end)
+        dataset.dependencies = dependencies
+        return dependencies
+    end
+
+    local function pruneGuildLootReferences(dataset, deletedDatasetId, deletedRef)
+        if type(dataset) ~= "table" then return false end
+        local mutated = false
+        local function matches(reference)
+            local ref = trim(reference)
+            if ref == "" then return false end
+            if deletedRef and ref == deletedRef then return true end
+            return deletedDatasetId ~= nil and parseDatasetId(ref) == tostring(deletedDatasetId)
+        end
+        for settingIndex = 1, #(dataset.guildSettings or {}) do
+            local setting = dataset.guildSettings[settingIndex]
+            for requisitionIndex = 1, #(setting and setting.requisitions or {}) do
+                local requisition = setting.requisitions[requisitionIndex]
+                if type(requisition) == "table" and requisitionUsesLootTable(requisition) and matches(requisition.lootRef) then
+                    requisition.lootRef = ""
+                    mutated = true
+                end
+            end
+            for rewardIndex = 1, #(setting and setting.dailyRewards or {}) do
+                local reward = setting.dailyRewards[rewardIndex]
+                if type(reward) == "table" and dailyRewardUsesLootTable(reward) and matches(reward.ref) then
+                    reward.ref = ""
+                    mutated = true
+                end
+            end
+        end
+        return mutated
+    end
+
+    function Dependecies.RecomputeDatasetDependencies(datasetId)
+        local dependencies = LootBaseRecomputeDatasetDependencies(datasetId)
+        if type(dependencies) ~= "table" then return dependencies end
+        local dataset = type(Database.GetDatasetByID) == "function" and Database.GetDatasetByID(datasetId) or nil
+        if not dataset then
+            local root = getDatasetRoot()
+            dataset = type(root) == "table" and type(root.datasets) == "table" and root.datasets[tostring(datasetId or "")] or nil
+        end
+        if not dataset then return dependencies end
+        return appendGuildLootDependencies(dataset, dependencies)
+    end
+
+    if type(LootBaseHandleDatasetDeleted) == "function" then
+        function Dependecies.HandleDatasetDeleted(datasetId)
+            local result = LootBaseHandleDatasetDeleted(datasetId)
+            local root = getDatasetRoot()
+            local changed = 0
+            if type(root) == "table" and type(root.datasets) == "table" then
+                for currentDatasetId, dataset in pairs(root.datasets) do
+                    if tostring(currentDatasetId) ~= tostring(datasetId) and pruneGuildLootReferences(dataset, tostring(datasetId), nil) then
+                        Dependecies.RecomputeDatasetDependencies(currentDatasetId)
+                        changed = changed + 1
+                    end
+                end
+            end
+            return math.max(tonumber(result) or 0, changed)
+        end
+    end
+
+    if type(LootBaseHandleDatasetEntryDeleted) == "function" then
+        function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
+            local result = LootBaseHandleDatasetEntryDeleted(datasetId, collectionKey, entry)
+            if collectionKey ~= "loot" then return result end
+            local entryId = trim(type(entry) == "table" and entry.id)
+            if entryId == "" then return result end
+            local deletedRef = tostring(datasetId or "") .. ":" .. entryId
+            local root = getDatasetRoot()
+            local changed = 0
+            if type(root) == "table" and type(root.datasets) == "table" then
+                for currentDatasetId, dataset in pairs(root.datasets) do
+                    if pruneGuildLootReferences(dataset, nil, deletedRef) then
+                        Dependecies.RecomputeDatasetDependencies(currentDatasetId)
+                        changed = changed + 1
+                    end
+                end
+            end
+            return math.max(tonumber(result) or 0, changed)
+        end
+    end
+
+    Dependecies._guildSettingLootDependencyIntegrationInstalled = true
+end
+
 Addon.Internal.GuildShopContributions = Addon.Internal.GuildShopContributions or {}
 Addon.Internal.GuildShopContributions.SentinelGuildName = CONTRIBUTION_GUILD_SENTINEL
 Addon.Internal.GuildShopContributions.RuntimeRequisitionPrefix = RUNTIME_REQUISITION_PREFIX
