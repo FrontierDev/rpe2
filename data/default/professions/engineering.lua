@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 30,
+    version = 31,
     dataset = {
         name = "Engineering",
         achievements = {},
@@ -2934,7 +2934,6 @@ Addon.Data.DefaultDatasets:Register({
                     { id = "gold_bar", maxQuantity = 2, minQuantity = 1, ref = "61fdf3df:hqook9xe", type = "item", weight = 3 },
                     { id = "truesilver_bar", maxQuantity = 2, minQuantity = 1, ref = "61fdf3df:ufv4fdnf", type = "item", weight = 2 },
                     { id = "dark_iron_bar", maxQuantity = 2, minQuantity = 1, ref = "61fdf3df:pb24e7k5", type = "item", weight = 1 },
-                    { id = "arcanite_bar", maxQuantity = 1, minQuantity = 1, ref = "61fdf3df:6hy57ood", type = "item", weight = 1 },
                 },
                 icon = "interface/icons/inv_gizmo_03.blp",
                 id = "n6r3k8vz",

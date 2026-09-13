@@ -908,6 +908,7 @@ local function buildEndArguments(eventState, reason)
         eventState and eventState.channelName or "",
         eventState and eventState.id or nil,
         tostring(reason or ""),
+        eventState and eventState.distributeEndRewards ~= false,
     }
 end
 
@@ -1037,25 +1038,6 @@ local function resolveInitialEventSnapshotChannel(server, sessionState, recipien
         or tonumber(localClientState.channelId) ~= channelId
     then
         return nil, "host-session-not-current"
-    end
-
-    if type(server.HasClientHashMismatch) == "function" and server:HasClientHashMismatch(sessionState) then
-        return nil, "client-hash-mismatch"
-    end
-
-    local hostName = Common.NormalizeName(Common.GetPlayerName())
-    local clientsByName = sessionState.clientsByName or {}
-    for index = 1, #(recipients or {}) do
-        local clientName = Common.NormalizeName(recipients[index])
-        if clientName ~= "" and clientName ~= hostName then
-            local clientState = clientsByName[clientName]
-            if type(clientState) ~= "table" or clientState.hashesReceived ~= true then
-                return nil, "client-handshake-incomplete:" .. clientName
-            end
-            if type(server.ClientHashesMatch) ~= "function" or server:ClientHashesMatch(clientName, sessionState) ~= true then
-                return nil, "client-hash-unverified:" .. clientName
-            end
-        end
     end
 
     sessionState.channelId = channelId

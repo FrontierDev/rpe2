@@ -914,6 +914,7 @@ function Event:ToEndArguments(reason)
         self.channelName,
         self.id,
         tostring(reason or ""),
+        self.distributeEndRewards ~= false,
     }
 end
 

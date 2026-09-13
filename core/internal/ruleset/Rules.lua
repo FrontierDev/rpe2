@@ -178,6 +178,8 @@ Rules.Definitions = {
         label = "Event",
         rules = {
             { key = "max_event_units", label = "Max Event Units", type = "text", default = "5", description = "Maximum number of event units shown per turn page." },
+            { key = "event_end_justice_currency", label = "End Event Justice", type = "text", default = "100", description = "Justice granted automatically to each participant when an event ends. Set to 0 to disable." },
+            { key = "boss_kill_valor_currency", label = "Boss Kill Valor", type = "text", default = "25", description = "Valor granted automatically to each participant when a boss-flag NPC dies. Set to 0 to disable." },
             { key = "initiative_stat", label = "Initiative Stat", type = "dropdown", default = "", description = "Select the stat reference used to resolve initiative.", optionsSource = "statReference", retainedWithoutConsumer = true },
             {
                 key = "allowed_event_difficulties",
