@@ -34,7 +34,6 @@ local CRAFTING_RECIPE_ASYNC_BATCH_SIZE = 12
 local CRAFTING_TRAINER_SYNC_OVERSCAN = 4
 local CRAFTING_TRAINER_ASYNC_BATCH_SIZE = 12
 local CRAFTING_UI_INTERNAL_TRACE = false
-local SKILL_BONUS_POPUP_KEY = "RPE_PROFILE_SKILL_PERMANENT_BONUS"
 
 local function getConfigurationRevision()
     return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
@@ -640,72 +639,29 @@ function SkillsPage:ResetSkillBonusAndGainedLevels(skillRef)
     return false
 end
 
-function SkillsPage:EnsureSkillBonusPopup()
-    if type(StaticPopupDialogs) ~= "table" then
-        return false
-    end
-    if StaticPopupDialogs[SKILL_BONUS_POPUP_KEY] then
-        return true
-    end
-
-    StaticPopupDialogs[SKILL_BONUS_POPUP_KEY] = {
-        text = "Add permanent bonus to %s:",
-        button1 = ACCEPT,
-        button2 = CANCEL,
-        hasEditBox = true,
-        timeout = 0,
-        whileDead = true,
-        hideOnEscape = true,
-        OnShow = function(dialog)
-            if dialog and dialog.editBox then
-                dialog.editBox:SetText("1")
-                dialog.editBox:HighlightText()
-                dialog.editBox:SetFocus()
-            end
-        end,
-        OnAccept = function(dialog)
-            local data = dialog and dialog.data or nil
-            local page = data and data.page or nil
-            local skillRef = data and data.skillRef or nil
-            local amount = dialog and dialog.editBox and tonumber(dialog.editBox:GetText()) or nil
-            amount = math.floor(tonumber(amount) or 0)
-            if page and skillRef and amount > 0 then
-                page:AddPermanentSkillBonus(skillRef, amount)
-            end
-        end,
-        EditBoxOnEnterPressed = function(editBox)
-            local dialog = editBox and editBox:GetParent() or nil
-            if dialog and dialog.button1 and dialog.button1.Click then
-                dialog.button1:Click()
-            end
-        end,
-        EditBoxOnEscapePressed = function(editBox)
-            local dialog = editBox and editBox:GetParent() or nil
-            if dialog and dialog.Hide then
-                dialog:Hide()
-            end
-        end,
-    }
-    return true
-end
-
 function SkillsPage:PromptPermanentSkillBonus(skillRef)
-    if type(StaticPopup_Show) ~= "function" or not self:EnsureSkillBonusPopup() then
+    if not (UI.Popup and UI.Popup.ShowConfirmation) then
         return false
     end
 
     local row = self:FindSkillRow(skillRef, self.AllSkillRows)
     local skillName = tostring(row and row.name or "Skill")
-    local popup = StaticPopup_Show(SKILL_BONUS_POPUP_KEY, skillName)
-    if not popup then
-        return false
-    end
-
-    popup.data = {
-        page = self,
-        skillRef = skillRef,
-    }
-    return true
+    return UI.Popup:ShowConfirmation({
+        title = "Permanent Skill Bonus",
+        width = 280,
+        message = ("Add a permanent bonus to %s."):format(skillName),
+        confirmText = "Add",
+        cancelText = "Cancel",
+        inputLabel = "Bonus",
+        inputText = "1",
+        requireInput = true,
+        onConfirm = function(spec)
+            local amount = math.floor(tonumber(spec and spec.inputText or "") or 0)
+            if amount > 0 then
+                self:AddPermanentSkillBonus(skillRef, amount)
+            end
+        end,
+    })
 end
 
 function SkillsPage:EnsureSkillContextMenu()
