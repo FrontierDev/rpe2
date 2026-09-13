@@ -8,15 +8,16 @@ This document is the implementation source of truth for the final **vanilla Clas
 required Engineering skill == 300
 ```
 
-The same output scope used by the earlier Engineering preparation work applies:
+The selected output scope is:
 
 - bombs and grenades;
 - armour and wearable equipment;
 - trinkets;
 - weapons;
-- potion-like consumables.
+- potion-like consumables;
+- **modifications**, including Engineering scopes.
 
-Classic Wowhead is authoritative for Classic recipe/item identity, source reagents, item metadata and active effects. Current RPE2 `dev` is authoritative for schema, packaged material ownership, runtime representability, existing item/spell abstractions and trainer-cost rules.
+Classic Wowhead is authoritative for Classic recipe/item identity, source reagents, item metadata and active effects. Current RPE2 `dev` is authoritative for schema, packaged material ownership, runtime representability, existing item/modification/spell abstractions and trainer-cost rules.
 
 Primary source:
 
@@ -24,11 +25,9 @@ Primary source:
 https://www.wowhead.com/classic/guide/engineering-leveling-1-300-wow-classic
 ```
 
-Individual Classic Wowhead recipe/item pages cited in the tables below are the detailed recipe sources.
-
 ## Scope result
 
-The selected exact-300 inventory contains **8 outputs**:
+The selected exact-300 inventory contains **9 outputs**:
 
 1. Arcane Bomb
 2. Arcanite Dragonling
@@ -38,14 +37,14 @@ The selected exact-300 inventory contains **8 outputs**:
 6. Bloodvine Goggles
 7. Bloodvine Lens
 8. Flawless Arcanite Rifle
+9. Biznicks 247x128 Accurascope
 
-The following exact-300 recipes are intentionally excluded by the established scope:
+The following exact-300 recipes remain excluded:
 
 | Output | Reason |
 | --- | --- |
-| Biznicks 247x128 Accurascope | Scope/modification |
 | Field Repair Bot 74A | Standalone utility device |
-| Any ammo/component/reagent output | Explicitly outside final-item scope |
+| Any ammo/component/reagent output | Outside selected final-output scope |
 
 Do not interpret this document as admitting TBC Engineering recipes that also start at 300. The boundary is **vanilla Classic recipes whose Classic recipe itself requires 300**.
 
@@ -57,14 +56,15 @@ Do not interpret this document as admitting TBC Engineering recipes that also st
 - Every eventual Recipe uses `learnMode = "trainer"`; original drop/vendor/reputation acquisition remains provenance only.
 - Trainer cost at skill 300 uses the current RPE formula and is `152475` copper.
 - Recursively flatten every Engineering intermediate to existing packaged external material leaves.
-- Stop expansion at an existing canonical material Item owned by another packaged dataset; do not recursively decompose cross-dataset materials merely because WoW itself has a transmute/crafting source for them.
+- Stop expansion at an existing canonical material Item owned by another packaged dataset.
 - Aggregate duplicate leaves after expansion.
 - Preserve source output batch quantities exactly.
 - Do not create missing shared/raw materials merely to make a recipe resolve. Report the recipe blocked instead.
 - Blacksmith Hammer `61fdf3df:518sbr8g` remains the only supported reusable Engineering Recipe tool.
-- Ignore source Arclight Spanner and Gyromatic Micro-Adjustor requirements as RPE `tool` inputs under the established Engineering rule.
-- An Engineering-finished item used as a higher-tier source ingredient must be flattened through the **canonical RPE recipe already implemented for that item**, not preserved as an Engineering input.
-- Item-use spells use the existing `Item.useSpellRef -> Spell` path only. Do not create bespoke item-use runtime code.
+- Ignore Arclight Spanner and Gyromatic Micro-Adjustor as RPE `tool` inputs under the established Engineering rule.
+- An Engineering-finished item used as a higher-tier source ingredient must be flattened through its canonical implemented RPE recipe.
+- Item-use spells use `Item.useSpellRef -> Spell`; do not add bespoke item runtime code.
+- Engineering scopes use the existing generic modification system, not an item-use Spell.
 
 ## Trainer cost
 
@@ -82,13 +82,10 @@ floor(75 + 300*28 + 300^2*1.6) = 152475 copper
 
 ## Existing material ownership relevant to this tier
 
-Current `dev` confirms the following relevant external packaged materials exist:
+Current `dev` confirms these relevant external packaged materials exist:
 
 ```text
-Bloodvine               Misc
-Fiery Core              Misc
-Lava Core               Misc
-Souldarite               Jewelcrafting
+Arcanite Bar             Blacksmithing
 Dark Iron Bar            Blacksmithing
 Thorium Bar              Blacksmithing
 Truesilver Bar           Blacksmithing
@@ -97,6 +94,7 @@ Runecloth                Tailoring
 Azerothian Diamond       Jewelcrafting
 Large Opal               Jewelcrafting
 Star Ruby                Jewelcrafting
+Souldarite               Jewelcrafting
 Enchanted Thorium Bar    Enchanting
 Enchanted Leather        Enchanting
 Elemental Earth          Enchanting
@@ -105,9 +103,12 @@ Living Essence           Enchanting
 Essence of Undeath       Enchanting
 Essence of Fire          Enchanting
 Essence of Earth         Enchanting
+Bloodvine                Misc
+Fiery Core               Misc
+Lava Core                Misc
 ```
 
-Known qualified refs already established by the current Engineering preparation/implementation work include:
+Known qualified refs already established by current Engineering work include:
 
 ```text
 Blacksmith Hammer        61fdf3df:518sbr8g
@@ -128,23 +129,18 @@ Fiery Core               3eb7e9bb:e0tarf0p
 Lava Core                3eb7e9bb:g3ytywfw
 ```
 
-Implementation should resolve the live qualified refs for Souldarite, Enchanted Thorium Bar, Living Essence, Essence of Fire and Essence of Earth directly from their current owner datasets rather than copying stale IDs from older preparation files.
+**Arcanite Bar is confirmed present in the Blacksmithing dataset and is not a blocker.** Implementation should resolve its current qualified ref directly from live `dev`, just as with Souldarite, Enchanted Thorium Bar, Living Essence, Essence of Fire and Essence of Earth.
 
 ## Missing material blockers on current `dev`
 
-The current packaged material audit does **not** resolve these required leaves:
+The remaining unresolved required leaves are:
 
-- `Arcanite Bar`;
 - `Ironweb Spider Silk`;
 - `Powerful Mojo`.
 
-Do not silently substitute them. The affected recipes are identified below.
-
-`Arcanite Bar` is a final external material leaf for this Engineering preparation even though Classic obtains it through Alchemy transmutation. If a canonical packaged Arcanite Bar is later added, Engineering recipes should consume that item directly rather than flattening the transmute to Thorium Bar + Arcane Crystal.
+Do not silently substitute them. Recipes depending on them remain blocked until the canonical material exists or the user gives an explicit substitution rule.
 
 ## Component expansion rules
-
-The prior Engineering component rules remain authoritative:
 
 | Engineering intermediate | External-leaf expansion |
 | --- | --- |
@@ -156,9 +152,7 @@ The prior Engineering component rules remain authoritative:
 
 ### Mithril Mechanical Dragonling as an input
 
-Arcanite Dragonling consumes one Mithril Mechanical Dragonling. Do **not** preserve that Engineering item as a Recipe input.
-
-Use the canonical RPE flattened recipe already implemented for Mithril Mechanical Dragonling:
+Arcanite Dragonling consumes one Mithril Mechanical Dragonling. Do not preserve that Engineering item as an input. Flatten it through its implemented RPE recipe:
 
 ```text
 Mithril Bar x19
@@ -170,382 +164,214 @@ Elemental Fire x4
 Blacksmith Hammer tool
 ```
 
-When incorporated into Arcanite Dragonling, aggregate its leaves with the higher-tier component expansions.
+## Included inventory and representation status
 
-## Included inventory and item representation
-
-| Skill | Output | WoW item ID | Category | Classic source | RPE representation status |
+| Skill | Output | WoW item ID | Category | Classic source | RPE status |
 | ---: | --- | ---: | --- | --- | --- |
-| 300 | Arcane Bomb | 16040 | Bomb | World-drop schematic | Item can be represented; exact active is only partially representable; Recipe blocked by missing Arcanite Bar + Ironweb Spider Silk |
-| 300 | Arcanite Dragonling | 16022 | Trinket | World-drop schematic | Item/recipe metadata representable; summon active blocked pending canonical Unit; Recipe blocked by missing Arcanite Bar + Ironweb Spider Silk |
-| 300 | Ultra-Flash Shadow Reflector | 18639 | Trinket | Stratholme drop schematic | Item + resistance abstraction + Recipe implementable |
-| 300 | Core Marksman Rifle | 18282 | Weapon | Molten Core drop schematic | Weapon metadata representable; Recipe blocked by missing Arcanite Bar + Ironweb Spider Silk |
-| 300 | Force Reactive Disk | 18168 | Armour/shield | Molten Core drop schematic | Base shield item representable; reactive-on-block proc blocked by current event model; Recipe blocked by missing Arcanite Bar + Ironweb Spider Silk |
-| 300 | Bloodvine Goggles | 19999 | Armour/head | Zandalar Tribe Honored schematic | Most passive item metadata representable; Recipe blocked by missing Arcanite Bar + Ironweb Spider Silk + Powerful Mojo |
-| 300 | Bloodvine Lens | 19998 | Armour/head | Zandalar Tribe Friendly schematic | Base armour/Stamina/crit representable; stealth detection blocked; Recipe blocked by missing Arcanite Bar + Ironweb Spider Silk + Powerful Mojo |
-| 300 | Flawless Arcanite Rifle | 16007 | Weapon | World-drop schematic | Weapon metadata mostly representable; Recipe blocked by missing Arcanite Bar |
+| 300 | Arcane Bomb | 16040 | Bomb | World-drop schematic | Item representable; exact active partially blocked; Recipe blocked only by Ironweb Spider Silk |
+| 300 | Arcanite Dragonling | 16022 | Trinket | World-drop schematic | Item/recipe metadata representable; summon active blocked; Recipe blocked only by Ironweb Spider Silk |
+| 300 | Ultra-Flash Shadow Reflector | 18639 | Trinket | Stratholme schematic drop | Item + resistance abstraction + Recipe implementable |
+| 300 | Core Marksman Rifle | 18282 | Weapon | Molten Core schematic | Weapon metadata representable; Recipe blocked only by Ironweb Spider Silk |
+| 300 | Force Reactive Disk | 18168 | Armour/shield | Molten Core schematic | Base item representable; proc blocked by event model; Recipe blocked only by Ironweb Spider Silk |
+| 300 | Bloodvine Goggles | 19999 | Armour/head | Zandalar Tribe Honored schematic | Passive item mostly representable; Recipe blocked by Ironweb Spider Silk + Powerful Mojo |
+| 300 | Bloodvine Lens | 19998 | Armour/head | Zandalar Tribe Friendly schematic | Base item mostly representable; Recipe blocked by Ironweb Spider Silk + Powerful Mojo |
+| 300 | Flawless Arcanite Rifle | 16007 | Weapon | World-drop schematic | Item and Recipe material-complete; verify Guns skill mapping |
+| 300 | Biznicks 247x128 Accurascope | 18283 | Modification/scope | Molten Core schematic | Modification model supported; Recipe blocked only by Ironweb Spider Silk |
 
-## Item details
+## Item and effect details
 
 ### Arcane Bomb
 
-Classic source:
+Classic sources:
 
 ```text
 https://www.wowhead.com/classic/item=16055/schematic-arcane-bomb
 https://www.wowhead.com/classic/item=16040/arcane-bomb
 ```
 
-Source behavior:
+Source behavior: output x3; drains 675–1125 mana, deals damage equal to 50% of mana actually drained, silences for 5 seconds, 1-minute cooldown.
 
-- Item Level 60;
-- Engineering 300;
-- output batch: 3;
-- drains 675–1125 mana from targets in the blast;
-- deals damage equal to 50% of mana actually drained;
-- silences targets for 5 seconds;
-- 1 minute cooldown.
-
-RPE representation decision:
-
-- use the normal Engineering explosive multi-target pattern; no geometry/radius simulation;
-- a silence Aura can be represented with generic control (`preventCasting = true`);
-- current generic `resource` components are fixed/percentage changes and current damage components cannot derive their amount dynamically from the actual resource removed by a sibling component;
-- therefore the **exact coupled random mana-drain -> 50%-of-drain damage effect is blocked** rather than approximated as a fixed value;
-- do not encode a misleading fixed damage/drain spell without a later explicit design decision.
+RPE decision: silence is representable with a control Aura, but current generic resource/damage components cannot derive damage from the actual resource removed by another component. Keep the exact active blocked rather than inventing fixed drain/damage values.
 
 ### Arcanite Dragonling
 
-Classic source:
+Classic sources:
 
 ```text
 https://www.wowhead.com/classic/item=16054/schematic-arcanite-dragonling
 https://www.wowhead.com/classic/item=16022/arcanite-dragonling
 ```
 
-Source metadata:
+Item Level 60, BoE Unique Trinket, level 50, Engineering 300, summons a dragonling for 1 minute, 1-hour cooldown.
 
-- Item Level 60;
-- BoE, Unique Trinket;
-- requires level 50;
-- requires Engineering 300;
-- use summons the dragonling for 1 minute;
-- Classic cooldown: 1 hour.
-
-RPE representation decision:
-
-- represent as `itemType = "armor"`, cosmetic weight, Trinket slot, as with previous Engineering trinkets;
-- preserve uniqueness through the existing item uniqueness mechanism;
-- active summon remains blocked because `summon_pet` requires a canonical Unit ref and Engineering currently has no prepared Arcanite Dragonling Unit;
-- do not create a dummy summon or approximate the guardian as direct damage.
+RPE decision: normal cosmetic armour/trinket representation. Active summon remains blocked because `summon_pet` requires a canonical Unit ref.
 
 ### Ultra-Flash Shadow Reflector
 
-Classic source:
+Classic sources:
 
 ```text
 https://www.wowhead.com/classic/item=18658/schematic-ultra-flash-shadow-reflector
 https://www.wowhead.com/classic/item=18639/ultra-flash-shadow-reflector
 ```
 
-Source metadata:
+Item Level 60, BoE Trinket, +20 Shadow Resistance, level 55, Engineering 300, 5-second Shadow reflection, 5-minute cooldown.
 
-- Item Level 60;
-- BoE Trinket;
-- +20 Shadow Resistance;
-- requires level 55;
-- requires Engineering 300;
-- use reflects Shadow spells for 5 sec;
-- 5 minute cooldown.
-
-RPE representation decision:
-
-- mirror the already-established Gyrofreeze/Hyper-Radiant abstraction;
-- preserve passive +20 Shadow Resistance;
-- active spell applies a 3-turn self Aura granting +100 Shadow Resistance;
-- `learnMode = "unavailable"` for the item-use Spell;
-- self-targeted, 5-turn cooldown, `ignoreGCD = true`;
-- literal spell reflection remains unsupported and is intentionally not simulated.
+RPE decision: mirror the existing frost/fire reflector abstraction. Preserve +20 Shadow Resistance; item-use Spell applies a 3-turn self Aura granting +100 Shadow Resistance, 5-turn cooldown, unavailable learning, no GCD. Literal reflection remains unsupported.
 
 ### Core Marksman Rifle
 
-Classic source:
+Classic sources:
 
 ```text
 https://www.wowhead.com/classic/item=18292/schematic-core-marksman-rifle
 https://www.wowhead.com/classic/item=18282/core-marksman-rifle
 ```
 
-Source metadata:
+Item Level 65; BoE gun; 64–120 damage; speed 2.50; level 60; +22 ranged Attack Power; +1% hit.
 
-- Item Level 65;
-- BoE ranged gun;
-- 64–120 damage;
-- speed 2.50;
-- requires level 60;
-- +22 ranged Attack Power;
-- +1% hit.
-
-RPE representation decision:
-
-- normal ranged gun item using the current Core ranged slot / gun weapon type;
-- preserve source weapon damage range and passive ranged AP/hit using existing generic stat refs where available;
-- no active spell.
+RPE decision: normal ranged gun using existing weapon/stat systems.
 
 ### Force Reactive Disk
 
-Classic source:
+Classic sources:
 
 ```text
 https://www.wowhead.com/classic/item=18291/schematic-force-reactive-disk
 https://www.wowhead.com/classic/item=18168/force-reactive-disk
 ```
 
-Source metadata:
+Item Level 65; BoE Shield; 2548 Armor; 44 Block; +11 Stamina; level 60; damages nearby enemies on successful block.
 
-- Item Level 65;
-- BoE off-hand Shield;
-- 2548 Armor;
-- 44 Block;
-- +11 Stamina;
-- requires level 60;
-- on block, damages nearby enemies; 1-second internal cooldown; source also allows durability damage to the shield.
-
-RPE representation decision:
-
-- base shield equipment metadata can use existing item/equipment systems;
-- preserve Stamina and supported armour/block stats where current Core refs exist;
-- current generic Spell/Aura event keys do not include a block event, so the reactive electrical proc cannot be tied faithfully to a successful block;
-- durability self-damage is likewise outside the generic trait/effect model;
-- do not attach the proc to a broader `on_*_taken` event because that would trigger when no block occurred.
+RPE decision: base shield metadata is representable. Current generic trait events do not include a successful-block event, so do not approximate the proc with broader damage-taken events. Durability self-damage is also unsupported.
 
 ### Bloodvine Goggles
 
-Classic source:
+Classic sources:
 
 ```text
 https://www.wowhead.com/classic/item=20000/schematic-bloodvine-goggles
 https://www.wowhead.com/classic/item=19999/bloodvine-goggles
 ```
 
-Source metadata:
+Item Level 65; BoE Cloth Head; 75 Armor; level 60; +2% spell hit; +1% spell crit; 9 mana/5 sec.
 
-- Item Level 65;
-- BoE Cloth Head;
-- 75 Armor;
-- requires level 60;
-- +2% spell hit;
-- +1% spell critical strike;
-- restores 9 mana per 5 sec.
-
-RPE representation decision:
-
-- armour, spell-hit and spell-crit bonuses should use existing Core stats if present;
-- mana-per-5 must not be converted to an arbitrary combat-turn value unless an existing canonical mana-regeneration stat/semantics already maps it consistently;
-- if no such generic stat exists at implementation time, omit that unsupported passive and record it as incomplete rather than adding bespoke regeneration logic.
+RPE decision: armour/hit/crit through existing stats. Only represent mana regeneration if the current Core stat semantics map it consistently; otherwise omit only that passive.
 
 ### Bloodvine Lens
 
-Classic source:
+Classic sources:
 
 ```text
 https://www.wowhead.com/classic/item=20001/schematic-bloodvine-lens
 https://www.wowhead.com/classic/item=19998/bloodvine-lens
 ```
 
-Source metadata:
+Item Level 65; BoE Leather Head; 147 Armor; +12 Stamina; level 60; +2% crit; increased stealth detection.
 
-- Item Level 65;
-- BoE Leather Head;
-- 147 Armor;
-- +12 Stamina;
-- requires level 60;
-- +2% critical strike chance;
-- slightly increases stealth detection.
-
-RPE representation decision:
-
-- armour, Stamina and generic critical chance are representable through normal item stats if the current Core stat mapping matches;
-- stealth detection has no generic item-stat/runtime representation in the current Engineering architecture and remains unsupported;
-- do not approximate stealth detection as hit or perception unless a canonical Core stat explicitly exists for that behavior at implementation time.
+RPE decision: armour/Stamina/crit are representable. Stealth detection remains unsupported unless a canonical Core stat exists for it.
 
 ### Flawless Arcanite Rifle
 
-Classic source:
+Classic sources:
 
 ```text
 https://www.wowhead.com/classic/item=16056/schematic-flawless-arcanite-rifle
 https://www.wowhead.com/classic/item=16007/flawless-arcanite-rifle
 ```
 
-Source metadata:
+Item Level 61; BoE gun; 65–122 damage; speed 3.00; level 56; +4 Guns; +10 ranged Attack Power.
 
-- Item Level 61;
-- BoE ranged gun;
-- 65–122 damage;
-- speed 3.00;
-- requires level 56;
-- +4 Guns;
-- +10 ranged Attack Power.
+RPE decision: normal ranged gun. Use `skillBonuses` for +4 Guns only if a canonical Guns skill exists; do not translate it to generic hit.
+
+### Biznicks 247x128 Accurascope
+
+Classic sources:
+
+```text
+https://www.wowhead.com/classic/item=18290/schematic-biznicks-247x128-accurascope
+https://www.wowhead.com/classic/spell=22793/biznicks-247x128-accurascope
+```
+
+Classic metadata:
+
+- Engineering 300;
+- crafted item ID `18283`;
+- Item Level 60;
+- requires level 50;
+- stack size 5;
+- permanently attaches to a bow or gun;
+- increases that ranged weapon's chance to hit by **3%**;
+- Classic 1.12 behavior is ranged-only.
 
 RPE representation decision:
 
-- normal ranged gun item;
-- +10 ranged AP uses the existing stat if available;
-- +4 Guns should use `skillBonuses` only if a canonical Guns skill exists in Core; otherwise leave only that bonus incomplete rather than mapping it to generic ranged hit.
+- represent as `itemType = "modification"`;
+- `modificationKind = "generic"` unless a more specific current generic scope key already exists;
+- modification stats grant +3% ranged hit using the canonical ranged-hit stat;
+- constrain application through the existing modification targeting fields (`targetSlotRefs` / `targetWeaponTypeRef`) so it applies to bow/gun ranged weapons only;
+- do not implement it as `useSpellRef`;
+- if current modification targeting can only express one weapon type per item and cannot express both bow and gun, that targeting limitation must be resolved generically rather than broadening the modification to all ranged equipment.
 
 ## Final normalized recipe BOM
 
-`Hammer` means Blacksmith Hammer `61fdf3df:518sbr8g` as a non-consumed `tool` input.
+`Hammer` means Blacksmith Hammer `61fdf3df:518sbr8g` as a non-consumed tool.
 
 | Skill | Output | Final normalized external inputs | Output qty | Material status |
 | ---: | --- | --- | ---: | --- |
-| 300 | Arcane Bomb | Arcanite Bar x1; Ironweb Spider Silk x1; Thorium Bar x3; Runecloth x1; Hammer | 3 | **Blocked:** Arcanite Bar, Ironweb Spider Silk |
-| 300 | Arcanite Dragonling | Mithril Bar x19; Truesilver Bar x5; Gold Bar x5; Star Ruby x2; Goblin Rocket Fuel x2; Elemental Fire x4; Arcanite Bar x8; Ironweb Spider Silk x8; Enchanted Thorium Bar x10; Thorium Bar x18; Runecloth x6; Enchanted Leather x6; Hammer | 1 | **Blocked:** Arcanite Bar, Ironweb Spider Silk |
+| 300 | Arcane Bomb | Arcanite Bar x1; Ironweb Spider Silk x1; Thorium Bar x3; Runecloth x1; Hammer | 3 | **Blocked:** Ironweb Spider Silk |
+| 300 | Arcanite Dragonling | Mithril Bar x19; Truesilver Bar x5; Gold Bar x5; Star Ruby x2; Goblin Rocket Fuel x2; Elemental Fire x4; Arcanite Bar x8; Ironweb Spider Silk x8; Enchanted Thorium Bar x10; Thorium Bar x18; Runecloth x6; Enchanted Leather x6; Hammer | 1 | **Blocked:** Ironweb Spider Silk |
 | 300 | Ultra-Flash Shadow Reflector | Dark Iron Bar x8; Truesilver Bar x8; Elemental Earth x8; Elemental Air x4; Living Essence x6; Essence of Undeath x4; Azerothian Diamond x2; Large Opal x2; Hammer | 1 | **Complete** |
-| 300 | Core Marksman Rifle | Fiery Core x4; Lava Core x2; Arcanite Bar x8; Ironweb Spider Silk x2; Thorium Bar x12; Hammer | 1 | **Blocked:** Arcanite Bar, Ironweb Spider Silk |
-| 300 | Force Reactive Disk | Arcanite Bar x8; Ironweb Spider Silk x2; Essence of Air x8; Living Essence x12; Essence of Earth x8; Hammer | 1 | **Blocked:** Arcanite Bar, Ironweb Spider Silk |
-| 300 | Bloodvine Goggles | Bloodvine x4; Souldarite x5; Arcanite Bar x2; Ironweb Spider Silk x2; Powerful Mojo x8; Enchanted Leather x4 | 1 | **Blocked:** Arcanite Bar, Ironweb Spider Silk, Powerful Mojo |
-| 300 | Bloodvine Lens | Bloodvine x5; Souldarite x5; Arcanite Bar x1; Ironweb Spider Silk x1; Powerful Mojo x8; Enchanted Leather x4 | 1 | **Blocked:** Arcanite Bar, Ironweb Spider Silk, Powerful Mojo |
-| 300 | Flawless Arcanite Rifle | Arcanite Bar x10; Thorium Bar x12; Essence of Fire x2; Essence of Earth x2; Azerothian Diamond x2; Enchanted Leather x2; Hammer | 1 | **Blocked:** Arcanite Bar |
+| 300 | Core Marksman Rifle | Fiery Core x4; Lava Core x2; Arcanite Bar x8; Ironweb Spider Silk x2; Thorium Bar x12; Hammer | 1 | **Blocked:** Ironweb Spider Silk |
+| 300 | Force Reactive Disk | Arcanite Bar x8; Ironweb Spider Silk x2; Essence of Air x8; Living Essence x12; Essence of Earth x8; Hammer | 1 | **Blocked:** Ironweb Spider Silk |
+| 300 | Bloodvine Goggles | Bloodvine x4; Souldarite x5; Arcanite Bar x2; Ironweb Spider Silk x2; Powerful Mojo x8; Enchanted Leather x4 | 1 | **Blocked:** Ironweb Spider Silk, Powerful Mojo |
+| 300 | Bloodvine Lens | Bloodvine x5; Souldarite x5; Arcanite Bar x1; Ironweb Spider Silk x1; Powerful Mojo x8; Enchanted Leather x4 | 1 | **Blocked:** Ironweb Spider Silk, Powerful Mojo |
+| 300 | Flawless Arcanite Rifle | Arcanite Bar x10; Thorium Bar x12; Essence of Fire x2; Essence of Earth x2; Azerothian Diamond x2; Enchanted Leather x2; Hammer | 1 | **Complete** |
+| 300 | Biznicks 247x128 Accurascope | Lava Core x2; Essence of Earth x2; Arcanite Bar x4; Ironweb Spider Silk x4; Dark Iron Bar x6; Thorium Bar x6; Hammer | 1 | **Blocked:** Ironweb Spider Silk |
 
 ### Tool provenance
 
-Classic source tools are:
-
-- Arcane Bomb: Blacksmith Hammer;
-- Arcanite Dragonling: Blacksmith Hammer + Arclight Spanner;
-- Ultra-Flash Shadow Reflector: Blacksmith Hammer + Arclight Spanner;
-- Core Marksman Rifle: Blacksmith Hammer + Arclight Spanner;
-- Force Reactive Disk: Blacksmith Hammer + Arclight Spanner;
-- Bloodvine Goggles: Gyromatic Micro-Adjustor + Arclight Spanner;
-- Bloodvine Lens: Gyromatic Micro-Adjustor + Arclight Spanner;
-- Flawless Arcanite Rifle: Blacksmith Hammer + Arclight Spanner.
-
-Under the RPE Engineering tool rule this becomes:
-
-- retain Blacksmith Hammer only where the source requires it;
-- Bloodvine Goggles and Bloodvine Lens receive **no RPE tool input**, because neither source recipe requires the Hammer and the Engineering-crafted tools are intentionally not modeled as reusable RPE tools.
-
-## Spell / Aura preparation
-
-### Ultra-Flash Shadow Reflector
-
-Prepare one item-use Spell plus one Aura using the same pattern as the existing two reflectors:
-
-```text
-Spell:
-- learnMode = unavailable
-- item-only use
-- caster/self target
-- cooldown = 5 turns
-- ignoreGCD = true
-- applies Ultra-Flash Shadow Reflector aura
-
-Aura:
-- duration = 3 turns
-- +100 Shadow Resistance
-- refresh_duration
-```
-
-The source +20 Shadow Resistance remains a permanent item stat independent of the active Aura.
-
-### Arcane Bomb
-
-The source spell is not exactly representable with the current generic components:
-
-```text
-675-1125 mana drained
-50% of actual mana drained -> damage
-5 sec silence
-multi-target
-1 minute cooldown
-```
-
-The silence portion alone is representable, but the drain/damage coupling is not. Keep the active blocked as a whole until either:
-
-1. a generic resource-drain component gains min/max amount plus an output/result value that a damage component can reference; or
-2. the project explicitly approves a simplified approximation.
-
-Do not add Arcane Bomb as a damage-only or silence-only active without that decision.
-
-### Arcanite Dragonling
-
-The item-use Spell cannot be completed until a canonical Arcanite Dragonling Unit exists. `summon_pet` requires `unitRef`; no unit should be invented as part of item/spell preparation alone.
-
-### Force Reactive Disk
-
-Do not create a proc Aura/trait until the generic event model has a successful-block trigger. The closest current events (`on_*_taken`) are semantically too broad.
-
-## Item metadata summary
-
-| Output | Item level | Required level | Binding | Key item data |
-| --- | ---: | ---: | --- | --- |
-| Arcane Bomb | 60 | — | Consumable | Stack 10; use effect above |
-| Arcanite Dragonling | 60 | 50 | BoE, Unique | Trinket; 1-hour summon active |
-| Ultra-Flash Shadow Reflector | 60 | 55 | BoE | Trinket; +20 Shadow Resistance |
-| Core Marksman Rifle | 65 | 60 | BoE | Gun 64–120, speed 2.50; +22 ranged AP; +1% hit |
-| Force Reactive Disk | 65 | 60 | BoE | Shield; 2548 Armor; 44 Block; +11 Stamina |
-| Bloodvine Goggles | 65 | 60 | BoE | Cloth Head; 75 Armor; +2% spell hit; +1% spell crit; 9 mana/5 sec |
-| Bloodvine Lens | 65 | 60 | BoE | Leather Head; 147 Armor; +12 Stamina; +2% crit; stealth detection |
-| Flawless Arcanite Rifle | 61 | 56 | BoE | Gun 65–122, speed 3.00; +4 Guns; +10 ranged AP |
-
-## Original acquisition provenance
-
-All future RPE Recipe records still use `learnMode = "trainer"`.
-
-| Output | Classic acquisition provenance |
-| --- | --- |
-| Arcane Bomb | World-drop schematic |
-| Arcanite Dragonling | World-drop schematic |
-| Ultra-Flash Shadow Reflector | Drop from Crimson/Risen Inquisitors in Stratholme |
-| Core Marksman Rifle | Molten Core schematic drop |
-| Force Reactive Disk | Molten Core schematic drop |
-| Bloodvine Goggles | Zandalar Tribe Honored schematic |
-| Bloodvine Lens | Zandalar Tribe Friendly schematic |
-| Flawless Arcanite Rifle | World-drop schematic / Mossflayer Shadowhunter source |
-
-Provenance must not be converted into `book`, faction or vendor learning behavior for the RPE Recipe implementation.
+Source Blacksmith Hammer requirements are retained. Arclight Spanner and Gyromatic Micro-Adjustor are omitted as RPE tool inputs under the established rule. Bloodvine Goggles/Lens therefore have no RPE tool input because their source recipes do not require the Hammer.
 
 ## Incomplete / Blocked Items and Recipes
 
 | Entry | Complete | Missing / blocker | Type | Smallest follow-up |
 | --- | --- | --- | --- | --- |
-| Arcane Bomb | Source metadata, item shape, flattened BOM, silence representation | Arcanite Bar; Ironweb Spider Silk; exact variable drain -> dependent damage semantics | Missing materials + Spell semantics | Add/approve canonical leaves; add generic coupled resource/damage support or approve simplification |
-| Arcanite Dragonling | Item metadata, flattened BOM | Arcanite Bar; Ironweb Spider Silk; canonical summon Unit | Missing materials + Unit dependency | Add/approve leaves and prepare Arcanite Dragonling Unit |
-| Ultra-Flash Shadow Reflector | Item, spell abstraction, Aura plan, BOM | None for prepared scope | None | Ready for implementation |
-| Core Marksman Rifle | Item metadata, flattened BOM | Arcanite Bar; Ironweb Spider Silk | Missing materials | Add/approve canonical leaves |
-| Force Reactive Disk | Base item metadata, flattened BOM | Arcanite Bar; Ironweb Spider Silk; block-triggered proc event | Missing materials + runtime event semantics | Add/approve leaves; add generic successful-block event before proc implementation |
-| Bloodvine Goggles | Item metadata, flattened BOM | Arcanite Bar; Ironweb Spider Silk; Powerful Mojo; possibly canonical mana-per-5 mapping | Missing materials + possible stat semantics | Add/approve leaves; verify generic mana regeneration stat before item implementation |
-| Bloodvine Lens | Item metadata, flattened BOM | Arcanite Bar; Ironweb Spider Silk; Powerful Mojo; stealth detection | Missing materials + unsupported passive | Add/approve leaves; leave stealth detection omitted unless generic perception support is added |
-| Flawless Arcanite Rifle | Weapon metadata, flattened BOM | Arcanite Bar; verify canonical Guns skill for +4 Guns | Missing material + possible skill ref | Add/approve Arcanite Bar; resolve Guns skill or omit only that bonus |
+| Arcane Bomb | Item metadata, BOM, silence model | Ironweb Spider Silk; coupled variable drain -> damage | Material + Spell semantics | Add/substitute silk; add generic coupled resource/damage support or approve simplification |
+| Arcanite Dragonling | Item metadata, BOM | Ironweb Spider Silk; canonical summon Unit | Material + Unit dependency | Add/substitute silk; prepare guardian Unit |
+| Ultra-Flash Shadow Reflector | Item, Spell/Aura abstraction, BOM | None | None | Ready |
+| Core Marksman Rifle | Item metadata, BOM | Ironweb Spider Silk | Material | Add/substitute silk |
+| Force Reactive Disk | Base item, BOM | Ironweb Spider Silk; successful-block trigger | Material + runtime event | Add/substitute silk; add generic block event for proc |
+| Bloodvine Goggles | Item metadata, BOM | Ironweb Spider Silk; Powerful Mojo; verify mana regeneration mapping | Material + possible stat semantics | Add/substitute leaves; verify Core stat |
+| Bloodvine Lens | Item metadata, BOM | Ironweb Spider Silk; Powerful Mojo; stealth detection | Material + unsupported passive | Add/substitute leaves; omit stealth detection unless supported |
+| Flawless Arcanite Rifle | Item metadata, material-complete BOM | Verify canonical Guns skill | Possible skill ref | Resolve Guns skill or omit only that bonus |
+| Biznicks 247x128 Accurascope | Modification metadata/effect, BOM | Ironweb Spider Silk; verify bow+gun targeting can be expressed without broadening | Material + modification targeting | Add/substitute silk; use/extend generic modification targeting if necessary |
 
 ## Implementation sequencing
 
-When implementation is requested, use the same staged pattern as the previous Engineering tier:
+When implementation is requested:
 
-1. **Spell/Aura support** — Ultra-Flash Shadow Reflector and any newly-approved generic support only. Do not approximate blocked mechanics.
-2. **Items** — all eight source items may be authored even when their recipes/actives remain blocked, provided unsupported behavior is not falsely represented.
-3. **Recipes** — implement only those whose final flattened external leaves resolve at implementation time.
+1. **Spell/Aura support** — Ultra-Flash Shadow Reflector and only newly approved generic support for blocked mechanics.
+2. **Items/modifications** — author all source items plus Biznicks as a generic modification; unsupported behavior must not be falsely represented.
+3. **Recipes** — implement every recipe whose final external leaves resolve at implementation time.
 
-Do not add Engineering component Items/Recipes as a shortcut to satisfy the final recipes.
+Do not add Engineering component Items/Recipes as a shortcut.
 
 ## Validation checklist
 
-Before closing any implementation issue derived from this document, verify:
+Verify before closing implementation work:
 
-- every selected recipe has `requiredSkillLevel = 300`;
-- no TBC 300+ recipe is introduced;
-- all eventual recipes use `learnMode = "trainer"`;
-- trainer cost is `152475` copper unless the live formula changes before implementation;
-- every consumed input is an existing external packaged material or the supported Blacksmith Hammer tool;
-- no Engineering intermediate/final lower-tier item remains as a consumed input after recursive flattening;
-- Arclight Spanner and Gyromatic Micro-Adjustor are not RPE tool inputs;
+- all selected recipes require exactly 300 Engineering;
+- all Recipes use `learnMode = "trainer"`;
+- trainer cost is `152475` unless the live formula changes;
+- Arcanite Bar resolves from Blacksmithing and is never reported as missing;
+- every consumed input is an external packaged material or Blacksmith Hammer;
+- no Engineering intermediate survives recursive flattening;
+- Arclight Spanner/Gyromatic Micro-Adjustor are not RPE tool inputs;
 - output quantities match Classic source data, including Arcane Bomb x3;
-- Ultra-Flash Shadow Reflector follows the same abstraction as the existing frost/fire reflectors;
-- blocked mechanics are not silently approximated;
-- item IDs/names remain unique;
-- Recipe IDs are collision-checked;
-- Engineering packaged version increments monotonically from the live version;
-- re-registration/reload does not duplicate records;
-- the final implementation report lists any still-blocked entries explicitly.
+- Biznicks is an Item modification, not a use Spell, and provides +3% ranged hit only to valid bow/gun targets;
+- Ultra-Flash Shadow Reflector uses the established reflector abstraction;
+- blocked mechanics are not approximated silently;
+- no TBC Engineering 300+ recipes are introduced;
+- IDs/names are unique and dataset versioning remains monotonic;
+- final implementation reports any remaining blocked entries explicitly.
