@@ -61,11 +61,26 @@ local function notifyGain(result)
         return false
     end
 
-    DEFAULT_CHAT_FRAME:AddMessage(("|cff33ff99RPEngine|r: %s increased to %d / %d."):format(
-        tostring(result.skillName or "Skill"),
-        tonumber(result.level) or 0,
-        tonumber(result.maxLevel) or 0
-    ))
+    local skillName = tostring(result.skillName or "Skill")
+    local level = tonumber(result.level) or 0
+    local message
+    if tostring(result.skillType or "") == "noncombat" then
+        message = ("Your modifier in %s has increased to %d."):format(skillName, level)
+    else
+        message = ("Your skill in %s has increased to %d."):format(skillName, level)
+    end
+
+    local skillColor = type(ChatTypeInfo) == "table" and ChatTypeInfo["SKILL"] or nil
+    if type(skillColor) == "table" then
+        DEFAULT_CHAT_FRAME:AddMessage(
+            message,
+            tonumber(skillColor.r) or 1,
+            tonumber(skillColor.g) or 1,
+            tonumber(skillColor.b) or 1
+        )
+    else
+        DEFAULT_CHAT_FRAME:AddMessage(message)
+    end
     return true
 end
 
