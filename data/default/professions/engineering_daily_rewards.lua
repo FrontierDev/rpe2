@@ -25,58 +25,129 @@ local function getRewardBand(itemLevel)
     return 3, 1, 2
 end
 
-if type(dataset) == "table" then
-    dataset.loot = type(dataset.loot) == "table" and dataset.loot or {}
+local function buildItemIndex()
+    local itemsByRef = {}
 
-    local materials = {}
-    for _, item in ipairs(type(dataset.items) == "table" and dataset.items or {}) do
-        local itemId = tostring(item and item.id or "")
-        local itemName = tostring(item and item.name or "")
-        if itemId ~= "" and itemName ~= "" and tostring(item.itemType or "") == "material" then
-            materials[#materials + 1] = item
+    for datasetId, definition in pairs(type(definitions) == "table" and definitions or {}) do
+        local sourceDataset = type(definition) == "table" and definition.dataset or nil
+        for _, item in ipairs(type(sourceDataset) == "table" and type(sourceDataset.items) == "table" and sourceDataset.items or {}) do
+            local itemId = tostring(item and item.id or "")
+            if itemId ~= "" then
+                itemsByRef[("%s:%s"):format(tostring(datasetId), itemId)] = item
+            end
         end
     end
 
-    table.sort(materials, function(left, right)
-        local leftLevel = tonumber(left and left.itemLevel) or 0
-        local rightLevel = tonumber(right and right.itemLevel) or 0
+    return itemsByRef
+end
+
+if type(dataset) == "table" then
+    dataset.loot = type(dataset.loot) == "table" and dataset.loot or {}
+
+    local recipesByOutputRef = {}
+    for _, recipe in ipairs(type(dataset.recipes) == "table" and dataset.recipes or {}) do
+        local outputRef = tostring(recipe and recipe.output and recipe.output.itemRef or "")
+        if outputRef ~= "" then
+            recipesByOutputRef[outputRef] = recipe
+        end
+    end
+
+    local flattenedMaterials = {}
+    local activeRefs = {}
+
+    local function addFlattenedInput(itemRef, quantity)
+        itemRef = tostring(itemRef or "")
+        quantity = math.max(1, math.floor(tonumber(quantity) or 1))
+        if itemRef == "" then
+            return
+        end
+
+        local componentRecipe = recipesByOutputRef[itemRef]
+        if componentRecipe then
+            if activeRefs[itemRef] then
+                error(("Engineering daily rewards found a cyclic recipe dependency at '%s'."):format(itemRef), 2)
+            end
+
+            activeRefs[itemRef] = true
+            for _, input in ipairs(type(componentRecipe.inputs) == "table" and componentRecipe.inputs or {}) do
+                if tostring(input and input.kind or "") == "rpe_item" then
+                    addFlattenedInput(input.itemRef, quantity * math.max(1, math.floor(tonumber(input.quantity) or 1)))
+                end
+            end
+            activeRefs[itemRef] = nil
+            return
+        end
+
+        flattenedMaterials[itemRef] = (flattenedMaterials[itemRef] or 0) + quantity
+    end
+
+    for _, recipe in ipairs(type(dataset.recipes) == "table" and dataset.recipes or {}) do
+        for _, input in ipairs(type(recipe.inputs) == "table" and recipe.inputs or {}) do
+            if tostring(input and input.kind or "") == "rpe_item" then
+                addFlattenedInput(input.itemRef, input.quantity)
+            end
+        end
+    end
+
+    local itemsByRef = buildItemIndex()
+    local materialRefs = {}
+    for itemRef in pairs(flattenedMaterials) do
+        materialRefs[#materialRefs + 1] = itemRef
+    end
+
+    table.sort(materialRefs, function(left, right)
+        local leftItem = itemsByRef[left]
+        local rightItem = itemsByRef[right]
+        local leftLevel = tonumber(leftItem and leftItem.itemLevel) or 0
+        local rightLevel = tonumber(rightItem and rightItem.itemLevel) or 0
         if leftLevel ~= rightLevel then
             return leftLevel < rightLevel
         end
-        return tostring(left and left.name or "") < tostring(right and right.name or "")
+
+        local leftName = tostring(leftItem and leftItem.name or left)
+        local rightName = tostring(rightItem and rightItem.name or right)
+        if leftName ~= rightName then
+            return leftName < rightName
+        end
+        return left < right
     end)
 
     local entries = {}
-    for _, item in ipairs(materials) do
+    for _, itemRef in ipairs(materialRefs) do
+        local item = itemsByRef[itemRef]
+        if type(item) ~= "table" then
+            error(("Engineering daily rewards could not resolve flattened material '%s'."):format(itemRef), 2)
+        end
+
         local weight, minQuantity, maxQuantity = getRewardBand(item.itemLevel)
         local maxStackSize = math.max(1, math.floor(tonumber(item.maxStackSize) or maxQuantity))
         maxQuantity = math.min(maxQuantity, maxStackSize)
         minQuantity = math.min(minQuantity, maxQuantity)
 
         entries[#entries + 1] = {
-            id = tostring(item.id),
+            id = ("material_%s"):format(itemRef:gsub("[^%w]", "_")),
             maxQuantity = maxQuantity,
             minQuantity = minQuantity,
-            ref = ("af503002:%s"):format(tostring(item.id)),
+            ref = itemRef,
             type = "item",
             weight = weight,
         }
     end
 
     if #entries == 0 then
-        error("Engineering daily rewards could not resolve any Engineering material items.", 2)
+        error("Engineering daily rewards could not resolve any flattened recipe materials.", 2)
     end
 
     local lootId = "n6r3k8vz"
     local definition = {
         conditions = {},
-        description = "Daily Engineering material cache. Guarantees one Engineering material reward from the full Engineering material pool, with lower-tier components more common and higher-tier components progressively rarer.",
+        description = "Daily Engineering material cache. Rewards flattened base materials used by Engineering recipes, such as metals, cloth, stone, leather, gems and elemental materials, instead of crafted Engineering components.",
         drawCount = 1,
         entries = entries,
         icon = "interface/icons/inv_gizmo_03.blp",
         id = lootId,
         items = {},
-        name = "Engineering Daily Component Cache",
+        name = "Engineering Daily Material Cache",
         tags = {},
     }
 
@@ -94,5 +165,5 @@ if type(dataset) == "table" then
         dataset.loot[#dataset.loot + 1] = definition
     end
 
-    engineering.version = math.max(14, math.floor(tonumber(engineering.version) or 1))
+    engineering.version = math.max(27, math.floor(tonumber(engineering.version) or 1))
 end
