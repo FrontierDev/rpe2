@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 21,
+    version = 22,
     dataset = {
         name = "Engineering",
         achievements = {},
@@ -6144,6 +6144,126 @@ Addon.Data.DefaultDatasets:Register({
                 skillRef = "f82db71a:xprqs3y1",
                 tags = {},
                 trainerCostCopper = 115515,
+            },
+            {
+                category = "",
+                description = "",
+                id = "03d113ed",
+                inputs = {
+                    {
+                        itemRef = "61fdf3df:pb24e7k5",
+                        kind = "rpe_item",
+                        quantity = 8,
+                    },
+                    {
+                        itemRef = "61fdf3df:ufv4fdnf",
+                        kind = "rpe_item",
+                        quantity = 8,
+                    },
+                    {
+                        itemRef = "732368d4:ku9j8vhw",
+                        kind = "rpe_item",
+                        quantity = 8,
+                    },
+                    {
+                        itemRef = "732368d4:2616xh4v",
+                        kind = "rpe_item",
+                        quantity = 4,
+                    },
+                    {
+                        itemRef = "732368d4:lxqnh3pp",
+                        kind = "rpe_item",
+                        quantity = 6,
+                    },
+                    {
+                        itemRef = "732368d4:xtnbjwzj",
+                        kind = "rpe_item",
+                        quantity = 4,
+                    },
+                    {
+                        itemRef = "4999dcec:atpvfzht",
+                        kind = "rpe_item",
+                        quantity = 2,
+                    },
+                    {
+                        itemRef = "4999dcec:pkgfp4sl",
+                        kind = "rpe_item",
+                        quantity = 2,
+                    },
+                    {
+                        itemRef = "61fdf3df:518sbr8g",
+                        kind = "tool",
+                        quantity = 1,
+                    },
+                },
+                learnMode = "trainer",
+                name = "Ultra-Flash Shadow Reflector",
+                output = {
+                    itemRef = "af503002:4d93dae9",
+                    maxQuantity = 1,
+                    minQuantity = 1,
+                },
+                reagents = {},
+                requiredSkillLevel = 300,
+                results = {},
+                skillRef = "f82db71a:xprqs3y1",
+                tags = {},
+                trainerCostCopper = 152475,
+            },
+            {
+                category = "",
+                description = "",
+                id = "29b73ccb",
+                inputs = {
+                    {
+                        itemRef = "61fdf3df:6hy57ood",
+                        kind = "rpe_item",
+                        quantity = 10,
+                    },
+                    {
+                        itemRef = "61fdf3df:5m4zt99z",
+                        kind = "rpe_item",
+                        quantity = 12,
+                    },
+                    {
+                        itemRef = "732368d4:50qj8dzw",
+                        kind = "rpe_item",
+                        quantity = 2,
+                    },
+                    {
+                        itemRef = "732368d4:tfwg197j",
+                        kind = "rpe_item",
+                        quantity = 2,
+                    },
+                    {
+                        itemRef = "4999dcec:atpvfzht",
+                        kind = "rpe_item",
+                        quantity = 2,
+                    },
+                    {
+                        itemRef = "732368d4:x5hz6tby",
+                        kind = "rpe_item",
+                        quantity = 2,
+                    },
+                    {
+                        itemRef = "61fdf3df:518sbr8g",
+                        kind = "tool",
+                        quantity = 1,
+                    },
+                },
+                learnMode = "trainer",
+                name = "Flawless Arcanite Rifle",
+                output = {
+                    itemRef = "af503002:eaf992c3",
+                    maxQuantity = 1,
+                    minQuantity = 1,
+                },
+                reagents = {},
+                requiredSkillLevel = 300,
+                results = {},
+                skillRef = "f82db71a:xprqs3y1",
+                tags = {},
+                trainerCostCopper = 152475,
             },
         },
         skills = {},
