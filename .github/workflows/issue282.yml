@@ -1,0 +1,34 @@
+name: Implement issue 282
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/issue282.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+      - name: Apply patch
+        run: python .github/scripts/issue282_patch.py
+      - name: Validate scope and syntax hygiene
+        run: |
+          git diff --check
+          test "$(git diff --name-only | wc -l)" -eq 1
+          test "$(git diff --name-only)" = "client/client_Skills.lua"
+          grep -q 'local function isLocalPlayerSkillProgressionSource(eventState, eventUnit)' client/client_Skills.lua
+          grep -q 'and isLocalPlayerSkillProgressionSource(eventState, eventUnit)' client/client_Skills.lua
+      - name: Commit fix
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add client/client_Skills.lua
+          git commit -m 'Prevent NPC skill rolls from progressing local skills'
+          git push origin HEAD:dev
