@@ -24,19 +24,27 @@ local FIRST_PLAYER_TURN_HELP_ID = "event.first-player-turn"
 local FIRST_PLAYER_TURN_HELP_TEXT = "It is your turn. Use your RPE Action Bar to cast spells or perform actions, then click End Turn when you are finished."
 
 local ACTION_BAR_BIND_HELP_ID = "actionbar.bind-spells"
+local ACTION_BAR_AUTO_ATTACK_HELP_ID = "actionbar.auto-attacks"
+local ACTION_BAR_SCROLLABLE_BINDS_HELP_ID = "actionbar.scrollable-binds"
 local ACTION_BAR_SWITCH_HELP_ID = "actionbar.switch-bars"
 local ACTION_BAR_MOVEMENT_HELP_ID = "actionbar.movement"
 local ACTION_BAR_HELP_SEQUENCE = {
     ACTION_BAR_BIND_HELP_ID,
+    ACTION_BAR_AUTO_ATTACK_HELP_ID,
+    ACTION_BAR_SCROLLABLE_BINDS_HELP_ID,
     ACTION_BAR_SWITCH_HELP_ID,
 }
 local ACTION_BAR_HELP_IDS = {
     [ACTION_BAR_BIND_HELP_ID] = true,
+    [ACTION_BAR_AUTO_ATTACK_HELP_ID] = true,
+    [ACTION_BAR_SCROLLABLE_BINDS_HELP_ID] = true,
     [ACTION_BAR_SWITCH_HELP_ID] = true,
     [ACTION_BAR_MOVEMENT_HELP_ID] = true,
 }
 local ACTION_BAR_HELP_TEXT = {
     [ACTION_BAR_BIND_HELP_ID] = "Bind spells to your RPE Action Bar from the Spellbook in your Profile window.",
+    [ACTION_BAR_AUTO_ATTACK_HELP_ID] = "These slots contain your auto attacks. They stay visible while you browse your other bound spells.",
+    [ACTION_BAR_SCROLLABLE_BINDS_HELP_ID] = "These slots contain your bound spells. Use the mouse wheel over this section or the arrows to scroll through more bindings.",
     [ACTION_BAR_SWITCH_HELP_ID] = "Use these buttons to switch between Spells and Skills, and to use mounted or pet action bars when those are available.",
     [ACTION_BAR_MOVEMENT_HELP_ID] = "This bar shows how much RPE movement you have remaining. It updates as you move during an event.",
 }
@@ -401,6 +409,29 @@ function ActionBarWidget:GetIssue250ActionBarHelpAnchor(id)
         return getFrame(self.rootPanel)
     end
 
+    if id == ACTION_BAR_AUTO_ATTACK_HELP_ID then
+        if self.complexActionBarActive ~= true or (tonumber(self.autoHitSpellCount) or 0) < 1 then
+            return nil
+        end
+
+        local firstAutoAttackSlot = type(self.slots) == "table" and self.slots[1] or nil
+        local frame = getFrame(firstAutoAttackSlot)
+        return isFrameShown(frame) and frame or nil
+    end
+
+    if id == ACTION_BAR_SCROLLABLE_BINDS_HELP_ID then
+        local autoHitSpellCount = math.max(0, math.floor(tonumber(self.autoHitSpellCount) or 0))
+        if self.complexActionBarActive ~= true
+            or math.max(0, math.floor(tonumber(self.currentActionBarSlotCount) or 0)) <= autoHitSpellCount
+        then
+            return nil
+        end
+
+        local firstBindableSlot = type(self.slots) == "table" and self.slots[autoHitSpellCount + 1] or nil
+        local frame = getFrame(firstBindableSlot)
+        return isFrameShown(frame) and frame or nil
+    end
+
     if id == ACTION_BAR_SWITCH_HELP_ID then
         local modeButtons = {
             self.spellModeButton,
@@ -466,10 +497,9 @@ function ActionBarWidget:UpdateIssue250ActionBarHelp()
         local id = ACTION_BAR_HELP_SEQUENCE[index]
         if not Help:IsAcknowledged(id) then
             local anchor = self:GetIssue250ActionBarHelpAnchor(id)
-            if not isFrameShown(anchor) then
-                return false
+            if isFrameShown(anchor) then
+                return Help:Show(id, anchor) == true
             end
-            return Help:Show(id, anchor) == true
         end
     end
 

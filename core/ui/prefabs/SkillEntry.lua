@@ -189,7 +189,7 @@ function SkillEntry:Create()
 
     self.valueElement = Text:New({
         name = (self.name or "SkillEntry") .. "Value",
-        width = 64,
+        width = 100,
         height = 12,
         text = "",
         justifyH = "RIGHT",

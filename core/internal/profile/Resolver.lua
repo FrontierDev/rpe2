@@ -2108,7 +2108,7 @@ local function buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, pe
             local statRow = resolvedStatsByRef and resolvedStatsByRef[skill.derivedStatRef] or nil
             local statValue = tonumber(statRow and statRow.value) or 0
             derivedValue = roundResolvedValue(statValue * (tonumber(skill.derivedMultiplier) or 0))
-            baseValue = storedValue + derivedValue
+            baseValue = storedValue
         else
             baseValue = storedValue
         end
@@ -2128,7 +2128,7 @@ local function buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, pe
     local raceBonus = tonumber(raceBonuses and raceBonuses[entry.ref]) or 0
     local classBonus = tonumber(classBonuses and classBonuses[entry.ref]) or 0
     local auraBonus = resolveAuraBonusForSkill(auraContext, entry.ref)
-    local bonusValue = permanentBonus + itemBonus + traitBonus + raceBonus + classBonus + auraBonus
+    local bonusValue = derivedValue + permanentBonus + itemBonus + traitBonus + raceBonus + classBonus + auraBonus
     local resolvedValue = math.max(0, baseValue + bonusValue)
     if skillType == "crafting" then
         resolvedValue = clampNumber(math.max(1, resolvedValue), 1, maxValue)

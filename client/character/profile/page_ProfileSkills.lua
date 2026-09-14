@@ -388,7 +388,7 @@ local function formatFooterLevelText(row)
         return "Level -- / --"
     end
 
-    local text = ("Level %d / %d"):format(tonumber(row.value) or 0, tonumber(row.maxValue) or 0)
+    local text = ("Level %d / %d"):format(tonumber(row.baseValue) or 0, tonumber(row.maxValue) or 0)
     local bonusValue = tonumber(row.bonusValue) or 0
     if bonusValue > 0 then
         text = text .. (" |cff55ff55(+%d)|r"):format(bonusValue)
@@ -2269,7 +2269,12 @@ function SkillsPage:BuildSkillEntryRenderer()
 
         entry:SetIcon(row.icon ~= "" and row.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
         entry:SetSkillName(row.name or "Unnamed Skill")
-        entry:SetValueText(("%d / %d"):format(tonumber(row.value) or 0, tonumber(row.maxValue) or 0))
+        local bonusValue = tonumber(row.bonusValue) or 0
+        local valueText = ("%d / %d"):format(tonumber(row.value) or 0, tonumber(row.maxValue) or 0)
+        if bonusValue ~= 0 then
+            valueText = valueText .. (" |cff55ff55(%+d)|r"):format(bonusValue)
+        end
+        entry:SetValueText(valueText)
         entry:SetProgress(row.progressValue, row.maxValue, "")
         entry:SetSelected(tostring(row.ref or "") == tostring(self.SelectedSkillRef or ""))
         if tostring(row.ref or "") == tostring(self.SelectedSkillRef or "") then
@@ -2360,10 +2365,10 @@ function SkillsPage:RefreshFooter()
     end
 
     if self.FooterValueText and self.FooterValueText.SetText then
-        self.FooterValueText:SetText(row and ("Current Level: %d"):format(tonumber(row.value) or 0) or "Current Level: --")
+        self.FooterValueText:SetText(row and ("Current Level: %d"):format(tonumber(row.baseValue) or 0) or "Current Level: --")
     end
     if self.FooterProgressText and self.FooterProgressText.SetText then
-        self.FooterProgressText:SetText(row and ("Progress: %d / %d"):format(tonumber(row.progressValue) or 0, tonumber(row.maxValue) or 0) or "Progress: --")
+        self.FooterProgressText:SetText(row and ("Progress: %d / %d"):format(tonumber(row.baseValue) or 0, tonumber(row.maxValue) or 0) or "Progress: --")
     end
     if self.FooterBaseText and self.FooterBaseText.SetText then
         if not row then
@@ -2371,16 +2376,12 @@ function SkillsPage:RefreshFooter()
         elseif row.isDerived == true then
             local statName = resolveDerivedStatLabel(row.derivedStatRef)
             local derivedAmount = tonumber(row.derivedValue) or 0
-            local storedAmount = tonumber(row.storedValue) or 0
-            local sourceText = ("%d from %s x %s"):format(
+            local sourceText = ("Derived Stat Bonus: %+d (%s x %s)"):format(
                 derivedAmount,
                 statName ~= "" and statName or "stat",
                 tostring(tonumber(row.derivedMultiplier) or 0)
             )
-            if storedAmount > 0 then
-                sourceText = ("%s, stored +%d"):format(sourceText, storedAmount)
-            end
-            self.FooterBaseText:SetText(("Base Value: %d (%s)"):format(
+            self.FooterBaseText:SetText(("Base Value: %d | %s"):format(
                 tonumber(row.baseValue) or 0,
                 sourceText
             ))

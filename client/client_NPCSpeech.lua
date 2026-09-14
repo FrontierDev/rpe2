@@ -8,10 +8,16 @@ local Client = Addon.Client
 local Comms = Addon.Internal.Comms or {}
 local Operations = Comms.Operations or {}
 local Common = Addon.Utils.Common or {}
+local Event = Addon.Internal
+    and Addon.Internal.Database
+    and Addon.Internal.Database.Classes
+    and Addon.Internal.Database.Classes.Event
+    or nil
 
 local NPC_SPEECH_OPCODE = Operations.GetOpcode and Operations:GetOpcode("NPC_SPEECH") or nil
 local MAX_SPEECH_TEXT_LENGTH = 500
 local MAX_SPEECH_ID_LENGTH = 96
+local NPC_SPEECH_CHAT_COLOR = { r = 1, g = 1, b = 0x9F / 0xFF }
 local generatedSpeechSequence = 0
 
 local function normalizeName(value)
@@ -140,6 +146,51 @@ local function nextSpeechId()
     return ("s%d-%d"):format(tonumber(timestamp) or 0, generatedSpeechSequence)
 end
 
+local function escapeChatMarkup(value)
+    return tostring(value or ""):gsub("|", "||")
+end
+
+local function colorizeTeamName(name, eventState, speaker)
+    local color = type(Event) == "table" and type(Event.GetTeamColor) == "function"
+        and Event.GetTeamColor(eventState, tonumber(speaker and speaker.team) or 0)
+        or nil
+    if type(color) ~= "table" then
+        return name
+    end
+
+    local red = math.floor(math.max(0, math.min(1, tonumber(color.r) or 1)) * 255 + 0.5)
+    local green = math.floor(math.max(0, math.min(1, tonumber(color.g) or 1)) * 255 + 0.5)
+    local blue = math.floor(math.max(0, math.min(1, tonumber(color.b) or 1)) * 255 + 0.5)
+    return ("|cFF%02X%02X%02X%s|r"):format(red, green, blue, name)
+end
+
+local function buildNPCSpeechChatSpeakerLabel(entry, eventState)
+    local speaker = findSpeaker(eventState, entry and entry.speakerEventId)
+    local eventUnitId = math.max(1, math.floor(tonumber(speaker and speaker.eventID) or tonumber(entry and entry.speakerEventId) or 1))
+    local name = colorizeTeamName(escapeChatMarkup(speaker and speaker.name or "Unknown NPC"), eventState, speaker)
+    local marker = math.floor(tonumber(speaker and speaker.raidMarker) or 0)
+    local inline = Addon.UI and Addon.UI.Inline or nil
+    local markerIcon = marker >= 1 and marker <= 8 and type(inline) == "table" and type(inline.RaidMarker) == "function"
+        and inline:RaidMarker(marker, 14, 14)
+        or ""
+    return (markerIcon ~= "" and (markerIcon .. " ") or "") .. name .. (" |cff9d9d9d[#%d]|r"):format(eventUnitId)
+end
+
+local function emitNPCSpeechChatMessage(entry, eventState)
+    if not (DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function") then
+        return false
+    end
+
+    local text = tostring(entry and entry.text or "")
+    DEFAULT_CHAT_FRAME:AddMessage(
+        ("%s: %s"):format(buildNPCSpeechChatSpeakerLabel(entry, eventState), escapeChatMarkup(text)),
+        NPC_SPEECH_CHAT_COLOR.r,
+        NPC_SPEECH_CHAT_COLOR.g,
+        NPC_SPEECH_CHAT_COLOR.b
+    )
+    return true
+end
+
 function Client:ClearNPCSpeechState()
     self.NPCSpeechSeenIds = {}
     return true
@@ -169,6 +220,7 @@ function Client:QueueNPCSpeech(entry)
     end
 
     self.NPCSpeechSeenIds[duplicateKey] = true
+    emitNPCSpeechChatMessage(normalized, eventState)
     return true
 end
 
