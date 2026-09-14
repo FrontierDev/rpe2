@@ -303,8 +303,10 @@ end
 
 local function emitForAction(action, plan, eventState)
     if not exactCurrentPlan(action, plan, eventState) then return false end
-    local expectedStatus = action.actionType == "spell" and "authorized" or "confirmed"
-    if action.status ~= expectedStatus then return false end
+    local validStatus = action.actionType == "spell"
+        and (action.status == "authorized" or action.status == "completed")
+        or action.status == "confirmed"
+    if not validStatus then return false end
     local source = getList(plan, action.actionId, false) or {}
     local list = {}
     for index = 1, #source do list[index] = source[index] end

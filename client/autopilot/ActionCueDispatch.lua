@@ -74,12 +74,17 @@ if Client._autopilotActionCueDispatchInstalled ~= true then
     local baseAuthorized = Client.OnAutopilotPendingActionAuthorized
     if type(baseAuthorized) == "function" then
         function Client:OnAutopilotPendingActionAuthorized(action, plan, eventState, ...)
-            if type(action) == "table" and action.actionType == "spell"
-                and action.status == "authorized" and currentPlanFor(action, plan, eventState)
-            then
+            local shouldDispatch = type(action) == "table"
+                and action.actionType == "spell"
+                and action.status == "authorized"
+                and currentPlanFor(action, plan, eventState)
+            local results = pack(baseAuthorized(self, action, plan, eventState, ...))
+            if shouldDispatch and results[1] == true and currentPlanFor(action, plan, eventState) then
+                -- Gameplay commits first. Presentation must never run ahead of a cast
+                -- that can still fail validation, local state mutation, or comms enqueue.
                 dispatch("spellAuthorized", action, plan, eventState)
             end
-            return baseAuthorized(self, action, plan, eventState, ...)
+            return unpackValues(results, 1, results.n)
         end
     end
 
