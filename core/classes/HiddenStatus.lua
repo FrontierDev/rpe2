@@ -165,9 +165,15 @@ local function restoreRemoveHiddenEventEffects(events, preserved)
     for eventIndex, effects in pairs(preserved or {}) do
         local auraEvent = type(events) == "table" and events[eventIndex] or nil
         if type(auraEvent) == "table" and type(auraEvent.effects) == "table" then
-            for effectIndex, effect in pairs(effects) do
-                if type(auraEvent.effects[effectIndex]) == "table" then
-                    auraEvent.effects[effectIndex] = effect
+            local highestEffectIndex = 0
+            for effectIndex in pairs(effects) do
+                highestEffectIndex = math.max(highestEffectIndex, tonumber(effectIndex) or 0)
+            end
+
+            for effectIndex = 1, highestEffectIndex do
+                local effect = effects[effectIndex]
+                if effect then
+                    table.insert(auraEvent.effects, math.min(effectIndex, #auraEvent.effects + 1), effect)
                 end
             end
         end
