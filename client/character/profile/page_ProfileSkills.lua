@@ -584,6 +584,10 @@ function SkillsPage:RefreshAfterSkillManualAdjustment()
 end
 
 function SkillsPage:AddPermanentSkillBonus(skillRef, amount)
+    if getSkillRuleValue("allow_permanent_skill_bonuses_after_setup", false) ~= true then
+        return false
+    end
+
     local normalizedAmount = math.max(0, math.floor(tonumber(amount) or 0))
     if normalizedAmount <= 0 or type(Profile.SetSkillPermanentBonus) ~= "function" then
         return false
@@ -640,6 +644,9 @@ function SkillsPage:ResetSkillBonusAndGainedLevels(skillRef)
 end
 
 function SkillsPage:PromptPermanentSkillBonus(skillRef)
+    if getSkillRuleValue("allow_permanent_skill_bonuses_after_setup", false) ~= true then
+        return false
+    end
     if not (UI.Popup and UI.Popup.ShowConfirmation) then
         return false
     end
@@ -716,11 +723,12 @@ function SkillsPage:ShowSkillContextMenu(anchorFrame, row)
         or 0
     local hasBonus = permanentBonus > 0
     local hasGainedLevels = storedLevel > 0
+    local canAddPermanentBonus = getSkillRuleValue("allow_permanent_skill_bonuses_after_setup", false) == true
 
     self.ContextMenuSkillRef = row.ref
     local menu = self:EnsureSkillContextMenu()
     menu:SetItems({
-        { label = "Add Permanent Bonus...", value = "add-permanent-bonus" },
+        { label = "Add Permanent Bonus...", value = "add-permanent-bonus", enabled = canAddPermanentBonus },
         { label = "Reset Permanent Bonus", value = "reset-permanent-bonus", enabled = hasBonus },
         { label = "Reset Gained Levels", value = "reset-gained-levels", enabled = hasGainedLevels },
         { label = "Reset Bonus & Gained Levels", value = "reset-bonus-and-levels", enabled = hasBonus or hasGainedLevels },

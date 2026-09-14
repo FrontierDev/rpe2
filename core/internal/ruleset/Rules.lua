@@ -247,6 +247,7 @@ Rules.Definitions = {
             { key = "noncombat_skill_max_level", label = "Non-Combat Skill Max Level", type = "text", default = "100", description = "Maximum resolved level shown for non-combat skills." },
             { key = "crafting_skill_max_level", label = "Crafting Skill Max Level", type = "text", default = "100", description = "Maximum resolved level shown for crafting skills." },
             { key = "language_skill_max_level", label = "Language Skill Max Level", type = "text", default = "100", description = "Maximum resolved level shown for language skills." },
+            { key = "allow_permanent_skill_bonuses_after_setup", label = "Allow Permanent Skill Bonuses After Setup", type = "checkbox", default = false, description = "Allow players to manually add permanent skill bonuses from the Skills window after character setup." },
             { key = "weapon_skill_gain_chance_on_hit", label = "Weapon Skill Gain Chance On Hit", type = "text", default = "0", description = "Percent chance to gain weapon skill progression from a valid hit." },
             { key = "noncombat_skill_gain_chance_on_roll", label = "Non-Combat Skill Gain Chance On Roll", type = "text", default = "0", description = "Percent chance to gain non-combat skill progression from a valid roll." },
             { key = "language_skill_gain_chance", label = "Language Skill Gain Chance", type = "text", default = "0", description = "Percent chance to gain language skill progression from supported language actions." },
