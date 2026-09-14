@@ -1,0 +1,37 @@
+name: Add permanent skill bonus rule
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/add-permanent-skill-bonus-rule.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+      - name: Apply patch
+        run: python .github/scripts/add_permanent_skill_bonus_rule.py
+      - name: Validate scope and wiring
+        run: |
+          git diff --check
+          test "$(git diff --name-only | wc -l)" -eq 2
+          git diff --name-only | grep -qx 'core/internal/ruleset/Rules.lua'
+          git diff --name-only | grep -qx 'client/character/profile/page_ProfileSkills.lua'
+          grep -q 'key = "allow_permanent_skill_bonuses_after_setup"' core/internal/ruleset/Rules.lua
+          grep -q 'default = false' core/internal/ruleset/Rules.lua
+          test "$(grep -c 'getSkillRuleValue("allow_permanent_skill_bonuses_after_setup", false)' client/character/profile/page_ProfileSkills.lua)" -eq 3
+          grep -q 'enabled = canAddPermanentBonus' client/character/profile/page_ProfileSkills.lua
+      - name: Commit change
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add core/internal/ruleset/Rules.lua client/character/profile/page_ProfileSkills.lua
+          git commit -m 'Gate permanent skill bonuses after setup'
+          git push origin HEAD:dev
