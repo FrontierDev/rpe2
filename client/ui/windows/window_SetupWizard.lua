@@ -7,6 +7,7 @@ Addon.Client.UI.SetupWizard = Addon.Client.UI.SetupWizard or {}
 local Client = Addon.Client
 local SetupWizard = Addon.Client.UI.SetupWizard
 local UI = Addon.UI or {}
+local BaseElement = UI.BaseElement
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local RulesetLogic = Addon.Internal and Addon.Internal.Ruleset or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
@@ -47,10 +48,103 @@ local ACTIONBAR_SPELLBOOK_ENTRIES_PER_PAGE = ACTIONBAR_SPELLBOOK_COLUMNS * ACTIO
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local COPPER_CURRENCY_KEY = "copper"
 local SETUP_WIZARD_TIMING_THRESHOLD_MS = 16
+local SKILLS_TAB_INDEX = 3
+local SKILLS_TAB_WIDTH = 56
+local SETUP_SKILL_ROW_HEIGHT = 30
+local SETUP_SKILL_ROW_WIDTH = 440
 
 local DEFAULT_SLOT_BORDER = { r = 0.42, g = 0.46, b = 0.52, a = 1 }
 local SELECTED_SLOT_BORDER = { r = 0.64, g = 0.82, b = 0.38, a = 1 }
 local ACTIONBAR_SELECTED_SLOT_BORDER = { r = 0.94, g = 0.74, b = 0.22, a = 1 }
+
+local SetupSkillAllocationRow = {}
+SetupSkillAllocationRow.__index = SetupSkillAllocationRow
+setmetatable(SetupSkillAllocationRow, { __index = BaseElement })
+
+function SetupSkillAllocationRow:New(options)
+    local instance = BaseElement.New(self, options)
+    instance.options.border = false
+    instance.adjustButtons = {}
+    instance.adjustHandler = nil
+    return instance
+end
+
+function SetupSkillAllocationRow:Create()
+    if self.frame then
+        return self.frame
+    end
+
+    local frame = CreateFrame("Frame", self.name, self:GetParentFrame())
+    self:SetFrame(frame)
+    local width = math.max(1, tonumber(self.options.width) or SETUP_SKILL_ROW_WIDTH)
+    local height = math.max(1, tonumber(self.options.height) or SETUP_SKILL_ROW_HEIGHT)
+    frame:SetSize(width, height)
+
+    local buttonWidth = 30
+    local buttonSpacing = 3
+    local controlsWidth = (buttonWidth * 4) + (buttonSpacing * 3)
+    local skillWidth = math.max(220, width - controlsWidth - 8)
+
+    self.skillEntry = UI.SkillEntry:New({
+        name = (self.name or "SetupSkillAllocationRow") .. "SkillEntry",
+        width = skillWidth,
+        height = height,
+        border = false,
+    })
+    self.skillEntry:SetParent(frame)
+    self.skillEntry:Create()
+    self.skillEntry:GetFrame():SetPoint("LEFT", frame, "LEFT", 0, 0)
+
+    local specs = {
+        { label = "-5", delta = -5 },
+        { label = "-1", delta = -1 },
+        { label = "+1", delta = 1 },
+        { label = "+5", delta = 5 },
+    }
+    local previousFrame = nil
+    for index = #specs, 1, -1 do
+        local spec = specs[index]
+        local delta = spec.delta
+        local button = UI.CreateButton(
+            frame,
+            (self.name or "SetupSkillAllocationRow") .. "AdjustButton" .. index,
+            spec.label,
+            buttonWidth,
+            function()
+                if type(self.adjustHandler) == "function" then
+                    self.adjustHandler(delta)
+                end
+            end,
+            {
+                height = 20,
+                fontSize = 7,
+            }
+        )
+        local buttonFrame = button and button.GetFrame and button:GetFrame() or nil
+        if buttonFrame then
+            if previousFrame then
+                buttonFrame:SetPoint("RIGHT", previousFrame, "LEFT", -buttonSpacing, 0)
+            else
+                buttonFrame:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
+            end
+            previousFrame = buttonFrame
+        end
+        self.adjustButtons[delta] = button
+    end
+
+    return frame
+end
+
+function SetupSkillAllocationRow:SetAdjustHandler(handler)
+    self.adjustHandler = handler
+end
+
+function SetupSkillAllocationRow:SetAdjustmentEnabled(delta, enabled)
+    local button = self.adjustButtons and self.adjustButtons[delta] or nil
+    if button and button.SetEnabled then
+        button:SetEnabled(enabled == true)
+    end
+end
 
 local function ensureString(value)
     if value == nil then
@@ -159,6 +253,26 @@ local function selectionArrayFromLookup(orderedItems, lookup)
     return results
 end
 
+local function normalizeSetupSkillBonusMap(record)
+    local normalized = {}
+    for skillRef, value in pairs(type(record) == "table" and record or {}) do
+        local normalizedRef = trimString(skillRef)
+        local normalizedValue = math.max(0, math.floor(tonumber(value) or 0))
+        if normalizedRef ~= "" and normalizedValue > 0 then
+            normalized[normalizedRef] = normalizedValue
+        end
+    end
+    return normalized
+end
+
+local function copySetupSkillBonusMap(record)
+    local copy = {}
+    for skillRef, value in pairs(normalizeSetupSkillBonusMap(record)) do
+        copy[skillRef] = value
+    end
+    return copy
+end
+
 local function findEntryByValue(items, value)
     local needle = trimString(value)
     if needle == "" then
@@ -237,6 +351,10 @@ local function createInstance()
         selectedRaceRef = "",
         selectedClassRef = "",
         selectedStartingItemLookup = {},
+        selectedSkillPermanentBonuses = {},
+        initialSkillPermanentBonuses = {},
+        setupSkillRows = {},
+        skillPointFeedback = "",
         startingItemFilterQuery = "",
         startingItemPage = 1,
         availableStartingItems = {},
@@ -303,6 +421,14 @@ end
 function SetupWizard:GetRequiredStartingItemSlotRefs()
     local values = self:GetRuleValue("required_starting_item_slot_refs", {})
     return type(values) == "table" and values or {}
+end
+
+function SetupWizard:ShouldShowSkillsPage()
+    return self:GetRuleValue("enable_skills_page", true) ~= false
+end
+
+function SetupWizard:GetPermanentSkillPointLimit()
+    return math.max(0, math.floor(tonumber(self:GetRuleValue("permanent_skill_point_limit", 50)) or 50))
 end
 
 function SetupWizard:ApplyDatasetPolicy()
@@ -712,6 +838,7 @@ function SetupWizard:CaptureSelectionState()
         classRef = trimString(Profile.GetClassRef and Profile.GetClassRef() or setupState.classRef),
         startingItemRefs = type(setupState.startingItemRefs) == "table" and setupState.startingItemRefs or {},
         actionBarSpellRefs = actionBarSpellRefs,
+        skillPermanentBonuses = copySetupSkillBonusMap(setupState.skillPermanentBonuses),
     }
 end
 
@@ -719,7 +846,131 @@ function SetupWizard:SyncSelectionState(state)
     self.selectedRaceRef = trimString(state and state.raceRef)
     self.selectedClassRef = trimString(state and state.classRef)
     self.selectedStartingItemLookup = selectionLookupFromArray(state and state.startingItemRefs or {})
+    self.selectedSkillPermanentBonuses = copySetupSkillBonusMap(state and state.skillPermanentBonuses)
+    self.initialSkillPermanentBonuses = copySetupSkillBonusMap(state and state.skillPermanentBonuses)
+    self.skillPointFeedback = ""
     self.hasDraftSelectionState = true
+end
+
+function SetupWizard:GetSetupSkillRows()
+    local resolved = Profile.ListResolvedSkills and Profile.ListResolvedSkills() or {}
+    local rows = {}
+    for index = 1, #resolved do
+        local row = resolved[index]
+        if row and tostring(row.skillType or "") == "noncombat" and trimString(row.ref) ~= "" then
+            rows[#rows + 1] = row
+        end
+    end
+    table.sort(rows, function(left, right)
+        local leftName = string.lower(trimString(left and left.name))
+        local rightName = string.lower(trimString(right and right.name))
+        if leftName == rightName then
+            return trimString(left and left.ref) < trimString(right and right.ref)
+        end
+        return leftName < rightName
+    end)
+    return rows
+end
+
+function SetupWizard:GetAllocatedPermanentSkillPointTotal(bonuses)
+    local total = 0
+    for _, value in pairs(normalizeSetupSkillBonusMap(bonuses)) do
+        total = total + math.max(0, math.floor(tonumber(value) or 0))
+    end
+    return total
+end
+
+function SetupWizard:ValidatePermanentSkillPointAllocation(bonuses)
+    local limit = self:GetPermanentSkillPointLimit()
+    local total = self:GetAllocatedPermanentSkillPointTotal(bonuses)
+    return {
+        limit = limit,
+        total = total,
+        remaining = math.max(0, limit - total),
+        valid = total <= limit,
+    }
+end
+
+function SetupWizard:GetSetupSkillPreviewValue(row)
+    local skillRef = trimString(row and row.ref)
+    local currentValue = math.max(0, tonumber(row and row.value) or 0)
+    if skillRef == "" then
+        return currentValue
+    end
+
+    local previousSetupBonus = math.max(0, math.floor(tonumber(self.initialSkillPermanentBonuses and self.initialSkillPermanentBonuses[skillRef]) or 0))
+    local currentPermanentBonus = type(Profile.GetSkillPermanentBonus) == "function"
+        and math.max(0, math.floor(tonumber(Profile.GetSkillPermanentBonus(skillRef)) or 0))
+        or 0
+    local currentSetupContribution = math.min(currentPermanentBonus, previousSetupBonus)
+    local draftBonus = math.max(0, math.floor(tonumber(self.selectedSkillPermanentBonuses and self.selectedSkillPermanentBonuses[skillRef]) or 0))
+    return math.max(0, currentValue - currentSetupContribution + draftBonus)
+end
+
+function SetupWizard:AdjustPermanentSkillPoint(skillRef, delta)
+    local normalizedRef = trimString(skillRef)
+    local normalizedDelta = math.floor(tonumber(delta) or 0)
+    if normalizedRef == "" or normalizedDelta == 0 then
+        return false
+    end
+
+    self.selectedSkillPermanentBonuses = self.selectedSkillPermanentBonuses or {}
+    local current = math.max(0, math.floor(tonumber(self.selectedSkillPermanentBonuses[normalizedRef]) or 0))
+    local nextValue = current + normalizedDelta
+    if nextValue < 0 then
+        return false
+    end
+
+    local validation = self:ValidatePermanentSkillPointAllocation(self.selectedSkillPermanentBonuses)
+    if normalizedDelta > 0 and validation.total + normalizedDelta > validation.limit then
+        self.skillPointFeedback = ("Permanent skill point limit reached: %d / %d."):format(validation.total, validation.limit)
+        self:RefreshStatus()
+        return false
+    end
+
+    if nextValue > 0 then
+        self.selectedSkillPermanentBonuses[normalizedRef] = nextValue
+    else
+        self.selectedSkillPermanentBonuses[normalizedRef] = nil
+    end
+    self.skillPointFeedback = ""
+    self:RefreshSkillsPage()
+    if self.FinalizePageBuilt then
+        self:RefreshFinalizePage()
+    end
+    self:RefreshStatus()
+    return true
+end
+
+function SetupWizard:ApplySetupSkillPermanentBonuses(previousBonuses, nextBonuses)
+    if type(Profile.GetSkillPermanentBonus) ~= "function" or type(Profile.SetSkillPermanentBonus) ~= "function" then
+        return false
+    end
+
+    local previous = normalizeSetupSkillBonusMap(previousBonuses)
+    local nextValues = normalizeSetupSkillBonusMap(nextBonuses)
+    local refs = {}
+    for skillRef in pairs(previous) do
+        refs[skillRef] = true
+    end
+    for skillRef in pairs(nextValues) do
+        refs[skillRef] = true
+    end
+
+    for skillRef in pairs(refs) do
+        local currentPermanentBonus = math.max(0, math.floor(tonumber(Profile.GetSkillPermanentBonus(skillRef)) or 0))
+        local previousSetupBonus = math.max(0, math.floor(tonumber(previous[skillRef]) or 0))
+        local manualPermanentBonus = math.max(0, currentPermanentBonus - previousSetupBonus)
+        local targetPermanentBonus = manualPermanentBonus + math.max(0, math.floor(tonumber(nextValues[skillRef]) or 0))
+        if targetPermanentBonus > 0 then
+            Profile.SetSkillPermanentBonus(skillRef, targetPermanentBonus)
+        elseif type(Profile.ClearSkillPermanentBonus) == "function" then
+            Profile.ClearSkillPermanentBonus(skillRef)
+        else
+            Profile.SetSkillPermanentBonus(skillRef, 0)
+        end
+    end
+    return true
 end
 
 local function createSectionPanel(parent, name, width)
@@ -1027,6 +1278,148 @@ function SetupWizard:BuildStartingItemsPage(page)
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
     self.StartingItemsEmptyText:GetFrame():SetPoint("CENTER", self.StartingItemsPanel:GetContentFrame(), "CENTER", 0, 0)
+end
+
+function SetupWizard:BuildSkillsPage(page)
+    if self.SkillsPageBuilt then
+        return
+    end
+
+    self.SkillsPageBuilt = true
+    self.SkillsPage = page
+
+    self.SkillsHintText = UI.CreateText(page, "RPESetupWizardSkillsHintText",
+        "Allocate permanent bonus points to non-combat skills. Changes are applied only when setup is finalized.", {
+            width = CONTENT_WIDTH,
+            height = 14,
+            justifyH = "LEFT",
+            textColor = UI.ResolveColor(nil, "text.secondary"),
+        }
+    )
+    self.SkillsHintText:GetFrame():SetPoint("TOPLEFT", page, "TOPLEFT", 0, 0)
+    self.SkillsHintText:GetFrame():SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, 0)
+
+    self.SkillsSummaryText = UI.CreateText(page, "RPESetupWizardSkillsSummaryText", "", {
+        width = CONTENT_WIDTH,
+        height = 14,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.SkillsSummaryText:GetFrame():SetPoint("TOPLEFT", self.SkillsHintText:GetFrame(), "BOTTOMLEFT", 0, -6)
+    self.SkillsSummaryText:GetFrame():SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, -20)
+
+    self.SkillsPanel = UI.CreatePanel(page, "RPESetupWizardSkillsPanel", {
+        width = CONTENT_WIDTH,
+        height = 238,
+        contentInset = 6,
+    })
+    self.SkillsPanel:GetFrame():SetPoint("TOPLEFT", self.SkillsSummaryText:GetFrame(), "BOTTOMLEFT", 0, -4)
+    self.SkillsPanel:GetFrame():SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, -38)
+
+    self.SkillsScroll = UI.ScrollLayout:New({
+        name = "RPESetupWizardSkillsScroll",
+        width = CONTENT_WIDTH - 12,
+        height = 226,
+        visibleRows = 7,
+        autoFitRows = true,
+        minVisibleRows = 4,
+        rowHeight = SETUP_SKILL_ROW_HEIGHT,
+        rowSpacing = 2,
+        border = false,
+        rowElementClass = SetupSkillAllocationRow,
+        rowWidth = SETUP_SKILL_ROW_WIDTH,
+        rowInsetLeft = 0,
+        rowInsetRight = 0,
+        contentInsetLeft = 0,
+        contentInsetRight = 0,
+        contentInsetTop = 0,
+        contentInsetBottom = 0,
+        scrollBarInsetRight = 0,
+    })
+    self.SkillsScroll:SetParent(self.SkillsPanel:GetContentFrame())
+    self.SkillsScroll:SetRowRenderer(function(row, item)
+        local resolved = item and item.row or nil
+        local skillRef = trimString(item and item.skillRef)
+        if not resolved or skillRef == "" then
+            return
+        end
+
+        local allocated = math.max(0, math.floor(tonumber(self.selectedSkillPermanentBonuses and self.selectedSkillPermanentBonuses[skillRef]) or 0))
+        local validation = self:ValidatePermanentSkillPointAllocation(self.selectedSkillPermanentBonuses)
+        local previewValue = self:GetSetupSkillPreviewValue(resolved)
+        local maxValue = math.max(0, math.floor(tonumber(resolved.maxValue) or 0))
+        local entry = row.skillEntry
+        if entry then
+            entry:SetIcon(trimString(resolved.icon) ~= "" and resolved.icon or DEFAULT_ICON)
+            entry:SetSkillName(resolved.name or "Unnamed Skill")
+            entry:SetValueText(("%d / %d"):format(math.floor(previewValue), maxValue))
+            entry:SetProgress(math.min(previewValue, maxValue), maxValue, "")
+            entry:SetSelected(false)
+            entry:SetBorderColor(DEFAULT_SLOT_BORDER.r, DEFAULT_SLOT_BORDER.g, DEFAULT_SLOT_BORDER.b, DEFAULT_SLOT_BORDER.a)
+            entry:SetEnabled(true)
+        end
+
+        row:SetAdjustHandler(function(delta)
+            self:AdjustPermanentSkillPoint(skillRef, delta)
+        end)
+        row:SetAdjustmentEnabled(-5, allocated >= 5)
+        row:SetAdjustmentEnabled(-1, allocated >= 1)
+        row:SetAdjustmentEnabled(1, validation.remaining >= 1)
+        row:SetAdjustmentEnabled(5, validation.remaining >= 5)
+    end)
+    self.SkillsScroll:Create()
+    self.SkillsScroll:SetPoint("TOPLEFT", self.SkillsPanel:GetContentFrame(), "TOPLEFT", 0, 0)
+    self.SkillsScroll:SetPoint("BOTTOMRIGHT", self.SkillsPanel:GetContentFrame(), "BOTTOMRIGHT", 0, 0)
+
+    self.SkillsEmptyText = UI.CreateText(self.SkillsPanel:GetContentFrame(), "RPESetupWizardSkillsEmptyText", "", {
+        width = CONTENT_WIDTH - 24,
+        height = 24,
+        justifyH = "CENTER",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.SkillsEmptyText:GetFrame():SetPoint("CENTER", self.SkillsPanel:GetContentFrame(), "CENTER", 0, 0)
+end
+
+function SetupWizard:RefreshSkillsPage()
+    if not self.SkillsPageBuilt then
+        local page = self.window and self.window.tabContainer and self.window.tabContainer.pageFrames and self.window.tabContainer.pageFrames[SKILLS_TAB_INDEX] or nil
+        if page then
+            self:BuildSkillsPage(page)
+        end
+    end
+    if not self.SkillsPageBuilt then
+        return
+    end
+
+    local rows = self:GetSetupSkillRows()
+    self.setupSkillRows = rows
+    local validation = self:ValidatePermanentSkillPointAllocation(self.selectedSkillPermanentBonuses)
+    if validation.valid then
+        self.skillPointFeedback = ""
+    else
+        self.skillPointFeedback = ("Permanent skill points exceed the ruleset limit: %d / %d."):format(validation.total, validation.limit)
+    end
+
+    if self.SkillsSummaryText and self.SkillsSummaryText.SetText then
+        self.SkillsSummaryText:SetText(("Permanent points allocated: %d / %d"):format(validation.total, validation.limit))
+    end
+
+    local items = {}
+    for index = 1, #rows do
+        local row = rows[index]
+        items[#items + 1] = {
+            row = row,
+            skillRef = row.ref,
+        }
+    end
+    if self.SkillsScroll and self.SkillsScroll.SetItems then
+        self.SkillsScroll:SetItems(items)
+    end
+
+    setFrameShown(self.SkillsEmptyText, #rows == 0)
+    if self.SkillsEmptyText and self.SkillsEmptyText.SetText then
+        self.SkillsEmptyText:SetText(#rows == 0 and "No enabled non-combat skills are available." or "")
+    end
 end
 
 function SetupWizard:BuildFinalizePage(page)
@@ -1519,6 +1912,16 @@ function SetupWizard:BuildWindow()
                 end,
             },
             {
+                name = "skills",
+                label = "Skills",
+                width = SKILLS_TAB_WIDTH,
+                builder = function(page)
+                    measureSetupTiming("SetupWizard.BuildPage", "skills", function()
+                        self:BuildSkillsPage(page)
+                    end)
+                end,
+            },
+            {
                 name = "actionbar",
                 label = "Action Bar",
                 width = 72,
@@ -1543,6 +1946,7 @@ function SetupWizard:BuildWindow()
     window:SetTitle("Setup Wizard")
     window:Create()
     self.window = window
+    self:ApplySkillsPageVisibility()
 
     local outerContent = window.contentFrame or (window.GetContentFrame and window:GetContentFrame()) or nil
     local footerHost = window.GetFrame and window:GetFrame() or outerContent
@@ -1596,6 +2000,42 @@ function SetupWizard:BuildWindow()
     return window
 end
 
+function SetupWizard:ApplySkillsPageVisibility()
+    local tabContainer = self.window and self.window.tabContainer or nil
+    if type(tabContainer) ~= "table" then
+        return self:ShouldShowSkillsPage()
+    end
+
+    local visible = self:ShouldShowSkillsPage()
+    local tab = tabContainer.tabs and tabContainer.tabs[SKILLS_TAB_INDEX] or nil
+    local button = tabContainer.tabButtons and tabContainer.tabButtons[SKILLS_TAB_INDEX] or nil
+    local buttonFrame = button and button.GetFrame and button:GetFrame() or nil
+    local page = tabContainer.pageFrames and tabContainer.pageFrames[SKILLS_TAB_INDEX] or nil
+
+    if tab and tostring(tab.name or "") == "skills" then
+        tab.width = visible and SKILLS_TAB_WIDTH or 0
+    end
+    if buttonFrame and buttonFrame.SetShown then
+        buttonFrame:SetShown(visible)
+    elseif buttonFrame then
+        if visible and buttonFrame.Show then
+            buttonFrame:Show()
+        elseif not visible and buttonFrame.Hide then
+            buttonFrame:Hide()
+        end
+    end
+
+    if not visible and tonumber(tabContainer.activeTabIndex) == SKILLS_TAB_INDEX then
+        tabContainer:SetActiveTab(1)
+    elseif not visible and page and page.Hide then
+        page:Hide()
+    end
+    if tabContainer.LayoutTabs then
+        tabContainer:LayoutTabs()
+    end
+    return visible
+end
+
 function SetupWizard:GetActiveTabIndex()
     local tabContainer = self.window and self.window.tabContainer or nil
     return math.max(1, math.floor(tonumber(tabContainer and tabContainer.activeTabIndex) or 1))
@@ -1627,23 +2067,27 @@ end
 
 function SetupWizard:RefreshPage(tabIndex, state)
     local index = math.max(1, math.floor(tonumber(tabIndex) or 1))
-    local context = ({ "identity", "items", "actionbar", "finalize" })[index] or tostring(index)
+    local context = ({ "identity", "items", "skills", "actionbar", "finalize" })[index] or tostring(index)
     return measureSetupTiming("SetupWizard.RefreshPage", context, function()
         if index == 1 then
             self:RefreshIdentityPage(state)
         elseif index == 2 then
             self:RefreshStartingItemsPage(state)
-        elseif index == 3 then
+        elseif index == SKILLS_TAB_INDEX then
+            if self:ShouldShowSkillsPage() then
+                self:RefreshSkillsPage()
+            end
+        elseif index == 4 then
             if not self.ActionBarPageRoot then
-                local page = self.window and self.window.tabContainer and self.window.tabContainer.pageFrames and self.window.tabContainer.pageFrames[3] or nil
+                local page = self.window and self.window.tabContainer and self.window.tabContainer.pageFrames and self.window.tabContainer.pageFrames[4] or nil
                 if page then
                     self:BuildActionBarPage(page)
                 end
             end
             self:RefreshActionBarPage(state)
-        elseif index == 4 then
+        elseif index == 5 then
             if not self.FinalizePageBuilt then
-                local page = self.window and self.window.tabContainer and self.window.tabContainer.pageFrames and self.window.tabContainer.pageFrames[4] or nil
+                local page = self.window and self.window.tabContainer and self.window.tabContainer.pageFrames and self.window.tabContainer.pageFrames[5] or nil
                 if page then
                     self:BuildFinalizePage(page)
                 end
@@ -2231,6 +2675,24 @@ function SetupWizard:RefreshFinalizePage()
         lines[#lines + 1] = ("Bound Spells: %d / %d"):format(boundSpellCount, actionBarSize)
     end
 
+    local skillValidation = self:ValidatePermanentSkillPointAllocation(selection.skillPermanentBonuses)
+    if self:ShouldShowSkillsPage() then
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = ("Permanent Skill Points: %d / %d"):format(skillValidation.total, skillValidation.limit)
+        local allocatedCount = 0
+        for index = 1, #(self:GetSetupSkillRows() or {}) do
+            local row = self:GetSetupSkillRows()[index]
+            local amount = math.max(0, math.floor(tonumber(selection.skillPermanentBonuses and selection.skillPermanentBonuses[row.ref]) or 0))
+            if amount > 0 then
+                allocatedCount = allocatedCount + 1
+                lines[#lines + 1] = ("- %s: +%d"):format(tostring(row.name or "Skill"), amount)
+            end
+        end
+        if allocatedCount == 0 then
+            lines[#lines + 1] = "- None"
+        end
+    end
+
     if self.FinalizeSummaryScroll and self.FinalizeSummaryScroll.SetItems then
         local items = {}
         for index = 1, #lines do
@@ -2245,6 +2707,7 @@ function SetupWizard:RefreshFinalizePage()
             self:IsEnabled()
             and validation.withinBudget == true
             and validation.passesRequiredSlots == true
+            and (not self:ShouldShowSkillsPage() or skillValidation.valid == true)
         )
     end
 end
@@ -2391,7 +2854,9 @@ function SetupWizard:RefreshStatus()
         return
     end
 
-    if self:IsEnabled() and trimString(self.startingItemFeedback) ~= "" then
+    if self:IsEnabled() and trimString(self.skillPointFeedback) ~= "" then
+        self.StatusText:SetText(self.skillPointFeedback)
+    elseif self:IsEnabled() and trimString(self.startingItemFeedback) ~= "" then
         self.StatusText:SetText(self.startingItemFeedback)
     elseif self:IsEnabled() then
         self.StatusText:SetText("")
@@ -2403,6 +2868,7 @@ end
 function SetupWizard:Refresh()
     local timing = startSetupTiming("SetupWizard.Refresh", "full")
     self:ApplyDatasetPolicy()
+    self:ApplySkillsPageVisibility()
     local state = self:CaptureSelectionState()
     self.cachedState = state
     if self.hasDraftSelectionState ~= true then
@@ -2415,6 +2881,9 @@ function SetupWizard:Refresh()
     if self.StartingItemsPageBuilt then
         self:RefreshStartingItemsPage(state)
     end
+    if self.SkillsPageBuilt and self:ShouldShowSkillsPage() then
+        self:RefreshSkillsPage()
+    end
     if self.ActionBarPageRoot then
         self:RefreshActionBarPage(state)
     end
@@ -2426,6 +2895,7 @@ function SetupWizard:Refresh()
     stopSetupTiming(timing, {
         identity = self.IdentityPageBuilt and 1 or 0,
         items = self.StartingItemsPageBuilt and 1 or 0,
+        skills = self.SkillsPageBuilt and self:ShouldShowSkillsPage() and 1 or 0,
         actionbar = self.ActionBarPageRoot and 1 or 0,
         finalize = self.FinalizePageBuilt and 1 or 0,
     })
@@ -2470,6 +2940,7 @@ function SetupWizard:CollectCurrentSelection()
         classRef = trimString(self.selectedClassRef) ~= "" and trimString(self.selectedClassRef) or trimString(state.classRef),
         startingItemRefs = selectionArrayFromLookup(self.availableStartingItems, self.selectedStartingItemLookup),
         actionBarSpellRefs = state.actionBarSpellRefs or {},
+        skillPermanentBonuses = copySetupSkillBonusMap(self.selectedSkillPermanentBonuses or state.skillPermanentBonuses),
     }
 
     local actionBarSize = Profile.GetActionBarSize and Profile.GetActionBarSize() or 0
@@ -2494,7 +2965,14 @@ function SetupWizard:ApplyCurrentSelection()
 
     local state = self:CollectCurrentSelection()
     local validation = self:ValidateCurrentItemSelection()
+    local skillValidation = self:ValidatePermanentSkillPointAllocation(state.skillPermanentBonuses)
+    local previousSetupState = Profile.GetSetupWizardState and Profile.GetSetupWizardState() or {}
     local plan = validation.plan
+    if self:ShouldShowSkillsPage() and skillValidation.valid ~= true then
+        self.skillPointFeedback = ("Permanent skill points exceed the ruleset limit: %d / %d."):format(skillValidation.total, skillValidation.limit)
+        self:RefreshStatus()
+        return false
+    end
     if validation.withinBudget ~= true then
         self.startingItemFeedback = ("Budget exceeded: %s / %s"):format(formatCopperAmount(validation.totalPrice), formatCopperAmount(validation.budget))
         self:RefreshStatus()
@@ -2533,6 +3011,10 @@ function SetupWizard:ApplyCurrentSelection()
         end
     end
 
+    if self:ShouldShowSkillsPage() then
+        self:ApplySetupSkillPermanentBonuses(previousSetupState.skillPermanentBonuses, state.skillPermanentBonuses)
+    end
+
     for index = 1, #(plan.inventory or {}) do
         local itemRef = trimString(plan.inventory[index] and plan.inventory[index].value)
         local datasetId, itemId = string.match(itemRef, "^([^:]+):(.+)$")
@@ -2550,6 +3032,7 @@ function SetupWizard:ApplyCurrentSelection()
     end
 
     self.startingItemFeedback = ""
+    self.skillPointFeedback = ""
     if Client.RefreshActionBarWidget then
         Client:RefreshActionBarWidget("setup-wizard-apply")
     end
@@ -2561,6 +3044,7 @@ end
 
 function SetupWizard:Show()
     local window = self:BuildWindow()
+    self:ApplySkillsPageVisibility()
     local state = self:CaptureSelectionState()
     self.cachedState = state
     self:SyncSelectionState(state)
@@ -2578,6 +3062,7 @@ end
 function SetupWizard:Hide()
     self.hasDraftSelectionState = false
     self.needsDatasetPolicyRefresh = false
+    self.skillPointFeedback = ""
     self.refreshRequestId = math.max(0, math.floor(tonumber(self.refreshRequestId) or 0)) + 1
     if self.window and self.window.Hide then
         self.window:Hide()

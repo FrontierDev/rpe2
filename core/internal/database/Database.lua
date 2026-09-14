@@ -1180,6 +1180,7 @@ local function normalizeProfileSetupWizard(record)
         classRef = ensureString(data.classRef, ""),
         startingItemRefs = startingItemRefs,
         actionBarSpellRefs = actionBarSpellRefs,
+        skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(data.skillPermanentBonuses),
     }
 end
 

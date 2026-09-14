@@ -19,6 +19,8 @@ Rules.Definitions = {
             { key = "starting_item_tags", label = "Starting Item Tags", type = "text", default = "", description = "Comma-separated item tags that qualify items for the setup wizard starting-item picker." },
             { key = "starting_item_budget_copper", label = "Starting Item Budget (Copper)", type = "text", default = "0", description = "Optional copper budget for the setup wizard starting-item picker. Use 0 to disable the budget." },
             { key = "required_starting_item_slot_refs", label = "Required Starting Item Slots", type = "dropdown", default = {}, multiSelect = true, description = "Require the setup wizard selection to include equipable items that satisfy these item slots.", optionsSource = "itemSlotReference" },
+            { key = "enable_skills_page", label = "Enable Skills Page", type = "checkbox", default = true, description = "Show the Skills page in the setup wizard for allocating permanent bonuses to non-combat skills." },
+            { key = "permanent_skill_point_limit", label = "Permanent Skill Point Limit", type = "text", default = "50", description = "Maximum number of permanent non-combat skill points that can be allocated during character setup." },
         },
     },
     {
