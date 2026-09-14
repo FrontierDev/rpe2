@@ -12,6 +12,7 @@ local Event = Addon.Internal
     or nil
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
+local Debug = Addon.Debug or {}
 
 Client.AutopilotExecution = Client.AutopilotExecution or {}
 local Execution = Client.AutopilotExecution
@@ -355,6 +356,261 @@ local function createExecutionProxy(casterUnit, eventState)
     })
 end
 
+local function cloneTable(value, seen)
+    if type(value) ~= "table" then
+        return value
+    end
+
+    seen = seen or {}
+    if seen[value] then
+        return seen[value]
+    end
+
+    local copied = {}
+    seen[value] = copied
+    for key, entry in pairs(value) do
+        copied[cloneTable(key, seen)] = cloneTable(entry, seen)
+    end
+    return copied
+end
+
+local function snapshotSpellStartState(eventState, casterUnit)
+    local eventId = tostring(type(eventState) == "table" and eventState.id or "")
+    local casterEventId = normalizeEventId(casterUnit and casterUnit.eventID)
+    local snapshot = {
+        eventId = eventId,
+        casterEventId = casterEventId,
+        resources = {},
+        cooldownState = nil,
+        cooldownStateExisted = false,
+        castEntry = nil,
+        castEntryExisted = false,
+    }
+
+    for index = 1, #(casterUnit and casterUnit.resources or {}) do
+        local entry = casterUnit.resources[index]
+        if type(entry) == "table" then
+            snapshot.resources[index] = {
+                entry = entry,
+                resourceRef = tostring(entry.resourceRef or ""),
+                currentValue = entry.currentValue,
+                maxValue = entry.maxValue,
+            }
+        end
+    end
+
+    local cooldownBucket = eventId ~= ""
+        and type(Client.CooldownsByEventId) == "table"
+        and Client.CooldownsByEventId[eventId]
+        or nil
+    local cooldownState = type(cooldownBucket) == "table" and cooldownBucket[casterEventId] or nil
+    if type(cooldownState) == "table" then
+        snapshot.cooldownStateExisted = true
+        snapshot.cooldownState = cloneTable(cooldownState)
+    end
+
+    local castEntry = eventId ~= ""
+        and casterEventId > 0
+        and type(Spellcasting.GetCastEntry) == "function"
+        and Spellcasting.GetCastEntry(Client, eventId, casterEventId)
+        or nil
+    if type(castEntry) == "table" then
+        snapshot.castEntryExisted = true
+        snapshot.castEntry = cloneTable(castEntry)
+    end
+
+    return snapshot
+end
+
+local function queueRollbackResourceDeltas(state, resourceDeltas)
+    if type(resourceDeltas) ~= "table" or #resourceDeltas == 0 then
+        return false
+    end
+    if type(Client.GetState) ~= "function" or type(Client.QueueClientResourceDeltas) ~= "function" then
+        return false
+    end
+
+    local sessionState = Client:GetState()
+    if type(sessionState) ~= "table" or sessionState.active ~= true then
+        return false
+    end
+
+    return Client:QueueClientResourceDeltas(
+        sessionState,
+        "spellcast-start-rollback",
+        resourceDeltas,
+        state.casterEventId
+    ) == true
+end
+
+local function restoreSpellStartState(state)
+    if type(state) ~= "table" then
+        return false
+    end
+
+    local resourceDeltas = {}
+    for index = 1, #(state.resources or {}) do
+        local saved = state.resources[index]
+        local entry = type(saved) == "table" and saved.entry or nil
+        if type(entry) == "table" then
+            local before = tonumber(saved.currentValue)
+            local current = tonumber(entry.currentValue)
+            if before == nil then
+                before = tonumber(saved.maxValue) or 0
+            end
+            if current == nil then
+                current = tonumber(entry.maxValue) or 0
+            end
+            if before ~= current then
+                entry.currentValue = before
+                if saved.maxValue ~= nil then
+                    entry.maxValue = saved.maxValue
+                end
+                resourceDeltas[#resourceDeltas + 1] = {
+                    resourceRef = tostring(saved.resourceRef or entry.resourceRef or ""),
+                    delta = before - current,
+                    currentValue = before,
+                    maxValue = tonumber(entry.maxValue) or before,
+                }
+            end
+        end
+    end
+
+    if state.eventId ~= "" and state.casterEventId > 0 then
+        Client.CooldownsByEventId = Client.CooldownsByEventId or {}
+        local cooldownBucket = Client.CooldownsByEventId[state.eventId]
+        if state.cooldownStateExisted == true then
+            if type(cooldownBucket) ~= "table" then
+                cooldownBucket = {}
+                Client.CooldownsByEventId[state.eventId] = cooldownBucket
+            end
+            cooldownBucket[state.casterEventId] = cloneTable(state.cooldownState)
+        elseif type(cooldownBucket) == "table" then
+            cooldownBucket[state.casterEventId] = nil
+            if next(cooldownBucket) == nil then
+                Client.CooldownsByEventId[state.eventId] = nil
+            end
+        end
+
+        if state.castEntryExisted == true and type(Spellcasting.SetCastEntry) == "function" then
+            Spellcasting.SetCastEntry(Client, state.eventId, state.casterEventId, cloneTable(state.castEntry))
+        elseif type(Spellcasting.RemoveCastEntry) == "function" then
+            Spellcasting.RemoveCastEntry(Client, state.eventId, state.casterEventId)
+        end
+    end
+
+    queueRollbackResourceDeltas(state, resourceDeltas)
+
+    if type(Spellcasting.RefreshLocalResourceDisplays) == "function" then
+        Spellcasting.RefreshLocalResourceDisplays("spellcast-start-rollback")
+    end
+    if type(Client.QueueActionBarRefresh) == "function" then
+        Client:QueueActionBarRefresh("spellcast-start-rollback")
+    end
+    if state.casterEventId > 0 and type(Client.QueueEventWidgetTargetedRefresh) == "function" then
+        Client:QueueEventWidgetTargetedRefresh("spellcast-start-rollback", { state.casterEventId })
+    end
+
+    return true
+end
+
+local function getSpellStartPreflightFailure(eventState, casterUnit, spell, snapshot)
+    local sessionState = type(Client.GetState) == "function" and Client:GetState() or nil
+    if type(sessionState) ~= "table" or sessionState.active ~= true
+        or type(eventState) ~= "table" or eventState.active ~= true
+    then
+        return "spell-start-context-unavailable"
+    end
+
+    if type(Client.CanPerformEventAction) == "function"
+        and Client:CanPerformEventAction(eventState, "spell-cast") ~= true
+    then
+        return "spell-start-action-blocked"
+    end
+
+    if type(Spellcasting.ResolveSessionChannelId) == "function"
+        and Spellcasting.ResolveSessionChannelId(sessionState) == nil
+    then
+        return "spell-start-channel-unavailable"
+    end
+
+    local auraManager = Client.Spellcasting and Client.Spellcasting.AuraManager or nil
+    if type(auraManager) == "table"
+        and type(auraManager.CanUnitCast) == "function"
+        and auraManager:CanUnitCast(eventState, casterUnit.eventID) ~= true
+    then
+        return "spell-start-cast-blocked"
+    end
+
+    local startCosts = type(snapshot) == "table" and snapshot.startCosts or nil
+    if type(startCosts) ~= "table" and type(Spellcasting.GetSpellResourceCostsForPhase) == "function" then
+        startCosts = Spellcasting.GetSpellResourceCostsForPhase(spell, "on_cast_start")
+    end
+    if type(startCosts) == "table"
+        and #startCosts > 0
+        and type(Spellcasting.CanAffordResourceCosts) == "function"
+        and Spellcasting.CanAffordResourceCosts(casterUnit, startCosts) ~= true
+    then
+        return "spell-start-resource-cost-failed"
+    end
+
+    return nil
+end
+
+local function classifySpellStartFailure(results, eventState, casterEventId, spellRef, castTime)
+    if type(results) ~= "table" then
+        return "spell-start-error: no-result"
+    end
+
+    if results[1] ~= true then
+        local detail = tostring(results[2] or "unknown-error")
+        detail = string.gsub(detail, "[\r\n]+", " ")
+        if #detail > 220 then
+            detail = string.sub(detail, 1, 220) .. "..."
+        end
+        return "spell-start-error: " .. detail
+    end
+
+    if results[2] == true then
+        return nil
+    end
+
+    if type(results[3]) == "string" and results[3] ~= "" then
+        return results[3]
+    end
+
+    local existing = type(Spellcasting.GetCastEntry) == "function"
+        and Spellcasting.GetCastEntry(Client, tostring(eventState and eventState.id or ""), casterEventId)
+        or nil
+    if type(existing) == "table"
+        and normalizeEventId(existing.casterEventId) == casterEventId
+        and tostring(existing.spellRef or "") == tostring(spellRef or "")
+    then
+        return "spell-start-send-failed"
+    end
+
+    if castTime == nil then
+        return "spell-start-instant-dispatch-failed"
+    end
+
+    return "spell-start-failed"
+end
+
+local function logSpellStartFailure(casterEventId, spellRef, reason)
+    if type(Debug.Internal) ~= "function" then
+        return
+    end
+    if type(Debug.EnsureInternalLevelEnabled) == "function" then
+        Debug.EnsureInternalLevelEnabled()
+    end
+    Debug.Internal(
+        "Autopilot spell start failed [caster=%s spell=%s]: %s",
+        tostring(casterEventId or 0),
+        tostring(spellRef or ""),
+        tostring(reason or "unknown")
+    )
+end
+
 local function classifyStaleReason(reason)
     local staleReasons = {
         ["event-changed"] = true,
@@ -371,6 +627,9 @@ local function classifyStaleReason(reason)
         ["target-group-unavailable"] = true,
         ["target-count-invalid"] = true,
         ["target-invalid"] = true,
+        ["spell-start-action-blocked"] = true,
+        ["spell-start-cast-blocked"] = true,
+        ["spell-start-resource-cost-failed"] = true,
     }
     if staleReasons[tostring(reason or "")] == true then
         return true
@@ -451,20 +710,21 @@ function Client:ExecuteEventUnitSpell(request)
     local proxy = createExecutionProxy(casterUnit, eventState)
     Spellcasting.QueueLocalSpellTargetSelection(proxy, spellRef, targetSelections, targetSelectionOrder)
 
+    local preflightReason = getSpellStartPreflightFailure(eventState, casterUnit, snapshot.spell, snapshot)
+    if preflightReason then
+        proxy.QueuedSpellTargetSelection = nil
+        return false, preflightReason, classifyStaleReason(preflightReason) and "stale" or "failed"
+    end
+
+    local startState = snapshotSpellStartState(eventState, casterUnit)
     local castTime = tonumber(snapshot.spell and snapshot.spell.totalTicks) or (snapshot.spell and snapshot.spell.castTime)
     local results = pack(pcall(Client.OnSpellcastStart, proxy, spellRef, castTime, snapshot))
     if results[1] ~= true or results[2] ~= true then
-        local existing = type(Spellcasting.GetCastEntry) == "function"
-            and Spellcasting.GetCastEntry(Client, tostring(eventState.id or ""), casterEventId)
-            or nil
-        if type(existing) == "table"
-            and normalizeEventId(existing.casterEventId) == casterEventId
-            and tostring(existing.spellRef or "") == spellRef
-            and type(Spellcasting.RemoveCastEntry) == "function"
-        then
-            Spellcasting.RemoveCastEntry(Client, tostring(eventState.id or ""), casterEventId)
-        end
-        return false, results[1] == true and "spell-start-failed" or "spell-start-error", "failed"
+        local failureReason = classifySpellStartFailure(results, eventState, casterEventId, spellRef, castTime)
+        restoreSpellStartState(startState)
+        proxy.QueuedSpellTargetSelection = nil
+        logSpellStartFailure(casterEventId, spellRef, failureReason)
+        return false, failureReason, classifyStaleReason(failureReason) and "stale" or "failed"
     end
 
     local castEntry = type(Spellcasting.GetCastEntry) == "function"
