@@ -342,6 +342,18 @@ local function createExecutionProxy(casterUnit, eventState)
             end
             return casterUnit, eventState
         end,
+        GetActionBarControlContext = function(_, requestedEventState)
+            if requestedEventState ~= eventState then
+                return nil
+            end
+            return {
+                eventState = eventState,
+                controlledUnit = casterUnit,
+                activeEventUnit = casterUnit,
+                controlledEventId = tonumber(casterUnit.eventID) or 0,
+                isControlled = true,
+            }
+        end,
     }
 
     return setmetatable(proxy, {
@@ -708,6 +720,32 @@ function Client:ExecuteEventUnitSpell(request)
     end
 
     local proxy = createExecutionProxy(casterUnit, eventState)
+    if type(proxy.ResolveSpellActivationSnapshot) ~= "function" then
+        return false, "activation-execution-api-unavailable", "failed"
+    end
+
+    local executionSnapshot = proxy:ResolveSpellActivationSnapshot(spellRef, {
+        casterEventId = casterEventId,
+        includeTargetCandidates = true,
+    })
+    if type(executionSnapshot) ~= "table" then
+        return false, "activation-execution-unavailable", "stale"
+    end
+    if executionSnapshot.canCast ~= true then
+        return false, "activation-execution-" .. tostring(executionSnapshot.reason or "unavailable"), "stale"
+    end
+    if type(Spellcasting.IsSpellActivationSnapshotValid) == "function"
+        and Spellcasting.IsSpellActivationSnapshotValid(proxy, executionSnapshot) ~= true
+    then
+        return false, "activation-execution-guard-invalid", "stale"
+    end
+
+    snapshot = executionSnapshot
+    targetSelections, targetSelectionOrder, targetReason = buildValidatedTargetSelection(selectionSource, snapshot)
+    if not targetSelections then
+        return false, "activation-execution-" .. tostring(targetReason or "target-invalid"), "stale"
+    end
+
     Spellcasting.QueueLocalSpellTargetSelection(proxy, spellRef, targetSelections, targetSelectionOrder)
 
     local preflightReason = getSpellStartPreflightFailure(eventState, casterUnit, snapshot.spell, snapshot)
@@ -717,7 +755,9 @@ function Client:ExecuteEventUnitSpell(request)
     end
 
     local startState = snapshotSpellStartState(eventState, casterUnit)
-    local castTime = tonumber(snapshot.spell and snapshot.spell.totalTicks) or (snapshot.spell and snapshot.spell.castTime)
+    local castTime = type(Spellcasting.ResolvePersistentCastTurns) == "function"
+        and Spellcasting.ResolvePersistentCastTurns(snapshot.spell)
+        or (tonumber(snapshot.spell and snapshot.spell.castTime) or tonumber(snapshot.spell and snapshot.spell.totalTicks))
     local results = pack(pcall(Client.OnSpellcastStart, proxy, spellRef, castTime, snapshot))
     if results[1] ~= true or results[2] ~= true then
         local failureReason = classifySpellStartFailure(results, eventState, casterEventId, spellRef, castTime)
