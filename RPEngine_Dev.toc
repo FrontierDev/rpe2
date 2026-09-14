@@ -47,6 +47,7 @@ core/internal/comms/Diagnostics.lua
 core/internal/tasks/TaskQueue.lua
 core/internal/comms/MessageQueue.lua
 core/internal/comms/Operations.lua
+core/internal/comms/EventUnitHidden.lua
 core/internal/comms/Serialization.lua
 core/internal/comms/EventRejoinState.lua
 core/internal/comms/Core.lua
@@ -137,6 +138,7 @@ core/internal/database/DatasetSchema23.lua
 core/internal/database/DatasetSchema24.lua
 core/classes/Recipe.lua
 core/classes/Aura.lua
+core/classes/HiddenStatus.lua
 core/classes/Interaction.lua
 core/classes/Achievement.lua
 core/classes/GuildSetting.lua
@@ -148,6 +150,8 @@ core/classes/EventVariantNetwork.lua
 core/classes/EventVariantSpellEquipmentNetwork.lua
 core/classes/EventEndLoot.lua
 client/client_Event.lua
+client/client_EventUnitHidden.lua
+client/conditions/Hidden.lua
 client/client_Loot.lua
 client/client_LootNotifications.lua
 client/client_EventCurrencyRewards.lua
@@ -156,6 +160,7 @@ client/client_CombatLogTurnIdentity.lua
 client/client_Skills.lua
 client/client_SkillProgression.lua
 server/server_Event.lua
+server/server_EventUnitHidden.lua
 server/server_EventEndLoot.lua
 server/server_Loot.lua
 server/server_LootRecentEvent.lua
@@ -191,6 +196,7 @@ client/spellcasting/effects/RemoveAura.lua
 client/spellcasting/effects/Resource.lua
 client/spellcasting/effects/Stat.lua
 client/spellcasting/effects/Control.lua
+client/spellcasting/effects/RemoveHidden.lua
 client/spellcasting/Handles.lua
 client/client_EventRejoinState.lua
 client/combat/Core.lua
@@ -208,6 +214,7 @@ client/combat/effects/Resource.lua
 client/combat/effects/Interrupt.lua
 client/combat/effects/Revert.lua
 client/combat/effects/SummonPet.lua
+client/combat/effects/Hide.lua
 client/combat/ReactionPerformance.lua
 client/spellcasting/TooltipTemplate.lua
 client/spellcasting/AuraDescriptionBuilder.lua
@@ -427,6 +434,7 @@ client/ui/editor/inspectors/aura/page_InspectorAuraEffects.lua
 client/ui/editor/inspectors/aura/page_InspectorAuraEvents.lua
 client/ui/editor/inspectors/page_InspectorAura.lua
 client/ui/editor/inspectors/spell/page_InspectorSpellShared.lua
+client/ui/editor/inspectors/page_InspectorHiddenStatus.lua
 client/ui/editor/inspectors/spell/page_InspectorSpellGeneral.lua
 client/ui/editor/inspectors/spell/page_InspectorSpellCasting.lua
 client/ui/editor/inspectors/spell/page_InspectorSpellCooldown.lua
