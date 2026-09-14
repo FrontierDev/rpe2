@@ -1,0 +1,98 @@
+local _, Addon = ...
+
+Addon.Server = Addon.Server or {}
+Addon.Utils = Addon.Utils or {}
+
+local Server = Addon.Server
+local Common = Addon.Utils.Common or {}
+
+local function normalizeName(name)
+    if type(Common.NormalizeName) == "function" then
+        return Common.NormalizeName(name)
+    end
+
+    return type(name) == "string" and name or ""
+end
+
+local function findEventUnitById(eventState, eventId)
+    local numericEventId = math.floor(tonumber(eventId) or 0)
+    if numericEventId <= 0 then
+        return nil
+    end
+
+    for index = 1, #(eventState and eventState.units or {}) do
+        local unit = eventState.units[index]
+        if tonumber(unit and unit.eventID) == numericEventId then
+            return unit
+        end
+    end
+
+    return nil
+end
+
+local function resolveControllingPlayer(eventState, unit)
+    if type(unit) ~= "table" then
+        return nil
+    end
+
+    if unit.isPlayer == true then
+        return unit
+    end
+
+    local controllerEventId = math.floor(tonumber(unit.controllerID) or 0)
+    if controllerEventId <= 0 then
+        return nil
+    end
+
+    local controller = findEventUnitById(eventState, controllerEventId)
+    return type(controller) == "table" and controller.isPlayer == true and controller or nil
+end
+
+local function senderControlsUnit(eventState, unit, sender)
+    local controller = resolveControllingPlayer(eventState, unit)
+    if type(controller) ~= "table" then
+        return false
+    end
+
+    local expectedSender = normalizeName(controller.ownerID or controller.name)
+    local normalizedSender = normalizeName(sender)
+    return expectedSender ~= "" and normalizedSender ~= "" and expectedSender == normalizedSender
+end
+
+function Server:HandleEventUnitHidden(arguments, sender)
+    local sessionState = type(self.GetState) == "function" and self:GetState() or nil
+    local eventState = type(self.GetEventState) == "function" and self:GetEventState() or nil
+    if type(sessionState) ~= "table" or sessionState.active ~= true or type(eventState) ~= "table" or eventState.active ~= true then
+        return false
+    end
+
+    local channelName = type(arguments) == "table" and arguments[1] or nil
+    if type(channelName) ~= "string" or channelName == "" or channelName ~= sessionState.channelName then
+        return false
+    end
+
+    local eventId = type(arguments) == "table" and arguments[2] or nil
+    if type(eventId) ~= "string" or eventId == "" or eventId ~= eventState.id then
+        return false
+    end
+
+    local sourceEventId = math.floor(tonumber(arguments and arguments[3]) or 0)
+    local targetEventId = math.floor(tonumber(arguments and arguments[4]) or 0)
+    if sourceEventId <= 0 or targetEventId <= 0 then
+        return false
+    end
+
+    local sourceUnit = findEventUnitById(eventState, sourceEventId)
+    local targetUnit = findEventUnitById(eventState, targetEventId)
+    if not sourceUnit or not targetUnit or not senderControlsUnit(eventState, sourceUnit, sender) then
+        return false
+    end
+
+    if type(self.SetEventUnitHidden) ~= "function" then
+        return false
+    end
+
+    local hiddenValue = arguments and arguments[5]
+    local hidden = hiddenValue == true or tonumber(hiddenValue) == 1 or string.lower(tostring(hiddenValue or "")) == "true"
+    return self:SetEventUnitHidden(targetEventId, hidden)
+end
