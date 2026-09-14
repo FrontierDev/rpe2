@@ -2680,8 +2680,9 @@ function SetupWizard:RefreshFinalizePage()
         lines[#lines + 1] = ""
         lines[#lines + 1] = ("Permanent Skill Points: %d / %d"):format(skillValidation.total, skillValidation.limit)
         local allocatedCount = 0
-        for index = 1, #(self:GetSetupSkillRows() or {}) do
-            local row = self:GetSetupSkillRows()[index]
+        local setupSkillRows = self:GetSetupSkillRows() or {}
+        for index = 1, #setupSkillRows do
+            local row = setupSkillRows[index]
             local amount = math.max(0, math.floor(tonumber(selection.skillPermanentBonuses and selection.skillPermanentBonuses[row.ref]) or 0))
             if amount > 0 then
                 allocatedCount = allocatedCount + 1
