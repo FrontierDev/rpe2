@@ -1790,6 +1790,17 @@ function Client:HandleProfileEquipmentRuntimeChange(changeSet)
     end
     self._lastProfileEquipmentRuntimeChangeSet = changeSet
 
+    if type(self.MarkActionBarSlotsDirty) == "function" then
+        self:MarkActionBarSlotsDirty("profile-equipment", nil, { structural = true })
+    elseif type(self.RefreshActionBarWidget) == "function" then
+        self:RefreshActionBarWidget("profile-equipment")
+    end
+    if type(self.MarkActionBarCompanionBarsDirty) == "function" then
+        self:MarkActionBarCompanionBarsDirty("profile-equipment", { immediate = true })
+    elseif type(self.RefreshActionBarCompanionBars) == "function" then
+        self:RefreshActionBarCompanionBars("profile-equipment")
+    end
+
     local eventState = self.GetEventState and self:GetEventState() or nil
     if type(eventState) ~= "table" or eventState.active ~= true then
         return true

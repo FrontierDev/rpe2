@@ -151,7 +151,7 @@ end
 local function isAchievementComplete(achievement, state)
     local criteria = achievement and achievement.criteria or nil
     if type(criteria) ~= "table" or #criteria == 0 then
-        return false
+        return true
     end
 
     local stateCriteria = state and state.criteria or {}
@@ -1132,10 +1132,6 @@ function Achievements:Grant(achievementRef, options)
         end
 
         local criteria = type(achievement.criteria) == "table" and achievement.criteria or {}
-        if #criteria == 0 then
-            return false, "achievement-has-no-criteria"
-        end
-
         local hasCriterion = false
         for index = 1, #criteria do
             local criterion = criteria[index]
@@ -1145,7 +1141,7 @@ function Achievements:Grant(achievementRef, options)
                 hasCriterion = true
             end
         end
-        if not hasCriterion then
+        if #criteria > 0 and not hasCriterion then
             return false, "achievement-has-no-criteria"
         end
 

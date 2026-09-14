@@ -336,7 +336,7 @@ local function stopEventFromWidget()
     return server:EndEvent("widget-stop")
 end
 
-local function buildPortraitDisplayKey(eventState, eventUnit, healthState, primaryState, castState, isPet, targetIndicatorState)
+local function buildPortraitDisplayKey(eventState, eventUnit, healthState, primaryState, castState, isPet, targetIndicatorState, turnComplete)
     if type(eventUnit) ~= "table" then
         return ""
     end
@@ -355,6 +355,7 @@ local function buildPortraitDisplayKey(eventState, eventUnit, healthState, prima
         tostring(castState and castState.icon or ""),
         isPet == true and "1" or "0",
         tostring(math.floor((tonumber(targetIndicatorState and targetIndicatorState.alpha) or 0) * 100 + 0.5)),
+        turnComplete == true and "1" or "0",
     }, "\31")
 end
 
@@ -1768,7 +1769,15 @@ function EventWidget:RefreshPortraitSlot(index, eventUnit, state, context, optio
         and Client.ResolveEventUnitInteractionMarkerState
         and Client:ResolveEventUnitInteractionMarkerState(desiredUnit, state)
         or { visible = false, alpha = 0 }
-    local nextKey = buildPortraitDisplayKey(state, desiredUnit or eventUnit, healthState, primaryState, castState, isPet, targetIndicatorState)
+    local isHiddenUnit = type(eventUnit) == "table" and eventUnit.hidden == true
+    local hideHiddenUnitDetails = isHiddenUnit and context.isHost ~= true
+    local turnComplete = desiredUnit
+        and Client.IsEventUnitTurnComplete
+        and Client:IsEventUnitTurnComplete(desiredUnit, state)
+        or false
+    local nextKey = buildPortraitDisplayKey(state, desiredUnit or eventUnit, healthState, primaryState, castState, isPet, targetIndicatorState, turnComplete)
+        .. "\31" .. (isHiddenUnit and "hidden" or "visible")
+        .. "\31" .. (context.isHost == true and "host" or "client")
     local currentKeys = type(options.currentKeys) == "table" and options.currentKeys or self.currentKeys
     local currentVisualKeys = type(options.currentVisualKeys) == "table" and options.currentVisualKeys or self.currentVisualKeys
     local previousKey = currentKeys[index]
@@ -1816,8 +1825,14 @@ function EventWidget:RefreshPortraitSlot(index, eventUnit, state, context, optio
     if portrait and portraitStateChanged and portrait.SetTargetIndicatorAlpha then
         portrait:SetTargetIndicatorAlpha(tonumber(targetIndicatorState and targetIndicatorState.alpha) or 0)
     end
+    if portrait and portraitStateChanged and portrait.SetTurnCompleteIndicatorVisible then
+        portrait:SetTurnCompleteIndicatorVisible(turnComplete)
+    end
     if portrait and portraitStateChanged and portrait.SetCastIcon then
         portrait:SetCastIcon(castState and castState.icon or nil)
+    end
+    if portrait and portraitStateChanged and portrait.SetHiddenPresentation then
+        portrait:SetHiddenPresentation(isHiddenUnit, hideHiddenUnitDetails)
     end
 
     if frame then

@@ -14,6 +14,9 @@ ActionBarWidget.__index = ActionBarWidget
 
 local SLOT_SIZE = 36
 local SLOT_SPACING = 6
+local COMPLEX_AUTO_SPELL_GAP = 24
+local COMPLEX_SCROLL_ARROW_WIDTH = 16
+local COMPLEX_SCROLL_ARROW_GAP = 3
 local ROOT_PADDING = 8
 local ROOT_HEIGHT = 52
 local MODE_BUTTON_SIZE = 20
@@ -162,6 +165,15 @@ local function buildActionBarRowsSignature(rows)
     return table.concat(parts, "\30")
 end
 
+local function buildActionBarSlotIndexSignature(slotIndexes, slotCount)
+    local parts = {}
+    for index = 1, math.max(0, math.floor(tonumber(slotCount) or 0)) do
+        parts[#parts + 1] = tostring((slotIndexes or {})[index] or "")
+    end
+
+    return table.concat(parts, ",")
+end
+
 local function buildActionBarRefreshSignature(widget, rows, controlContext, slotCount)
     local eventState = type(controlContext) == "table" and controlContext.eventState or (Client.GetEventState and Client:GetEventState() or nil)
     local activeEventUnit = type(controlContext) == "table" and controlContext.activeEventUnit or nil
@@ -181,6 +193,7 @@ local function buildActionBarRefreshSignature(widget, rows, controlContext, slot
     return buildSignature(
         slotCount,
         Profile.GetActionBarMode and Profile.GetActionBarMode() or "spells",
+        Profile.GetActionBarLayoutMode and Profile.GetActionBarLayoutMode() or "complex",
         Profile.ShouldUseMountedActionBar and Profile.ShouldUseMountedActionBar() and 1 or 0,
         widget.IsUnlocked and widget:IsUnlocked() and 1 or 0,
         type(controlContext) == "table" and controlContext.isControlled == true and 1 or 0,
@@ -200,7 +213,8 @@ local function buildActionBarRefreshSignature(widget, rows, controlContext, slot
             tonumber(spellcastEntry and spellcastEntry.focusedTargetEventId) or 0
         ),
         buildTargetingSignature(),
-        buildActionBarRowsSignature(rows)
+        buildActionBarRowsSignature(rows),
+        buildActionBarSlotIndexSignature(widget.visibleActionBarSlotIndexes, slotCount)
     )
 end
 
@@ -208,6 +222,7 @@ local function buildActionBarStructureSignature(widget, rows, controlContext, sl
     return buildSignature(
         slotCount,
         Profile.GetActionBarMode and Profile.GetActionBarMode() or "spells",
+        Profile.GetActionBarLayoutMode and Profile.GetActionBarLayoutMode() or "complex",
         Profile.ShouldUseMountedActionBar and Profile.ShouldUseMountedActionBar() and 1 or 0,
         widget.IsUnlocked and widget:IsUnlocked() and 1 or 0,
         type(controlContext) == "table" and controlContext.isControlled == true and 1 or 0,
@@ -486,10 +501,96 @@ local function resolveActionBarDetailWithPlan(detail, plan)
     return resolveRuntimeSpellDetailWithActivationState(detail, resolvePlanActivationState(plan, spellRef))
 end
 
+local function isNormalSpellActionBar(npcControlActive)
+    return npcControlActive ~= true
+        and (Profile.GetActionBarMode and Profile.GetActionBarMode() or "spells") == "spells"
+        and not (Profile.ShouldUseMountedActionBar and Profile.ShouldUseMountedActionBar())
+end
+
+local function buildActionBarDisplayRows(widget, rows, size, npcControlActive)
+    local configuredSlotCount = math.max(0, math.floor(tonumber(size) or 0))
+    if not isNormalSpellActionBar(npcControlActive) then
+        widget.complexActionBarActive = false
+        widget.complexActionBarMaxScrollOffset = 0
+        widget.complexActionBarScrollOffset = 0
+        return rows, configuredSlotCount, 0, nil
+    end
+
+    local autoHitSpellCount = math.max(0, math.floor(tonumber(rows.autoHitSpellCount) or 0))
+    local layoutMode = Profile.GetActionBarLayoutMode and Profile.GetActionBarLayoutMode() or "complex"
+    if layoutMode == "simple" then
+        widget.complexActionBarActive = false
+        widget.complexActionBarMaxScrollOffset = 0
+        widget.complexActionBarScrollOffset = 0
+        return rows, math.max(configuredSlotCount, #rows), autoHitSpellCount, nil
+    end
+
+    local visibleAutoHitSpellCount = math.min(configuredSlotCount, autoHitSpellCount)
+    local visibleBoundSpellCount = math.max(0, configuredSlotCount - visibleAutoHitSpellCount)
+    local totalBoundSpellCount = math.max(0, #rows - autoHitSpellCount)
+    local maxScrollOffset = math.max(0, totalBoundSpellCount - visibleBoundSpellCount)
+    local scrollOffset = math.max(0, math.min(maxScrollOffset, math.floor(tonumber(widget.complexActionBarScrollOffset) or 0)))
+    local displayRows = {}
+    local slotIndexes = {}
+
+    for index = 1, visibleAutoHitSpellCount do
+        displayRows[#displayRows + 1] = rows[index]
+    end
+    for index = 1, visibleBoundSpellCount do
+        local sourceIndex = autoHitSpellCount + scrollOffset + index
+        displayRows[#displayRows + 1] = rows[sourceIndex] or false
+        slotIndexes[#displayRows] = scrollOffset + index
+    end
+
+    widget.complexActionBarActive = true
+    widget.complexActionBarMaxScrollOffset = maxScrollOffset
+    widget.complexActionBarScrollOffset = scrollOffset
+    return displayRows, configuredSlotCount, visibleAutoHitSpellCount, slotIndexes
+end
+
+local function getActionBarSlotLabel(widget, index, detail)
+    if type(detail) == "table" and detail.actionBarKind == "auto-spell" then
+        return ""
+    end
+
+    local slotIndexes = widget and widget.visibleActionBarSlotIndexes or nil
+    if type(slotIndexes) == "table" and slotIndexes[index] ~= nil then
+        return slotIndexes[index]
+    end
+
+    local autoHitSpellCount = math.max(0, math.floor(tonumber(widget and widget.autoHitSpellCount) or 0))
+    return math.max(1, index - autoHitSpellCount)
+end
+
+local function getComplexAutoSpellGap(widget, slotCount)
+    local autoHitSpellCount = math.max(0, math.floor(tonumber(widget and widget.autoHitSpellCount) or 0))
+    return widget and widget.complexActionBarActive == true
+        and autoHitSpellCount > 0
+        and math.max(0, math.floor(tonumber(slotCount) or 0)) > autoHitSpellCount
+        and COMPLEX_AUTO_SPELL_GAP
+        or 0
+end
+
+local function getComplexScrollNavigationWidth(widget)
+    return widget and widget.complexActionBarActive == true
+        and math.max(0, math.floor(tonumber(widget.complexActionBarMaxScrollOffset) or 0)) > 0
+        and COMPLEX_SCROLL_ARROW_WIDTH + COMPLEX_SCROLL_ARROW_GAP
+        or 0
+end
+
+local function getActionBarSlotOffset(widget, index, slotCount)
+    local offset = (math.max(1, index) - 1) * (SLOT_SIZE + SLOT_SPACING)
+    local autoHitSpellCount = math.max(0, math.floor(tonumber(widget and widget.autoHitSpellCount) or 0))
+    if index > autoHitSpellCount then
+        offset = offset + getComplexAutoSpellGap(widget, slotCount)
+    end
+    return offset
+end
+
 local function applyActionBarSlotDetail(self, slot, slotHost, index, detail, npcControlActive, contentInset)
     local frame = slot:GetFrame()
     frame:ClearAllPoints()
-    frame:SetPoint("LEFT", slotHost, "LEFT", contentInset + ((index - 1) * (SLOT_SIZE + SLOT_SPACING)), 0)
+    frame:SetPoint("LEFT", slotHost, "LEFT", contentInset + getActionBarSlotOffset(self, index, self.currentActionBarSlotCount), 0)
 
     if detail then
         if detail.pendingActivationState == true then
@@ -524,7 +625,7 @@ local function applyActionBarSlotDetail(self, slot, slotHost, index, detail, npc
         if slot.RefreshVisualState then
             slot:RefreshVisualState()
         end
-        slot:SetCount(index)
+        slot:SetCount(getActionBarSlotLabel(self, index, detail))
         slot:SetOverlayText(isSkillActionBarDetail(detail) and "" or (detail.cooldownOverlayText or ""))
         slot.tooltipDetail = detail
         if npcControlActive then
@@ -540,7 +641,7 @@ local function applyActionBarSlotDetail(self, slot, slotHost, index, detail, npc
     else
         slot:SetIcon(DEFAULT_ICON)
         slot:SetEnabled(false)
-        slot:SetCount(index)
+        slot:SetCount(getActionBarSlotLabel(self, index, nil))
         slot:SetOverlayText("")
         slot.tooltipDetail = nil
         slot:SetBorderColor(EMPTY_SLOT_BORDER.r, EMPTY_SLOT_BORDER.g, EMPTY_SLOT_BORDER.b, EMPTY_SLOT_BORDER.a)
@@ -549,8 +650,98 @@ local function applyActionBarSlotDetail(self, slot, slotHost, index, detail, npc
         slot.boundActionBarKind = nil
     end
 
+    slot.isScrollableActionBarSlot = self.complexActionBarActive == true
+        and index > math.max(0, math.floor(tonumber(self.autoHitSpellCount) or 0))
+
     frame:Show()
     return true
+end
+
+function ActionBarWidget:ScrollComplexActionBar(delta)
+    if self.complexActionBarActive ~= true then
+        return false
+    end
+
+    local maxScrollOffset = math.max(0, math.floor(tonumber(self.complexActionBarMaxScrollOffset) or 0))
+    local offset = math.max(0, math.floor(tonumber(self.complexActionBarScrollOffset) or 0))
+    local nextOffset = math.max(0, math.min(maxScrollOffset, offset + ((tonumber(delta) or 0) < 0 and 1 or -1)))
+    if nextOffset == offset then
+        return false
+    end
+
+    self.complexActionBarScrollOffset = nextOffset
+    if type(Client.MarkActionBarSlotsDirty) == "function" then
+        Client:MarkActionBarSlotsDirty("complex-action-bar-scroll")
+    elseif type(Client.RefreshActionBarWidget) == "function" then
+        Client:RefreshActionBarWidget("complex-action-bar-scroll")
+    end
+    return true
+end
+
+function ActionBarWidget:EnsureComplexScrollIndicators()
+    if not self.rootPanel then
+        return false
+    end
+
+    local rootFrame = self.rootPanel:GetFrame()
+    if not self.complexScrollPreviousIndicator then
+        self.complexScrollPreviousIndicator = UI.CreateButton(rootFrame, "RPEClientActionBarScrollPrevious", "<", COMPLEX_SCROLL_ARROW_WIDTH, function()
+            self:ScrollComplexActionBar(1)
+        end, {
+            height = 22,
+            fontSize = 11,
+            fontFlags = "OUTLINE",
+            backgroundColor = UI.ResolveColor(nil, "panel.background"),
+            labelColor = UI.ResolveColor(nil, "text.muted"),
+        })
+        self.complexScrollPreviousIndicator:GetFrame():Hide()
+    end
+    if not self.complexScrollNextIndicator then
+        self.complexScrollNextIndicator = UI.CreateButton(rootFrame, "RPEClientActionBarScrollNext", ">", COMPLEX_SCROLL_ARROW_WIDTH, function()
+            self:ScrollComplexActionBar(-1)
+        end, {
+            height = 22,
+            fontSize = 11,
+            fontFlags = "OUTLINE",
+            backgroundColor = UI.ResolveColor(nil, "panel.background"),
+            labelColor = UI.ResolveColor(nil, "text.muted"),
+        })
+        self.complexScrollNextIndicator:GetFrame():Hide()
+    end
+
+    return true
+end
+
+function ActionBarWidget:RefreshComplexScrollIndicators(slotCount, contentInset)
+    self:EnsureComplexScrollIndicators()
+    local slotHost = self.rootPanel.GetContentFrame and self.rootPanel:GetContentFrame() or self.rootPanel:GetFrame()
+    local previousFrame = self.complexScrollPreviousIndicator and self.complexScrollPreviousIndicator:GetFrame() or nil
+    local nextFrame = self.complexScrollNextIndicator and self.complexScrollNextIndicator:GetFrame() or nil
+    local autoHitSpellCount = math.max(0, math.floor(tonumber(self.autoHitSpellCount) or 0))
+    local maxScrollOffset = math.max(0, math.floor(tonumber(self.complexActionBarMaxScrollOffset) or 0))
+    local scrollOffset = math.max(0, math.floor(tonumber(self.complexActionBarScrollOffset) or 0))
+    local canScroll = self.complexActionBarActive == true
+        and autoHitSpellCount > 0
+        and maxScrollOffset > 0
+
+    if previousFrame then
+        previousFrame:ClearAllPoints()
+        if canScroll and scrollOffset > 0 then
+            previousFrame:SetPoint("LEFT", slotHost, "LEFT", contentInset + (autoHitSpellCount * (SLOT_SIZE + SLOT_SPACING)) + 1, 0)
+            previousFrame:Show()
+        else
+            previousFrame:Hide()
+        end
+    end
+    if nextFrame then
+        nextFrame:ClearAllPoints()
+        if canScroll and scrollOffset < maxScrollOffset then
+            nextFrame:SetPoint("LEFT", slotHost, "LEFT", contentInset + getActionBarSlotOffset(self, slotCount, slotCount) + SLOT_SIZE + COMPLEX_SCROLL_ARROW_GAP, 0)
+            nextFrame:Show()
+        else
+            nextFrame:Hide()
+        end
+    end
 end
 
 local function RefreshVisibleProfileWindow()
@@ -1111,8 +1302,9 @@ function ActionBarWidget:EnsureSlot(index)
 
     local frame = slot:GetFrame()
     local contentInset = self.GetContentInset and self:GetContentInset() or ROOT_PADDING
-    frame:SetPoint("LEFT", slotHost, "LEFT", contentInset + ((index - 1) * (SLOT_SIZE + SLOT_SPACING)), 0)
+    frame:SetPoint("LEFT", slotHost, "LEFT", contentInset + getActionBarSlotOffset(self, index, self.currentActionBarSlotCount), 0)
     frame:EnableMouse(true)
+    frame:EnableMouseWheel(true)
     if frame.SetMotionScriptsWhileDisabled then
         frame:SetMotionScriptsWhileDisabled(true)
     end
@@ -1133,6 +1325,11 @@ function ActionBarWidget:EnsureSlot(index)
         end
         if slot.HideTooltip then
             slot:HideTooltip()
+        end
+    end)
+    frame:HookScript("OnMouseWheel", function(_, delta)
+        if slot.isScrollableActionBarSlot == true then
+            self:ScrollComplexActionBar(delta)
         end
     end)
     slot:SetScript("OnMouseDown", function()
@@ -1168,7 +1365,7 @@ function ActionBarWidget:EnsureSlot(index)
 
         local unbound = false
         if slot.boundSpellRef then
-            if slot.boundActionBarKind == "mounted-spell" then
+            if slot.boundActionBarKind == "mounted-spell" or slot.boundActionBarKind == "auto-spell" then
                 return
             elseif Profile.UnbindSpellFromActionBar then
                 unbound = Profile.UnbindSpellFromActionBar(slot.boundSpellRef) == true
@@ -1221,13 +1418,17 @@ function ActionBarWidget:Refresh(reason)
     local rows = self.GetActionBarRows and self:GetActionBarRows() or (Profile.ListActionBarSlots and Profile.ListActionBarSlots() or {})
     local rootFrame = self.rootPanel:GetFrame()
     local slotHost = self.rootPanel.GetContentFrame and self.rootPanel:GetContentFrame() or rootFrame
-    local slotCount = math.max(0, math.floor(tonumber(size) or 0))
+    local displayRows, slotCount, autoHitSpellCount, visibleActionBarSlotIndexes = buildActionBarDisplayRows(self, rows, size, npcControlActive)
+    self.autoHitSpellCount = autoHitSpellCount
+    self.visibleActionBarSlotIndexes = visibleActionBarSlotIndexes
+    self.currentActionBarSlotCount = slotCount
     local contentInset = self.GetContentInset and self:GetContentInset() or ROOT_PADDING
-    local refreshSignature = buildActionBarRefreshSignature(self, rows, controlContext, slotCount)
-    local structureSignature = buildActionBarStructureSignature(self, rows, controlContext, slotCount)
+    local refreshSignature = buildActionBarRefreshSignature(self, displayRows, controlContext, slotCount)
+    local structureSignature = buildActionBarStructureSignature(self, displayRows, controlContext, slotCount)
     self:RefreshActionRowButtons()
-    local baseWidth = (slotCount * SLOT_SIZE) + (math.max(0, slotCount - 1) * SLOT_SPACING) + (contentInset * 2)
+    local baseWidth = (slotCount * SLOT_SIZE) + (math.max(0, slotCount - 1) * SLOT_SPACING) + getComplexAutoSpellGap(self, slotCount) + getComplexScrollNavigationWidth(self) + (contentInset * 2)
     rootFrame:SetSize(baseWidth, ROOT_HEIGHT)
+    self:RefreshComplexScrollIndicators(slotCount, contentInset)
 
     self:ApplyAnchor()
     self:UpdateMovableState()
@@ -1245,13 +1446,13 @@ function ActionBarWidget:Refresh(reason)
         deferActivation = isStartupPending(eventState),
     }
 
-    for index = 1, size do
+    for index = 1, slotCount do
         local slot = self:EnsureSlot(index)
-        local detail = resolveActionBarDetailWithPlan(rows[index], plan)
+        local detail = resolveActionBarDetailWithPlan(displayRows[index], plan)
         applyActionBarSlotDetail(self, slot, slotHost, index, detail, npcControlActive, contentInset)
     end
 
-    for index = size + 1, #(self.slots or {}) do
+    for index = slotCount + 1, #(self.slots or {}) do
         local slot = self.slots[index]
         local frame = slot and slot.GetFrame and slot:GetFrame() or nil
         if frame then
@@ -1280,13 +1481,16 @@ function ActionBarWidget:BuildIncrementalRefreshPlan(reason)
     local rows = self.GetActionBarRows and self:GetActionBarRows() or (Profile.ListActionBarSlots and Profile.ListActionBarSlots() or {})
     local rootFrame = self.rootPanel:GetFrame()
     local slotHost = self.rootPanel.GetContentFrame and self.rootPanel:GetContentFrame() or rootFrame
-    local slotCount = math.max(0, math.floor(tonumber(size) or 0))
+    local displayRows, slotCount, autoHitSpellCount, visibleActionBarSlotIndexes = buildActionBarDisplayRows(self, rows, size, npcControlActive)
+    self.autoHitSpellCount = autoHitSpellCount
+    self.visibleActionBarSlotIndexes = visibleActionBarSlotIndexes
+    self.currentActionBarSlotCount = slotCount
     local contentInset = self.GetContentInset and self:GetContentInset() or ROOT_PADDING
-    local refreshSignature = buildActionBarRefreshSignature(self, rows, controlContext, slotCount)
-    local structureSignature = buildActionBarStructureSignature(self, rows, controlContext, slotCount)
+    local refreshSignature = buildActionBarRefreshSignature(self, displayRows, controlContext, slotCount)
+    local structureSignature = buildActionBarStructureSignature(self, displayRows, controlContext, slotCount)
     local eventState = Client.GetEventState and Client:GetEventState() or nil
     local plan = {
-        rows = rows,
+        rows = displayRows,
         controlContext = controlContext,
         npcControlActive = npcControlActive,
         rootFrame = rootFrame,
@@ -1300,7 +1504,7 @@ function ActionBarWidget:BuildIncrementalRefreshPlan(reason)
             and math.max(0, math.floor(tonumber(Client.DirtyUiRefreshState.actionBarRevision) or 0))
             or 0,
         activationStatesBySpellRef = {},
-        pendingActivationSpellRefs = collectActionBarSpellRefs(rows),
+        pendingActivationSpellRefs = collectActionBarSpellRefs(displayRows),
         nextSlotIndex = 1,
         fullRefresh = false,
     }
@@ -1314,7 +1518,7 @@ function ActionBarWidget:PrepareIncrementalRefresh(reason, dirtyState)
         or (type(dirtyState) == "table" and dirtyState.actionBarStructuralDirty == true)
     if structureChanged then
         self:RefreshActionRowButtons()
-        local baseWidth = (plan.slotCount * SLOT_SIZE) + (math.max(0, plan.slotCount - 1) * SLOT_SPACING) + (plan.contentInset * 2)
+        local baseWidth = (plan.slotCount * SLOT_SIZE) + (math.max(0, plan.slotCount - 1) * SLOT_SPACING) + getComplexAutoSpellGap(self, plan.slotCount) + getComplexScrollNavigationWidth(self) + (plan.contentInset * 2)
         plan.rootFrame:SetSize(baseWidth, ROOT_HEIGHT)
         self:ApplyAnchor()
         self:UpdateMovableState()
@@ -1322,7 +1526,7 @@ function ActionBarWidget:PrepareIncrementalRefresh(reason, dirtyState)
             local slot = self:EnsureSlot(index)
             local frame = slot:GetFrame()
             frame:ClearAllPoints()
-            frame:SetPoint("LEFT", plan.slotHost, "LEFT", plan.contentInset + ((index - 1) * (SLOT_SIZE + SLOT_SPACING)), 0)
+            frame:SetPoint("LEFT", plan.slotHost, "LEFT", plan.contentInset + getActionBarSlotOffset(self, index, plan.slotCount), 0)
             frame:Show()
         end
         for index = plan.slotCount + 1, #(self.slots or {}) do
@@ -1334,6 +1538,8 @@ function ActionBarWidget:PrepareIncrementalRefresh(reason, dirtyState)
         end
         self.lastStructureSignature = plan.structureSignature
     end
+
+    self:RefreshComplexScrollIndicators(plan.slotCount, plan.contentInset)
 
     local eventState = Client.GetEventState and Client:GetEventState() or nil
     if self.RefreshControlState and not isStartupPending(eventState) then

@@ -19,6 +19,7 @@ UnitPortrait.__index = UnitPortrait
 setmetatable(UnitPortrait, { __index = BaseElement })
 
 local DEFAULT_TEXTURE = "Interface\\Icons\\INV_Misc_QuestionMark"
+local DEFAULT_HIDDEN_OVERLAY_TEXTURE = "Interface\\AddOns\\RPEngine_Dev\\data\\textures\\ui\\hidden_portrait_overlay.png"
 local DEFAULT_HEALTH_ICON = "Interface\\Icons\\Spell_Holy_SealOfSacrifice"
 local DEFAULT_PET_ICON = 132161
 local DEFAULT_TARGET_ICON = 132177
@@ -27,6 +28,7 @@ local DEFAULT_STATUS_BAR_SPACING = 2
 local DEFAULT_CAST_ICON_SIZE = 14
 local DEFAULT_RAID_MARKER_ICON_SIZE = 14
 local DEFAULT_CORNER_BADGE_ICON_SIZE = 21
+local DEFAULT_TURN_COMPLETE_ICON = "Interface\\RaidFrame\\ReadyCheck-Ready"
 
 local function getMaxFrameLevel(...)
     local maxLevel = 0
@@ -336,6 +338,8 @@ function UnitPortrait:New(options)
     instance.portraitImage = nil
     instance.portraitTexture = nil
     instance.model = nil
+    instance.hiddenOverlayFrame = nil
+    instance.hiddenOverlayTexture = nil
     instance.progressBar = nil
     instance.secondaryProgressBar = nil
     instance.castIcon = nil
@@ -343,6 +347,7 @@ function UnitPortrait:New(options)
     instance.raidMarkerTexture = nil
     instance.petIndicator = nil
     instance.targetIndicator = nil
+    instance.turnCompleteIndicator = nil
     instance.portraitUnit = options and options.unit or nil
     instance.portraitUpdater = nil
     instance.portraitWidthValue = 0
@@ -511,6 +516,37 @@ function UnitPortrait:SetBorderColor(r, g, b, a)
     end
 end
 
+function UnitPortrait:SetHiddenPresentation(hidden, hideDetails)
+    local isHidden = hidden == true
+    local shouldHideDetails = isHidden and hideDetails == true
+    local overlayFrame = self.hiddenOverlayFrame
+    if overlayFrame then
+        if isHidden then
+            overlayFrame:Show()
+        else
+            overlayFrame:Hide()
+        end
+    end
+
+    if self.portraitPanel then
+        self.portraitPanel:SetOption("showBorder", not shouldHideDetails)
+        self.portraitPanel:ApplyPanelBorders()
+    end
+
+    local progressFrame = self.progressBar and self.progressBar.GetFrame and self.progressBar:GetFrame() or nil
+    if progressFrame and shouldHideDetails then
+        progressFrame:Hide()
+    end
+
+    local secondaryProgressFrame = self.secondaryProgressBar and self.secondaryProgressBar.GetFrame and self.secondaryProgressBar:GetFrame() or nil
+    if secondaryProgressFrame and shouldHideDetails then
+        secondaryProgressFrame:Hide()
+    end
+
+    self:RefreshStatusLayout()
+    return isHidden
+end
+
 function UnitPortrait:SetProgressValue(value)
     if self.progressBar and self.progressBar.SetValue then
         self.progressBar:SetValue(value)
@@ -598,6 +634,20 @@ function UnitPortrait:SetTargetIndicatorAlpha(alpha)
     return true
 end
 
+function UnitPortrait:SetTurnCompleteIndicatorVisible(visible)
+    local frame = self.turnCompleteIndicator and self.turnCompleteIndicator.GetFrame and self.turnCompleteIndicator:GetFrame() or nil
+    if not frame then
+        return false
+    end
+
+    if visible == true then
+        frame:Show()
+    else
+        frame:Hide()
+    end
+    return visible == true
+end
+
 function UnitPortrait:SetCastIcon(texturePath)
     local frame = self.castIcon and self.castIcon.GetFrame and self.castIcon:GetFrame() or nil
     if not self.castIcon or not frame then
@@ -625,9 +675,11 @@ function UnitPortrait:RefreshOverlayFrameLevels()
     local overlayLevel = getMaxFrameLevel(rootFrame, self.portraitFrame, portraitImageFrame, self.model) + 10
     local overlayStrata = rootFrame.GetFrameStrata and rootFrame:GetFrameStrata() or nil
     local overlayFrames = {
+        self.hiddenOverlayFrame,
         self.raidMarker and self.raidMarker.GetFrame and self.raidMarker:GetFrame() or nil,
         self.petIndicator and self.petIndicator.GetFrame and self.petIndicator:GetFrame() or nil,
         self.targetIndicator and self.targetIndicator.GetFrame and self.targetIndicator:GetFrame() or nil,
+        self.turnCompleteIndicator and self.turnCompleteIndicator.GetFrame and self.turnCompleteIndicator:GetFrame() or nil,
     }
 
     for index = 1, #overlayFrames do
@@ -806,6 +858,14 @@ function UnitPortrait:Create()
         self.model:Hide()
     end
 
+    self.hiddenOverlayFrame = CreateFrame("Frame", (self.name or "UnitPortrait") .. "HiddenOverlay", self.portraitPanel:GetContentFrame())
+    self.hiddenOverlayFrame:SetAllPoints(self.portraitPanel:GetContentFrame())
+    self.hiddenOverlayTexture = self.hiddenOverlayFrame:CreateTexture(nil, "OVERLAY")
+    self.hiddenOverlayTexture:SetAllPoints(self.hiddenOverlayFrame)
+    self.hiddenOverlayTexture:SetTexture(self.options.hiddenOverlayTexture or DEFAULT_HIDDEN_OVERLAY_TEXTURE)
+    self.hiddenOverlayTexture:SetAlpha(tonumber(self.options.hiddenOverlayAlpha) or 0.85)
+    self.hiddenOverlayFrame:Hide()
+
     self.petIndicator = Image:New({
         name = (self.name or "UnitPortrait") .. "PetIndicator",
         width = DEFAULT_CORNER_BADGE_ICON_SIZE,
@@ -841,6 +901,24 @@ function UnitPortrait:Create()
     self.targetIndicator:Create()
     self.targetIndicator:GetFrame():SetPoint("CENTER", self.portraitFrame, "TOPRIGHT", 0, 0)
     self.targetIndicator:GetFrame():Hide()
+
+    self.turnCompleteIndicator = Image:New({
+        name = (self.name or "UnitPortrait") .. "TurnCompleteIndicator",
+        width = DEFAULT_CORNER_BADGE_ICON_SIZE,
+        height = DEFAULT_CORNER_BADGE_ICON_SIZE,
+        texture = DEFAULT_TURN_COMPLETE_ICON,
+        border = false,
+        layer = "OVERLAY",
+        frameStrata = self.options.frameStrata,
+        textureInsetLeft = 0,
+        textureInsetTop = 0,
+        textureInsetRight = 0,
+        textureInsetBottom = 0,
+    })
+    self.turnCompleteIndicator:SetParent(frame)
+    self.turnCompleteIndicator:Create()
+    self.turnCompleteIndicator:GetFrame():SetPoint("CENTER", self.portraitFrame, "BOTTOMRIGHT", 0, 0)
+    self.turnCompleteIndicator:GetFrame():Hide()
 
     self.portraitUnit = self.options.unit or defaults.Unit or self.portraitUnit
     local tooltip = buildPortraitTooltip(self.portraitUnit)

@@ -587,6 +587,7 @@ local function normalizeTarget(value)
             minTargets = 0,
             maxTargets = 0,
             allowDeadTargets = false,
+            allowHiddenTargets = false,
             disableSelfCast = false,
         }
     end
@@ -599,6 +600,7 @@ local function normalizeTarget(value)
             minTargets = 1,
             maxTargets = 1,
             allowDeadTargets = false,
+            allowHiddenTargets = false,
             disableSelfCast = false,
         }
     end
@@ -615,6 +617,7 @@ local function normalizeTarget(value)
         minTargets = minTargets,
         maxTargets = maxTargets,
         allowDeadTargets = normalizeBool(data.allowDeadTargets, false),
+        allowHiddenTargets = normalizeBool(data.allowHiddenTargets, false),
         disableSelfCast = normalizeBool(data.disableSelfCast, false),
     }
 end
@@ -660,6 +663,8 @@ function Spell:New(data)
         range = 0,
         canMoveWhileCasting = false,
         allowDeadTargets = false,
+        canTargetHiddenUnits = false,
+        doesNotRevealCaster = false,
         mountedCombatOnly = false,
         totalTicks = 0,
         casterEvents = {},
@@ -702,6 +707,8 @@ function Spell:Merge(data)
     self.range = tonumber(self.range) or 0
     self.canMoveWhileCasting = normalizeBool(self.canMoveWhileCasting, false)
     self.allowDeadTargets = normalizeBool(self.allowDeadTargets, false)
+    self.canTargetHiddenUnits = normalizeBool(self.canTargetHiddenUnits, false)
+    self.doesNotRevealCaster = normalizeBool(self.doesNotRevealCaster, false)
     self.mountedCombatOnly = normalizeBool(self.mountedCombatOnly, false)
     self.totalTicks = tonumber(self.totalTicks) or 0
     self.casterEvents = normalizeEventList(self.casterEvents)
@@ -735,6 +742,8 @@ function Spell:ToTable()
         range = self.range,
         canMoveWhileCasting = self.canMoveWhileCasting == true,
         allowDeadTargets = self.allowDeadTargets == true,
+        canTargetHiddenUnits = self.canTargetHiddenUnits == true,
+        doesNotRevealCaster = self.doesNotRevealCaster == true,
         mountedCombatOnly = self.mountedCombatOnly == true,
         totalTicks = self.totalTicks,
         casterEvents = normalizeEventList(self.casterEvents),

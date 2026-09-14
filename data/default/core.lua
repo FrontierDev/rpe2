@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 5,
+    version = 6,
     dataset = {
         achievements = {},
         auras = {},
@@ -3845,6 +3845,12 @@ Addon.Data.DefaultDatasets:Register({
                 spellbookCategory = "",
                 tags = {},
                 tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Basic ranged attack. Deal {DAMAGE_1} Physical damage to an enemy.",
+                    tokens = { { applyMode = "damage_range", componentIndex = 1, key = "DAMAGE_1", tokenType = "spell_damage_range" } },
+                    version = 1
+                },
                 totalTicks = 0,
                 triggersGCD = true,
                 useCooldownCharges = false
@@ -3979,72 +3985,128 @@ Addon.Data.DefaultDatasets:Register({
                 useCooldownCharges = false
             },
             {
-                _resourceCostsByPhase = {
-                    on_cast_end = {},
-                    on_cast_start = {}
-                },
                 allowDeadTargets = false,
                 canMoveWhileCasting = false,
                 castTime = 0,
-                casterEvents = {},
+                casterEvents = { "on_auto_attack_hit" },
                 charges = 0,
                 components = {
                     {
                         castPhase = "on_cast_end",
                         castingGroup = "default",
                         effect = {
-                            alwaysHits = true,
+                            alwaysHits = false,
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 10000,
-                            damageSchoolRefs = {
-                                "f82db71a:v1azo4j6"
-                            },
-                            damageType = "spell",
-                            hitType = "ability",
+                            baseDamage = 0,
+                            damageSchoolRefs = { "f82db71a:v1azo4j6" },
+                            damageType = "ranged",
+                            hitType = "auto",
                             projectilePath = "",
                             projectileSpeed = 0,
-                            statScaling = {},
-                            targetEvents = {},
+                            statScaling = { { coefficient = 0.5, statRef = "f82db71a:xqz0daz2" } },
+                            targetEvents = { "on_auto_attack_taken" },
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
                             weaponDamageCoefficient = 1,
                             weaponDamageMode = "none"
                         },
-                        key = "23e7b733",
-                        target = {
-                            allowDeadTargets = false,
-                            disableSelfCast = false,
-                            maxTargets = 1,
-                            minTargets = 1,
-                            requiresTarget = true,
-                            targetDisposition = "enemy",
-                            type = "single"
-                        }
+                        key = "shoota01",
+                        target = { allowDeadTargets = false, disableSelfCast = false, maxTargets = 1, minTargets = 1, requiresTarget = true, targetDisposition = "enemy", type = "single" }
                     }
                 },
-                conditions = {},
+                conditions = {
+                    { invert = false, showOnTooltip = true, slotKey = "ranged", tooltipTextOverride = "Requires a bow, crossbow, or gun", type = "item_equipped", weaponTypeRefs = { "f82db71a:l3ce0puc", "f82db71a:j2gceby4", "f82db71a:anoo8qfp" } }
+                },
                 cooldown = 0,
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
-                icon = "interface/icons/spell_shadow_demonicfortitude.blp",
-                id = "2mxpp23s",
-                ignoreGCD = true,
+                icon = "interface/icons/ability_marksmanship.blp",
+                id = "shoota01",
+                ignoreGCD = false,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
-                name = "[TEST] Instant Death",
+                name = "Shoot",
                 range = 0,
                 resourceCosts = {},
-                seedNPCSpell = false,
+                seedNPCSpell = true,
                 spellbookCategory = "",
                 tags = {},
                 tooltipTemplate = true,
                 totalTicks = 0,
-                triggersGCD = false,
+                triggersGCD = true,
                 useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = { "on_auto_attack_hit" },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false, amountMode = "flat", applyAura = false, auraStacks = 1, baseDamage = 0,
+                            damageSchoolRefs = { "f82db71a:v1azo4j6" }, damageType = "ranged", hitType = "auto",
+                            projectilePath = "", projectileSpeed = 0,
+                            statScaling = { { coefficient = 0.5, statRef = "f82db71a:xqz0daz2" } },
+                            targetEvents = { "on_auto_attack_taken" }, threatCoefficient = 1, type = "damage", usesProjectile = false,
+                            weaponDamageCoefficient = 1, weaponDamageMode = "none"
+                        },
+                        key = "throwa01",
+                        target = { allowDeadTargets = false, disableSelfCast = false, maxTargets = 1, minTargets = 1, requiresTarget = true, targetDisposition = "enemy", type = "single" }
+                    }
+                },
+                conditions = { { invert = false, showOnTooltip = true, slotKey = "ranged", tooltipTextOverride = "Requires a thrown weapon", type = "item_equipped", weaponTypeRefs = { "f82db71a:we5ul4ne" } } },
+                cooldown = 0, cooldownGroup = "", cooldownScalesWithHaste = false, description = "",
+                icon = "interface/icons/inv_throwingknife_02.blp", id = "throwa01", ignoreGCD = false, learnMode = "always_learned", mountedCombatOnly = false,
+                name = "Throw", range = 0, resourceCosts = {}, seedNPCSpell = true, spellbookCategory = "", tags = {}, tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Basic ranged attack. Deal {DAMAGE_1} Physical damage to an enemy.",
+                    tokens = { { applyMode = "damage_range", componentIndex = 1, key = "DAMAGE_1", tokenType = "spell_damage_range" } },
+                    version = 1
+                },
+                totalTicks = 0, triggersGCD = true, useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = { "on_auto_attack_hit" },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false, amountMode = "flat", applyAura = false, auraStacks = 1, baseDamage = 0,
+                            damageSchoolRefs = { "f82db71a:v1azo4j6" }, damageType = "ranged", hitType = "auto",
+                            projectilePath = "", projectileSpeed = 0,
+                            statScaling = { { coefficient = 0.5, statRef = "f82db71a:xqz0daz2" } },
+                            targetEvents = { "on_auto_attack_taken" }, threatCoefficient = 1, type = "damage", usesProjectile = false,
+                            weaponDamageCoefficient = 1, weaponDamageMode = "none"
+                        },
+                        key = "wandauto",
+                        target = { allowDeadTargets = false, disableSelfCast = false, maxTargets = 1, minTargets = 1, requiresTarget = true, targetDisposition = "enemy", type = "single" }
+                    }
+                },
+                conditions = { { invert = false, showOnTooltip = true, slotKey = "ranged", tooltipTextOverride = "Requires a wand", type = "item_equipped", weaponTypeRefs = { "f82db71a:s4q9t5f3" } } },
+                cooldown = 0, cooldownGroup = "", cooldownScalesWithHaste = false, description = "",
+                icon = "interface/icons/ability_shootwand.blp", id = "wandauto", ignoreGCD = false, learnMode = "always_learned", mountedCombatOnly = false,
+                name = "Wand", range = 0, resourceCosts = {}, seedNPCSpell = true, spellbookCategory = "", tags = {}, tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Basic ranged attack. Deal {DAMAGE_1} Physical damage to an enemy.",
+                    tokens = { { applyMode = "damage_range", componentIndex = 1, key = "DAMAGE_1", tokenType = "spell_damage_range" } },
+                    version = 1
+                },
+                totalTicks = 0, triggersGCD = true, useCooldownCharges = false
             },
             {
                 _resourceCostsByPhase = {
@@ -4109,6 +4171,15 @@ Addon.Data.DefaultDatasets:Register({
                         showOnTooltip = true,
                         slotKey = "offhand",
                         tooltipTextOverride = "Requires off hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    },
+                    {
+                        invert = true,
+                        requiresShield = true,
+                        showOnTooltip = true,
+                        slotKey = "offhand",
+                        tooltipTextOverride = "Requires an off-hand weapon, not a shield",
                         type = "item_equipped",
                         weaponTypeRefs = {}
                     }

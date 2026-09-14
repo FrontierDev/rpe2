@@ -3197,6 +3197,11 @@ function Profile.GetActionBarSize()
     return getActionBarSizeFromRuleset()
 end
 
+function Profile.GetActionBarLayoutMode()
+    local mode = tostring(getInterfaceRuleValue("action_bar_layout", "complex"))
+    return mode == "simple" and "simple" or "complex"
+end
+
 function Profile.GetActionBarMode()
     if Database.GetProfileActionBarMode then
         return Database.GetProfileActionBarMode()
@@ -3671,12 +3676,50 @@ function Profile.GetMountedActionBarSlotDetails(slotIndex)
     return detail
 end
 
+local function isAutoHitSpell(spell)
+    for componentIndex = 1, #((spell and spell.components) or {}) do
+        local component = spell.components[componentIndex]
+        local effect = type(component) == "table" and component.effect or nil
+        if type(effect) == "table" and tostring(effect.hitType or "ability") == "auto" then
+            return true
+        end
+    end
+
+    return false
+end
+
+function Profile.ListEligibleAutoHitSpellDetails()
+    local rows = {}
+    local spellRefs = buildKnownSpellRefs()
+
+    for index = 1, #spellRefs do
+        local detail = Profile.GetKnownSpellDetails and Profile.GetKnownSpellDetails(spellRefs[index]) or nil
+        if detail
+            and isAutoHitSpell(detail.spell)
+            and detail.conditionFailureText == ""
+        then
+            detail.actionBarKind = "auto-spell"
+            rows[#rows + 1] = detail
+        end
+    end
+
+    return rows
+end
+
 function Profile.ListActionBarSlots()
     local size = Profile.GetActionBarSize()
     local rows = {}
 
+    local autoHitRows = Profile.ListEligibleAutoHitSpellDetails()
+    for index = 1, #autoHitRows do
+        rows[#rows + 1] = autoHitRows[index]
+    end
+    rows.autoHitSpellCount = #autoHitRows
+
     for slotIndex = 1, size do
-        rows[slotIndex] = Profile.GetActionBarSlotDetails(slotIndex)
+        -- Keep the list dense: action bar rendering uses its length to reserve
+        -- every configured slot after the automatic entries.
+        rows[#rows + 1] = Profile.GetActionBarSlotDetails(slotIndex) or false
     end
 
     return rows

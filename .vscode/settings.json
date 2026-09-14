@@ -45,6 +45,7 @@
         "LOOT_ITEM_SELF",
         "CURRENCY_GAINED",
         "ChatFrame_OnEvent",
-        "NUM_CHAT_WINDOWS"
+        "NUM_CHAT_WINDOWS",
+        "ChatTypeInfo"
     ]
 }

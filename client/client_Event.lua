@@ -2289,6 +2289,10 @@ function Client:EndTurn()
         self.TurnEndPending = false
         return false
     end
+    local localEventUnit = self.ResolveLocalEventUnit and self:ResolveLocalEventUnit(eventState) or nil
+    if type(self.SendEventTurnComplete) == "function" then
+        self:SendEventTurnComplete(eventState, localEventUnit)
+    end
     return true
 end
 

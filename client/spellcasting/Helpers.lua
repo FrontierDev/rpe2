@@ -728,6 +728,7 @@ local function cloneTargetPolicy(policy)
         minTargets = math.max(0, tonumber(policy.minTargets) or 0),
         maxTargets = math.max(0, tonumber(policy.maxTargets) or 0),
         allowDeadTargets = policy.allowDeadTargets == true,
+        allowHiddenTargets = policy.allowHiddenTargets == true,
         disableSelfCast = policy.disableSelfCast == true,
     }
 end
@@ -752,6 +753,7 @@ local function mergeTargetPolicies(existingPolicy, nextPolicy)
         minTargets = math.max(0, math.max(tonumber(current.minTargets) or 0, tonumber(incoming.minTargets) or 0)),
         maxTargets = math.max(0, math.max(tonumber(current.maxTargets) or 0, tonumber(incoming.maxTargets) or 0)),
         allowDeadTargets = current.allowDeadTargets == true or incoming.allowDeadTargets == true,
+        allowHiddenTargets = current.allowHiddenTargets == true or incoming.allowHiddenTargets == true,
         disableSelfCast = current.disableSelfCast == true,
     }
 end
@@ -1795,6 +1797,7 @@ function Spellcasting.BuildSpellTargetGroups(spell)
         local policy = combat and combat.NormalizeTarget and combat.NormalizeTarget(normalizedComponent and normalizedComponent.target) or normalizedComponent and normalizedComponent.target or nil
         if type(policy) == "table" then
             policy.allowDeadTargets = type(spell) == "table" and spell.allowDeadTargets == true or policy.allowDeadTargets == true
+            policy.allowHiddenTargets = type(spell) == "table" and spell.canTargetHiddenUnits == true or policy.allowHiddenTargets == true
         end
         local targetType = tostring(policy and policy.type or "single")
         local maxTargets = math.max(0, tonumber(policy and policy.maxTargets) or 0)
@@ -2344,6 +2347,9 @@ function Spellcasting.ResolveComponentTargets(eventState, casterUnit, component,
     targetPolicy.allowDeadTargets = targetPolicy.allowDeadTargets == true
         or (type(selection) == "table" and type(selection.policy) == "table" and selection.policy.allowDeadTargets == true)
         or (type(castEntry) == "table" and type(castEntry.targetPolicy) == "table" and castEntry.targetPolicy.allowDeadTargets == true)
+    targetPolicy.allowHiddenTargets = targetPolicy.allowHiddenTargets == true
+        or (type(selection) == "table" and type(selection.policy) == "table" and selection.policy.allowHiddenTargets == true)
+        or (type(castEntry) == "table" and type(castEntry.targetPolicy) == "table" and castEntry.targetPolicy.allowHiddenTargets == true)
     local focusedTargetEventId = tonumber(selection and selection.focusedTargetEventId) or 0
     local selectedTargetEventIds = Spellcasting.CloneTargetEventIds(selection and selection.targetEventIds)
     local maxTargets = math.max(0, tonumber(targetPolicy and targetPolicy.maxTargets) or 0)
@@ -2365,6 +2371,10 @@ function Spellcasting.ResolveComponentTargets(eventState, casterUnit, component,
         local targetUnit = Lookup.FindEventUnitById and Lookup.FindEventUnitById(eventState.units, numericEventId) or nil
         local eventClass = getEventClass()
         if not targetUnit or (eventClass and eventClass.IsUnitActive and not eventClass.IsUnitActive(targetUnit)) then
+            return false
+        end
+
+        if targetUnit.hidden == true and targetPolicy.allowHiddenTargets ~= true then
             return false
         end
 
@@ -2451,6 +2461,19 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
     for index = 1, #(spell.components or {}) do
         local component = spell.components[index]
         local normalizedComponent = combat.NormalizeComponent and combat.NormalizeComponent(component) or component
+        if normalizedComponent and type(normalizedComponent.target) == "table" and spell.canTargetHiddenUnits == true then
+            local targetPolicy = {}
+            for key, value in pairs(normalizedComponent.target) do
+                targetPolicy[key] = value
+            end
+            targetPolicy.allowHiddenTargets = true
+            local componentCopy = {}
+            for key, value in pairs(normalizedComponent) do
+                componentCopy[key] = value
+            end
+            componentCopy.target = targetPolicy
+            normalizedComponent = componentCopy
+        end
         local componentPhase = normalizedComponent and normalizedComponent.castPhase or nil
         if normalizedComponent and componentPhase == targetPhase and normalizedComponent.effect then
             executedComponentTotal = executedComponentTotal + 1

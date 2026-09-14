@@ -238,6 +238,20 @@ local function isEventUnitActive(unit)
     return true
 end
 
+local function revealCasterForSpell(server, casterUnit, spell)
+    if type(server) ~= "table"
+        or type(casterUnit) ~= "table"
+        or casterUnit.hidden ~= true
+        or type(spell) ~= "table"
+        or spell.doesNotRevealCaster == true
+        or type(server.SetEventUnitHidden) ~= "function"
+    then
+        return false
+    end
+
+    return server:SetEventUnitHidden(casterUnit.eventID, false) == true
+end
+
 local function normalizeTurnCount(turnCount)
     local numericTurns = tonumber(turnCount)
     if numericTurns == nil or numericTurns <= 0 then
@@ -436,7 +450,6 @@ function Server:HandleSpellcastStart(arguments, sender)
         authorityType = payload.authorityType,
         casterEventId = payload.casterEventId,
     })
-
     if not suppressLog then
         logLifecycle("start", payload.authorityType, payload.casterUnit.name, resolveSpellName(payload.spellRef), payload.castTurns)
     end
@@ -449,6 +462,8 @@ function Server:HandleSpellcastComplete(arguments, sender)
     if not payload then
         return false
     end
+
+    revealCasterForSpell(self, payload.casterUnit, payload.spell)
 
     local suppressLog = shouldSuppressLoopbackLog(self, payload.eventId, payload.casterEventId, payload.spellRef, payload.authorityType, payload.sender, "complete")
     local previous = removeCastEntry(self, payload.eventId, payload.casterEventId)

@@ -269,7 +269,18 @@ Rules.Definitions = {
         key = "interface",
         label = "Interface",
         rules = {
-            { key = "action_bar_size", label = "Action Bar Size", type = "text", default = "5", description = "Number of spell slots shown in the player action bar widget." },
+            { key = "action_bar_size", label = "Action Bar Size", type = "text", default = "5", description = "Number of visible slots in the player action bar widget." },
+            {
+                key = "action_bar_layout",
+                label = "Action Bar Layout",
+                type = "dropdown",
+                default = "complex",
+                description = "Complex keeps the visible slot count fixed and scrolls bound spells beside automatic attacks. Simple shows every automatic attack plus every configured slot.",
+                options = {
+                    { label = "Complex", value = "complex" },
+                    { label = "Simple", value = "simple" },
+                },
+            },
             { key = "use_item_level", label = "Use Item Level", type = "checkbox", default = true, description = "Show item level in eligible item tooltips and the profile equipment summary." },
             {
                 key = "trait_display_mode",

@@ -613,6 +613,7 @@ local function buildCandidateMap(units, casterUnit, policy)
                 return not eventClass or not eventClass.IsUnitActive or eventClass.IsUnitActive(eventUnit)
             end)()
             and (policy.allowDeadTargets == true or isUnitAlive(eventUnit))
+            and (policy.allowHiddenTargets == true or eventUnit.hidden ~= true)
             and isCandidateDispositionMatch(casterUnit, eventUnit, policy)
             and (includeCaster or eventId ~= casterEventId)
         then
@@ -632,6 +633,7 @@ local function resolveSpellTargetPolicy(spell)
     if type(target) ~= "table" then
         local defaultPolicy = getDefaultTargetPolicy()
         defaultPolicy.allowDeadTargets = spell and spell.allowDeadTargets == true or false
+        defaultPolicy.allowHiddenTargets = spell and spell.canTargetHiddenUnits == true or false
         return defaultPolicy
     end
 
@@ -642,6 +644,7 @@ local function resolveSpellTargetPolicy(spell)
         minTargets = math.max(0, tonumber(target.minTargets) or 0),
         maxTargets = math.max(0, tonumber(target.maxTargets) or 0),
         allowDeadTargets = spell and spell.allowDeadTargets == true or target.allowDeadTargets == true,
+        allowHiddenTargets = spell and spell.canTargetHiddenUnits == true or target.allowHiddenTargets == true,
         disableSelfCast = target.disableSelfCast == true,
     }
 end

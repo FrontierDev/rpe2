@@ -1867,7 +1867,7 @@ function AuraManager:ResolveAuraEffectAmount(targetUnit, effect)
         local resources = targetUnit.resources or {}
         for index = 1, #resources do
             local entry = resources[index]
-            if type(entry) == "table" and tostring(entry.ref or "") == resourceRef then
+            if type(entry) == "table" and tostring(entry.resourceRef or entry.resourceID or entry.id or "") == resourceRef then
                 if amountMode == "base_percent" then
                     resourceValue = tonumber(entry.maxValue) or tonumber(entry.currentValue) or 0
                 else -- max_percent
@@ -3748,7 +3748,7 @@ function AuraManager:TickAura(client, eventState, entry, casterUnit, targetUnit)
         local effect = auraDefinition.effects[effectIndex]
         local contract = self:GetEffect(effect and effect.type or nil)
         if contract and type(contract.Execute) == "function" then
-            local applied, result = contract:Execute({
+            local applied, result = contract.Execute(self, {
                 client = client,
                 eventState = eventState,
                 sessionState = client.GetState and client:GetState() or nil,
@@ -3872,7 +3872,7 @@ function AuraManager:HandleCombatEvent(client, context)
                             local effect = auraEvent.effects[effectIndex]
                             local contract = self:GetEffect(effect and effect.type or nil)
                             if contract and type(contract.Execute) == "function" then
-                                local applied, result = contract:Execute({
+                                local applied, result = contract.Execute(self, {
                                     client = client,
                                     eventState = eventState,
                                     sessionState = type(context) == "table" and context.sessionState or (client.GetState and client:GetState() or nil),

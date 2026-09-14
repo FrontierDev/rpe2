@@ -47,7 +47,9 @@ if type(baseHandleEventEnd) == "function" then
     function Client:HandleEventEnd(...)
         local endingState = self.EventState
         local arguments = select(1, ...)
-        local distributeEndRewards = type(arguments) ~= "table" or arguments[4] ~= false
+        local distributionFlag = type(arguments) == "table" and arguments[4] or nil
+        local distributeEndRewards = distributionFlag == nil
+            or (distributionFlag ~= false and tostring(distributionFlag) ~= "false" and tostring(distributionFlag) ~= "0")
         local result = baseHandleEventEnd(self, ...)
         if result == true and distributeEndRewards and type(endingState) == "table" then
             self:GrantConfiguredEventCurrency("justice", "event_end_justice_currency", 100, endingState, "event-end-justice")
