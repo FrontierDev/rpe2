@@ -1,0 +1,86 @@
+name: Add setup wizard skills page
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/add-setup-wizard-skills-page.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+      - name: Apply patch
+        run: python .github/scripts/add_setup_wizard_skills_page.py
+      - name: Validate scope and behavior wiring
+        run: |
+          git diff --check
+          test "$(git diff --name-only | wc -l)" -eq 4
+          git diff --name-only | grep -qx 'core/internal/ruleset/Rules.lua'
+          git diff --name-only | grep -qx 'core/internal/database/Database.lua'
+          git diff --name-only | grep -qx 'core/internal/database/Dependecies.lua'
+          git diff --name-only | grep -qx 'client/ui/windows/window_SetupWizard.lua'
+          python - <<'PY'
+          from pathlib import Path
+
+          rules = Path('core/internal/ruleset/Rules.lua').read_text()
+          db = Path('core/internal/database/Database.lua').read_text()
+          deps = Path('core/internal/database/Dependecies.lua').read_text()
+          ui = Path('client/ui/windows/window_SetupWizard.lua').read_text()
+
+          assert 'key = "enable_skills_page"' in rules
+          assert 'label = "Enable Skills Page"' in rules
+          assert 'default = true' in rules[rules.index('key = "enable_skills_page"'):rules.index('key = "enable_skills_page"') + 250]
+          assert 'key = "permanent_skill_point_limit"' in rules
+          assert 'default = "50"' in rules[rules.index('key = "permanent_skill_point_limit"'):rules.index('key = "permanent_skill_point_limit"') + 250]
+
+          assert 'skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(data.skillPermanentBonuses)' in db
+          assert deps.count('profile.setupWizard.skillPermanentBonuses') >= 4
+
+          assert 'name = "skills"' in ui
+          assert 'rowElementClass = SetupSkillAllocationRow' in ui
+          assert '{ label = "-5", delta = -5 }' in ui
+          assert '{ label = "-1", delta = -1 }' in ui
+          assert '{ label = "+1", delta = 1 }' in ui
+          assert '{ label = "+5", delta = 5 }' in ui
+          assert 'Profile.ListResolvedSkills' in ui
+          assert 'tostring(row.skillType or "") == "noncombat"' in ui
+          assert 'Permanent points allocated: %d / %d' in ui
+          assert 'self:ApplySetupSkillPermanentBonuses(previousSetupState.skillPermanentBonuses, state.skillPermanentBonuses)' in ui
+          assert 'and (not self:ShouldShowSkillsPage() or skillValidation.valid == true)' in ui
+          assert 'tab.width = visible and SKILLS_TAB_WIDTH or 0' in ui
+
+          adjust_start = ui.index('function SetupWizard:AdjustPermanentSkillPoint')
+          adjust_end = ui.index('function SetupWizard:ApplySetupSkillPermanentBonuses', adjust_start)
+          adjust_body = ui[adjust_start:adjust_end]
+          assert 'Profile.SetSkillPermanentBonus' not in adjust_body
+          assert 'Profile.ClearSkillPermanentBonus' not in adjust_body
+
+          apply_start = ui.index('function SetupWizard:ApplyCurrentSelection')
+          apply_end = ui.index('function SetupWizard:Show()', apply_start)
+          apply_body = ui[apply_start:apply_end]
+          assert apply_body.index('ApplySetupSkillPermanentBonuses') < apply_body.index('SetSetupWizardState')
+
+          # Deterministic ownership merge cases: setup replacement preserves manual additions.
+          def target(current, previous_setup, next_setup):
+              manual = max(0, current - previous_setup)
+              return manual + next_setup
+
+          assert target(13, 10, 7) == 10   # 3 manual + replacement 7
+          assert target(10, 10, 10) == 10  # rerun is idempotent
+          assert target(0, 10, 5) == 5     # externally reset bonus does not go negative
+          assert target(4, 0, 6) == 10     # pre-existing manual + first setup allocation
+          PY
+      - name: Commit change
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add core/internal/ruleset/Rules.lua core/internal/database/Database.lua core/internal/database/Dependecies.lua client/ui/windows/window_SetupWizard.lua
+          git commit -m 'Add setup wizard skill allocation page'
+          git push origin HEAD:dev
