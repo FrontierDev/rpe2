@@ -1,165 +1,238 @@
-## Goal
+## Objective
 
-Create the read-only planning foundation required for periodic, control, and interrupt evaluation without changing current tactical selection behavior yet.
+Allow the event host to make the NPC they are currently controlling speak immediately through the talking-head system.
 
-**Source design:** `.docs/RPE2-NPC-Autopilot-Advanced-Spell-Utility-Action-Economy-PDD.md`  
-**Implementation plan:** `.docs/RPE2-NPC-Autopilot-Advanced-Spell-Utility-Action-Economy-Implementation-Plan.md`  
-**Depends on:** current Autopilot implementation only.
+Depends on: #292.
 
-## Implementation-agent rules
+#293 is not a functional dependency; DM Helper queued speech and direct controlled-NPC speech are separate authoring surfaces using the same canonical runtime API.
 
-This task is sized for **5.6-Luna-ExtraHigh**.
+Source document:
 
-Before editing:
+```text
+.docs/RPE2-NPC-Talking-Heads-PDD.md
+```
 
-1. work from the current `dev` branch;
-2. read the current version of every affected file;
-3. trace the exact current callers/callees being modified;
-4. do not assume the PDD source snapshot is still current;
-5. implement **only this issue**;
-6. do not pre-implement #142–#148;
-7. search every changed API/helper for all call sites;
-8. exercise pure logic with deterministic Lua fixtures/mocks where possible;
-9. review the final diff for accidental architectural expansion;
-10. close this issue only after its acceptance criteria are validated, then stop.
+Target branch: `dev`.
 
-Preserve manual mode, host-only planning, canonical spell/aura semantics, sliceability, and the same-marker no-split invariant.
+## Current architecture to inspect
 
-## Primary current files to inspect
+Before editing, re-read the current `dev` versions of at least:
 
-- `client/autopilot/PlannerIntegration.lua`
-- `client/autopilot/SpellEvaluator.lua`
-- `client/spellcasting/AuraManager.lua`
-- `core/classes/Aura.lua`
-- `core/classes/Spell.lua`
-- `RPEngine_Dev.toc`
+```text
+client/client_Event.lua
+client/ui/widgets/widget_ActionBar.lua
+client/ui/widgets/widget_ActionBar_Control.lua
+client/ui/widgets/widget_Event.lua
+core/ui/elements/ClipboardTextArea.lua
+core/ui/elements/TextButton.lua
+core/ui/elements/Panel.lua
+core/ui/Popup.lua
+RPEngine_Dev.toc
+```
 
-Expected new module if current source supports it:
+Also inspect the final NPC speech emitter/API implemented by #292.
 
-- `client/autopilot/AuraEvaluator.lua`
+Do not assume the PDD's suggested function/file names if #292 implemented an equivalent with different names.
 
-Do not force this exact file split if the current load/dependency graph demonstrates a narrower existing home, but do not fold the work into generic AuraManager mutation paths merely for convenience.
+## Existing control path
+
+The Event Widget currently allows the host to take control of an NPC from its portrait, reaching the existing client control state:
+
+```text
+Event Widget portrait right-click
+    -> Client:TakeControlOfEventUnit(eventUnit)
+    -> Client.ControlledEventUnitId
+    -> Client:GetActionBarControlContext()
+    -> ActionBar controlled-NPC rows/chrome
+```
+
+`widget_ActionBar_Control.lua` already renders the controlled-unit label using:
+
+- raid marker;
+- unit name;
+- EventUnit ID;
+
+and handles release/end-turn/control chrome.
+
+Extend this existing controlled-unit surface. Do not introduce a second NPC-control window.
 
 ## Required changes
 
-### 1. Freeze relevant aura state for the planning snapshot
+### 1. Add a host-only `Speak` control to controlled-NPC chrome
 
-Extend planner snapshot/scratch state so later utility evaluation can inspect immutable aura information relevant to candidate targets.
+When the local player is the active event host and the current action-bar control context represents a non-player EventUnit, show a `Speak` control near the existing controlled-unit label/buttons.
 
-At minimum retain enough information to derive:
-
-```text
-aura identity/ref
-dataset context where required
-aura caster event ID
-aura target event ID
-current stacks
-remaining duration/turns
-stack behavior
-max stacks
-resolved definition/ref
-current target control state where relevant
-```
-
-Do not blindly clone the entire live AuraManager runtime if a narrower immutable representation is sufficient.
-
-The snapshot must not mutate when live aura state changes later during planning.
-
-### 2. Freeze active spellcast summary for later interrupt evaluation
-
-Capture the current active-cast information needed to answer whether a potential target is casting and, where the canonical runtime exposes it, remaining/urgency information.
-
-Do **not** add Autopilot plan/action identity to persistent casts.
-
-### 3. Add per-plan Aura definition resolution/cache
-
-Provide a read-only resolver/cache that maps spell-applied `auraRef` values through the same registry/dataset semantics used by normal spell/aura execution.
-
-Support both existing spell patterns:
+Conceptually:
 
 ```text
-component.effect.type = apply_aura
+Controlling {skull} Defias Captain (#12)             [Speak] [X]
 ```
 
-and:
+The button must not appear for:
+
+- ordinary player action-bar mode;
+- a participant controlling their own pet/companion where they are not the event host;
+- inactive/ending event state;
+- missing/stale controlled unit;
+- any context that fails the current control/host checks.
+
+Do not infer authority from the button being visible: the send path must still validate through #292's canonical speech API.
+
+### 2. Add a compact freeform speech editor
+
+Clicking `Speak` should open a small editor anchored to the Action Bar/control chrome or another existing RPE popup convention.
+
+Required UI:
+
+- speaker context showing raid marker + name + EventUnit ID;
+- multiline editable text area;
+- `Send` button;
+- `Cancel`/close behavior;
+- visible validation/error feedback for rejected/empty/too-long/stale speech.
+
+Do not use Blizzard chat edit boxes or send `/say`, `/yell`, PARTY, or RAID chat. This is an RPE NPC talking-head message.
+
+Use existing RPE UI primitives (`Panel`, `ClipboardTextArea`, `TextButton`, `Popup`, etc.) rather than a new XML/template subsystem.
+
+### 3. Send through #292's canonical runtime API
+
+On Send:
+
+1. re-resolve the current controlled-unit context;
+2. confirm the same EventUnit is still controlled and valid;
+3. confirm local host authority/current active event;
+4. trim/validate text through the canonical NPC speech path;
+5. call the canonical emitter from #292 using the controlled EventUnit ID;
+6. only clear/close the editor after a successful local emission, unless current UX conventions favor keeping it open for repeated lines.
+
+The UI must not:
+
+- call `Comms:SendMessage()` directly;
+- construct its own `speechId` if #292 owns speech identity generation;
+- resolve or serialize portrait/team/name metadata itself;
+- directly queue the Event Widget presentation.
+
+### 4. Speech is not a gameplay action
+
+Immediate NPC speech must not affect combat/action state.
+
+Sending speech must not:
+
+- consume an action;
+- end the controlled NPC's turn;
+- start/finish a Spell;
+- spend resources;
+- trigger GCD/cooldown;
+- change movement state;
+- create a pending Autopilot action;
+- write to combat-log history.
+
+It is host-authored presentation only.
+
+### 5. Controlled-unit changes and editor lifecycle
+
+The editor must be bound to the controlled EventUnit identity that opened it.
+
+If any of the following occurs while it is open:
 
 ```text
-damage/heal component with applyAura = true and auraRef = ...
+Client:ReleaseControl(...)
+host takes control of a different EventUnit
+event ends/starts ending
+controlled unit becomes invalid/inactive
+Event Widget/control context is rebuilt
 ```
 
-Repeated resolution of the same Aura definition inside one plan should use the planning cache rather than repeatedly walking registry/dataset state.
+then the old editor must close or invalidate its draft. It must never send the text as whichever NPC happens to be controlled later.
 
-### 4. Add a normalized Aura planning profile
+If the implementation keeps a draft while the same NPC remains controlled, key it by event ID + EventUnit ID, not by a generic global text field.
 
-Expose a deterministic, side-effect-free API conceptually equivalent to:
+No draft persistence is required across `/reload` or event teardown.
 
-```lua
-AuraEvaluator.BuildAuraProfile(...)
+### 6. Repeated immediate speech
+
+The host must be able to send multiple dialogue messages from the same controlled NPC during the event.
+
+Each successful send should become a separate #292 speech emission and therefore enter the shared FIFO presentation queue normally.
+
+Do not replace the currently displayed talking head in-place simply because the same NPC speaks again.
+
+### 7. Layout integration
+
+Preserve existing controlled action-bar behavior:
+
+- controlled NPC spell rows remain usable;
+- release-control button remains usable;
+- existing control label remains readable;
+- end-turn behavior remains unchanged;
+- action-bar sizing/positioning must not jump significantly when Speak is shown/hidden.
+
+If the existing control label's reserved-right-width calculation is used to avoid button overlap, include Speak in that same layout accounting rather than hard-coded overlapping anchors.
+
+## Expected file scope
+
+Primary file:
+
+```text
+client/ui/widgets/widget_ActionBar_Control.lua
 ```
 
-The exact name may follow current conventions.
+Potentially:
 
-The normalized profile should make later issues able to inspect:
+```text
+client/ui/widgets/widget_ActionBar.lua
+```
 
-- direct Aura damage/heal effects present;
-- control effects present;
-- triggered-event descriptors;
-- duration;
-- stack behavior;
-- max stacks;
-- any other existing immutable information needed by #142/#143.
+Only modify #292 runtime files if a narrowly required public helper is missing. Do not duplicate NPC speech logic inside Action Bar code.
 
-This issue does **not** assign tactical utility values yet.
+## Deterministic validation
 
-### 5. Preserve sliceability/load order
+Exercise with mocked control/event contexts where possible:
 
-Inspect the current TOC and module dependencies before adding the new module.
+1. active host controlling NPC -> Speak visible;
+2. host not controlling an NPC -> Speak hidden;
+3. non-host participant controlled-pet context -> Speak hidden;
+4. controlled unit becomes stale/inactive -> Speak/editor invalidated;
+5. opening editor shows exact current speaker marker/name/EventUnit ID;
+6. empty/whitespace text cannot send;
+7. valid text calls #292 emitter exactly once with current `speakerEventId`;
+8. failed emitter response does not falsely report success;
+9. release control while editor is open prevents later Send;
+10. switch control from NPC A to NPC B while A editor is open cannot send A draft as B;
+11. two successful sends from one NPC create two distinct queued speech emissions;
+12. sending speech does not mutate turn/action/resource/cooldown/movement state;
+13. controlled NPC Spell buttons still function normally after adding the Speak control;
+14. event teardown closes the editor and leaves no stale runtime draft.
 
-Current source loads `SpellEvaluator.lua` before `AuraManager.lua`, while `PlannerIntegration.lua` loads later. Do not create a load-time dependency on an API that does not yet exist at that point.
+## In-game regression checks
 
-Any scan over active auras or Aura event definitions which can grow with event/dataset size must be bounded/cached or integrated into the existing resumable planner.
+Verify:
 
-## Explicitly out of scope
-
-Do not implement in this issue:
-
-- periodic future-value math;
-- DoT/HoT scoring;
-- aura refresh/stack tactical value;
-- projected aura reservations;
-- control score coefficients;
-- interrupt prioritization;
-- multiple actions per NPC;
-- action-economy ledgers;
-- authorization/execution changes;
-- DM Helper UI changes;
-- new Spell/Aura AI metadata.
-
-## Deterministic regression coverage
-
-Validate at minimum:
-
-1. A pure `apply_aura` spell resolves its canonical Aura definition.
-2. A damage/heal component using `applyAura = true` resolves through the same canonical path.
-3. Frozen active-aura records preserve caster/target/stacks/duration identity.
-4. `refresh_duration` and `independent_duration` remain distinguishable.
-5. `maxStacks` is available to later planning.
-6. Control flags are readable without mutating live AuraManager control state.
-7. Current active-cast state can be frozen/read without changing the cast entry.
-8. Repeated Aura refs use the per-plan definition cache.
-9. A planner-side Aura profile call never applies, removes, advances, or rolls an Aura effect.
-10. Existing direct-damage/direct-heal Autopilot selection remains unchanged by this foundation-only issue.
-11. Manual spell/aura behavior remains unchanged.
+```text
+right-click NPC portrait -> control still works
+controlled action bar -> spells still cast normally
+Speak -> talking head appears for host and participants
+rapid two-line speech -> both messages queue rather than overlap
+release control -> normal action bar state returns
+participant pet control -> no host NPC Speak UI leaks in
+```
 
 ## Acceptance criteria
 
-- [ ] Advanced planning can inspect a frozen, immutable subset of relevant active Aura state.
-- [ ] Advanced planning can inspect current active-cast summaries without taking ownership of casts.
-- [ ] Applied Aura definitions are resolved through canonical registry/dataset semantics.
-- [ ] Both pure `apply_aura` and damage/heal `applyAura` spell patterns are supported.
-- [ ] A per-plan Aura-definition cache prevents repeated equivalent resolution work.
-- [ ] The normalized Aura profile exposes effect/event/control/stacking metadata but performs no tactical scoring.
-- [ ] No planning call mutates canonical Aura, cast, resource, cooldown, or combat state.
-- [ ] Current direct-only Autopilot decisions remain behaviorally unchanged.
-- [ ] New work remains bounded/sliceable and does not increase the global TaskQueue budget.
-- [ ] Manual mode and normal Aura behavior remain unchanged.
+- [ ] Host sees a `Speak` control while directly controlling a valid NPC EventUnit.
+- [ ] Speak opens a compact freeform dialogue editor showing the exact controlled speaker identity.
+- [ ] Sending uses #292's canonical NPC speech API and produces the normal synchronized talking head.
+- [ ] The UI revalidates the controlled EventUnit immediately before sending.
+- [ ] Stale control/editor state cannot make another NPC speak the old draft.
+- [ ] Multiple immediate speech messages queue normally through the shared presentation scheduler.
+- [ ] NPC speech consumes no action economy/resources/cooldowns and does not enter combat-log history.
+- [ ] Existing controlled-NPC action-bar behavior has no regression.
+
+## Non-goals
+
+- DM Helper queued speech cues (#293).
+- NPC speech macros/presets.
+- AI-generated dialogue.
+- Voice/audio playback.
+- Player-character speech.
+- Persistent dialogue history or replay.

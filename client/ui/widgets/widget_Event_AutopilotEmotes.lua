@@ -166,7 +166,13 @@ function Widget:EnsureAutopilotEmoteCueUI()
     self.autopilotEmoteContextText = UI.CreateText(content, "RPEClientEventWidgetDMAutopilotEmoteContext", "Emote — Selected Units", {
         height=16, fontSize=10, fontFlags="OUTLINE", justifyH="LEFT", justifyV="MIDDLE", wordWrap=false, textColor=UI.ResolveColor(nil,"text.secondary"),
     })
-    frame(self.autopilotEmoteContextText):SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0); frame(self.autopilotEmoteContextText):SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, 0)
+    self.autopilotEmoteSpeechTabButton = textButton(content,"RPEClientEventWidgetDMAutopilotEmoteSpeechTab","Talking Head",78,function()
+        if type(self.SetAutopilotCueAuthoringMode) == "function" then self:SetAutopilotCueAuthoringMode("speech") end
+    end)
+    frame(self.autopilotEmoteSpeechTabButton):SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, 0)
+    frame(self.autopilotEmoteSpeechTabButton):SetHeight(16)
+    frame(self.autopilotEmoteContextText):SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0)
+    frame(self.autopilotEmoteContextText):SetPoint("TOPRIGHT", frame(self.autopilotEmoteSpeechTabButton), "TOPLEFT", -GAP, 0)
 
     self.autopilotEmoteUnitScroll = UI.ScrollLayout:New({
         name="RPEClientEventWidgetDMAutopilotEmoteUnits", rowHeight=17, rowSpacing=1, visibleRows=3, rowElementClass=UnitRow,

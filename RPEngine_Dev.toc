@@ -158,6 +158,7 @@ client/client_Loot.lua
 client/client_LootNotifications.lua
 client/client_EventCurrencyRewards.lua
 client/client_CombatLog.lua
+client/client_NPCSpeech.lua
 client/client_CombatLogTurnIdentity.lua
 client/client_Skills.lua
 client/client_SkillProgression.lua
@@ -233,6 +234,7 @@ client/autopilot/Authorization.lua
 client/autopilot/Execution.lua
 client/autopilot/AuthorizationSequence.lua
 client/autopilot/AuthorizationBatch.lua
+client/autopilot/ActionCueDispatch.lua
 client/autopilot/AuraEvaluatorPerformance.lua
 client/autopilot/SequencePlanningPerformance.lua
 client/autopilot/MovementSolverPerformance.lua
@@ -307,8 +309,10 @@ client/ui/widgets/widget_Event_CombatLogHistory.lua
 client/ui/widgets/widget_Event_DMHelper.lua
 client/autopilot/Helper.lua
 client/autopilot/EmoteCues.lua
+client/autopilot/SpeechCues.lua
 client/ui/widgets/widget_Event_AutopilotHelper.lua
 client/ui/widgets/widget_Event_AutopilotEmotes.lua
+client/ui/widgets/widget_Event_AutopilotSpeech.lua
 client/ui/widgets/widget_Event_AutopilotPerformance.lua
 client/ui/widgets/widget_Event_PortraitReadiness.lua
 client/ui/widgets/widget_Event_QueueStatus.lua

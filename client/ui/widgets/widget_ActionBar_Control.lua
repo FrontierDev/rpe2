@@ -18,6 +18,12 @@ local CONTROL_LABEL_HEIGHT = 14
 local CONTROL_LABEL_GAP = 4
 local CONTROL_BUTTON_SIZE = 16
 local CONTROL_BUTTON_GAP = 4
+local SPEAK_BUTTON_WIDTH = 54
+local SPEAK_BUTTON_HEIGHT = 18
+local SPEECH_EDITOR_WIDTH = 320
+local SPEECH_EDITOR_HEIGHT = 144
+local SPEECH_EDITOR_TEXT_MAX_BYTES = 500
+local SPEECH_EDITOR_POLL_INTERVAL = 0.2
 local END_TURN_BUTTON_WIDTH = 76
 local END_TURN_BUTTON_HEIGHT = 20
 local CONTROL_BUTTON_TEXTURE = "Interface\\AddOns\\RPEngine_Dev\\data\\textures\\ui\\close_button.png"
@@ -194,6 +200,29 @@ local function buildControlLabel(controlledUnit)
     return ("Controlling %s%s (#%d)"):format(raidMarkerPrefix, unitName, eventId)
 end
 
+local function buildSpeakSpeakerLabel(controlledUnit)
+    if type(controlledUnit) ~= "table" then
+        return ""
+    end
+
+    local raidMarker = tonumber(controlledUnit.raidMarker) or 0
+    local raidMarkerText = raidMarker > 0 and type(Inline.RaidMarker) == "function" and Inline:RaidMarker(raidMarker, 12, 12) or ""
+    local raidMarkerPrefix = raidMarkerText ~= "" and (raidMarkerText .. " ") or ""
+    local unitName = tostring(controlledUnit.name or "Unnamed Unit")
+    local eventId = tonumber(controlledUnit.eventID) or 0
+    if eventId <= 0 then
+        return ""
+    end
+
+    return ("Speaking as %s%s (#%d)"):format(raidMarkerPrefix, unitName, eventId)
+end
+
+local function sameSpeakIdentity(context, eventId, unitId)
+    return type(context) == "table"
+        and tostring(context.eventId or "") == tostring(eventId or "")
+        and tonumber(context.unitId) == tonumber(unitId)
+end
+
 local function isLocalPlayerPet(eventUnit, localEventUnit)
     if type(eventUnit) ~= "table" or type(localEventUnit) ~= "table" or eventUnit.isPlayer == true then
         return false
@@ -217,6 +246,329 @@ end
 function ActionBarWidget:IsActionBarControlActive()
     local controlContext = Client.GetActionBarControlContext and Client:GetActionBarControlContext() or nil
     return type(controlContext) == "table" and controlContext.isControlled == true and controlContext.controlledUnit ~= nil
+end
+
+function ActionBarWidget:GetSpeakControlContext()
+    local eventState = Client.GetEventState and Client:GetEventState() or Client.EventState
+    if type(eventState) ~= "table" or eventState.active ~= true or eventState.ending == true then
+        return nil, "The event is no longer active."
+    end
+    if not Client.IsLocalEventHost or Client:IsLocalEventHost(eventState) ~= true then
+        return nil, "Only the event host can speak as a controlled NPC."
+    end
+
+    local context = Client.GetActionBarControlContext and Client:GetActionBarControlContext(eventState) or nil
+    if type(context) ~= "table" or context.isControlled ~= true or type(context.controlledUnit) ~= "table" then
+        return nil, "No NPC is currently controlled."
+    end
+
+    local controlledUnit = context.controlledUnit
+    local unitId = tonumber(controlledUnit.eventID) or 0
+    local eventId = tostring(eventState.id or "")
+    if controlledUnit.isPlayer == true
+        or unitId <= 0
+        or unitId == math.huge
+        or unitId == -math.huge
+        or unitId ~= unitId
+        or unitId ~= math.floor(unitId)
+        or eventId == ""
+    then
+        return nil, "The controlled NPC is no longer valid."
+    end
+
+    local resolvedUnit = Client.ResolveControlledEventUnit and Client:ResolveControlledEventUnit(eventState) or nil
+    if type(resolvedUnit) ~= "table"
+        or (tonumber(resolvedUnit.eventID) or 0) ~= unitId
+        or (tonumber(Client.ControlledEventUnitId) or 0) ~= unitId
+        or not Client.CanControlEventUnit
+        or Client:CanControlEventUnit(resolvedUnit, eventState) ~= true
+    then
+        return nil, "The controlled NPC is no longer valid."
+    end
+
+    return {
+        eventId = eventId,
+        unitId = unitId,
+        eventState = eventState,
+        controlledUnit = resolvedUnit,
+    }
+end
+
+function ActionBarWidget:SetSpeakEditorStatus(message, isError)
+    local statusText = self.speakEditorStatusText
+    if not statusText then
+        return false
+    end
+
+    statusText:SetText(tostring(message or ""))
+    local color = isError and { r = 0.95, g = 0.42, b = 0.36, a = 1 } or UI.ResolveColor(nil, "text.muted")
+    if color and statusText.SetTextColor then
+        statusText:SetTextColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
+    end
+    return true
+end
+
+function ActionBarWidget:InvalidateSpeakEditor(reason)
+    if not self.speakEditorOpen then
+        return false
+    end
+
+    self.speakEditorInvalid = true
+    self.speakEditorDraftText = ""
+    if self.speakEditorTextArea then
+        self.speakEditorTextArea:SetText("")
+        self.speakEditorTextArea:SetEnabled(false)
+    end
+    if self.speakSendButton then
+        self.speakSendButton:SetEnabled(false)
+    end
+    self:SetSpeakEditorStatus(reason or "Control changed. Close this editor and open Speak again.", true)
+    if self.speakEditorUpdater then
+        self.speakEditorUpdater:Hide()
+    end
+    return true
+end
+
+function ActionBarWidget:CloseSpeakEditor()
+    self.speakEditorOpen = false
+    self.speakEditorInvalid = false
+    self.speakEditorEventId = nil
+    self.speakEditorUnitId = nil
+    self.speakEditorDraftText = ""
+    if self.speakEditorUpdater then
+        self.speakEditorUpdater:Hide()
+    end
+    if self.speakEditorTextArea then
+        self.speakEditorTextArea:ClearFocus()
+        self.speakEditorTextArea:SetEnabled(true)
+        self.speakEditorTextArea:SetText("")
+    end
+    if self.speakSendButton then
+        self.speakSendButton:SetEnabled(true)
+    end
+    if self.speakEditorPanel and self.speakEditorPanel.Hide then
+        self.speakEditorPanel:Hide()
+    end
+    self:SetSpeakEditorStatus("", false)
+    return true
+end
+
+function ActionBarWidget:EnsureSpeakEditor()
+    if not self.rootPanel then
+        return false
+    end
+
+    if self.speakButton and self.speakEditorPanel then
+        return true
+    end
+
+    local rootFrame = self.rootPanel:GetFrame()
+    if not self.speakButton then
+        self.speakButton = UI.CreateButton(rootFrame, "RPEClientActionBarSpeakButton", "Speak", SPEAK_BUTTON_WIDTH, function()
+            self:OpenSpeakEditor()
+        end)
+        local buttonFrame = self.speakButton:GetFrame()
+        buttonFrame:SetHeight(SPEAK_BUTTON_HEIGHT)
+        buttonFrame:Hide()
+    end
+
+    if not self.speakEditorPanel then
+        self.speakEditorPanel = UI.CreatePanel(rootFrame, "RPEClientActionBarSpeakEditor", {
+            width = SPEECH_EDITOR_WIDTH,
+            height = SPEECH_EDITOR_HEIGHT,
+            contentInset = 8,
+            showBorder = true,
+            panelBackgroundColor = UI.ResolveColor(nil, "panel.background"),
+            panelBorderColor = UI.ResolveColor(nil, "panel.border"),
+            frameStrata = "DIALOG",
+            frameLevel = 70,
+            hidden = true,
+        })
+        local panelFrame = self.speakEditorPanel:GetFrame()
+        panelFrame:SetFrameStrata("DIALOG")
+        panelFrame:SetFrameLevel(math.max(70, (rootFrame:GetFrameLevel() or 55) + 10))
+        panelFrame:SetClampedToScreen(true)
+        panelFrame:SetPoint("BOTTOMLEFT", rootFrame, "TOPLEFT", getHorizontalContentInset(self), 4)
+
+        local content = self.speakEditorPanel:GetContentFrame()
+        self.speakEditorSpeakerText = UI.CreateText(content, "RPEClientActionBarSpeakSpeaker", "", {
+            width = SPEECH_EDITOR_WIDTH - 16,
+            height = 16,
+            fontSize = 9,
+            fontFlags = "OUTLINE",
+            justifyH = "LEFT",
+            justifyV = "MIDDLE",
+            wordWrap = false,
+            textColor = UI.ResolveColor(nil, "text.primary"),
+        })
+        self.speakEditorSpeakerText:GetFrame():SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0)
+
+        self.speakEditorTextArea = UI.ClipboardTextArea:New({
+            name = "RPEClientActionBarSpeakText",
+            width = SPEECH_EDITOR_WIDTH - 16,
+            height = 64,
+            readOnly = false,
+            autoResize = false,
+            fontSize = 9,
+            fontFlags = "OUTLINE",
+            text = "",
+            textColor = UI.ResolveColor(nil, "text.primary"),
+            backgroundColor = UI.ResolveColor(nil, "panel.background"),
+            borderColor = UI.ResolveColor(nil, "panel.border"),
+        })
+        self.speakEditorTextArea:SetParent(content)
+        self.speakEditorTextArea:Create()
+        local textFrame = self.speakEditorTextArea:GetFrame()
+        textFrame:SetPoint("TOPLEFT", self.speakEditorSpeakerText:GetFrame(), "BOTTOMLEFT", 0, -4)
+        textFrame:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, -20)
+        textFrame:SetHeight(64)
+        self.speakEditorTextArea:SetScript("OnTextChanged", function(_, text)
+            if self.speakEditorOpen and not self.speakEditorInvalid then
+                self.speakEditorDraftText = tostring(text or "")
+                if #self.speakEditorDraftText > SPEECH_EDITOR_TEXT_MAX_BYTES then
+                    self:SetSpeakEditorStatus(("Speech is too long (maximum %d bytes)."):format(SPEECH_EDITOR_TEXT_MAX_BYTES), true)
+                else
+                    self:SetSpeakEditorStatus("", false)
+                end
+            end
+        end)
+
+        self.speakEditorStatusText = UI.CreateText(content, "RPEClientActionBarSpeakStatus", "", {
+            width = SPEECH_EDITOR_WIDTH - 16,
+            height = 13,
+            fontSize = 8,
+            fontFlags = "OUTLINE",
+            justifyH = "LEFT",
+            justifyV = "MIDDLE",
+            wordWrap = false,
+            textColor = UI.ResolveColor(nil, "text.muted"),
+        })
+        local statusFrame = self.speakEditorStatusText:GetFrame()
+        statusFrame:SetPoint("TOPLEFT", textFrame, "BOTTOMLEFT", 0, -4)
+        statusFrame:SetPoint("RIGHT", content, "RIGHT", 0, 0)
+
+        self.speakCancelButton = UI.CreateButton(content, "RPEClientActionBarSpeakCancelButton", "Cancel", 60, function()
+            self:CloseSpeakEditor()
+        end)
+        self.speakSendButton = UI.CreateButton(content, "RPEClientActionBarSpeakSendButton", "Send", 60, function()
+            self:SendSpeakEditorText()
+        end)
+        self.speakCancelButton:GetFrame():SetHeight(18)
+        self.speakSendButton:GetFrame():SetHeight(18)
+        self.speakSendButton:GetFrame():SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", 0, 0)
+        self.speakCancelButton:GetFrame():SetPoint("RIGHT", self.speakSendButton:GetFrame(), "LEFT", -4, 0)
+        self.speakEditorPanel:Hide()
+    end
+
+    if not self.speakEditorUpdater then
+        self.speakEditorUpdater = CreateFrame("Frame", "RPEClientActionBarSpeakEditorUpdater", rootFrame)
+        self.speakEditorUpdater:SetScript("OnUpdate", function(_, elapsed)
+            if not self.speakEditorOpen or self.speakEditorInvalid then
+                self.speakEditorUpdater:Hide()
+                return
+            end
+
+            self._speakEditorPollElapsed = (self._speakEditorPollElapsed or 0) + (tonumber(elapsed) or 0)
+            if self._speakEditorPollElapsed < SPEECH_EDITOR_POLL_INTERVAL then
+                return
+            end
+            self._speakEditorPollElapsed = 0
+
+            local currentContext = self:GetSpeakControlContext()
+            if not sameSpeakIdentity(currentContext, self.speakEditorEventId, self.speakEditorUnitId) then
+                self:InvalidateSpeakEditor("Control or event changed. Close this editor and open Speak again.")
+            end
+        end)
+        self.speakEditorUpdater:Hide()
+    end
+
+    return true
+end
+
+function ActionBarWidget:OpenSpeakEditor()
+    if not self:EnsureSpeakEditor() then
+        return false
+    end
+
+    local context, reason = self:GetSpeakControlContext()
+    if not context then
+        self.speakEditorOpen = true
+        self.speakEditorInvalid = true
+        self.speakEditorEventId = nil
+        self.speakEditorUnitId = nil
+        self.speakEditorDraftText = ""
+        self.speakEditorSpeakerText:SetText("Speaker unavailable")
+        self.speakEditorTextArea:SetText("")
+        self.speakEditorTextArea:SetEnabled(false)
+        self.speakSendButton:SetEnabled(false)
+        if self.speakEditorUpdater then
+            self.speakEditorUpdater:Hide()
+        end
+        self:SetSpeakEditorStatus(reason or "The controlled NPC is no longer valid.", true)
+        self.speakEditorPanel:Show()
+        return false
+    end
+
+    self.speakEditorEventId = context.eventId
+    self.speakEditorUnitId = context.unitId
+    self.speakEditorDraftText = ""
+    self.speakEditorOpen = true
+    self.speakEditorInvalid = false
+    self.speakEditorSpeakerText:SetText(buildSpeakSpeakerLabel(context.controlledUnit))
+    self.speakEditorTextArea:SetEnabled(true)
+    self.speakEditorTextArea:SetText("")
+    self.speakSendButton:SetEnabled(true)
+    self:SetSpeakEditorStatus("", false)
+    self.speakEditorPanel:Show()
+    self.speakEditorUpdater:Show()
+    self.speakEditorTextArea:Focus()
+    return true
+end
+
+function ActionBarWidget:SendSpeakEditorText()
+    if not self.speakEditorOpen or self.speakEditorInvalid then
+        self:SetSpeakEditorStatus("Control changed. Close this editor and open Speak again.", true)
+        return false
+    end
+
+    local context = self:GetSpeakControlContext()
+    if not sameSpeakIdentity(context, self.speakEditorEventId, self.speakEditorUnitId) then
+        self:InvalidateSpeakEditor("Control or event changed. This speech was not sent.")
+        return false
+    end
+
+    local text = self.speakEditorTextArea and self.speakEditorTextArea:GetText() or self.speakEditorDraftText or ""
+    if not tostring(text):match("%S") then
+        self:SetSpeakEditorStatus("Enter some speech before sending.", true)
+        return false
+    end
+    if #tostring(text) > SPEECH_EDITOR_TEXT_MAX_BYTES then
+        self:SetSpeakEditorStatus(("Speech is too long (maximum %d bytes)."):format(SPEECH_EDITOR_TEXT_MAX_BYTES), true)
+        return false
+    end
+    if type(Client.EmitNPCSpeech) ~= "function" then
+        self:SetSpeakEditorStatus("NPC speech is unavailable right now.", true)
+        return false
+    end
+
+    local callOk, emitted = pcall(function()
+        return Client:EmitNPCSpeech(context.unitId, text)
+    end)
+    if not callOk or emitted ~= true then
+        local currentContext = self:GetSpeakControlContext()
+        if not sameSpeakIdentity(currentContext, self.speakEditorEventId, self.speakEditorUnitId) then
+            self:InvalidateSpeakEditor("Control or event changed. This speech was not sent.")
+        else
+            self:SetSpeakEditorStatus("The NPC speech service rejected this message.", true)
+        end
+        return false
+    end
+
+    self.speakEditorDraftText = ""
+    self.speakEditorTextArea:SetText("")
+    self:SetSpeakEditorStatus("Speech sent.", false)
+    self.speakEditorTextArea:Focus()
+    return true
 end
 
 function ActionBarWidget:ResolveControllablePetUnit(controlContext)
@@ -431,6 +783,14 @@ function ActionBarWidget:EnsureControlChrome()
         self.controlStateUpdater:Hide()
     end
 
+    self:EnsureSpeakEditor()
+    if not self._speakEditorRootHideHooked and rootFrame.HookScript then
+        rootFrame:HookScript("OnHide", function()
+            self:CloseSpeakEditor()
+        end)
+        self._speakEditorRootHideHooked = true
+    end
+
     return true
 end
 
@@ -454,6 +814,12 @@ function ActionBarWidget:RefreshControlState(reason)
     end
     local isControlled = type(controlContext) == "table" and controlContext.isControlled == true and controlContext.controlledUnit ~= nil
     local controlledUnit = isControlled and controlContext.controlledUnit or nil
+    local speakContext = self:GetSpeakControlContext()
+    if self.speakEditorOpen and not self.speakEditorInvalid
+        and not sameSpeakIdentity(speakContext, self.speakEditorEventId, self.speakEditorUnitId)
+    then
+        self:InvalidateSpeakEditor("Control or event changed. Close this editor and open Speak again.")
+    end
     local rootFrame = self.rootPanel:GetFrame()
     local baseWidth = rootFrame and rootFrame.GetWidth and rootFrame:GetWidth() or 0
     local contentInset = getHorizontalContentInset(self)
@@ -463,9 +829,11 @@ function ActionBarWidget:RefreshControlState(reason)
     local showMovementBar = isMovementBarActive(controlContext)
     local movementDisplayState = (not startupPending) and showMovementBar and buildMovementDisplayState() or nil
     local showCloseButton = isControlled and labelText ~= ""
+    local showSpeakButton = speakContext ~= nil and showCloseButton
     local showEndTurnButton = hasEventContext and not isLocalHost
     local showActionRowButtons = not isControlled
     local labelRightReservedWidth = 0
+    local visibleControlButtonCount = 0
     local actionRowButtonSize, actionRowButtonGap = getActionRowButtonMetrics(self)
     local actionRowButtonFrames = {}
     local actionRowButtons = self.GetActionRowButtons and self:GetActionRowButtons() or {}
@@ -473,13 +841,22 @@ function ActionBarWidget:RefreshControlState(reason)
     self:SyncControlUpdaterState(false)
 
     if showCloseButton then
-        labelRightReservedWidth = CONTROL_BUTTON_SIZE
+        labelRightReservedWidth = labelRightReservedWidth + CONTROL_BUTTON_SIZE
+        visibleControlButtonCount = visibleControlButtonCount + 1
     end
-    if showEndTurnButton then
-        labelRightReservedWidth = labelRightReservedWidth + END_TURN_BUTTON_WIDTH
-        if showCloseButton then
+    if showSpeakButton then
+        if visibleControlButtonCount > 0 then
             labelRightReservedWidth = labelRightReservedWidth + CONTROL_BUTTON_GAP
         end
+        labelRightReservedWidth = labelRightReservedWidth + SPEAK_BUTTON_WIDTH
+        visibleControlButtonCount = visibleControlButtonCount + 1
+    end
+    if showEndTurnButton then
+        if visibleControlButtonCount > 0 then
+            labelRightReservedWidth = labelRightReservedWidth + CONTROL_BUTTON_GAP
+        end
+        labelRightReservedWidth = labelRightReservedWidth + END_TURN_BUTTON_WIDTH
+        visibleControlButtonCount = visibleControlButtonCount + 1
     end
     if labelRightReservedWidth > 0 then
         labelRightReservedWidth = labelRightReservedWidth + contentInset
@@ -536,6 +913,21 @@ function ActionBarWidget:RefreshControlState(reason)
         end
     end
 
+    if self.speakButton and self.speakButton.GetFrame then
+        local buttonFrame = self.speakButton:GetFrame()
+        if showSpeakButton then
+            buttonFrame:Show()
+        else
+            buttonFrame:Hide()
+        end
+        buttonFrame:ClearAllPoints()
+        if showCloseButton and self.closeButton and self.closeButton.GetFrame then
+            buttonFrame:SetPoint("TOPRIGHT", self.closeButton:GetFrame(), "TOPLEFT", -CONTROL_BUTTON_GAP, 0)
+        else
+            buttonFrame:SetPoint("TOPRIGHT", rootFrame, "BOTTOMRIGHT", -contentInset, -getControlRowTopGap())
+        end
+    end
+
     if self.endTurnButton and self.endTurnButton.GetFrame then
         local buttonFrame = self.endTurnButton:GetFrame()
         if showEndTurnButton then
@@ -553,7 +945,9 @@ function ActionBarWidget:RefreshControlState(reason)
             end
         end
         buttonFrame:ClearAllPoints()
-        if showCloseButton and self.closeButton and self.closeButton.GetFrame then
+        if showSpeakButton and self.speakButton and self.speakButton.GetFrame then
+            buttonFrame:SetPoint("TOPRIGHT", self.speakButton:GetFrame(), "TOPLEFT", -CONTROL_BUTTON_GAP, 0)
+        elseif showCloseButton and self.closeButton and self.closeButton.GetFrame then
             buttonFrame:SetPoint("TOPRIGHT", self.closeButton:GetFrame(), "TOPLEFT", -CONTROL_BUTTON_GAP, 0)
         else
             buttonFrame:SetPoint("TOPRIGHT", rootFrame, "BOTTOMRIGHT", -contentInset, -getControlRowTopGap())

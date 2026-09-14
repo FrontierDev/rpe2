@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 6,
+    version = 7,
     dataset = {
         achievements = {},
         auras = {},
@@ -3847,7 +3847,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Basic ranged attack. Deal {DAMAGE_1} Physical damage to an enemy.",
+                    mainText = "Basic attack. Deal {DAMAGE_1} Physical damage to an enemy.",
                     tokens = { { applyMode = "damage_range", componentIndex = 1, key = "DAMAGE_1", tokenType = "spell_damage_range" } },
                     version = 1
                 },
@@ -4036,6 +4036,19 @@ Addon.Data.DefaultDatasets:Register({
                 spellbookCategory = "",
                 tags = {},
                 tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Basic ranged attack. Deal {DAMAGE_1} Physical damage to an enemy.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        }
+                    },
+                    version = 1
+                },
                 totalTicks = 0,
                 triggersGCD = true,
                 useCooldownCharges = false

@@ -530,6 +530,18 @@ Operations.Opcodes = Operations.Opcodes or {
             return client:HandleSkillRollRequest(arguments, sender, distribution, target, message)
         end,
     },
+    [36] = {
+        key = "NPC_SPEECH",
+        name = "npc-speech",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleNPCSpeech) ~= "function" then
+                return false
+            end
+
+            return client:HandleNPCSpeech(arguments, sender, distribution, target, message)
+        end,
+    },
 }
 
 Operations:ResetRegistry()

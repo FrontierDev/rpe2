@@ -238,6 +238,14 @@ local COMBAT_LOG_PANEL_HEIGHT = 34
 local COMBAT_LOG_TIME_VISIBLE = 5
 local COMBAT_LOG_FADE_IN_DURATION = 0.18
 local COMBAT_LOG_FADE_OUT_DURATION = 0.22
+local NPC_SPEECH_MIN_DURATION = 7
+local NPC_SPEECH_MAX_DURATION = 18
+local NPC_SPEECH_CHARACTERS_PER_SECOND = 18
+local NPC_SPEECH_PANEL_WIDTH = 480
+local NPC_SPEECH_PANEL_HEIGHT = 104
+local NPC_SPEECH_MAX_PANEL_HEIGHT = 220
+local NPC_SPEECH_PORTRAIT_SIZE = 76
+local NPC_SPEECH_PANEL_GAP = 12
 local TOOLTIP_HINT_COLOR = { r = 0.38, g = 0.9, b = 0.42, a = 1 }
 local UNKNOWN_UNIT_NAME = "Unknown Unit"
 
@@ -955,10 +963,16 @@ function EventWidget:Get()
         initiativePortraitPanel = nil,
         combatLogPanel = nil,
         combatLogText = nil,
-        combatLogQueue = {},
-        currentCombatLogEntry = nil,
-        combatLogTickerToken = 0,
-        combatLogTransitionToken = 0,
+        npcSpeechPanel = nil,
+        npcSpeechPortrait = nil,
+        npcSpeechNameText = nil,
+        npcSpeechDialogueText = nil,
+        presentationQueue = {},
+        currentPresentation = nil,
+        presentationTickerToken = 0,
+        presentationTransitionToken = 0,
+        presentationTimer = nil,
+        presentationEventId = nil,
         portraitSlots = {},
         bossPortraitSlots = {},
         portraitSlotCount = 0,
@@ -1375,6 +1389,58 @@ function EventWidget:Build()
     combatLogTextFrame:SetPoint("LEFT", combatLogFrame, "LEFT", 12, 0)
     combatLogTextFrame:SetPoint("RIGHT", combatLogFrame, "RIGHT", -12, 0)
 
+    self.npcSpeechPanel = UI.CreatePanel(rootFrame, "RPEClientEventWidgetNPCSpeechPanel", {
+        width = NPC_SPEECH_PANEL_WIDTH,
+        height = NPC_SPEECH_PANEL_HEIGHT,
+        contentInset = 0,
+        showBorder = true,
+        panelBorderSize = 1,
+        panelBorderColor = UI.ResolveColor(nil, "panel.border"),
+        panelBackgroundColor = UI.ResolveColor(nil, "panel.background"),
+        alpha = 1,
+    })
+    local npcSpeechFrame = self.npcSpeechPanel:GetFrame()
+    npcSpeechFrame:SetPoint("TOP", portraitFrame, "BOTTOM", 0, -NPC_SPEECH_PANEL_GAP)
+    npcSpeechFrame:Hide()
+
+    self.npcSpeechPortrait = UI.UnitPortrait:New({
+        name = "RPEClientEventWidgetNPCSpeechPortrait",
+        width = NPC_SPEECH_PORTRAIT_SIZE,
+        height = NPC_SPEECH_PORTRAIT_SIZE,
+        portraitWidth = NPC_SPEECH_PORTRAIT_SIZE,
+        portraitHeight = NPC_SPEECH_PORTRAIT_SIZE,
+        portraitBorderColor = UI.ResolveColor(nil, "panel.border"),
+        unit = nil,
+    })
+    self.npcSpeechPortrait:SetParent(npcSpeechFrame)
+    self.npcSpeechPortrait:Create()
+    local npcSpeechPortraitFrame = self.npcSpeechPortrait:GetFrame()
+    npcSpeechPortraitFrame:SetPoint("LEFT", npcSpeechFrame, "LEFT", 12, 0)
+
+    self.npcSpeechNameText = UI.CreateText(npcSpeechFrame, "RPEClientEventWidgetNPCSpeechName", "", {
+        fontSize = 13,
+        fontFlags = "OUTLINE",
+        justifyH = "LEFT",
+        justifyV = "MIDDLE",
+        wordWrap = false,
+        textColor = UI.ResolveColor(nil, "text.primary"),
+    })
+    local npcSpeechNameFrame = self.npcSpeechNameText:GetFrame()
+    npcSpeechNameFrame:SetPoint("TOPLEFT", npcSpeechFrame, "TOPLEFT", 104, -8)
+    npcSpeechNameFrame:SetPoint("TOPRIGHT", npcSpeechFrame, "TOPRIGHT", -12, -8)
+    npcSpeechNameFrame:SetHeight(22)
+
+    self.npcSpeechDialogueText = UI.CreateText(npcSpeechFrame, "RPEClientEventWidgetNPCSpeechDialogue", "", {
+        fontSize = 12,
+        justifyH = "LEFT",
+        justifyV = "TOP",
+        wordWrap = true,
+        textColor = UI.ResolveColor(nil, "text.primary"),
+    })
+    local npcSpeechDialogueFrame = self.npcSpeechDialogueText:GetFrame()
+    npcSpeechDialogueFrame:SetPoint("TOPLEFT", npcSpeechNameFrame, "BOTTOMLEFT", 0, -3)
+    npcSpeechDialogueFrame:SetPoint("BOTTOMRIGHT", npcSpeechFrame, "BOTTOMRIGHT", -12, 10)
+
     self.advanceStepButton:SetScript("OnEnter", function()
         if Client.ShowPendingTurnChangesTooltip then
             Client:ShowPendingTurnChangesTooltip(self.advanceStepButton)
@@ -1565,21 +1631,78 @@ function EventWidget:Hide()
     return true
 end
 
-function EventWidget:StartCombatLogTickerTimer()
-    self.combatLogTickerToken = math.max(0, tonumber(self.combatLogTickerToken) or 0) + 1
-    local token = self.combatLogTickerToken
+function EventWidget:StopPresentationTimer()
+    local timer = self.presentationTimer
+    self.presentationTimer = nil
+    if timer and type(timer.Cancel) == "function" then
+        timer:Cancel()
+    end
+    return true
+end
+
+function EventWidget:StopPresentationTransitions()
+    if self.combatLogPanel and self.combatLogPanel.StopFade then
+        self.combatLogPanel:StopFade()
+    end
+    if self.npcSpeechPanel and self.npcSpeechPanel.StopFade then
+        self.npcSpeechPanel:StopFade()
+    end
+end
+
+local function getPresentationPanel(self, presentation)
+    local presentationType = type(presentation) == "table" and presentation.presentationType or nil
+    if presentationType == "combat-log" then
+        return self.combatLogPanel
+    elseif presentationType == "npc-speech" then
+        return self.npcSpeechPanel
+    end
+    return nil
+end
+
+local function setPanelVisible(panel, visible)
+    local frame = panel and panel.GetFrame and panel:GetFrame() or nil
+    if not frame then
+        return false
+    end
+    if frame.SetAlpha then
+        frame:SetAlpha(1)
+    end
+    if visible == true then
+        frame:Show()
+    else
+        frame:Hide()
+    end
+    return true
+end
+
+local function getPresentationDuration(presentation)
+    if type(presentation) == "table" and presentation.presentationType == "npc-speech" then
+        local text = tostring(type(presentation.payload) == "table" and presentation.payload.text or "")
+        return math.max(
+            NPC_SPEECH_MIN_DURATION,
+            math.min(NPC_SPEECH_MAX_DURATION, 2 + (#text / NPC_SPEECH_CHARACTERS_PER_SECOND))
+        )
+    end
+    return COMBAT_LOG_TIME_VISIBLE
+end
+
+function EventWidget:StartPresentationTimer()
+    self.presentationTickerToken = math.max(0, tonumber(self.presentationTickerToken) or 0) + 1
+    local token = self.presentationTickerToken
+    local duration = getPresentationDuration(self.currentPresentation)
     if type(C_Timer) == "table" and type(C_Timer.NewTimer) == "function" then
-        C_Timer.NewTimer(COMBAT_LOG_TIME_VISIBLE, function()
-            if self.combatLogTickerToken == token then
-                self:AdvanceCombatLogTicker()
+        self.presentationTimer = C_Timer.NewTimer(duration, function()
+            if self.presentationTickerToken == token then
+                self.presentationTimer = nil
+                self:AdvancePresentation()
             end
         end)
         return true
     end
     if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
-        C_Timer.After(COMBAT_LOG_TIME_VISIBLE, function()
-            if self.combatLogTickerToken == token then
-                self:AdvanceCombatLogTicker()
+        C_Timer.After(duration, function()
+            if self.presentationTickerToken == token then
+                self:AdvancePresentation()
             end
         end)
         return true
@@ -1588,94 +1711,220 @@ function EventWidget:StartCombatLogTickerTimer()
     return false
 end
 
-function EventWidget:StopCombatLogTransitions()
-    if self.combatLogPanel and self.combatLogPanel.StopFade then
-        self.combatLogPanel:StopFade()
+function EventWidget:RenderNPCSpeech(entry)
+    local eventState = Client.GetEventState and Client:GetEventState() or Client.EventState
+    if type(eventState) ~= "table"
+        or eventState.active ~= true
+        or tostring(eventState.id or "") ~= tostring(entry and entry.eventId or "")
+    then
+        return false
     end
+
+    local speaker = nil
+    local speakerEventId = tonumber(entry and entry.speakerEventId) or 0
+    for index = 1, #(eventState.units or {}) do
+        local candidate = eventState.units[index]
+        if tonumber(candidate and candidate.eventID) == speakerEventId and candidate.isPlayer ~= true then
+            speaker = candidate
+            break
+        end
+    end
+    if not speaker then
+        return false
+    end
+
+    local isHost = isLocalHostForEvent(eventState)
+    local displayUnit = buildWidgetDisplayUnit(speaker, isHost)
+    local hidden = speaker.hidden == true
+    local hideDetails = hidden and isHost ~= true
+    local teamColor = getTeamColor(eventState, speaker.team)
+    local red = math.floor(math.max(0, math.min(1, tonumber(teamColor.r) or 1)) * 255 + 0.5)
+    local green = math.floor(math.max(0, math.min(1, tonumber(teamColor.g) or 1)) * 255 + 0.5)
+    local blue = math.floor(math.max(0, math.min(1, tonumber(teamColor.b) or 1)) * 255 + 0.5)
+    local displayName = tostring(displayUnit and displayUnit.name or UNKNOWN_UNIT_NAME):gsub("|", "||")
+    local displayId = math.max(1, math.floor(tonumber(displayUnit and displayUnit.eventID) or speakerEventId))
+    local inline = Addon.UI and Addon.UI.Inline or nil
+    local markerNumber = math.floor(tonumber(displayUnit and displayUnit.raidMarker) or 0)
+    local raidMarker = inline and type(inline.RaidMarker) == "function"
+        and inline:RaidMarker(markerNumber >= 1 and markerNumber <= 8 and markerNumber or 0, 16, 16)
+        or ""
+    local nameMarkup = ("|cFF%02X%02X%02X%s|r  (#%d)"):format(red, green, blue, displayName, displayId)
+    if self.npcSpeechNameText and self.npcSpeechNameText.SetText then
+        self.npcSpeechNameText:SetText((raidMarker ~= "" and (raidMarker .. "  ") or "") .. nameMarkup)
+    end
+    if self.npcSpeechDialogueText and self.npcSpeechDialogueText.SetText then
+        local dialogue = tostring(entry.text or ""):gsub("|", "||")
+        self.npcSpeechDialogueText:SetText(dialogue)
+        local dialogueRegion = self.npcSpeechDialogueText.textRegion
+        local measuredHeight = dialogueRegion and dialogueRegion.GetStringHeight and tonumber(dialogueRegion:GetStringHeight()) or 0
+        local panelFrame = self.npcSpeechPanel and self.npcSpeechPanel.GetFrame and self.npcSpeechPanel:GetFrame() or nil
+        if panelFrame and panelFrame.SetHeight then
+            panelFrame:SetHeight(math.max(
+                NPC_SPEECH_PANEL_HEIGHT,
+                math.min(NPC_SPEECH_MAX_PANEL_HEIGHT, measuredHeight + 48)
+            ))
+        end
+    end
+
+    if self.npcSpeechPortrait then
+        self.npcSpeechPortrait:SetUnit(displayUnit)
+        local actionBarWidget = getActionBarWidget()
+        local resourceContext = type(actionBarWidget) == "table"
+            and type(actionBarWidget.BuildActionBarResourceContext) == "function"
+            and actionBarWidget:BuildActionBarResourceContext(eventState)
+            or nil
+        local healthState = buildPortraitResourceStates(actionBarWidget, displayUnit, eventState, resourceContext)
+        self.npcSpeechPortrait:SetProgressState(healthState)
+        self.npcSpeechPortrait:SetSecondaryProgressState(nil)
+        self.npcSpeechPortrait:SetBorderColor(teamColor.r or 1, teamColor.g or 1, teamColor.b or 1, teamColor.a or 1)
+        self.npcSpeechPortrait:SetRaidMarker(0)
+        self.npcSpeechPortrait:SetHiddenPresentation(hidden, hideDetails)
+    end
+
+    return true
 end
 
-function EventWidget:ShowCurrentCombatLogEntry(useFade)
-    if not self.combatLogPanel or not self.combatLogText then
+function EventWidget:ShowCurrentPresentation(useFade)
+    if type(self.currentPresentation) ~= "table" then
         return false
     end
 
-    local frame = self.combatLogPanel.GetFrame and self.combatLogPanel:GetFrame() or nil
-    if type(self.currentCombatLogEntry) ~= "table" then
+    local presentation = self.currentPresentation
+    self:StopPresentationTransitions()
+    setPanelVisible(self.combatLogPanel, false)
+    setPanelVisible(self.npcSpeechPanel, false)
+
+    if presentation.presentationType == "combat-log" then
+        if not self.combatLogPanel or not self.combatLogText then
+            return false
+        end
         if self.combatLogText.SetText then
-            self.combatLogText:SetText("")
+            self.combatLogText:SetText(buildCombatLogText(presentation.payload))
         end
-        if frame and frame.Hide then
-            frame:Hide()
+    elseif presentation.presentationType == "npc-speech" then
+        if not self.npcSpeechPanel or not self:RenderNPCSpeech(presentation.payload) then
+            return false
         end
+    else
         return false
     end
 
-    if self.combatLogText.SetText then
-        self.combatLogText:SetText(buildCombatLogText(self.currentCombatLogEntry))
-    end
-    self:StopCombatLogTransitions()
-    if useFade ~= false and self.combatLogPanel.FadeIn then
-        self.combatLogPanel:FadeIn(COMBAT_LOG_FADE_IN_DURATION)
-    elseif frame and frame.Show then
+    local panel = getPresentationPanel(self, presentation)
+    local frame = panel and panel.GetFrame and panel:GetFrame() or nil
+    if useFade ~= false and panel and panel.FadeIn then
+        panel:FadeIn(COMBAT_LOG_FADE_IN_DURATION)
+    elseif frame then
         if frame.SetAlpha then
             frame:SetAlpha(1)
         end
         frame:Show()
     end
-    self:StartCombatLogTickerTimer()
+    self:StartPresentationTimer()
     return true
 end
 
-function EventWidget:AdvanceCombatLogTicker()
-    self.combatLogTickerToken = math.max(0, tonumber(self.combatLogTickerToken) or 0) + 1
-    self.combatLogTransitionToken = math.max(0, tonumber(self.combatLogTransitionToken) or 0) + 1
-    local transitionToken = self.combatLogTransitionToken
+function EventWidget:AdvancePresentation()
+    self:StopPresentationTimer()
+    self.presentationTickerToken = math.max(0, tonumber(self.presentationTickerToken) or 0) + 1
+    self.presentationTransitionToken = math.max(0, tonumber(self.presentationTransitionToken) or 0) + 1
+    local transitionToken = self.presentationTransitionToken
 
-    local function completeAdvance()
-        if self.combatLogTransitionToken ~= transitionToken then
+    local function showNextPresentation()
+        if self.presentationTransitionToken ~= transitionToken then
             return false
         end
 
-        local nextEntry = nil
-        if type(self.combatLogQueue) == "table" and #self.combatLogQueue > 0 then
-            nextEntry = table.remove(self.combatLogQueue, 1)
+        while type(self.presentationQueue) == "table" and #self.presentationQueue > 0 do
+            self.currentPresentation = table.remove(self.presentationQueue, 1)
+            if self:ShowCurrentPresentation(true) then
+                return true
+            end
         end
-        self.currentCombatLogEntry = nextEntry
-        return self:ShowCurrentCombatLogEntry(true)
+
+        self.currentPresentation = nil
+        setPanelVisible(self.combatLogPanel, false)
+        setPanelVisible(self.npcSpeechPanel, false)
+        return false
     end
 
-    if type(self.currentCombatLogEntry) ~= "table" then
-        return completeAdvance()
+    if type(self.currentPresentation) ~= "table" then
+        return showNextPresentation()
     end
 
-    self:StopCombatLogTransitions()
-    if self.combatLogPanel and self.combatLogPanel.FadeOut then
-        self.combatLogPanel:FadeOut(COMBAT_LOG_FADE_OUT_DURATION, function()
-            completeAdvance()
+    local currentPanel = getPresentationPanel(self, self.currentPresentation)
+    self:StopPresentationTransitions()
+    if currentPanel and currentPanel.FadeOut then
+        currentPanel:FadeOut(COMBAT_LOG_FADE_OUT_DURATION, function()
+            showNextPresentation()
         end)
         return true
     end
 
-    return completeAdvance()
+    return showNextPresentation()
 end
 
-function EventWidget:ClearCombatLogTicker(reason)
-    self.combatLogTickerToken = math.max(0, tonumber(self.combatLogTickerToken) or 0) + 1
-    self.combatLogTransitionToken = math.max(0, tonumber(self.combatLogTransitionToken) or 0) + 1
-    self.currentCombatLogEntry = nil
-    self.combatLogQueue = {}
-    self.lastCombatLogReason = reason
-    self:StopCombatLogTransitions()
+function EventWidget:ClearPresentations(reason)
+    self:StopPresentationTimer()
+    self.presentationTickerToken = math.max(0, tonumber(self.presentationTickerToken) or 0) + 1
+    self.presentationTransitionToken = math.max(0, tonumber(self.presentationTransitionToken) or 0) + 1
+    self.currentPresentation = nil
+    self.presentationQueue = {}
+    self.presentationEventId = nil
+    self.lastPresentationClearReason = reason
+    self:StopPresentationTransitions()
     if self.combatLogText and self.combatLogText.SetText then
         self.combatLogText:SetText("")
     end
-    local frame = self.combatLogPanel and self.combatLogPanel.GetFrame and self.combatLogPanel:GetFrame() or nil
-    if frame and frame.Hide then
-        if frame.SetAlpha then
-            frame:SetAlpha(1)
-        end
-        frame:Hide()
+    if self.npcSpeechNameText and self.npcSpeechNameText.SetText then
+        self.npcSpeechNameText:SetText("")
     end
+    if self.npcSpeechDialogueText and self.npcSpeechDialogueText.SetText then
+        self.npcSpeechDialogueText:SetText("")
+    end
+    local speechFrame = self.npcSpeechPanel and self.npcSpeechPanel.GetFrame and self.npcSpeechPanel:GetFrame() or nil
+    if speechFrame and speechFrame.SetHeight then
+        speechFrame:SetHeight(NPC_SPEECH_PANEL_HEIGHT)
+    end
+    if self.npcSpeechPortrait then
+        self.npcSpeechPortrait:SetUnit(nil)
+        self.npcSpeechPortrait:SetRaidMarker(0)
+        self.npcSpeechPortrait:SetHiddenPresentation(false, false)
+    end
+    setPanelVisible(self.combatLogPanel, false)
+    setPanelVisible(self.npcSpeechPanel, false)
+    if type(Client.ClearNPCSpeechState) == "function" then
+        Client:ClearNPCSpeechState(reason)
+    end
+    return true
+end
+
+function EventWidget:ClearCombatLogTicker(reason)
+    return self:ClearPresentations(reason)
+end
+
+function EventWidget:QueuePresentation(presentation)
+    if type(presentation) ~= "table"
+        or (presentation.presentationType ~= "combat-log" and presentation.presentationType ~= "npc-speech")
+        or type(presentation.payload) ~= "table"
+    then
+        return false
+    end
+
+    local eventId = tostring(presentation.payload.eventId or "")
+    if eventId ~= "" then
+        if self.presentationEventId ~= nil and self.presentationEventId ~= eventId then
+            self:ClearPresentations("event-identity-change")
+        end
+        self.presentationEventId = eventId
+    end
+
+    self:Build()
+    self.presentationQueue = self.presentationQueue or {}
+    self.presentationQueue[#self.presentationQueue + 1] = presentation
+    if type(self.currentPresentation) ~= "table" then
+        return self:AdvancePresentation()
+    end
+
     return true
 end
 
@@ -1683,15 +1932,20 @@ function EventWidget:QueueCombatLogEntry(entry)
     if type(entry) ~= "table" then
         return false
     end
+    return self:QueuePresentation({
+        presentationType = "combat-log",
+        payload = entry,
+    })
+end
 
-    self:Build()
-    self.combatLogQueue = self.combatLogQueue or {}
-    self.combatLogQueue[#self.combatLogQueue + 1] = entry
-    if type(self.currentCombatLogEntry) ~= "table" then
-        return self:AdvanceCombatLogTicker()
+function EventWidget:QueueNPCSpeech(entry)
+    if type(entry) ~= "table" then
+        return false
     end
-
-    return true
+    return self:QueuePresentation({
+        presentationType = "npc-speech",
+        payload = entry,
+    })
 end
 
 function EventWidget:LayoutPortraitRow(panel, slots, slotCount, portraitSize, portraitSpacing)
@@ -1958,6 +2212,12 @@ function EventWidget:Refresh(reason)
         self:Hide()
         return false
     end
+
+    local eventId = tostring(state.id or "")
+    if self.presentationEventId ~= nil and self.presentationEventId ~= eventId then
+        self:ClearPresentations("event-identity-change")
+    end
+    self.presentationEventId = eventId
 
     self:Build()
     self:Show()
