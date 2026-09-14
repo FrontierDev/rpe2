@@ -19,12 +19,15 @@ then
 end
 
 local DASHBOARD_PANEL_WIDTH = 560
-local DASHBOARD_PANEL_HEIGHT = 460
+-- The dashboard height is fixed; cue review space is balanced against outcomes below.
+local DASHBOARD_PANEL_HEIGHT = 654
 local MARKER_BUTTON_SIZE = 28
 local MARKER_GAP = 5
 local SECTION_TITLE_HEIGHT = 16
 local PENDING_HEIGHT = 158
-local OUTCOMES_HEIGHT = 138
+-- Keep the dashboard at its established size while reserving the recovered
+-- outcome-list space for cue review, where it prevents authoring mistakes.
+local OUTCOMES_HEIGHT = 110
 local DETAIL_TOGGLE_HEIGHT = 20
 local DETAIL_HEIGHT = 92
 local TOOLBAR_HEIGHT = 22
@@ -32,6 +35,8 @@ local SECTION_GAP = 4
 local ACTION_ROW_HEIGHT = 30
 local OUTCOME_ROW_HEIGHT = 26
 local BUTTON_HEIGHT = 20
+local CUE_AUTHORING_HEIGHT = 226
+local CUE_AUTHORING_TAB_HEIGHT = 20
 
 local function getFrame(element)
     if type(element) == "table" and type(element.GetFrame) == "function" then
@@ -51,6 +56,12 @@ local function setShown(element, shown)
         frame:Hide()
     end
     return true
+end
+
+local function getCueModes()
+    EventWidget.AutopilotCueAuthoringModes = EventWidget.AutopilotCueAuthoringModes or {}
+    EventWidget.AutopilotCueAuthoringModeOrder = EventWidget.AutopilotCueAuthoringModeOrder or {}
+    return EventWidget.AutopilotCueAuthoringModes, EventWidget.AutopilotCueAuthoringModeOrder
 end
 
 local function getActiveEventState()
@@ -162,6 +173,7 @@ function AutopilotActionRow:New(options)
         doneButton = nil,
         authoriseButton = nil,
         rejectButton = nil,
+        speechCueBadge = nil,
         item = nil,
         ownerWidget = nil,
     }, self)
@@ -232,6 +244,20 @@ function AutopilotActionRow:Create()
         end
     end)
 
+    self.speechCueBadge = buildTextButton(frame, self.name .. "SpeechCue", "", 40, function()
+        if type(self.item) == "table"
+            and self.ownerWidget
+            and type(self.ownerWidget.SelectAutopilotHelperDetail) == "function"
+        then
+            self.ownerWidget:SelectAutopilotHelperDetail(self.item)
+        end
+    end)
+    self.speechCueBadge:SetTooltip({
+        type = "custom",
+        title = "Queued Talking Head dialogue",
+        lines = { "This action has dialogue queued to play when it resolves." },
+    })
+
     frame:SetScript("OnMouseUp", function(_, button)
         if button == "LeftButton"
             and type(self.item) == "table"
@@ -253,6 +279,7 @@ function AutopilotActionRow:Reset()
     setShown(self.doneButton, false)
     setShown(self.authoriseButton, false)
     setShown(self.rejectButton, false)
+    setShown(self.speechCueBadge, false)
 end
 
 function AutopilotActionRow:SetItem(item, ownerWidget)
@@ -274,6 +301,9 @@ function AutopilotActionRow:SetItem(item, ownerWidget)
     setShown(self.doneButton, doneVisible)
     setShown(self.authoriseButton, authoriseVisible)
     setShown(self.rejectButton, rejectVisible)
+    local speechCueCount = math.max(0, math.floor(tonumber(item.speechCueCount) or 0))
+    local speechCueVisible = item.hasSpeechCue == true and speechCueCount > 0
+    setShown(self.speechCueBadge, speechCueVisible)
 
     local rightAnchor = frame
     local rightPoint = "RIGHT"
@@ -322,8 +352,28 @@ function AutopilotActionRow:SetItem(item, ownerWidget)
         end
     end
 
+    local textLeftAnchor = frame
+    local textLeftPoint = "LEFT"
+    local textLeftOffset = 8
+    local badgeFrame = getFrame(self.speechCueBadge)
+    if speechCueVisible and badgeFrame then
+        badgeFrame:ClearAllPoints()
+        badgeFrame:SetPoint("LEFT", frame, "LEFT", 5, 0)
+        self.speechCueBadge:SetText(speechCueCount > 1 and ("THx" .. speechCueCount) or "TH")
+        self.speechCueBadge:SetTooltip({
+            type = "custom",
+            title = "Queued Talking Head dialogue",
+            lines = { speechCueCount > 1
+                and ("" .. speechCueCount .. " dialogue cues will play when this action resolves.")
+                or "One dialogue cue will play when this action resolves." },
+        })
+        textLeftAnchor = badgeFrame
+        textLeftPoint = "RIGHT"
+        textLeftOffset = 5
+    end
+
     self.textRegion:ClearAllPoints()
-    self.textRegion:SetPoint("LEFT", frame, "LEFT", 8, 0)
+    self.textRegion:SetPoint("LEFT", textLeftAnchor, textLeftPoint, textLeftOffset, 0)
     self.textRegion:SetPoint("RIGHT", rightAnchor, rightPoint, rightOffset, 0)
     self.textRegion:SetText(displayText)
 end
@@ -431,7 +481,116 @@ end
 function EventWidget:ClearAutopilotHelperSelection()
     self.selectedAutopilotMarker = nil
     self.selectedAutopilotDetailKey = nil
+    if type(self.ResetAutopilotCueAuthoring) == "function" then
+        self:ResetAutopilotCueAuthoring()
+    end
+    if type(self.RefreshAutopilotCueAuthoring) == "function" then
+        self:RefreshAutopilotCueAuthoring()
+    end
     return true
+end
+
+function EventWidget:RegisterAutopilotCueAuthoringMode(key, spec)
+    local normalizedKey = tostring(key or "")
+    if normalizedKey == "" or type(spec) ~= "table"
+        or type(spec.ensureMethod) ~= "string"
+        or type(spec.refreshMethod) ~= "string"
+        or type(spec.frameField) ~= "string"
+    then
+        return false
+    end
+
+    local modes, order = getCueModes()
+    if not modes[normalizedKey] then
+        order[#order + 1] = normalizedKey
+    end
+    modes[normalizedKey] = spec
+    table.sort(order, function(left, right)
+        local leftPriority = left == "emote" and 1 or (left == "speech" and 2 or 3)
+        local rightPriority = right == "emote" and 1 or (right == "speech" and 2 or 3)
+        if leftPriority == rightPriority then
+            return left < right
+        end
+        return leftPriority < rightPriority
+    end)
+    return true
+end
+
+function EventWidget:SetAutopilotCueAuthoringMode(mode)
+    local modes, order = getCueModes()
+    local selected = tostring(mode or "")
+    if not modes[selected] then
+        selected = order[1] or ""
+    end
+    if selected == "" then
+        return false
+    end
+
+    self.autopilotCueAuthoringMode = selected
+    self:RefreshAutopilotCueAuthoring()
+    self:LayoutAutopilotHelperDashboard()
+    return true
+end
+
+function EventWidget:ResetAutopilotCueAuthoring()
+    local modes, order = getCueModes()
+    for index = 1, #order do
+        local spec = modes[order[index]]
+        local reset = spec and self[spec.resetMethod]
+        if type(reset) == "function" then
+            reset(self)
+        end
+    end
+    return true
+end
+
+function EventWidget:RefreshAutopilotCueAuthoring()
+    if not self.autopilotCueAuthoringFrame then
+        return false
+    end
+
+    local modes, order = getCueModes()
+    for index = 1, #order do
+        local spec = modes[order[index]]
+        local ensure = spec and self[spec.ensureMethod]
+        if type(ensure) == "function" then
+            ensure(self)
+        end
+        local modeFrame = spec and getFrame(self[spec.frameField])
+        if modeFrame and self.autopilotCueAuthoringContentFrame then
+            modeFrame:ClearAllPoints()
+            modeFrame:SetAllPoints(self.autopilotCueAuthoringContentFrame)
+        end
+    end
+
+    local selected = tostring(self.autopilotCueAuthoringMode or "")
+    if not modes[selected] then
+        selected = order[1] or ""
+        self.autopilotCueAuthoringMode = selected
+    end
+
+    local state = getActiveEventState()
+    local active = tostring(self.combatLogHistoryMode or "") == "dm-helper"
+        and isHostAutopilotEvent(state)
+        and self.autopilotDetailsExpanded ~= true
+    for index = 1, #order do
+        local key = order[index]
+        local spec = modes[key]
+        local modeFrame = spec and self[spec.frameField]
+        setShown(modeFrame, active and key == selected)
+        local tab = spec and self.autopilotCueAuthoringTabs and self.autopilotCueAuthoringTabs[key]
+        setShown(tab, active)
+        if tab and type(tab.SetEnabled) == "function" then
+            tab:SetEnabled(active and key ~= selected)
+        end
+    end
+
+    local activeSpec = modes[selected]
+    local refresh = activeSpec and self[activeSpec.refreshMethod]
+    if active and type(refresh) == "function" then
+        refresh(self)
+    end
+    return active
 end
 
 function EventWidget:SelectAutopilotHelperDetail(entry)
@@ -451,6 +610,7 @@ function EventWidget:SelectAutopilotHelperDetail(entry)
     self:RefreshAutopilotMarkerButtons()
     self:RefreshAutopilotHelperDetail()
     self:RefreshAutopilotHelperControls()
+    self:RefreshAutopilotCueAuthoring()
     return true
 end
 
@@ -622,6 +782,7 @@ local function setAutopilotSummaryShown(self, shown)
     setShown(self.autopilotOutcomeTitle, shown)
     setShown(self.autopilotOutcomeScroll, shown)
     setShown(self.autopilotOutcomeEmptyText, shown)
+    setShown(self.autopilotCueAuthoringFrame, shown)
     setShown(self.autopilotToolbarFrame, shown)
 end
 
@@ -658,8 +819,18 @@ function EventWidget:LayoutAutopilotHelperDashboard()
             detailToggleFrame:SetFrameLevel(detailPanelFrame:GetFrameLevel() + 1)
         end
     else
-        detailToggleFrame:SetPoint("BOTTOMLEFT", toolbar, "TOPLEFT", 0, SECTION_GAP)
-        detailToggleFrame:SetPoint("BOTTOMRIGHT", toolbar, "TOPRIGHT", 0, SECTION_GAP)
+        local cueFrame = getFrame(self.autopilotCueAuthoringFrame)
+        if cueFrame then
+            cueFrame:ClearAllPoints()
+            cueFrame:SetPoint("BOTTOMLEFT", toolbar, "TOPLEFT", 0, SECTION_GAP)
+            cueFrame:SetPoint("BOTTOMRIGHT", toolbar, "TOPRIGHT", 0, SECTION_GAP)
+            cueFrame:SetHeight(CUE_AUTHORING_HEIGHT)
+            detailToggleFrame:SetPoint("BOTTOMLEFT", cueFrame, "TOPLEFT", 0, SECTION_GAP)
+            detailToggleFrame:SetPoint("BOTTOMRIGHT", cueFrame, "TOPRIGHT", 0, SECTION_GAP)
+        else
+            detailToggleFrame:SetPoint("BOTTOMLEFT", toolbar, "TOPLEFT", 0, SECTION_GAP)
+            detailToggleFrame:SetPoint("BOTTOMRIGHT", toolbar, "TOPRIGHT", 0, SECTION_GAP)
+        end
     end
     detailToggleFrame:SetHeight(DETAIL_TOGGLE_HEIGHT)
     return true
@@ -701,6 +872,7 @@ function EventWidget:RefreshAutopilotHelperDashboard()
     self:RefreshAutopilotHelperDetail()
     self:RefreshAutopilotHelperControls(actionRows, markerStates)
     setAutopilotSummaryShown(self, self.autopilotDetailsExpanded ~= true)
+    self:RefreshAutopilotCueAuthoring()
     self:LayoutAutopilotHelperDashboard()
     return pending ~= nil or #markerStates > 0 or #outcomeRows > 0
 end
@@ -778,7 +950,7 @@ function EventWidget:EnsureAutopilotHelperUI()
         name = "RPEClientEventWidgetDMAutopilotPendingScroll",
         rowHeight = ACTION_ROW_HEIGHT,
         rowSpacing = 2,
-        visibleRows = 5,
+        visibleRows = 4,
         rowElementClass = AutopilotActionRow,
         rowRenderer = function(row, item)
             row:SetItem(item, self)
@@ -850,6 +1022,68 @@ function EventWidget:EnsureAutopilotHelperUI()
     )
     local outcomeEmptyFrame = getFrame(self.autopilotOutcomeEmptyText)
     outcomeEmptyFrame:SetPoint("CENTER", outcomeScrollFrame, "CENTER", 0, 0)
+
+    self.autopilotCueAuthoringFrame = UI.CreatePanel(self.autopilotDashboardFrame, "RPEClientEventWidgetDMAutopilotCueAuthoring", {
+        height = CUE_AUTHORING_HEIGHT,
+        contentInset = 5,
+        showBorder = true,
+        panelBorderSize = 1,
+        panelBorderColor = UI.ResolveColor(nil, "panel.border"),
+        panelBackgroundColor = UI.ResolveColor(nil, "panel.background"),
+    })
+    local cueContent = self.autopilotCueAuthoringFrame:GetContentFrame()
+    self.autopilotCueAuthoringTitle = UI.CreateText(cueContent, "RPEClientEventWidgetDMAutopilotCueAuthoringTitle", "Cue Authoring", {
+        height = CUE_AUTHORING_TAB_HEIGHT,
+        fontSize = 10,
+        fontFlags = "OUTLINE",
+        justifyH = "LEFT",
+        justifyV = "MIDDLE",
+        wordWrap = false,
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    local cueTitleFrame = getFrame(self.autopilotCueAuthoringTitle)
+    cueTitleFrame:SetPoint("TOPLEFT", cueContent, "TOPLEFT", 0, 0)
+    self.autopilotCueAuthoringTabsFrame = CreateFrame("Frame", "RPEClientEventWidgetDMAutopilotCueTabs", cueContent)
+    self.autopilotCueAuthoringTabsFrame:SetPoint("TOPRIGHT", cueContent, "TOPRIGHT", 0, 0)
+    self.autopilotCueAuthoringTabsFrame:SetHeight(CUE_AUTHORING_TAB_HEIGHT)
+    cueTitleFrame:SetPoint("TOPRIGHT", self.autopilotCueAuthoringTabsFrame, "TOPLEFT", -SECTION_GAP, 0)
+    self.autopilotCueAuthoringContentFrame = CreateFrame("Frame", "RPEClientEventWidgetDMAutopilotCueContent", cueContent)
+    self.autopilotCueAuthoringContentFrame:SetPoint("TOPLEFT", cueTitleFrame, "BOTTOMLEFT", 0, SECTION_GAP)
+    self.autopilotCueAuthoringContentFrame:SetPoint("BOTTOMRIGHT", cueContent, "BOTTOMRIGHT", 0, 0)
+    self.autopilotCueAuthoringTabs = {}
+
+    local modes, modeOrder = getCueModes()
+    local tabsWidth = 0
+    for index = 1, #modeOrder do
+        local spec = modes[modeOrder[index]]
+        tabsWidth = tabsWidth + (tonumber(spec and spec.tabWidth) or 72)
+        if index > 1 then
+            tabsWidth = tabsWidth + SECTION_GAP
+        end
+    end
+    self.autopilotCueAuthoringTabsFrame:SetWidth(tabsWidth)
+    local previousTab = nil
+    for index = 1, #modeOrder do
+        local key = modeOrder[index]
+        local spec = modes[key]
+        local tab = buildTextButton(
+            self.autopilotCueAuthoringTabsFrame,
+            "RPEClientEventWidgetDMAutopilotCueTab" .. key,
+            tostring(spec.label or key),
+            tonumber(spec.tabWidth) or 72,
+            function()
+                self:SetAutopilotCueAuthoringMode(key)
+            end
+        )
+        local tabFrame = getFrame(tab)
+        if previousTab then
+            tabFrame:SetPoint("LEFT", previousTab, "RIGHT", SECTION_GAP, 0)
+        else
+            tabFrame:SetPoint("LEFT", self.autopilotCueAuthoringTabsFrame, "LEFT", 0, 0)
+        end
+        previousTab = tabFrame
+        self.autopilotCueAuthoringTabs[key] = tab
+    end
 
     self.autopilotToolbarFrame = CreateFrame("Frame", "RPEClientEventWidgetDMAutopilotToolbar", self.autopilotDashboardFrame)
     self.autopilotToolbarFrame:SetPoint("BOTTOMLEFT", self.autopilotDashboardFrame, "BOTTOMLEFT", 0, 0)
@@ -973,6 +1207,9 @@ function EventWidget:EnsureAutopilotHelperUI()
     end
 
     self.autopilotDetailsExpanded = false
+    local modes, modeOrder = getCueModes()
+    self.autopilotCueAuthoringMode = self.autopilotCueAuthoringMode
+        or (modes.emote and "emote" or modeOrder[1])
     self:LayoutAutopilotHelperDashboard()
     return true
 end
@@ -983,6 +1220,7 @@ local function configureAutopilotDashboardForMode(self)
         and isHostAutopilotEvent(state)
 
     self:EnsureAutopilotHelperUI()
+    self.autopilotDMHelperOwnsPanelSize = active
     setShown(self.autopilotDashboardFrame, active)
     if active then
         local panelFrame = getFrame(self.combatLogHistoryPanel)
@@ -1019,6 +1257,9 @@ end
 
 function EventWidget:RefreshCombatLogHistoryPanel(...)
     self:EnsureAutopilotHelperUI()
+    local state = getActiveEventState()
+    self.autopilotDMHelperOwnsPanelSize = tostring(self.combatLogHistoryMode or "") == "dm-helper"
+        and isHostAutopilotEvent(state)
     local result = originalRefreshPanel(self, ...)
     configureAutopilotDashboardForMode(self)
     return result

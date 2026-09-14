@@ -13,8 +13,7 @@ if type(Widget) ~= "table" or Widget._autopilotSpeechCueExtensionInstalled == tr
     or type(Cues.GetActionCues) ~= "function"
 then return true end
 
-local WIDTH, HEIGHT = 560, 620
-local SPEECH_HEIGHT, ROW_HEIGHT, GAP = 164, 15, 3
+local SPEECH_HEIGHT, ROW_HEIGHT, GAP = 192, 16, 3
 local ERROR = {
     ["not-host-autopilot"] = "Talking Head cues are only available to the host during Autopilot.",
     ["pending-plan-unavailable"] = "There is no current pending plan.",
@@ -149,13 +148,6 @@ function Widget:StoreAutopilotSpeechDraft()
     self.autopilotSpeechDraftText = tostring(self.autopilotSpeechTextArea:GetText() or "")
 end
 
-function Widget:SetAutopilotCueAuthoringMode(mode)
-    self.autopilotCueAuthoringMode = mode == "speech" and "speech" or "emote"
-    self:RefreshAutopilotSpeechCueUI()
-    self:LayoutAutopilotHelperDashboard()
-    return true
-end
-
 function Widget:SelectAutopilotSpeechCue(cueId)
     self:StoreAutopilotSpeechDraft()
     cueId = tostring(cueId or "")
@@ -168,6 +160,18 @@ function Widget:SelectAutopilotSpeechCue(cueId)
     self.autopilotSpeechSelectedSpeakerId = tonumber(found.speakerEventId)
     self.autopilotSpeechSpeakerConfirmed = true
     self:SetAutopilotSpeechDraft(found.text)
+    self:RefreshAutopilotSpeechCueUI()
+    return true
+end
+
+function Widget:CancelAutopilotSpeechCueEdit()
+    self.autopilotSpeechSelectedCueId = nil
+    self.autopilotSpeechDraftText = ""
+    local speakers = self.autopilotSpeechSpeakers or {}
+    self.autopilotSpeechSelectedSpeakerId = #speakers == 1 and speakers[1].eventId or nil
+    self.autopilotSpeechSpeakerConfirmed = #speakers == 1
+    self:SetAutopilotSpeechDraft("")
+    self:SetAutopilotSpeechStatus("New Talking Head cue.", false)
     self:RefreshAutopilotSpeechCueUI()
     return true
 end
@@ -216,11 +220,10 @@ end
 
 function Widget:EnsureAutopilotSpeechCueUI()
     if self.autopilotSpeechFrame then return true end
-    if not self.autopilotDashboardFrame or not self.autopilotToolbarFrame then return false end
-    self.autopilotCueAuthoringMode = self.autopilotCueAuthoringMode or "emote"
+    if not self.autopilotCueAuthoringContentFrame then return false end
     self.autopilotSpeechDraftText = tostring(self.autopilotSpeechDraftText or "")
 
-    self.autopilotSpeechFrame = UI.CreatePanel(self.autopilotDashboardFrame, "RPEClientEventWidgetDMAutopilotSpeechPanel", {
+    self.autopilotSpeechFrame = UI.CreatePanel(self.autopilotCueAuthoringContentFrame, "RPEClientEventWidgetDMAutopilotSpeechPanel", {
         height = SPEECH_HEIGHT, contentInset = 5, showBorder = true, panelBorderSize = 1,
         panelBorderColor = UI.ResolveColor(nil, "panel.border"), panelBackgroundColor = UI.ResolveColor(nil, "panel.background"),
     })
@@ -231,17 +234,12 @@ function Widget:EnsureAutopilotSpeechCueUI()
     })
     frame(self.autopilotSpeechContextText):SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0)
 
-    self.autopilotSpeechEmoteTabButton = textButton(content, "RPEClientEventWidgetDMAutopilotSpeechEmoteTab", "Emotes", 58, function()
-        self:SetAutopilotCueAuthoringMode("emote")
-    end)
-    frame(self.autopilotSpeechEmoteTabButton):SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, 0)
-    frame(self.autopilotSpeechEmoteTabButton):SetHeight(16)
-    frame(self.autopilotSpeechContextText):SetPoint("TOPRIGHT", frame(self.autopilotSpeechEmoteTabButton), "TOPLEFT", -GAP, 0)
+    frame(self.autopilotSpeechContextText):SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, 0)
 
     self.autopilotSpeechSpeakerRow = CreateFrame("Frame", "RPEClientEventWidgetDMAutopilotSpeechSpeakerRow", content)
     self.autopilotSpeechSpeakerRow:SetHeight(20)
     self.autopilotSpeechSpeakerRow:SetPoint("TOPLEFT", frame(self.autopilotSpeechContextText), "BOTTOMLEFT", 0, -GAP)
-    self.autopilotSpeechSpeakerRow:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, -19)
+    self.autopilotSpeechSpeakerRow:SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, 0)
     self.autopilotSpeechSpeakerSummary = UI.CreateText(self.autopilotSpeechSpeakerRow, "RPEClientEventWidgetDMAutopilotSpeechSpeaker", "", {
         height = 20, fontSize = 9, fontFlags = "OUTLINE", justifyH = "LEFT", justifyV = "MIDDLE", wordWrap = false,
         textColor = UI.ResolveColor(nil, "text.secondary"),
@@ -264,7 +262,7 @@ function Widget:EnsureAutopilotSpeechCueUI()
     dropdownFrame:SetHeight(20)
 
     self.autopilotSpeechTextArea = UI.ClipboardTextArea:New({
-        name = "RPEClientEventWidgetDMAutopilotSpeechText", height = 42, readOnly = false, autoResize = false,
+        name = "RPEClientEventWidgetDMAutopilotSpeechText", height = 34, readOnly = false, autoResize = false,
         fontSize = 9, fontFlags = "OUTLINE", text = self.autopilotSpeechDraftText,
         textColor = UI.ResolveColor(nil, "text.primary"), backgroundColor = UI.ResolveColor(nil, "panel.background"),
         borderColor = UI.ResolveColor(nil, "panel.border"),
@@ -273,7 +271,7 @@ function Widget:EnsureAutopilotSpeechCueUI()
     self.autopilotSpeechTextArea:Create()
     frame(self.autopilotSpeechTextArea):SetPoint("TOPLEFT", self.autopilotSpeechSpeakerRow, "BOTTOMLEFT", 0, -GAP)
     frame(self.autopilotSpeechTextArea):SetPoint("TOPRIGHT", self.autopilotSpeechSpeakerRow, "BOTTOMRIGHT", 0, -GAP)
-    frame(self.autopilotSpeechTextArea):SetHeight(42)
+    frame(self.autopilotSpeechTextArea):SetHeight(34)
     self.autopilotSpeechTextArea:SetScript("OnTextChanged", function()
         self:StoreAutopilotSpeechDraft()
         self:RefreshAutopilotSpeechCueControls()
@@ -281,34 +279,36 @@ function Widget:EnsureAutopilotSpeechCueUI()
 
     self.autopilotSpeechCueScroll = UI.ScrollLayout:New({
         name = "RPEClientEventWidgetDMAutopilotSpeechCueList", rowHeight = ROW_HEIGHT, rowSpacing = 0,
-        visibleRows = 2, rowElementClass = CueRow, rowRenderer = function(row, item) row:SetItem(item, self) end,
+        visibleRows = 4, rowElementClass = CueRow, rowRenderer = function(row, item) row:SetItem(item, self) end,
     })
     self.autopilotSpeechCueScroll:SetParent(content)
     self.autopilotSpeechCueScroll:Create()
     frame(self.autopilotSpeechCueScroll):SetPoint("TOPLEFT", frame(self.autopilotSpeechTextArea), "BOTTOMLEFT", 0, -GAP)
     frame(self.autopilotSpeechCueScroll):SetPoint("TOPRIGHT", frame(self.autopilotSpeechTextArea), "BOTTOMRIGHT", 0, -GAP)
-    frame(self.autopilotSpeechCueScroll):SetHeight((ROW_HEIGHT * 2) + 1)
+    frame(self.autopilotSpeechCueScroll):SetHeight((ROW_HEIGHT * 4) + 1)
 
     self.autopilotSpeechButtons = CreateFrame("Frame", "RPEClientEventWidgetDMAutopilotSpeechButtons", content)
     self.autopilotSpeechButtons:SetHeight(20)
-    self.autopilotSpeechAddButton = textButton(self.autopilotSpeechButtons, "RPEClientEventWidgetDMAutopilotSpeechAdd", "Add Speech", 76, function() self:AddAutopilotSpeechCue() end)
-    self.autopilotSpeechUpdateButton = textButton(self.autopilotSpeechButtons, "RPEClientEventWidgetDMAutopilotSpeechUpdate", "Update", 58, function() self:UpdateAutopilotSpeechCue() end)
-    self.autopilotSpeechRemoveButton = textButton(self.autopilotSpeechButtons, "RPEClientEventWidgetDMAutopilotSpeechRemove", "Remove", 56, function() self:RemoveAutopilotSpeechCue() end)
+    self.autopilotSpeechAddButton = textButton(self.autopilotSpeechButtons, "RPEClientEventWidgetDMAutopilotSpeechAdd", "Add", 44, function() self:AddAutopilotSpeechCue() end)
+    self.autopilotSpeechUpdateButton = textButton(self.autopilotSpeechButtons, "RPEClientEventWidgetDMAutopilotSpeechUpdate", "Save", 44, function() self:UpdateAutopilotSpeechCue() end)
+    self.autopilotSpeechCancelButton = textButton(self.autopilotSpeechButtons, "RPEClientEventWidgetDMAutopilotSpeechCancel", "Cancel Edit", 68, function() self:CancelAutopilotSpeechCueEdit() end)
+    self.autopilotSpeechRemoveButton = textButton(self.autopilotSpeechButtons, "RPEClientEventWidgetDMAutopilotSpeechRemove", "Delete", 48, function() self:RemoveAutopilotSpeechCue() end)
     self.autopilotSpeechUpButton = textButton(self.autopilotSpeechButtons, "RPEClientEventWidgetDMAutopilotSpeechUp", "Up", 34, function() self:MoveAutopilotSpeechCue(-1) end)
     self.autopilotSpeechDownButton = textButton(self.autopilotSpeechButtons, "RPEClientEventWidgetDMAutopilotSpeechDown", "Down", 42, function() self:MoveAutopilotSpeechCue(1) end)
-    local buttons = { self.autopilotSpeechAddButton, self.autopilotSpeechUpdateButton, self.autopilotSpeechRemoveButton, self.autopilotSpeechUpButton, self.autopilotSpeechDownButton }
-    for index, button in ipairs(buttons) do
+    local leftButtons = { self.autopilotSpeechAddButton, self.autopilotSpeechUpdateButton, self.autopilotSpeechCancelButton, self.autopilotSpeechRemoveButton }
+    for index, button in ipairs(leftButtons) do
         local buttonFrame = frame(button)
         if index == 1 then buttonFrame:SetPoint("LEFT", self.autopilotSpeechButtons, "LEFT", 0, 0)
-        else buttonFrame:SetPoint("LEFT", frame(buttons[index - 1]), "RIGHT", GAP, 0) end
+        else buttonFrame:SetPoint("LEFT", frame(leftButtons[index - 1]), "RIGHT", GAP, 0) end
     end
+    frame(self.autopilotSpeechDownButton):SetPoint("RIGHT", self.autopilotSpeechButtons, "RIGHT", 0, 0)
+    frame(self.autopilotSpeechUpButton):SetPoint("RIGHT", frame(self.autopilotSpeechDownButton), "LEFT", -GAP, 0)
     self.autopilotSpeechStatusText = UI.CreateText(self.autopilotSpeechButtons, "RPEClientEventWidgetDMAutopilotSpeechStatus", "", {
         height = 12, fontSize = 8, fontFlags = "OUTLINE", justifyH = "RIGHT", justifyV = "MIDDLE", wordWrap = false,
         textColor = UI.ResolveColor(nil, "text.muted"),
     })
-    frame(self.autopilotSpeechStatusText):SetPoint("LEFT", frame(self.autopilotSpeechDownButton), "RIGHT", GAP, 0)
-    frame(self.autopilotSpeechStatusText):SetPoint("RIGHT", self.autopilotSpeechButtons, "RIGHT", 0, 0)
-    frame(self.autopilotSpeechStatusText):SetPoint("CENTER", self.autopilotSpeechButtons, "CENTER", 0, 0)
+    frame(self.autopilotSpeechStatusText):SetPoint("LEFT", frame(self.autopilotSpeechRemoveButton), "RIGHT", GAP, 0)
+    frame(self.autopilotSpeechStatusText):SetPoint("RIGHT", frame(self.autopilotSpeechUpButton), "LEFT", -GAP, 0)
     self.autopilotSpeechButtons:SetPoint("TOPLEFT", frame(self.autopilotSpeechCueScroll), "BOTTOMLEFT", 0, -GAP)
     self.autopilotSpeechButtons:SetPoint("TOPRIGHT", frame(self.autopilotSpeechCueScroll), "BOTTOMRIGHT", 0, -GAP)
     return true
@@ -325,8 +325,33 @@ function Widget:RefreshAutopilotSpeechCueControls()
     local hasText = tostring(self.autopilotSpeechDraftText or ""):match("%S") ~= nil
     local hasSpeaker = tonumber(self.autopilotSpeechSelectedSpeakerId) ~= nil
         and (#(self.autopilotSpeechSpeakers or {}) == 1 or self.autopilotSpeechSpeakerConfirmed == true)
-    shown(self.autopilotSpeechAddButton, true)
-    shown(self.autopilotSpeechUpdateButton, selected ~= nil)
+    local editing = selected ~= nil
+    shown(self.autopilotSpeechAddButton, not editing)
+    shown(self.autopilotSpeechUpdateButton, editing)
+    shown(self.autopilotSpeechCancelButton, editing)
+    shown(self.autopilotSpeechRemoveButton, editing)
+    shown(self.autopilotSpeechUpButton, editing)
+    shown(self.autopilotSpeechDownButton, editing)
+    local addFrame = frame(self.autopilotSpeechAddButton)
+    local saveFrame = frame(self.autopilotSpeechUpdateButton)
+    local cancelFrame = frame(self.autopilotSpeechCancelButton)
+    local deleteFrame = frame(self.autopilotSpeechRemoveButton)
+    local upFrame = frame(self.autopilotSpeechUpButton)
+    local downFrame = frame(self.autopilotSpeechDownButton)
+    local statusFrame = frame(self.autopilotSpeechStatusText)
+    if editing then
+        saveFrame:ClearAllPoints(); saveFrame:SetPoint("LEFT", self.autopilotSpeechButtons, "LEFT", 0, 0)
+        cancelFrame:ClearAllPoints(); cancelFrame:SetPoint("LEFT", saveFrame, "RIGHT", GAP, 0)
+        deleteFrame:ClearAllPoints(); deleteFrame:SetPoint("LEFT", cancelFrame, "RIGHT", GAP, 0)
+        downFrame:ClearAllPoints(); downFrame:SetPoint("RIGHT", self.autopilotSpeechButtons, "RIGHT", 0, 0)
+        upFrame:ClearAllPoints(); upFrame:SetPoint("RIGHT", downFrame, "LEFT", -GAP, 0)
+        statusFrame:ClearAllPoints(); statusFrame:SetPoint("LEFT", deleteFrame, "RIGHT", GAP, 0)
+        statusFrame:SetPoint("RIGHT", upFrame, "LEFT", -GAP, 0)
+    else
+        addFrame:ClearAllPoints(); addFrame:SetPoint("LEFT", self.autopilotSpeechButtons, "LEFT", 0, 0)
+        statusFrame:ClearAllPoints(); statusFrame:SetPoint("LEFT", addFrame, "RIGHT", GAP, 0)
+        statusFrame:SetPoint("RIGHT", self.autopilotSpeechButtons, "RIGHT", 0, 0)
+    end
     self.autopilotSpeechAddButton:SetEnabled(canEdit and hasSpeaker and hasText)
     self.autopilotSpeechUpdateButton:SetEnabled(canEdit and hasSpeaker and hasText and selected ~= nil and selected.sent ~= true and selected.dispatchAttempted ~= true)
     self.autopilotSpeechRemoveButton:SetEnabled(canEdit and selected ~= nil and selected.sent ~= true and selected.dispatchAttempted ~= true)
@@ -339,9 +364,6 @@ function Widget:RefreshAutopilotSpeechCueUI()
     self:StoreAutopilotSpeechDraft()
     local state = eventState()
     self.autopilotSpeechEventState = state
-    local active = self.combatLogHistoryMode == "dm-helper" and type(state) == "table" and state.active == true
-        and tostring(state.turnMode or "manual") == "autopilot" and type(Client.IsLocalEventHost) == "function"
-        and Client:IsLocalEventHost(state) == true and self.autopilotDetailsExpanded ~= true
     local entry = type(self.GetSelectedAutopilotHelperEntry) == "function" and self:GetSelectedAutopilotHelperEntry() or nil
     local actionId = type(entry) == "table" and (entry.actionType == "spell" or entry.actionType == "movement")
         and tostring(entry.actionId or "") or ""
@@ -401,7 +423,6 @@ function Widget:RefreshAutopilotSpeechCueUI()
     local title = "Talking Head - Select a pending spell or movement action"
     if type(entry) == "table" and actionId ~= "" then
         local summary = tostring(entry.displayText or entry.summary or entry.kind or "Pending action")
-        if #summary > 62 then summary = summary:sub(1, 59) .. "..." end
         title = "Talking Head - " .. summary
     end
     self.autopilotSpeechContextText:SetText(title)
@@ -430,76 +451,25 @@ function Widget:RefreshAutopilotSpeechCueUI()
         self:SetAutopilotSpeechStatus(actionId == "" and "Select an action to queue Talking Head dialogue." or "Add dialogue to queue it before this action.", false)
     end
     self:RefreshAutopilotSpeechCueControls()
-    shown(self.autopilotSpeechFrame, active and self.autopilotCueAuthoringMode == "speech")
     return true
 end
 
-local baseEnsure = Widget.EnsureAutopilotHelperUI
-local baseLayout = Widget.LayoutAutopilotHelperDashboard
-local baseRefresh = Widget.RefreshAutopilotHelperDashboard
-local baseExpand = Widget.SetAutopilotDetailsExpanded
-local baseSelect = Widget.SelectAutopilotHelperDetail
-local baseClear = Widget.ClearAutopilotHelperSelection
-
-function Widget:EnsureAutopilotHelperUI(...)
-    local result = baseEnsure(self, ...)
-    if result then self:EnsureAutopilotSpeechCueUI() end
-    return result
-end
-
-function Widget:LayoutAutopilotHelperDashboard(...)
-    local result = baseLayout(self, ...)
-    if self.autopilotSpeechFrame and self.autopilotToolbarFrame then
-        local speech = frame(self.autopilotSpeechFrame)
-        speech:ClearAllPoints()
-        speech:SetPoint("BOTTOMLEFT", self.autopilotToolbarFrame, "TOPLEFT", 0, GAP + 1)
-        speech:SetPoint("BOTTOMRIGHT", self.autopilotToolbarFrame, "TOPRIGHT", 0, GAP + 1)
-        speech:SetHeight(SPEECH_HEIGHT)
-        local active = self.combatLogHistoryMode == "dm-helper" and self.autopilotDetailsExpanded ~= true
-        shown(self.autopilotSpeechFrame, active and self.autopilotCueAuthoringMode == "speech")
-        shown(self.autopilotEmoteFrame, active and self.autopilotCueAuthoringMode ~= "speech")
-        if self.autopilotDetailToggleButton and self.autopilotDetailsExpanded ~= true then
-            local details = frame(self.autopilotDetailToggleButton)
-            details:ClearAllPoints()
-            details:SetPoint("BOTTOMLEFT", speech, "TOPLEFT", 0, GAP)
-            details:SetPoint("BOTTOMRIGHT", speech, "TOPRIGHT", 0, GAP)
-        end
-    end
-    return result
-end
-
-function Widget:RefreshAutopilotHelperDashboard(...)
-    local result = baseRefresh(self, ...)
-    local panel = frame(self.combatLogHistoryPanel)
-    if panel and self.combatLogHistoryMode == "dm-helper" then panel:SetSize(WIDTH, HEIGHT) end
-    self:RefreshAutopilotSpeechCueUI()
-    self:LayoutAutopilotHelperDashboard()
-    return result
-end
-
-function Widget:SetAutopilotDetailsExpanded(expanded, ...)
-    local result = baseExpand(self, expanded, ...)
-    self:RefreshAutopilotSpeechCueUI()
-    self:LayoutAutopilotHelperDashboard()
-    return result
-end
-
-function Widget:SelectAutopilotHelperDetail(entry, ...)
-    local result = baseSelect(self, entry, ...)
-    self:RefreshAutopilotSpeechCueUI()
-    return result
-end
-
-function Widget:ClearAutopilotHelperSelection(...)
-    local result = baseClear(self, ...)
+function Widget:ResetAutopilotSpeechCueAuthoring()
     self.autopilotSpeechActionId, self.autopilotSpeechSelectedCueId = nil, nil
     self.autopilotSpeechDraftKey, self.autopilotSpeechDraftText = nil, ""
     self.autopilotSpeechSelectedSpeakerId, self.autopilotSpeechSpeakerConfirmed = nil, false
     if self.autopilotSpeechTextArea then self:SetAutopilotSpeechDraft("") end
-    self:RefreshAutopilotSpeechCueUI()
-    self:LayoutAutopilotHelperDashboard()
-    return result
+    return true
 end
+
+Widget:RegisterAutopilotCueAuthoringMode("speech", {
+    label = "Talking Heads",
+    tabWidth = 94,
+    ensureMethod = "EnsureAutopilotSpeechCueUI",
+    refreshMethod = "RefreshAutopilotSpeechCueUI",
+    resetMethod = "ResetAutopilotSpeechCueAuthoring",
+    frameField = "autopilotSpeechFrame",
+})
 
 Widget._autopilotSpeechCueExtensionInstalled = true
 return true

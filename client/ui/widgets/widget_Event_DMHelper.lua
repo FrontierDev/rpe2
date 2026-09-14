@@ -335,7 +335,7 @@ function EventWidget:ConfigureDMHelperLayout(bottomInset)
         return false
     end
 
-    if type(panelFrame.SetSize) == "function" then
+    if self.autopilotDMHelperOwnsPanelSize ~= true and type(panelFrame.SetSize) == "function" then
         panelFrame:SetSize(DM_HELPER_PANEL_WIDTH, DM_HELPER_PANEL_HEIGHT)
     end
 

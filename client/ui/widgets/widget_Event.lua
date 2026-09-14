@@ -238,10 +238,10 @@ local COMBAT_LOG_PANEL_HEIGHT = 34
 local COMBAT_LOG_TIME_VISIBLE = 5
 local COMBAT_LOG_FADE_IN_DURATION = 0.18
 local COMBAT_LOG_FADE_OUT_DURATION = 0.22
-local NPC_SPEECH_MIN_DURATION = 7
-local NPC_SPEECH_MAX_DURATION = 18
-local NPC_SPEECH_CHARACTERS_PER_SECOND = 18
-local NPC_SPEECH_PANEL_WIDTH = 480
+local NPC_SPEECH_MIN_DURATION = 5
+local NPC_SPEECH_MAX_DURATION = 12
+local NPC_SPEECH_SECONDS_PER_CHARACTER = 0.035
+local NPC_SPEECH_PANEL_WIDTH = 540
 local NPC_SPEECH_PANEL_HEIGHT = 104
 local NPC_SPEECH_MAX_PANEL_HEIGHT = 220
 local NPC_SPEECH_PORTRAIT_SIZE = 76
@@ -1680,7 +1680,7 @@ local function getPresentationDuration(presentation)
         local text = tostring(type(presentation.payload) == "table" and presentation.payload.text or "")
         return math.max(
             NPC_SPEECH_MIN_DURATION,
-            math.min(NPC_SPEECH_MAX_DURATION, 2 + (#text / NPC_SPEECH_CHARACTERS_PER_SECOND))
+            math.min(NPC_SPEECH_MAX_DURATION, NPC_SPEECH_MIN_DURATION + (#text * NPC_SPEECH_SECONDS_PER_CHARACTER))
         )
     end
     return COMBAT_LOG_TIME_VISIBLE
@@ -1733,10 +1733,10 @@ function EventWidget:RenderNPCSpeech(entry)
         return false
     end
 
-    local isHost = isLocalHostForEvent(eventState)
-    local displayUnit = buildWidgetDisplayUnit(speaker, isHost)
-    local hidden = speaker.hidden == true
-    local hideDetails = hidden and isHost ~= true
+    -- Talking Head dialogue is an explicit host-authored reveal.  It must use
+    -- the authoritative EventUnit directly rather than the roster's masked
+    -- hidden-unit presentation, without altering that unit's hidden state.
+    local displayUnit = speaker
     local teamColor = getTeamColor(eventState, speaker.team)
     local red = math.floor(math.max(0, math.min(1, tonumber(teamColor.r) or 1)) * 255 + 0.5)
     local green = math.floor(math.max(0, math.min(1, tonumber(teamColor.g) or 1)) * 255 + 0.5)
@@ -1778,7 +1778,7 @@ function EventWidget:RenderNPCSpeech(entry)
         self.npcSpeechPortrait:SetSecondaryProgressState(nil)
         self.npcSpeechPortrait:SetBorderColor(teamColor.r or 1, teamColor.g or 1, teamColor.b or 1, teamColor.a or 1)
         self.npcSpeechPortrait:SetRaidMarker(0)
-        self.npcSpeechPortrait:SetHiddenPresentation(hidden, hideDetails)
+        self.npcSpeechPortrait:SetHiddenPresentation(false, false)
     end
 
     return true

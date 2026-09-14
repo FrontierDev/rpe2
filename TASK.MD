@@ -1,238 +1,182 @@
 ## Objective
 
-Allow the event host to make the NPC they are currently controlling speak immediately through the talking-head system.
+Bring the NPC Talking Head popup presentation into line with the intended design while explicitly retaining the current health/resource display on the portrait.
 
-Depends on: #292.
+Target branch: `dev`.
 
-#293 is not a functional dependency; DM Helper queued speech and direct controlled-NPC speech are separate authoring surfaces using the same canonical runtime API.
-
-Source document:
+Source design:
 
 ```text
 .docs/RPE2-NPC-Talking-Heads-PDD.md
 ```
 
-Target branch: `dev`.
+This is a corrective follow-up to commit:
 
-## Current architecture to inspect
+```text
+1c1fea99ef4e86177c35e8314d882e5b7acf346f
+```
+
+## Important product decision
+
+The Talking Head portrait **may continue to show the health bar/resource presentation currently implemented**.
+
+Do not remove the health bar as part of this issue.
+
+## Current review findings
+
+The current implementation differs from the intended presentation in several other ways:
+
+1. hidden NPCs are passed through normal hidden-unit masking for non-host clients;
+2. the popup is narrower than the intended Talking Head presentation target;
+3. speech can remain visible for up to 18 seconds, which blocks all subsequent combat-ticker presentations because the queue is strict FIFO.
+
+The PDD defines NPC speech as an explicit host-authored reveal and describes a larger 520-560px-class Talking Head surface with a more conservative adaptive display duration.
+
+## Required current-code inspection
 
 Before editing, re-read the current `dev` versions of at least:
 
 ```text
-client/client_Event.lua
-client/ui/widgets/widget_ActionBar.lua
-client/ui/widgets/widget_ActionBar_Control.lua
 client/ui/widgets/widget_Event.lua
-core/ui/elements/ClipboardTextArea.lua
-core/ui/elements/TextButton.lua
-core/ui/elements/Panel.lua
-core/ui/Popup.lua
-RPEngine_Dev.toc
+client/client_NPCSpeech.lua
+core/ui/prefabs/UnitPortrait.lua
+.docs/RPE2-NPC-Talking-Heads-PDD.md
 ```
 
-Also inspect the final NPC speech emitter/API implemented by #292.
-
-Do not assume the PDD's suggested function/file names if #292 implemented an equivalent with different names.
-
-## Existing control path
-
-The Event Widget currently allows the host to take control of an NPC from its portrait, reaching the existing client control state:
-
-```text
-Event Widget portrait right-click
-    -> Client:TakeControlOfEventUnit(eventUnit)
-    -> Client.ControlledEventUnitId
-    -> Client:GetActionBarControlContext()
-    -> ActionBar controlled-NPC rows/chrome
-```
-
-`widget_ActionBar_Control.lua` already renders the controlled-unit label using:
-
-- raid marker;
-- unit name;
-- EventUnit ID;
-
-and handles release/end-turn/control chrome.
-
-Extend this existing controlled-unit surface. Do not introduce a second NPC-control window.
+Trace the final presentation queue and `RenderNPCSpeech()` implementation before modifying it.
 
 ## Required changes
 
-### 1. Add a host-only `Speak` control to controlled-NPC chrome
+### 1. Treat Talking Head speech as an explicit reveal
 
-When the local player is the active event host and the current action-bar control context represents a non-player EventUnit, show a `Speak` control near the existing controlled-unit label/buttons.
+When the event host deliberately makes an NPC speak, the Talking Head should use that NPC's actual identity/portrait even if the NPC is currently marked `hidden` in the normal Event Widget presentation.
 
-Conceptually:
+Do not pass the Talking Head speaker through the ordinary participant hidden-unit masking path.
 
-```text
-Controlling {skull} Defias Captain (#12)             [Speak] [X]
-```
+Required behavior:
 
-The button must not appear for:
+- resolve the authoritative EventUnit by `speakerEventId`;
+- show its actual name;
+- show its actual raid marker;
+- show its actual EventUnit ID;
+- show its actual portrait/model presentation;
+- retain team-coloured name presentation;
+- retain the health/resource presentation currently shown on the Talking Head portrait.
 
-- ordinary player action-bar mode;
-- a participant controlling their own pet/companion where they are not the event host;
-- inactive/ending event state;
-- missing/stale controlled unit;
-- any context that fails the current control/host checks.
+This reveal applies to the Talking Head presentation only. It must not change the EventUnit's `hidden` state or reveal the unit in the normal portrait roster.
 
-Do not infer authority from the button being visible: the send path must still validate through #292's canonical speech API.
+### 2. Increase the Talking Head popup width
 
-### 2. Add a compact freeform speech editor
+Tune the panel toward the intended larger Talking Head surface rather than the current 480px width.
 
-Clicking `Speak` should open a small editor anchored to the Action Bar/control chrome or another existing RPE popup convention.
-
-Required UI:
-
-- speaker context showing raid marker + name + EventUnit ID;
-- multiline editable text area;
-- `Send` button;
-- `Cancel`/close behavior;
-- visible validation/error feedback for rejected/empty/too-long/stale speech.
-
-Do not use Blizzard chat edit boxes or send `/say`, `/yell`, PARTY, or RAID chat. This is an RPE NPC talking-head message.
-
-Use existing RPE UI primitives (`Panel`, `ClipboardTextArea`, `TextButton`, `Popup`, etc.) rather than a new XML/template subsystem.
-
-### 3. Send through #292's canonical runtime API
-
-On Send:
-
-1. re-resolve the current controlled-unit context;
-2. confirm the same EventUnit is still controlled and valid;
-3. confirm local host authority/current active event;
-4. trim/validate text through the canonical NPC speech path;
-5. call the canonical emitter from #292 using the controlled EventUnit ID;
-6. only clear/close the editor after a successful local emission, unless current UX conventions favor keeping it open for repeated lines.
-
-The UI must not:
-
-- call `Comms:SendMessage()` directly;
-- construct its own `speechId` if #292 owns speech identity generation;
-- resolve or serialize portrait/team/name metadata itself;
-- directly queue the Event Widget presentation.
-
-### 4. Speech is not a gameplay action
-
-Immediate NPC speech must not affect combat/action state.
-
-Sending speech must not:
-
-- consume an action;
-- end the controlled NPC's turn;
-- start/finish a Spell;
-- spend resources;
-- trigger GCD/cooldown;
-- change movement state;
-- create a pending Autopilot action;
-- write to combat-log history.
-
-It is host-authored presentation only.
-
-### 5. Controlled-unit changes and editor lifecycle
-
-The editor must be bound to the controlled EventUnit identity that opened it.
-
-If any of the following occurs while it is open:
+Target approximately:
 
 ```text
-Client:ReleaseControl(...)
-host takes control of a different EventUnit
-event ends/starts ending
-controlled unit becomes invalid/inactive
-Event Widget/control context is rebuilt
+520-560 px wide
 ```
 
-then the old editor must close or invalidate its draft. It must never send the text as whichever NPC happens to be controlled later.
+Choose the final width based on the existing Event Widget width and current text/portrait geometry.
 
-If the implementation keeps a draft while the same NPC remains controlled, key it by event ID + EventUnit ID, not by a generic global text field.
+Requirements:
 
-No draft persistence is required across `/reload` or event teardown.
+- portrait remains on the left;
+- identity header and dialogue remain on the right;
+- long but valid dialogue has materially better line length/readability;
+- popup remains centered below the unit portraits;
+- no overlap with the normal Event Widget controls;
+- bounded dynamic height still works.
 
-### 6. Repeated immediate speech
+The current 76px portrait size may be retained unless the final geometry clearly benefits from a small adjustment.
 
-The host must be able to send multiple dialogue messages from the same controlled NPC during the event.
+### 3. Reduce maximum Talking Head queue occupancy
 
-Each successful send should become a separate #292 speech emission and therefore enter the shared FIFO presentation queue normally.
+Keep adaptive duration based on dialogue length, but reduce the maximum so one long line cannot block combat ticker traffic for 18 seconds.
 
-Do not replace the currently displayed talking head in-place simply because the same NPC speaks again.
-
-### 7. Layout integration
-
-Preserve existing controlled action-bar behavior:
-
-- controlled NPC spell rows remain usable;
-- release-control button remains usable;
-- existing control label remains readable;
-- end-turn behavior remains unchanged;
-- action-bar sizing/positioning must not jump significantly when Speak is shown/hidden.
-
-If the existing control label's reserved-right-width calculation is used to avoid button overlap, include Speak in that same layout accounting rather than hard-coded overlapping anchors.
-
-## Expected file scope
-
-Primary file:
+Use a deterministic duration in the approximate design range:
 
 ```text
-client/ui/widgets/widget_ActionBar_Control.lua
+minimum: about 5 seconds
+maximum: about 12 seconds
 ```
 
-Potentially:
+A reasonable implementation is conceptually:
 
 ```text
-client/ui/widgets/widget_ActionBar.lua
+base duration + text-length component
+clamped to 5-12 seconds
 ```
 
-Only modify #292 runtime files if a narrowly required public helper is missing. Do not duplicate NPC speech logic inside Action Bar code.
+Do not change combat-log ticker duration; compact combat entries must retain their existing fixed 5-second behavior.
 
-## Deterministic validation
+### 4. Preserve strict FIFO behavior
 
-Exercise with mocked control/event contexts where possible:
+Do not make speech pre-empt combat entries or allow combat entries to overlap speech.
 
-1. active host controlling NPC -> Speak visible;
-2. host not controlling an NPC -> Speak hidden;
-3. non-host participant controlled-pet context -> Speak hidden;
-4. controlled unit becomes stale/inactive -> Speak/editor invalidated;
-5. opening editor shows exact current speaker marker/name/EventUnit ID;
-6. empty/whitespace text cannot send;
-7. valid text calls #292 emitter exactly once with current `speakerEventId`;
-8. failed emitter response does not falsely report success;
-9. release control while editor is open prevents later Send;
-10. switch control from NPC A to NPC B while A editor is open cannot send A draft as B;
-11. two successful sends from one NPC create two distinct queued speech emissions;
-12. sending speech does not mutate turn/action/resource/cooldown/movement state;
-13. controlled NPC Spell buttons still function normally after adding the Speak control;
-14. event teardown closes the editor and leaves no stale runtime draft.
-
-## In-game regression checks
-
-Verify:
+The queue must remain:
 
 ```text
-right-click NPC portrait -> control still works
-controlled action bar -> spells still cast normally
-Speak -> talking head appears for host and participants
-rapid two-line speech -> both messages queue rather than overlap
-release control -> normal action bar state returns
-participant pet control -> no host NPC Speak UI leaks in
+presentation A finishes
+    -> presentation B begins
 ```
+
+The duration adjustment exists only to prevent excessive queue starvation from long NPC speech.
+
+### 5. Preserve identity formatting
+
+Keep the current required identity ordering:
+
+```text
+<raid marker> <team-coloured NPC name> (#<eventUnitId>)
+```
+
+The EventUnit ID should remain neutral text rather than inheriting the team colour.
+
+Speech body must remain plain/escaped text and must not allow arbitrary WoW formatting injection.
+
+## Suggested file scope
+
+Expected primary file:
+
+```text
+client/ui/widgets/widget_Event.lua
+```
+
+Only touch `client/client_NPCSpeech.lua` or `UI.UnitPortrait` if a narrowly required helper is missing. Do not duplicate portrait resolution or network behavior.
+
+## Validation
+
+Verify at minimum:
+
+1. visible NPC speech still renders correctly;
+2. hidden NPC speech shows the real NPC identity/portrait to participants in the Talking Head only;
+3. hidden NPC remains hidden in the ordinary Event Widget roster;
+4. raid marker/name/EventUnit ID ordering remains correct;
+5. only the name is team-coloured;
+6. Talking Head health/resource presentation remains visible;
+7. panel width is in the intended larger range and remains centered;
+8. short speech uses the minimum/near-minimum display duration;
+9. long valid speech never exceeds the new ~12-second cap;
+10. combat ticker entries remain fixed at 5 seconds;
+11. speech followed by combat remains strict FIFO with no overlap;
+12. multiple speech entries remain strict FIFO;
+13. dynamic popup height still remains bounded;
+14. event teardown clears the popup/timer normally.
 
 ## Acceptance criteria
 
-- [ ] Host sees a `Speak` control while directly controlling a valid NPC EventUnit.
-- [ ] Speak opens a compact freeform dialogue editor showing the exact controlled speaker identity.
-- [ ] Sending uses #292's canonical NPC speech API and produces the normal synchronized talking head.
-- [ ] The UI revalidates the controlled EventUnit immediately before sending.
-- [ ] Stale control/editor state cannot make another NPC speak the old draft.
-- [ ] Multiple immediate speech messages queue normally through the shared presentation scheduler.
-- [ ] NPC speech consumes no action economy/resources/cooldowns and does not enter combat-log history.
-- [ ] Existing controlled-NPC action-bar behavior has no regression.
+- [ ] Host-authored Talking Head speech explicitly reveals the actual NPC identity/portrait even when the normal EventUnit is hidden.
+- [ ] The ordinary hidden-unit state/presentation is not otherwise changed.
+- [ ] Health/resource display on the Talking Head portrait is retained.
+- [ ] Talking Head panel width is increased toward the intended 520-560px range.
+- [ ] Adaptive speech duration is capped at approximately 12 seconds rather than 18 seconds.
+- [ ] Combat ticker duration and strict FIFO scheduling are unchanged.
+- [ ] Existing NPC speech networking and duplicate suppression have no regression.
 
 ## Non-goals
 
-- DM Helper queued speech cues (#293).
-- NPC speech macros/presets.
-- AI-generated dialogue.
-- Voice/audio playback.
-- Player-character speech.
-- Persistent dialogue history or replay.
+- Removing health/resource bars from Talking Head portraits.
+- Changing DM Helper cue authoring UI (#295/#296).
+- Adding dialogue history.
+- Adding voice/audio.
+- Changing NPC hidden-state gameplay semantics.
+- Changing combat-log presentation timing.

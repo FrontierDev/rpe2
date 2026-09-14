@@ -360,7 +360,6 @@ if type(baseRows) == "function" then
                 if #cues > 0 and type(row) == "table" then
                     row.hasSpeechCue = true
                     row.speechCueCount = #cues
-                    row.displayText = "[Talking Head] " .. tostring(row.displayText or row.summary or "")
                 end
             end
         end
