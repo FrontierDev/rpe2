@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 10,
+    version = 9,
     dataset = {
         achievements = {},
         auras = {
@@ -4251,7 +4251,9 @@ Addon.Data.DefaultDatasets:Register({
                 castTime = 0,
                 casterEvents = {
                     "on_heal",
-                    "on_critical_heal"
+                    "on_heal_taken",
+                    "on_critical_heal",
+                    "on_critical_heal_taken"
                 },
                 charges = 0,
                 components = {
@@ -4271,9 +4273,7 @@ Addon.Data.DefaultDatasets:Register({
                                     statRef = "f82db71a:hj6d4kvy"
                                 }
                             },
-                            targetEvents = {
-                                "on_heal_taken"
-                            },
+                            targetEvents = {},
                             type = "heal",
                             usesProjectile = false
                         },
