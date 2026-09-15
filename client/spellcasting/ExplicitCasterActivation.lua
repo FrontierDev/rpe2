@@ -429,7 +429,8 @@ end
 if type(baseResolveSpellActivationState) == "function" then
     function Spellcasting.ResolveSpellActivationState(self, spellRef, options)
         local state = baseResolveSpellActivationState(self, spellRef, options)
-        if type(state) == "table" and state.reason == "basic-attack-type" and options and options.includeText ~= false then
+        local includeText = type(options) ~= "table" or options.includeText ~= false
+        if type(state) == "table" and state.reason == "basic-attack-type" and includeText then
             state.failureText = BASIC_ATTACK_TYPE_FAILURE_TEXT
         end
         return state
