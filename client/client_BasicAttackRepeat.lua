@@ -483,11 +483,17 @@ local baseHandleEventState = Client.HandleEventState
 if type(baseHandleEventState) == "function" then
     function Client:HandleEventState(arguments, ...)
         local previousEventState = type(self.GetEventState) == "function" and self:GetEventState() or nil
+        local previousStepKey = buildStepKey(previousEventState)
         local wasLocalPlayerTurn = isLocalPlayerTurnActive(self, previousEventState)
         local result = baseHandleEventState(self, arguments, ...)
         if result == true then
             local currentEventState = type(self.GetEventState) == "function" and self:GetEventState() or nil
-            if not wasLocalPlayerTurn and isLocalPlayerTurnActive(self, currentEventState) then
+            local currentStepKey = buildStepKey(currentEventState)
+            local isLocalPlayerTurn = isLocalPlayerTurnActive(self, currentEventState)
+            if isLocalPlayerTurn
+                and currentStepKey ~= ""
+                and (not wasLocalPlayerTurn or currentStepKey ~= previousStepKey)
+            then
                 self:QueueBasicAttackRepeatAttempt(currentEventState)
             end
         end
