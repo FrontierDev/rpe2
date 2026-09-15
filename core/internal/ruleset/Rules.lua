@@ -216,7 +216,7 @@ Rules.Definitions = {
         rules = {
             { key = "max_total_traits", label = "Max Total Traits", type = "text", default = "0", description = "Maximum number of manually learned traits allowed. Use 0 for unlimited." },
             { key = "enforce_class_talent_limit", label = "Enforce Class Talent Limit", type = "checkbox", default = true, description = "Apply the class-talent progression limit. Disabled keeps class talents opt-in without a cap." },
-            { key = "base_talent_traits", label = "Base Class Talents", type = "text", default = "999", description = "Selected class talents allowed before level scaling is added." },
+            { key = "base_talent_traits", label = "Base Class Talents", type = "text", default = "2", description = "Selected class talents allowed before level scaling is added." },
             { key = "talent_traits_per_level", label = "Class Talents Per Level", type = "text", default = "0", description = "Additional selected class talents granted per level above 1." },
             { key = "auto_enable_race_traits", label = "Auto Enable Race Traits (Legacy)", type = "checkbox", default = true, description = "Retained for imported rulesets; race traits are always intrinsic." },
             { key = "auto_enable_class_traits", label = "Auto Enable Class Traits (Legacy)", type = "checkbox", default = true, description = "Retained for imported rulesets; class passives are always intrinsic and talents remain opt-in." },

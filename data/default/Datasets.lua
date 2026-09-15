@@ -12,8 +12,8 @@ DefaultDatasets.Definitions = {}
 -- race/class traits back into an unowned manual trait.
 local REQUIRED_TRAIT_OWNERSHIP = {
     { datasetId = "f82db71a", collection = "races", ownerId = "v17z463g", field = "traitRefs", traitRef = "f82db71a:dm2h660e" },
-    { datasetId = "23d5dce2", collection = "classes", ownerId = "ta9uh9xw", field = "passiveTraitRefs", traitRef = "23d5dce2:z9yfqvhy" },
-    { datasetId = "23d5dce2", collection = "classes", ownerId = "ta9uh9xw", field = "passiveTraitRefs", traitRef = "23d5dce2:58pob6kr" },
+    { datasetId = "23d5dce2", collection = "classes", ownerId = "ta9uh9xw", field = "talentTraitRefs", traitRef = "23d5dce2:z9yfqvhy" },
+    { datasetId = "23d5dce2", collection = "classes", ownerId = "ta9uh9xw", field = "talentTraitRefs", traitRef = "23d5dce2:58pob6kr" },
     { datasetId = "7bbb4cb9", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "7bbb4cb9:duukevtq" },
     { datasetId = "7bbb4cb9", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "7bbb4cb9:r73vv899" },
     { datasetId = "7bbb4cb9", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "7bbb4cb9:0ncx0gfs" },

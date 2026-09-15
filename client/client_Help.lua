@@ -342,21 +342,26 @@ local SETUP_WIZARD_HELP_BY_TAB = {
         text = "Race and class are saved to your profile and may affect progression, traits and equipment restrictions under the active ruleset. Hover an option to review its description.",
     },
     [2] = {
+        id = "setup.traits",
+        anchor = "TraitsScroll",
+        text = "Race and class passives are granted automatically. Click an available class talent to select it for your starting character; selections remain in this setup draft until you apply it.",
+    },
+    [3] = {
         id = "setup.items",
         anchor = "StartingItemsPanel",
         text = "Click starter items to select them. The ruleset may impose a budget and required equipment slots; compatible equipment is assigned to available slots and other selected items go to your inventory.",
     },
-    [3] = {
+    [4] = {
         id = "setup.skills",
         anchor = "SkillsPanel",
         text = "Use the +/- controls to allocate permanent bonuses to non-combat skills within the ruleset point limit. These changes are not applied until setup is finalized.",
     },
-    [4] = {
+    [5] = {
         id = "setup.actionbar",
         anchor = "ActionBarDummyBarPanel",
         text = "Choose which resources the Action Bar displays, select a bar slot, then click an always-learned spell to bind it. Right-click a spell entry to clear the selected slot.",
     },
-    [5] = {
+    [6] = {
         id = "setup.finalize",
         anchor = "FinalizeApplyButton",
         text = "Review the setup before applying it. Apply commits the selected profile choices and replaces the current Action Bar bindings.",

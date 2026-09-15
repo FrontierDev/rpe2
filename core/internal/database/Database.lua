@@ -34,7 +34,7 @@ end
 
 local SCHEMA = {
     profiles = 7,
-    rulesets = 2,
+    rulesets = 3,
     datasets = 20,
     globalSettings = 1,
 }
@@ -2152,6 +2152,25 @@ function Database.ClearProfileSelectedClassTalentTraits()
     return true
 end
 
+function Database.SetProfileSelectedClassTalentTraits(traitRefs)
+    local profile = Database.GetOrCreateActiveProfile()
+    local normalized = normalizeProfileSelectedClassTalentTraits(traitRefs)
+    profile.selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(profile.selectedClassTalentTraits)
+    if #profile.selectedClassTalentTraits == #normalized then
+        local unchanged = true
+        for index = 1, #normalized do
+            if profile.selectedClassTalentTraits[index] ~= normalized[index] then
+                unchanged = false
+                break
+            end
+        end
+        if unchanged then return false end
+    end
+    profile.selectedClassTalentTraits = normalized
+    notifyConfigurationChanged("profile-selected-class-talents")
+    return true
+end
+
 function Database.ListProfilePreferredConsumables()
     local profile = Database.GetOrCreateActiveProfile()
     profile.preferredConsumables = normalizeProfilePreferredConsumables(profile.preferredConsumables)
@@ -3388,6 +3407,8 @@ function Database.ClearProfileSkillLevel(skillRef)
 end
 
 function Database.EnsureRulesets()
+    local existingRoot = rawget(_G, "RPEngineRulesetDB")
+    local previousSchema = type(existingRoot) == "table" and tonumber(existingRoot._schema) or 0
     local rulesets = ensureSection("RPEngineRulesetDB", SCHEMA.rulesets, {
         rulesets = {},
         activeByChar = {},
@@ -3400,7 +3421,20 @@ function Database.EnsureRulesets()
     rulesets.currentByChar = nil
     rulesets.activeByChar = ensureTable(rulesets.activeByChar)
     normalizeRulesetsCollection(rulesets)
+    local migratedTalentDefaults = false
+    if previousSchema < SCHEMA.rulesets then
+        for _, ruleset in pairs(rulesets.rulesets or {}) do
+            local traitRules = type(ruleset.rules) == "table" and ruleset.rules.traits or nil
+            if type(traitRules) == "table" and tonumber(traitRules.base_talent_traits) == 3 then
+                traitRules.base_talent_traits = 2
+                migratedTalentDefaults = true
+            end
+        end
+    end
     Database.Rulesets = rulesets
+    if migratedTalentDefaults then
+        notifyConfigurationChanged("ruleset-class-talent-default")
+    end
     return rulesets
 end
 

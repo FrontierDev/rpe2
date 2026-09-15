@@ -1,137 +1,239 @@
 ## Summary
 
-Update all built-in/default datasets to the race/class trait ownership model introduced by #301 and exposed by #302.
+Add a **Traits** page to the Setup Wizard on `dev` using the newly refactored race/class trait model.
 
-This issue is specifically responsible for **data migration/correction**, not the runtime or UI implementation.
+The page should let the player review the traits granted by their draft Race/Class selection and choose their starting **class talents** before finalizing setup.
 
-Target branch: `dev`.
+This must use the new ownership semantics:
 
-## Scope
+- racial traits are always granted by the selected race;
+- class passives are always granted by the selected class;
+- class talents are opt-in and limited by the active ruleset/starting level;
+- equipment/consumable traits are unrelated to this page.
 
-Audit every default Race, Class and Trait definition that participates in racial traits, class passives or class talents.
+The Setup Wizard is a staged editor: race/class/item/skill choices are held in local draft state and are not committed until Apply. Trait selection must follow the same pattern. Do **not** mutate the live profile when the player clicks talents inside the wizard.
 
-Current built-in class files include:
+## Placement and flow
 
-- `data/default/classes/mage.lua`
-- `data/default/classes/paladin.lua`
-- `data/default/classes/priest.lua`
-- `data/default/classes/rogue.lua`
-- `data/default/classes/warrior.lua`
+Insert a new **Traits** tab immediately after **Identity**:
 
-Also audit the race/trait definitions in `data/default/core.lua` and any other built-in/default dataset that defines Race/Class trait ownership.
+1. Identity
+2. Traits
+3. Items
+4. Skills (when enabled)
+5. Action Bar
+6. Finalize
 
-## Required class migration
+The current Setup Wizard uses hard-coded tab indices (`SKILLS_TAB_INDEX = 3`, index-specific refresh logic, page-frame lookups, etc.). Refactor these into explicit named/index constants or otherwise update all affected call paths so adding the Traits page cannot cause the wrong page to build/refresh.
 
-Replace each default class's legacy single `traitRefs` collection with the new explicit collections:
+Review at minimum:
+
+- tab definitions in `client/ui/windows/window_SetupWizard.lua`;
+- `RefreshPage` and its context array;
+- `QueuePageRefresh` / tab-selection callbacks;
+- `ApplySkillsPageVisibility`;
+- lazy page-frame lookup/build logic;
+- any hard-coded Finalize/Action Bar page indices.
+
+## Draft trait state
+
+Extend the Setup Wizard instance state with a draft selection for class talents, e.g.:
 
 ```lua
-passiveTraitRefs = { ... }
-talentTraitRefs = { ... }
+selectedClassTalentLookup = {}
 ```
 
-Every existing class-owned trait must be intentionally placed into **exactly one** of these collections.
+The draft should be initialized from the current profile when the wizard opens.
 
-Migration rule:
+`CaptureSelectionState`, `SyncSelectionState`, and `CollectCurrentSelection` should include the currently selected class talent refs so reopening the wizard faithfully represents the profile's existing selection.
 
-- a class-intrinsic effect that should always apply when the class is selected -> `passiveTraitRefs`;
-- a player-choice class trait -> `talentTraitRefs`;
-- do not preserve the old list wholesale and rely on Trait-level flags at runtime.
+### Race/Class changes
 
-Use the existing default content and intended gameplay meaning to classify each entry. If an existing definition is contradictory/ambiguous, resolve it explicitly rather than guessing through fallback behavior.
+Trait availability is determined from the wizard's **draft** identity selections (`selectedRaceRef` / `selectedClassRef`), not necessarily the currently committed profile identity.
 
-### Known examples
+When the draft race changes:
 
-The following current data should be corrected as part of this migration:
+- refresh the racial-passive section immediately.
 
-- Rogue `Instant Poison` (`z9yfqvhy`) is currently authored as a class trait and should be represented as a **Rogue class passive** in `passiveTraitRefs`.
-- Warrior `Defensive Stance` (`duukevtq`) is currently authored as a talent and owned by Warrior; it should be represented in Warrior's `talentTraitRefs`.
-- Warrior `Battle Stance` (`r73vv899`) is currently authored as a talent and owned by Warrior; it should be represented in Warrior's `talentTraitRefs`.
+When the draft class changes:
 
-Audit the remaining Warrior refs (`0ncx0gfs`, `a8x4ee34`) and all Mage/Paladin/Priest/Rogue refs and assign each to the correct passive/talent collection based on its intended behavior.
+- refresh class passives immediately;
+- refresh the available class talent pool immediately;
+- remove/prune draft-selected talents that do not belong to the newly selected class;
+- do not alter the live profile until Apply.
 
-Do not drop any currently intended class trait during migration.
+Do not call `Profile.ToggleTraitActivation()` directly from the wizard while editing, because that API acts on the committed profile and its currently selected class.
 
-## Required race migration/corrections
+## Page contents
 
-All racial traits must be owned by the appropriate Race definition, and every race-owned trait is an always-active racial passive.
+The Traits page should contain three logical sections.
 
-### Human Spirit defect
+### Racial Passives
 
-`The Human Spirit` (`dm2h660e`) is currently flagged as racial, but the Human race has an empty `traitRefs` collection. Under the canonical ownership model this means the racial is not actually granted by choosing Human.
+Resolve the draft selected Race and display every trait in its `traitRefs` collection.
 
-Correct the Human Race definition so `The Human Spirit` is present in Human's racial `traitRefs`.
+Requirements:
 
-Then audit all remaining default traits currently marked/treated as racial and ensure each one is referenced by the correct Race definition.
+- informational only;
+- always shown as active/granted;
+- no checkbox/toggle/action;
+- use the standard trait icon/name/tooltip presentation where possible;
+- tooltip should identify the trait as granted by the selected race.
 
-No default racial should depend solely on a Trait-level `isRacial` flag.
+If no race is selected, or races are disabled by the active ruleset, show an appropriate empty state rather than stale entries.
 
-## Remove obsolete ownership flags from default Trait definitions
+### Class Passives
 
-After the data has been migrated to canonical Race/Class ownership:
+Resolve the draft selected Class and display every trait in its `passiveTraitRefs` collection.
 
-- remove obsolete `isRacial` declarations from built-in trait definitions if #301 removes/deprecates that field;
-- remove obsolete `isClass` declarations from built-in trait definitions if #301 removes/deprecates that field;
-- remove/update any `isTalent` usage whose only purpose was to distinguish a class-owned trait from a class passive, because class ownership/type is now expressed by `passiveTraitRefs` vs `talentTraitRefs`;
-- retain unrelated fields such as environmental behavior where applicable.
+Requirements:
 
-Do not leave the default datasets in a hybrid state where both the new ownership collections and legacy flags are required to infer the same behavior.
+- informational only;
+- always shown as active/granted;
+- no checkbox/toggle/action;
+- use the standard trait icon/name/tooltip presentation where possible;
+- tooltip should identify the trait as granted by the selected class.
 
-## Preserve identifiers and references
+### Class Talents
 
-This is a schema/ownership migration, not a content recreation task.
+Resolve the draft selected Class and display the complete `talentTraitRefs` pool.
 
-Unless an existing definition is independently broken:
+Requirements:
 
-- preserve existing dataset IDs;
-- preserve trait IDs;
-- preserve names/descriptions/effects/auras/events;
-- preserve unlock levels;
-- preserve spell/item references;
-- preserve class/race IDs.
+- show selected and unselected talents;
+- left-click toggles only the wizard's local draft selection;
+- selected talents must be visually distinct;
+- talents locked by `unlockLevel` at the ruleset starting level must remain visible but disabled/locked;
+- locked tooltip/row text must show the required level;
+- talent refs from another class must never be selectable;
+- missing trait definitions should render safely and must not be selectable.
 
-The migration must not invalidate external references to built-in traits unnecessarily.
+The UI may reuse the same `UI.SpellbookEntry`/trait tooltip style already used by the Profile Traits page rather than inventing a separate visual language.
 
-## Built-in dataset versioning
+## Talent allowance
 
-Bump the relevant built-in/default dataset versions so installations with older built-in definitions receive the corrected Race/Class/Trait data through the existing default-dataset update mechanism.
+The page header/summary should show the actual starting class-talent allowance, for example:
 
-Updating a built-in dataset must not reactivate a dataset that the user has explicitly disabled; preserve the existing default-dataset activation semantics.
+```text
+Class Talents: 2 / 4 selected
+```
 
-## Add/extend default-data integrity validation
+or, when the limit is disabled:
 
-Add a deterministic validation/test pass for the default datasets so this category of defect is caught in future.
+```text
+Class Talents: 2 selected / Unlimited
+```
 
-At minimum assert:
+The allowance must be calculated using the **Setup Wizard starting level** (`GetStartingLevel()`), not the currently committed profile level.
 
-1. Every `Race.traitRefs` entry resolves to a valid Trait.
-2. Every `Class.passiveTraitRefs` entry resolves to a valid Trait.
-3. Every `Class.talentTraitRefs` entry resolves to a valid Trait.
-4. A class cannot contain the same ref in both passive and talent collections.
-5. Every legacy class-owned ref present before migration is accounted for exactly once after migration unless its deliberate removal is documented.
-6. Every built-in trait intended as a racial is owned by at least one Race.
-7. Default racial/class ownership does not depend solely on deprecated Trait ownership flags.
-8. No default class talent is accidentally available as an unowned generic/manual talent.
+Do not duplicate the talent-limit formula in Setup Wizard code. Factor/reuse a pure Profile/Ruleset helper that can calculate the class talent allowance for an arbitrary level, then use the same helper from both:
 
-Where practical, validate reverse ownership as well so orphaned built-in race/class traits are reported during development.
+- normal Profile trait-count/activation validation;
+- Setup Wizard draft validation.
 
-## Functional verification
+Selecting a talent that would exceed the allowance must fail without mutating draft state and should provide brief feedback.
 
-Verify in-game/profile behavior after #301/#302 with the migrated data:
+Racial traits and class passives do not consume class-talent selections.
 
-- selecting Human immediately grants and applies `The Human Spirit`;
-- the Human racial cannot be toggled off;
-- selecting Rogue immediately grants its class passives, including `Instant Poison` if that remains the intended passive behavior;
-- selecting Warrior exposes `Defensive Stance` and `Battle Stance` in the Warrior talent pool but does not activate them until selected;
-- class passives appear under Class Passives;
-- class talents appear under Class Talents;
-- changing class removes the previous class's passive/talent availability and loads the new class's data correctly.
+## Draft trait detail resolution
+
+The current Profile Traits page can rely on the committed profile when building trait rows. The Setup Wizard cannot, because its draft race/class may differ from the live profile.
+
+Do not temporarily mutate the live profile simply to obtain trait details/tooltips.
+
+Instead, resolve the draft Race/Class directly through `Registry` and construct/reuse a side-effect-free trait-detail helper for explicit ownership context, sufficient to provide:
+
+- `traitRef`;
+- name/icon;
+- payload/description;
+- `origin = race|class`;
+- `typeCategory = class|talent` as appropriate;
+- selected/active state;
+- lock state/reason based on the supplied starting level;
+- missing-definition state.
+
+Prefer sharing this helper with `BuildProfileTraitRows`/Profile trait detail logic if practical so tooltip/category semantics do not drift.
+
+## Finalize summary
+
+Extend the Finalize page to summarize traits before Apply.
+
+At minimum include:
+
+- race passive count/names where space permits;
+- class passive count/names where space permits;
+- selected class talents and selected/allowed count.
+
+The summary must use the wizard's draft identity and draft talent selections, not the live profile.
+
+## Applying the wizard
+
+`ApplyCurrentSelection()` currently commits level/race/class and then the remaining setup configuration. Extend this flow so selected class talents are committed **after the class has been set**.
+
+Apply the desired talent set deterministically rather than replaying click/toggle state.
+
+Prefer a canonical Profile API such as:
+
+```lua
+Profile.SetSelectedClassTalentTraits(refs)
+```
+
+If no equivalent already exists, add one. It should:
+
+- validate every ref against the selected class's `talentTraitRefs`;
+- reject/drop locked or invalid refs according to canonical Profile rules;
+- enforce the active class talent allowance;
+- replace the existing selected class talent set exactly;
+- trigger normal configuration/runtime invalidation once the final state is committed.
+
+This avoids the Setup Wizard directly manipulating Database internals or reimplementing the Profile validation layer.
+
+Remember that `Profile.SetClassRef()` now clears selected class talents when the class changes; the wizard should therefore set the class first and then apply its draft class-talent set.
+
+## Page visibility / empty behavior
+
+The Traits tab should be part of the normal Setup Wizard rather than controlled by a new ruleset toggle.
+
+If race/class systems are disabled or the selected definitions contain no traits, retain the page and show useful empty-state text. This avoids another dynamic-tab-index path and keeps the setup sequence predictable.
+
+## Performance
+
+Follow the current lazy page-build pattern used by the Setup Wizard.
+
+Do not rebuild/scan every activated trait dataset on every refresh. Resolve only the refs owned by the current draft Race/Class and cache/reuse row widgets where practical.
+
+The existing Setup Wizard timing instrumentation should include the new page (`SetupWizard.BuildPage` / `SetupWizard.RefreshPage` context `traits`) so any regression is visible at RPE INTERNAL debug level.
+
+## Required validation
+
+Exercise at minimum:
+
+1. Wizard opens on an existing character and reflects the currently selected class talents.
+2. Selecting Human shows its racial passives without modifying the live profile before Apply.
+3. Selecting a class shows its class passives and entire talent pool.
+4. Class passives/racials cannot be toggled.
+5. Class talents are inactive/unselected by default when appropriate and can be selected locally.
+6. Talent limit is calculated using the ruleset **starting level**.
+7. A third talent cannot be selected if the starting allowance is two.
+8. Locked higher-level talents are visible but cannot be selected.
+9. Switching class removes invalid draft talent selections and immediately displays the new class pool.
+10. Switching race immediately updates racial passives.
+11. Cancelling/closing the wizard leaves live trait selection unchanged.
+12. Applying commits race/class first, then the exact selected class talent set.
+13. Reopening the wizard after Apply reproduces the saved talent choices.
+14. Skills-tab visibility still works after the tab-index changes.
+15. Items, Action Bar and Finalize still refresh the correct pages after the new tab is inserted.
+16. Existing equipment and consumable trait behavior is unaffected.
 
 ## Acceptance criteria
 
-- Every built-in Race/Class trait relationship uses the new canonical ownership fields.
-- All five current default class files have been audited and migrated.
-- `The Human Spirit` is correctly owned by Human and works automatically when Human is selected.
-- All existing intended class traits are classified exactly once as either class passive or class talent.
-- Built-in Trait definitions no longer rely on duplicate Race/Class ownership flags after migration.
-- Relevant default dataset versions are bumped so the migration reaches existing installations without re-enabling disabled datasets.
-- Automated/default-data validation detects missing refs, duplicate passive/talent membership, orphaned racial ownership, and other invalid ownership states.
+- Setup Wizard contains a Traits tab directly after Identity.
+- The page shows draft racial passives, class passives and the full draft class talent pool.
+- Racials/passives are informational and always granted; only class talents are selectable.
+- Talent selection is staged locally until Apply.
+- Starting-level/ruleset talent limits and unlock levels are enforced.
+- Changing draft class/race refreshes the page and cannot leak stale selections.
+- Finalize summarizes the trait choices.
+- Apply commits an exact, validated class-talent set after class selection.
+- Hard-coded Setup Wizard page indices are corrected/refactored so all existing tabs continue working.
+- Setup Wizard timing diagnostics cover the new Traits page.

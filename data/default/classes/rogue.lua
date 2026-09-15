@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 9,
+    version = 11,
     dataset = {
         achievements = {},
         auras = {
@@ -384,11 +384,12 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 passiveTraitRefs = {
-                    "23d5dce2:z9yfqvhy",
-                    "23d5dce2:58pob6kr",
                     "23d5dce2:murderxx"
                 },
-                talentTraitRefs = {}
+                talentTraitRefs = {
+                    "23d5dce2:z9yfqvhy",
+                    "23d5dce2:58pob6kr"
+                }
             }
         },
         currencies = {},

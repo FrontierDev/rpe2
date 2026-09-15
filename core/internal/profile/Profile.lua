@@ -1484,11 +1484,9 @@ local function buildTraitCountSummary()
     end
 
     local level = getProfileLevel()
-    local baseTalentTraits = math.max(0, math.floor(tonumber(getTraitRuleValue("base_talent_traits", 0)) or 0))
-    local talentTraitsPerLevel = math.max(0, tonumber(getTraitRuleValue("talent_traits_per_level", 0)) or 0)
     local maxTotalTraits = math.max(0, math.floor(tonumber(getTraitRuleValue("max_total_traits", 0)) or 0))
-    local talentLimitEnabled = getTraitRuleValue("enforce_class_talent_limit", true) == true
-    local maxTalentTraits = talentLimitEnabled and math.max(0, math.floor(baseTalentTraits + ((level - 1) * talentTraitsPerLevel))) or 0
+    local talentAllowance = Profile.GetClassTalentAllowance(level)
+    local maxTalentTraits = talentAllowance.maxTalentTraits
     local countRaceTowardTotal = getTraitRuleValue("count_race_traits_toward_total", false) == true
     local countClassTowardTotal = getTraitRuleValue("count_class_traits_toward_total", false) == true
     if countRaceTowardTotal then
@@ -1515,6 +1513,19 @@ local function buildTraitCountSummary()
         autoClassCount = #classRefs,
         countRaceTowardTotal = countRaceTowardTotal,
         countClassTowardTotal = countClassTowardTotal,
+    }
+end
+
+function Profile.GetClassTalentAllowance(level)
+    local normalizedLevel = math.max(1, math.floor(tonumber(level) or 1))
+    local baseTalentTraits = math.max(0, math.floor(tonumber(getTraitRuleValue("base_talent_traits", 0)) or 0))
+    local talentTraitsPerLevel = math.max(0, tonumber(getTraitRuleValue("talent_traits_per_level", 0)) or 0)
+    local configuredLimit = math.max(0, math.floor(baseTalentTraits + ((normalizedLevel - 1) * talentTraitsPerLevel)))
+    local limitEnabled = getTraitRuleValue("enforce_class_talent_limit", true) == true and configuredLimit > 0
+    return {
+        level = normalizedLevel,
+        isLimited = limitEnabled,
+        maxTalentTraits = limitEnabled and configuredLimit or 0,
     }
 end
 
@@ -3043,6 +3054,30 @@ function Profile.DeactivateTrait(traitRef)
     end
 
     return false
+end
+
+function Profile.SetSelectedClassTalentTraits(traitRefs)
+    local availableRefs = buildSelectedOriginTraitRefs("classTalent")
+    local availableLookup = {}
+    for index = 1, #availableRefs do
+        availableLookup[availableRefs[index]] = true
+    end
+
+    local allowance = Profile.GetClassTalentAllowance(getProfileLevel())
+    local selected, seen = {}, {}
+    for index = 1, #(traitRefs or {}) do
+        local traitRef = ensureString(traitRefs[index])
+        local detail = traitRef ~= "" and Profile.GetKnownTraitDetails and Profile.GetKnownTraitDetails(traitRef) or nil
+        if traitRef ~= "" and availableLookup[traitRef] == true and seen[traitRef] ~= true
+            and detail and detail.isMissing ~= true and getTraitUnlockLevel(detail.trait) <= allowance.level
+            and (allowance.isLimited ~= true or #selected < allowance.maxTalentTraits)
+        then
+            seen[traitRef] = true
+            selected[#selected + 1] = traitRef
+        end
+    end
+
+    return Database.SetProfileSelectedClassTalentTraits and Database.SetProfileSelectedClassTalentTraits(selected) or false
 end
 
 function Profile.IsClassOwnedTrait(traitRef)
