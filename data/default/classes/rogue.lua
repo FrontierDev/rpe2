@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 2,
+    version = 4,
     dataset = {
         achievements = {},
         auras = {
@@ -334,6 +334,12 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/classicon_rogue.blp",
                 id = "ta9uh9xw",
                 name = "Rogue",
+                armorWeights = {
+                    "leather",
+                },
+                armorWeights = {
+                    "leather",
+                },
                 resourceProgressions = {
                     {
                         initialValue = 25,
@@ -374,6 +380,17 @@ Addon.Data.DefaultDatasets:Register({
                         statRef = "f82db71a:kec9rhli"
                     }
                 },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:i4pivdig",
+                    "f82db71a:9ni3vfas",
+                    "f82db71a:y0dnlo8g",
+                    "f82db71a:l3ce0puc",
+                    "f82db71a:j2gceby4",
+                    "f82db71a:anoo8qfp",
+                    "f82db71a:gjz2331m",
+                    "f82db71a:we5ul4ne",
+                },
                 traitRefs = {
                     "23d5dce2:z9yfqvhy"
                 }
@@ -395,6 +412,12 @@ Addon.Data.DefaultDatasets:Register({
         loot = {},
         mounts = {},
         name = "Rogue",
+                armorWeights = {
+                    "leather",
+                },
+                armorWeights = {
+                    "leather",
+                },
         pets = {},
         races = {},
         recipes = {},
@@ -2342,6 +2365,17 @@ Addon.Data.DefaultDatasets:Register({
                         type = "item_equipped",
                         weaponTypeRefs = {}
                     }
+                },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:i4pivdig",
+                    "f82db71a:9ni3vfas",
+                    "f82db71a:y0dnlo8g",
+                    "f82db71a:l3ce0puc",
+                    "f82db71a:j2gceby4",
+                    "f82db71a:anoo8qfp",
+                    "f82db71a:gjz2331m",
+                    "f82db71a:we5ul4ne",
                 },
                 description = "",
                 events = {

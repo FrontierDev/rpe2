@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 1,
+    version = 3,
     dataset = {
         achievements = {},
         auras = {
@@ -373,6 +373,12 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/classicon_mage.blp",
                 id = "02p0r8a2",
                 name = "Mage",
+                armorWeights = {
+                    "cloth",
+                },
+                armorWeights = {
+                    "cloth",
+                },
                 resourceProgressions = {
                     {
                         initialValue = 31,
@@ -413,6 +419,12 @@ Addon.Data.DefaultDatasets:Register({
                         statRef = "f82db71a:ygjno50i"
                     }
                 },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:y0dnlo8g",
+                    "f82db71a:3y1v01e4",
+                    "f82db71a:s4q9t5f3",
+                },
                 traitRefs = {}
             }
         },
@@ -432,6 +444,12 @@ Addon.Data.DefaultDatasets:Register({
         loot = {},
         mounts = {},
         name = "Mage",
+                armorWeights = {
+                    "cloth",
+                },
+                armorWeights = {
+                    "cloth",
+                },
         pets = {},
         races = {},
         recipes = {},

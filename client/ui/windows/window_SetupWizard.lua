@@ -356,6 +356,8 @@ local function createInstance()
         setupSkillRows = {},
         skillPointFeedback = "",
         startingItemFilterQuery = "",
+        startingItemTypeFilter = "all",
+        showClassItemsOnly = false,
         startingItemPage = 1,
         availableStartingItems = {},
         filteredStartingItems = {},
@@ -1195,13 +1197,43 @@ function SetupWizard:BuildStartingItemsPage(page)
         self:RefreshStartingItemsPage(self.cachedState or self:CaptureSelectionState())
     end)
 
+    self.StartingItemsTypeFilter = UI.CreateDropdown(page, "RPESetupWizardItemsTypeFilter", {
+        width = 82,
+        height = ITEM_SEARCH_HEIGHT,
+        items = {
+            { label = "All", value = "all" }, { label = "Armor", value = "armor" },
+            { label = "Weapons", value = "weapon" }, { label = "Consumables", value = "consumable" },
+        },
+        onValueChanged = function(value)
+            self.startingItemTypeFilter = value or "all"
+            self.startingItemPage = 1
+            self:RefreshStartingItemsPage(self.cachedState or self:CaptureSelectionState())
+        end,
+    })
+    self.StartingItemsTypeFilter:GetFrame():SetPoint("TOPRIGHT", self.StartingItemsSearchClearButton:GetFrame(), "TOPLEFT", -4, 0)
+    self.StartingItemsSearchInput:GetFrame():ClearAllPoints()
+    self.StartingItemsSearchInput:GetFrame():SetPoint("TOPLEFT", self.StartingItemsSearchLabel:GetFrame(), "TOPRIGHT", 4, 0)
+    self.StartingItemsSearchInput:GetFrame():SetPoint("TOPRIGHT", self.StartingItemsTypeFilter:GetFrame(), "TOPLEFT", -4, 0)
+
+    self.StartingItemsClassFilter = UI.Checkbox:New({
+        name = "RPESetupWizardItemsClassFilter", text = "Show class items", width = 112, height = ITEM_SEARCH_HEIGHT,
+        onValueChanged = function(checked)
+            self.showClassItemsOnly = checked == true
+            self.startingItemPage = 1
+            self:RefreshStartingItemsPage(self.cachedState or self:CaptureSelectionState())
+        end,
+    })
+    self.StartingItemsClassFilter:SetParent(page)
+    self.StartingItemsClassFilter:Create()
+    self.StartingItemsClassFilter:GetFrame():SetPoint("TOPLEFT", self.StartingItemsSearchLabel:GetFrame(), "BOTTOMLEFT", 0, -3)
+
     self.StartingItemsSummaryText = UI.CreateText(page, "RPESetupWizardItemsSummaryText", "", {
         width = 300,
         height = 14,
         justifyH = "LEFT",
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
-    self.StartingItemsSummaryText:GetFrame():SetPoint("TOPLEFT", self.StartingItemsSearchInput:GetFrame(), "BOTTOMLEFT", -40, -6)
+    self.StartingItemsSummaryText:GetFrame():SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 0, 0)
 
     self.StartingItemsRequirementText = UI.CreateText(page, "RPESetupWizardItemsRequirementText", "", {
         width = 148,
@@ -1209,7 +1241,7 @@ function SetupWizard:BuildStartingItemsPage(page)
         justifyH = "RIGHT",
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
-    self.StartingItemsRequirementText:GetFrame():SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, -44)
+    self.StartingItemsRequirementText:GetFrame():SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, 0)
 
     self.StartingItemsNextButton = UI.TextButton:New({
         name = "RPESetupWizardItemsNextButton",
@@ -1225,7 +1257,7 @@ function SetupWizard:BuildStartingItemsPage(page)
         self.startingItemPage = self.startingItemPage + 1
         self:RefreshStartingItemsPage(self.cachedState or self:CaptureSelectionState())
     end)
-    self.StartingItemsNextButton:GetFrame():SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, -44)
+    self.StartingItemsNextButton:GetFrame():SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, 16)
 
     self.StartingItemsPrevButton = UI.TextButton:New({
         name = "RPESetupWizardItemsPrevButton",
@@ -1256,8 +1288,8 @@ function SetupWizard:BuildStartingItemsPage(page)
         height = 240,
         contentInset = 6,
     })
-    self.StartingItemsPanel:GetFrame():SetPoint("TOPLEFT", self.StartingItemsSummaryText:GetFrame(), "BOTTOMLEFT", 0, -4)
-    self.StartingItemsPanel:GetFrame():SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, -42)
+    self.StartingItemsPanel:GetFrame():SetPoint("TOPLEFT", self.StartingItemsClassFilter:GetFrame(), "BOTTOMLEFT", 0, -4)
+    self.StartingItemsPanel:GetFrame():SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, 34)
 
     self.StartingItemsGrid = UI.CreateLayout(UI.GridLayoutGroup, self.StartingItemsPanel:GetContentFrame(), "RPESetupWizardItemsGrid", {
         width = (ITEM_SLOT_COLUMNS * ITEM_SLOT_SIZE) + ((ITEM_SLOT_COLUMNS - 1) * ITEM_SLOT_SPACING),
@@ -2216,7 +2248,17 @@ function SetupWizard:BuildFilteredStartingItems()
 
     for index = 1, #(self.availableStartingItems or {}) do
         local entry = self.availableStartingItems[index]
-        if query == "" or string.find(tostring(entry.searchIndex or ""), query, 1, true) ~= nil then
+        local item = entry and entry.item or {}
+        local matchesQuery = query == "" or string.find(tostring(entry.searchIndex or ""), query, 1, true) ~= nil
+        local matchesType = self.startingItemTypeFilter == "all" or tostring(item.itemType or "") == self.startingItemTypeFilter
+        local matchesClass = true
+        if self.showClassItemsOnly then
+            local _, class = Registry:ResolveClassReference(self.selectedClassRef)
+            local armorWeights, weaponTypeRefs = class and class.armorWeights or {}, class and class.weaponTypeRefs or {}
+            matchesClass = (item.itemType == "armor" and tContains(armorWeights, item.armorWeight))
+                or (item.itemType == "weapon" and tContains(weaponTypeRefs, item.weaponTypeRef))
+        end
+        if matchesQuery and matchesType and matchesClass then
             filtered[#filtered + 1] = entry
         end
     end

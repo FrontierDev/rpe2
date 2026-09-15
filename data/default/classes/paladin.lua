@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 1,
+    version = 3,
     dataset = {
         achievements = {},
         auras = {
@@ -642,6 +642,16 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/classicon_paladin.blp",
                 id = "wvirv9um",
                 name = "Paladin",
+                armorWeights = {
+                    "mail",
+                    "plate",
+                    "shield",
+                },
+                armorWeights = {
+                    "mail",
+                    "plate",
+                    "shield",
+                },
                 resourceProgressions = {
                     {
                         initialValue = 28,
@@ -659,6 +669,12 @@ Addon.Data.DefaultDatasets:Register({
                         skillRef = "f82db71a:4keh3nf1",
                         value = 275
                     }
+                },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:i4pivdig",
+                    "f82db71a:9ni3vfas",
+                    "f82db71a:25s5wyry",
                 },
                 statProgressions = {
                     {
@@ -757,6 +773,12 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         color = "blue"
                     }
+                },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:i4pivdig",
+                    "f82db71a:9ni3vfas",
+                    "f82db71a:25s5wyry",
                 },
                 stats = {
                     {
@@ -870,6 +892,12 @@ Addon.Data.DefaultDatasets:Register({
                         color = "red"
                     }
                 },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:i4pivdig",
+                    "f82db71a:9ni3vfas",
+                    "f82db71a:25s5wyry",
+                },
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
@@ -981,6 +1009,12 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         color = "yellow"
                     }
+                },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:i4pivdig",
+                    "f82db71a:9ni3vfas",
+                    "f82db71a:25s5wyry",
                 },
                 stats = {
                     {
@@ -1097,6 +1131,12 @@ Addon.Data.DefaultDatasets:Register({
                         value = 16
                     }
                 },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:i4pivdig",
+                    "f82db71a:9ni3vfas",
+                    "f82db71a:25s5wyry",
+                },
                 tags = {},
                 targetArmorWeight = "none",
                 targetSlotRefs = {},
@@ -1172,6 +1212,12 @@ Addon.Data.DefaultDatasets:Register({
                         color = "blue"
                     }
                 },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:i4pivdig",
+                    "f82db71a:9ni3vfas",
+                    "f82db71a:25s5wyry",
+                },
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
@@ -1212,6 +1258,16 @@ Addon.Data.DefaultDatasets:Register({
         loot = {},
         mounts = {},
         name = "Paladin",
+                armorWeights = {
+                    "mail",
+                    "plate",
+                    "shield",
+                },
+                armorWeights = {
+                    "mail",
+                    "plate",
+                    "shield",
+                },
         pets = {},
         races = {},
         recipes = {},
@@ -4353,6 +4409,12 @@ Addon.Data.DefaultDatasets:Register({
                         value = -10
                     }
                 },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:i4pivdig",
+                    "f82db71a:9ni3vfas",
+                    "f82db71a:25s5wyry",
+                },
                 unlockLevel = 1
             },
             {
@@ -4403,6 +4465,12 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         triggerTarget = "event_source"
                     }
+                },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:i4pivdig",
+                    "f82db71a:9ni3vfas",
+                    "f82db71a:25s5wyry",
                 },
                 icon = "interface/icons/spell_magic_managain.blp",
                 id = "yz6qglzv",
