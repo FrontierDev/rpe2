@@ -51,7 +51,7 @@ local function registerBasicAttackRule()
                 key = BASIC_ATTACK_RULE_KEY,
                 label = "Basic Attacks Do Not Consume Global Cooldown",
                 type = "checkbox",
-                default = false,
+                default = true,
                 description = "Basic attacks (auto hit type) do not consume the global cooldown. Each basic attack may still be used only once per turn, and after using one basic attack only other basic attacks of the same damage type (melee, ranged, or spell) may be used that turn.",
             }
             return true
@@ -65,11 +65,11 @@ registerBasicAttackRule()
 
 local function isBasicAttackRuleEnabled()
     if type(Ruleset.GetRulesetRuleValueByKey) ~= "function" then
-        return false
+        return true
     end
 
     local activeRuleset = type(Ruleset.GetActiveRuleset) == "function" and Ruleset.GetActiveRuleset() or nil
-    return Ruleset.GetRulesetRuleValueByKey(activeRuleset, "combat", BASIC_ATTACK_RULE_KEY, false) == true
+    return Ruleset.GetRulesetRuleValueByKey(activeRuleset, "combat", BASIC_ATTACK_RULE_KEY, true) == true
 end
 
 local function normalizeDamageType(value)
