@@ -466,5 +466,6 @@ client/ui/ruleset/inspectors/page_InspectorRuleset.lua
 client/ui/ruleset/window_Ruleset.lua
 
 data/default/Install.lua
+data/default/Ruleset.lua
 BagScanTest.lua
 RuneclothDeleteTest.lua
