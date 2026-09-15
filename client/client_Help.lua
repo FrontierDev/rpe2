@@ -335,4 +335,118 @@ if type(Commands.RegisterCommand) == "function" then
     })
 end
 
+local SETUP_WIZARD_HELP_BY_TAB = {
+    [1] = {
+        id = "setup.identity",
+        anchor = "ClassPanel",
+        text = "Race and class are saved to your profile and may affect progression, traits and equipment restrictions under the active ruleset. Hover an option to review its description.",
+    },
+    [2] = {
+        id = "setup.items",
+        anchor = "StartingItemsPanel",
+        text = "Click starter items to select them. The ruleset may impose a budget and required equipment slots; compatible equipment is assigned to available slots and other selected items go to your inventory.",
+    },
+    [3] = {
+        id = "setup.skills",
+        anchor = "SkillsPanel",
+        text = "Use the +/- controls to allocate permanent bonuses to non-combat skills within the ruleset point limit. These changes are not applied until setup is finalized.",
+    },
+    [4] = {
+        id = "setup.actionbar",
+        anchor = "ActionBarDummyBarPanel",
+        text = "Choose which resources the Action Bar displays, select a bar slot, then click an always-learned spell to bind it. Right-click a spell entry to clear the selected slot.",
+    },
+    [5] = {
+        id = "setup.finalize",
+        anchor = "FinalizeApplyButton",
+        text = "Review the setup before applying it. Apply commits the selected profile choices and replaces the current Action Bar bindings.",
+    },
+}
+
+local SETUP_WIZARD_HELP_IDS = {}
+for _, definition in pairs(SETUP_WIZARD_HELP_BY_TAB) do
+    SETUP_WIZARD_HELP_IDS[definition.id] = true
+end
+
+function Help:RegisterSetupWizardTips()
+    for _, definition in pairs(SETUP_WIZARD_HELP_BY_TAB) do
+        self:Register(definition.id, {
+            text = definition.text,
+        })
+    end
+    return true
+end
+
+function Help:HideSetupWizardTip()
+    local activeTipId = self.ActiveTipId
+    if type(activeTipId) ~= "string" or SETUP_WIZARD_HELP_IDS[activeTipId] ~= true then
+        return false
+    end
+    return self:Hide(activeTipId)
+end
+
+function Help:ShowSetupWizardTipForTab(wizard, tabIndex)
+    if type(wizard) ~= "table" then
+        return false
+    end
+
+    local definition = SETUP_WIZARD_HELP_BY_TAB[math.max(1, math.floor(tonumber(tabIndex) or 1))]
+    if not definition then
+        self:HideSetupWizardTip()
+        return false
+    end
+
+    self:RegisterSetupWizardTips()
+    self:HideSetupWizardTip()
+
+    local anchor = wizard[definition.anchor]
+    if anchor == nil then
+        return false
+    end
+
+    return self:Show(definition.id, anchor)
+end
+
+local function installSetupWizardHelp()
+    local setupWizard = Addon.Client
+        and Addon.Client.UI
+        and Addon.Client.UI.SetupWizard
+        or nil
+    if type(setupWizard) ~= "table" or setupWizard._helpTipExtensionInstalled == true then
+        return false
+    end
+
+    local originalRefreshPage = setupWizard.RefreshPage
+    if type(originalRefreshPage) == "function" then
+        function setupWizard:RefreshPage(tabIndex, state, ...)
+            local result = originalRefreshPage(self, tabIndex, state, ...)
+            Help:ShowSetupWizardTipForTab(self, tabIndex)
+            return result
+        end
+    end
+
+    local originalHide = setupWizard.Hide
+    if type(originalHide) == "function" then
+        function setupWizard:Hide(...)
+            Help:HideSetupWizardTip()
+            return originalHide(self, ...)
+        end
+    end
+
+    setupWizard._helpTipExtensionInstalled = true
+    Help:RegisterSetupWizardTips()
+    return true
+end
+
+if C_Timer and type(C_Timer.After) == "function" then
+    C_Timer.After(0, installSetupWizardHelp)
+elseif type(CreateFrame) == "function" then
+    local setupHelpLoader = CreateFrame("Frame")
+    setupHelpLoader:RegisterEvent("PLAYER_LOGIN")
+    setupHelpLoader:SetScript("OnEvent", function(self)
+        self:UnregisterEvent("PLAYER_LOGIN")
+        installSetupWizardHelp()
+    end)
+end
+
 return Help
