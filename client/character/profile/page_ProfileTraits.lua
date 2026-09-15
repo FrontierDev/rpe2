@@ -315,7 +315,8 @@ end
 function TraitsPage:HandleTraitLeftClick(row)
     if type(row) ~= "table"
         or row.isToggleable ~= true
-        or row.isLocked == true
+        or (row.isLocked == true and row.isActive ~= true)
+        or (row.isAssignmentValid == false and row.isActive ~= true)
     then
         return false
     end
@@ -386,7 +387,7 @@ function TraitsPage:ShowTraitContextMenu(anchorFrame, row)
         items[#items + 1] = {
             label = row.isActive == true and "Deactivate" or "Activate",
             value = "toggle-trait",
-            enabled = row.isLocked ~= true and row.isMissing ~= true and (
+            enabled = (row.isActive == true or (row.isLocked ~= true and row.isAssignmentValid ~= false)) and row.isMissing ~= true and (
                 (row.sourceType == "trait" and row.traitRef ~= nil)
                 or (row.sourceType == "consumable" and row.itemRef ~= nil)
             ),
@@ -534,7 +535,7 @@ function TraitsPage:RefreshTraitEntries()
 
                 entry:SetIcon(icon)
                 entry:SetSpellName(displayName)
-                entry:SetEnabled(row.isLocked ~= true)
+                entry:SetEnabled(row.isLocked ~= true or row.isActive == true)
                 entry:SetTooltip(function(owner)
                     local currentRow = entry.traitRow
                     if not currentRow then

@@ -86,12 +86,21 @@ function TraitTooltip:Build(detail, owner)
 
     if detail.isLocked == true then
         lines[#lines + 1] = { text = ensureString(detail.lockedReason, "Locked"), r = 0.82, g = 0.45, b = 0.9, wrap = true }
+        if detail.origin == "class" and detail.typeCategory == "talent" and detail.isActive == true then
+            lines[#lines + 1] = { text = "Selected class talent.", r = 0.94, g = 0.74, b = 0.22, wrap = true }
+        end
     elseif detail.origin == "race" then
         lines[#lines + 1] = { text = "Granted by selected race.", r = 0.4, g = 0.7, b = 1, wrap = true }
     elseif detail.origin == "class" and detail.typeCategory == "class" then
         lines[#lines + 1] = { text = "Granted by selected class.", r = 0.4, g = 0.7, b = 1, wrap = true }
     elseif detail.origin == "class" and detail.typeCategory == "talent" then
         lines[#lines + 1] = { text = detail.isActive == true and "Selected class talent." or "Available class talent.", r = 0.94, g = 0.74, b = 0.22, wrap = true }
+    end
+
+    local validation = detail.assignmentValidation
+    local validationReason = ensureString(detail.validationFailureText or (validation and validation.reason), "")
+    if validation and validation.valid ~= true and validationReason ~= "" and detail.isLocked ~= true then
+        lines[#lines + 1] = { text = validationReason, r = 0.95, g = 0.25, b = 0.25, wrap = true }
     end
 
     for index = 1, #conditionLines do

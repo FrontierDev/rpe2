@@ -2119,6 +2119,11 @@ end
 function Database.AddProfileSelectedClassTalentTrait(traitRef)
     local normalizedRef = ensureString(traitRef, "")
     if not isValidProfileTraitRef(normalizedRef) then return false end
+    local profileApi = Addon.Internal and Addon.Internal.Profile
+    if type(profileApi) == "table" and type(profileApi.ValidateTraitAssignment) == "function" then
+        local validation = profileApi.ValidateTraitAssignment(normalizedRef, { operation = "select" })
+        if validation.valid ~= true then return false, validation end
+    end
     local profile = Database.GetOrCreateActiveProfile()
     profile.selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(profile.selectedClassTalentTraits)
     for index = 1, #profile.selectedClassTalentTraits do
@@ -2153,8 +2158,25 @@ function Database.ClearProfileSelectedClassTalentTraits()
 end
 
 function Database.SetProfileSelectedClassTalentTraits(traitRefs)
-    local profile = Database.GetOrCreateActiveProfile()
     local normalized = normalizeProfileSelectedClassTalentTraits(traitRefs)
+    local profileApi = Addon.Internal and Addon.Internal.Profile
+    if type(profileApi) == "table" and type(profileApi.ValidateTraitAssignment) == "function" then
+        for index = 1, #normalized do
+            local validation = profileApi.ValidateTraitAssignment(normalized[index], {
+                operation = "select",
+                selectedClassTalentRefs = normalized,
+            })
+            if validation.valid ~= true then return false, validation end
+        end
+        if type(profileApi.GetClassTalentAllowance) == "function" then
+            local level = Database.GetProfileLevel and Database.GetProfileLevel() or 1
+            local allowance = profileApi.GetClassTalentAllowance(level)
+            if allowance.isLimited == true and #normalized > allowance.maxTalentTraits then
+                return false, { valid = false, code = "talent_limit", reason = ("Class talent limit reached: %d / %d."):format(#normalized, allowance.maxTalentTraits) }
+            end
+        end
+    end
+    local profile = Database.GetOrCreateActiveProfile()
     profile.selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(profile.selectedClassTalentTraits)
     if #profile.selectedClassTalentTraits == #normalized then
         local unchanged = true
@@ -2188,6 +2210,11 @@ function Database.AddProfileTrait(traitRef)
     if not isValidProfileTraitRef(normalizedRef) then
         return false
     end
+    local profileApi = Addon.Internal and Addon.Internal.Profile
+    if type(profileApi) == "table" and type(profileApi.ValidateTraitAssignment) == "function" then
+        local validation = profileApi.ValidateTraitAssignment(normalizedRef, { operation = "add" })
+        if validation.valid ~= true then return false, validation end
+    end
 
     local profile = Database.GetOrCreateActiveProfile()
     profile.traits = normalizeProfileTraits(profile.traits)
@@ -2207,6 +2234,11 @@ function Database.AddProfileActiveTrait(traitRef)
     local normalizedRef = ensureString(traitRef, "")
     if not isValidProfileTraitRef(normalizedRef) then
         return false
+    end
+    local profileApi = Addon.Internal and Addon.Internal.Profile
+    if type(profileApi) == "table" and type(profileApi.ValidateTraitAssignment) == "function" then
+        local validation = profileApi.ValidateTraitAssignment(normalizedRef, { operation = "activate" })
+        if validation.valid ~= true then return false, validation end
     end
 
     local profile = Database.GetOrCreateActiveProfile()

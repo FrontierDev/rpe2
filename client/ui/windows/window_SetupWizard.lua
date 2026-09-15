@@ -981,6 +981,16 @@ function SetupWizard:BuildDraftTraitRows(reference, collectionKey, origin, typeC
     elseif collectionKey ~= "traitRefs" and type(Registry.ResolveClassReference) == "function" then
         dataset, owner = Registry:ResolveClassReference(reference)
     end
+    local draftTalentRefs = {}
+    for traitRef, selected in pairs(self.selectedClassTalentLookup or {}) do
+        if selected == true then draftTalentRefs[#draftTalentRefs + 1] = traitRef end
+    end
+    local draftProfile = {
+        level = self:GetStartingLevel(),
+        raceRef = self.selectedRaceRef,
+        classRef = self.selectedClassRef,
+        selectedClassTalentTraits = draftTalentRefs,
+    }
     local rows = {}
     for index = 1, #(owner and owner[collectionKey] or {}) do
         local traitRef = trimString(owner[collectionKey][index])
@@ -989,6 +999,9 @@ function SetupWizard:BuildDraftTraitRows(reference, collectionKey, origin, typeC
             local trait = detail and detail.trait or nil
             local unlockLevel = math.max(1, math.floor(tonumber(trait and trait.unlockLevel) or 1))
             local selected = typeCategory == "talent" and self.selectedClassTalentLookup[traitRef] == true
+            local assignmentValidation = Profile.ValidateTraitAssignment and Profile.ValidateTraitAssignment(traitRef, {
+                operation = "select", profile = draftProfile, selectedClassTalentRefs = draftTalentRefs,
+            }) or { valid = true, reason = "" }
             rows[#rows + 1] = {
                 traitRef = traitRef,
                 name = trimString(detail and detail.name) ~= "" and detail.name or traitRef,
@@ -999,12 +1012,15 @@ function SetupWizard:BuildDraftTraitRows(reference, collectionKey, origin, typeC
                 origin = origin,
                 typeCategory = typeCategory,
                 isAutoGranted = typeCategory ~= "talent",
-                isToggleable = typeCategory == "talent",
+                isToggleable = typeCategory == "talent" and (assignmentValidation.valid == true or selected),
                 isActive = selected or typeCategory ~= "talent",
                 isMissing = not trait,
                 unlockLevel = unlockLevel,
-                isLocked = typeCategory == "talent" and unlockLevel > self:GetStartingLevel(),
-                lockedReason = unlockLevel > self:GetStartingLevel() and ("Requires level %d."):format(unlockLevel) or "",
+                assignmentValidation = assignmentValidation,
+                isAssignmentValid = assignmentValidation.valid == true,
+                validationFailureText = assignmentValidation.valid == true and "" or trimString(assignmentValidation.reason),
+                isLocked = typeCategory == "talent" and (unlockLevel > self:GetStartingLevel() or assignmentValidation.valid ~= true),
+                lockedReason = assignmentValidation.valid ~= true and trimString(assignmentValidation.reason) or (unlockLevel > self:GetStartingLevel() and ("Requires level %d."):format(unlockLevel) or ""),
             }
         end
     end
@@ -1051,7 +1067,8 @@ function SetupWizard:ToggleDraftClassTalent(traitRef)
     for index = 1, #sections.classTalents do
         if sections.classTalents[index].traitRef == normalizedRef then candidate = sections.classTalents[index]; break end
     end
-    if not candidate or candidate.isMissing == true or candidate.isLocked == true then return false end
+    local isSelected = self.selectedClassTalentLookup[normalizedRef] == true
+    if not candidate or candidate.isMissing == true or (candidate.isLocked == true and not isSelected) then return false end
     if self.selectedClassTalentLookup[normalizedRef] == true then
         self.selectedClassTalentLookup[normalizedRef] = nil
     else
@@ -1059,6 +1076,17 @@ function SetupWizard:ToggleDraftClassTalent(traitRef)
         local selected = self:GetDraftSelectedClassTalentRefs()
         if allowance.isLimited == true and #selected >= allowance.maxTalentTraits then
             self.traitTalentFeedback = ("Class talent limit reached: %d / %d."):format(#selected, allowance.maxTalentTraits)
+            self:RefreshStatus()
+            return false
+        end
+        local validation = Profile.ValidateTraitAssignment and Profile.ValidateTraitAssignment(normalizedRef, {
+            operation = "select", profile = { level = self:GetStartingLevel(), raceRef = self.selectedRaceRef, classRef = self.selectedClassRef },
+            selectedClassTalentRefs = (function()
+                local refs = self:GetDraftSelectedClassTalentRefs(); refs[#refs + 1] = normalizedRef; return refs
+            end)(),
+        }) or { valid = true }
+        if validation.valid ~= true then
+            self.traitTalentFeedback = trimString(validation.reason)
             self:RefreshStatus()
             return false
         end
@@ -1095,6 +1123,11 @@ function SetupWizard:BuildTraitsPage(page)
         row:SetStatus(item and item.status or "")
         row:SetDetail(item and item.detail or "")
         row:SetStatusColor(item and item.selected and 0.94 or 0.5, item and item.selected and 0.74 or 0.7, item and item.selected and 0.22 or 0.8, 1)
+        local frame = row:GetFrame()
+        local disabled = item and item.traitRow and item.traitRow.isLocked == true and item.traitRow.isActive ~= true
+        if frame and row.nameRegion and row.nameRegion.SetTextColor then
+            row.nameRegion:SetTextColor(disabled and 0.5 or 1, disabled and 0.5 or 0.82, disabled and 0.5 or 0, 1)
+        end
         if row.SetTooltip then
             row:SetTooltip(function(owner)
                 local traitRow = row.traitRow
@@ -1104,7 +1137,6 @@ function SetupWizard:BuildTraitsPage(page)
                 return TooltipBuilders.Trait:Build(traitRow, owner)
             end)
         end
-        local frame = row:GetFrame()
         if frame and not frame._setupTraitClickInstalled then
             frame._setupTraitClickInstalled = true
             frame:EnableMouse(true)
@@ -1135,7 +1167,7 @@ function SetupWizard:RefreshTraitsPage()
                 items[#items + 1] = {
                     category = index == 1 and labels[key] or "",
                     name = icon ~= "" and ("|T%s:16|t %s"):format(icon, traitRow.name) or traitRow.name,
-                    status = traitRow.isMissing and "Missing" or (traitRow.isLocked and ("Level %d"):format(traitRow.unlockLevel) or (traitRow.typeCategory == "talent" and (traitRow.isActive and "Selected" or "Available") or "Granted")),
+                    status = traitRow.isMissing and "Missing" or (traitRow.isLocked and (traitRow.lockedReason ~= "" and traitRow.lockedReason or "Unavailable") or (traitRow.typeCategory == "talent" and (traitRow.isActive and "Selected" or "Available") or "Granted")),
                     detail = traitRow.descriptionText, selected = traitRow.isActive == true, traitRow = traitRow,
                 }
             end
@@ -3410,6 +3442,24 @@ function SetupWizard:ApplyCurrentSelection()
     end
 
     local state = self:CollectCurrentSelection()
+    if Profile.ValidateTraitAssignment then
+        local draftProfile = {
+            level = self:GetStartingLevel(),
+            raceRef = state.raceRef,
+            classRef = state.classRef,
+            selectedClassTalentTraits = state.selectedClassTalentRefs,
+        }
+        for index = 1, #(state.selectedClassTalentRefs or {}) do
+            local validation = Profile.ValidateTraitAssignment(state.selectedClassTalentRefs[index], {
+                operation = "select", profile = draftProfile, selectedClassTalentRefs = state.selectedClassTalentRefs,
+            })
+            if validation.valid ~= true then
+                self.traitTalentFeedback = trimString(validation.reason)
+                self:RefreshStatus()
+                return false
+            end
+        end
+    end
     local validation = self:ValidateCurrentItemSelection()
     local skillValidation = self:ValidatePermanentSkillPointAllocation(state.skillPermanentBonuses)
     local previousSetupState = Profile.GetSetupWizardState and Profile.GetSetupWizardState() or {}
@@ -3440,7 +3490,12 @@ function SetupWizard:ApplyCurrentSelection()
         Profile.SetClassRef(state.classRef)
     end
     if Profile.SetSelectedClassTalentTraits then
-        Profile.SetSelectedClassTalentTraits(state.selectedClassTalentRefs)
+        local _, traitFailure = Profile.SetSelectedClassTalentTraits(state.selectedClassTalentRefs)
+        if traitFailure and traitFailure.valid ~= true then
+            self.traitTalentFeedback = trimString(traitFailure.reason)
+            self:RefreshStatus()
+            return false
+        end
     end
     if Profile.SetPrimaryResourceRef then
         Profile.SetPrimaryResourceRef(state.primaryResourceRef)
