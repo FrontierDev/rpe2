@@ -353,11 +353,6 @@ Addon.Data.DefaultDatasets:Register({
                         initialValue = 25,
                         perLevelValue = 25.39,
                         resourceRef = "f82db71a:q2ktkztt"
-                    },
-                    {
-                        initialValue = 100,
-                        perLevelValue = 0,
-                        resourceRef = "f82db71a:c3gaf7dd"
                     }
                 },
                 skillBonuses = {},
