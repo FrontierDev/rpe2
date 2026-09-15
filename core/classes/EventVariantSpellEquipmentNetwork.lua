@@ -139,6 +139,9 @@ local function appendSpellEquipment(record, sourceUnit)
             showInNpcMode = runtimeUnit.showInNpcMode == true
         end
     end
+    while #fields < SHOW_IN_NPC_MODE_FIELD - 1 do
+        fields[#fields + 1] = ""
+    end
     fields[SHOW_IN_NPC_MODE_FIELD] = showInNpcMode and "1" or "0"
 
     return table.concat(fields, UNIT_FIELD_SEPARATOR)
