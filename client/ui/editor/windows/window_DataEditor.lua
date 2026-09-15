@@ -1472,6 +1472,12 @@ function DataEditor:StartDatasetImportFromText(text)
         end
 
         session.importedDatasets[#session.importedDatasets + 1] = dataset
+        -- Database imports activate the dataset as part of their commit. Keep
+        -- the visible activation indicator in sync while a multi-dataset import
+        -- is progressing across frames.
+        if self.RefreshDatasetsPane then
+            self:RefreshDatasetsPane()
+        end
         scheduleNextFrame(importNext)
     end
 

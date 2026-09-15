@@ -10,7 +10,7 @@ Inline.DefaultWidth = Inline.DefaultWidth or 12
 Inline.DefaultHeight = Inline.DefaultHeight or 12
 Inline.Icons = Inline.Icons or {}
 
-local ADDON_TEXTURE_ROOT = "Interface\\AddOns\\RPEngine_Dev\\data\\textures\\ui\\"
+local ADDON_TEXTURE_ROOT = "Interface\\AddOns\\RPEngine2\\data\\textures\\ui\\"
 
 local function normalizeSize(value, fallback)
     local number = tonumber(value)

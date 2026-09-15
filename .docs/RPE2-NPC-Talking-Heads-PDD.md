@@ -694,7 +694,7 @@ core/internal/comms/Operations.lua
 client/ui/widgets/widget_Event.lua
 client/ui/widgets/widget_ActionBar_Control.lua       (or extension-only integration)
 client/autopilot/Authorization.lua                  (only if a clean cue hook is required)
-RPEngine_Dev.toc
+RPEngine2.toc
 ```
 
 Implementation may fold the small action-bar extension into `widget_ActionBar_Control.lua`, but the speech transport/normalization and event-widget talking-head renderer should remain separate responsibilities.

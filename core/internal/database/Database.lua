@@ -6,6 +6,7 @@ local Database = Addon.Internal.Database or {}
 Addon.Internal.Database = Database
 local Dependecies = Database.Dependecies or {}
 local Runtime = Addon.Internal.Runtime
+local activeDatasetImportTransaction = nil
 
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
@@ -217,7 +218,7 @@ local function markConfigurationChanged()
     return Addon.Internal.ConfigurationRevision
 end
 
-local function notifyConfigurationChanged(reason)
+local function notifyConfigurationChanged(reason, options)
     if isRuntimeOnlyConfigurationReason(reason) then
         logRuntimeConfigurationBoundaryViolation(reason)
     end
@@ -225,7 +226,20 @@ local function notifyConfigurationChanged(reason)
     local timer = startTiming("Database:notifyConfigurationChanged", 4, reason or "configuration-changed")
     markConfigurationChanged()
     local client = Addon.Client or nil
-    if client and type(client.TryDeferLocalConfigurationChanged) == "function" and client:TryDeferLocalConfigurationChanged(reason) then
+    if not (type(options) == "table" and options.bypassEditorDeferral == true)
+        and client
+        and type(client.TryDeferLocalConfigurationChanged) == "function"
+        and client:TryDeferLocalConfigurationChanged(reason)
+    then
+        stopTiming(timer)
+        return
+    end
+    if type(options) == "table"
+        and options.queueConfigurationRefresh == true
+        and client
+        and type(client.QueueLocalConfigurationRefresh) == "function"
+    then
+        client:QueueLocalConfigurationRefresh(reason)
         stopTiming(timer)
         return
     end
@@ -241,6 +255,20 @@ local function notifyConfigurationChanged(reason)
         client:HandleLocalConfigurationChanged(reason)
     end
     stopTiming(timer)
+end
+
+local function notifyDatasetConfigurationChanged(reason, options)
+    if type(activeDatasetImportTransaction) == "table" then
+        activeDatasetImportTransaction.configurationChangeReason = reason or activeDatasetImportTransaction.configurationChangeReason or "dataset-import"
+        return true
+    end
+
+    notifyConfigurationChanged(reason, options)
+    return true
+end
+
+function Database.IsDatasetImportTransactionActive()
+    return type(activeDatasetImportTransaction) == "table"
 end
 
 local function runProfileRuntimeMutation(reason, scope, detail, mutation)
@@ -4003,13 +4031,16 @@ function Database.IsDatasetActivated(datasetId)
     return false
 end
 
-function Database.SetDatasetActivated(datasetId, isActivated)
+function Database.SetDatasetActivated(datasetId, isActivated, options)
     local normalizedId = ensureString(datasetId, "")
     if normalizedId == "" then
         return false
     end
 
-    local root = Database.EnsureDatasets()
+    local root = type(options) == "table" and options.root or nil
+    if type(root) ~= "table" then
+        root = Database.EnsureDatasets()
+    end
     local activated = normalizeActivatedDatasets(root)
     local existingIndex = nil
 
@@ -4027,14 +4058,18 @@ function Database.SetDatasetActivated(datasetId, isActivated)
 
         if existingIndex == nil then
             activated[#activated + 1] = normalizedId
-            notifyConfigurationChanged("dataset-activation")
+            if not (type(options) == "table" and options.deferConfigurationChange == true) then
+                notifyDatasetConfigurationChanged("dataset-activation")
+            end
         end
         return true
     end
 
     if existingIndex ~= nil then
         table.remove(activated, existingIndex)
-        notifyConfigurationChanged("dataset-activation")
+        if not (type(options) == "table" and options.deferConfigurationChange == true) then
+            notifyDatasetConfigurationChanged("dataset-activation")
+        end
     end
 
     return true
@@ -4252,7 +4287,9 @@ function Database.ImportDataset(text)
         payloadDataset = decoded.dataset
     end
 
-    local root = Database.EnsureDatasets()
+    local root = type(activeDatasetImportTransaction) == "table"
+        and activeDatasetImportTransaction.root
+        or Database.EnsureDatasets()
     local existingDatasets = {}
     for datasetId, dataset in pairs(root.datasets or {}) do
         existingDatasets[tostring(datasetId)] = dataset
@@ -4271,14 +4308,31 @@ function Database.ImportDataset(text)
     existingDatasets[imported.id] = imported
     root.datasets = existingDatasets
 
-    if Dependecies and Dependecies.RecomputeDatasetDependencies then
-        Dependecies.RecomputeDatasetDependencies(imported.id)
-    end
-    if Dependecies and Dependecies.RecomputeAllDatasetDependencies then
-        Dependecies.RecomputeAllDatasetDependencies()
+    -- Imported datasets are user-authored configuration. Activate them through
+    -- the same canonical path used by the editor, but defer its notification so
+    -- activation, dependency recomputation, and the import notification form a
+    -- single deterministic commit.
+    if not Database.SetDatasetActivated(imported.id, true, {
+        deferConfigurationChange = true,
+        root = root,
+    }) then
+        existingDatasets[imported.id] = nil
+        root.datasets = existingDatasets
+        return nil, "The imported dataset could not be activated."
     end
 
-    notifyConfigurationChanged("dataset-import")
+    if type(activeDatasetImportTransaction) ~= "table" then
+        if Dependecies and Dependecies.RecomputeAllDatasetDependencies then
+            Dependecies.RecomputeAllDatasetDependencies()
+        elseif Dependecies and Dependecies.RecomputeDatasetDependencies then
+            Dependecies.RecomputeDatasetDependencies(imported.id)
+        end
+    end
+
+    notifyDatasetConfigurationChanged("dataset-import", {
+        bypassEditorDeferral = true,
+        queueConfigurationRefresh = true,
+    })
 
     return imported
 end
@@ -4356,12 +4410,53 @@ function Database.ImportDatasets(text)
 
     local pendingDatasets = importBatch.datasetTexts or importBatch.datasets or {}
     local importedDatasets = {}
+    local root = getInitializedDatasetRoot()
+    local transaction = {
+        root = root,
+        originalDatasets = root.datasets,
+        originalActivatedDatasets = deepCopy(root.activatedDatasets),
+        originalNextId = root.nextId,
+    }
+
+    activeDatasetImportTransaction = transaction
+
+    local function rollback()
+        root.datasets = transaction.originalDatasets
+        root.activatedDatasets = transaction.originalActivatedDatasets
+        root.nextId = transaction.originalNextId
+        Database.Datasets = root
+    end
+
     for index = 1, #pendingDatasets do
-        local dataset, err = Database.ImportPreparedDataset(importBatch, index)
+        local ok, dataset, err = pcall(Database.ImportPreparedDataset, importBatch, index)
+        if not ok then
+            activeDatasetImportTransaction = nil
+            rollback()
+            return nil, tostring(dataset or ("Dataset %d failed to import."):format(index))
+        end
         if not dataset then
+            activeDatasetImportTransaction = nil
+            rollback()
             return nil, err or ("Dataset %d failed to import."):format(index)
         end
         importedDatasets[#importedDatasets + 1] = dataset
+    end
+
+    activeDatasetImportTransaction = nil
+
+    if #importedDatasets > 0 then
+        if Dependecies and Dependecies.RecomputeAllDatasetDependencies then
+            Dependecies.RecomputeAllDatasetDependencies()
+        elseif Dependecies and Dependecies.RecomputeDatasetDependencies then
+            for index = 1, #importedDatasets do
+                Dependecies.RecomputeDatasetDependencies(importedDatasets[index].id)
+            end
+        end
+
+        notifyConfigurationChanged(transaction.configurationChangeReason or "dataset-import", {
+            bypassEditorDeferral = true,
+            queueConfigurationRefresh = true,
+        })
     end
 
     return importedDatasets

@@ -19,7 +19,7 @@ UnitPortrait.__index = UnitPortrait
 setmetatable(UnitPortrait, { __index = BaseElement })
 
 local DEFAULT_TEXTURE = "Interface\\Icons\\INV_Misc_QuestionMark"
-local DEFAULT_HIDDEN_OVERLAY_TEXTURE = "Interface\\AddOns\\RPEngine_Dev\\data\\textures\\ui\\hidden_portrait_overlay.png"
+local DEFAULT_HIDDEN_OVERLAY_TEXTURE = "Interface\\AddOns\\RPEngine2\\data\\textures\\ui\\hidden_portrait_overlay.png"
 local DEFAULT_HEALTH_ICON = "Interface\\Icons\\Spell_Holy_SealOfSacrifice"
 local DEFAULT_PET_ICON = 132161
 local DEFAULT_TARGET_ICON = 132177

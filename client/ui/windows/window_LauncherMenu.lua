@@ -15,8 +15,8 @@ local Help = Addon.Client and Addon.Client.Help or {}
 LauncherMenu.__index = LauncherMenu
 MinimapButton.__index = MinimapButton
 
-local HEADER_ICON = "Interface\\AddOns\\RPEngine_Dev\\data\\textures\\ui\\rpe.png"
-local MINIMAP_ICON = "Interface\\AddOns\\RPEngine_Dev\\data\\textures\\ui\\rpe_logo.png"
+local HEADER_ICON = "Interface\\AddOns\\RPEngine2\\data\\textures\\ui\\rpe.png"
+local MINIMAP_ICON = "Interface\\AddOns\\RPEngine2\\data\\textures\\ui\\rpe_logo.png"
 
 local WINDOW_WIDTH = 172
 local BUTTON_WIDTH = 136
