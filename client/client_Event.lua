@@ -650,6 +650,34 @@ local function emitTurnStartAnnouncement(eventState)
     emitChatLine(("|cffffff00%s%s: Turn %d|r"):format(prefix, eventName, turnNumber))
 end
 
+local function getEventDifficultyAnnouncementSuffix(eventState)
+    local difficulty = string.lower(tostring(eventState and eventState.difficulty or "normal"))
+    if difficulty == "heroic" then
+        return " (Heroic)"
+    end
+    if difficulty == "mythic" then
+        return " (Mythic)"
+    end
+    return ""
+end
+
+local function emitEventStartAnnouncement(eventState)
+    local icon = getTurnAnnouncementIconMarkup()
+    local prefix = icon ~= "" and (icon .. " ") or ""
+    emitChatLine(("|cffffff00%s%s%s|r"):format(
+        prefix,
+        getEventDisplayName(eventState),
+        getEventDifficultyAnnouncementSuffix(eventState)
+    ))
+end
+
+local function emitEventEndAnnouncement(eventState)
+    local icon = getTurnAnnouncementIconMarkup()
+    local prefix = icon ~= "" and (icon .. " ") or ""
+    local hex = getColorHex("text.secondary", { r = 0.8, g = 0.82, b = 0.88, a = 1 })
+    emitChatLine(("|cff%s%s%s ended.|r"):format(hex, prefix, getEventDisplayName(eventState)))
+end
+
 local function emitLocalTurnStartAnnouncement()
     local icon = getTurnAnnouncementIconMarkup()
     local prefix = icon ~= "" and (icon .. " ") or ""
@@ -2435,10 +2463,7 @@ local function clearEventStateNow(client, state, reason, options)
         eventState.startupReady = false
         eventState.endedAt = Common.GetNow()
         client.LastEventEndReason = reason
-        Debug.Info(
-            "Event ended: %s.",
-            tostring(eventState.name ~= "" and eventState.name or eventState.id or "unnamed")
-        )
+        emitEventEndAnnouncement(eventState)
     end
 
     if client.EventState == eventState then
@@ -2659,10 +2684,7 @@ local function runEventEndStep(targetClient, work, deadlineMs)
         eventState.startupReady = false
         eventState.endedAt = Common.GetNow()
         targetClient.LastEventEndReason = work.reason
-        Debug.Info(
-            "Event ended: %s.",
-            tostring(eventState.name ~= "" and eventState.name or eventState.id or "unnamed")
-        )
+        emitEventEndAnnouncement(eventState)
         if targetClient.EventState == eventState then
             targetClient.EventState = nil
         end
@@ -2906,6 +2928,7 @@ function Client:HandleEventStart(arguments, sender)
     end
     self.LastEventEndReason = nil
     playEventStartSound()
+    emitEventStartAnnouncement(nextState)
 
     local movementStartTime = timingParts and getTimingNowMilliseconds() or nil
     queueDeferredMovementSync(self, wasLocalTurn, nextState, nil, nil, "event-start")

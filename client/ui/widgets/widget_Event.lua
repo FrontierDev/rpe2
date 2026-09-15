@@ -1015,11 +1015,14 @@ function EventWidget:Get()
         presentationTimer = nil,
         presentationEventId = nil,
         portraitSlots = {},
+        npcPortraitSlots = {},
         bossPortraitSlots = {},
         portraitSlotCount = 0,
         bossPortraitSlotCount = 0,
         currentKeys = {},
         currentVisualKeys = {},
+        npcCurrentKeys = {},
+        npcCurrentVisualKeys = {},
         bossCurrentKeys = {},
         bossCurrentVisualKeys = {},
         portraitRefreshToken = 0,
@@ -1540,6 +1543,17 @@ function EventWidget:EnsureBossPortraitSlot(index)
     return slot
 end
 
+function EventWidget:EnsureNpcPortraitSlot(index)
+    local slot = self.npcPortraitSlots[index]
+    if slot then
+        return slot
+    end
+
+    slot = buildPortraitSlot(self.initiativePortraitPanel:GetFrame(), ("RPEClientEventWidgetNpcPortrait%d"):format(index), BOSS_PORTRAIT_SIZE)
+    self.npcPortraitSlots[index] = slot
+    return slot
+end
+
 function EventWidget:EnsurePortraitPool(slotCount)
     slotCount = math.max(1, math.floor(tonumber(slotCount) or DEFAULT_MAX_EVENT_UNITS))
     self.portraitSlotCount = slotCount
@@ -1557,6 +1571,21 @@ function EventWidget:EnsurePortraitPool(slotCount)
     end
 
     return self.portraitSlots
+end
+
+function EventWidget:EnsureNpcPortraitPool(slotCount)
+    slotCount = math.max(0, math.floor(tonumber(slotCount) or 0))
+    for index = 1, slotCount do
+        self:EnsureNpcPortraitSlot(index)
+    end
+    for index = slotCount + 1, #(self.npcPortraitSlots or {}) do
+        local slot = self.npcPortraitSlots[index]
+        local frame = slot and slot.GetFrame and slot:GetFrame() or nil
+        if frame and frame.Hide then
+            frame:Hide()
+        end
+    end
+    return self.npcPortraitSlots
 end
 
 function EventWidget:EnsureBossPortraitPool(slotCount)
@@ -2077,7 +2106,7 @@ function EventWidget:BuildPortraitRefreshContext(state)
         maxEventUnits = maxEventUnits,
         npcMode = npcMode,
         portraitSlotCount = npcMode and #pageUnits or maxEventUnits,
-        normalPortraitColumns = npcMode and getNpcPortraitColumnCount(maxEventUnits, PORTRAIT_SIZE, PORTRAIT_SPACING) or #pageUnits,
+        normalPortraitColumns = npcMode and getNpcPortraitColumnCount(maxEventUnits, BOSS_PORTRAIT_SIZE, BOSS_PORTRAIT_SPACING) or #pageUnits,
         bossPortraitColumns = npcMode and getNpcPortraitColumnCount(maxEventUnits, BOSS_PORTRAIT_SIZE, BOSS_PORTRAIT_SPACING) or #bossUnits,
         pageUnits = pageUnits,
         bossUnits = bossUnits,
@@ -2103,6 +2132,9 @@ function EventWidget:RefreshPortraitSlot(index, eventUnit, state, context, optio
         state,
         context.actionBarResourceContext
     )
+    if context.npcMode then
+        healthState, primaryState = nil, nil
+    end
     local castState = buildPortraitCastState(context.actionBarWidget, desiredUnit, state)
     local isPet = desiredUnit and isLocalPlayerPet(desiredUnit, context.localEventUnit) or false
     local targetIndicatorState = desiredUnit
@@ -2215,7 +2247,11 @@ function EventWidget:BuildTargetedPortraitRefreshPlan(eventIds, reason)
     self:Show()
 
     local context = self:BuildPortraitRefreshContext(state)
-    self:EnsurePortraitPool(context.portraitSlotCount)
+    if context.npcMode then
+        self:EnsureNpcPortraitPool(context.portraitSlotCount)
+    else
+        self:EnsurePortraitPool(context.portraitSlotCount)
+    end
     self:EnsureBossPortraitPool(#(context.bossUnits or {}))
 
     local targetEventIds = {}
@@ -2248,7 +2284,12 @@ function EventWidget:DrainTargetedPortraitRefreshPlan(token)
         local eventId = plan.targetEventIds[plan.nextIndex]
         local slotIndex = findPageUnitIndexByEventId(plan.context.pageUnits, eventId)
         if slotIndex then
-            self:RefreshPortraitSlot(slotIndex, plan.context.pageUnits[slotIndex], plan.state, plan.context)
+        self:RefreshPortraitSlot(slotIndex, plan.context.pageUnits[slotIndex], plan.state, plan.context,
+            plan.context.npcMode and {
+                ensureSlot = self.EnsureNpcPortraitSlot,
+                currentKeys = self.npcCurrentKeys,
+                currentVisualKeys = self.npcCurrentVisualKeys,
+            } or nil)
             plan.refreshed = true
         end
 
@@ -2294,7 +2335,7 @@ end
 function EventWidget:Refresh(reason)
     self.lastRefreshReason = reason
     local state = Client:GetEventState()
-    if not state or state.active ~= true then
+    if not state or state.active ~= true or state.ending == true then
         self:Hide()
         return false
     end
@@ -2532,13 +2573,13 @@ function EventWidget:Refresh(reason)
     local normalRows = context.npcMode and getPortraitRowCount(#pageUnits, context.normalPortraitColumns) or 1
     local bossRows = context.npcMode and getPortraitRowCount(#bossUnits, context.bossPortraitColumns) or 1
     local normalPanelHeight = context.npcMode
-        and getPortraitRowPanelHeight(normalRows, PORTRAIT_FRAME_HEIGHT)
+        and getPortraitRowPanelHeight(normalRows, BOSS_PORTRAIT_FRAME_HEIGHT)
         or (PORTRAIT_FRAME_HEIGHT + PORTRAIT_PANEL_BASE_PADDING)
     local bossPanelHeight = context.npcMode
         and getPortraitRowPanelHeight(bossRows, BOSS_PORTRAIT_FRAME_HEIGHT)
         or (BOSS_PORTRAIT_FRAME_HEIGHT + PORTRAIT_PANEL_BASE_PADDING)
     local portraitPanelHeight = context.npcMode
-        and getPortraitPanelHeight(#bossUnits > 0, normalRows, bossRows)
+        and (#bossUnits > 0 and bossPanelHeight + PORTRAIT_SECTION_SPACING + normalPanelHeight or normalPanelHeight)
         or getPortraitPanelHeight(#bossUnits > 0)
     if portraitHostFrame and portraitHostFrame.SetHeight then
         portraitHostFrame:SetHeight(portraitPanelHeight)
@@ -2594,13 +2635,32 @@ function EventWidget:Refresh(reason)
     end
 
     local normalPortraitSlotCount = context.portraitSlotCount
-    self:EnsurePortraitPool(normalPortraitSlotCount)
+    if context.npcMode then
+        self:EnsureNpcPortraitPool(normalPortraitSlotCount)
+        self:EnsurePortraitPool(0)
+        for index = 1, #(self.portraitSlots or {}) do
+            local frame = self.portraitSlots[index] and self.portraitSlots[index].GetFrame and self.portraitSlots[index]:GetFrame() or nil
+            if frame and frame.Hide then
+                frame:Hide()
+            end
+        end
+    else
+        self:EnsurePortraitPool(normalPortraitSlotCount)
+        self:EnsureNpcPortraitPool(0)
+    end
     for index = 1, normalPortraitSlotCount do
-        self:RefreshPortraitSlot(index, pageUnits[index] or nil, state, context)
+        self:RefreshPortraitSlot(index, pageUnits[index] or nil, state, context, context.npcMode and {
+            ensureSlot = self.EnsureNpcPortraitSlot,
+            currentKeys = self.npcCurrentKeys,
+            currentVisualKeys = self.npcCurrentVisualKeys,
+        } or nil)
     end
 
-    for index = normalPortraitSlotCount + 1, #(self.portraitSlots or {}) do
-        local portrait = self.portraitSlots[index]
+    local normalSlots = context.npcMode and self.npcPortraitSlots or self.portraitSlots
+    local normalCurrentKeys = context.npcMode and self.npcCurrentKeys or self.currentKeys
+    local normalCurrentVisualKeys = context.npcMode and self.npcCurrentVisualKeys or self.currentVisualKeys
+    for index = normalPortraitSlotCount + 1, #(normalSlots or {}) do
+        local portrait = normalSlots[index]
         local frame = portrait and portrait.GetFrame and portrait:GetFrame() or nil
         if frame and frame.Hide then
             if frame.SetAlpha then
@@ -2608,8 +2668,8 @@ function EventWidget:Refresh(reason)
             end
             frame:Hide()
         end
-        self.currentKeys[index] = nil
-        self.currentVisualKeys[index] = nil
+        normalCurrentKeys[index] = nil
+        normalCurrentVisualKeys[index] = nil
     end
 
     self:LayoutPortraitRow(
@@ -2622,11 +2682,11 @@ function EventWidget:Refresh(reason)
     )
     self:LayoutPortraitRow(
         self.initiativePortraitPanel,
-        self.portraitSlots,
+        normalSlots,
         normalPortraitSlotCount,
-        PORTRAIT_SIZE,
-        PORTRAIT_SPACING,
-        context.npcMode and { maxColumns = context.normalPortraitColumns, rowStep = PORTRAIT_FRAME_HEIGHT + PORTRAIT_SECTION_SPACING } or nil
+        context.npcMode and BOSS_PORTRAIT_SIZE or PORTRAIT_SIZE,
+        context.npcMode and BOSS_PORTRAIT_SPACING or PORTRAIT_SPACING,
+        context.npcMode and { maxColumns = context.normalPortraitColumns, rowStep = BOSS_PORTRAIT_FRAME_HEIGHT + PORTRAIT_SECTION_SPACING } or nil
     )
     return true
 end
