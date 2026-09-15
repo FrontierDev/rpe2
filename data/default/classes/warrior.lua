@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 5,
+    version = 7,
     dataset = {
         achievements = {},
         auras = {
@@ -475,7 +475,10 @@ Addon.Data.DefaultDatasets:Register({
                         statRef = "f82db71a:kec9rhli"
                     }
                 },
-                traitRefs = {
+                passiveTraitRefs = {
+                    "7bbb4cb9:gntslayr"
+                },
+                talentTraitRefs = {
                     "7bbb4cb9:duukevtq",
                     "7bbb4cb9:r73vv899",
                     "7bbb4cb9:0ncx0gfs",
@@ -2648,6 +2651,25 @@ Addon.Data.DefaultDatasets:Register({
         traits = {
             {
                 automaticAuras = {},
+                category = "Arms",
+                conditions = {},
+                description = "Increases your damage against Giants by 5%.",
+                events = {},
+                icon = "interface/icons/ability_warrior_savageblow.blp",
+                id = "gntslayr",
+                isEnvironmental = false,
+                name = "Giantslayer",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:x1lxi8cf",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
                 category = "Protection",
                 conditions = {
                     {
@@ -2683,10 +2705,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 icon = "interface/icons/ability_warrior_defensivestance.blp",
                 id = "duukevtq",
-                isClass = false,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = true,
                 name = "Defensive Stance",
                 skillBonuses = {},
                 statBonuses = {
@@ -2727,10 +2746,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 icon = "interface/icons/spell_shadow_unholyfrenzy.blp",
                 id = "a8x4ee34",
-                isClass = false,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = true,
                 name = "Enrage",
                 skillBonuses = {},
                 statBonuses = {},
@@ -2784,10 +2800,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 icon = "interface/icons/ability_warrior_offensivestance.blp",
                 id = "r73vv899",
-                isClass = false,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = true,
                 name = "Battle Stance",
                 skillBonuses = {},
                 statBonuses = {},
@@ -2830,10 +2843,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 icon = "interface/icons/ability_racial_avatar.blp",
                 id = "0ncx0gfs",
-                isClass = false,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = true,
                 name = "Berserker Stance",
                 skillBonuses = {},
                 statBonuses = {
@@ -2870,10 +2880,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 icon = "interface/icons/ability_backstab.blp",
                 id = "0yud4l94",
-                isClass = false,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = true,
                 name = "Deep Wounds",
                 skillBonuses = {},
                 statBonuses = {},

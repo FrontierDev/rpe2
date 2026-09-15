@@ -928,11 +928,8 @@ local function getTraitCategory(entry)
         end
         return "class_passives"
     end
-    if entry.origin == "race" or trait.isRacial == true then
+    if entry.origin == "race" then
         return "race_passives"
-    end
-    if trait.isClass == true then
-        return "class_passives"
     end
     if entry.sourceType == "consumable" then
         return "consumable"
@@ -1171,10 +1168,10 @@ end
 function Client:IsTraitCategoryAllowed(category)
     local normalizedCategory = ensureString(category)
     if normalizedCategory == "class_passives" or normalizedCategory == "class_talents" then
-        return getRulesetRuleValue("traits", "allow_class_traits", true) ~= false
+        return true -- selected-class ownership is intrinsic
     end
     if normalizedCategory == "race_passives" then
-        return getRulesetRuleValue("traits", "allow_race_traits", true) ~= false
+        return true -- selected-race ownership is intrinsic
     end
     if normalizedCategory == "consumable" then
         return getRulesetRuleValue("consumables", "allow_consumable_traits", true) ~= false
@@ -1326,6 +1323,9 @@ function Client:BuildProfileTraitRows()
             isRemovable = row.isRemovable == true,
             isActive = row.isActive == true,
             isMissing = row.isMissing == true,
+            isLocked = row.isLocked == true,
+            lockedReason = row.lockedReason,
+            unlockLevel = row.unlockLevel,
             conditionFailureText = row.conditionFailureText,
         }
         return true

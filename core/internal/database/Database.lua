@@ -1006,6 +1006,10 @@ local function normalizeProfileActiveTraits(record)
     return normalizeProfileTraits(record)
 end
 
+local function normalizeProfileSelectedClassTalentTraits(record)
+    return normalizeProfileTraits(record)
+end
+
 local function normalizeProfilePreferredConsumables(record)
     local normalized = {}
     local seen = {}
@@ -1224,6 +1228,7 @@ local function normalizeProfileRecord(record, fallbackCharacterKey, fallbackName
         traits = normalizeProfileTraits(data.traits),
         activeTraits = normalizeProfileActiveTraits(data.activeTraits ~= nil and data.activeTraits or data.traits),
         inactiveTraits = normalizeProfileActiveTraits(data.inactiveTraits),
+        selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(data.selectedClassTalentTraits),
         skillLevels = normalizeProfileSkillLevels(data.skillLevels),
         skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(data.skillPermanentBonuses),
         preferredConsumables = normalizeProfilePreferredConsumables(data.preferredConsumables),
@@ -1490,17 +1495,34 @@ local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId
     end
 
     local classObject = getDatasetEntryClassObject(collectionKey)
+    local sourceData = deepCopy(type(data) == "table" and data or {})
+    if collectionKey == "classes" and type(sourceData.traitRefs) == "table" then
+        sourceData.passiveTraitRefs = type(sourceData.passiveTraitRefs) == "table" and sourceData.passiveTraitRefs or {}
+        sourceData.talentTraitRefs = type(sourceData.talentTraitRefs) == "table" and sourceData.talentTraitRefs or {}
+        for index = 1, #sourceData.traitRefs do
+            local traitRef = ensureString(sourceData.traitRefs[index], "")
+            local traitId = traitRef:match("^[^:]+:(.+)$")
+            local legacyTrait = nil
+            for traitIndex = 1, #(dataset and dataset.traits or {}) do
+                local candidate = dataset.traits[traitIndex]
+                if candidate and tostring(candidate.id or "") == tostring(traitId or "") then legacyTrait = candidate; break end
+            end
+            local target = legacyTrait and legacyTrait.isTalent == true and sourceData.talentTraitRefs or sourceData.passiveTraitRefs
+            target[#target + 1] = traitRef
+        end
+        sourceData.traitRefs = nil
+    end
     local normalized = nil
 
     if classObject and type(classObject.FromTable) == "function" then
-        local instance = classObject.FromTable(deepCopy(type(data) == "table" and data or {}))
+        local instance = classObject.FromTable(sourceData)
         if classObject.ToTable then
             normalized = classObject.ToTable(instance)
         else
             normalized = deepCopy(instance)
         end
     elseif classObject and type(classObject.New) == "function" then
-        local instance = classObject:New(deepCopy(type(data) == "table" and data or {}))
+        local instance = classObject:New(sourceData)
         if classObject.ToTable then
             normalized = classObject.ToTable(instance)
         else
@@ -1508,8 +1530,8 @@ local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId
         end
     else
         normalized = createDatasetEntryRecord(dataset, collectionKey, entryId)
-        if type(data) == "table" then
-            applyTable(normalized, deepCopy(data))
+        if type(sourceData) == "table" then
+            applyTable(normalized, sourceData)
         end
     end
 
@@ -1681,6 +1703,34 @@ local function normalizeDatasetsCollection(root)
     end
 
     root.datasets = normalized
+    -- Legacy datasets put both passives and talents in Class.traitRefs and
+    -- repeated the classification on the trait. Convert once at load time so
+    -- runtime ownership has exactly one source of truth.
+    local traitsByRef = {}
+    for datasetId, dataset in pairs(normalized) do
+        for traitIndex = 1, #(dataset.traits or {}) do
+            local trait = dataset.traits[traitIndex]
+            if trait and trait.id then
+                traitsByRef[tostring(datasetId) .. ":" .. tostring(trait.id)] = trait
+            end
+        end
+    end
+    for _, dataset in pairs(normalized) do
+        for classIndex = 1, #(dataset.classes or {}) do
+            local class = dataset.classes[classIndex]
+            if type(class) == "table" and type(class.traitRefs) == "table" then
+                class.passiveTraitRefs = type(class.passiveTraitRefs) == "table" and class.passiveTraitRefs or {}
+                class.talentTraitRefs = type(class.talentTraitRefs) == "table" and class.talentTraitRefs or {}
+                for traitIndex = 1, #class.traitRefs do
+                    local traitRef = ensureString(class.traitRefs[traitIndex], "")
+                    local legacyTrait = traitsByRef[traitRef]
+                    local target = legacyTrait and legacyTrait.isTalent == true and class.talentTraitRefs or class.passiveTraitRefs
+                    target[#target + 1] = traitRef
+                end
+                class.traitRefs = nil
+            end
+        end
+    end
     return root.datasets
 end
 
@@ -1831,6 +1881,7 @@ function Database.GetOrCreateActiveProfile()
         traits = {},
         activeTraits = {},
         inactiveTraits = {},
+        selectedClassTalentTraits = {},
         skillLevels = {},
         preferredConsumables = {},
         actionBar = {},
@@ -2057,6 +2108,48 @@ function Database.ListProfileInactiveTraits()
     end
 
     return traits
+end
+
+function Database.ListProfileSelectedClassTalentTraits()
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(profile.selectedClassTalentTraits)
+    return deepCopy(profile.selectedClassTalentTraits)
+end
+
+function Database.AddProfileSelectedClassTalentTrait(traitRef)
+    local normalizedRef = ensureString(traitRef, "")
+    if not isValidProfileTraitRef(normalizedRef) then return false end
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(profile.selectedClassTalentTraits)
+    for index = 1, #profile.selectedClassTalentTraits do
+        if profile.selectedClassTalentTraits[index] == normalizedRef then return false end
+    end
+    profile.selectedClassTalentTraits[#profile.selectedClassTalentTraits + 1] = normalizedRef
+    notifyConfigurationChanged("profile-selected-class-talents")
+    return true
+end
+
+function Database.RemoveProfileSelectedClassTalentTrait(traitRef)
+    local normalizedRef = ensureString(traitRef, "")
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(profile.selectedClassTalentTraits)
+    for index = 1, #profile.selectedClassTalentTraits do
+        if profile.selectedClassTalentTraits[index] == normalizedRef then
+            table.remove(profile.selectedClassTalentTraits, index)
+            notifyConfigurationChanged("profile-selected-class-talents")
+            return true
+        end
+    end
+    return false
+end
+
+function Database.ClearProfileSelectedClassTalentTraits()
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(profile.selectedClassTalentTraits)
+    if #profile.selectedClassTalentTraits == 0 then return false end
+    profile.selectedClassTalentTraits = {}
+    notifyConfigurationChanged("profile-selected-class-talents")
+    return true
 end
 
 function Database.ListProfilePreferredConsumables()

@@ -275,6 +275,15 @@ local function getProgressionSourceRefs(definition)
         end
     end
 
+    for index = 1, #(definition.passiveTraitRefs or {}) do
+        local traitRef = definition.passiveTraitRefs[index]
+        if type(traitRef) == "string" and traitRef ~= "" then refs[#refs + 1] = traitRef end
+    end
+    for index = 1, #(definition.talentTraitRefs or {}) do
+        local traitRef = definition.talentTraitRefs[index]
+        if type(traitRef) == "string" and traitRef ~= "" then refs[#refs + 1] = traitRef end
+    end
+
     for index = 1, #(definition.skillBonuses or {}) do
         local skillBonus = definition.skillBonuses[index]
         local skillRef = type(skillBonus) == "table" and skillBonus.skillRef or nil
@@ -1501,6 +1510,15 @@ function Dependecies.HandleDatasetDeleted(datasetId)
                 if traitRefsMutated then
                     class.traitRefs = keptTraitRefs
                     classMutated = true
+                end
+
+                for _, traitCollectionKey in ipairs({ "passiveTraitRefs", "talentTraitRefs" }) do
+                    local kept, mutated = {}, false
+                    for traitIndex = 1, #(class[traitCollectionKey] or {}) do
+                        local traitRef = class[traitCollectionKey][traitIndex]
+                        if Dependecies.ParseSourceStatRef(traitRef) == datasetId then mutated = true else kept[#kept + 1] = traitRef end
+                    end
+                    if mutated then class[traitCollectionKey] = kept; classMutated = true end
                 end
 
                 local keptSkillBonuses = {}

@@ -435,6 +435,13 @@ function SetupWizard:GetPermanentSkillPointLimit()
     return math.max(0, math.floor(tonumber(self:GetRuleValue("permanent_skill_point_limit", 50)) or 50))
 end
 
+function SetupWizard:GetStartingLevel()
+    local rawValue = type(RulesetLogic.GetRulesetRuleValueByKey) == "function"
+        and RulesetLogic.GetRulesetRuleValueByKey(self:GetActiveRuleset(), "character", "starting_level", 1)
+        or 1
+    return math.max(1, math.floor(tonumber(rawValue) or 1))
+end
+
 function SetupWizard:ApplyDatasetPolicy()
     local forcedDatasetIds = self:GetForcedDatasetIds()
     local forceDeactivateOthers = self:GetRuleValue("force_deactivate_other_datasets", false) == true
@@ -2811,6 +2818,7 @@ function SetupWizard:RefreshFinalizePage()
 
     lines[#lines + 1] = ("Race: %s"):format(formatChoiceLabel(raceEntry, selection.raceRef))
     lines[#lines + 1] = ("Class: %s"):format(formatChoiceLabel(classEntry, selection.classRef))
+    lines[#lines + 1] = ("Starting Level: %d"):format(self:GetStartingLevel())
     lines[#lines + 1] = ""
     lines[#lines + 1] = ("Starting Items: %d selected  |  Cost %s"):format(#selectedItems, formatCopperAmount(validation.totalPrice))
 
@@ -3163,6 +3171,9 @@ function SetupWizard:ApplyCurrentSelection()
         return false
     end
 
+    if Profile.SetLevel then
+        Profile.SetLevel(self:GetStartingLevel())
+    end
     if trimString(state.raceRef) ~= "" and Profile.SetRaceRef then
         Profile.SetRaceRef(state.raceRef)
     end

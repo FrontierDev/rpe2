@@ -43,7 +43,7 @@ local ACTION_BAR_HELP_IDS = {
 }
 local ACTION_BAR_HELP_TEXT = {
     [ACTION_BAR_BIND_HELP_ID] = "Bind spells to your RPE Action Bar from the Spellbook in your Profile window.",
-    [ACTION_BAR_AUTO_ATTACK_HELP_ID] = "These slots contain your auto attacks. They stay visible while you browse your other bound spells.",
+    [ACTION_BAR_AUTO_ATTACK_HELP_ID] = "These slots contain your auto attacks. Right-click an auto attack to toggle auto-cast on or off. They stay visible while you browse your other bound spells.",
     [ACTION_BAR_SCROLLABLE_BINDS_HELP_ID] = "These slots contain your bound spells. Use the mouse wheel over this section or the arrows to scroll through more bindings.",
     [ACTION_BAR_SWITCH_HELP_ID] = "Use these buttons to switch between Spells and Skills, and to use mounted or pet action bars when those are available.",
     [ACTION_BAR_MOVEMENT_HELP_ID] = "This bar shows how much RPE movement you have remaining. It updates as you move during an event.",

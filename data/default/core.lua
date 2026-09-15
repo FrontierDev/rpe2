@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 13,
+    version = 15,
     dataset = {
         achievements = {},
         auras = {},
@@ -2032,7 +2032,9 @@ Addon.Data.DefaultDatasets:Register({
                         statRef = "f82db71a:ygjno50i"
                     }
                 },
-                traitRefs = {}
+                traitRefs = {
+                    "f82db71a:dm2h660e"
+                }
             },
             {
                 description = "The dwarves are a hardy race, hailing from Khaz Modan in the Eastern Kingdoms. They can trace their heritage back to the Titans; a mutated version of the Earthen servants turned mortal by the Curse of Flesh, originally designed to help shape Azeroth. They went into hibernation in Titan cities for thousands of years following the Sundering, emerging to find themselves mortal.",
@@ -4303,17 +4305,14 @@ Addon.Data.DefaultDatasets:Register({
                 events = {},
                 icon = "interface/icons/inv_enchant_shardbrilliantsmall.blp",
                 id = "dm2h660e",
-                isClass = false,
                 isEnvironmental = false,
-                isRacial = true,
-                isTalent = false,
                 name = "The Human Spirit",
                 skillBonuses = {},
                 statBonuses = {
                     {
-                        operation = "flat",
+                        operation = "percent",
                         statRef = "f82db71a:kec9rhli",
-                        value = 10
+                        value = 5
                     }
                 },
                 unlockLevel = 1

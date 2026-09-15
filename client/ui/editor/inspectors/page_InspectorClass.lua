@@ -7,6 +7,7 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
 local Shared = DataEditor.ItemInspectorShared or {}
+local Database = Addon.Internal and Addon.Internal.Database or {}
 
 local FIELD_WIDTH = 236
 local ARMOR_WEIGHT_ITEMS = Shared.ARMOR_WEIGHT_ITEMS or {
@@ -57,6 +58,80 @@ local function commitSelectedClass(self, mutate)
     end
 
     self:QueuePendingDatasetEntryChanged(dataset.id, "classes")
+end
+
+local function buildClassTraitReferenceItems(self)
+    local items = {}
+    local datasets = Database.ListDatasets and Database.ListDatasets() or {}
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local datasetId = tostring(dataset and dataset.id or "")
+        local datasetName = tostring(dataset and dataset.name or datasetId)
+        for traitIndex = 1, #(dataset and dataset.traits or {}) do
+            local trait = dataset.traits[traitIndex]
+            if trait and trait.id and datasetId ~= "" then
+                items[#items + 1] = {
+                    label = ("%s / %s"):format(datasetName, tostring(trait.name or trait.id)),
+                    value = ("%s:%s"):format(datasetId, tostring(trait.id)),
+                }
+            end
+        end
+    end
+    return items
+end
+
+local function normalizeTraitRefs(values, excluded)
+    local refs, seen = {}, {}
+    for index = 1, #(values or {}) do
+        local ref = tostring(values[index] or "")
+        if ref ~= "" and not seen[ref] and not (excluded and excluded[ref]) then
+            seen[ref] = true
+            refs[#refs + 1] = ref
+        end
+    end
+    return refs
+end
+
+local function ensureClassTraitOwnershipControls(self)
+    if self.ClassInspectorPassiveTraitsDropdown or not self.ClassInspectorTraitsPage then return end
+    local page = self.ClassInspectorTraitsPage
+    local overlay = CreateFrame("Frame", "RPEDataEditorClassInspectorTraitOwnershipPage", page)
+    overlay:SetAllPoints(page)
+    overlay:SetFrameLevel(page:GetFrameLevel() + 10)
+    self.ClassInspectorTraitOwnershipOverlay = overlay
+    local root = UI.CreateLayout(UI.VerticalLayoutGroup, overlay, "RPEDataEditorClassInspectorTraitOwnershipLayout", {
+        spacing = 8, fitChildrenWidth = true, fitChildrenHeight = false,
+    })
+    UI.Utils.AnchorFill(root, overlay, 0, 0, 0, 0)
+
+    root:AddChild(buildLabel(root:GetFrame(), "RPEDataEditorClassPassivesLabel", "Class Passives"))
+    self.ClassInspectorPassiveTraitsDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorClassPassivesDropdown", {
+        width = FIELD_WIDTH, height = 48, multiSelect = true, showSelectionActions = false, items = {},
+        onValueChanged = function(values)
+            if self._refreshingClassTraitOwnership then return end
+            commitSelectedClass(self, function(class)
+                local excluded = {}
+                for index = 1, #(class.talentTraitRefs or {}) do excluded[class.talentTraitRefs[index]] = true end
+                class.passiveTraitRefs = normalizeTraitRefs(values, excluded)
+            end)
+        end,
+    })
+    root:AddChild(self.ClassInspectorPassiveTraitsDropdown)
+    root:AddChild(buildLabel(root:GetFrame(), "RPEDataEditorClassTalentsLabel", "Talents"))
+    self.ClassInspectorTalentTraitsDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorClassTalentsDropdown", {
+        width = FIELD_WIDTH, height = 48, multiSelect = true, showSelectionActions = false, items = {},
+        onValueChanged = function(values)
+            if self._refreshingClassTraitOwnership then return end
+            commitSelectedClass(self, function(class)
+                local excluded = {}
+                for index = 1, #(class.passiveTraitRefs or {}) do excluded[class.passiveTraitRefs[index]] = true end
+                class.talentTraitRefs = normalizeTraitRefs(values, excluded)
+            end)
+        end,
+    })
+    root:AddChild(self.ClassInspectorTalentTraitsDropdown)
+    self.ClassInspectorTraitOwnershipHint = buildLabel(root:GetFrame(), "RPEDataEditorClassTraitOwnershipHint", "A trait may be a passive or talent, not both.")
+    root:AddChild(self.ClassInspectorTraitOwnershipHint)
 end
 
 local function ensureClassEquipmentControls(self)
@@ -127,14 +202,35 @@ function DataEditor:RefreshClassInspectorEquipmentFields()
     end
 end
 
+function DataEditor:RefreshClassInspectorTraitOwnershipFields()
+    local class = self:GetSelectedClass()
+    local hasClass = class ~= nil
+    local items = buildClassTraitReferenceItems(self)
+    self._refreshingClassTraitOwnership = true
+    if self.ClassInspectorPassiveTraitsDropdown then
+        self.ClassInspectorPassiveTraitsDropdown:SetItems(items)
+        self.ClassInspectorPassiveTraitsDropdown:SetSelectedValues(class and class.passiveTraitRefs or {}, true)
+        setDropdownEnabled(self.ClassInspectorPassiveTraitsDropdown, hasClass)
+    end
+    if self.ClassInspectorTalentTraitsDropdown then
+        self.ClassInspectorTalentTraitsDropdown:SetItems(items)
+        self.ClassInspectorTalentTraitsDropdown:SetSelectedValues(class and class.talentTraitRefs or {}, true)
+        setDropdownEnabled(self.ClassInspectorTalentTraitsDropdown, hasClass)
+    end
+    self._refreshingClassTraitOwnership = false
+end
+
 function DataEditor:BuildClassInspectorPage(parent)
     local page = self:BuildProgressionDefinitionInspectorPage(parent, "classes")
     ensureClassEquipmentControls(self)
+    ensureClassTraitOwnershipControls(self)
     self:RefreshClassInspectorEquipmentFields()
+    self:RefreshClassInspectorTraitOwnershipFields()
     return page
 end
 
 function DataEditor:RefreshClassInspectorPage()
     self:RefreshProgressionDefinitionInspectorPage("classes")
     self:RefreshClassInspectorEquipmentFields()
+    self:RefreshClassInspectorTraitOwnershipFields()
 end

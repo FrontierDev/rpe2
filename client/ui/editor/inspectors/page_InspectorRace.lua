@@ -856,7 +856,7 @@ local function buildTraitRefsPage(self, page, collectionKey)
     })
     UI.Utils.AnchorFill(root, page, 0, 0, 0, 0)
 
-    root:AddChild(buildLabel(root:GetFrame(), "RPEDataEditor" .. prefix .. "TraitRefsTitle", "Assigned Traits"))
+    root:AddChild(buildLabel(root:GetFrame(), "RPEDataEditor" .. prefix .. "TraitRefsTitle", collectionKey == "races" and "Racial Traits" or "Class Traits"))
 
     local panel = UI.CreatePanel(root:GetFrame(), "RPEDataEditor" .. prefix .. "TraitRefsPanel", {
         width = FIELD_WIDTH,

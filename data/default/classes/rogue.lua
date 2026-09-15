@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 7,
+    version = 9,
     dataset = {
         achievements = {},
         auras = {
@@ -383,9 +383,12 @@ Addon.Data.DefaultDatasets:Register({
                         statRef = "f82db71a:kec9rhli"
                     }
                 },
-                traitRefs = {
-                    "23d5dce2:z9yfqvhy"
-                }
+                passiveTraitRefs = {
+                    "23d5dce2:z9yfqvhy",
+                    "23d5dce2:58pob6kr",
+                    "23d5dce2:murderxx"
+                },
+                talentTraitRefs = {}
             }
         },
         currencies = {},
@@ -2294,6 +2297,25 @@ Addon.Data.DefaultDatasets:Register({
             {
                 automaticAuras = {},
                 category = "",
+                conditions = {},
+                description = "Increases your damage against Humanoids by 5%.",
+                events = {},
+                icon = "interface/icons/ability_rogue_murderspree.blp",
+                id = "murderxx",
+                isEnvironmental = false,
+                name = "Murder",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:bj6h5ikw",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "",
                 conditions = {
                     {
                         invert = false,
@@ -2330,10 +2352,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 icon = "interface/icons/ability_poisonarrow.blp",
                 id = "z9yfqvhy",
-                isClass = true,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = false,
                 name = "Instant Poison",
                 skillBonuses = {},
                 statBonuses = {},
@@ -2371,10 +2390,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 icon = "interface/icons/inv_misc_herb_16.blp",
                 id = "58pob6kr",
-                isClass = true,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = false,
                 name = "Wound Poison",
                 skillBonuses = {},
                 statBonuses = {},

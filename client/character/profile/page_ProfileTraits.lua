@@ -151,13 +151,13 @@ local function buildTraitHeaderText(selectedCategoryKey, rows)
     end
 
     if tostring(selectedCategoryKey or "") == "class_talents" then
-        local selectedCount = math.max(0, math.floor(tonumber(summary.manualTalentCount) or 0))
+        local selectedCount = math.max(0, math.floor(tonumber(summary.selectedClassTalentCount) or 0))
         local maxCount = math.max(0, math.floor(tonumber(summary.maxTalentTraits) or 0))
         if maxCount > 0 then
             return ("Selected: %d / %d"):format(selectedCount, maxCount)
         end
 
-        return ("Selected: %d"):format(selectedCount)
+        return ("Selected: %d / Unlimited"):format(selectedCount)
     end
 
     if tostring(selectedCategoryKey or "") == "all" then
@@ -315,6 +315,7 @@ end
 function TraitsPage:HandleTraitLeftClick(row)
     if type(row) ~= "table"
         or row.isToggleable ~= true
+        or row.isLocked == true
     then
         return false
     end
@@ -385,7 +386,7 @@ function TraitsPage:ShowTraitContextMenu(anchorFrame, row)
         items[#items + 1] = {
             label = row.isActive == true and "Deactivate" or "Activate",
             value = "toggle-trait",
-            enabled = row.isMissing ~= true and (
+            enabled = row.isLocked ~= true and row.isMissing ~= true and (
                 (row.sourceType == "trait" and row.traitRef ~= nil)
                 or (row.sourceType == "consumable" and row.itemRef ~= nil)
             ),
@@ -533,7 +534,7 @@ function TraitsPage:RefreshTraitEntries()
 
                 entry:SetIcon(icon)
                 entry:SetSpellName(displayName)
-                entry:SetEnabled(true)
+                entry:SetEnabled(row.isLocked ~= true)
                 entry:SetTooltip(function(owner)
                     local currentRow = entry.traitRow
                     if not currentRow then
@@ -550,6 +551,8 @@ function TraitsPage:RefreshTraitEntries()
                     entry:SetBorderColor(0.22, 0.72, 0.62, 1)
                 elseif row.sourceType == "equipment" then
                     entry:SetBorderColor(0.18, 0.9, 0.3, 1)
+                elseif row.isLocked == true then
+                    entry:SetBorderColor(0.38, 0.28, 0.48, 1)
                 elseif row.isToggleable == true and row.isActive == true then
                     entry:SetBorderColor(0.94, 0.74, 0.22, 1)
                 elseif row.isToggleable == true then

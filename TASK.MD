@@ -1,198 +1,137 @@
-## Objective
+## Summary
 
-Implement the actual Event Widget/runtime behavior for NPC Mode using the synchronized `eventMode` and `showInNpcMode` state from #298 and the host controls from #299.
+Update all built-in/default datasets to the race/class trait ownership model introduced by #301 and exposed by #302.
 
-NPC Mode is explicitly a **presentation mode**, not a combat-turn mode:
+This issue is specifically responsible for **data migration/correction**, not the runtime or UI implementation.
 
-- the Event Widget shows only selected NPC EventUnits;
-- player frames are never shown;
-- combat turn/tick paging is not used to decide which frames are visible;
-- there is no way to advance the event turn/tick while NPC Mode is active;
-- switching back to Combat Mode resumes the existing combat turn/tick state.
+Target branch: `dev`.
 
-Depends on #298. The Dashboard portions of the UX are implemented by #299.
+## Scope
 
-Target branch: `dev`. Re-read the current implementation before editing.
+Audit every default Race, Class and Trait definition that participates in racial traits, class passives or class talents.
 
-## Current Event Widget behavior
+Current built-in class files include:
 
-`client/ui/widgets/widget_Event.lua` currently derives the normal portrait set from combat turn state:
+- `data/default/classes/mage.lua`
+- `data/default/classes/paladin.lua`
+- `data/default/classes/priest.lua`
+- `data/default/classes/rogue.lua`
+- `data/default/classes/warrior.lua`
 
-```text
-BuildPortraitRefreshContext(state)
-  -> pageNumber = state.tickNumber
-  -> getWidgetUnitsForPage(units, pageNumber, maxEventUnits)
-```
+Also audit the race/trait definitions in `data/default/core.lua` and any other built-in/default dataset that defines Race/Class trait ownership.
 
-`getWidgetUnitsForPage()` filters active non-boss units and pages them according to the current tick. Boss units are gathered separately by `collectBossUnits()` and rendered in the boss row.
+## Required class migration
 
-The Event Widget also exposes a host `advanceEventStepFromWidget()` path, while the Event Manager has its own `Next Tick / Turn` control. The client-wide action gate is `Client:CanPerformEventAction(...)`, and the server owns the final `Server:AdvanceEventStep()` mutation.
-
-NPC Mode must bypass the turn-page selection logic without damaging it for Combat Mode.
-
-## Required changes
-
-### 1. Add one canonical NPC-mode portrait selector
-
-When:
+Replace each default class's legacy single `traitRefs` collection with the new explicit collections:
 
 ```lua
-eventState.eventMode == "npc"
+passiveTraitRefs = { ... }
+talentTraitRefs = { ... }
 ```
 
-derive the visible Event Widget unit set from the synchronized EventUnit flag introduced by #298.
+Every existing class-owned trait must be intentionally placed into **exactly one** of these collections.
 
-Eligibility must be:
+Migration rule:
 
-```text
-unit.isPlayer ~= true
-AND
-unit.showInNpcMode == true
-```
+- a class-intrinsic effect that should always apply when the class is selected -> `passiveTraitRefs`;
+- a player-choice class trait -> `talentTraitRefs`;
+- do not preserve the old list wholesale and rely on Trait-level flags at runtime.
 
-Do not use `tickNumber` or turn schedule membership to decide whether an eligible NPC is visible in NPC Mode.
+Use the existing default content and intended gameplay meaning to classify each entry. If an existing definition is contradictory/ambiguous, resolve it explicitly rather than guessing through fallback behavior.
 
-The selection flag is explicit host presentation state. Therefore an NPC which is flagged for NPC Mode should not disappear merely because it is not on the current combat tick. Existing unit state such as `active`, dead/alive state, resources, cast state, etc. may still affect how its portrait is rendered, but not whether the explicitly selected NPC has a frame.
+### Known examples
 
-Player EventUnits must never appear in NPC Mode even if malformed/legacy data sets the flag true.
+The following current data should be corrected as part of this migration:
 
-### 2. Apply the filter to both normal and boss portrait paths
+- Rogue `Instant Poison` (`z9yfqvhy`) is currently authored as a class trait and should be represented as a **Rogue class passive** in `passiveTraitRefs`.
+- Warrior `Defensive Stance` (`duukevtq`) is currently authored as a talent and owned by Warrior; it should be represented in Warrior's `talentTraitRefs`.
+- Warrior `Battle Stance` (`r73vv899`) is currently authored as a talent and owned by Warrior; it should be represented in Warrior's `talentTraitRefs`.
 
-The current boss path bypasses `getWidgetUnitsForPage()`. In NPC Mode:
+Audit the remaining Warrior refs (`0ncx0gfs`, `a8x4ee34`) and all Mage/Paladin/Priest/Rogue refs and assign each to the correct passive/talent collection based on its intended behavior.
 
-- an unflagged boss must not appear merely because `boss == true`;
-- a flagged boss may continue to use the existing boss portrait presentation/row;
-- flagged non-boss NPCs use the normal portrait presentation.
+Do not drop any currently intended class trait during migration.
 
-Do not change boss behavior in Combat Mode.
+## Required race migration/corrections
 
-`showInNpcMode` and `hidden` remain orthogonal. The new flag controls whether the frame exists; preserve the current hidden-unit presentation/masking rules rather than mutating `hidden` as a side effect.
+All racial traits must be owned by the appropriate Race definition, and every race-owned trait is an always-active racial passive.
 
-### 3. Do not silently drop selected NPCs because there is no combat paging
+### Human Spirit defect
 
-NPC Mode has no turn/tick advance mechanism, so it cannot rely on the current combat page number to reveal additional selected units.
+`The Human Spirit` (`dm2h660e`) is currently flagged as racial, but the Human race has an empty `traitRefs` collection. Under the canonical ownership model this means the racial is not actually granted by choosing Human.
 
-If the number of flagged NPCs exceeds the current normal portrait pool/capacity, the Event Widget must handle that as presentation state rather than silently hiding later flagged units behind nonexistent combat pages.
+Correct the Human Race definition so `The Human Spirit` is present in Human's racial `traitRefs`.
 
-Use the narrowest layout change compatible with the current widget architecture, for example growing/wrapping portrait slots or another bounded multi-row presentation. Do not reintroduce a fake combat tick just to page the display.
+Then audit all remaining default traits currently marked/treated as racial and ensure each one is referenced by the correct Race definition.
 
-The host-side `showInNpcMode` flag is intended to keep this list curated and normally small, but the client must still behave deterministically if too many are selected.
+No default racial should depend solely on a Trait-level `isRacial` flag.
 
-### 4. Remove turn-order presentation from NPC Mode
+## Remove obsolete ownership flags from default Trait definitions
 
-While NPC Mode is active, hide/neutralize Event Widget UI which only makes sense for combat turn progression, including:
+After the data has been migrated to canonical Race/Class ownership:
 
-- host `Next`/advance control;
-- turn/tick progress indicators which imply a current combat page;
-- current-turn-only portrait emphasis/turn-complete presentation where it would misleadingly imply that the displayed NPCs are the current combat actors.
+- remove obsolete `isRacial` declarations from built-in trait definitions if #301 removes/deprecates that field;
+- remove obsolete `isClass` declarations from built-in trait definitions if #301 removes/deprecates that field;
+- remove/update any `isTalent` usage whose only purpose was to distinguish a class-owned trait from a class passive, because class ownership/type is now expressed by `passiveTraitRefs` vs `talentTraitRefs`;
+- retain unrelated fields such as environmental behavior where applicable.
 
-Keep presentation that is still useful for the talking-head reference use case:
+Do not leave the default datasets in a hybrid state where both the new ownership collections and legacy flags are required to infer the same behavior.
 
-- portrait/model;
-- name/raid marker/team presentation;
-- health/resource bars;
-- current cast/aura/resource visuals where already supported;
-- host right-click NPC control, including the existing immediate `Speak` workflow.
+## Preserve identifiers and references
 
-Talking Head speech itself must **not** require `showInNpcMode == true`; the flag controls persistent Event Widget reference frames, not whether an NPC is allowed to speak.
+This is a schema/ownership migration, not a content recreation task.
 
-### 5. Hard-block turn advancement outside the UI
+Unless an existing definition is independently broken:
 
-NPC Mode must have no alternate path which can advance combat state.
+- preserve existing dataset IDs;
+- preserve trait IDs;
+- preserve names/descriptions/effects/auras/events;
+- preserve unlock levels;
+- preserve spell/item references;
+- preserve class/race IDs.
 
-Add a client action-gate check in `Client:CanPerformEventAction(eventState, actionKind)` so:
+The migration must not invalidate external references to built-in traits unnecessarily.
 
-```lua
-actionKind == "advance-event-step"
-```
+## Built-in dataset versioning
 
-returns false with a specific reason such as:
+Bump the relevant built-in/default dataset versions so installations with older built-in definitions receive the corrected Race/Class/Trait data through the existing default-dataset update mechanism.
 
-```text
-npc-mode
-```
+Updating a built-in dataset must not reactivate a dataset that the user has explicitly disabled; preserve the existing default-dataset activation semantics.
 
-when `eventMode == "npc"`.
+## Add/extend default-data integrity validation
 
-Also add a server-side guard at the start of `Server:AdvanceEventStep()` so direct/internal callers cannot bypass the client UI guard.
+Add a deterministic validation/test pass for the default datasets so this category of defect is caught in future.
 
-The rejected call must not change:
+At minimum assert:
 
-```text
-turnNumber
-tickNumber
-totalTicks
-turn completion state
-pending turn state
-resources/cooldowns/auras/casts
-```
+1. Every `Race.traitRefs` entry resolves to a valid Trait.
+2. Every `Class.passiveTraitRefs` entry resolves to a valid Trait.
+3. Every `Class.talentTraitRefs` entry resolves to a valid Trait.
+4. A class cannot contain the same ref in both passive and talent collections.
+5. Every legacy class-owned ref present before migration is accounted for exactly once after migration unless its deliberate removal is documented.
+6. Every built-in trait intended as a racial is owned by at least one Race.
+7. Default racial/class ownership does not depend solely on deprecated Trait ownership flags.
+8. No default class talent is accidentally available as an unowned generic/manual talent.
 
-#299 will hide the Event Manager Dashboard button, but this issue owns the authoritative runtime protection.
+Where practical, validate reverse ownership as well so orphaned built-in race/class traits are reported during development.
 
-### 6. Preserve combat state across mode switches
+## Functional verification
 
-A live transition:
+Verify in-game/profile behavior after #301/#302 with the migrated data:
 
-```text
-Combat Mode -> NPC Mode -> Combat Mode
-```
-
-must resume the same combat position.
-
-Do not reset or normalize the event onto tick 1 merely because NPC Mode was entered. The Event Widget should simply stop using combat paging while NPC Mode is active and resume using the stored `turnNumber`/`tickNumber` when Combat Mode returns.
-
-The inbound `EVENT_STATE` mode change must cause an immediate structural Event Widget refresh on clients so players do not need to wait for another unit/resource/turn event to see the correct portrait set.
-
-## Primary files to inspect
-
-At minimum:
-
-```text
-client/ui/widgets/widget_Event.lua
-client/client_Event.lua
-server/server_Event.lua
-core/classes/Event.lua
-core/classes/EventUnit.lua
-```
-
-Also inspect the final implementation of #298 rather than assuming helper names.
-
-Before changing `widget_Event.lua`, trace:
-
-```text
-BuildPortraitRefreshContext
-getWidgetUnitsForPage
-collectBossUnits
-EnsurePortraitPool
-EnsureBossPortraitPool
-LayoutPortraitRow
-Refresh / targeted refresh paths
-host control-button visibility
-turn-progress rendering
-```
-
-Do not create a second Event Widget or a separate NPC-frame window.
+- selecting Human immediately grants and applies `The Human Spirit`;
+- the Human racial cannot be toggled off;
+- selecting Rogue immediately grants its class passives, including `Instant Poison` if that remains the intended passive behavior;
+- selecting Warrior exposes `Defensive Stance` and `Battle Stance` in the Warrior talent pool but does not activate them until selected;
+- class passives appear under Class Passives;
+- class talents appear under Class Talents;
+- changing class removes the previous class's passive/talent availability and loads the new class's data correctly.
 
 ## Acceptance criteria
 
-1. Combat Mode renders exactly as before.
-2. NPC Mode shows no player EventUnit portraits.
-3. NPC Mode shows only non-player units whose `showInNpcMode` value is true.
-4. Flagged NPCs are not filtered by current combat tick/page.
-5. Unflagged bosses do not leak through the separate boss portrait path; flagged bosses still render correctly.
-6. Existing hidden-unit presentation semantics are preserved and the visibility flag never mutates `hidden`.
-7. More flagged NPCs than the normal single-row capacity are handled deterministically without relying on turn advancement or silently making selected units unreachable.
-8. Event Widget turn/tick advance controls and misleading turn-progress UI are absent/neutral in NPC Mode.
-9. `Client:CanPerformEventAction(..., "advance-event-step")` rejects advancement in NPC Mode.
-10. `Server:AdvanceEventStep()` independently rejects advancement in NPC Mode even if called directly.
-11. Switching `combat -> npc -> combat` leaves the stored turn/tick state unchanged and Combat Mode resumes where it left off.
-12. A live mode switch refreshes the Event Widget immediately on all clients.
-13. Right-click NPC control and immediate Talking Head speech still work from NPC Mode frames.
-14. An NPC may still produce a Talking Head even if it is not selected for persistent NPC Mode display.
-
-## Non-goals
-
-- Do not change spellcasting, NPC AI, threat, target selection, loot, or turn scheduling rules.
-- Do not make NPC Mode a new `turnMode` value.
-- Do not automatically set/clear `showInNpcMode` when an NPC speaks.
-- Do not alter EventUnit `hidden` state when entering/leaving NPC Mode.
+- Every built-in Race/Class trait relationship uses the new canonical ownership fields.
+- All five current default class files have been audited and migrated.
+- `The Human Spirit` is correctly owned by Human and works automatically when Human is selected.
+- All existing intended class traits are classified exactly once as either class passive or class talent.
+- Built-in Trait definitions no longer rely on duplicate Race/Class ownership flags after migration.
+- Relevant default dataset versions are bumped so the migration reaches existing installations without re-enabling disabled datasets.
+- Automated/default-data validation detects missing refs, duplicate passive/talent membership, orphaned racial ownership, and other invalid ownership states.

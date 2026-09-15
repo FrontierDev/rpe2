@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 5,
+    version = 7,
     dataset = {
         achievements = {},
         auras = {
@@ -422,7 +422,10 @@ Addon.Data.DefaultDatasets:Register({
                         statRef = "f82db71a:ygjno50i"
                     }
                 },
-                traitRefs = {}
+                passiveTraitRefs = {
+                    "d7c874c4:arcdecon"
+                },
+                talentTraitRefs = {}
             }
         },
         currencies = {},
@@ -2693,6 +2696,25 @@ Addon.Data.DefaultDatasets:Register({
                 automaticAuras = {},
                 category = "",
                 conditions = {},
+                description = "Increases your damage against Elementals by 5%.",
+                events = {},
+                icon = "interface/icons/spell_arcane_arcane04.blp",
+                id = "arcdecon",
+                isEnvironmental = false,
+                name = "Arcane Deconstruction",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:bh4yvi9u",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "",
+                conditions = {},
                 description = "",
                 events = {
                     {
@@ -2711,10 +2733,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 icon = "interface/icons/spell_arcane_arcane04.blp",
                 id = "0ih4ypms",
-                isClass = false,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = true,
                 name = "Arcane Attunement",
                 skillBonuses = {},
                 statBonuses = {},

@@ -679,6 +679,13 @@ local function syncDefaultDatasets()
     end
 
     applyPackagedVersionCorrections(DefaultDatasets.Definitions)
+    if type(DefaultDatasets.ValidateTraitOwnership) == "function" then
+        local valid, message = DefaultDatasets:ValidateTraitOwnership()
+        if valid ~= true then
+            logInstallDiagnostic(message or "default trait ownership validation failed")
+            return false
+        end
+    end
 
     local installedRevision = math.max(0, math.floor(tonumber(savedRoot.defaultDatasetSyncRevision) or 0))
     local forceSync = installedRevision < PACKAGED_DEFAULT_SYNC_REVISION

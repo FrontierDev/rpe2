@@ -376,9 +376,6 @@ function Trait:New(data)
         icon = "",
         category = "",
         unlockLevel = 1,
-        isRacial = false,
-        isClass = false,
-        isTalent = true,
         isEnvironmental = false,
         conditions = {},
         statBonuses = {},
@@ -404,19 +401,12 @@ function Trait:Merge(data)
     self.icon = ensureString(self.icon)
     self.category = normalizeCategory(self.category)
     self.unlockLevel = normalizeUnlockLevel(self.unlockLevel)
-    self.isRacial = normalizeBoolean(self.isRacial)
-    self.isClass = normalizeBoolean(self.isClass)
-    self.isTalent = normalizeBoolean(self.isTalent)
     self.isEnvironmental = normalizeBoolean(self.isEnvironmental)
     self.conditions = Condition.NormalizeList and Condition.NormalizeList(data.conditions or self.conditions) or {}
     self.statBonuses = normalizeStatBonuses(data.statBonuses or self.statBonuses)
     self.skillBonuses = normalizeSkillBonuses(data.skillBonuses or self.skillBonuses)
     self.automaticAuras = normalizeAutomaticAuras(data.automaticAuras or self.automaticAuras)
     self.events = normalizeEvents(data.events or self.events)
-
-    if self.isRacial ~= true and self.isClass ~= true and self.isTalent ~= true then
-        self.isTalent = true
-    end
 
     return self
 end
@@ -429,9 +419,6 @@ function Trait:ToTable()
         icon = self.icon,
         category = self.category,
         unlockLevel = self.unlockLevel,
-        isRacial = self.isRacial == true,
-        isClass = self.isClass == true,
-        isTalent = self.isTalent == true,
         isEnvironmental = self.isEnvironmental == true,
         conditions = Condition.NormalizeList and Condition.NormalizeList(self.conditions) or {},
         statBonuses = normalizeStatBonuses(self.statBonuses),
