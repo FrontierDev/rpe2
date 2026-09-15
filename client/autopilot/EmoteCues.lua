@@ -18,7 +18,6 @@ local MARKERS = {
     [5] = "{moon}", [6] = "{square}", [7] = "{cross}", [8] = "{skull}",
 }
 
-local function pack(...) return { n = select("#", ...), ... } end
 local function eventId(value)
     local id = math.floor(tonumber(value) or 0)
     return id > 0 and id or 0
@@ -383,28 +382,20 @@ if type(baseRows) == "function" then
     end
 end
 
--- Authorization has already succeeded when this hook is entered; publish immediately before execution.
-local baseAuthorized = Client.OnAutopilotPendingActionAuthorized
-if type(baseAuthorized) == "function" then
-    function Client:OnAutopilotPendingActionAuthorized(action, plan, eventState, ...)
-        if type(action) == "table" and action.actionType == "spell" and action.status == "authorized" then
-            Cues.TrySendForUnits({ action.casterEventId }, plan, eventState, action.actionId)
-        end
-        return baseAuthorized(self, action, plan, eventState, ...)
-    end
-end
-
--- Movement narration fires only after the canonical movement confirmation succeeds.
-local baseConfirmMovement = Client.ConfirmAutopilotPendingMovement
-if type(baseConfirmMovement) == "function" then
-    function Client:ConfirmAutopilotPendingMovement(actionId, eventStateOverride, ...)
-        local results = pack(baseConfirmMovement(self, actionId, eventStateOverride, ...))
-        if results[1] == true and type(results[2]) == "table" then
-            local eventState = state(eventStateOverride)
-            Cues.TrySendForUnits(results[2].expectedMemberEventIds or {}, select(1, currentPlan(eventState)), eventState, results[2].actionId)
-        end
-        return unpack(results, 1, results.n)
-    end
+-- Both presentation systems share one authorization/commit dispatch point.
+if type(Client.RegisterAutopilotActionCueHandler) == "function" then
+    Client:RegisterAutopilotActionCueHandler("group-chat-emote", {
+        spellAuthorized = function(action, plan, eventState)
+            if type(action) == "table" then
+                Cues.TrySendForUnits({ action.casterEventId }, plan, eventState, action.actionId)
+            end
+        end,
+        movementConfirmed = function(action, plan, eventState)
+            if type(action) == "table" then
+                Cues.TrySendForUnits(action.expectedMemberEventIds or {}, plan, eventState, action.actionId)
+            end
+        end,
+    })
 end
 
 return Cues

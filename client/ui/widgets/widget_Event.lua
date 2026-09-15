@@ -32,6 +32,14 @@ local function getEventClass()
     return Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Event or nil
 end
 
+local function isNpcEventMode(state)
+    local eventClass = getEventClass()
+    return eventClass
+        and type(eventClass.NormalizeEventMode) == "function"
+        and eventClass.NormalizeEventMode(state and state.eventMode) == "npc"
+        or false
+end
+
 local function coerceEventUnitBoolean(value, defaultValue)
     local eventUnitClass = Addon.Internal
         and Addon.Internal.Database
@@ -66,6 +74,22 @@ local function coerceEventUnitBoolean(value, defaultValue)
     end
 
     return defaultValue == true
+end
+
+local function isNpcWidgetUnit(eventUnit)
+    if type(eventUnit) ~= "table" or eventUnit.isPlayer == true then
+        return false
+    end
+
+    local eventUnitClass = Addon.Internal
+        and Addon.Internal.Database
+        and Addon.Internal.Database.Classes
+        and Addon.Internal.Database.Classes.EventUnit
+        or nil
+    if eventUnitClass and type(eventUnitClass.IsShownInNpcMode) == "function" then
+        return eventUnitClass.IsShownInNpcMode(eventUnit) == true
+    end
+    return coerceEventUnitBoolean(eventUnit.showInNpcMode, false)
 end
 
 local function isEventUnitActive(eventUnit)
@@ -119,6 +143,17 @@ local function getWidgetUnitsForPage(units, pageNumber, pageSize)
     end
 
     return pageUnits
+end
+
+local function getNpcWidgetUnits(units, isBoss)
+    local selectedUnits = {}
+    for index = 1, #(units or {}) do
+        local eventUnit = units[index]
+        if isNpcWidgetUnit(eventUnit) and isEventUnitBoss(eventUnit) == (isBoss == true) then
+            selectedUnits[#selectedUnits + 1] = eventUnit
+        end
+    end
+    return selectedUnits
 end
 
 local function findPageUnitIndexByEventId(pageUnits, targetEventId)
@@ -238,6 +273,14 @@ local COMBAT_LOG_PANEL_HEIGHT = 34
 local COMBAT_LOG_TIME_VISIBLE = 5
 local COMBAT_LOG_FADE_IN_DURATION = 0.18
 local COMBAT_LOG_FADE_OUT_DURATION = 0.22
+local NPC_SPEECH_MIN_DURATION = 5
+local NPC_SPEECH_MAX_DURATION = 12
+local NPC_SPEECH_SECONDS_PER_CHARACTER = 0.035
+local NPC_SPEECH_PANEL_WIDTH = 540
+local NPC_SPEECH_PANEL_HEIGHT = 104
+local NPC_SPEECH_MAX_PANEL_HEIGHT = 220
+local NPC_SPEECH_PORTRAIT_SIZE = 76
+local NPC_SPEECH_PANEL_GAP = 12
 local TOOLTIP_HINT_COLOR = { r = 0.38, g = 0.9, b = 0.42, a = 1 }
 local UNKNOWN_UNIT_NAME = "Unknown Unit"
 
@@ -253,12 +296,18 @@ local function getEventHeaderIconTexture(difficulty)
     return EVENT_ICON_TEXTURE
 end
 
-local function getPortraitPanelHeight(hasBossUnits)
+local function getPortraitPanelHeight(hasBossUnits, normalRows, bossRows)
+    local normalizedNormalRows = math.max(1, math.floor(tonumber(normalRows) or 1))
+    local normalizedBossRows = math.max(1, math.floor(tonumber(bossRows) or 1))
+    local normalHeight = (normalizedNormalRows * PORTRAIT_FRAME_HEIGHT)
+        + ((normalizedNormalRows - 1) * PORTRAIT_SECTION_SPACING)
     if hasBossUnits == true then
-        return BOSS_PORTRAIT_FRAME_HEIGHT + PORTRAIT_SECTION_SPACING + PORTRAIT_FRAME_HEIGHT + PORTRAIT_PANEL_BASE_PADDING
+        local bossHeight = (normalizedBossRows * BOSS_PORTRAIT_FRAME_HEIGHT)
+            + ((normalizedBossRows - 1) * PORTRAIT_SECTION_SPACING)
+        return bossHeight + PORTRAIT_SECTION_SPACING + normalHeight + PORTRAIT_PANEL_BASE_PADDING
     end
 
-    return PORTRAIT_FRAME_HEIGHT + PORTRAIT_PANEL_BASE_PADDING
+    return normalHeight + PORTRAIT_PANEL_BASE_PADDING
 end
 
 ClientUI.EventWidget = ClientUI.EventWidget or {}
@@ -336,7 +385,7 @@ local function stopEventFromWidget()
     return server:EndEvent("widget-stop")
 end
 
-local function buildPortraitDisplayKey(eventState, eventUnit, healthState, primaryState, castState, isPet, targetIndicatorState)
+local function buildPortraitDisplayKey(eventState, eventUnit, healthState, primaryState, castState, isPet, targetIndicatorState, turnComplete)
     if type(eventUnit) ~= "table" then
         return ""
     end
@@ -355,6 +404,7 @@ local function buildPortraitDisplayKey(eventState, eventUnit, healthState, prima
         tostring(castState and castState.icon or ""),
         isPet == true and "1" or "0",
         tostring(math.floor((tonumber(targetIndicatorState and targetIndicatorState.alpha) or 0) * 100 + 0.5)),
+        turnComplete == true and "1" or "0",
     }, "\31")
 end
 
@@ -954,16 +1004,25 @@ function EventWidget:Get()
         initiativePortraitPanel = nil,
         combatLogPanel = nil,
         combatLogText = nil,
-        combatLogQueue = {},
-        currentCombatLogEntry = nil,
-        combatLogTickerToken = 0,
-        combatLogTransitionToken = 0,
+        npcSpeechPanel = nil,
+        npcSpeechPortrait = nil,
+        npcSpeechNameText = nil,
+        npcSpeechDialogueText = nil,
+        presentationQueue = {},
+        currentPresentation = nil,
+        presentationTickerToken = 0,
+        presentationTransitionToken = 0,
+        presentationTimer = nil,
+        presentationEventId = nil,
         portraitSlots = {},
+        npcPortraitSlots = {},
         bossPortraitSlots = {},
         portraitSlotCount = 0,
         bossPortraitSlotCount = 0,
         currentKeys = {},
         currentVisualKeys = {},
+        npcCurrentKeys = {},
+        npcCurrentVisualKeys = {},
         bossCurrentKeys = {},
         bossCurrentVisualKeys = {},
         portraitRefreshToken = 0,
@@ -1374,6 +1433,58 @@ function EventWidget:Build()
     combatLogTextFrame:SetPoint("LEFT", combatLogFrame, "LEFT", 12, 0)
     combatLogTextFrame:SetPoint("RIGHT", combatLogFrame, "RIGHT", -12, 0)
 
+    self.npcSpeechPanel = UI.CreatePanel(rootFrame, "RPEClientEventWidgetNPCSpeechPanel", {
+        width = NPC_SPEECH_PANEL_WIDTH,
+        height = NPC_SPEECH_PANEL_HEIGHT,
+        contentInset = 0,
+        showBorder = true,
+        panelBorderSize = 1,
+        panelBorderColor = UI.ResolveColor(nil, "panel.border"),
+        panelBackgroundColor = UI.ResolveColor(nil, "panel.background"),
+        alpha = 1,
+    })
+    local npcSpeechFrame = self.npcSpeechPanel:GetFrame()
+    npcSpeechFrame:SetPoint("TOP", portraitFrame, "BOTTOM", 0, -NPC_SPEECH_PANEL_GAP)
+    npcSpeechFrame:Hide()
+
+    self.npcSpeechPortrait = UI.UnitPortrait:New({
+        name = "RPEClientEventWidgetNPCSpeechPortrait",
+        width = NPC_SPEECH_PORTRAIT_SIZE,
+        height = NPC_SPEECH_PORTRAIT_SIZE,
+        portraitWidth = NPC_SPEECH_PORTRAIT_SIZE,
+        portraitHeight = NPC_SPEECH_PORTRAIT_SIZE,
+        portraitBorderColor = UI.ResolveColor(nil, "panel.border"),
+        unit = nil,
+    })
+    self.npcSpeechPortrait:SetParent(npcSpeechFrame)
+    self.npcSpeechPortrait:Create()
+    local npcSpeechPortraitFrame = self.npcSpeechPortrait:GetFrame()
+    npcSpeechPortraitFrame:SetPoint("LEFT", npcSpeechFrame, "LEFT", 12, 0)
+
+    self.npcSpeechNameText = UI.CreateText(npcSpeechFrame, "RPEClientEventWidgetNPCSpeechName", "", {
+        fontSize = 13,
+        fontFlags = "OUTLINE",
+        justifyH = "LEFT",
+        justifyV = "MIDDLE",
+        wordWrap = false,
+        textColor = UI.ResolveColor(nil, "text.primary"),
+    })
+    local npcSpeechNameFrame = self.npcSpeechNameText:GetFrame()
+    npcSpeechNameFrame:SetPoint("TOPLEFT", npcSpeechFrame, "TOPLEFT", 104, -8)
+    npcSpeechNameFrame:SetPoint("TOPRIGHT", npcSpeechFrame, "TOPRIGHT", -12, -8)
+    npcSpeechNameFrame:SetHeight(22)
+
+    self.npcSpeechDialogueText = UI.CreateText(npcSpeechFrame, "RPEClientEventWidgetNPCSpeechDialogue", "", {
+        fontSize = 12,
+        justifyH = "LEFT",
+        justifyV = "TOP",
+        wordWrap = true,
+        textColor = UI.ResolveColor(nil, "text.primary"),
+    })
+    local npcSpeechDialogueFrame = self.npcSpeechDialogueText:GetFrame()
+    npcSpeechDialogueFrame:SetPoint("TOPLEFT", npcSpeechNameFrame, "BOTTOMLEFT", 0, -3)
+    npcSpeechDialogueFrame:SetPoint("BOTTOMRIGHT", npcSpeechFrame, "BOTTOMRIGHT", -12, 10)
+
     self.advanceStepButton:SetScript("OnEnter", function()
         if Client.ShowPendingTurnChangesTooltip then
             Client:ShowPendingTurnChangesTooltip(self.advanceStepButton)
@@ -1432,6 +1543,17 @@ function EventWidget:EnsureBossPortraitSlot(index)
     return slot
 end
 
+function EventWidget:EnsureNpcPortraitSlot(index)
+    local slot = self.npcPortraitSlots[index]
+    if slot then
+        return slot
+    end
+
+    slot = buildPortraitSlot(self.initiativePortraitPanel:GetFrame(), ("RPEClientEventWidgetNpcPortrait%d"):format(index), BOSS_PORTRAIT_SIZE)
+    self.npcPortraitSlots[index] = slot
+    return slot
+end
+
 function EventWidget:EnsurePortraitPool(slotCount)
     slotCount = math.max(1, math.floor(tonumber(slotCount) or DEFAULT_MAX_EVENT_UNITS))
     self.portraitSlotCount = slotCount
@@ -1449,6 +1571,21 @@ function EventWidget:EnsurePortraitPool(slotCount)
     end
 
     return self.portraitSlots
+end
+
+function EventWidget:EnsureNpcPortraitPool(slotCount)
+    slotCount = math.max(0, math.floor(tonumber(slotCount) or 0))
+    for index = 1, slotCount do
+        self:EnsureNpcPortraitSlot(index)
+    end
+    for index = slotCount + 1, #(self.npcPortraitSlots or {}) do
+        local slot = self.npcPortraitSlots[index]
+        local frame = slot and slot.GetFrame and slot:GetFrame() or nil
+        if frame and frame.Hide then
+            frame:Hide()
+        end
+    end
+    return self.npcPortraitSlots
 end
 
 function EventWidget:EnsureBossPortraitPool(slotCount)
@@ -1564,21 +1701,78 @@ function EventWidget:Hide()
     return true
 end
 
-function EventWidget:StartCombatLogTickerTimer()
-    self.combatLogTickerToken = math.max(0, tonumber(self.combatLogTickerToken) or 0) + 1
-    local token = self.combatLogTickerToken
+function EventWidget:StopPresentationTimer()
+    local timer = self.presentationTimer
+    self.presentationTimer = nil
+    if timer and type(timer.Cancel) == "function" then
+        timer:Cancel()
+    end
+    return true
+end
+
+function EventWidget:StopPresentationTransitions()
+    if self.combatLogPanel and self.combatLogPanel.StopFade then
+        self.combatLogPanel:StopFade()
+    end
+    if self.npcSpeechPanel and self.npcSpeechPanel.StopFade then
+        self.npcSpeechPanel:StopFade()
+    end
+end
+
+local function getPresentationPanel(self, presentation)
+    local presentationType = type(presentation) == "table" and presentation.presentationType or nil
+    if presentationType == "combat-log" then
+        return self.combatLogPanel
+    elseif presentationType == "npc-speech" then
+        return self.npcSpeechPanel
+    end
+    return nil
+end
+
+local function setPanelVisible(panel, visible)
+    local frame = panel and panel.GetFrame and panel:GetFrame() or nil
+    if not frame then
+        return false
+    end
+    if frame.SetAlpha then
+        frame:SetAlpha(1)
+    end
+    if visible == true then
+        frame:Show()
+    else
+        frame:Hide()
+    end
+    return true
+end
+
+local function getPresentationDuration(presentation)
+    if type(presentation) == "table" and presentation.presentationType == "npc-speech" then
+        local text = tostring(type(presentation.payload) == "table" and presentation.payload.text or "")
+        return math.max(
+            NPC_SPEECH_MIN_DURATION,
+            math.min(NPC_SPEECH_MAX_DURATION, NPC_SPEECH_MIN_DURATION + (#text * NPC_SPEECH_SECONDS_PER_CHARACTER))
+        )
+    end
+    return COMBAT_LOG_TIME_VISIBLE
+end
+
+function EventWidget:StartPresentationTimer()
+    self.presentationTickerToken = math.max(0, tonumber(self.presentationTickerToken) or 0) + 1
+    local token = self.presentationTickerToken
+    local duration = getPresentationDuration(self.currentPresentation)
     if type(C_Timer) == "table" and type(C_Timer.NewTimer) == "function" then
-        C_Timer.NewTimer(COMBAT_LOG_TIME_VISIBLE, function()
-            if self.combatLogTickerToken == token then
-                self:AdvanceCombatLogTicker()
+        self.presentationTimer = C_Timer.NewTimer(duration, function()
+            if self.presentationTickerToken == token then
+                self.presentationTimer = nil
+                self:AdvancePresentation()
             end
         end)
         return true
     end
     if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
-        C_Timer.After(COMBAT_LOG_TIME_VISIBLE, function()
-            if self.combatLogTickerToken == token then
-                self:AdvanceCombatLogTicker()
+        C_Timer.After(duration, function()
+            if self.presentationTickerToken == token then
+                self:AdvancePresentation()
             end
         end)
         return true
@@ -1587,94 +1781,220 @@ function EventWidget:StartCombatLogTickerTimer()
     return false
 end
 
-function EventWidget:StopCombatLogTransitions()
-    if self.combatLogPanel and self.combatLogPanel.StopFade then
-        self.combatLogPanel:StopFade()
+function EventWidget:RenderNPCSpeech(entry)
+    local eventState = Client.GetEventState and Client:GetEventState() or Client.EventState
+    if type(eventState) ~= "table"
+        or eventState.active ~= true
+        or tostring(eventState.id or "") ~= tostring(entry and entry.eventId or "")
+    then
+        return false
     end
+
+    local speaker = nil
+    local speakerEventId = tonumber(entry and entry.speakerEventId) or 0
+    for index = 1, #(eventState.units or {}) do
+        local candidate = eventState.units[index]
+        if tonumber(candidate and candidate.eventID) == speakerEventId and candidate.isPlayer ~= true then
+            speaker = candidate
+            break
+        end
+    end
+    if not speaker then
+        return false
+    end
+
+    -- Talking Head dialogue is an explicit host-authored reveal.  It must use
+    -- the authoritative EventUnit directly rather than the roster's masked
+    -- hidden-unit presentation, without altering that unit's hidden state.
+    local displayUnit = speaker
+    local teamColor = getTeamColor(eventState, speaker.team)
+    local red = math.floor(math.max(0, math.min(1, tonumber(teamColor.r) or 1)) * 255 + 0.5)
+    local green = math.floor(math.max(0, math.min(1, tonumber(teamColor.g) or 1)) * 255 + 0.5)
+    local blue = math.floor(math.max(0, math.min(1, tonumber(teamColor.b) or 1)) * 255 + 0.5)
+    local displayName = tostring(displayUnit and displayUnit.name or UNKNOWN_UNIT_NAME):gsub("|", "||")
+    local displayId = math.max(1, math.floor(tonumber(displayUnit and displayUnit.eventID) or speakerEventId))
+    local inline = Addon.UI and Addon.UI.Inline or nil
+    local markerNumber = math.floor(tonumber(displayUnit and displayUnit.raidMarker) or 0)
+    local raidMarker = inline and type(inline.RaidMarker) == "function"
+        and inline:RaidMarker(markerNumber >= 1 and markerNumber <= 8 and markerNumber or 0, 16, 16)
+        or ""
+    local nameMarkup = ("|cFF%02X%02X%02X%s|r  (#%d)"):format(red, green, blue, displayName, displayId)
+    if self.npcSpeechNameText and self.npcSpeechNameText.SetText then
+        self.npcSpeechNameText:SetText((raidMarker ~= "" and (raidMarker .. "  ") or "") .. nameMarkup)
+    end
+    if self.npcSpeechDialogueText and self.npcSpeechDialogueText.SetText then
+        local dialogue = tostring(entry.text or ""):gsub("|", "||")
+        self.npcSpeechDialogueText:SetText(dialogue)
+        local dialogueRegion = self.npcSpeechDialogueText.textRegion
+        local measuredHeight = dialogueRegion and dialogueRegion.GetStringHeight and tonumber(dialogueRegion:GetStringHeight()) or 0
+        local panelFrame = self.npcSpeechPanel and self.npcSpeechPanel.GetFrame and self.npcSpeechPanel:GetFrame() or nil
+        if panelFrame and panelFrame.SetHeight then
+            panelFrame:SetHeight(math.max(
+                NPC_SPEECH_PANEL_HEIGHT,
+                math.min(NPC_SPEECH_MAX_PANEL_HEIGHT, measuredHeight + 48)
+            ))
+        end
+    end
+
+    if self.npcSpeechPortrait then
+        self.npcSpeechPortrait:SetUnit(displayUnit)
+        local actionBarWidget = getActionBarWidget()
+        local resourceContext = type(actionBarWidget) == "table"
+            and type(actionBarWidget.BuildActionBarResourceContext) == "function"
+            and actionBarWidget:BuildActionBarResourceContext(eventState)
+            or nil
+        local healthState = buildPortraitResourceStates(actionBarWidget, displayUnit, eventState, resourceContext)
+        self.npcSpeechPortrait:SetProgressState(healthState)
+        self.npcSpeechPortrait:SetSecondaryProgressState(nil)
+        self.npcSpeechPortrait:SetBorderColor(teamColor.r or 1, teamColor.g or 1, teamColor.b or 1, teamColor.a or 1)
+        self.npcSpeechPortrait:SetRaidMarker(0)
+        self.npcSpeechPortrait:SetHiddenPresentation(false, false)
+    end
+
+    return true
 end
 
-function EventWidget:ShowCurrentCombatLogEntry(useFade)
-    if not self.combatLogPanel or not self.combatLogText then
+function EventWidget:ShowCurrentPresentation(useFade)
+    if type(self.currentPresentation) ~= "table" then
         return false
     end
 
-    local frame = self.combatLogPanel.GetFrame and self.combatLogPanel:GetFrame() or nil
-    if type(self.currentCombatLogEntry) ~= "table" then
+    local presentation = self.currentPresentation
+    self:StopPresentationTransitions()
+    setPanelVisible(self.combatLogPanel, false)
+    setPanelVisible(self.npcSpeechPanel, false)
+
+    if presentation.presentationType == "combat-log" then
+        if not self.combatLogPanel or not self.combatLogText then
+            return false
+        end
         if self.combatLogText.SetText then
-            self.combatLogText:SetText("")
+            self.combatLogText:SetText(buildCombatLogText(presentation.payload))
         end
-        if frame and frame.Hide then
-            frame:Hide()
+    elseif presentation.presentationType == "npc-speech" then
+        if not self.npcSpeechPanel or not self:RenderNPCSpeech(presentation.payload) then
+            return false
         end
+    else
         return false
     end
 
-    if self.combatLogText.SetText then
-        self.combatLogText:SetText(buildCombatLogText(self.currentCombatLogEntry))
-    end
-    self:StopCombatLogTransitions()
-    if useFade ~= false and self.combatLogPanel.FadeIn then
-        self.combatLogPanel:FadeIn(COMBAT_LOG_FADE_IN_DURATION)
-    elseif frame and frame.Show then
+    local panel = getPresentationPanel(self, presentation)
+    local frame = panel and panel.GetFrame and panel:GetFrame() or nil
+    if useFade ~= false and panel and panel.FadeIn then
+        panel:FadeIn(COMBAT_LOG_FADE_IN_DURATION)
+    elseif frame then
         if frame.SetAlpha then
             frame:SetAlpha(1)
         end
         frame:Show()
     end
-    self:StartCombatLogTickerTimer()
+    self:StartPresentationTimer()
     return true
 end
 
-function EventWidget:AdvanceCombatLogTicker()
-    self.combatLogTickerToken = math.max(0, tonumber(self.combatLogTickerToken) or 0) + 1
-    self.combatLogTransitionToken = math.max(0, tonumber(self.combatLogTransitionToken) or 0) + 1
-    local transitionToken = self.combatLogTransitionToken
+function EventWidget:AdvancePresentation()
+    self:StopPresentationTimer()
+    self.presentationTickerToken = math.max(0, tonumber(self.presentationTickerToken) or 0) + 1
+    self.presentationTransitionToken = math.max(0, tonumber(self.presentationTransitionToken) or 0) + 1
+    local transitionToken = self.presentationTransitionToken
 
-    local function completeAdvance()
-        if self.combatLogTransitionToken ~= transitionToken then
+    local function showNextPresentation()
+        if self.presentationTransitionToken ~= transitionToken then
             return false
         end
 
-        local nextEntry = nil
-        if type(self.combatLogQueue) == "table" and #self.combatLogQueue > 0 then
-            nextEntry = table.remove(self.combatLogQueue, 1)
+        while type(self.presentationQueue) == "table" and #self.presentationQueue > 0 do
+            self.currentPresentation = table.remove(self.presentationQueue, 1)
+            if self:ShowCurrentPresentation(true) then
+                return true
+            end
         end
-        self.currentCombatLogEntry = nextEntry
-        return self:ShowCurrentCombatLogEntry(true)
+
+        self.currentPresentation = nil
+        setPanelVisible(self.combatLogPanel, false)
+        setPanelVisible(self.npcSpeechPanel, false)
+        return false
     end
 
-    if type(self.currentCombatLogEntry) ~= "table" then
-        return completeAdvance()
+    if type(self.currentPresentation) ~= "table" then
+        return showNextPresentation()
     end
 
-    self:StopCombatLogTransitions()
-    if self.combatLogPanel and self.combatLogPanel.FadeOut then
-        self.combatLogPanel:FadeOut(COMBAT_LOG_FADE_OUT_DURATION, function()
-            completeAdvance()
+    local currentPanel = getPresentationPanel(self, self.currentPresentation)
+    self:StopPresentationTransitions()
+    if currentPanel and currentPanel.FadeOut then
+        currentPanel:FadeOut(COMBAT_LOG_FADE_OUT_DURATION, function()
+            showNextPresentation()
         end)
         return true
     end
 
-    return completeAdvance()
+    return showNextPresentation()
 end
 
-function EventWidget:ClearCombatLogTicker(reason)
-    self.combatLogTickerToken = math.max(0, tonumber(self.combatLogTickerToken) or 0) + 1
-    self.combatLogTransitionToken = math.max(0, tonumber(self.combatLogTransitionToken) or 0) + 1
-    self.currentCombatLogEntry = nil
-    self.combatLogQueue = {}
-    self.lastCombatLogReason = reason
-    self:StopCombatLogTransitions()
+function EventWidget:ClearPresentations(reason)
+    self:StopPresentationTimer()
+    self.presentationTickerToken = math.max(0, tonumber(self.presentationTickerToken) or 0) + 1
+    self.presentationTransitionToken = math.max(0, tonumber(self.presentationTransitionToken) or 0) + 1
+    self.currentPresentation = nil
+    self.presentationQueue = {}
+    self.presentationEventId = nil
+    self.lastPresentationClearReason = reason
+    self:StopPresentationTransitions()
     if self.combatLogText and self.combatLogText.SetText then
         self.combatLogText:SetText("")
     end
-    local frame = self.combatLogPanel and self.combatLogPanel.GetFrame and self.combatLogPanel:GetFrame() or nil
-    if frame and frame.Hide then
-        if frame.SetAlpha then
-            frame:SetAlpha(1)
-        end
-        frame:Hide()
+    if self.npcSpeechNameText and self.npcSpeechNameText.SetText then
+        self.npcSpeechNameText:SetText("")
     end
+    if self.npcSpeechDialogueText and self.npcSpeechDialogueText.SetText then
+        self.npcSpeechDialogueText:SetText("")
+    end
+    local speechFrame = self.npcSpeechPanel and self.npcSpeechPanel.GetFrame and self.npcSpeechPanel:GetFrame() or nil
+    if speechFrame and speechFrame.SetHeight then
+        speechFrame:SetHeight(NPC_SPEECH_PANEL_HEIGHT)
+    end
+    if self.npcSpeechPortrait then
+        self.npcSpeechPortrait:SetUnit(nil)
+        self.npcSpeechPortrait:SetRaidMarker(0)
+        self.npcSpeechPortrait:SetHiddenPresentation(false, false)
+    end
+    setPanelVisible(self.combatLogPanel, false)
+    setPanelVisible(self.npcSpeechPanel, false)
+    if type(Client.ClearNPCSpeechState) == "function" then
+        Client:ClearNPCSpeechState(reason)
+    end
+    return true
+end
+
+function EventWidget:ClearCombatLogTicker(reason)
+    return self:ClearPresentations(reason)
+end
+
+function EventWidget:QueuePresentation(presentation)
+    if type(presentation) ~= "table"
+        or (presentation.presentationType ~= "combat-log" and presentation.presentationType ~= "npc-speech")
+        or type(presentation.payload) ~= "table"
+    then
+        return false
+    end
+
+    local eventId = tostring(presentation.payload.eventId or "")
+    if eventId ~= "" then
+        if self.presentationEventId ~= nil and self.presentationEventId ~= eventId then
+            self:ClearPresentations("event-identity-change")
+        end
+        self.presentationEventId = eventId
+    end
+
+    self:Build()
+    self.presentationQueue = self.presentationQueue or {}
+    self.presentationQueue[#self.presentationQueue + 1] = presentation
+    if type(self.currentPresentation) ~= "table" then
+        return self:AdvancePresentation()
+    end
+
     return true
 end
 
@@ -1682,18 +2002,23 @@ function EventWidget:QueueCombatLogEntry(entry)
     if type(entry) ~= "table" then
         return false
     end
-
-    self:Build()
-    self.combatLogQueue = self.combatLogQueue or {}
-    self.combatLogQueue[#self.combatLogQueue + 1] = entry
-    if type(self.currentCombatLogEntry) ~= "table" then
-        return self:AdvanceCombatLogTicker()
-    end
-
-    return true
+    return self:QueuePresentation({
+        presentationType = "combat-log",
+        payload = entry,
+    })
 end
 
-function EventWidget:LayoutPortraitRow(panel, slots, slotCount, portraitSize, portraitSpacing)
+function EventWidget:QueueNPCSpeech(entry)
+    if type(entry) ~= "table" then
+        return false
+    end
+    return self:QueuePresentation({
+        presentationType = "npc-speech",
+        payload = entry,
+    })
+end
+
+function EventWidget:LayoutPortraitRow(panel, slots, slotCount, portraitSize, portraitSpacing, options)
     if not panel then
         return false
     end
@@ -1703,32 +2028,73 @@ function EventWidget:LayoutPortraitRow(panel, slots, slotCount, portraitSize, po
         return true
     end
 
-    local totalWidth = (count * portraitSize) + ((count - 1) * portraitSpacing)
-    local startOffset = -(totalWidth / 2)
+    local maxColumns = type(options) == "table" and tonumber(options.maxColumns) or nil
+    local rowStep = type(options) == "table" and tonumber(options.rowStep) or nil
+    local columns = maxColumns and math.max(1, math.floor(maxColumns)) or count
+    local resolvedRowStep = rowStep and math.max(1, rowStep) or portraitSize
+    local panelFrame = panel:GetFrame()
 
     for index = 1, count do
         local portrait = slots[index]
         local frame = portrait and portrait.GetFrame and portrait:GetFrame() or nil
 
         if frame then
+            local row = math.floor((index - 1) / columns)
+            local column = ((index - 1) % columns) + 1
+            local rowCount = math.min(columns, count - (row * columns))
+            local totalWidth = (rowCount * portraitSize) + ((rowCount - 1) * portraitSpacing)
+            local startOffset = -(totalWidth / 2)
             frame:ClearAllPoints()
-            frame:SetPoint("TOPLEFT", panel:GetFrame(), "TOP", startOffset + ((index - 1) * (portraitSize + portraitSpacing)), 0)
+            frame:SetPoint(
+                "TOPLEFT",
+                panelFrame,
+                "TOP",
+                startOffset + ((column - 1) * (portraitSize + portraitSpacing)),
+                -(row * resolvedRowStep)
+            )
         end
     end
 
     return true
 end
 
+local function getNpcPortraitColumnCount(maxEventUnits, portraitSize, portraitSpacing)
+    local panelColumns = math.floor((ROOT_WIDTH + portraitSpacing) / (portraitSize + portraitSpacing))
+    return math.max(1, math.min(math.max(1, math.floor(tonumber(maxEventUnits) or DEFAULT_MAX_EVENT_UNITS)), panelColumns))
+end
+
+local function getPortraitRowCount(unitCount, maxColumns)
+    local count = math.max(0, math.floor(tonumber(unitCount) or 0))
+    local columns = math.max(1, math.floor(tonumber(maxColumns) or 1))
+    return math.max(1, math.ceil(count / columns))
+end
+
+local function getPortraitRowPanelHeight(rowCount, portraitFrameHeight)
+    local rows = math.max(1, math.floor(tonumber(rowCount) or 1))
+    return (rows * portraitFrameHeight) + ((rows - 1) * PORTRAIT_SECTION_SPACING) + PORTRAIT_PANEL_BASE_PADDING
+end
+
 function EventWidget:BuildPortraitRefreshContext(state)
     local maxEventUnits = getMaxEventUnits()
     local units = state and state.units or {}
-    local pageNumber = math.max(1, math.floor(tonumber(state and state.tickNumber) or 1))
+    local npcMode = isNpcEventMode(state)
     local isHost = isLocalHostForEvent(state)
-    local pageUnits = getWidgetUnitsForPage(units, pageNumber, maxEventUnits)
-    local bossUnits = collectBossUnits(units)
+    local pageUnits
+    local bossUnits
+    if npcMode then
+        pageUnits = getNpcWidgetUnits(units, false)
+        bossUnits = getNpcWidgetUnits(units, true)
+    else
+        pageUnits = getWidgetUnitsForPage(
+            units,
+            math.max(1, math.floor(tonumber(state and state.tickNumber) or 1)),
+            maxEventUnits
+        )
+        bossUnits = collectBossUnits(units)
+    end
     local controlContext = Client.GetActionBarControlContext and Client:GetActionBarControlContext(state) or nil
     local controlledUnitId = tonumber(controlContext and controlContext.isControlled == true and controlContext.controlledUnit and controlContext.controlledUnit.eventID or 0) or 0
-    local dimOtherPortraits = controlledUnitId > 0
+    local dimOtherPortraits = npcMode ~= true and controlledUnitId > 0
     local actionBarWidget = getActionBarWidget()
     local actionBarResourceContext = type(actionBarWidget) == "table"
         and type(actionBarWidget.BuildActionBarResourceContext) == "function"
@@ -1738,6 +2104,10 @@ function EventWidget:BuildPortraitRefreshContext(state)
 
     return {
         maxEventUnits = maxEventUnits,
+        npcMode = npcMode,
+        portraitSlotCount = npcMode and #pageUnits or maxEventUnits,
+        normalPortraitColumns = npcMode and getNpcPortraitColumnCount(maxEventUnits, BOSS_PORTRAIT_SIZE, BOSS_PORTRAIT_SPACING) or #pageUnits,
+        bossPortraitColumns = npcMode and getNpcPortraitColumnCount(maxEventUnits, BOSS_PORTRAIT_SIZE, BOSS_PORTRAIT_SPACING) or #bossUnits,
         pageUnits = pageUnits,
         bossUnits = bossUnits,
         isHost = isHost,
@@ -1762,13 +2132,25 @@ function EventWidget:RefreshPortraitSlot(index, eventUnit, state, context, optio
         state,
         context.actionBarResourceContext
     )
+    if context.npcMode then
+        healthState, primaryState = nil, nil
+    end
     local castState = buildPortraitCastState(context.actionBarWidget, desiredUnit, state)
     local isPet = desiredUnit and isLocalPlayerPet(desiredUnit, context.localEventUnit) or false
     local targetIndicatorState = desiredUnit
         and Client.ResolveEventUnitInteractionMarkerState
         and Client:ResolveEventUnitInteractionMarkerState(desiredUnit, state)
         or { visible = false, alpha = 0 }
-    local nextKey = buildPortraitDisplayKey(state, desiredUnit or eventUnit, healthState, primaryState, castState, isPet, targetIndicatorState)
+    local isHiddenUnit = type(eventUnit) == "table" and eventUnit.hidden == true
+    local hideHiddenUnitDetails = isHiddenUnit and context.isHost ~= true
+    local turnComplete = context.npcMode ~= true
+        and desiredUnit
+        and Client.IsEventUnitTurnComplete
+        and Client:IsEventUnitTurnComplete(desiredUnit, state)
+        or false
+    local nextKey = buildPortraitDisplayKey(state, desiredUnit or eventUnit, healthState, primaryState, castState, isPet, targetIndicatorState, turnComplete)
+        .. "\31" .. (isHiddenUnit and "hidden" or "visible")
+        .. "\31" .. (context.isHost == true and "host" or "client")
     local currentKeys = type(options.currentKeys) == "table" and options.currentKeys or self.currentKeys
     local currentVisualKeys = type(options.currentVisualKeys) == "table" and options.currentVisualKeys or self.currentVisualKeys
     local previousKey = currentKeys[index]
@@ -1816,8 +2198,14 @@ function EventWidget:RefreshPortraitSlot(index, eventUnit, state, context, optio
     if portrait and portraitStateChanged and portrait.SetTargetIndicatorAlpha then
         portrait:SetTargetIndicatorAlpha(tonumber(targetIndicatorState and targetIndicatorState.alpha) or 0)
     end
+    if portrait and portraitStateChanged and portrait.SetTurnCompleteIndicatorVisible then
+        portrait:SetTurnCompleteIndicatorVisible(turnComplete)
+    end
     if portrait and portraitStateChanged and portrait.SetCastIcon then
         portrait:SetCastIcon(castState and castState.icon or nil)
+    end
+    if portrait and portraitStateChanged and portrait.SetHiddenPresentation then
+        portrait:SetHiddenPresentation(isHiddenUnit, hideHiddenUnitDetails)
     end
 
     if frame then
@@ -1859,7 +2247,11 @@ function EventWidget:BuildTargetedPortraitRefreshPlan(eventIds, reason)
     self:Show()
 
     local context = self:BuildPortraitRefreshContext(state)
-    self:EnsurePortraitPool(context.maxEventUnits)
+    if context.npcMode then
+        self:EnsureNpcPortraitPool(context.portraitSlotCount)
+    else
+        self:EnsurePortraitPool(context.portraitSlotCount)
+    end
     self:EnsureBossPortraitPool(#(context.bossUnits or {}))
 
     local targetEventIds = {}
@@ -1892,7 +2284,12 @@ function EventWidget:DrainTargetedPortraitRefreshPlan(token)
         local eventId = plan.targetEventIds[plan.nextIndex]
         local slotIndex = findPageUnitIndexByEventId(plan.context.pageUnits, eventId)
         if slotIndex then
-            self:RefreshPortraitSlot(slotIndex, plan.context.pageUnits[slotIndex], plan.state, plan.context)
+        self:RefreshPortraitSlot(slotIndex, plan.context.pageUnits[slotIndex], plan.state, plan.context,
+            plan.context.npcMode and {
+                ensureSlot = self.EnsureNpcPortraitSlot,
+                currentKeys = self.npcCurrentKeys,
+                currentVisualKeys = self.npcCurrentVisualKeys,
+            } or nil)
             plan.refreshed = true
         end
 
@@ -1937,16 +2334,22 @@ end
 
 function EventWidget:Refresh(reason)
     self.lastRefreshReason = reason
-    local maxEventUnits = getMaxEventUnits()
     local state = Client:GetEventState()
-    if not state or state.active ~= true then
+    if not state or state.active ~= true or state.ending == true then
         self:Hide()
         return false
     end
+    local npcMode = isNpcEventMode(state)
+    self:CancelPendingTargetedPortraitRefresh()
+
+    local eventId = tostring(state.id or "")
+    if self.presentationEventId ~= nil and self.presentationEventId ~= eventId then
+        self:ClearPresentations("event-identity-change")
+    end
+    self.presentationEventId = eventId
 
     self:Build()
     self:Show()
-    self:EnsurePortraitPool(maxEventUnits)
 
     self.titleText:SetText(tostring(state.name ~= "" and state.name or state.id or "Active Event"))
     self.subtitleText:SetText(getSubtitleText(state))
@@ -1955,6 +2358,14 @@ function EventWidget:Refresh(reason)
     end
     if self.turnStatusText and self.turnStatusText.SetText then
         self.turnStatusText:SetText(tostring(math.max(1, tonumber(state.turnNumber) or 1)))
+    end
+    local turnStatusFrame = self.turnStatusText and self.turnStatusText.GetFrame and self.turnStatusText:GetFrame() or nil
+    if turnStatusFrame then
+        if npcMode then
+            turnStatusFrame:Hide()
+        else
+            turnStatusFrame:Show()
+        end
     end
     local startupPending = state.unitsReady ~= true or state.startupReady ~= true
     local startupPhase = tostring(
@@ -2039,7 +2450,11 @@ function EventWidget:Refresh(reason)
     if self.turnProgressBar and self.turnProgressBar.SetMinMax and self.turnProgressBar.SetValue then
         local progressFrame = self.turnProgressBar.GetFrame and self.turnProgressBar:GetFrame() or nil
 
-        if startupPending then
+        if npcMode then
+            if progressFrame and progressFrame.Hide then
+                progressFrame:Hide()
+            end
+        elseif startupPending then
             local expectedCount = math.max(
                 0,
                 tonumber(state.startupProgressExpected)
@@ -2124,11 +2539,14 @@ function EventWidget:Refresh(reason)
             end
         end
         if advanceFrame then
-            if isHost then
+            if isHost and not npcMode then
                 advanceFrame:Show()
             else
                 advanceFrame:Hide()
             end
+        end
+        if self.advanceStepButton and self.advanceStepButton.SetWidth then
+            self.advanceStepButton:SetWidth(npcMode and 0 or CONTROL_BUTTON_ADVANCE_WIDTH)
         end
         if self.manageEventButton and self.manageEventButton.SetEnabled then
             self.manageEventButton:SetEnabled(canManage)
@@ -2138,6 +2556,9 @@ function EventWidget:Refresh(reason)
         end
         if self.advanceStepButton.SetEnabled then
             self.advanceStepButton:SetEnabled(canAdvance)
+        end
+        if self.controlButtonRow and self.controlButtonRow.RefreshLayout then
+            self.controlButtonRow:RefreshLayout()
         end
     end
     self:UpdateHeaderLayout()
@@ -2149,8 +2570,34 @@ function EventWidget:Refresh(reason)
     local initiativeHostFrame = self.initiativePortraitPanel and self.initiativePortraitPanel.GetFrame and self.initiativePortraitPanel:GetFrame() or nil
     local portraitHostFrame = self.portraitPanel and self.portraitPanel.GetFrame and self.portraitPanel:GetFrame() or nil
 
+    local normalRows = context.npcMode and getPortraitRowCount(#pageUnits, context.normalPortraitColumns) or 1
+    local bossRows = context.npcMode and getPortraitRowCount(#bossUnits, context.bossPortraitColumns) or 1
+    local normalPanelHeight = context.npcMode
+        and getPortraitRowPanelHeight(normalRows, BOSS_PORTRAIT_FRAME_HEIGHT)
+        or (PORTRAIT_FRAME_HEIGHT + PORTRAIT_PANEL_BASE_PADDING)
+    local bossPanelHeight = context.npcMode
+        and getPortraitRowPanelHeight(bossRows, BOSS_PORTRAIT_FRAME_HEIGHT)
+        or (BOSS_PORTRAIT_FRAME_HEIGHT + PORTRAIT_PANEL_BASE_PADDING)
+    local portraitPanelHeight = context.npcMode
+        and (#bossUnits > 0 and bossPanelHeight + PORTRAIT_SECTION_SPACING + normalPanelHeight or normalPanelHeight)
+        or getPortraitPanelHeight(#bossUnits > 0)
     if portraitHostFrame and portraitHostFrame.SetHeight then
-        portraitHostFrame:SetHeight(getPortraitPanelHeight(#bossUnits > 0))
+        portraitHostFrame:SetHeight(portraitPanelHeight)
+    end
+    if bossHostFrame and bossHostFrame.SetHeight then
+        bossHostFrame:SetHeight(bossPanelHeight)
+    end
+    local initiativePanelFrame = self.initiativePortraitPanel
+        and self.initiativePortraitPanel.GetFrame
+        and self.initiativePortraitPanel:GetFrame()
+        or nil
+    if initiativePanelFrame and initiativePanelFrame.SetHeight then
+        initiativePanelFrame:SetHeight(normalPanelHeight)
+    end
+    local rootFrame = self.rootPanel and self.rootPanel.GetFrame and self.rootPanel:GetFrame() or nil
+    if rootFrame and rootFrame.SetHeight then
+        local standardPortraitHeight = getPortraitPanelHeight(#bossUnits > 0)
+        rootFrame:SetHeight(ROOT_HEIGHT + math.max(0, portraitPanelHeight - standardPortraitHeight))
     end
 
     self:EnsureBossPortraitPool(#bossUnits)
@@ -2187,12 +2634,33 @@ function EventWidget:Refresh(reason)
         end
     end
 
-    for index = 1, maxEventUnits do
-        self:RefreshPortraitSlot(index, pageUnits[index] or nil, state, context)
+    local normalPortraitSlotCount = context.portraitSlotCount
+    if context.npcMode then
+        self:EnsureNpcPortraitPool(normalPortraitSlotCount)
+        self:EnsurePortraitPool(0)
+        for index = 1, #(self.portraitSlots or {}) do
+            local frame = self.portraitSlots[index] and self.portraitSlots[index].GetFrame and self.portraitSlots[index]:GetFrame() or nil
+            if frame and frame.Hide then
+                frame:Hide()
+            end
+        end
+    else
+        self:EnsurePortraitPool(normalPortraitSlotCount)
+        self:EnsureNpcPortraitPool(0)
+    end
+    for index = 1, normalPortraitSlotCount do
+        self:RefreshPortraitSlot(index, pageUnits[index] or nil, state, context, context.npcMode and {
+            ensureSlot = self.EnsureNpcPortraitSlot,
+            currentKeys = self.npcCurrentKeys,
+            currentVisualKeys = self.npcCurrentVisualKeys,
+        } or nil)
     end
 
-    for index = maxEventUnits + 1, #(self.portraitSlots or {}) do
-        local portrait = self.portraitSlots[index]
+    local normalSlots = context.npcMode and self.npcPortraitSlots or self.portraitSlots
+    local normalCurrentKeys = context.npcMode and self.npcCurrentKeys or self.currentKeys
+    local normalCurrentVisualKeys = context.npcMode and self.npcCurrentVisualKeys or self.currentVisualKeys
+    for index = normalPortraitSlotCount + 1, #(normalSlots or {}) do
+        local portrait = normalSlots[index]
         local frame = portrait and portrait.GetFrame and portrait:GetFrame() or nil
         if frame and frame.Hide then
             if frame.SetAlpha then
@@ -2200,12 +2668,26 @@ function EventWidget:Refresh(reason)
             end
             frame:Hide()
         end
-        self.currentKeys[index] = nil
-        self.currentVisualKeys[index] = nil
+        normalCurrentKeys[index] = nil
+        normalCurrentVisualKeys[index] = nil
     end
 
-    self:LayoutPortraitRow(self.bossPortraitPanel, self.bossPortraitSlots, #bossUnits, BOSS_PORTRAIT_SIZE, BOSS_PORTRAIT_SPACING)
-    self:LayoutPortraitRow(self.initiativePortraitPanel, self.portraitSlots, maxEventUnits, PORTRAIT_SIZE, PORTRAIT_SPACING)
+    self:LayoutPortraitRow(
+        self.bossPortraitPanel,
+        self.bossPortraitSlots,
+        #bossUnits,
+        BOSS_PORTRAIT_SIZE,
+        BOSS_PORTRAIT_SPACING,
+        context.npcMode and { maxColumns = context.bossPortraitColumns, rowStep = BOSS_PORTRAIT_FRAME_HEIGHT + PORTRAIT_SECTION_SPACING } or nil
+    )
+    self:LayoutPortraitRow(
+        self.initiativePortraitPanel,
+        normalSlots,
+        normalPortraitSlotCount,
+        context.npcMode and BOSS_PORTRAIT_SIZE or PORTRAIT_SIZE,
+        context.npcMode and BOSS_PORTRAIT_SPACING or PORTRAIT_SPACING,
+        context.npcMode and { maxColumns = context.normalPortraitColumns, rowStep = BOSS_PORTRAIT_FRAME_HEIGHT + PORTRAIT_SECTION_SPACING } or nil
+    )
     return true
 end
 
@@ -2216,6 +2698,10 @@ function Client:BuildEventWidget()
 end
 
 function Client:ShowEventWidget()
+    if self:RequireSetupCompletion("event-widget") ~= true then
+        return nil
+    end
+
     return EventWidget:Get():Show()
 end
 

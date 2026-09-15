@@ -12,7 +12,7 @@ if type(Widget) ~= "table" or Widget._autopilotEmoteCueExtensionInstalled == tru
     or type(Widget.EnsureAutopilotHelperUI) ~= "function" or type(Cues.GetParticipatingUnits) ~= "function"
 then return true end
 
-local WIDTH, HEIGHT, EMOTE_HEIGHT = 560, 620, 164
+local EMOTE_HEIGHT = 164
 local UNIT_HEIGHT, TEXT_HEIGHT, BUTTON_HEIGHT, GAP = 54, 48, 20, 4
 local ERROR = {
     ["not-host-autopilot"] = "Emotes are only available to the host during an Autopilot event.",
@@ -154,11 +154,11 @@ end
 
 function Widget:EnsureAutopilotEmoteCueUI()
     if self.autopilotEmoteFrame then return true end
-    if not self.autopilotDashboardFrame or not self.autopilotToolbarFrame then return false end
+    if not self.autopilotCueAuthoringContentFrame then return false end
     self.selectedAutopilotEmoteUnitIds, self.autopilotOutcomeEmoteDrafts = self.selectedAutopilotEmoteUnitIds or {}, self.autopilotOutcomeEmoteDrafts or {}
     self.autopilotUnitEmoteDraft, self.autopilotEmoteMode = tostring(self.autopilotUnitEmoteDraft or ""), tostring(self.autopilotEmoteMode or "units")
 
-    self.autopilotEmoteFrame = UI.CreatePanel(self.autopilotDashboardFrame, "RPEClientEventWidgetDMAutopilotEmotePanel", {
+    self.autopilotEmoteFrame = UI.CreatePanel(self.autopilotCueAuthoringContentFrame, "RPEClientEventWidgetDMAutopilotEmotePanel", {
         height=EMOTE_HEIGHT, contentInset=5, showBorder=true, panelBorderSize=1,
         panelBorderColor=UI.ResolveColor(nil,"panel.border"), panelBackgroundColor=UI.ResolveColor(nil,"panel.background"),
     })
@@ -166,7 +166,8 @@ function Widget:EnsureAutopilotEmoteCueUI()
     self.autopilotEmoteContextText = UI.CreateText(content, "RPEClientEventWidgetDMAutopilotEmoteContext", "Emote — Selected Units", {
         height=16, fontSize=10, fontFlags="OUTLINE", justifyH="LEFT", justifyV="MIDDLE", wordWrap=false, textColor=UI.ResolveColor(nil,"text.secondary"),
     })
-    frame(self.autopilotEmoteContextText):SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0); frame(self.autopilotEmoteContextText):SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, 0)
+    frame(self.autopilotEmoteContextText):SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0)
+    frame(self.autopilotEmoteContextText):SetPoint("TOPRIGHT", content, "TOPRIGHT", 0, 0)
 
     self.autopilotEmoteUnitScroll = UI.ScrollLayout:New({
         name="RPEClientEventWidgetDMAutopilotEmoteUnits", rowHeight=17, rowSpacing=1, visibleRows=3, rowElementClass=UnitRow,
@@ -211,11 +212,6 @@ end
 function Widget:RefreshAutopilotEmoteCueUI()
     if not self:EnsureAutopilotEmoteCueUI() then return false end
     local state = eventState()
-    local active = self.combatLogHistoryMode == "dm-helper" and type(state) == "table" and state.active == true
-        and tostring(state.turnMode or "manual") == "autopilot" and type(Client.IsLocalEventHost) == "function"
-        and Client:IsLocalEventHost(state) == true and self.autopilotDetailsExpanded ~= true
-    shown(self.autopilotEmoteFrame, active); if not active then return false end
-
     local units, plan = Cues.GetParticipatingUnits(state)
     local eventKey, turn, planKey = tostring(state.id or ""), math.max(0,math.floor(tonumber(state.turnNumber) or 0)), tostring(plan and plan.planId or "")
     local turnChanged = tostring(self.autopilotEmoteEventId or "") ~= eventKey or tonumber(self.autopilotEmoteTurnNumber) ~= turn
@@ -254,38 +250,20 @@ function Widget:RefreshAutopilotEmoteCueUI()
     self:RefreshAutopilotEmoteCueControls(); return true
 end
 
-local baseEnsure, baseLayout, baseRefresh = Widget.EnsureAutopilotHelperUI, Widget.LayoutAutopilotHelperDashboard, Widget.RefreshAutopilotHelperDashboard
-local baseExpand, baseSelect, baseClear = Widget.SetAutopilotDetailsExpanded, Widget.SelectAutopilotHelperDetail, Widget.ClearAutopilotHelperSelection
-function Widget:EnsureAutopilotHelperUI(...)
-    local result = baseEnsure(self,...); if result then self:EnsureAutopilotEmoteCueUI() end; return result
-end
-function Widget:LayoutAutopilotHelperDashboard(...)
-    local result = baseLayout(self,...)
-    if self.autopilotEmoteFrame and self.autopilotToolbarFrame then
-        local emote = frame(self.autopilotEmoteFrame); emote:ClearAllPoints(); emote:SetPoint("BOTTOMLEFT",self.autopilotToolbarFrame,"TOPLEFT",0,GAP); emote:SetPoint("BOTTOMRIGHT",self.autopilotToolbarFrame,"TOPRIGHT",0,GAP); emote:SetHeight(EMOTE_HEIGHT)
-        if self.autopilotDetailsExpanded ~= true and self.autopilotDetailToggleButton then
-            local details = frame(self.autopilotDetailToggleButton); details:ClearAllPoints(); details:SetPoint("BOTTOMLEFT",emote,"TOPLEFT",0,GAP); details:SetPoint("BOTTOMRIGHT",emote,"TOPRIGHT",0,GAP)
-        end
-    end
-    return result
-end
-function Widget:RefreshAutopilotHelperDashboard(...)
-    local result = baseRefresh(self,...); local panel = frame(self.combatLogHistoryPanel)
-    if panel and self.combatLogHistoryMode == "dm-helper" then panel:SetSize(WIDTH,HEIGHT) end
-    self:RefreshAutopilotEmoteCueUI(); self:LayoutAutopilotHelperDashboard(); return result
-end
-function Widget:SetAutopilotDetailsExpanded(expanded,...)
-    local result = baseExpand(self,expanded,...); shown(self.autopilotEmoteFrame,self.autopilotDetailsExpanded ~= true); self:LayoutAutopilotHelperDashboard(); return result
-end
-function Widget:SelectAutopilotHelperDetail(entry,...)
-    local result = baseSelect(self,entry,...); self:RefreshAutopilotEmoteCueUI(); return result
-end
-function Widget:ClearAutopilotHelperSelection(...)
-    local result = baseClear(self,...)
+function Widget:ResetAutopilotEmoteCueAuthoring()
     self.selectedAutopilotEmoteUnitIds, self.autopilotEmoteEditingCueId, self.autopilotEmoteOutcomeEntryId, self.autopilotEmoteMode = {}, nil, nil, "units"
     self.autopilotUnitEmoteDraft, self.autopilotOutcomeEmoteDrafts = "", {}; if self.autopilotEmoteTextArea then self:SetAutopilotEmoteText("") end
-    return result
+    return true
 end
+
+Widget:RegisterAutopilotCueAuthoringMode("emote", {
+    label = "Emotes",
+    tabWidth = 62,
+    ensureMethod = "EnsureAutopilotEmoteCueUI",
+    refreshMethod = "RefreshAutopilotEmoteCueUI",
+    resetMethod = "ResetAutopilotEmoteCueAuthoring",
+    frameField = "autopilotEmoteFrame",
+})
 
 Widget._autopilotEmoteCueExtensionInstalled = true
 return true

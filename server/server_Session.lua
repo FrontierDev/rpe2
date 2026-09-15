@@ -282,10 +282,20 @@ function Server:IsActive()
 end
 
 function Server:GetExpectedClientHashes()
-    return {
+    local expected = {
         datasetHash = normalizeHashValue(Registry.GenerateActivatedDatasetsHash and Registry:GenerateActivatedDatasetsHash() or nil),
         rulesetHash = normalizeHashValue(Registry.GenerateActiveRulesetHash and Registry:GenerateActiveRulesetHash() or nil),
     }
+    if type(Debug.Internal) == "function" then
+        Debug.Internal(
+            "Compatibility refresh client=%s revision=%d datasetHash=%s rulesetHash=%s stage=server-expected-hashes reason=host-state.",
+            tostring(Common.GetPlayerName and Common.GetPlayerName() or "unknown"),
+            math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0)),
+            tostring(expected.datasetHash or ""),
+            tostring(expected.rulesetHash or "")
+        )
+    end
+    return expected
 end
 
 function Server:GetClientHashMismatches(state)
@@ -309,6 +319,17 @@ function Server:GetClientHashMismatches(state)
             local rulesetMismatch = rulesetHash ~= expected.rulesetHash
 
             if datasetMismatch or rulesetMismatch then
+                if type(Debug.Internal) == "function" then
+                    Debug.Internal(
+                        "Compatibility refresh client=%s revision=%d datasetHash=%s rulesetHash=%s stage=server-mismatch-evaluation reason=stored-vs-expected expectedDatasetHash=%s expectedRulesetHash=%s.",
+                        tostring(clientName),
+                        math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0)),
+                        tostring(datasetHash or ""),
+                        tostring(rulesetHash or ""),
+                        tostring(expected.datasetHash or ""),
+                        tostring(expected.rulesetHash or "")
+                    )
+                end
                 mismatches[#mismatches + 1] = {
                     name = clientName,
                     datasetMismatch = datasetMismatch,
@@ -319,6 +340,28 @@ function Server:GetClientHashMismatches(state)
                     expectedRulesetHash = expected.rulesetHash,
                 }
             end
+        elseif clientState then
+            if type(Debug.Internal) == "function" then
+                Debug.Internal(
+                    "Compatibility refresh client=%s revision=%d datasetHash=%s rulesetHash=%s stage=server-mismatch-evaluation reason=hashes-pending expectedDatasetHash=%s expectedRulesetHash=%s.",
+                    tostring(clientName),
+                    math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0)),
+                    tostring(clientState.datasetHash or ""),
+                    tostring(clientState.rulesetHash or ""),
+                    tostring(expected.datasetHash or ""),
+                    tostring(expected.rulesetHash or "")
+                )
+            end
+            mismatches[#mismatches + 1] = {
+                name = clientName,
+                hashesPending = true,
+                datasetMismatch = false,
+                rulesetMismatch = false,
+                datasetHash = normalizeHashValue(clientState.datasetHash),
+                rulesetHash = normalizeHashValue(clientState.rulesetHash),
+                expectedDatasetHash = expected.datasetHash,
+                expectedRulesetHash = expected.rulesetHash,
+            }
         end
     end
 
@@ -353,13 +396,19 @@ function Server:BuildClientHashMismatchWarning(state)
     end
 
     local details = {}
+    local pendingCount = 0
     for index = 1, #mismatches do
         local mismatch = mismatches[index]
         local labels = {}
-        if mismatch.datasetMismatch then
+        if mismatch.hashesPending then
+            pendingCount = pendingCount + 1
+            labels[#labels + 1] = "pending"
+        elseif mismatch.datasetMismatch then
             labels[#labels + 1] = "dataset"
-        end
-        if mismatch.rulesetMismatch then
+            if mismatch.rulesetMismatch then
+                labels[#labels + 1] = "ruleset"
+            end
+        elseif mismatch.rulesetMismatch then
             labels[#labels + 1] = "ruleset"
         end
 
@@ -367,6 +416,10 @@ function Server:BuildClientHashMismatchWarning(state)
             tostring(mismatch.name or "unknown"),
             table.concat(labels, " and ")
         )
+    end
+
+    if pendingCount > 0 then
+        return ("Warning: Waiting for compatibility hashes from %s. Event start is locked."):format(table.concat(details, ", "))
     end
 
     return ("Warning: Client hash mismatch detected for %s. Event start is locked."):format(table.concat(details, ", "))
@@ -424,6 +477,19 @@ function Server:HandleClientConnect(arguments, sender)
         clientState.datasetHash = normalizeHashValue(arguments and arguments[3] or nil)
         clientState.rulesetHash = normalizeHashValue(arguments and arguments[4] or nil)
         clientState.hashesReceived = clientState.datasetHash ~= nil or clientState.rulesetHash ~= nil
+    end
+
+    local expected = self:GetExpectedClientHashes()
+    if type(Debug.Internal) == "function" then
+        Debug.Internal(
+            "Compatibility refresh client=%s revision=%d datasetHash=%s rulesetHash=%s stage=server-replace reason=client-connect expectedDatasetHash=%s expectedRulesetHash=%s.",
+            tostring(clientName),
+            math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0)),
+            tostring(clientState and clientState.datasetHash or ""),
+            tostring(clientState and clientState.rulesetHash or ""),
+            tostring(expected.datasetHash or ""),
+            tostring(expected.rulesetHash or "")
+        )
     end
 
     if self.ReconcileClientEventSession then
@@ -687,6 +753,13 @@ function Server:FinalizeStartServer(state, attempt)
 end
 
 function Server:StartServer()
+    if not Addon.Client
+        or type(Addon.Client.RequireSetupCompletion) ~= "function"
+        or Addon.Client:RequireSetupCompletion("server-start") ~= true
+    then
+        return nil
+    end
+
     if self:IsActive() then
         self:StopServer("replaced")
     end
@@ -707,7 +780,15 @@ function Server:StartServer()
     state.channelId = Comms:JoinChannel(state.channelName)
     self.State = state
 
-    addClient(state, Common.GetPlayerName(), state.startedAt)
+    local hostName = Common.NormalizeName(Common.GetPlayerName())
+    addClient(state, hostName, state.startedAt)
+    local hostClientState = state.clientsByName and state.clientsByName[hostName] or nil
+    local expectedHostHashes = self:GetExpectedClientHashes()
+    if hostClientState then
+        hostClientState.datasetHash = expectedHostHashes.datasetHash
+        hostClientState.rulesetHash = expectedHostHashes.rulesetHash
+        hostClientState.hashesReceived = true
+    end
     if Client and Client.HandleServerStart then
         Client:HandleServerStart({
             state.channelName,

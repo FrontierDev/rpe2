@@ -5,6 +5,7 @@ Addon.Server.UI = Addon.Server.UI or {}
 
 local Server = Addon.Server
 local ServerUI = Addon.Server.UI
+local Debug = Addon.Debug or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local EventUnit = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.EventUnit or nil
 local Event = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Event or nil
@@ -108,7 +109,8 @@ local function buildUnitRowsSignature(rows, totalCount, playerCount, npcCount, s
             tostring(row and row.registryID or ""),
             row and row.isPlayer == true and 1 or 0,
             row and row.active == true and 1 or 0,
-            row and row.hidden == true and 1 or 0
+            row and row.hidden == true and 1 or 0,
+            row and row.showInNpcMode == true and 1 or 0
         )
     end
 
@@ -169,15 +171,19 @@ end
 
 function EventManage:BuildEventSummary()
     local state = Server.GetEventState and Server:GetEventState() or nil
+    local editableState = Server.GetEditableEventState and Server:GetEditableEventState() or nil
+    local modeState = editableState or state
+    local eventMode = Event and Event.NormalizeEventMode and Event.NormalizeEventMode(modeState and modeState.eventMode) or "combat"
+    local eventModeLabel = eventMode == "npc" and "NPC" or "Combat"
     if not state then
-        return "Status: Inactive\nEvent ID: -\nName: -\nHost: -\nChannel: -\nStarted At: -\nTurn: -\nTick: -"
+        return ("Status: Inactive  Mode: %s\nEvent ID: -\nName: -\nHost: -\nChannel: -\nStarted At: -\nTurn: -\nTick: -"):format(eventModeLabel)
     end
 
     local rosterReady = state.rosterReady == true
     local healthReady = state.resourcesReady == true
 
     return table.concat({
-        ("Status: %s"):format(formatValue(state.active)),
+        ("Status: %s  Mode: %s"):format(formatValue(state.active), eventModeLabel),
         ("Event ID: %s"):format(formatValue(state.id)),
         ("Name: %s"):format(formatValue(state.name, "Unnamed")),
         ("Subtext: %s"):format(formatValue(state.subtext)),
@@ -210,6 +216,7 @@ function EventManage:BuildUnitRows()
             isPlayer = unit and unit.isPlayer == true or false,
             active = EventUnit and EventUnit.IsActive and EventUnit.IsActive(unit) or (unit and (unit.isPlayer == true or coerceEventUnitBoolean(unit.active, true)) or false),
             hidden = EventUnit and EventUnit.IsHidden and EventUnit.IsHidden(unit) or coerceEventUnitBoolean(unit and unit.hidden, false),
+            showInNpcMode = EventUnit and EventUnit.IsShownInNpcMode and EventUnit.IsShownInNpcMode(unit) or coerceEventUnitBoolean(unit and unit.showInNpcMode, false),
             sourceUnit = unit,
         }
     end
@@ -306,6 +313,7 @@ function EventManage:BuildUnitTooltip(rowData)
             ("Boss: %s"):format(rowData.boss == true and "Yes" or "No"),
             ("State: %s"):format(rowData.active == true and "Active" or "Inactive"),
             ("Visibility: %s"):format(rowData.hidden == true and "Hidden" or "Visible"),
+            ("NPC Mode: %s"):format(rowData.isPlayer == true and "Not Applicable" or rowData.showInNpcMode == true and "Shown" or "Hidden"),
         },
     }
 end
@@ -344,19 +352,36 @@ function EventManage:CanAdvanceEventStep()
         return false
     end
 
+    if Event and Event.NormalizeEventMode and Event.NormalizeEventMode(serverEventState.eventMode) == "npc" then
+        return false
+    end
+
     return client:CanPerformEventAction(eventState, "advance-event-step") == true
 end
 
 function EventManage:RefreshDashboard()
     local layout = self.Layout or {}
-    local hasClientHashMismatch = Server.HasClientHashMismatch and Server:HasClientHashMismatch() or false
+    local mismatches = Server.GetClientHashMismatches and Server:GetClientHashMismatches() or {}
+    local hasClientHashMismatch = #mismatches > 0
     local datasetHash = Registry.GenerateActivatedDatasetsHash and Registry:GenerateActivatedDatasetsHash() or nil
     local rulesetHash = Registry.GenerateActiveRulesetHash and Registry:GenerateActiveRulesetHash() or nil
     local warningText = Server.BuildClientHashMismatchWarning and Server:BuildClientHashMismatchWarning() or nil
+    if type(Debug.Internal) == "function" then
+        Debug.Internal(
+            "Compatibility refresh client=%s revision=%d datasetHash=%s rulesetHash=%s stage=dashboard-refresh reason=state-change mismatches=%d.",
+            tostring(Addon.Utils and Addon.Utils.Common and Addon.Utils.Common.GetPlayerName and Addon.Utils.Common.GetPlayerName() or "unknown"),
+            math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0)),
+            tostring(datasetHash or ""),
+            tostring(rulesetHash or ""),
+            #mismatches
+        )
+    end
     local sessionSummary = self:BuildSessionSummary()
     local eventSummary = self:BuildEventSummary()
     local serverActive = Server.IsActive and Server:IsActive() or false
     local eventActive = Server.IsEventActive and Server:IsEventActive() or false
+    local editableEventState = Server.GetEditableEventState and Server:GetEditableEventState() or nil
+    local eventMode = Event and Event.NormalizeEventMode and Event.NormalizeEventMode(editableEventState and editableEventState.eventMode) or "combat"
     local eventUnitsReady = Server.IsEventUnitsReady and Server:IsEventUnitsReady() or false
     local canAdvanceEventStep = self:CanAdvanceEventStep()
     local signature = buildSignature(
@@ -368,6 +393,7 @@ function EventManage:RefreshDashboard()
         hasClientHashMismatch == true and 1 or 0,
         serverActive == true and 1 or 0,
         eventActive == true and 1 or 0,
+        eventMode,
         eventUnitsReady == true and 1 or 0,
         canAdvanceEventStep == true and 1 or 0
     )
@@ -419,6 +445,22 @@ function EventManage:RefreshDashboard()
 
     if self.AdvanceEventStepButton and self.AdvanceEventStepButton.SetEnabled then
         self.AdvanceEventStepButton:SetEnabled(canAdvanceEventStep)
+    end
+    if self.AdvanceEventStepButton then
+        if self.AdvanceEventStepButton.SetWidth then
+            self.AdvanceEventStepButton:SetWidth(eventMode == "npc" and 0 or self.AdvanceEventStepButtonWidth or (layout.DashboardAdvanceButtonWidth or 104))
+        end
+        local frame = self.AdvanceEventStepButton.GetFrame and self.AdvanceEventStepButton:GetFrame() or nil
+        if frame then
+            if eventMode == "npc" then
+                frame:Hide()
+            else
+                frame:Show()
+            end
+        end
+        if self.DashboardToolbarLayout and self.DashboardToolbarLayout.RefreshLayout then
+            self.DashboardToolbarLayout:RefreshLayout()
+        end
     end
 
     return true
@@ -537,6 +579,8 @@ function EventManage:EnsureUnitsContextMenu()
                 Server:SetEventUnitHidden(targetEventId, numericValue == 1)
             elseif assignmentType == "boss" and Server.SetEventUnitBoss then
                 Server:SetEventUnitBoss(targetEventId, numericValue == 1)
+            elseif assignmentType == "showInNpcMode" and Server.SetEventUnitShowInNpcMode then
+                Server:SetEventUnitShowInNpcMode(targetEventId, numericValue == 1)
             end
 
             self:RefreshUnitsPage()
@@ -578,7 +622,7 @@ function EventManage:ShowUnitsContextMenu(row, rowData)
     local bossItem = self:BuildBossMenuItem(rowData.boss == true)
     bossItem.assignmentType = "boss"
 
-    menu:SetItems({
+    local items = {
         {
             label = "Marker",
             value = "marker",
@@ -592,6 +636,15 @@ function EventManage:ShowUnitsContextMenu(row, rowData)
         activityItem,
         visibilityItem,
         bossItem,
-    })
+    }
+    if rowData.isPlayer ~= true then
+        items[#items + 1] = {
+            label = rowData.showInNpcMode == true and "Hide from NPC Mode" or "Show in NPC Mode",
+            value = rowData.showInNpcMode == true and 0 or 1,
+            assignmentType = "showInNpcMode",
+        }
+    end
+
+    menu:SetItems(items)
     menu:ShowAt(row and row.GetFrame and row:GetFrame() or nil)
 end

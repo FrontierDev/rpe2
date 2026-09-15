@@ -226,6 +226,7 @@ local function normalizeTarget(value)
             minTargets = 0,
             maxTargets = 0,
             allowDeadTargets = false,
+            allowHiddenTargets = false,
             disableSelfCast = false,
         }
     end
@@ -238,6 +239,7 @@ local function normalizeTarget(value)
             minTargets = 1,
             maxTargets = 1,
             allowDeadTargets = false,
+            allowHiddenTargets = false,
             disableSelfCast = false,
         }
     end
@@ -254,6 +256,7 @@ local function normalizeTarget(value)
         minTargets = minTargets,
         maxTargets = maxTargets,
         allowDeadTargets = Normalization.NormalizeBool(data.allowDeadTargets, false),
+        allowHiddenTargets = Normalization.NormalizeBool(data.allowHiddenTargets, false),
         disableSelfCast = Normalization.NormalizeBool(data.disableSelfCast, false),
     }
 end

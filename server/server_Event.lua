@@ -138,6 +138,7 @@ local function buildEventState(data)
         startedAt = data.startedAt or 0,
         endedAt = data.endedAt or 0,
         active = data.active == true,
+        eventMode = data.eventMode,
         difficulty = data.difficulty or "normal",
         level = tonumber(data.level) or 1,
         turnNumber = tonumber(data.turnNumber) or 0,
@@ -581,6 +582,7 @@ local function buildNpcUnit(unitData, ownerName, nextEventUnitId, playerCount)
         active = coerceEventUnitBoolean(values.active, true),
         hidden = coerceEventUnitBoolean(values.hidden, false),
         boss = coerceEventUnitBoolean(values.boss, false),
+        showInNpcMode = coerceEventUnitBoolean(values.showInNpcMode, false),
         petRef = values.petRef,
         summonedByEventID = values.summonedByEventID,
         mainHandWeapon = values.mainHandWeapon,
@@ -681,12 +683,9 @@ local function buildEventUnits(sessionState, sourceUnits, hostName)
     local nextEventUnitId = 1
     local seenPlayers = {}
     local playerOrder = {}
-    local groupedPlayerOrder = {}
-    local trackedPlayerOrder = {}
-    local trackedPlayersSeen = {}
+    local playerOrderSeen = {}
     local sourcePlayerUnitsByName = {}
     local sourceNpcUnits = {}
-    local groupedPlayers = Common.GetGroupMemberNames and Common.GetGroupMemberNames() or {}
     local playerCount = 0
     local playerEventIds = {}
 
@@ -700,13 +699,18 @@ local function buildEventUnits(sessionState, sourceUnits, hostName)
         target[#target + 1] = normalizedName
     end
 
-    for index = 1, #groupedPlayers do
-        appendUniqueName(groupedPlayerOrder, seenPlayers, groupedPlayers[index])
-    end
-
-    seenPlayers = {}
+    -- Only clients that joined the RPE session are event participants.
+    -- Ordinary WoW party/raid members without the addon never enter clientOrder and are ignored.
     for index = 1, #((sessionState and sessionState.clientOrder) or {}) do
-        appendUniqueName(trackedPlayerOrder, trackedPlayersSeen, sessionState.clientOrder[index])
+        local playerName = Common.NormalizeName(sessionState.clientOrder[index])
+        local clientState = playerName ~= ""
+            and sessionState
+            and sessionState.clientsByName
+            and sessionState.clientsByName[playerName]
+            or nil
+        if clientState then
+            appendUniqueName(playerOrder, playerOrderSeen, playerName)
+        end
     end
 
     for index = 1, #((sourceUnits) or {}) do
@@ -718,20 +722,6 @@ local function buildEventUnits(sessionState, sourceUnits, hostName)
             end
         elseif unit then
             sourceNpcUnits[#sourceNpcUnits + 1] = unit
-        end
-    end
-
-    if #trackedPlayerOrder > 1 then
-        for index = 1, #trackedPlayerOrder do
-            playerOrder[#playerOrder + 1] = trackedPlayerOrder[index]
-        end
-    else
-        local playerOrderSeen = {}
-        for index = 1, #groupedPlayerOrder do
-            appendUniqueName(playerOrder, playerOrderSeen, groupedPlayerOrder[index])
-        end
-        for index = 1, #trackedPlayerOrder do
-            appendUniqueName(playerOrder, playerOrderSeen, trackedPlayerOrder[index])
         end
     end
 
@@ -908,6 +898,7 @@ local function buildEndArguments(eventState, reason)
         eventState and eventState.channelName or "",
         eventState and eventState.id or nil,
         tostring(reason or ""),
+        eventState and eventState.distributeEndRewards ~= false,
     }
 end
 
@@ -1039,6 +1030,8 @@ local function resolveInitialEventSnapshotChannel(server, sessionState, recipien
         return nil, "host-session-not-current"
     end
 
+    -- These recipients come from the RPE session, not the raw WoW group roster.
+    -- Non-addon group members are absent; connected addon clients must be hash-compatible.
     if type(server.HasClientHashMismatch) == "function" and server:HasClientHashMismatch(sessionState) then
         return nil, "client-hash-mismatch"
     end
@@ -1184,6 +1177,7 @@ local function copyLiveEventToDraft(server, eventState)
     server.EventDraftState.name = eventState.name or ""
     server.EventDraftState.subtext = eventState.subtext or ""
     server.EventDraftState.description = eventState.description or ""
+    server.EventDraftState.eventMode = Event and Event.NormalizeEventMode and Event.NormalizeEventMode(eventState.eventMode) or "combat"
     server.EventDraftState.difficulty = normalizeEventDifficulty(eventState.difficulty)
     server.EventDraftState.level = normalizeEventLevel(eventState.level)
     server.EventDraftState.turnNumber = eventState.turnNumber
@@ -1238,6 +1232,48 @@ end
 
 function Server:CopyLiveEventToDraftState()
     return copyLiveEventToDraft(self, self.EventState)
+end
+
+function Server:SetEventMode(mode)
+    local eventState = self:GetEditableEventState()
+    if not eventState then
+        return false
+    end
+
+    local nextMode = Event and Event.NormalizeEventMode and Event.NormalizeEventMode(mode) or "combat"
+    if Event and Event.NormalizeEventMode then
+        eventState.eventMode = Event.NormalizeEventMode(eventState.eventMode)
+    end
+    if eventState.eventMode == nextMode then
+        return true
+    end
+
+    eventState.eventMode = nextMode
+    if eventState.active == true then
+        copyLiveEventToDraft(self, eventState)
+        local sessionState = self:GetState()
+        local channelId = resolveEventChannelId(sessionState, eventState)
+        if channelId then
+            -- NPC mode selects portraits from per-unit presentation state. Send
+            -- the authoritative roster first so every client evaluates the
+            -- incoming mode against the same showInNpcMode flags.
+            Comms:SendToChannel(
+                channelId,
+                EVENT_UNITS_OPCODE,
+                buildEventUnitsArguments(eventState),
+                buildSendMetadata(EVENT_UNITS_OPCODE)
+            )
+            Comms:SendToChannel(
+                channelId,
+                EVENT_STATE_OPCODE,
+                buildEventStateArguments(eventState),
+                buildSendMetadata(EVENT_STATE_OPCODE)
+            )
+        end
+    end
+
+    refreshEventManagePage()
+    return true
 end
 
 local function sendEventSnapshotToClient(eventState, clientName, snapshot)
@@ -1624,6 +1660,7 @@ function Server:BuildEventNpcUnitDataFromDefinition(registryId, options)
         active = coerceEventUnitBoolean(resolvedOptions.active, true),
         hidden = coerceEventUnitBoolean(resolvedOptions.hidden, false),
         boss = coerceEventUnitBoolean(resolvedOptions.boss, false),
+        showInNpcMode = coerceEventUnitBoolean(resolvedOptions.showInNpcMode, false),
         spells = deepCopy(unit.spells or {}),
     }
 end
@@ -1693,6 +1730,46 @@ function Server:SetEventUnitHidden(eventId, isHidden)
     end
 
     unit.hidden = nextHidden
+    if eventState.active == true then
+        copyLiveEventToDraft(self, eventState)
+        broadcastEventDeltaBatch(self, eventState, {
+            {
+                operation = "upsert",
+                eventID = unit.eventID,
+                unit = unit,
+            },
+        }, false)
+    end
+
+    refreshEventManagePage()
+    return true
+end
+
+function Server:SetEventUnitShowInNpcMode(eventId, shown)
+    local eventState = self:GetEditableEventState()
+    if not eventState then
+        return false
+    end
+
+    local unit = findEventUnitById(eventState.units, eventId)
+    if not unit then
+        return false
+    end
+
+    local nextShown = false
+    if EventUnit and EventUnit.CoerceBoolean then
+        nextShown = EventUnit.CoerceBoolean(shown, false)
+    else
+        nextShown = shown == true
+    end
+    local currentShown = EventUnit and EventUnit.IsShownInNpcMode
+        and EventUnit.IsShownInNpcMode(unit)
+        or unit.showInNpcMode == true
+    if currentShown == nextShown then
+        return true
+    end
+
+    unit.showInNpcMode = nextShown
     if eventState.active == true then
         copyLiveEventToDraft(self, eventState)
         broadcastEventDeltaBatch(self, eventState, {
@@ -1843,6 +1920,13 @@ function Server:ClearEventNpcUnits()
 end
 
 function Server:StartEvent(data)
+    if not Addon.Client
+        or type(Addon.Client.RequireSetupCompletion) ~= "function"
+        or Addon.Client:RequireSetupCompletion("server-event-start") ~= true
+    then
+        return nil
+    end
+
     local totalTimer = startTiming("Server:StartEvent", {
         context = "event-start",
         thresholdMs = 50,
@@ -1879,6 +1963,11 @@ function Server:StartEvent(data)
     local eventName = eventData.name or (draftState and draftState.name) or ""
     local eventSubtext = eventData.subtext or (draftState and draftState.subtext) or ""
     local eventDescription = eventData.description or (draftState and draftState.description) or ""
+    local eventModeInput = eventData.eventMode
+    if eventModeInput == nil then
+        eventModeInput = draftState and draftState.eventMode
+    end
+    local eventMode = Event and Event.NormalizeEventMode and Event.NormalizeEventMode(eventModeInput) or "combat"
     local eventDifficulty = normalizeEventDifficulty(eventData.difficulty or (draftState and draftState.difficulty) or "normal")
     local eventTeams = cloneTeams(eventData.teams or (draftState and draftState.teams) or nil)
     local eventTeamColors = eventData.teamColors or (draftState and draftState.teamColors) or DEFAULT_TEAM_COLORS
@@ -1911,6 +2000,7 @@ function Server:StartEvent(data)
         startedAt = tonumber(eventData.startedAt) or Common.GetNow(),
         endedAt = 0,
         active = true,
+        eventMode = eventMode,
         units = eventUnits,
         difficulty = eventDifficulty,
         teams = eventTeams,
@@ -1941,6 +2031,7 @@ function Server:StartEvent(data)
         startedAt = 0,
         endedAt = 0,
         active = false,
+        eventMode = eventState.eventMode,
         difficulty = eventState.difficulty,
         level = eventState.level,
         turnNumber = eventState.turnNumber,
@@ -2035,6 +2126,18 @@ function Server:_AdvanceEventStepAfterCommit(commit, completed)
     end
 
     local eventState = self.EventState
+    if type(eventState) == "table"
+        and Event
+        and type(Event.NormalizeEventMode) == "function"
+        and Event.NormalizeEventMode(eventState.eventMode) == "npc"
+    then
+        commit.status = "cancelled"
+        commit.failureReason = "npc-mode"
+        self.PendingEventAdvanceCommit = nil
+        self.LastEventAdvanceCommit = commit
+        refreshEventManagePage()
+        return false
+    end
     local clientEventState = Client and Client.GetEventState and Client:GetEventState() or nil
     if type(eventState) ~= "table"
         or eventState.active ~= true
@@ -2101,6 +2204,13 @@ end
 
 function Server:AdvanceEventStep()
     local eventState = self.EventState
+    if type(eventState) == "table"
+        and Event
+        and type(Event.NormalizeEventMode) == "function"
+        and Event.NormalizeEventMode(eventState.eventMode) == "npc"
+    then
+        return false
+    end
     if not eventState or eventState.active ~= true or eventState.unitsReady ~= true then
         return false
     end

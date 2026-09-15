@@ -30,7 +30,7 @@ function Window:New(options)
 end
 
 local function GetCloseButtonTexture()
-    return "Interface\\AddOns\\RPEngine_Dev\\data\\textures\\ui\\close_button.png"
+    return "Interface\\AddOns\\RPEngine2\\data\\textures\\ui\\close_button.png"
 end
 
 local function ApplyTitleStyle(titleRegion, options)

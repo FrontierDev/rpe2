@@ -5,7 +5,7 @@ Addon.UI = UI
 local BaseElement = UI.BaseElement
 
 local MAX_MENU_DEPTH = 4
-local CATEGORY_TEXTURE_PATH = "Interface\\AddOns\\RPEngine_Dev\\data\\textures\\ui\\category.png"
+local CATEGORY_TEXTURE_PATH = "Interface\\AddOns\\RPEngine2\\data\\textures\\ui\\category.png"
 
 UI.ContextMenu = UI.ContextMenu or {}
 local ContextMenu = UI.ContextMenu

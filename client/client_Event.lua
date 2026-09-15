@@ -326,8 +326,22 @@ function Client:EndEventTransition(eventId, generation, eventState, reason)
 end
 
 function Client:CanPerformEventAction(eventState, actionKind)
+    if self:RequireSetupCompletion("event-action") ~= true then
+        return false, "setup-incomplete"
+    end
+
     local state = eventState or self:GetEventState()
-    if type(state) ~= "table" or state.active ~= true or state.ending == true then
+    if type(state) ~= "table" then
+        return false, "event-inactive"
+    end
+    if tostring(actionKind or "") == "advance-event-step"
+        and Event
+        and type(Event.NormalizeEventMode) == "function"
+        and Event.NormalizeEventMode(state.eventMode) == "npc"
+    then
+        return false, "npc-mode"
+    end
+    if state.active ~= true or state.ending == true then
         return false, "event-inactive"
     end
 
@@ -638,6 +652,34 @@ local function emitTurnStartAnnouncement(eventState)
     local eventName = getEventDisplayName(eventState)
     local prefix = icon ~= "" and (icon .. " ") or ""
     emitChatLine(("|cffffff00%s%s: Turn %d|r"):format(prefix, eventName, turnNumber))
+end
+
+local function getEventDifficultyAnnouncementSuffix(eventState)
+    local difficulty = string.lower(tostring(eventState and eventState.difficulty or "normal"))
+    if difficulty == "heroic" then
+        return " (Heroic)"
+    end
+    if difficulty == "mythic" then
+        return " (Mythic)"
+    end
+    return ""
+end
+
+local function emitEventStartAnnouncement(eventState)
+    local icon = getTurnAnnouncementIconMarkup()
+    local prefix = icon ~= "" and (icon .. " ") or ""
+    emitChatLine(("|cffffff00%s%s%s|r"):format(
+        prefix,
+        getEventDisplayName(eventState),
+        getEventDifficultyAnnouncementSuffix(eventState)
+    ))
+end
+
+local function emitEventEndAnnouncement(eventState)
+    local icon = getTurnAnnouncementIconMarkup()
+    local prefix = icon ~= "" and (icon .. " ") or ""
+    local hex = getColorHex("text.secondary", { r = 0.8, g = 0.82, b = 0.88, a = 1 })
+    emitChatLine(("|cff%s%s%s ended.|r"):format(hex, prefix, getEventDisplayName(eventState)))
 end
 
 local function emitLocalTurnStartAnnouncement()
@@ -2289,6 +2331,10 @@ function Client:EndTurn()
         self.TurnEndPending = false
         return false
     end
+    local localEventUnit = self.ResolveLocalEventUnit and self:ResolveLocalEventUnit(eventState) or nil
+    if type(self.SendEventTurnComplete) == "function" then
+        self:SendEventTurnComplete(eventState, localEventUnit)
+    end
     return true
 end
 
@@ -2421,10 +2467,7 @@ local function clearEventStateNow(client, state, reason, options)
         eventState.startupReady = false
         eventState.endedAt = Common.GetNow()
         client.LastEventEndReason = reason
-        Debug.Info(
-            "Event ended: %s.",
-            tostring(eventState.name ~= "" and eventState.name or eventState.id or "unnamed")
-        )
+        emitEventEndAnnouncement(eventState)
     end
 
     if client.EventState == eventState then
@@ -2645,10 +2688,7 @@ local function runEventEndStep(targetClient, work, deadlineMs)
         eventState.startupReady = false
         eventState.endedAt = Common.GetNow()
         targetClient.LastEventEndReason = work.reason
-        Debug.Info(
-            "Event ended: %s.",
-            tostring(eventState.name ~= "" and eventState.name or eventState.id or "unnamed")
-        )
+        emitEventEndAnnouncement(eventState)
         if targetClient.EventState == eventState then
             targetClient.EventState = nil
         end
@@ -2778,6 +2818,10 @@ local function hydrateLocalHostAuthoritativeRoster(eventState)
 end
 
 function Client:HandleEventStart(arguments, sender)
+    if self:RequireSetupCompletion("event-start") ~= true then
+        return false
+    end
+
     local totalStartTime = getTimingNowMilliseconds()
     local timingParts = totalStartTime > 0 and {} or nil
     local sessionState = self:GetState()
@@ -2892,6 +2936,7 @@ function Client:HandleEventStart(arguments, sender)
     end
     self.LastEventEndReason = nil
     playEventStartSound()
+    emitEventStartAnnouncement(nextState)
 
     local movementStartTime = timingParts and getTimingNowMilliseconds() or nil
     queueDeferredMovementSync(self, wasLocalTurn, nextState, nil, nil, "event-start")

@@ -309,6 +309,7 @@ function DataEditor:CreateAuthoringConditionDefaults(conditionType)
     elseif normalizedType == "item_equipped" then
         condition.slotKey = ensureString(condition.slotKey) ~= "" and condition.slotKey or getFirstSelectableValue(self:BuildInspectorConditionSlotItems()) or "head"
         condition.weaponTypeRefs = condition.weaponTypeRefs or {}
+        condition.requiresShield = condition.requiresShield == true
     elseif normalizedType == "aura_requirement" then
         condition.unit = ensureString(condition.unit) ~= "" and condition.unit or "caster"
         condition.auraRef = ensureString(condition.auraRef) ~= "" and condition.auraRef or getFirstSelectableValue(buildAcrossDatasets(self, "auras", true))
@@ -889,6 +890,20 @@ local function createEditorRoot(self, ownerKey, page)
         end)
     end, true)
 
+    ui.RequiresShieldCheckbox = createCheckbox(ui.EditorRoot:GetFrame(), ("RPEDataEditor%sInspectorConditionRequiresShieldCheckbox"):format(ownerKey), "Require Shield (invert for no shield)", false, function(checked)
+        if self._refreshingConditionInspector then
+            return
+        end
+        local _, index = self:GetSelectedInspectorCondition(ownerKey)
+        if not index then
+            return
+        end
+        self:CommitInspectorConditionOwner(ownerKey, function(owner)
+            owner.conditions[index].requiresShield = checked == true
+        end)
+    end, ui.FieldWidth)
+    ui.EditorRoot:AddChild(ui.RequiresShieldCheckbox)
+
     ui.UnitGroup = createGroup(ui, ui.EditorRoot, ("RPEDataEditor%sInspectorConditionUnitGroup"):format(ownerKey), "Unit", 18)
     ui.UnitDropdown = createDropdown(ui.UnitGroup, ("RPEDataEditor%sInspectorConditionUnitDropdown"):format(ownerKey), UNIT_ITEMS, ui.FieldWidth, function(value)
         if self._refreshingConditionInspector then
@@ -1065,6 +1080,10 @@ function DataEditor:RefreshInspectorConditionsPage(ownerKey)
         ui.ItemDropdown:SetSelectedValues(condition and condition.weaponTypeRefs or {}, true)
         setDropdownEnabled(ui.ItemDropdown, condition ~= nil)
     end
+    if ui.RequiresShieldCheckbox then
+        ui.RequiresShieldCheckbox:SetChecked(condition and condition.requiresShield == true or false, true)
+        setCheckboxEnabled(ui.RequiresShieldCheckbox, condition ~= nil)
+    end
     if ui.UnitDropdown then
         ui.UnitDropdown:SetSelectedValue(condition and ensureString(condition.unit) or "caster", true)
         setDropdownEnabled(ui.UnitDropdown, condition ~= nil)
@@ -1107,6 +1126,16 @@ function DataEditor:RefreshInspectorConditionsPage(ownerKey)
     setGroupVisible(ui.SlotGroup, conditionType == "weapon_type" or conditionType == "item_equipped")
     setGroupVisible(ui.WeaponTypeGroup, conditionType == "weapon_type")
     setGroupVisible(ui.ItemGroup, conditionType == "item_equipped")
+    if ui.RequiresShieldCheckbox and ui.RequiresShieldCheckbox.GetFrame then
+        local frame = ui.RequiresShieldCheckbox:GetFrame()
+        if frame then
+            if conditionType == "item_equipped" then
+                frame:Show()
+            else
+                frame:Hide()
+            end
+        end
+    end
     setGroupVisible(ui.UnitGroup, conditionType == "aura_requirement" or conditionType == "trait_requirement" or conditionType == "mounted")
     setGroupVisible(ui.AuraGroup, conditionType == "aura_requirement")
     setGroupVisible(ui.TraitGroup, conditionType == "trait_requirement")

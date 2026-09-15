@@ -275,6 +275,15 @@ local function getProgressionSourceRefs(definition)
         end
     end
 
+    for index = 1, #(definition.passiveTraitRefs or {}) do
+        local traitRef = definition.passiveTraitRefs[index]
+        if type(traitRef) == "string" and traitRef ~= "" then refs[#refs + 1] = traitRef end
+    end
+    for index = 1, #(definition.talentTraitRefs or {}) do
+        local traitRef = definition.talentTraitRefs[index]
+        if type(traitRef) == "string" and traitRef ~= "" then refs[#refs + 1] = traitRef end
+    end
+
     for index = 1, #(definition.skillBonuses or {}) do
         local skillBonus = definition.skillBonuses[index]
         local skillRef = type(skillBonus) == "table" and skillBonus.skillRef or nil
@@ -1503,6 +1512,15 @@ function Dependecies.HandleDatasetDeleted(datasetId)
                     classMutated = true
                 end
 
+                for _, traitCollectionKey in ipairs({ "passiveTraitRefs", "talentTraitRefs" }) do
+                    local kept, mutated = {}, false
+                    for traitIndex = 1, #(class[traitCollectionKey] or {}) do
+                        local traitRef = class[traitCollectionKey][traitIndex]
+                        if Dependecies.ParseSourceStatRef(traitRef) == datasetId then mutated = true else kept[#kept + 1] = traitRef end
+                    end
+                    if mutated then class[traitCollectionKey] = kept; classMutated = true end
+                end
+
                 local keptSkillBonuses = {}
                 local skillBonusesMutated = false
                 for skillIndex = 1, #(class and class.skillBonuses or {}) do
@@ -1706,6 +1724,22 @@ function Dependecies.HandleDatasetDeleted(datasetId)
                     local sourceDatasetId = Dependecies.ParseSourceStatRef(skillRef)
                     if sourceDatasetId == datasetId then
                         profile.skillLevels[skillRef] = nil
+                    end
+                end
+            end
+            if type(profile) == "table" and type(profile.skillPermanentBonuses) == "table" then
+                for skillRef in pairs(profile.skillPermanentBonuses) do
+                    local sourceDatasetId = Dependecies.ParseSourceStatRef(skillRef)
+                    if sourceDatasetId == datasetId then
+                        profile.skillPermanentBonuses[skillRef] = nil
+                    end
+                end
+            end
+            if type(profile) == "table" and type(profile.setupWizard) == "table" and type(profile.setupWizard.skillPermanentBonuses) == "table" then
+                for skillRef in pairs(profile.setupWizard.skillPermanentBonuses) do
+                    local sourceDatasetId = Dependecies.ParseSourceStatRef(skillRef)
+                    if sourceDatasetId == datasetId then
+                        profile.setupWizard.skillPermanentBonuses[skillRef] = nil
                     end
                 end
             end
@@ -2031,6 +2065,12 @@ function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
             for _, profile in pairs(profiles) do
                 if type(profile) == "table" and type(profile.skillLevels) == "table" then
                     profile.skillLevels[deletedRef] = nil
+                end
+                if type(profile) == "table" and type(profile.skillPermanentBonuses) == "table" then
+                    profile.skillPermanentBonuses[deletedRef] = nil
+                end
+                if type(profile) == "table" and type(profile.setupWizard) == "table" and type(profile.setupWizard.skillPermanentBonuses) == "table" then
+                    profile.setupWizard.skillPermanentBonuses[deletedRef] = nil
                 end
                 if type(profile) == "table" and type(profile.skillActionBar) == "table" then
                     for slotIndex, skillRef in pairs(profile.skillActionBar) do

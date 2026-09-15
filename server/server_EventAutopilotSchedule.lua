@@ -34,6 +34,12 @@ local function normalizeTurnMode(value)
     return tostring(value or "") == "autopilot" and "autopilot" or "manual"
 end
 
+local function isNpcEventMode(eventState)
+    return type(eventState) == "table"
+        and type(Event.NormalizeEventMode) == "function"
+        and Event.NormalizeEventMode(eventState.eventMode) == "npc"
+end
+
 local function getMaxEventUnits()
     local activeRuleset = Ruleset.GetActiveRuleset and Ruleset.GetActiveRuleset() or nil
     local definition = Ruleset.GetRulesetRuleDefinition
@@ -142,8 +148,13 @@ local function wrapScheduleSensitiveMethod(methodName)
     end
 
     Server[methodName] = function(self, ...)
+        if methodName == "AdvanceEventStep" and isNpcEventMode(self and self.EventState) then
+            return false
+        end
         local results = pack(invokeWithScheduleCount(baseMethod, self, ...))
-        normalizeKnownServerStates(self)
+        if not (methodName == "_AdvanceEventStepAfterCommit" and isNpcEventMode(self and self.EventState)) then
+            normalizeKnownServerStates(self)
+        end
         return unpack(results, 1, results.n)
     end
     return true

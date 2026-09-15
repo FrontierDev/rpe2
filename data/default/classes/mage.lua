@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 1,
+    version = 7,
     dataset = {
         achievements = {},
         auras = {
@@ -373,6 +373,15 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/classicon_mage.blp",
                 id = "02p0r8a2",
                 name = "Mage",
+                armorWeights = {
+                    "cloth",
+                },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:y0dnlo8g",
+                    "f82db71a:3y1v01e4",
+                    "f82db71a:s4q9t5f3",
+                },
                 resourceProgressions = {
                     {
                         initialValue = 31,
@@ -413,7 +422,10 @@ Addon.Data.DefaultDatasets:Register({
                         statRef = "f82db71a:ygjno50i"
                     }
                 },
-                traitRefs = {}
+                passiveTraitRefs = {
+                    "d7c874c4:arcdecon"
+                },
+                talentTraitRefs = {}
             }
         },
         currencies = {},
@@ -2684,6 +2696,25 @@ Addon.Data.DefaultDatasets:Register({
                 automaticAuras = {},
                 category = "",
                 conditions = {},
+                description = "Increases your damage against Elementals by 5%.",
+                events = {},
+                icon = "interface/icons/spell_arcane_arcane04.blp",
+                id = "arcdecon",
+                isEnvironmental = false,
+                name = "Arcane Deconstruction",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:bh4yvi9u",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "",
+                conditions = {},
                 description = "",
                 events = {
                     {
@@ -2702,10 +2733,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 icon = "interface/icons/spell_arcane_arcane04.blp",
                 id = "0ih4ypms",
-                isClass = false,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = true,
                 name = "Arcane Attunement",
                 skillBonuses = {},
                 statBonuses = {},

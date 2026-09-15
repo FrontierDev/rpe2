@@ -211,15 +211,9 @@ function Server:RemoveEventManagerAura(eventId, auraKey)
     refreshActions(); return true
 end
 
-local function registerSkillRequestOpcode()
-    if type(Operations.GetOpcode)=="function" then local existing=Operations:GetOpcode("SKILL_ROLL_REQUEST"); if existing then return existing end end
-    local opcode=28; Operations.KeyIndex=type(Operations.KeyIndex)=="table" and Operations.KeyIndex or {}; Operations.KeyIndex.SKILL_ROLL_REQUEST=opcode; Operations.Opcodes=type(Operations.Opcodes)=="table" and Operations.Opcodes or {}
-    local handler=function(args,sender,distribution,target,message) local client=Addon.Client; return type(client)=="table" and type(client.HandleSkillRollRequest)=="function" and client:HandleSkillRollRequest(args,sender,distribution,target,message) or false end
-    Operations.Opcodes[opcode]={key="SKILL_ROLL_REQUEST",name="skill-roll-request",["function"]=handler}
-    if type(Operations.Register)=="function" then Operations:Register(opcode,handler,"skill-roll-request"); local op=type(Operations.Get)=="function" and Operations:Get(opcode) or nil; if type(op)=="table" then op.key="SKILL_ROLL_REQUEST" end else Operations.Registry=type(Operations.Registry)=="table" and Operations.Registry or {}; Operations.Registry[opcode]=Operations.Opcodes[opcode] end
-    return opcode
-end
-local SKILL_REQUEST_OPCODE=registerSkillRequestOpcode()
+local SKILL_REQUEST_OPCODE = type(Operations.GetOpcode) == "function"
+    and Operations:GetOpcode("SKILL_ROLL_REQUEST")
+    or nil
 local function controllerName(unit)
     local name=normName(unit and unit.controllerID); if name~="" then return name end; name=normName(unit and unit.ownerID); if name~="" then return name end; return unit and unit.isPlayer==true and normName(unit.name) or ""
 end

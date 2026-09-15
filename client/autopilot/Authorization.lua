@@ -356,6 +356,9 @@ function Authorization.MarkPlanStale(plan, reason)
     end
     plan.status = "stale"
     plan.reason = tostring(reason or "stale")
+    if type(Client.ClearAutopilotSpeechCuesForPlan) == "function" then
+        Client:ClearAutopilotSpeechCuesForPlan(plan)
+    end
     return changed
 end
 

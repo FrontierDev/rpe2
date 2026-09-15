@@ -42,6 +42,7 @@ end
 function EventWidget:BuildPortraitRefreshContext(state)
     local context = baseBuildPortraitRefreshContext(self, state)
     if type(context) ~= "table"
+        or context.npcMode == true
         or normalizeTurnMode(state and state.turnMode) ~= "autopilot"
         or type(Event.GetUnitsForTurnStep) ~= "function"
     then

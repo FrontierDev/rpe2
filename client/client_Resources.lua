@@ -419,6 +419,26 @@ local function isBossEventUnit(unit)
     return unit.boss == true
 end
 
+local function grantBossKillValor(targetClient, eventState, result)
+    local kill = result and result.kill
+    if type(kill) ~= "table" or kill.isBoss ~= true then
+        return false
+    end
+
+    if type(targetClient.GrantConfiguredEventCurrency) ~= "function" then
+        return false
+    end
+
+    local targetEventId = tonumber(kill.targetEventId) or 0
+    return targetClient:GrantConfiguredEventCurrency(
+        "valor",
+        "boss_kill_valor_currency",
+        25,
+        eventState,
+        ("boss-kill-valor:%d"):format(targetEventId)
+    )
+end
+
 local function notifyRPEKillAchievement(targetClient, eventState, actionOwnerName, result)
     local kill = result and result.kill
     if type(kill) ~= "table" then
@@ -2298,6 +2318,7 @@ function Client:HandleResourceDelta(arguments, sender)
 
     local eventState = self:GetEventState()
     local result = applyInboundResourceDeltasForTarget(self, state, eventState, playerName, sender, targetEventId, resourceDeltas)
+    grantBossKillValor(self, eventState, result)
     if transportActionOwner then
         notifyRPEKillAchievement(self, eventState, transportActionOwner, result)
         notifyRPEHealthAchievement(self, eventState, transportActionOwner, result)
@@ -2424,6 +2445,7 @@ function Client:HandleResourceDeltaBatch(arguments, sender)
             targetEventId,
             deltasByTargetEventId[targetEventId]
         )
+        grantBossKillValor(self, eventState, result)
         if transportActionOwner then
             notifyRPEKillAchievement(self, eventState, transportActionOwner, result)
             notifyRPEHealthAchievement(self, eventState, transportActionOwner, result)

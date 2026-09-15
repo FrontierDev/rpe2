@@ -7,6 +7,11 @@ Addon.Internal = Addon.Internal or {}
 local Server = Addon.Server
 local EventManage = Addon.Server.UI.EventManage or {}
 local Autopilot = Addon.Internal.Autopilot or {}
+local Event = Addon.Internal
+    and Addon.Internal.Database
+    and Addon.Internal.Database.Classes
+    and Addon.Internal.Database.Classes.Event
+    or nil
 local UI = Addon.UI or {}
 
 local WARNING_TEXT = "NPC Autopilot does not work in instances. Use Manual mode in dungeons, raids, battlegrounds and arenas."
@@ -17,6 +22,13 @@ local function normalizeTurnMode(value)
         return Autopilot.NormalizeTurnMode(value)
     end
     return tostring(value or "") == "autopilot" and "autopilot" or "manual"
+end
+
+local function normalizeEventMode(value)
+    if type(Event) == "table" and type(Event.NormalizeEventMode) == "function" then
+        return Event.NormalizeEventMode(value)
+    end
+    return tostring(value or "") == "npc" and "npc" or "combat"
 end
 
 local function setElementVisible(element, visible, height)
@@ -116,6 +128,38 @@ function EventManage:BuildSettingsPage(page)
         end,
     })
     self.EventTurnModeRow:AddChild(self.EventTurnModeDropdown)
+
+    self.EventStartModeLabel = UI.CreateText(self.EventTurnModeRow:GetFrame(), "RPEServerEventManageSettingsStartModeLabel", "Start Mode", {
+        width = 64,
+        height = CONTROL_HEIGHT,
+        justifyH = "LEFT",
+        justifyV = "MIDDLE",
+        wordWrap = false,
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.EventTurnModeRow:AddChild(self.EventStartModeLabel)
+
+    self.EventStartModeDropdown = UI.CreateDropdown(self.EventTurnModeRow:GetFrame(), "RPEServerEventManageSettingsStartModeDropdown", {
+        width = 120,
+        height = CONTROL_HEIGHT,
+        items = {
+            { label = "Combat Mode", value = "combat" },
+            { label = "NPC Mode", value = "npc" },
+        },
+        selectedValue = "combat",
+        onValueChanged = function(value)
+            if Server.IsEventActive and Server:IsEventActive() then
+                self:RefreshSettingsPage()
+                return
+            end
+            if type(self.CommitEventSettings) == "function" then
+                self:CommitEventSettings(function(eventState)
+                    eventState.eventMode = normalizeEventMode(value)
+                end)
+            end
+        end,
+    })
+    self.EventTurnModeRow:AddChild(self.EventStartModeDropdown)
     root:AddChild(self.EventTurnModeRow)
 
     self.EventAutopilotWarningText = UI.CreateText(root:GetFrame(), "RPEServerEventManageSettingsAutopilotWarning", WARNING_TEXT, {
@@ -140,6 +184,7 @@ function EventManage:RefreshSettingsPage()
 
     local eventState = self.GetEditableSettingsState and self:GetEditableSettingsState() or nil
     local turnMode = normalizeTurnMode(eventState and eventState.turnMode)
+    local eventMode = normalizeEventMode(eventState and eventState.eventMode)
 
     if self.EventTurnModeDropdown and self.EventTurnModeDropdown.SetSelectedValue then
         self.EventTurnModeDropdown:SetSelectedValue(turnMode, true)
@@ -147,6 +192,13 @@ function EventManage:RefreshSettingsPage()
     if self.EventTurnModeDropdown and self.EventTurnModeDropdown.SetEnabled then
         local eventActive = Server.IsEventActive and Server:IsEventActive() == true
         self.EventTurnModeDropdown:SetEnabled(not eventActive)
+    end
+    if self.EventStartModeDropdown and self.EventStartModeDropdown.SetSelectedValue then
+        self.EventStartModeDropdown:SetSelectedValue(eventMode, true)
+    end
+    if self.EventStartModeDropdown and self.EventStartModeDropdown.SetEnabled then
+        local eventActive = Server.IsEventActive and Server:IsEventActive() == true
+        self.EventStartModeDropdown:SetEnabled(not eventActive)
     end
 
     setElementVisible(self.EventAutopilotWarningText, turnMode == "autopilot", 30)
@@ -166,7 +218,11 @@ function EventManage:BuildDashboardPage(page)
     self.StartEventButton:SetScript("OnClick", function()
         local eventState, reason = nil, nil
         if Server.StartEvent then
-            eventState, reason = Server:StartEvent({})
+            local startData = {}
+            if self.EventStartModeDropdown and self.EventStartModeDropdown.GetSelectedValue then
+                startData.eventMode = normalizeEventMode(self.EventStartModeDropdown:GetSelectedValue())
+            end
+            eventState, reason = Server:StartEvent(startData)
         end
         if eventState == nil and tostring(reason or "") ~= "" then
             showStartFailure(reason)

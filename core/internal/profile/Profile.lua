@@ -1043,21 +1043,6 @@ local function refreshMountedUi(reason)
     return true
 end
 
-local function getTraitSourceCategory(trait)
-    if type(trait) ~= "table" then
-        return "talent"
-    end
-
-    if trait.isClass == true then
-        return "class"
-    end
-    if trait.isRacial == true then
-        return "race"
-    end
-
-    return "talent"
-end
-
 local function getTraitCategoryFromDefinition(trait)
     if type(trait) ~= "table" then
         return DEFAULT_TALENT_TRAIT_CATEGORY
@@ -1182,9 +1167,6 @@ local function buildSelectedOriginTraitRefs(kind)
     local seen = {}
 
     if kind == "race" then
-        if getTraitRuleValue("allow_race_traits", true) == false then
-            return refs
-        end
         local profileRaceRef = Database.GetProfileRaceRef and Database.GetProfileRaceRef() or nil
         local _, race = resolveProfileDefinition(profileRaceRef, "races")
         local raceTraitRefs = type(race) == "table" and race.traitRefs or nil
@@ -1194,12 +1176,9 @@ local function buildSelectedOriginTraitRefs(kind)
         return refs
     end
 
-    if getTraitRuleValue("allow_class_traits", true) == false then
-        return refs
-    end
     local profileClassRef = Database.GetProfileClassRef and Database.GetProfileClassRef() or nil
     local _, class = resolveProfileDefinition(profileClassRef, "classes")
-    local classTraitRefs = type(class) == "table" and class.traitRefs or nil
+    local classTraitRefs = type(class) == "table" and (kind == "classTalent" and class.talentTraitRefs or class.passiveTraitRefs) or nil
     for index = 1, #(classTraitRefs or {}) do
         appendUniqueRef(refs, seen, classTraitRefs[index])
     end
@@ -1207,23 +1186,56 @@ local function buildSelectedOriginTraitRefs(kind)
     return refs
 end
 
-local function buildAutoGrantedTraitRefs(kind)
-    local refs = {}
-    local seen = {}
-    local selectedRefs = buildSelectedOriginTraitRefs(kind)
-
-    if kind == "race" and getTraitRuleValue("auto_enable_race_traits", true) == false then
-        return refs
+local function isRefInList(reference, refs)
+    for index = 1, #(refs or {}) do
+        if refs[index] == reference then return true end
     end
-    if kind == "class" and getTraitRuleValue("auto_enable_class_traits", true) == false then
-        return refs
-    end
+    return false
+end
 
-    for index = 1, #selectedRefs do
-        appendUniqueRef(refs, seen, selectedRefs[index])
+local function getKnownTraitTypeCategory(traitRef, origin)
+    if origin == "race" then return "race" end
+    if origin == "class" then
+        return isRefInList(traitRef, buildSelectedOriginTraitRefs("classTalent")) and "talent" or "class"
     end
+    return "talent"
+end
 
+local function buildSelectedClassTalentRefs()
+    local refs, seen = {}, {}
+    local selected = Database.ListProfileSelectedClassTalentTraits and Database.ListProfileSelectedClassTalentTraits() or {}
+    local available = buildSelectedOriginTraitRefs("classTalent")
+    for index = 1, #selected do
+        if isRefInList(selected[index], available) then appendUniqueRef(refs, seen, selected[index]) end
+    end
     return refs
+end
+
+local function isOwnedByAnyClass(traitRef)
+    local normalizedRef = ensureString(traitRef)
+    for _, dataset in pairs(Database.ListDatasets and Database.ListDatasets() or {}) do
+        local datasetId = ensureString(dataset and dataset.id)
+        for index = 1, #(dataset and dataset.classes or {}) do
+            local class = dataset.classes[index]
+            for _, collectionKey in ipairs({ "passiveTraitRefs", "talentTraitRefs" }) do
+                for refIndex = 1, #(class and class[collectionKey] or {}) do
+                    if ensureString(class[collectionKey][refIndex]) == normalizedRef then return true end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function isOwnedByAnyRace(traitRef)
+    local normalizedRef = ensureString(traitRef)
+    for _, dataset in pairs(Database.ListDatasets and Database.ListDatasets() or {}) do
+        for index = 1, #(dataset and dataset.races or {}) do
+            local race = dataset.races[index]
+            if isRefInList(normalizedRef, race and race.traitRefs) then return true end
+        end
+    end
+    return false
 end
 
 local function getKnownTraitOrigin(traitRef)
@@ -1239,9 +1251,16 @@ local function getKnownTraitOrigin(traitRef)
         end
     end
 
-    local classRefs = buildSelectedOriginTraitRefs("class")
+    local classRefs = buildSelectedOriginTraitRefs("classPassive")
     for index = 1, #classRefs do
         if classRefs[index] == normalizedRef then
+            return "class"
+        end
+    end
+
+    local classTalentRefs = buildSelectedOriginTraitRefs("classTalent")
+    for index = 1, #classTalentRefs do
+        if classTalentRefs[index] == normalizedRef then
             return "class"
         end
     end
@@ -1261,7 +1280,8 @@ local function buildEffectiveKnownTraitRefs()
     local seen = {}
     local manualRefs = buildManualKnownTraitRefs()
     local raceRefs = buildSelectedOriginTraitRefs("race")
-    local classRefs = buildSelectedOriginTraitRefs("class")
+    local classRefs = buildSelectedOriginTraitRefs("classPassive")
+    local classTalentRefs = buildSelectedOriginTraitRefs("classTalent")
 
     for index = 1, #manualRefs do
         appendUniqueRef(refs, seen, manualRefs[index])
@@ -1271,6 +1291,9 @@ local function buildEffectiveKnownTraitRefs()
     end
     for index = 1, #classRefs do
         appendUniqueRef(refs, seen, classRefs[index])
+    end
+    for index = 1, #classTalentRefs do
+        appendUniqueRef(refs, seen, classTalentRefs[index])
     end
 
     return refs
@@ -1332,14 +1355,9 @@ local function buildEffectiveActiveTraitRefs()
     local refs = {}
     local seen = {}
     local manualRefs = buildManualActiveTraitRefs()
-    local inactiveRefs = buildInactiveTraitRefs()
-    local raceRefs = buildAutoGrantedTraitRefs("race")
-    local classRefs = buildAutoGrantedTraitRefs("class")
-    local inactiveLookup = {}
-
-    for index = 1, #inactiveRefs do
-        inactiveLookup[inactiveRefs[index]] = true
-    end
+    local raceRefs = buildSelectedOriginTraitRefs("race")
+    local classRefs = buildSelectedOriginTraitRefs("classPassive")
+    local classTalentRefs = buildSelectedClassTalentRefs()
 
     for index = 1, #manualRefs do
         appendUniqueRef(refs, seen, manualRefs[index])
@@ -1348,22 +1366,10 @@ local function buildEffectiveActiveTraitRefs()
         appendUniqueRef(refs, seen, raceRefs[index])
     end
     for index = 1, #classRefs do
-        local traitRef = classRefs[index]
-        local registry = getRegistry()
-        local trait = nil
-        if type(registry.ResolveTraitReference) == "function" then
-            local _, resolvedTrait = registry:ResolveTraitReference(traitRef)
-            trait = resolvedTrait
-        end
-        local origin = getKnownTraitOrigin(traitRef)
-        local typeCategory = getTraitSourceCategory(trait)
-        if origin == "class" and typeCategory == "talent" then
-            if inactiveLookup[traitRef] ~= true then
-                appendUniqueRef(refs, seen, traitRef)
-            end
-        else
-            appendUniqueRef(refs, seen, traitRef)
-        end
+        appendUniqueRef(refs, seen, classRefs[index])
+    end
+    for index = 1, #classTalentRefs do
+        appendUniqueRef(refs, seen, classTalentRefs[index])
     end
 
     return refs
@@ -1412,7 +1418,7 @@ local function isTraitRefVisibleToProfileWithoutConditions(traitRef)
     end
 
     local origin = getKnownTraitOrigin(normalizedRef) or "manual"
-    local typeCategory = getTraitSourceCategory(trait)
+    local typeCategory = getKnownTraitTypeCategory(normalizedRef, origin)
     if typeCategory == "race" and origin ~= "race" then
         return false
     end
@@ -1432,6 +1438,7 @@ local function buildTraitCountSummary()
     local countedSeen = {}
     local manualCount = 0
     local manualTalentCount = 0
+    local selectedClassTalentCount = 0
 
     for index = 1, #manualRefs do
         local detail = Profile.GetKnownTraitDetails and Profile.GetKnownTraitDetails(manualRefs[index]) or nil
@@ -1452,7 +1459,7 @@ local function buildTraitCountSummary()
         end
     end
 
-    local raceCandidates = buildAutoGrantedTraitRefs("race")
+    local raceCandidates = buildSelectedOriginTraitRefs("race")
     for index = 1, #raceCandidates do
         local detail = Profile.GetKnownTraitDetails and Profile.GetKnownTraitDetails(raceCandidates[index]) or nil
         if detail and detail.isEnvironmental ~= true and detail.isVisibleToProfile == true then
@@ -1460,7 +1467,7 @@ local function buildTraitCountSummary()
         end
     end
 
-    local classCandidates = buildAutoGrantedTraitRefs("class")
+    local classCandidates = buildSelectedOriginTraitRefs("classPassive")
     for index = 1, #classCandidates do
         local detail = Profile.GetKnownTraitDetails and Profile.GetKnownTraitDetails(classCandidates[index]) or nil
         if detail and detail.isEnvironmental ~= true and detail.isVisibleToProfile == true then
@@ -1468,11 +1475,18 @@ local function buildTraitCountSummary()
         end
     end
 
+    local selectedClassTalents = buildSelectedClassTalentRefs()
+    for index = 1, #selectedClassTalents do
+        local detail = Profile.GetKnownTraitDetails and Profile.GetKnownTraitDetails(selectedClassTalents[index]) or nil
+        if detail and detail.isEnvironmental ~= true then
+            selectedClassTalentCount = selectedClassTalentCount + 1
+        end
+    end
+
     local level = getProfileLevel()
-    local baseTalentTraits = math.max(0, math.floor(tonumber(getTraitRuleValue("base_talent_traits", 0)) or 0))
-    local talentTraitsPerLevel = math.max(0, tonumber(getTraitRuleValue("talent_traits_per_level", 0)) or 0)
     local maxTotalTraits = math.max(0, math.floor(tonumber(getTraitRuleValue("max_total_traits", 0)) or 0))
-    local maxTalentTraits = math.max(0, math.floor(baseTalentTraits + ((level - 1) * talentTraitsPerLevel)))
+    local talentAllowance = Profile.GetClassTalentAllowance(level)
+    local maxTalentTraits = talentAllowance.maxTalentTraits
     local countRaceTowardTotal = getTraitRuleValue("count_race_traits_toward_total", false) == true
     local countClassTowardTotal = getTraitRuleValue("count_class_traits_toward_total", false) == true
     if countRaceTowardTotal then
@@ -1490,6 +1504,7 @@ local function buildTraitCountSummary()
         level = level,
         manualCount = manualCount,
         manualTalentCount = manualTalentCount,
+        selectedClassTalentCount = selectedClassTalentCount,
         maxTotalTraits = maxTotalTraits,
         maxTalentTraits = maxTalentTraits,
         effectiveTotalCount = #countedTotalRefs,
@@ -1499,6 +1514,192 @@ local function buildTraitCountSummary()
         countRaceTowardTotal = countRaceTowardTotal,
         countClassTowardTotal = countClassTowardTotal,
     }
+end
+
+function Profile.GetClassTalentAllowance(level)
+    local normalizedLevel = math.max(1, math.floor(tonumber(level) or 1))
+    local baseTalentTraits = math.max(0, math.floor(tonumber(getTraitRuleValue("base_talent_traits", 0)) or 0))
+    local talentTraitsPerLevel = math.max(0, tonumber(getTraitRuleValue("talent_traits_per_level", 0)) or 0)
+    local configuredLimit = math.max(0, math.floor(baseTalentTraits + ((normalizedLevel - 1) * talentTraitsPerLevel)))
+    local limitEnabled = getTraitRuleValue("enforce_class_talent_limit", true) == true and configuredLimit > 0
+    return {
+        level = normalizedLevel,
+        isLimited = limitEnabled,
+        maxTalentTraits = limitEnabled and configuredLimit or 0,
+    }
+end
+
+local function buildTraitAssignmentProfile(options)
+    local values = type(options) == "table" and options or {}
+    local source = type(values.profile) == "table"
+        and values.profile
+        or (Database.GetActiveProfile and Database.GetActiveProfile() or {})
+    local profile = {}
+    for key, value in pairs(source or {}) do
+        profile[key] = value
+    end
+    if values.level ~= nil or values.draftLevel ~= nil then profile.level = values.level ~= nil and values.level or values.draftLevel end
+    if values.raceRef ~= nil or values.draftRaceRef ~= nil then profile.raceRef = values.raceRef ~= nil and values.raceRef or values.draftRaceRef end
+    if values.classRef ~= nil or values.draftClassRef ~= nil then profile.classRef = values.classRef ~= nil and values.classRef or values.draftClassRef end
+    local draftTalentRefs = values.selectedClassTalentRefs ~= nil and values.selectedClassTalentRefs or values.draftSelectedClassTalentRefs
+    if draftTalentRefs ~= nil then
+        profile.selectedClassTalentTraits = draftTalentRefs
+    end
+    local fallbackLevel = Database.GetProfileLevel and Database.GetProfileLevel() or 1
+    profile.level = math.max(1, math.floor(tonumber(profile.level) or tonumber(fallbackLevel) or 1))
+    return profile
+end
+
+local function listTraitOwnerMembership(traitRef, profile, options)
+    local normalizedRef = ensureString(traitRef)
+    local membership = {
+        selectedRace = false,
+        anyRace = false,
+        selectedClassPassive = false,
+        selectedClassTalent = false,
+        anyClassPassive = false,
+        anyClassTalent = false,
+    }
+    local registry = getRegistry()
+    local raceRef = ensureString(profile and profile.raceRef)
+    local classRef = ensureString(profile and profile.classRef)
+    local race, class = nil, nil
+    if type(registry.ResolveRaceReference) == "function" then
+        _, race = registry:ResolveRaceReference(raceRef)
+    end
+    if type(registry.ResolveClassReference) == "function" then
+        _, class = registry:ResolveClassReference(classRef)
+    end
+    membership.selectedRace = isRefInList(normalizedRef, race and race.traitRefs)
+    membership.selectedClassPassive = isRefInList(normalizedRef, class and class.passiveTraitRefs)
+    membership.selectedClassTalent = isRefInList(normalizedRef, class and class.talentTraitRefs)
+    membership.anyRace = membership.selectedRace
+    membership.anyClassPassive = membership.selectedClassPassive
+    membership.anyClassTalent = membership.selectedClassTalent
+
+    for _, dataset in pairs(Database.ListDatasets and Database.ListDatasets() or {}) do
+        for index = 1, #(dataset and dataset.races or {}) do
+            local raceDefinition = dataset.races[index]
+            if isRefInList(normalizedRef, raceDefinition and raceDefinition.traitRefs) then
+                membership.anyRace = true
+            end
+        end
+        for index = 1, #(dataset and dataset.classes or {}) do
+            local classDefinition = dataset.classes[index]
+            if isRefInList(normalizedRef, classDefinition and classDefinition.passiveTraitRefs) then
+                membership.anyClassPassive = true
+            end
+            if isRefInList(normalizedRef, classDefinition and classDefinition.talentTraitRefs) then
+                membership.anyClassTalent = true
+            end
+        end
+    end
+    return membership
+end
+
+local function getSelectedTalentRefsForAssignment(profile, options)
+    local values = type(options) == "table" and options or {}
+    local source = values.selectedClassTalentRefs ~= nil and values.selectedClassTalentRefs or values.draftSelectedClassTalentRefs
+    if source == nil then
+        source = profile and profile.selectedClassTalentTraits
+    end
+    if source == nil then
+        source = Database.ListProfileSelectedClassTalentTraits and Database.ListProfileSelectedClassTalentTraits() or {}
+    end
+    local refs, seen = {}, {}
+    for index = 1, #(source or {}) do
+        local ref = ensureString(source[index])
+        if ref ~= "" and not seen[ref] then
+            seen[ref] = true
+            refs[#refs + 1] = ref
+        end
+    end
+    return refs
+end
+
+local function traitAssignmentFailure(code, reason, extra)
+    local result = { valid = false, code = code, reason = reason }
+    for key, value in pairs(extra or {}) do result[key] = value end
+    return result
+end
+
+-- Canonical, side-effect-free assignment validation used by Profile APIs and UI.
+-- Trait conditions currently serve both availability and runtime display semantics;
+-- this validates only when assigning and never removes an already-selected trait.
+function Profile.ValidateTraitAssignment(traitRef, options)
+    local normalizedRef = ensureString(traitRef)
+    if normalizedRef == "" then
+        return traitAssignmentFailure("invalid_ref", "A trait reference is required.")
+    end
+
+    local registry = getRegistry()
+    local dataset, trait = nil, nil
+    if type(registry.ResolveTraitReference) == "function" then
+        dataset, trait = registry:ResolveTraitReference(normalizedRef)
+    end
+    if type(trait) ~= "table" then
+        return traitAssignmentFailure("trait_missing", "This trait definition is missing from its dataset.")
+    end
+
+    local values = type(options) == "table" and options or {}
+    local profile = buildTraitAssignmentProfile(values)
+    local membership = listTraitOwnerMembership(normalizedRef, profile, values)
+    local selectedTalentRefs = getSelectedTalentRefsForAssignment(profile, values)
+    local selectedTalentLookup = {}
+    for index = 1, #selectedTalentRefs do selectedTalentLookup[selectedTalentRefs[index]] = true end
+    local isClassTalent = membership.anyClassTalent
+    local isSelectedClassTalent = membership.selectedClassTalent
+    local isManual = not membership.anyClassTalent and not membership.anyClassPassive and not membership.anyRace
+
+    if membership.anyRace or membership.anyClassPassive then
+        return traitAssignmentFailure("passive_not_assignable", "This passive trait is granted automatically.", { typeCategory = membership.selectedRace and "race" or "class" })
+    end
+    if isClassTalent and not isSelectedClassTalent then
+        return traitAssignmentFailure("wrong_class", "This class talent belongs to a different class.", { typeCategory = "talent" })
+    end
+
+    local unlockLevel = getTraitUnlockLevel(trait)
+    if profile.level < unlockLevel then
+        return traitAssignmentFailure("level_locked", ("Requires level %d."):format(unlockLevel), { typeCategory = isClassTalent and "talent" or "talent", unlockLevel = unlockLevel })
+    end
+
+    local conditionOptions = {
+        traitRef = normalizedRef,
+        profile = profile,
+        raceRef = profile.raceRef,
+        classRef = profile.classRef,
+    }
+    for _, key in ipairs({ "eventState", "sessionState", "casterUnit", "targetUnit", "item", "itemRef", "equipmentScope" }) do
+        if values[key] ~= nil then conditionOptions[key] = values[key] end
+    end
+    local conditionState = evaluateDetailConditions("trait", normalizeTraitPayload(trait), conditionOptions)
+    if conditionState and conditionState.passed ~= true then
+        return traitAssignmentFailure("condition_failed", conditionState.failureText or "Requirement not met", {
+            typeCategory = isClassTalent and "talent" or "talent", unlockLevel = unlockLevel, conditionState = conditionState,
+        })
+    end
+
+    local alreadySelected = selectedTalentLookup[normalizedRef] == true
+    local allowance = Profile.GetClassTalentAllowance(profile.level)
+    if isClassTalent and not alreadySelected and allowance.isLimited == true and #selectedTalentRefs >= allowance.maxTalentTraits then
+        return traitAssignmentFailure("talent_limit", ("Class talent limit reached: %d / %d."):format(#selectedTalentRefs, allowance.maxTalentTraits), {
+            typeCategory = "talent", unlockLevel = unlockLevel, allowance = allowance,
+        })
+    end
+
+    if isManual then
+        local known = false
+        local knownTraits = Database.ListProfileTraits and Database.ListProfileTraits() or {}
+        for index = 1, #knownTraits do
+            if ensureString(knownTraits[index]) == normalizedRef then known = true break end
+        end
+        local maxTotal = math.max(0, math.floor(tonumber(getTraitRuleValue("max_total_traits", 0)) or 0))
+        if not known and maxTotal > 0 and #buildManualKnownTraitRefs() >= maxTotal then
+            return traitAssignmentFailure("trait_limit", ("Trait limit reached: %d."):format(maxTotal), { typeCategory = "talent" })
+        end
+    end
+
+    return { valid = true, code = "ok", reason = "", typeCategory = isClassTalent and "talent" or "talent", isClassTalent = isClassTalent, unlockLevel = unlockLevel, dataset = dataset, trait = trait }
 end
 
 local PROFILE_STAT_CATEGORY_ORDER = {
@@ -2151,13 +2352,25 @@ function Profile.EquipInventoryItem(slotIndex, record, options)
         ("profile-%s-equipment-equip"):format(equipmentScope),
         function()
             local previousEntry = Equipment.GetEquippedEntryByScope and Equipment.GetEquippedEntryByScope(equipmentScope, slotKey) or nil
+            local clearsOffHand = equipmentScope == "character"
+                and (Equipment.NormalizeSlotKey and Equipment.NormalizeSlotKey(slotKey) or tostring(slotKey or "")) == "mainhand"
+                and item.isTwoHanded == true
+            local offHandEntry = clearsOffHand and Equipment.GetEquippedEntryByScope and Equipment.GetEquippedEntryByScope("character", "offhand") or nil
             if previousEntry and Inventory.AddItem then
                 Inventory.AddItem({
                     dataset = previousEntry.datasetId,
                     id = previousEntry.itemId,
                     modifications = previousEntry.modifications,
                     soulbound = previousEntry.soulbound == true,
-                })
+                }, { suppressLootNotification = true })
+            end
+            if offHandEntry and Inventory.AddItem then
+                Inventory.AddItem({
+                    dataset = offHandEntry.datasetId,
+                    id = offHandEntry.itemId,
+                    modifications = offHandEntry.modifications,
+                    soulbound = offHandEntry.soulbound == true,
+                }, { suppressLootNotification = true })
             end
 
             local itemClass = getItemClass()
@@ -2197,7 +2410,7 @@ function Profile.UnequipSlotToInventoryByScope(scope, slotKey)
                     id = equippedEntry.itemId,
                     modifications = equippedEntry.modifications,
                     soulbound = equippedEntry.soulbound == true,
-                })
+                }, { suppressLootNotification = true })
             end
 
             return Equipment.UnequipItemInScope and Equipment.UnequipItemInScope(scope, slotKey) or false
@@ -2457,7 +2670,8 @@ function Profile.ListKnownTraits()
 
     for index = 1, #traitbook do
         local detail = Profile.GetKnownTraitDetails and Profile.GetKnownTraitDetails(traitbook[index]) or nil
-        if detail and detail.isEnvironmental ~= true and detail.isVisibleToProfile == true then
+        if detail and detail.isEnvironmental ~= true
+            and (detail.isVisibleToProfile == true or (detail.origin == "class" and detail.typeCategory == "talent")) then
             detail.isActive = activeRefs[detail.traitRef] == true
             rows[#rows + 1] = detail
         end
@@ -2656,10 +2870,10 @@ function Profile.GetKnownTraitDetails(traitRef)
     local authoredDescriptionText = traitPayload and trimString(traitPayload.description) or ""
     local summaryText = getTraitSummaryText(traitPayload, trait and "No effects" or "This trait definition is missing from its dataset.")
     local descriptionText = authoredDescriptionText
-    local typeCategory = getTraitSourceCategory(trait)
+    local origin = getKnownTraitOrigin(normalizedRef) or "manual"
+    local typeCategory = getKnownTraitTypeCategory(normalizedRef, origin)
     local unlockLevel = getTraitUnlockLevel(trait)
     local descriptionSource = authoredDescriptionText ~= "" and "authored" or "summary"
-    local origin = getKnownTraitOrigin(normalizedRef) or "manual"
     local category = getTraitDisplayCategory(origin, typeCategory, trait)
     local isVisibleToProfile = false
     local isUnlockedForProfile = false
@@ -2701,6 +2915,12 @@ function Profile.GetKnownTraitDetails(traitRef)
     }
     detail.isUnlockedForProfile = isUnlockedForProfile
     detail.isVisibleToProfile = isTraitDetailVisibleToProfile(detail)
+    local assignmentValidation = Profile.ValidateTraitAssignment and Profile.ValidateTraitAssignment(normalizedRef, {}) or { valid = true, reason = "" }
+    detail.assignmentValidation = assignmentValidation
+    detail.isAssignmentValid = assignmentValidation.valid == true
+    detail.validationFailureText = assignmentValidation.valid == true and "" or ensureString(assignmentValidation.reason)
+    detail.isLocked = assignmentValidation.valid ~= true
+    detail.lockedReason = detail.isLocked and detail.validationFailureText or ""
     return detail
 end
 
@@ -2879,8 +3099,18 @@ function Profile.AddKnownTrait(traitRef)
         return false
     end
 
+    local validation = Profile.ValidateTraitAssignment(normalizedRef, { operation = "add" })
+    if validation.valid ~= true then
+        return false, validation
+    end
+
     local detail = Profile.GetKnownTraitDetails and Profile.GetKnownTraitDetails(normalizedRef) or nil
     if detail and detail.typeCategory ~= "talent" then
+        return false
+    end
+    -- A class talent can only be selected through its owning selected class;
+    -- it must never fall through to the generic/manual trait store.
+    if isOwnedByAnyClass(normalizedRef) or isOwnedByAnyRace(normalizedRef) then
         return false
     end
     if detail and detail.isAutoGranted == true then
@@ -2893,9 +3123,6 @@ function Profile.AddKnownTrait(traitRef)
     local summary = buildTraitCountSummary()
     if detail and detail.isEnvironmental ~= true then
         if summary.maxTotalTraits > 0 and summary.manualCount >= summary.maxTotalTraits then
-            return false
-        end
-        if detail.typeCategory == "talent" and summary.maxTalentTraits > 0 and summary.manualTalentCount >= summary.maxTalentTraits then
             return false
         end
     end
@@ -2913,11 +3140,8 @@ end
 
 function Profile.RemoveKnownTrait(traitRef)
     local detail = Profile.GetKnownTraitDetails and Profile.GetKnownTraitDetails(traitRef) or nil
-    if detail and detail.isMissing == true and detail.origin == "race" then
-        return pruneSelectedOriginTraitRef("race", detail.traitRef)
-    end
-    if detail and detail.isMissing == true and detail.origin == "class" then
-        return pruneSelectedOriginTraitRef("class", detail.traitRef)
+    if detail and (detail.origin == "race" or detail.origin == "class") then
+        return false
     end
 
     if Database.RemoveProfileTrait then
@@ -2949,6 +3173,11 @@ function Profile.ActivateTrait(traitRef)
         return false
     end
 
+    local validation = Profile.ValidateTraitAssignment(normalizedRef, { operation = "activate" })
+    if validation.valid ~= true then
+        return false, validation
+    end
+
     local detail = Profile.GetKnownTraitDetails and Profile.GetKnownTraitDetails(normalizedRef) or nil
     if detail and detail.isToggleable ~= true then
         return false
@@ -2973,11 +3202,10 @@ function Profile.ActivateTrait(traitRef)
         return false
     end
 
-    if detail and detail.origin == "class" and detail.typeCategory == "talent" then
-        if Database.RemoveProfileInactiveTrait then
-            Database.RemoveProfileInactiveTrait(normalizedRef)
-        end
-        return true
+    if validation.typeCategory == "talent" and validation.isClassTalent == true then
+        local summary = buildTraitCountSummary()
+        if summary.maxTalentTraits > 0 and summary.selectedClassTalentCount >= summary.maxTalentTraits then return false, traitAssignmentFailure("talent_limit", ("Class talent limit reached: %d / %d."):format(summary.selectedClassTalentCount, summary.maxTalentTraits)) end
+        return Database.AddProfileSelectedClassTalentTrait and Database.AddProfileSelectedClassTalentTrait(normalizedRef) or false
     end
 
     if Database.AddProfileActiveTrait then
@@ -2994,11 +3222,7 @@ function Profile.DeactivateTrait(traitRef)
     end
 
     if detail and detail.origin == "class" and detail.typeCategory == "talent" then
-        if Profile.IsTraitActive(traitRef) and Database.AddProfileInactiveTrait then
-            Database.AddProfileInactiveTrait(traitRef)
-            return true
-        end
-        return false
+        return Database.RemoveProfileSelectedClassTalentTrait and Database.RemoveProfileSelectedClassTalentTrait(traitRef) or false
     end
 
     local profile = Database.GetActiveProfile and Database.GetActiveProfile() or nil
@@ -3019,6 +3243,50 @@ function Profile.DeactivateTrait(traitRef)
     return false
 end
 
+function Profile.SetSelectedClassTalentTraits(traitRefs)
+    local availableRefs = buildSelectedOriginTraitRefs("classTalent")
+    local availableLookup = {}
+    for index = 1, #availableRefs do
+        availableLookup[availableRefs[index]] = true
+    end
+
+    local allowance = Profile.GetClassTalentAllowance(getProfileLevel())
+    local selected, seen = {}, {}
+    for index = 1, #(traitRefs or {}) do
+        local traitRef = ensureString(traitRefs[index])
+        if traitRef ~= "" and availableLookup[traitRef] ~= true then
+            return false, traitAssignmentFailure("wrong_class", "This class talent is not available to the selected class.")
+        end
+        if traitRef ~= "" and seen[traitRef] ~= true then
+            local validation = Profile.ValidateTraitAssignment(traitRef, {
+                operation = "select",
+                selectedClassTalentRefs = traitRefs,
+            })
+            if validation.valid ~= true then
+                return false, validation
+            end
+            seen[traitRef] = true
+            selected[#selected + 1] = traitRef
+        end
+    end
+
+    if allowance.isLimited == true and #selected > allowance.maxTalentTraits then
+        return false, traitAssignmentFailure("talent_limit", ("Class talent limit reached: %d / %d."):format(#selected, allowance.maxTalentTraits))
+    end
+
+    return Database.SetProfileSelectedClassTalentTraits and Database.SetProfileSelectedClassTalentTraits(selected) or false
+end
+
+function Profile.IsClassOwnedTrait(traitRef)
+    return isOwnedByAnyClass(traitRef)
+end
+
+function Profile.GetTraitOwnership(traitRef)
+    if isOwnedByAnyRace(traitRef) then return "race" end
+    if isOwnedByAnyClass(traitRef) then return "class" end
+    return "manual"
+end
+
 function Profile.ToggleTraitActivation(traitRef)
     local detail = Profile.GetKnownTraitDetails and Profile.GetKnownTraitDetails(traitRef) or nil
     if detail and detail.isToggleable ~= true then
@@ -3029,11 +3297,12 @@ function Profile.ToggleTraitActivation(traitRef)
         return Profile.DeactivateTrait(traitRef) and "deactivated" or nil
     end
 
-    if Profile.ActivateTrait(traitRef) then
+    local activated, validation = Profile.ActivateTrait(traitRef)
+    if activated then
         return "activated"
     end
 
-    return nil
+    return nil, validation
 end
 
 function Profile.RemoveKnownTraitAt(index)
@@ -3197,6 +3466,11 @@ function Profile.GetActionBarSize()
     return getActionBarSizeFromRuleset()
 end
 
+function Profile.GetActionBarLayoutMode()
+    local mode = tostring(getInterfaceRuleValue("action_bar_layout", "complex"))
+    return mode == "simple" and "simple" or "complex"
+end
+
 function Profile.GetActionBarMode()
     if Database.GetProfileActionBarMode then
         return Database.GetProfileActionBarMode()
@@ -3355,7 +3629,14 @@ end
 
 function Profile.SetClassRef(classRef)
     if Database.SetProfileClassRef then
-        return Database.SetProfileClassRef(classRef)
+        local previous = Database.GetProfileClassRef and Database.GetProfileClassRef() or nil
+        local updated = Database.SetProfileClassRef(classRef)
+        -- Selections belong to a class, not to the character globally. Prune
+        -- immediately; the resolver also filters them as a defensive guard.
+        if previous ~= updated and Database.ClearProfileSelectedClassTalentTraits then
+            Database.ClearProfileSelectedClassTalentTraits()
+        end
+        return updated
     end
 
     return nil
@@ -3375,6 +3656,62 @@ function Profile.SetSetupWizardState(state)
     end
 
     return nil
+end
+
+function Profile.SetSetupWizardCompleted(completed)
+    if Database.SetProfileSetupWizardCompleted then
+        return Database.SetProfileSetupWizardCompleted(completed)
+    end
+
+    return false
+end
+
+function Profile.IsSetupWizardEnabled()
+    local rulesetLogic = Addon.Internal and Addon.Internal.Ruleset or nil
+    if type(rulesetLogic) ~= "table"
+        or type(rulesetLogic.GetActiveRuleset) ~= "function"
+        or type(rulesetLogic.GetRulesetRuleValueByKey) ~= "function"
+    then
+        return nil
+    end
+
+    return rulesetLogic.GetRulesetRuleValueByKey(
+        rulesetLogic.GetActiveRuleset(),
+        "setup",
+        "enable_setup_wizard",
+        false
+    ) == true
+end
+
+function Profile.IsSetupComplete()
+    local wizardEnabled = Profile.IsSetupWizardEnabled()
+    if wizardEnabled == false then
+        return true
+    end
+    if wizardEnabled ~= true then
+        return false
+    end
+
+    if type(Database.GetProfileSetupWizardState) ~= "function" then
+        return false
+    end
+
+    local state = Database.GetProfileSetupWizardState()
+    if type(state) == "table" and state.completed == true then
+        return true
+    end
+
+    if type(Database.MigrateProfileSetupWizardCompletion) == "function"
+        and Database.MigrateProfileSetupWizardCompletion() == true
+    then
+        return true
+    end
+
+    return false
+end
+
+function Profile.IsSetupRequired()
+    return Profile.IsSetupWizardEnabled() == true and not Profile.IsSetupComplete()
 end
 
 function Profile.GetResolvedBaseResourceValue(resourceRef, options)
@@ -3671,12 +4008,50 @@ function Profile.GetMountedActionBarSlotDetails(slotIndex)
     return detail
 end
 
+local function isAutoHitSpell(spell)
+    for componentIndex = 1, #((spell and spell.components) or {}) do
+        local component = spell.components[componentIndex]
+        local effect = type(component) == "table" and component.effect or nil
+        if type(effect) == "table" and tostring(effect.hitType or "ability") == "auto" then
+            return true
+        end
+    end
+
+    return false
+end
+
+function Profile.ListEligibleAutoHitSpellDetails()
+    local rows = {}
+    local spellRefs = buildKnownSpellRefs()
+
+    for index = 1, #spellRefs do
+        local detail = Profile.GetKnownSpellDetails and Profile.GetKnownSpellDetails(spellRefs[index]) or nil
+        if detail
+            and isAutoHitSpell(detail.spell)
+            and detail.conditionFailureText == ""
+        then
+            detail.actionBarKind = "auto-spell"
+            rows[#rows + 1] = detail
+        end
+    end
+
+    return rows
+end
+
 function Profile.ListActionBarSlots()
     local size = Profile.GetActionBarSize()
     local rows = {}
 
+    local autoHitRows = Profile.ListEligibleAutoHitSpellDetails()
+    for index = 1, #autoHitRows do
+        rows[#rows + 1] = autoHitRows[index]
+    end
+    rows.autoHitSpellCount = #autoHitRows
+
     for slotIndex = 1, size do
-        rows[slotIndex] = Profile.GetActionBarSlotDetails(slotIndex)
+        -- Keep the list dense: action bar rendering uses its length to reserve
+        -- every configured slot after the automatic entries.
+        rows[#rows + 1] = Profile.GetActionBarSlotDetails(slotIndex) or false
     end
 
     return rows
@@ -3723,6 +4098,38 @@ end
 function Profile.ClearStatBonus(statRef)
     if Database.ClearProfileStatBonus then
         return Database.ClearProfileStatBonus(statRef)
+    end
+
+    return false
+end
+
+function Profile.ListSkillPermanentBonuses()
+    if Database.ListProfileSkillPermanentBonuses then
+        return Database.ListProfileSkillPermanentBonuses()
+    end
+
+    return {}
+end
+
+function Profile.GetSkillPermanentBonus(skillRef)
+    if Database.GetProfileSkillPermanentBonus then
+        return Database.GetProfileSkillPermanentBonus(skillRef)
+    end
+
+    return 0
+end
+
+function Profile.SetSkillPermanentBonus(skillRef, value)
+    if Database.SetProfileSkillPermanentBonus then
+        return Database.SetProfileSkillPermanentBonus(skillRef, value)
+    end
+
+    return nil
+end
+
+function Profile.ClearSkillPermanentBonus(skillRef)
+    if Database.ClearProfileSkillPermanentBonus then
+        return Database.ClearProfileSkillPermanentBonus(skillRef)
     end
 
     return false

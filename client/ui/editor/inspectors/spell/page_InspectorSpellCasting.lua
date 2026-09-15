@@ -89,4 +89,26 @@ function DataEditor:BuildSpellInspectorCastingPage(page)
         end)
     end)
     root:AddChild(self.SpellInspectorAllowDeadTargetsCheckbox)
+
+    self.SpellInspectorCanTargetHiddenUnitsCheckbox = self:CreateSpellInspectorCheckbox(root:GetFrame(), "RPEDataEditorSpellInspectorCanTargetHiddenUnitsCheckbox", "Can Target Hidden Units", false, function(checked)
+        if self._refreshingSpellInspector then
+            return
+        end
+
+        self:CommitSelectedSpell(function(spell)
+            spell.canTargetHiddenUnits = checked == true
+        end)
+    end)
+    root:AddChild(self.SpellInspectorCanTargetHiddenUnitsCheckbox)
+
+    self.SpellInspectorDoesNotRevealCasterCheckbox = self:CreateSpellInspectorCheckbox(root:GetFrame(), "RPEDataEditorSpellInspectorDoesNotRevealCasterCheckbox", "Does Not Reveal Caster", false, function(checked)
+        if self._refreshingSpellInspector then
+            return
+        end
+
+        self:CommitSelectedSpell(function(spell)
+            spell.doesNotRevealCaster = checked == true
+        end)
+    end)
+    root:AddChild(self.SpellInspectorDoesNotRevealCasterCheckbox)
 end

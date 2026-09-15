@@ -740,6 +740,10 @@ function Client:BuildItemModificationWindow()
 end
 
 function Client:ShowItemModificationWindow(slotIndex)
+    if self:RequireSetupCompletion("item-modification-window") ~= true then
+        return nil
+    end
+
     return ItemModificationWindow:Get():ShowForSlot(slotIndex)
 end
 

@@ -296,6 +296,25 @@ local function buildCooldownRemainingText(runtimeState)
     return ("Cooldown Remaining: %s"):format(formatTurnCount(cooldownRemaining))
 end
 
+local function isBasicAttack(spell)
+    if type(spell) ~= "table" then
+        return false
+    end
+
+    for index = 1, #(spell.components or {}) do
+        local component = spell.components[index]
+        local effect = type(component) == "table" and component.effect or nil
+        if type(effect) == "table"
+            and tostring(effect.type or "") == "damage"
+            and string.lower(tostring(effect.hitType or "")) == "auto"
+        then
+            return true
+        end
+    end
+
+    return false
+end
+
 local function buildInactiveTooltip(detail)
     return {
         type = "game",
@@ -420,6 +439,20 @@ function SpellTooltip:Build(detail, owner)
                 wrap = true,
             }
         end
+    end
+
+    if isBasicAttack(detail.spell) then
+        lines[#lines + 1] = {
+            text = " ",
+            wrap = false,
+        }
+        lines[#lines + 1] = {
+            text = "Right-click to toggle auto-cast.",
+            r = 0.6,
+            g = 0.6,
+            b = 0.6,
+            wrap = true,
+        }
     end
 
     return {

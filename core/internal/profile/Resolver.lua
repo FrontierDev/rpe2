@@ -135,6 +135,21 @@ local function buildProfileStatBonusMap()
     return bonuses
 end
 
+local function buildProfileSkillPermanentBonusMap()
+    local bonuses = {}
+    local profile = Database.GetActiveProfile and Database.GetActiveProfile() or nil
+    local storedBonuses = profile and profile.skillPermanentBonuses or nil
+
+    for skillRef, value in pairs(type(storedBonuses) == "table" and storedBonuses or {}) do
+        local normalizedSkillRef = ensureString(skillRef)
+        if normalizedSkillRef ~= "" then
+            bonuses[normalizedSkillRef] = math.max(0, math.floor(tonumber(value) or 0))
+        end
+    end
+
+    return bonuses
+end
+
 local function buildProfileSkillLevelMap()
     local levels = {}
     local profile = Database.GetActiveProfile and Database.GetActiveProfile() or nil
@@ -2064,7 +2079,7 @@ local function getFixedSkillCap(skillType)
     return math.max(0, math.floor(tonumber(getRulesetRuleValue("skills", "noncombat_skill_max_level", 100)) or 100))
 end
 
-local function buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, itemBonuses, traitBonuses, raceBonuses, classBonuses, auraContext, level, weaponMultiplier)
+local function buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, permanentBonuses, itemBonuses, traitBonuses, raceBonuses, classBonuses, auraContext, level, weaponMultiplier)
     local skill = entry and entry.skill or {}
     local skillType = ensureString(skill.skillType)
     if not isSkillTypeEnabled(skillType) then
@@ -2093,7 +2108,7 @@ local function buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, it
             local statRow = resolvedStatsByRef and resolvedStatsByRef[skill.derivedStatRef] or nil
             local statValue = tonumber(statRow and statRow.value) or 0
             derivedValue = roundResolvedValue(statValue * (tonumber(skill.derivedMultiplier) or 0))
-            baseValue = storedValue + derivedValue
+            baseValue = storedValue
         else
             baseValue = storedValue
         end
@@ -2107,12 +2122,13 @@ local function buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, it
         name = "Unnamed Skill"
     end
 
+    local permanentBonus = tonumber(permanentBonuses and permanentBonuses[entry.ref]) or 0
     local itemBonus = tonumber(itemBonuses and itemBonuses[entry.ref]) or 0
     local traitBonus = tonumber(traitBonuses and traitBonuses[entry.ref]) or 0
     local raceBonus = tonumber(raceBonuses and raceBonuses[entry.ref]) or 0
     local classBonus = tonumber(classBonuses and classBonuses[entry.ref]) or 0
     local auraBonus = resolveAuraBonusForSkill(auraContext, entry.ref)
-    local bonusValue = itemBonus + traitBonus + raceBonus + classBonus + auraBonus
+    local bonusValue = derivedValue + permanentBonus + itemBonus + traitBonus + raceBonus + classBonus + auraBonus
     local resolvedValue = math.max(0, baseValue + bonusValue)
     if skillType == "crafting" then
         resolvedValue = clampNumber(math.max(1, resolvedValue), 1, maxValue)
@@ -2135,6 +2151,7 @@ local function buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, it
         baseValue = baseValue,
         derivedValue = hasDerivedStat and derivedValue or nil,
         maxValue = maxValue,
+        permanentBonus = permanentBonus,
         itemBonus = itemBonus,
         traitBonus = traitBonus,
         raceBonus = raceBonus,
@@ -2197,6 +2214,7 @@ function Resolver.ListResolvedSkills(options)
     local entries = collectActivatedSkills()
     local resolvedStatsByRef = buildResolvedStatsByRef(Resolver.ListResolvedStats(options))
     local storedLevels = buildProfileSkillLevelMap()
+    local permanentBonuses = buildProfileSkillPermanentBonusMap()
     local itemBonuses = buildItemSkillBonusMap()
     local traitBonuses = buildTraitSkillBonusMap()
     local raceBonuses = buildOriginSkillBonusMap("races")
@@ -2208,7 +2226,7 @@ function Resolver.ListResolvedSkills(options)
 
     for index = 1, #entries do
         local entry = entries[index]
-        local row = buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, itemBonuses, traitBonuses, raceBonuses, classBonuses, auraContext, level, weaponMultiplier)
+        local row = buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, permanentBonuses, itemBonuses, traitBonuses, raceBonuses, classBonuses, auraContext, level, weaponMultiplier)
         if row then
             rows[#rows + 1] = row
         end
@@ -2236,6 +2254,7 @@ function Resolver.GetResolvedSkillRowsByRefs(skillRefs, options)
     local entries, needsResolvedStats = requestedSkillEntries(requestedRefs)
     local resolvedStatsByRef = needsResolvedStats and buildResolvedStatsByRef(Resolver.ListResolvedStats(options)) or {}
     local storedLevels = buildProfileSkillLevelMap()
+    local permanentBonuses = buildProfileSkillPermanentBonusMap()
     local itemBonuses = buildItemSkillBonusMap()
     local traitBonuses = buildTraitSkillBonusMap()
     local raceBonuses = buildOriginSkillBonusMap("races")
@@ -2247,7 +2266,7 @@ function Resolver.GetResolvedSkillRowsByRefs(skillRefs, options)
 
     for index = 1, #entries do
         local entry = entries[index]
-        local row = buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, itemBonuses, traitBonuses, raceBonuses, classBonuses, auraContext, level, weaponMultiplier)
+        local row = buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, permanentBonuses, itemBonuses, traitBonuses, raceBonuses, classBonuses, auraContext, level, weaponMultiplier)
         if row then
             rowsByRef[row.ref] = row
         end

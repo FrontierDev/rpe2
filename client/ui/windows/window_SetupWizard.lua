@@ -7,6 +7,7 @@ Addon.Client.UI.SetupWizard = Addon.Client.UI.SetupWizard or {}
 local Client = Addon.Client
 local SetupWizard = Addon.Client.UI.SetupWizard
 local UI = Addon.UI or {}
+local BaseElement = UI.BaseElement
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local RulesetLogic = Addon.Internal and Addon.Internal.Ruleset or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
@@ -47,10 +48,108 @@ local ACTIONBAR_SPELLBOOK_ENTRIES_PER_PAGE = ACTIONBAR_SPELLBOOK_COLUMNS * ACTIO
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local COPPER_CURRENCY_KEY = "copper"
 local SETUP_WIZARD_TIMING_THRESHOLD_MS = 16
+local IDENTITY_TAB_INDEX = 1
+local TRAITS_TAB_INDEX = 2
+local ITEMS_TAB_INDEX = 3
+local SKILLS_TAB_INDEX = 4
+local ACTIONBAR_TAB_INDEX = 5
+local FINALIZE_TAB_INDEX = 6
+local SKILLS_TAB_WIDTH = 56
+local SETUP_SKILL_ROW_HEIGHT = 30
+local SETUP_SKILL_ROW_WIDTH = 440
 
 local DEFAULT_SLOT_BORDER = { r = 0.42, g = 0.46, b = 0.52, a = 1 }
 local SELECTED_SLOT_BORDER = { r = 0.64, g = 0.82, b = 0.38, a = 1 }
 local ACTIONBAR_SELECTED_SLOT_BORDER = { r = 0.94, g = 0.74, b = 0.22, a = 1 }
+
+local SetupSkillAllocationRow = {}
+SetupSkillAllocationRow.__index = SetupSkillAllocationRow
+setmetatable(SetupSkillAllocationRow, { __index = BaseElement })
+
+function SetupSkillAllocationRow:New(options)
+    local instance = BaseElement.New(self, options)
+    instance.options.border = false
+    instance.adjustButtons = {}
+    instance.adjustHandler = nil
+    return instance
+end
+
+function SetupSkillAllocationRow:Create()
+    if self.frame then
+        return self.frame
+    end
+
+    local frame = CreateFrame("Frame", self.name, self:GetParentFrame())
+    self:SetFrame(frame)
+    local width = math.max(1, tonumber(self.options.width) or SETUP_SKILL_ROW_WIDTH)
+    local height = math.max(1, tonumber(self.options.height) or SETUP_SKILL_ROW_HEIGHT)
+    frame:SetSize(width, height)
+
+    local buttonWidth = 30
+    local buttonSpacing = 3
+    local controlsWidth = (buttonWidth * 4) + (buttonSpacing * 3)
+    local skillWidth = math.max(220, width - controlsWidth - 8)
+
+    self.skillEntry = UI.SkillEntry:New({
+        name = (self.name or "SetupSkillAllocationRow") .. "SkillEntry",
+        width = skillWidth,
+        height = height,
+        border = false,
+    })
+    self.skillEntry:SetParent(frame)
+    self.skillEntry:Create()
+    self.skillEntry:GetFrame():SetPoint("LEFT", frame, "LEFT", 0, 0)
+
+    local specs = {
+        { label = "-5", delta = -5 },
+        { label = "-1", delta = -1 },
+        { label = "+1", delta = 1 },
+        { label = "+5", delta = 5 },
+    }
+    local previousFrame = nil
+    for index = #specs, 1, -1 do
+        local spec = specs[index]
+        local delta = spec.delta
+        local button = UI.CreateButton(
+            frame,
+            (self.name or "SetupSkillAllocationRow") .. "AdjustButton" .. index,
+            spec.label,
+            buttonWidth,
+            function()
+                if type(self.adjustHandler) == "function" then
+                    self.adjustHandler(delta)
+                end
+            end,
+            {
+                height = 20,
+                fontSize = 7,
+            }
+        )
+        local buttonFrame = button and button.GetFrame and button:GetFrame() or nil
+        if buttonFrame then
+            if previousFrame then
+                buttonFrame:SetPoint("RIGHT", previousFrame, "LEFT", -buttonSpacing, 0)
+            else
+                buttonFrame:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
+            end
+            previousFrame = buttonFrame
+        end
+        self.adjustButtons[delta] = button
+    end
+
+    return frame
+end
+
+function SetupSkillAllocationRow:SetAdjustHandler(handler)
+    self.adjustHandler = handler
+end
+
+function SetupSkillAllocationRow:SetAdjustmentEnabled(delta, enabled)
+    local button = self.adjustButtons and self.adjustButtons[delta] or nil
+    if button and button.SetEnabled then
+        button:SetEnabled(enabled == true)
+    end
+end
 
 local function ensureString(value)
     if value == nil then
@@ -159,6 +258,26 @@ local function selectionArrayFromLookup(orderedItems, lookup)
     return results
 end
 
+local function normalizeSetupSkillBonusMap(record)
+    local normalized = {}
+    for skillRef, value in pairs(type(record) == "table" and record or {}) do
+        local normalizedRef = trimString(skillRef)
+        local normalizedValue = math.max(0, math.floor(tonumber(value) or 0))
+        if normalizedRef ~= "" and normalizedValue > 0 then
+            normalized[normalizedRef] = normalizedValue
+        end
+    end
+    return normalized
+end
+
+local function copySetupSkillBonusMap(record)
+    local copy = {}
+    for skillRef, value in pairs(normalizeSetupSkillBonusMap(record)) do
+        copy[skillRef] = value
+    end
+    return copy
+end
+
 local function findEntryByValue(items, value)
     local needle = trimString(value)
     if needle == "" then
@@ -236,8 +355,16 @@ local function createInstance()
         cachedState = nil,
         selectedRaceRef = "",
         selectedClassRef = "",
+        selectedPrimaryResourceRef = "",
+        selectedSpecialResourceRef = "",
         selectedStartingItemLookup = {},
+        selectedSkillPermanentBonuses = {},
+        initialSkillPermanentBonuses = {},
+        setupSkillRows = {},
+        skillPointFeedback = "",
         startingItemFilterQuery = "",
+        startingItemTypeFilter = "all",
+        showClassItemsOnly = false,
         startingItemPage = 1,
         availableStartingItems = {},
         filteredStartingItems = {},
@@ -255,6 +382,8 @@ local function createInstance()
         currentActionBarSpellPage = 1,
         selectedActionBarDatasetId = nil,
         selectedActionBarSpellbookCategory = nil,
+        selectedClassTalentLookup = {},
+        traitTalentFeedback = "",
         finalizeLines = {},
         hasDraftSelectionState = false,
         refreshRequestId = 0,
@@ -303,6 +432,47 @@ end
 function SetupWizard:GetRequiredStartingItemSlotRefs()
     local values = self:GetRuleValue("required_starting_item_slot_refs", {})
     return type(values) == "table" and values or {}
+end
+
+function SetupWizard:ShouldShowSkillsPage()
+    return self:GetRuleValue("enable_skills_page", true) ~= false
+end
+
+function SetupWizard:GetPermanentSkillPointLimit()
+    return math.max(0, math.floor(tonumber(self:GetRuleValue("permanent_skill_point_limit", 50)) or 50))
+end
+
+function SetupWizard:GetStartingLevel()
+    local rawValue = type(RulesetLogic.GetRulesetRuleValueByKey) == "function"
+        and RulesetLogic.GetRulesetRuleValueByKey(self:GetActiveRuleset(), "character", "starting_level", 1)
+        or 1
+    return math.max(1, math.floor(tonumber(rawValue) or 1))
+end
+
+function SetupWizard:IsClassItemFilterForced()
+    local value = type(RulesetLogic.GetRulesetRuleValueByKey) == "function"
+        and RulesetLogic.GetRulesetRuleValueByKey(
+            self:GetActiveRuleset(),
+            "equipment",
+            "enforce_class_armor_weight_restrictions",
+            true
+        )
+        or false
+    return value == true or tonumber(value) == 1
+end
+
+function SetupWizard:SyncClassItemFilter()
+    local forced = self:IsClassItemFilterForced()
+    if forced then
+        self.showClassItemsOnly = true
+    end
+    if self.StartingItemsClassFilter then
+        self.StartingItemsClassFilter:SetChecked(self.showClassItemsOnly, true)
+        if self.StartingItemsClassFilter.SetEnabled then
+            self.StartingItemsClassFilter:SetEnabled(not forced)
+        end
+    end
+    return forced
 end
 
 function SetupWizard:ApplyDatasetPolicy()
@@ -689,6 +859,76 @@ function SetupWizard:BuildAllowedActionBarSpellItems()
     return items
 end
 
+function SetupWizard:GetActionBarResourceChoices()
+    local choices = {}
+    local rows = Profile.ListResolvedResources and Profile.ListResolvedResources() or {}
+    local healthResourceRef = ""
+    if type(RulesetLogic.GetRulesetRuleValueByKey) == "function" then
+        healthResourceRef = trimString(RulesetLogic.GetRulesetRuleValueByKey(
+            self:GetActiveRuleset(),
+            "resources",
+            "health_stat",
+            ""
+        ))
+    end
+
+    for index = 1, #rows do
+        local row = rows[index]
+        local resourceRef = trimString(row and row.ref)
+        if resourceRef ~= "" and resourceRef ~= healthResourceRef then
+            choices[#choices + 1] = {
+                label = trimString(row.name) ~= "" and trimString(row.name) or resourceRef,
+                value = resourceRef,
+                isSpecial = row.isSpecial == true,
+            }
+        end
+    end
+
+    return choices
+end
+
+function SetupWizard:RefreshActionBarResourceSelectors()
+    if not self.ActionBarPrimaryResourceDropdown or not self.ActionBarSpecialResourceDropdown then
+        return
+    end
+
+    local choices = self:GetActionBarResourceChoices()
+    local primaryRef = trimString(self.selectedPrimaryResourceRef)
+    local specialRef = trimString(self.selectedSpecialResourceRef)
+    local primaryItems = { { label = "None", value = "" } }
+    local specialItems = { { label = "None", value = "" } }
+
+    for index = 1, #choices do
+        local choice = choices[index]
+        if choice.value ~= specialRef then
+            primaryItems[#primaryItems + 1] = {
+                label = choice.label,
+                value = choice.value,
+            }
+        end
+        if choice.isSpecial == true and choice.value ~= primaryRef then
+            specialItems[#specialItems + 1] = {
+                label = choice.label,
+                value = choice.value,
+            }
+        end
+    end
+
+    self._refreshingActionBarResourceSelectors = true
+    self.ActionBarPrimaryResourceDropdown:SetItems(primaryItems)
+    self.ActionBarPrimaryResourceDropdown:SetSelectedValue(primaryRef, true)
+    self.ActionBarSpecialResourceDropdown:SetItems(specialItems)
+    self.ActionBarSpecialResourceDropdown:SetSelectedValue(specialRef, true)
+    self._refreshingActionBarResourceSelectors = false
+
+    if self.ActionBarPrimaryResourceDropdown.SetEnabled then
+        self.ActionBarPrimaryResourceDropdown:SetEnabled(#primaryItems > 1)
+    end
+    if self.ActionBarSpecialResourceDropdown.SetEnabled then
+        self.ActionBarSpecialResourceDropdown:SetEnabled(#specialItems > 1)
+    end
+end
+
 function SetupWizard:CaptureSelectionState()
     local setupState = Profile.GetSetupWizardState and Profile.GetSetupWizardState() or {}
     local actionBarSpellRefs = {}
@@ -707,19 +947,370 @@ function SetupWizard:CaptureSelectionState()
         end
     end
 
+    local primaryResourceRef
+    local specialResourceRef
+    if type(Profile.GetPrimaryResourceRef) == "function" then
+        primaryResourceRef = Profile.GetPrimaryResourceRef()
+    else
+        primaryResourceRef = setupState.primaryResourceRef
+    end
+    if type(Profile.GetSpecialResourceRef) == "function" then
+        specialResourceRef = Profile.GetSpecialResourceRef()
+    else
+        specialResourceRef = setupState.specialResourceRef
+    end
+
     return {
         raceRef = trimString(Profile.GetRaceRef and Profile.GetRaceRef() or setupState.raceRef),
         classRef = trimString(Profile.GetClassRef and Profile.GetClassRef() or setupState.classRef),
+        primaryResourceRef = trimString(primaryResourceRef),
+        specialResourceRef = trimString(specialResourceRef),
         startingItemRefs = type(setupState.startingItemRefs) == "table" and setupState.startingItemRefs or {},
         actionBarSpellRefs = actionBarSpellRefs,
+        skillPermanentBonuses = copySetupSkillBonusMap(setupState.skillPermanentBonuses),
+        selectedClassTalentRefs = Database.ListProfileSelectedClassTalentTraits and Database.ListProfileSelectedClassTalentTraits() or {},
     }
 end
 
 function SetupWizard:SyncSelectionState(state)
     self.selectedRaceRef = trimString(state and state.raceRef)
     self.selectedClassRef = trimString(state and state.classRef)
+    self.selectedPrimaryResourceRef = trimString(state and state.primaryResourceRef)
+    self.selectedSpecialResourceRef = trimString(state and state.specialResourceRef)
     self.selectedStartingItemLookup = selectionLookupFromArray(state and state.startingItemRefs or {})
+    self.selectedSkillPermanentBonuses = copySetupSkillBonusMap(state and state.skillPermanentBonuses)
+    self.initialSkillPermanentBonuses = copySetupSkillBonusMap(state and state.skillPermanentBonuses)
+    self.selectedClassTalentLookup = selectionLookupFromArray(state and state.selectedClassTalentRefs or {})
+    self.traitTalentFeedback = ""
+    self.skillPointFeedback = ""
     self.hasDraftSelectionState = true
+end
+
+function SetupWizard:BuildDraftTraitRows(reference, collectionKey, origin, typeCategory)
+    local dataset = nil
+    local owner = nil
+    if collectionKey == "traitRefs" and type(Registry.ResolveRaceReference) == "function" then
+        dataset, owner = Registry:ResolveRaceReference(reference)
+    elseif collectionKey ~= "traitRefs" and type(Registry.ResolveClassReference) == "function" then
+        dataset, owner = Registry:ResolveClassReference(reference)
+    end
+    local draftTalentRefs = {}
+    for traitRef, selected in pairs(self.selectedClassTalentLookup or {}) do
+        if selected == true then draftTalentRefs[#draftTalentRefs + 1] = traitRef end
+    end
+    local draftProfile = {
+        level = self:GetStartingLevel(),
+        raceRef = self.selectedRaceRef,
+        classRef = self.selectedClassRef,
+        selectedClassTalentTraits = draftTalentRefs,
+    }
+    local rows = {}
+    for index = 1, #(owner and owner[collectionKey] or {}) do
+        local traitRef = trimString(owner[collectionKey][index])
+        if traitRef ~= "" then
+            local detail = Profile.GetKnownTraitDetails and Profile.GetKnownTraitDetails(traitRef) or { traitRef = traitRef }
+            local trait = detail and detail.trait or nil
+            local unlockLevel = math.max(1, math.floor(tonumber(trait and trait.unlockLevel) or 1))
+            local selected = typeCategory == "talent" and self.selectedClassTalentLookup[traitRef] == true
+            local assignmentValidation = Profile.ValidateTraitAssignment and Profile.ValidateTraitAssignment(traitRef, {
+                operation = "select", profile = draftProfile, selectedClassTalentRefs = draftTalentRefs,
+            }) or { valid = true, reason = "" }
+            rows[#rows + 1] = {
+                traitRef = traitRef,
+                name = trimString(detail and detail.name) ~= "" and detail.name or traitRef,
+                icon = trimString(detail and detail.icon),
+                trait = trait,
+                traitPayload = detail and detail.traitPayload or nil,
+                descriptionText = detail and detail.descriptionText or "",
+                origin = origin,
+                typeCategory = typeCategory,
+                isAutoGranted = typeCategory ~= "talent",
+                isToggleable = typeCategory == "talent" and (assignmentValidation.valid == true or selected),
+                isActive = selected or typeCategory ~= "talent",
+                isMissing = not trait,
+                unlockLevel = unlockLevel,
+                assignmentValidation = assignmentValidation,
+                isAssignmentValid = assignmentValidation.valid == true,
+                validationFailureText = assignmentValidation.valid == true and "" or trimString(assignmentValidation.reason),
+                isLocked = typeCategory == "talent" and (unlockLevel > self:GetStartingLevel() or assignmentValidation.valid ~= true),
+                lockedReason = assignmentValidation.valid ~= true and trimString(assignmentValidation.reason) or (unlockLevel > self:GetStartingLevel() and ("Requires level %d."):format(unlockLevel) or ""),
+            }
+        end
+    end
+    return rows
+end
+
+function SetupWizard:GetDraftTraitSections()
+    local canChooseRace = RulesetLogic.GetRulesetRuleValueByKey
+        and RulesetLogic.GetRulesetRuleValueByKey(self:GetActiveRuleset(), "character", "use_races", false) == true
+    local canChooseClass = RulesetLogic.GetRulesetRuleValueByKey
+        and RulesetLogic.GetRulesetRuleValueByKey(self:GetActiveRuleset(), "character", "use_classes", false) == true
+    return {
+        race = canChooseRace and self:BuildDraftTraitRows(self.selectedRaceRef, "traitRefs", "race", "race") or {},
+        classPassives = canChooseClass and self:BuildDraftTraitRows(self.selectedClassRef, "passiveTraitRefs", "class", "class") or {},
+        classTalents = canChooseClass and self:BuildDraftTraitRows(self.selectedClassRef, "talentTraitRefs", "class", "talent") or {},
+    }
+end
+
+function SetupWizard:PruneDraftClassTalents()
+    local sections = self:GetDraftTraitSections()
+    local allowed = {}
+    for index = 1, #sections.classTalents do
+        allowed[sections.classTalents[index].traitRef] = true
+    end
+    for traitRef in pairs(self.selectedClassTalentLookup or {}) do
+        if allowed[traitRef] ~= true then self.selectedClassTalentLookup[traitRef] = nil end
+    end
+end
+
+function SetupWizard:GetDraftSelectedClassTalentRefs()
+    local sections = self:GetDraftTraitSections()
+    local ordered = {}
+    for index = 1, #sections.classTalents do
+        local row = sections.classTalents[index]
+        if self.selectedClassTalentLookup[row.traitRef] == true then ordered[#ordered + 1] = row.traitRef end
+    end
+    return ordered
+end
+
+function SetupWizard:ToggleDraftClassTalent(traitRef)
+    local normalizedRef = trimString(traitRef)
+    local sections = self:GetDraftTraitSections()
+    local candidate = nil
+    for index = 1, #sections.classTalents do
+        if sections.classTalents[index].traitRef == normalizedRef then candidate = sections.classTalents[index]; break end
+    end
+    local isSelected = self.selectedClassTalentLookup[normalizedRef] == true
+    if not candidate or candidate.isMissing == true or (candidate.isLocked == true and not isSelected) then return false end
+    if self.selectedClassTalentLookup[normalizedRef] == true then
+        self.selectedClassTalentLookup[normalizedRef] = nil
+    else
+        local allowance = Profile.GetClassTalentAllowance and Profile.GetClassTalentAllowance(self:GetStartingLevel()) or { isLimited = false }
+        local selected = self:GetDraftSelectedClassTalentRefs()
+        if allowance.isLimited == true and #selected >= allowance.maxTalentTraits then
+            self.traitTalentFeedback = ("Class talent limit reached: %d / %d."):format(#selected, allowance.maxTalentTraits)
+            self:RefreshStatus()
+            return false
+        end
+        local validation = Profile.ValidateTraitAssignment and Profile.ValidateTraitAssignment(normalizedRef, {
+            operation = "select", profile = { level = self:GetStartingLevel(), raceRef = self.selectedRaceRef, classRef = self.selectedClassRef },
+            selectedClassTalentRefs = (function()
+                local refs = self:GetDraftSelectedClassTalentRefs(); refs[#refs + 1] = normalizedRef; return refs
+            end)(),
+        }) or { valid = true }
+        if validation.valid ~= true then
+            self.traitTalentFeedback = trimString(validation.reason)
+            self:RefreshStatus()
+            return false
+        end
+        self.selectedClassTalentLookup[normalizedRef] = true
+    end
+    self.traitTalentFeedback = ""
+    self:RefreshTraitsPage()
+    if self.FinalizePageBuilt then self:RefreshFinalizePage() end
+    self:RefreshStatus()
+    return true
+end
+
+function SetupWizard:BuildTraitsPage(page)
+    if self.TraitsPageBuilt or not page then return end
+    self.TraitsPageBuilt, self.TraitsPage = true, page
+    self.TraitsHintText = UI.CreateText(page, "RPESetupWizardTraitsHintText", "Race and class passives are granted automatically. Select class talents to begin with.", {
+        width = CONTENT_WIDTH, height = 16, justifyH = "LEFT", textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.TraitsHintText:GetFrame():SetPoint("TOPLEFT", page, "TOPLEFT", 0, 0)
+    self.TraitsSummaryText = UI.CreateText(page, "RPESetupWizardTraitsSummaryText", "", {
+        width = CONTENT_WIDTH, height = 16, justifyH = "LEFT", textColor = UI.ResolveColor(nil, "text.primary"),
+    })
+    self.TraitsSummaryText:GetFrame():SetPoint("TOPLEFT", self.TraitsHintText:GetFrame(), "BOTTOMLEFT", 0, -3)
+    self.TraitsScroll = UI.ScrollLayout:New({
+        name = "RPESetupWizardTraitsScroll", width = CONTENT_WIDTH, height = 194, visibleRows = 8, autoFitRows = true,
+        minVisibleRows = 4, rowHeight = 22, rowSpacing = 1, border = false, compact = true,
+        rowElementClass = UI.ScrollListEntry, compactCategoryWidth = 88, compactStatusWidth = 76,
+    })
+    self.TraitsScroll:SetParent(page)
+    self.TraitsScroll:SetRowRenderer(function(row, item)
+        row.traitRow = item and item.traitRow or nil
+        row:SetCategory(item and item.category or "")
+        row:SetTestName(item and item.name or "")
+        row:SetStatus(item and item.status or "")
+        row:SetDetail(item and item.detail or "")
+        row:SetStatusColor(item and item.selected and 0.94 or 0.5, item and item.selected and 0.74 or 0.7, item and item.selected and 0.22 or 0.8, 1)
+        local frame = row:GetFrame()
+        local disabled = item and item.traitRow and item.traitRow.isLocked == true and item.traitRow.isActive ~= true
+        if frame and row.nameRegion and row.nameRegion.SetTextColor then
+            row.nameRegion:SetTextColor(disabled and 0.5 or 1, disabled and 0.5 or 0.82, disabled and 0.5 or 0, 1)
+        end
+        if row.SetTooltip then
+            row:SetTooltip(function(owner)
+                local traitRow = row.traitRow
+                if not traitRow or not TooltipBuilders.Trait or type(TooltipBuilders.Trait.Build) ~= "function" then
+                    return nil
+                end
+                return TooltipBuilders.Trait:Build(traitRow, owner)
+            end)
+        end
+        if frame and not frame._setupTraitClickInstalled then
+            frame._setupTraitClickInstalled = true
+            frame:EnableMouse(true)
+            frame:HookScript("OnMouseUp", function()
+                local current = row.traitRow
+                if current and current.typeCategory == "talent" then self:ToggleDraftClassTalent(current.traitRef) end
+            end)
+        end
+    end)
+    self.TraitsScroll:Create()
+    self.TraitsScroll:SetPoint("TOPLEFT", self.TraitsSummaryText:GetFrame(), "BOTTOMLEFT", 0, -3)
+    self.TraitsScroll:SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, 0)
+end
+
+function SetupWizard:RefreshTraitsPage()
+    if not self.TraitsPageBuilt then return end
+    self:PruneDraftClassTalents()
+    local sections, items = self:GetDraftTraitSections(), {}
+    local labels = { race = "Racial Passives", classPassives = "Class Passives", classTalents = "Class Talents" }
+    for _, key in ipairs({ "race", "classPassives", "classTalents" }) do
+        local rows = sections[key]
+        if #rows == 0 then
+            items[#items + 1] = { category = labels[key], name = "None available", status = "", detail = "" }
+        else
+            for index = 1, #rows do
+                local traitRow = rows[index]
+                local icon = trimString(traitRow.icon)
+                items[#items + 1] = {
+                    category = index == 1 and labels[key] or "",
+                    name = icon ~= "" and ("|T%s:16|t %s"):format(icon, traitRow.name) or traitRow.name,
+                    status = traitRow.isMissing and "Missing" or (traitRow.isLocked and (traitRow.lockedReason ~= "" and traitRow.lockedReason or "Unavailable") or (traitRow.typeCategory == "talent" and (traitRow.isActive and "Selected" or "Available") or "Granted")),
+                    detail = traitRow.descriptionText, selected = traitRow.isActive == true, traitRow = traitRow,
+                }
+            end
+        end
+    end
+    local selected = self:GetDraftSelectedClassTalentRefs()
+    local allowance = Profile.GetClassTalentAllowance and Profile.GetClassTalentAllowance(self:GetStartingLevel()) or { isLimited = false }
+    self.TraitsSummaryText:SetText(allowance.isLimited and ("Class Talents: %d / %d selected"):format(#selected, allowance.maxTalentTraits) or ("Class Talents: %d selected / Unlimited"):format(#selected))
+    self.TraitsScroll:SetItems(items)
+end
+
+function SetupWizard:GetSetupSkillRows()
+    local resolved = Profile.ListResolvedSkills and Profile.ListResolvedSkills() or {}
+    local rows = {}
+    for index = 1, #resolved do
+        local row = resolved[index]
+        if row and tostring(row.skillType or "") == "noncombat" and trimString(row.ref) ~= "" then
+            rows[#rows + 1] = row
+        end
+    end
+    table.sort(rows, function(left, right)
+        local leftName = string.lower(trimString(left and left.name))
+        local rightName = string.lower(trimString(right and right.name))
+        if leftName == rightName then
+            return trimString(left and left.ref) < trimString(right and right.ref)
+        end
+        return leftName < rightName
+    end)
+    return rows
+end
+
+function SetupWizard:GetAllocatedPermanentSkillPointTotal(bonuses)
+    local total = 0
+    for _, value in pairs(normalizeSetupSkillBonusMap(bonuses)) do
+        total = total + math.max(0, math.floor(tonumber(value) or 0))
+    end
+    return total
+end
+
+function SetupWizard:ValidatePermanentSkillPointAllocation(bonuses)
+    local limit = self:GetPermanentSkillPointLimit()
+    local total = self:GetAllocatedPermanentSkillPointTotal(bonuses)
+    return {
+        limit = limit,
+        total = total,
+        remaining = math.max(0, limit - total),
+        valid = total <= limit,
+    }
+end
+
+function SetupWizard:GetSetupSkillPreviewValue(row)
+    local skillRef = trimString(row and row.ref)
+    local currentValue = math.max(0, tonumber(row and row.value) or 0)
+    if skillRef == "" then
+        return currentValue
+    end
+
+    local previousSetupBonus = math.max(0, math.floor(tonumber(self.initialSkillPermanentBonuses and self.initialSkillPermanentBonuses[skillRef]) or 0))
+    local currentPermanentBonus = type(Profile.GetSkillPermanentBonus) == "function"
+        and math.max(0, math.floor(tonumber(Profile.GetSkillPermanentBonus(skillRef)) or 0))
+        or 0
+    local currentSetupContribution = math.min(currentPermanentBonus, previousSetupBonus)
+    local draftBonus = math.max(0, math.floor(tonumber(self.selectedSkillPermanentBonuses and self.selectedSkillPermanentBonuses[skillRef]) or 0))
+    return math.max(0, currentValue - currentSetupContribution + draftBonus)
+end
+
+function SetupWizard:AdjustPermanentSkillPoint(skillRef, delta)
+    local normalizedRef = trimString(skillRef)
+    local normalizedDelta = math.floor(tonumber(delta) or 0)
+    if normalizedRef == "" or normalizedDelta == 0 then
+        return false
+    end
+
+    self.selectedSkillPermanentBonuses = self.selectedSkillPermanentBonuses or {}
+    local current = math.max(0, math.floor(tonumber(self.selectedSkillPermanentBonuses[normalizedRef]) or 0))
+    local nextValue = current + normalizedDelta
+    if nextValue < 0 then
+        return false
+    end
+
+    local validation = self:ValidatePermanentSkillPointAllocation(self.selectedSkillPermanentBonuses)
+    if normalizedDelta > 0 and validation.total + normalizedDelta > validation.limit then
+        self.skillPointFeedback = ("Permanent skill point limit reached: %d / %d."):format(validation.total, validation.limit)
+        self:RefreshStatus()
+        return false
+    end
+
+    if nextValue > 0 then
+        self.selectedSkillPermanentBonuses[normalizedRef] = nextValue
+    else
+        self.selectedSkillPermanentBonuses[normalizedRef] = nil
+    end
+    self.skillPointFeedback = ""
+    self:RefreshSkillsPage()
+    if self.FinalizePageBuilt then
+        self:RefreshFinalizePage()
+    end
+    self:RefreshStatus()
+    return true
+end
+
+function SetupWizard:ApplySetupSkillPermanentBonuses(previousBonuses, nextBonuses)
+    if type(Profile.GetSkillPermanentBonus) ~= "function" or type(Profile.SetSkillPermanentBonus) ~= "function" then
+        return false
+    end
+
+    local previous = normalizeSetupSkillBonusMap(previousBonuses)
+    local nextValues = normalizeSetupSkillBonusMap(nextBonuses)
+    local refs = {}
+    for skillRef in pairs(previous) do
+        refs[skillRef] = true
+    end
+    for skillRef in pairs(nextValues) do
+        refs[skillRef] = true
+    end
+
+    for skillRef in pairs(refs) do
+        local currentPermanentBonus = math.max(0, math.floor(tonumber(Profile.GetSkillPermanentBonus(skillRef)) or 0))
+        local previousSetupBonus = math.max(0, math.floor(tonumber(previous[skillRef]) or 0))
+        local manualPermanentBonus = math.max(0, currentPermanentBonus - previousSetupBonus)
+        local targetPermanentBonus = manualPermanentBonus + math.max(0, math.floor(tonumber(nextValues[skillRef]) or 0))
+        if targetPermanentBonus > 0 then
+            Profile.SetSkillPermanentBonus(skillRef, targetPermanentBonus)
+        elseif type(Profile.ClearSkillPermanentBonus) == "function" then
+            Profile.ClearSkillPermanentBonus(skillRef)
+        else
+            Profile.SetSkillPermanentBonus(skillRef, 0)
+        end
+    end
+    return true
 end
 
 local function createSectionPanel(parent, name, width)
@@ -944,13 +1535,43 @@ function SetupWizard:BuildStartingItemsPage(page)
         self:RefreshStartingItemsPage(self.cachedState or self:CaptureSelectionState())
     end)
 
+    self.StartingItemsTypeFilter = UI.CreateDropdown(page, "RPESetupWizardItemsTypeFilter", {
+        width = 82,
+        height = ITEM_SEARCH_HEIGHT,
+        items = {
+            { label = "All", value = "all" }, { label = "Armor", value = "armor" },
+            { label = "Weapons", value = "weapon" }, { label = "Consumables", value = "consumable" },
+        },
+        onValueChanged = function(value)
+            self.startingItemTypeFilter = value or "all"
+            self.startingItemPage = 1
+            self:RefreshStartingItemsPage(self.cachedState or self:CaptureSelectionState())
+        end,
+    })
+    self.StartingItemsTypeFilter:GetFrame():SetPoint("TOPRIGHT", self.StartingItemsSearchClearButton:GetFrame(), "TOPLEFT", -4, 0)
+    self.StartingItemsSearchInput:GetFrame():ClearAllPoints()
+    self.StartingItemsSearchInput:GetFrame():SetPoint("TOPLEFT", self.StartingItemsSearchLabel:GetFrame(), "TOPRIGHT", 4, 0)
+    self.StartingItemsSearchInput:GetFrame():SetPoint("TOPRIGHT", self.StartingItemsTypeFilter:GetFrame(), "TOPLEFT", -4, 0)
+
+    self.StartingItemsClassFilter = UI.Checkbox:New({
+        name = "RPESetupWizardItemsClassFilter", text = "Show class items", width = 112, height = ITEM_SEARCH_HEIGHT,
+        onValueChanged = function(checked)
+            self.showClassItemsOnly = checked == true
+            self.startingItemPage = 1
+            self:RefreshStartingItemsPage(self.cachedState or self:CaptureSelectionState())
+        end,
+    })
+    self.StartingItemsClassFilter:SetParent(page)
+    self.StartingItemsClassFilter:Create()
+    self.StartingItemsClassFilter:GetFrame():SetPoint("TOPLEFT", self.StartingItemsSearchLabel:GetFrame(), "BOTTOMLEFT", 0, -3)
+
     self.StartingItemsSummaryText = UI.CreateText(page, "RPESetupWizardItemsSummaryText", "", {
         width = 300,
         height = 14,
         justifyH = "LEFT",
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
-    self.StartingItemsSummaryText:GetFrame():SetPoint("TOPLEFT", self.StartingItemsSearchInput:GetFrame(), "BOTTOMLEFT", -40, -6)
+    self.StartingItemsSummaryText:GetFrame():SetPoint("BOTTOMLEFT", page, "BOTTOMLEFT", 0, 0)
 
     self.StartingItemsRequirementText = UI.CreateText(page, "RPESetupWizardItemsRequirementText", "", {
         width = 148,
@@ -958,7 +1579,7 @@ function SetupWizard:BuildStartingItemsPage(page)
         justifyH = "RIGHT",
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
-    self.StartingItemsRequirementText:GetFrame():SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, -44)
+    self.StartingItemsRequirementText:GetFrame():SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, 0)
 
     self.StartingItemsNextButton = UI.TextButton:New({
         name = "RPESetupWizardItemsNextButton",
@@ -974,7 +1595,7 @@ function SetupWizard:BuildStartingItemsPage(page)
         self.startingItemPage = self.startingItemPage + 1
         self:RefreshStartingItemsPage(self.cachedState or self:CaptureSelectionState())
     end)
-    self.StartingItemsNextButton:GetFrame():SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, -44)
+    self.StartingItemsNextButton:GetFrame():SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, 16)
 
     self.StartingItemsPrevButton = UI.TextButton:New({
         name = "RPESetupWizardItemsPrevButton",
@@ -1005,8 +1626,8 @@ function SetupWizard:BuildStartingItemsPage(page)
         height = 240,
         contentInset = 6,
     })
-    self.StartingItemsPanel:GetFrame():SetPoint("TOPLEFT", self.StartingItemsSummaryText:GetFrame(), "BOTTOMLEFT", 0, -4)
-    self.StartingItemsPanel:GetFrame():SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, -42)
+    self.StartingItemsPanel:GetFrame():SetPoint("TOPLEFT", self.StartingItemsClassFilter:GetFrame(), "BOTTOMLEFT", 0, -4)
+    self.StartingItemsPanel:GetFrame():SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", 0, 34)
 
     self.StartingItemsGrid = UI.CreateLayout(UI.GridLayoutGroup, self.StartingItemsPanel:GetContentFrame(), "RPESetupWizardItemsGrid", {
         width = (ITEM_SLOT_COLUMNS * ITEM_SLOT_SIZE) + ((ITEM_SLOT_COLUMNS - 1) * ITEM_SLOT_SPACING),
@@ -1027,6 +1648,148 @@ function SetupWizard:BuildStartingItemsPage(page)
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
     self.StartingItemsEmptyText:GetFrame():SetPoint("CENTER", self.StartingItemsPanel:GetContentFrame(), "CENTER", 0, 0)
+end
+
+function SetupWizard:BuildSkillsPage(page)
+    if self.SkillsPageBuilt then
+        return
+    end
+
+    self.SkillsPageBuilt = true
+    self.SkillsPage = page
+
+    self.SkillsHintText = UI.CreateText(page, "RPESetupWizardSkillsHintText",
+        "Allocate permanent bonus points to non-combat skills. Changes are applied only when setup is finalized.", {
+            width = CONTENT_WIDTH,
+            height = 14,
+            justifyH = "LEFT",
+            textColor = UI.ResolveColor(nil, "text.secondary"),
+        }
+    )
+    self.SkillsHintText:GetFrame():SetPoint("TOPLEFT", page, "TOPLEFT", 0, 0)
+    self.SkillsHintText:GetFrame():SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, 0)
+
+    self.SkillsSummaryText = UI.CreateText(page, "RPESetupWizardSkillsSummaryText", "", {
+        width = CONTENT_WIDTH,
+        height = 14,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.SkillsSummaryText:GetFrame():SetPoint("TOPLEFT", self.SkillsHintText:GetFrame(), "BOTTOMLEFT", 0, -6)
+    self.SkillsSummaryText:GetFrame():SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, -20)
+
+    self.SkillsPanel = UI.CreatePanel(page, "RPESetupWizardSkillsPanel", {
+        width = CONTENT_WIDTH,
+        height = 238,
+        contentInset = 6,
+    })
+    self.SkillsPanel:GetFrame():SetPoint("TOPLEFT", self.SkillsSummaryText:GetFrame(), "BOTTOMLEFT", 0, -4)
+    self.SkillsPanel:GetFrame():SetPoint("TOPRIGHT", page, "TOPRIGHT", 0, -38)
+
+    self.SkillsScroll = UI.ScrollLayout:New({
+        name = "RPESetupWizardSkillsScroll",
+        width = CONTENT_WIDTH - 12,
+        height = 226,
+        visibleRows = 7,
+        autoFitRows = true,
+        minVisibleRows = 4,
+        rowHeight = SETUP_SKILL_ROW_HEIGHT,
+        rowSpacing = 2,
+        border = false,
+        rowElementClass = SetupSkillAllocationRow,
+        rowWidth = SETUP_SKILL_ROW_WIDTH,
+        rowInsetLeft = 0,
+        rowInsetRight = 0,
+        contentInsetLeft = 0,
+        contentInsetRight = 0,
+        contentInsetTop = 0,
+        contentInsetBottom = 0,
+        scrollBarInsetRight = 0,
+    })
+    self.SkillsScroll:SetParent(self.SkillsPanel:GetContentFrame())
+    self.SkillsScroll:SetRowRenderer(function(row, item)
+        local resolved = item and item.row or nil
+        local skillRef = trimString(item and item.skillRef)
+        if not resolved or skillRef == "" then
+            return
+        end
+
+        local allocated = math.max(0, math.floor(tonumber(self.selectedSkillPermanentBonuses and self.selectedSkillPermanentBonuses[skillRef]) or 0))
+        local validation = self:ValidatePermanentSkillPointAllocation(self.selectedSkillPermanentBonuses)
+        local previewValue = self:GetSetupSkillPreviewValue(resolved)
+        local maxValue = math.max(0, math.floor(tonumber(resolved.maxValue) or 0))
+        local entry = row.skillEntry
+        if entry then
+            entry:SetIcon(trimString(resolved.icon) ~= "" and resolved.icon or DEFAULT_ICON)
+            entry:SetSkillName(resolved.name or "Unnamed Skill")
+            entry:SetValueText(("%d / %d"):format(math.floor(previewValue), maxValue))
+            entry:SetProgress(math.min(previewValue, maxValue), maxValue, "")
+            entry:SetSelected(false)
+            entry:SetBorderColor(DEFAULT_SLOT_BORDER.r, DEFAULT_SLOT_BORDER.g, DEFAULT_SLOT_BORDER.b, DEFAULT_SLOT_BORDER.a)
+            entry:SetEnabled(true)
+        end
+
+        row:SetAdjustHandler(function(delta)
+            self:AdjustPermanentSkillPoint(skillRef, delta)
+        end)
+        row:SetAdjustmentEnabled(-5, allocated >= 5)
+        row:SetAdjustmentEnabled(-1, allocated >= 1)
+        row:SetAdjustmentEnabled(1, validation.remaining >= 1)
+        row:SetAdjustmentEnabled(5, validation.remaining >= 5)
+    end)
+    self.SkillsScroll:Create()
+    self.SkillsScroll:SetPoint("TOPLEFT", self.SkillsPanel:GetContentFrame(), "TOPLEFT", 0, 0)
+    self.SkillsScroll:SetPoint("BOTTOMRIGHT", self.SkillsPanel:GetContentFrame(), "BOTTOMRIGHT", 0, 0)
+
+    self.SkillsEmptyText = UI.CreateText(self.SkillsPanel:GetContentFrame(), "RPESetupWizardSkillsEmptyText", "", {
+        width = CONTENT_WIDTH - 24,
+        height = 24,
+        justifyH = "CENTER",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.SkillsEmptyText:GetFrame():SetPoint("CENTER", self.SkillsPanel:GetContentFrame(), "CENTER", 0, 0)
+end
+
+function SetupWizard:RefreshSkillsPage()
+    if not self.SkillsPageBuilt then
+        local page = self.window and self.window.tabContainer and self.window.tabContainer.pageFrames and self.window.tabContainer.pageFrames[SKILLS_TAB_INDEX] or nil
+        if page then
+            self:BuildSkillsPage(page)
+        end
+    end
+    if not self.SkillsPageBuilt then
+        return
+    end
+
+    local rows = self:GetSetupSkillRows()
+    self.setupSkillRows = rows
+    local validation = self:ValidatePermanentSkillPointAllocation(self.selectedSkillPermanentBonuses)
+    if validation.valid then
+        self.skillPointFeedback = ""
+    else
+        self.skillPointFeedback = ("Permanent skill points exceed the ruleset limit: %d / %d."):format(validation.total, validation.limit)
+    end
+
+    if self.SkillsSummaryText and self.SkillsSummaryText.SetText then
+        self.SkillsSummaryText:SetText(("Permanent points allocated: %d / %d"):format(validation.total, validation.limit))
+    end
+
+    local items = {}
+    for index = 1, #rows do
+        local row = rows[index]
+        items[#items + 1] = {
+            row = row,
+            skillRef = row.ref,
+        }
+    end
+    if self.SkillsScroll and self.SkillsScroll.SetItems then
+        self.SkillsScroll:SetItems(items)
+    end
+
+    setFrameShown(self.SkillsEmptyText, #rows == 0)
+    if self.SkillsEmptyText and self.SkillsEmptyText.SetText then
+        self.SkillsEmptyText:SetText(#rows == 0 and "No enabled non-combat skills are available." or "")
+    end
 end
 
 function SetupWizard:BuildFinalizePage(page)
@@ -1148,13 +1911,69 @@ function SetupWizard:BuildActionBarPage(page)
     self.ActionBarHintText:GetFrame():SetPoint("TOPLEFT", self.ActionBarPageRoot, "TOPLEFT", 0, 0)
     self.ActionBarHintText:GetFrame():SetPoint("TOPRIGHT", self.ActionBarPageRoot, "TOPRIGHT", 0, 0)
 
+    self.ActionBarResourceControls = CreateFrame("Frame", "RPESetupWizardActionBarResourceControls", self.ActionBarPageRoot)
+    self.ActionBarResourceControls:SetPoint("TOPLEFT", self.ActionBarHintText:GetFrame(), "BOTTOMLEFT", 0, -6)
+    self.ActionBarResourceControls:SetPoint("TOPRIGHT", self.ActionBarPageRoot, "TOPRIGHT", 0, 0)
+    self.ActionBarResourceControls:SetHeight(34)
+
+    local resourceFieldWidth = math.floor((CONTENT_WIDTH - 12) / 2)
+    self.ActionBarPrimaryResourceLabel = UI.CreateText(self.ActionBarResourceControls, "RPESetupWizardActionBarPrimaryResourceLabel", "Primary Resource", {
+        width = resourceFieldWidth,
+        height = 12,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.ActionBarPrimaryResourceLabel:GetFrame():SetPoint("TOPLEFT", self.ActionBarResourceControls, "TOPLEFT", 0, 0)
+
+    self.ActionBarPrimaryResourceDropdown = UI.CreateDropdown(self.ActionBarResourceControls, "RPESetupWizardActionBarPrimaryResourceDropdown", {
+        width = resourceFieldWidth,
+        height = 18,
+        items = {},
+        onValueChanged = function(value)
+            if self._refreshingActionBarResourceSelectors then
+                return
+            end
+            self.selectedPrimaryResourceRef = trimString(value)
+            if self.selectedPrimaryResourceRef == self.selectedSpecialResourceRef then
+                self.selectedSpecialResourceRef = ""
+            end
+            self:RefreshActionBarResourceSelectors()
+        end,
+    })
+    self.ActionBarPrimaryResourceDropdown:GetFrame():SetPoint("TOPLEFT", self.ActionBarPrimaryResourceLabel:GetFrame(), "BOTTOMLEFT", 0, -2)
+
+    self.ActionBarSpecialResourceLabel = UI.CreateText(self.ActionBarResourceControls, "RPESetupWizardActionBarSpecialResourceLabel", "Special Resource", {
+        width = resourceFieldWidth,
+        height = 12,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.ActionBarSpecialResourceLabel:GetFrame():SetPoint("TOPLEFT", self.ActionBarPrimaryResourceLabel:GetFrame(), "TOPRIGHT", 12, 0)
+
+    self.ActionBarSpecialResourceDropdown = UI.CreateDropdown(self.ActionBarResourceControls, "RPESetupWizardActionBarSpecialResourceDropdown", {
+        width = resourceFieldWidth,
+        height = 18,
+        items = {},
+        onValueChanged = function(value)
+            if self._refreshingActionBarResourceSelectors then
+                return
+            end
+            self.selectedSpecialResourceRef = trimString(value)
+            if self.selectedSpecialResourceRef == self.selectedPrimaryResourceRef then
+                self.selectedPrimaryResourceRef = ""
+            end
+            self:RefreshActionBarResourceSelectors()
+        end,
+    })
+    self.ActionBarSpecialResourceDropdown:GetFrame():SetPoint("TOPLEFT", self.ActionBarSpecialResourceLabel:GetFrame(), "BOTTOMLEFT", 0, -2)
+
     self.ActionBarDummyBarPanel = UI.CreatePanel(self.ActionBarPageRoot, "RPESetupWizardDummyActionBarPanel", {
         width = CONTENT_WIDTH,
         height = 60,
         contentInset = 6,
     })
-    self.ActionBarDummyBarPanel:GetFrame():SetPoint("TOPLEFT", self.ActionBarHintText:GetFrame(), "BOTTOMLEFT", 0, -6)
-    self.ActionBarDummyBarPanel:GetFrame():SetPoint("TOPRIGHT", self.ActionBarPageRoot, "TOPRIGHT", 0, -20)
+    self.ActionBarDummyBarPanel:GetFrame():SetPoint("TOPLEFT", self.ActionBarResourceControls, "BOTTOMLEFT", 0, -6)
+    self.ActionBarDummyBarPanel:GetFrame():SetPoint("TOPRIGHT", self.ActionBarResourceControls, "BOTTOMRIGHT", 0, -6)
 
     self.ActionBarDummyBarLabel = UI.CreateText(self.ActionBarDummyBarPanel:GetContentFrame(), "RPESetupWizardDummyActionBarLabel", "Action Bar", {
         width = 120,
@@ -1170,17 +1989,17 @@ function SetupWizard:BuildActionBarPage(page)
 
     self.ActionBarBody = UI.CreateLayout(UI.HorizontalLayoutGroup, self.ActionBarPageRoot, "RPESetupWizardActionBarBody", {
         width = CONTENT_WIDTH,
-        height = 208,
+        height = 174,
         spacing = 8,
         fitChildrenWidth = true,
         fitChildrenHeight = true,
     })
     self.ActionBarBody:GetFrame():SetPoint("TOPLEFT", self.ActionBarDummyBarPanel:GetFrame(), "BOTTOMLEFT", 0, -6)
-    self.ActionBarBody:GetFrame():SetPoint("TOPRIGHT", self.ActionBarPageRoot, "TOPRIGHT", 0, -86)
+    self.ActionBarBody:GetFrame():SetPoint("TOPRIGHT", self.ActionBarDummyBarPanel:GetFrame(), "BOTTOMRIGHT", 0, -6)
 
     self.ActionBarDatasetPanel = UI.CreatePanel(self.ActionBarBody:GetFrame(), "RPESetupWizardActionBarDatasetPanel", {
         width = ACTIONBAR_DATASET_PANEL_WIDTH,
-        height = 208,
+        height = 174,
         contentInset = 2,
         showBorder = false,
     })
@@ -1188,7 +2007,7 @@ function SetupWizard:BuildActionBarPage(page)
 
     self.ActionBarGridPanel = UI.CreatePanel(self.ActionBarBody:GetFrame(), "RPESetupWizardActionBarGridPanel", {
         width = 1,
-        height = 208,
+        height = 174,
         expandWidth = true,
         weight = 1,
         contentInset = 0,
@@ -1199,8 +2018,8 @@ function SetupWizard:BuildActionBarPage(page)
     self.ActionBarDatasetList = UI.ScrollLayout:New({
         name = "RPESetupWizardActionBarDatasetList",
         width = ACTIONBAR_DATASET_PANEL_WIDTH - 4,
-        height = 204,
-        visibleRows = 10,
+        height = 170,
+        visibleRows = 8,
         rowHeight = 18,
         rowSpacing = 0,
         border = false,
@@ -1509,12 +2328,32 @@ function SetupWizard:BuildWindow()
                 end,
             },
             {
+                name = "traits",
+                label = "Traits",
+                width = 56,
+                builder = function(page)
+                    measureSetupTiming("SetupWizard.BuildPage", "traits", function()
+                        self:BuildTraitsPage(page)
+                    end)
+                end,
+            },
+            {
                 name = "items",
                 label = "Items",
                 width = 56,
                 builder = function(page)
                     measureSetupTiming("SetupWizard.BuildPage", "items", function()
                         self:BuildStartingItemsPage(page)
+                    end)
+                end,
+            },
+            {
+                name = "skills",
+                label = "Skills",
+                width = SKILLS_TAB_WIDTH,
+                builder = function(page)
+                    measureSetupTiming("SetupWizard.BuildPage", "skills", function()
+                        self:BuildSkillsPage(page)
                     end)
                 end,
             },
@@ -1543,6 +2382,7 @@ function SetupWizard:BuildWindow()
     window:SetTitle("Setup Wizard")
     window:Create()
     self.window = window
+    self:ApplySkillsPageVisibility()
 
     local outerContent = window.contentFrame or (window.GetContentFrame and window:GetContentFrame()) or nil
     local footerHost = window.GetFrame and window:GetFrame() or outerContent
@@ -1596,6 +2436,42 @@ function SetupWizard:BuildWindow()
     return window
 end
 
+function SetupWizard:ApplySkillsPageVisibility()
+    local tabContainer = self.window and self.window.tabContainer or nil
+    if type(tabContainer) ~= "table" then
+        return self:ShouldShowSkillsPage()
+    end
+
+    local visible = self:ShouldShowSkillsPage()
+    local tab = tabContainer.tabs and tabContainer.tabs[SKILLS_TAB_INDEX] or nil
+    local button = tabContainer.tabButtons and tabContainer.tabButtons[SKILLS_TAB_INDEX] or nil
+    local buttonFrame = button and button.GetFrame and button:GetFrame() or nil
+    local page = tabContainer.pageFrames and tabContainer.pageFrames[SKILLS_TAB_INDEX] or nil
+
+    if tab and tostring(tab.name or "") == "skills" then
+        tab.width = visible and SKILLS_TAB_WIDTH or 0
+    end
+    if buttonFrame and buttonFrame.SetShown then
+        buttonFrame:SetShown(visible)
+    elseif buttonFrame then
+        if visible and buttonFrame.Show then
+            buttonFrame:Show()
+        elseif not visible and buttonFrame.Hide then
+            buttonFrame:Hide()
+        end
+    end
+
+    if not visible and tonumber(tabContainer.activeTabIndex) == SKILLS_TAB_INDEX then
+        tabContainer:SetActiveTab(1)
+    elseif not visible and page and page.Hide then
+        page:Hide()
+    end
+    if tabContainer.LayoutTabs then
+        tabContainer:LayoutTabs()
+    end
+    return visible
+end
+
 function SetupWizard:GetActiveTabIndex()
     local tabContainer = self.window and self.window.tabContainer or nil
     return math.max(1, math.floor(tonumber(tabContainer and tabContainer.activeTabIndex) or 1))
@@ -1627,23 +2503,33 @@ end
 
 function SetupWizard:RefreshPage(tabIndex, state)
     local index = math.max(1, math.floor(tonumber(tabIndex) or 1))
-    local context = ({ "identity", "items", "actionbar", "finalize" })[index] or tostring(index)
+    local context = ({ "identity", "traits", "items", "skills", "actionbar", "finalize" })[index] or tostring(index)
     return measureSetupTiming("SetupWizard.RefreshPage", context, function()
-        if index == 1 then
+        if index == IDENTITY_TAB_INDEX then
             self:RefreshIdentityPage(state)
-        elseif index == 2 then
+        elseif index == TRAITS_TAB_INDEX then
+            if not self.TraitsPageBuilt then
+                local page = self.window and self.window.tabContainer and self.window.tabContainer.pageFrames and self.window.tabContainer.pageFrames[TRAITS_TAB_INDEX] or nil
+                if page then self:BuildTraitsPage(page) end
+            end
+            self:RefreshTraitsPage()
+        elseif index == ITEMS_TAB_INDEX then
             self:RefreshStartingItemsPage(state)
-        elseif index == 3 then
+        elseif index == SKILLS_TAB_INDEX then
+            if self:ShouldShowSkillsPage() then
+                self:RefreshSkillsPage()
+            end
+        elseif index == ACTIONBAR_TAB_INDEX then
             if not self.ActionBarPageRoot then
-                local page = self.window and self.window.tabContainer and self.window.tabContainer.pageFrames and self.window.tabContainer.pageFrames[3] or nil
+                local page = self.window and self.window.tabContainer and self.window.tabContainer.pageFrames and self.window.tabContainer.pageFrames[ACTIONBAR_TAB_INDEX] or nil
                 if page then
                     self:BuildActionBarPage(page)
                 end
             end
             self:RefreshActionBarPage(state)
-        elseif index == 4 then
+        elseif index == FINALIZE_TAB_INDEX then
             if not self.FinalizePageBuilt then
-                local page = self.window and self.window.tabContainer and self.window.tabContainer.pageFrames and self.window.tabContainer.pageFrames[4] or nil
+                local page = self.window and self.window.tabContainer and self.window.tabContainer.pageFrames and self.window.tabContainer.pageFrames[FINALIZE_TAB_INDEX] or nil
                 if page then
                     self:BuildFinalizePage(page)
                 end
@@ -1705,6 +2591,12 @@ function SetupWizard:RefreshChoiceGrid(collectionKey, layout, items, selectedVal
         local choice = self:EnsureChoiceChoice(collectionKey, index, layout:GetFrame(), function()
             setter(self, itemValue)
             self:RefreshIdentityPage(self.cachedState or self:CaptureSelectionState())
+            if collectionKey == "classChoices" then
+                self:PruneDraftClassTalents()
+            end
+            if self.TraitsPageBuilt then
+                self:RefreshTraitsPage()
+            end
             if self.FinalizePageBuilt then
                 self:RefreshFinalizePage()
             end
@@ -1739,7 +2631,7 @@ function SetupWizard:RefreshChoiceGrid(collectionKey, layout, items, selectedVal
 end
 
 function SetupWizard:RefreshIdentityPage(state)
-    self:BuildIdentityPage(self.IdentityPage or (self.window and self.window.tabContainer and self.window.tabContainer.GetPageFrame and self.window.tabContainer:GetPageFrame(1)) or nil)
+    self:BuildIdentityPage(self.IdentityPage or (self.window and self.window.tabContainer and self.window.tabContainer.GetPageFrame and self.window.tabContainer:GetPageFrame(IDENTITY_TAB_INDEX)) or nil)
 
     local raceItems = self:BuildAllowedRaceItems()
     local classItems = self:BuildAllowedClassItems()
@@ -1772,7 +2664,17 @@ function SetupWizard:BuildFilteredStartingItems()
 
     for index = 1, #(self.availableStartingItems or {}) do
         local entry = self.availableStartingItems[index]
-        if query == "" or string.find(tostring(entry.searchIndex or ""), query, 1, true) ~= nil then
+        local item = entry and entry.item or {}
+        local matchesQuery = query == "" or string.find(tostring(entry.searchIndex or ""), query, 1, true) ~= nil
+        local matchesType = self.startingItemTypeFilter == "all" or tostring(item.itemType or "") == self.startingItemTypeFilter
+        local matchesClass = true
+        if self.showClassItemsOnly then
+            local _, class = Registry:ResolveClassReference(self.selectedClassRef)
+            local armorWeights, weaponTypeRefs = class and class.armorWeights or {}, class and class.weaponTypeRefs or {}
+            matchesClass = (item.itemType == "armor" and (normalizeSearchToken(item.armorWeight) == "cosmetic" or tContains(armorWeights, item.armorWeight)))
+                or (item.itemType == "weapon" and tContains(weaponTypeRefs, item.weaponTypeRef))
+        end
+        if matchesQuery and matchesType and matchesClass then
             filtered[#filtered + 1] = entry
         end
     end
@@ -2078,7 +2980,9 @@ function SetupWizard:NextActionBarSpellPage()
 end
 
 function SetupWizard:RefreshStartingItemsPage(state)
-    self:BuildStartingItemsPage(self.StartingItemsPage or (self.window and self.window.tabContainer and self.window.tabContainer.GetPageFrame and self.window.tabContainer:GetPageFrame(2)) or nil)
+    self:BuildStartingItemsPage(self.StartingItemsPage or (self.window and self.window.tabContainer and self.window.tabContainer.GetPageFrame and self.window.tabContainer:GetPageFrame(ITEMS_TAB_INDEX)) or nil)
+
+    self:SyncClassItemFilter()
 
     self.availableStartingItems = self:BuildAllowedStartingItemItems()
     self:BuildFilteredStartingItems()
@@ -2193,6 +3097,24 @@ function SetupWizard:RefreshFinalizePage()
 
     lines[#lines + 1] = ("Race: %s"):format(formatChoiceLabel(raceEntry, selection.raceRef))
     lines[#lines + 1] = ("Class: %s"):format(formatChoiceLabel(classEntry, selection.classRef))
+    lines[#lines + 1] = ("Starting Level: %d"):format(self:GetStartingLevel())
+    local traitSections = self:GetDraftTraitSections()
+    local function traitNames(rows)
+        local names = {}
+        for index = 1, #rows do names[#names + 1] = tostring(rows[index].name or rows[index].traitRef) end
+        return #names > 0 and table.concat(names, ", ") or "None"
+    end
+    local selectedTraitRows = {}
+    for index = 1, #traitSections.classTalents do
+        local row = traitSections.classTalents[index]
+        if self.selectedClassTalentLookup[row.traitRef] then selectedTraitRows[#selectedTraitRows + 1] = row end
+    end
+    local allowance = Profile.GetClassTalentAllowance and Profile.GetClassTalentAllowance(self:GetStartingLevel()) or { isLimited = false }
+    lines[#lines + 1] = ("Racial Passives: %s"):format(traitNames(traitSections.race))
+    lines[#lines + 1] = ("Class Passives: %s"):format(traitNames(traitSections.classPassives))
+    lines[#lines + 1] = allowance.isLimited
+        and ("Class Talents: %d / %d selected (%s)"):format(#selection.selectedClassTalentRefs, allowance.maxTalentTraits, traitNames(selectedTraitRows))
+        or ("Class Talents: %d selected / Unlimited (%s)"):format(#selection.selectedClassTalentRefs, traitNames(selectedTraitRows))
     lines[#lines + 1] = ""
     lines[#lines + 1] = ("Starting Items: %d selected  |  Cost %s"):format(#selectedItems, formatCopperAmount(validation.totalPrice))
 
@@ -2231,6 +3153,25 @@ function SetupWizard:RefreshFinalizePage()
         lines[#lines + 1] = ("Bound Spells: %d / %d"):format(boundSpellCount, actionBarSize)
     end
 
+    local skillValidation = self:ValidatePermanentSkillPointAllocation(selection.skillPermanentBonuses)
+    if self:ShouldShowSkillsPage() then
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = ("Permanent Skill Points: %d / %d"):format(skillValidation.total, skillValidation.limit)
+        local allocatedCount = 0
+        local setupSkillRows = self:GetSetupSkillRows() or {}
+        for index = 1, #setupSkillRows do
+            local row = setupSkillRows[index]
+            local amount = math.max(0, math.floor(tonumber(selection.skillPermanentBonuses and selection.skillPermanentBonuses[row.ref]) or 0))
+            if amount > 0 then
+                allocatedCount = allocatedCount + 1
+                lines[#lines + 1] = ("- %s: +%d"):format(tostring(row.name or "Skill"), amount)
+            end
+        end
+        if allocatedCount == 0 then
+            lines[#lines + 1] = "- None"
+        end
+    end
+
     if self.FinalizeSummaryScroll and self.FinalizeSummaryScroll.SetItems then
         local items = {}
         for index = 1, #lines do
@@ -2245,11 +3186,14 @@ function SetupWizard:RefreshFinalizePage()
             self:IsEnabled()
             and validation.withinBudget == true
             and validation.passesRequiredSlots == true
+            and (not self:ShouldShowSkillsPage() or skillValidation.valid == true)
         )
     end
 end
 
 function SetupWizard:RefreshActionBarPage(state)
+    self:RefreshActionBarResourceSelectors()
+
     local actionBarSize = Profile.GetActionBarSize and Profile.GetActionBarSize() or 0
     if self.selectedActionBarSlotIndex > actionBarSize then
         self.selectedActionBarSlotIndex = 1
@@ -2391,7 +3335,11 @@ function SetupWizard:RefreshStatus()
         return
     end
 
-    if self:IsEnabled() and trimString(self.startingItemFeedback) ~= "" then
+    if self:IsEnabled() and trimString(self.traitTalentFeedback) ~= "" then
+        self.StatusText:SetText(self.traitTalentFeedback)
+    elseif self:IsEnabled() and trimString(self.skillPointFeedback) ~= "" then
+        self.StatusText:SetText(self.skillPointFeedback)
+    elseif self:IsEnabled() and trimString(self.startingItemFeedback) ~= "" then
         self.StatusText:SetText(self.startingItemFeedback)
     elseif self:IsEnabled() then
         self.StatusText:SetText("")
@@ -2403,6 +3351,7 @@ end
 function SetupWizard:Refresh()
     local timing = startSetupTiming("SetupWizard.Refresh", "full")
     self:ApplyDatasetPolicy()
+    self:ApplySkillsPageVisibility()
     local state = self:CaptureSelectionState()
     self.cachedState = state
     if self.hasDraftSelectionState ~= true then
@@ -2412,8 +3361,14 @@ function SetupWizard:Refresh()
     if self.IdentityPageBuilt then
         self:RefreshIdentityPage(state)
     end
+    if self.TraitsPageBuilt then
+        self:RefreshTraitsPage()
+    end
     if self.StartingItemsPageBuilt then
         self:RefreshStartingItemsPage(state)
+    end
+    if self.SkillsPageBuilt and self:ShouldShowSkillsPage() then
+        self:RefreshSkillsPage()
     end
     if self.ActionBarPageRoot then
         self:RefreshActionBarPage(state)
@@ -2425,7 +3380,9 @@ function SetupWizard:Refresh()
     self:RefreshStatus()
     stopSetupTiming(timing, {
         identity = self.IdentityPageBuilt and 1 or 0,
+        traits = self.TraitsPageBuilt and 1 or 0,
         items = self.StartingItemsPageBuilt and 1 or 0,
+        skills = self.SkillsPageBuilt and self:ShouldShowSkillsPage() and 1 or 0,
         actionbar = self.ActionBarPageRoot and 1 or 0,
         finalize = self.FinalizePageBuilt and 1 or 0,
     })
@@ -2464,12 +3421,17 @@ local function countOwnedItemRef(itemRef)
 end
 
 function SetupWizard:CollectCurrentSelection()
+    self:PruneDraftClassTalents()
     local state = self:CaptureSelectionState()
     local collected = {
         raceRef = trimString(self.selectedRaceRef) ~= "" and trimString(self.selectedRaceRef) or trimString(state.raceRef),
         classRef = trimString(self.selectedClassRef) ~= "" and trimString(self.selectedClassRef) or trimString(state.classRef),
+        primaryResourceRef = trimString(self.selectedPrimaryResourceRef),
+        specialResourceRef = trimString(self.selectedSpecialResourceRef),
         startingItemRefs = selectionArrayFromLookup(self.availableStartingItems, self.selectedStartingItemLookup),
         actionBarSpellRefs = state.actionBarSpellRefs or {},
+        skillPermanentBonuses = copySetupSkillBonusMap(self.selectedSkillPermanentBonuses or state.skillPermanentBonuses),
+        selectedClassTalentRefs = self:GetDraftSelectedClassTalentRefs(),
     }
 
     local actionBarSize = Profile.GetActionBarSize and Profile.GetActionBarSize() or 0
@@ -2493,8 +3455,33 @@ function SetupWizard:ApplyCurrentSelection()
     end
 
     local state = self:CollectCurrentSelection()
+    if Profile.ValidateTraitAssignment then
+        local draftProfile = {
+            level = self:GetStartingLevel(),
+            raceRef = state.raceRef,
+            classRef = state.classRef,
+            selectedClassTalentTraits = state.selectedClassTalentRefs,
+        }
+        for index = 1, #(state.selectedClassTalentRefs or {}) do
+            local validation = Profile.ValidateTraitAssignment(state.selectedClassTalentRefs[index], {
+                operation = "select", profile = draftProfile, selectedClassTalentRefs = state.selectedClassTalentRefs,
+            })
+            if validation.valid ~= true then
+                self.traitTalentFeedback = trimString(validation.reason)
+                self:RefreshStatus()
+                return false
+            end
+        end
+    end
     local validation = self:ValidateCurrentItemSelection()
+    local skillValidation = self:ValidatePermanentSkillPointAllocation(state.skillPermanentBonuses)
+    local previousSetupState = Profile.GetSetupWizardState and Profile.GetSetupWizardState() or {}
     local plan = validation.plan
+    if self:ShouldShowSkillsPage() and skillValidation.valid ~= true then
+        self.skillPointFeedback = ("Permanent skill points exceed the ruleset limit: %d / %d."):format(skillValidation.total, skillValidation.limit)
+        self:RefreshStatus()
+        return false
+    end
     if validation.withinBudget ~= true then
         self.startingItemFeedback = ("Budget exceeded: %s / %s"):format(formatCopperAmount(validation.totalPrice), formatCopperAmount(validation.budget))
         self:RefreshStatus()
@@ -2506,13 +3493,23 @@ function SetupWizard:ApplyCurrentSelection()
         return false
     end
 
+    if Profile.SetLevel then
+        Profile.SetLevel(self:GetStartingLevel())
+    end
     if trimString(state.raceRef) ~= "" and Profile.SetRaceRef then
         Profile.SetRaceRef(state.raceRef)
     end
     if trimString(state.classRef) ~= "" and Profile.SetClassRef then
         Profile.SetClassRef(state.classRef)
     end
-
+    if Profile.SetSelectedClassTalentTraits then
+        local _, traitFailure = Profile.SetSelectedClassTalentTraits(state.selectedClassTalentRefs)
+        if traitFailure and traitFailure.valid ~= true then
+            self.traitTalentFeedback = trimString(traitFailure.reason)
+            self:RefreshStatus()
+            return false
+        end
+    end
     for index = 1, #(plan.equipped or {}) do
         local assignment = plan.equipped[index]
         if assignment and Profile.EquipItem then
@@ -2533,6 +3530,10 @@ function SetupWizard:ApplyCurrentSelection()
         end
     end
 
+    if self:ShouldShowSkillsPage() then
+        self:ApplySetupSkillPermanentBonuses(previousSetupState.skillPermanentBonuses, state.skillPermanentBonuses)
+    end
+
     for index = 1, #(plan.inventory or {}) do
         local itemRef = trimString(plan.inventory[index] and plan.inventory[index].value)
         local datasetId, itemId = string.match(itemRef, "^([^:]+):(.+)$")
@@ -2549,9 +3550,31 @@ function SetupWizard:ApplyCurrentSelection()
         Profile.SetSetupWizardState(state)
     end
 
+    -- Resource display is an explicit wizard choice. Apply it after every
+    -- class/race/profile mutation so a recalculation cannot replace it with
+    -- an inferred resource before setup is complete.
+    if Profile.SetPrimaryResourceRef then
+        Profile.SetPrimaryResourceRef(state.primaryResourceRef)
+    end
+    if Profile.SetSpecialResourceRef then
+        Profile.SetSpecialResourceRef(state.specialResourceRef)
+    end
+
+    if type(Profile.SetSetupWizardCompleted) ~= "function"
+        or Profile.SetSetupWizardCompleted(true) ~= true
+    then
+        self.traitTalentFeedback = "Setup could not be completed. Please try again."
+        self:RefreshStatus()
+        return false
+    end
+
     self.startingItemFeedback = ""
+    self.skillPointFeedback = ""
     if Client.RefreshActionBarWidget then
         Client:RefreshActionBarWidget("setup-wizard-apply")
+    end
+    if Client.RefreshActionBarCompanionBars then
+        Client:RefreshActionBarCompanionBars("setup-wizard-apply")
     end
 
     self.cachedState = state
@@ -2561,6 +3584,7 @@ end
 
 function SetupWizard:Show()
     local window = self:BuildWindow()
+    self:ApplySkillsPageVisibility()
     local state = self:CaptureSelectionState()
     self.cachedState = state
     self:SyncSelectionState(state)
@@ -2578,6 +3602,8 @@ end
 function SetupWizard:Hide()
     self.hasDraftSelectionState = false
     self.needsDatasetPolicyRefresh = false
+    self.skillPointFeedback = ""
+    self.traitTalentFeedback = ""
     self.refreshRequestId = math.max(0, math.floor(tonumber(self.refreshRequestId) or 0)) + 1
     if self.window and self.window.Hide then
         self.window:Hide()

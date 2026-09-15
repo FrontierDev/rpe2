@@ -17,7 +17,7 @@ local function refreshProfileWindow()
     end
 end
 
-local function getTraitStatusText(trait)
+local function getTraitStatusText(trait, traitRef)
     if not trait then
         return ""
     end
@@ -25,12 +25,9 @@ local function getTraitStatusText(trait)
     if trait.isEnvironmental == true then
         return "Env"
     end
-    if trait.isClass == true then
-        return "Class"
-    end
-    if trait.isRacial == true then
-        return "Race"
-    end
+    local ownership = Profile.GetTraitOwnership and Profile.GetTraitOwnership(traitRef) or "manual"
+    if ownership == "class" then return "Class-owned" end
+    if ownership == "race" then return "Race-owned" end
 
     return "Talent"
 end
@@ -98,7 +95,9 @@ function DataEditor:BuildTraitsPage(page)
             row:SetTestName("")
         end
         if row.SetStatus then
-            row:SetStatus(getTraitStatusText(trait))
+            local dataset = self:GetSelectedDataset()
+            local traitRef = dataset and dataset.id and trait and trait.id and (tostring(dataset.id) .. ":" .. tostring(trait.id)) or ""
+            row:SetStatus(getTraitStatusText(trait, traitRef))
         end
         if row.SetDetail then
             row:SetDetail(getTraitDetailText(trait))
@@ -189,10 +188,11 @@ function DataEditor:ShowTraitsContextMenu(anchorFrame, trait)
     end
 
     local items = {}
-    local category = trait.isClass == true and "class" or (trait.isRacial == true and "race" or tostring(trait.category or "") ~= "" and tostring(trait.category or "") or "General")
+    local traitRef = ("%s:%s"):format(tostring(dataset.id), tostring(trait.id))
+    local ownership = Profile.GetTraitOwnership and Profile.GetTraitOwnership(traitRef) or "manual"
+    local category = tostring(trait.category or "") ~= "" and tostring(trait.category or "") or "General"
     local canAddToProfile = trait.isEnvironmental ~= true
-        and trait.isClass ~= true
-        and trait.isRacial ~= true
+        and ownership == "manual"
         and (type(Client.IsTraitCategoryAllowed) ~= "function" or Client:IsTraitCategoryAllowed(category))
     if canAddToProfile then
         items[#items + 1] = {

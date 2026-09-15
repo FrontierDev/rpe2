@@ -989,8 +989,7 @@ function DataEditor:ApplyDeferredConfigurationPreview(reason, datasetIds)
         end
     end
 
-    Addon.Internal = Addon.Internal or {}
-    Addon.Internal.ConfigurationRevision = math.max(0, math.floor(tonumber(Addon.Internal.ConfigurationRevision) or 0)) + 1
+    local revision = self.Database.MarkConfigurationChanged(normalizedReason)
 
     local client = Addon.Client or nil
     if client and type(client.HandleLocalConfigurationChanged) == "function" then
@@ -1055,8 +1054,7 @@ function DataEditor:CommitPendingChanges()
         crafting:RebuildRecipeSkillIndex(nextRevision)
     end
 
-    Addon.Internal = Addon.Internal or {}
-    Addon.Internal.ConfigurationRevision = math.max(0, math.floor(tonumber(Addon.Internal.ConfigurationRevision) or 0)) + 1
+    local databaseRevision = self.Database.MarkConfigurationChanged(reason)
 
     self.HasDeferredConfigurationChanges = false
     self.DeferredConfigurationRefreshReason = nil
@@ -1472,6 +1470,12 @@ function DataEditor:StartDatasetImportFromText(text)
         end
 
         session.importedDatasets[#session.importedDatasets + 1] = dataset
+        -- Database imports activate the dataset as part of their commit. Keep
+        -- the visible activation indicator in sync while a multi-dataset import
+        -- is progressing across frames.
+        if self.RefreshDatasetsPane then
+            self:RefreshDatasetsPane()
+        end
         scheduleNextFrame(importNext)
     end
 
@@ -2402,6 +2406,10 @@ function Client:BuildDataEditorWindow()
 end
 
 function Client:ShowDataEditorWindow()
+    if self:RequireSetupCompletion("data-editor-window") ~= true then
+        return nil
+    end
+
     return DataEditor:ShowWindow()
 end
 

@@ -506,6 +506,7 @@ end
 
 function Conditions:ResolveItemEquippedMatch(context, condition)
     local desiredWeaponTypeRefs = type(condition) == "table" and condition.weaponTypeRefs or {}
+    local requiresShield = type(condition) == "table" and condition.requiresShield == true
     local slotKey = lowercase(type(condition) == "table" and condition.slotKey)
     local equippedRows = self:ResolveEquippedItemRows(context)
     for index = 1, #equippedRows do
@@ -514,17 +515,20 @@ function Conditions:ResolveItemEquippedMatch(context, condition)
         local entry = row and row.entry or nil
         local itemRef = ensureString(entry and entry.itemRef)
         if slotKey == "" or slotKey == "any" or currentSlotKey == slotKey then
-            if #desiredWeaponTypeRefs == 0 then
-                return true
-            end
             local item = row and row.item or nil
             if not item and itemRef and type(Equipment.ResolveItemDefinition) == "function" then
                 item = select(1, Equipment.ResolveItemDefinition(itemRef))
             end
-            local weaponTypeRef = ensureString(item and item.weaponTypeRef)
-            for desiredIndex = 1, #desiredWeaponTypeRefs do
-                if weaponTypeRef == ensureString(desiredWeaponTypeRefs[desiredIndex]) then
+            if not requiresShield or lowercase(item and item.armorWeight) == "shield" then
+                if #desiredWeaponTypeRefs == 0 then
                     return true
+                else
+                    local weaponTypeRef = ensureString(item and item.weaponTypeRef)
+                    for desiredIndex = 1, #desiredWeaponTypeRefs do
+                        if weaponTypeRef == ensureString(desiredWeaponTypeRefs[desiredIndex]) then
+                            return true
+                        end
+                    end
                 end
             end
         end

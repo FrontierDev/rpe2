@@ -549,6 +549,9 @@ local baseAdvanceEventStep = Server.AdvanceEventStep
 if type(baseAdvanceEventStep) == "function" then
     function Server:AdvanceEventStep(...)
         local eventState = self.EventState
+        if Event.NormalizeEventMode and Event.NormalizeEventMode(eventState and eventState.eventMode) == "npc" then
+            return baseAdvanceEventStep(self, ...)
+        end
         if isHostAutopilotEvent(eventState) then
             Client:ClearAutopilotBatch(getEventId(eventState), "step-advance-requested")
         end

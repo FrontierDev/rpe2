@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 1,
+    version = 7,
     dataset = {
         achievements = {},
         auras = {
@@ -447,6 +447,15 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/classicon_priest.blp",
                 id = "nxlle3j6",
                 name = "Priest",
+                armorWeights = {
+                    "cloth",
+                },
+                weaponTypeRefs = {
+                    "f82db71a:i4pivdig",
+                    "f82db71a:y0dnlo8g",
+                    "f82db71a:3y1v01e4",
+                    "f82db71a:s4q9t5f3",
+                },
                 resourceProgressions = {
                     {
                         initialValue = 31,
@@ -487,7 +496,10 @@ Addon.Data.DefaultDatasets:Register({
                         statRef = "f82db71a:ygjno50i"
                     }
                 },
-                traitRefs = {}
+                passiveTraitRefs = {
+                    "1c1038a7:icnfaith"
+                },
+                talentTraitRefs = {}
             }
         },
         currencies = {},
@@ -2528,14 +2540,30 @@ Addon.Data.DefaultDatasets:Register({
                 automaticAuras = {},
                 category = "Discipline",
                 conditions = {},
+                description = "Increases your damage against Aberrations by 5%.",
+                events = {},
+                icon = "interface/icons/spell_holy_innerfire.blp",
+                id = "icnfaith",
+                isEnvironmental = false,
+                name = "Icon of Faith",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:i52j0tj3",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Discipline",
+                conditions = {},
                 description = "",
                 events = {},
                 icon = "interface/icons/spell_holy_innerfire.blp",
                 id = "kau90anf",
-                isClass = false,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = true,
                 name = "Inner Fire",
                 skillBonuses = {},
                 statBonuses = {

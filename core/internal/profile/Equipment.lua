@@ -50,6 +50,25 @@ local function getDependencies()
     return Database.Dependecies or {}
 end
 
+local function normalizeArmorWeight(value)
+    local normalized = string.lower(ensureString(value))
+    return normalized:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function isClassArmorWeightRestrictionEnabled()
+    local ruleset = Addon.Internal and Addon.Internal.Ruleset or {}
+    if type(ruleset.GetActiveRuleset) ~= "function" or type(ruleset.GetRulesetRuleValueByKey) ~= "function" then
+        return false
+    end
+
+    return ruleset.GetRulesetRuleValueByKey(
+        ruleset.GetActiveRuleset(),
+        "equipment",
+        "enforce_class_armor_weight_restrictions",
+        true
+    ) == true
+end
+
 local function bumpProfileTooltipContextRevision()
     local builder = Addon.Client and Addon.Client.Spellcasting and Addon.Client.Spellcasting.DescriptionBuilder or nil
     if type(builder) == "table" and type(builder.BumpProfileTooltipContextRevision) == "function" then
@@ -186,6 +205,62 @@ function Equipment.ResolveItemDefinition(itemRef)
     return nil, dataset
 end
 
+function Equipment.CanEquipItemInScope(scope, item)
+    if normalizeSlotType(scope) ~= "character" or not isClassArmorWeightRestrictionEnabled() then
+        return true
+    end
+
+    if type(item) ~= "table" then
+        return true
+    end
+
+    local itemType = string.lower(ensureString(item.itemType))
+    if itemType ~= "armor" and itemType ~= "weapon" then
+        return true
+    end
+
+    local classRef = Database.GetProfileClassRef and Database.GetProfileClassRef() or nil
+    if ensureString(classRef) == "" then
+        return false, "class-required"
+    end
+
+    local registry = Addon.Internal and Addon.Internal.Registry or {}
+    if type(registry.ResolveClassReference) ~= "function" then
+        return false, "class-unavailable"
+    end
+
+    local _, class = registry:ResolveClassReference(classRef)
+    if type(class) ~= "table" then
+        return false, "class-unavailable"
+    end
+
+    if itemType == "weapon" then
+        local weaponTypeRef = ensureString(item.weaponTypeRef)
+        for index = 1, #(class.weaponTypeRefs or {}) do
+            if ensureString(class.weaponTypeRefs[index]) == weaponTypeRef then
+                return true
+            end
+        end
+        return false, "weapon-type-restricted"
+    end
+
+    local armorWeight = normalizeArmorWeight(item.armorWeight)
+    if armorWeight == "cosmetic" then
+        return true
+    end
+    if armorWeight == "" then
+        return false, "armor-weight-restricted"
+    end
+
+    for index = 1, #(class.armorWeights or {}) do
+        if normalizeArmorWeight(class.armorWeights[index]) == armorWeight then
+            return true
+        end
+    end
+
+    return false, "armor-weight-restricted"
+end
+
 function Equipment.DoesItemFitSlot(item, slotKey)
     local normalizedSlotKey = Equipment.NormalizeSlotKey(slotKey)
     local matchKey = Equipment.NormalizeSlotMatchKey(normalizedSlotKey)
@@ -306,6 +381,11 @@ function Equipment.GetMountEquippedEntry(slotKey)
 end
 
 function Equipment.FindBestSlotForItemInScope(item, layout, scope)
+    local canEquip = Equipment.CanEquipItemInScope(scope, item)
+    if not canEquip then
+        return nil, nil
+    end
+
     local orderedEntries = layout and layout.entries or {}
     local exactMatches = {}
     local fallbackMatches = {}
@@ -383,6 +463,11 @@ function Equipment.EquipItemInScope(scope, slotKey, itemRef, modifications, slot
         return nil, "missing-item"
     end
 
+    local canEquip, restrictionReason = Equipment.CanEquipItemInScope(scope, item)
+    if not canEquip then
+        return nil, restrictionReason or "armor-weight-restricted"
+    end
+
     local finalSlotRef = ensureString(slotRef)
     if finalSlotRef ~= "" then
         if not itemHasExactSlotRef(item, finalSlotRef) then
@@ -406,6 +491,9 @@ function Equipment.EquipItemInScope(scope, slotKey, itemRef, modifications, slot
     end
 
     local normalizedScope = normalizeSlotType(scope)
+    local clearsOffHand = normalizedScope == "character"
+        and normalizedSlotKey == "mainhand"
+        and item.isTwoHanded == true
     local function persistEquipment()
         local entry = Database.SetProfileEquipmentSlotByScope and Database.SetProfileEquipmentSlotByScope(normalizedScope, normalizedSlotKey, {
             datasetId = dataset and dataset.id or "",
@@ -416,7 +504,12 @@ function Equipment.EquipItemInScope(scope, slotKey, itemRef, modifications, slot
             soulbound = soulbound == true,
         }) or nil
 
-        if entry ~= nil then
+        local offHandCleared = false
+        if entry ~= nil and clearsOffHand and Database.ClearProfileEquipmentSlotByScope then
+            offHandCleared = Database.ClearProfileEquipmentSlotByScope("character", "offhand") == true
+        end
+
+        if entry ~= nil or offHandCleared then
             bumpProfileTooltipContextRevision()
         end
         return entry
@@ -490,7 +583,8 @@ function Equipment.ListEquipableItemsForScopeSlot(scope, slotKey)
                 local itemRef = dependencies.ComposeSourceStatRef and dependencies.ComposeSourceStatRef(dataset.id, item.id) or nil
                 local fits, slotRef = Equipment.DoesItemFitSlot(item, normalizedSlotKey)
                 local slotDefinition = slotRef and Equipment.ResolveSlotDefinition(slotRef) or nil
-                if itemRef and fits and slotRef and slotDefinition and normalizeSlotType(slotDefinition.slotType) == expectedScope and not seen[itemRef] then
+                local canEquip = Equipment.CanEquipItemInScope(expectedScope, item)
+                if itemRef and fits and canEquip and slotRef and slotDefinition and normalizeSlotType(slotDefinition.slotType) == expectedScope and not seen[itemRef] then
                     seen[itemRef] = true
                     items[#items + 1] = {
                         itemRef = itemRef,

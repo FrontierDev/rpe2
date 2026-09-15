@@ -12,12 +12,6 @@ local SIDE_PADDING = 8
 local FIELD_WIDTH = 236
 local CONTROL_HEIGHT = 20
 
-local TRAIT_CATEGORY_ITEMS = {
-    { label = "Talent", value = "talent" },
-    { label = "Class", value = "class" },
-    { label = "Race", value = "race" },
-}
-
 local AUTO_AURA_TARGET_ITEMS = {
     { label = "Self", value = "self" },
     { label = "All Allies", value = "all_allies" },
@@ -987,24 +981,7 @@ local function buildTraitInspectorGeneralPage(self, page)
     end)
     root:AddChild(self.TraitInspectorDescriptionInput)
 
-    root:AddChild(buildLabel(root:GetFrame(), "RPEDataEditorTraitInspectorCategoryLabel", "Trait Type"))
-    self.TraitInspectorCategoryDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorTraitInspectorCategoryDropdown", {
-        width = FIELD_WIDTH,
-        height = 18,
-        items = TRAIT_CATEGORY_ITEMS,
-        onValueChanged = function(value)
-            if self._refreshingTraitInspector then
-                return
-            end
-
-            self:CommitSelectedTrait(function(trait)
-                trait.isTalent = value == "talent"
-                trait.isClass = value == "class"
-                trait.isRacial = value == "race"
-            end)
-        end,
-    })
-    root:AddChild(self.TraitInspectorCategoryDropdown)
+    root:AddChild(buildLabel(root:GetFrame(), "RPEDataEditorTraitInspectorCategoryLabel", "Ownership is assigned by Race/Class definitions."))
 
     root:AddChild(buildLabel(root:GetFrame(), "RPEDataEditorTraitInspectorDisplayCategoryLabel", "Category"))
     self.TraitInspectorDisplayCategoryInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorTraitInspectorDisplayCategoryInput", {
@@ -2262,7 +2239,6 @@ end
 function DataEditor:RefreshTraitInspectorPage()
     local _, trait = self:GetSelectedTraitAndDataset()
     local hasTrait = trait ~= nil
-    local category = hasTrait and (trait.isClass == true and "class" or trait.isRacial == true and "race" or "talent") or "talent"
     local automaticAura = hasTrait and trait.automaticAuras and trait.automaticAuras[1] or nil
 
     self._refreshingTraitInspector = true
@@ -2281,10 +2257,6 @@ function DataEditor:RefreshTraitInspectorPage()
     if self.TraitInspectorDescriptionInput then
         self.TraitInspectorDescriptionInput:SetText(hasTrait and ensureString(trait.description) or "")
         setTextElementEnabled(self.TraitInspectorDescriptionInput, hasTrait)
-    end
-    if self.TraitInspectorCategoryDropdown then
-        self.TraitInspectorCategoryDropdown:SetSelectedValue(category, true)
-        setDropdownEnabled(self.TraitInspectorCategoryDropdown, hasTrait)
     end
     if self.TraitInspectorDisplayCategoryInput then
         self.TraitInspectorDisplayCategoryInput:SetText(hasTrait and ensureString(trait.category) or "")

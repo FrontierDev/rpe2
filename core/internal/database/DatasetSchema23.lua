@@ -108,7 +108,8 @@ if type(baseImportDataset) == "function" then
         end
 
         normalizeDatasetLoot(dataset)
-        if type(Database.Dependecies) == "table"
+        if not (Database.IsDatasetImportTransactionActive and Database.IsDatasetImportTransactionActive())
+            and type(Database.Dependecies) == "table"
             and type(Database.Dependecies.RecomputeDatasetDependencies) == "function"
         then
             Database.Dependecies.RecomputeDatasetDependencies(dataset.id)

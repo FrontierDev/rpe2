@@ -231,6 +231,14 @@ function DataEditor:RefreshSpellInspectorPage()
         self.SpellInspectorAllowDeadTargetsCheckbox:SetChecked(spell and spell.allowDeadTargets == true or false, true)
         self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorAllowDeadTargetsCheckbox, hasSpell)
     end
+    if self.SpellInspectorCanTargetHiddenUnitsCheckbox then
+        self.SpellInspectorCanTargetHiddenUnitsCheckbox:SetChecked(spell and spell.canTargetHiddenUnits == true or false, true)
+        self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorCanTargetHiddenUnitsCheckbox, hasSpell)
+    end
+    if self.SpellInspectorDoesNotRevealCasterCheckbox then
+        self.SpellInspectorDoesNotRevealCasterCheckbox:SetChecked(spell and spell.doesNotRevealCaster == true or false, true)
+        self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorDoesNotRevealCasterCheckbox, hasSpell)
+    end
     if self.SpellInspectorPendingResourceRefDropdown then
         self.SpellInspectorPendingResourceRefDropdown:SetItems(self:BuildSpellInspectorResourcesAcrossDatasets())
         self:SetSpellInspectorDropdownEnabled(self.SpellInspectorPendingResourceRefDropdown, hasSpell)

@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 1,
+    version = 11,
     dataset = {
         achievements = {},
         auras = {
@@ -214,7 +214,7 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/ability_rogue_garrote.blp",
                 id = "72luk1ge",
                 maxStacks = 1,
-                name = "Garrotte",
+                name = "Garrote",
                 stackBehavior = "refresh_duration",
                 tags = {},
                 tooltipTemplate = false
@@ -334,16 +334,25 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/classicon_rogue.blp",
                 id = "ta9uh9xw",
                 name = "Rogue",
+                armorWeights = {
+                    "leather",
+                },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:i4pivdig",
+                    "f82db71a:9ni3vfas",
+                    "f82db71a:y0dnlo8g",
+                    "f82db71a:l3ce0puc",
+                    "f82db71a:j2gceby4",
+                    "f82db71a:anoo8qfp",
+                    "f82db71a:gjz2331m",
+                    "f82db71a:we5ul4ne",
+                },
                 resourceProgressions = {
                     {
                         initialValue = 25,
                         perLevelValue = 25.39,
                         resourceRef = "f82db71a:q2ktkztt"
-                    },
-                    {
-                        initialValue = 100,
-                        perLevelValue = 0,
-                        resourceRef = "f82db71a:c3gaf7dd"
                     }
                 },
                 skillBonuses = {},
@@ -374,8 +383,12 @@ Addon.Data.DefaultDatasets:Register({
                         statRef = "f82db71a:kec9rhli"
                     }
                 },
-                traitRefs = {
-                    "23d5dce2:z9yfqvhy"
+                passiveTraitRefs = {
+                    "23d5dce2:murderxx"
+                },
+                talentTraitRefs = {
+                    "23d5dce2:z9yfqvhy",
+                    "23d5dce2:58pob6kr"
                 }
             }
         },
@@ -527,6 +540,207 @@ Addon.Data.DefaultDatasets:Register({
                             tokenType = "spell_resource_amount"
                         }
                     },
+                    version = 1
+                },
+                totalTicks = 0,
+                triggersGCD = true,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                canTargetHiddenUnits = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_melee_hit",
+                    "on_critical_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false,
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseDamage = 265.359,
+                            damageSchoolRefs = {
+                                "f82db71a:v1azo4j6"
+                            },
+                            damageType = "melee",
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 1.238,
+                                    statRef = "f82db71a:u7b49vs9"
+                                }
+                            },
+                            targetEvents = {
+                                "on_melee_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 1,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 3.538,
+                            weaponDamageMode = "main_hand"
+                        },
+                        key = "0ce4d5de",
+                        target = {
+                            allowDeadTargets = false,
+                            allowHiddenTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    },
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amount = 2,
+                            amountMode = "flat",
+                            resourceRef = "f82db71a:1h7yfxff",
+                            targetEvents = {},
+                            type = "resource"
+                        },
+                        key = "6900cd49",
+                        target = {
+                            allowDeadTargets = false,
+                            allowHiddenTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires Dagger in Main Hand",
+                        type = "weapon_type",
+                        weaponTypeRefs = {
+                            "f82db71a:y0dnlo8g"
+                        }
+                    },
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Require Stealth",
+                        type = "hidden",
+                        unit = "caster"
+                    }
+                },
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                doesNotRevealCaster = false,
+                icon = "interface/icons/ability_rogue_ambush.blp",
+                id = "pfskjkhi",
+                ignoreGCD = false,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Ambush",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 60,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:c3gaf7dd"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Subtlety",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Restore {RESOURCE_AMOUNT_1} to yourself.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        },
+                        {
+                            applyMode = "resource_gain_amount",
+                            componentIndex = 2,
+                            key = "RESOURCE_AMOUNT_1",
+                            tokenType = "spell_resource_amount"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                triggersGCD = true,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                canTargetHiddenUnits = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            targetEvents = {},
+                            type = "hide"
+                        },
+                        key = "stealthhide",
+                        target = {
+                            allowDeadTargets = false,
+                            allowHiddenTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                doesNotRevealCaster = true,
+                icon = "interface/icons/ability_stealth.blp",
+                id = "stealth01",
+                ignoreGCD = false,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Stealth",
+                range = 0,
+                resourceCosts = {},
+                seedNPCSpell = false,
+                spellbookCategory = "Subtlety",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Hide yourself.",
+                    tokens = {},
                     version = 1
                 },
                 totalTicks = 0,
@@ -1686,6 +1900,13 @@ Addon.Data.DefaultDatasets:Register({
                         tooltipTextOverride = "Requires Main Hand",
                         type = "item_equipped",
                         weaponTypeRefs = {}
+                    },
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Require Stealth",
+                        type = "hidden",
+                        unit = "caster"
                     }
                 },
                 cooldown = 0,
@@ -1697,7 +1918,7 @@ Addon.Data.DefaultDatasets:Register({
                 ignoreGCD = false,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
-                name = "Garrotte",
+                name = "Garrote",
                 range = 0,
                 resourceCosts = {
                     {
@@ -1720,7 +1941,7 @@ Addon.Data.DefaultDatasets:Register({
                             descriptionText = "Deals {AURA_DAMAGE_1} Physical damage each turn.",
                             duration = 2,
                             icon = "interface/icons/ability_rogue_garrote.blp",
-                            nameText = "Garrotte",
+                            nameText = "Garrote",
                             powerLevel = 0,
                             spellDatasetId = "23d5dce2",
                             stacks = 1,
@@ -1741,7 +1962,7 @@ Addon.Data.DefaultDatasets:Register({
                             }
                         }
                     },
-                    mainText = "Apply Garrotte to an enemy for 2 turns. Restore {RESOURCE_AMOUNT_1} to yourself.",
+                    mainText = "Apply Garrote to an enemy for 2 turns. Restore {RESOURCE_AMOUNT_1} to yourself.",
                     tokens = {
                         {
                             applyMode = "resource_gain_amount",
@@ -2077,6 +2298,25 @@ Addon.Data.DefaultDatasets:Register({
             {
                 automaticAuras = {},
                 category = "",
+                conditions = {},
+                description = "Increases your damage against Humanoids by 5%.",
+                events = {},
+                icon = "interface/icons/ability_rogue_murderspree.blp",
+                id = "murderxx",
+                isEnvironmental = false,
+                name = "Murder",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:bj6h5ikw",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "",
                 conditions = {
                     {
                         invert = false,
@@ -2113,10 +2353,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 icon = "interface/icons/ability_poisonarrow.blp",
                 id = "z9yfqvhy",
-                isClass = true,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = false,
                 name = "Instant Poison",
                 skillBonuses = {},
                 statBonuses = {},
@@ -2154,10 +2391,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 icon = "interface/icons/inv_misc_herb_16.blp",
                 id = "58pob6kr",
-                isClass = true,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = false,
                 name = "Wound Poison",
                 skillBonuses = {},
                 statBonuses = {},

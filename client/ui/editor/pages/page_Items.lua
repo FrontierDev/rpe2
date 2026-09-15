@@ -198,6 +198,8 @@ function DataEditor:EnsureItemsContextMenu()
                     dataset = datasetId,
                     id = itemId,
                     modifications = {},
+                }, {
+                    source = "data-editor",
                 })
             end
 

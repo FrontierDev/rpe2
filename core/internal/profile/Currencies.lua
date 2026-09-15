@@ -385,6 +385,18 @@ function Profile.AddCurrencyAmount(currencyRefOrId, amount)
                     }
                 )
             end
+
+            local lootNotifications = Addon.Client and Addon.Client.LootNotifications or nil
+            if lootNotifications and type(lootNotifications.NotifyCurrencyGain) == "function" then
+                local notify = function()
+                    lootNotifications:NotifyCurrencyGain(normalizedKey, actualGain)
+                end
+                if type(Runtime) == "table" and type(Runtime.QueueAfterCommit) == "function" then
+                    Runtime:QueueAfterCommit(notify)
+                else
+                    notify()
+                end
+            end
         end
 
         return persistedAmount

@@ -153,6 +153,41 @@ local function buildTrackedResourceLookup(resources)
     return lookup
 end
 
+local function appendSelectedResourceEntry(baseResources, resourceRef, trackedByRef, resolvedByRef)
+    resourceRef = normalizeResourceRef(resourceRef)
+    if not resourceRef then
+        return
+    end
+
+    for index = 1, #baseResources do
+        local entry = baseResources[index]
+        if normalizeResourceRef(type(entry) == "table" and entry.resourceRef or nil) == resourceRef then
+            return
+        end
+    end
+
+    local trackedEntry = trackedByRef[resourceRef]
+    local resolvedRow = resolvedByRef[resourceRef]
+    if not trackedEntry and not resolvedRow then
+        return
+    end
+
+    if trackedEntry then
+        baseResources[#baseResources + 1] = trackedEntry
+        return
+    end
+
+    local maxValue = tonumber(resolvedRow and resolvedRow.value) or 0
+    local startsAtZero = resolvedRow
+        and resolvedRow.resource
+        and resolvedRow.resource.startsAtZero == true
+    baseResources[#baseResources + 1] = {
+        resourceRef = resourceRef,
+        currentValue = startsAtZero and 0 or maxValue,
+        maxValue = maxValue,
+    }
+end
+
 local function hasResourceEntries(resources)
     return type(resources) == "table" and #resources > 0
 end
@@ -385,13 +420,10 @@ function ActionBarWidget:BuildActionBarResourceStates(eventState, eventUnit, res
             and (type(ResourceSync.CloneResources) == "function" and ResourceSync.CloneResources(unitResources) or unitResources)
             or resourceContext.profileResourceSnapshot
             or (type(ResourceSync.BuildProfileResourceSnapshot) == "function" and ResourceSync.BuildProfileResourceSnapshot() or {}))
-    if #baseResources == 0 then
-        return {
-            health = nil,
-            primary = nil,
-            special = nil,
-        }
+    if type(ResourceSync.CloneResources) == "function" then
+        baseResources = ResourceSync.CloneResources(baseResources)
     end
+    baseResources = type(baseResources) == "table" and baseResources or {}
 
     local trackedResources = hasResourceEntries(effectiveLocalResources)
         and effectiveLocalResources
@@ -399,6 +431,34 @@ function ActionBarWidget:BuildActionBarResourceStates(eventState, eventUnit, res
         or resourceContext.localTrackedResources
         or getLocalTrackedResources()
     local trackedByRef = buildTrackedResourceLookup(trackedResources)
+    local supplementalTrackedResources = resourceContext.localTrackedResources
+    if not hasResourceEntries(supplementalTrackedResources) then
+        supplementalTrackedResources = getLocalTrackedResources()
+    end
+    local supplementalTrackedByRef = buildTrackedResourceLookup(
+        supplementalTrackedResources
+    )
+    for resourceRef, entry in pairs(supplementalTrackedByRef) do
+        if not trackedByRef[resourceRef] then
+            trackedByRef[resourceRef] = entry
+        end
+    end
+
+    -- The live event unit often contains only the resources currently being
+    -- synchronized. Explicit local selections must still be rendered when a
+    -- selected resource is available from the resolved profile data.
+    if localPlayerContext then
+        appendSelectedResourceEntry(baseResources, resourceContext.primaryResourceRef, trackedByRef, resolvedByRef)
+        appendSelectedResourceEntry(baseResources, resourceContext.specialResourceRef, trackedByRef, resolvedByRef)
+    end
+
+    if #baseResources == 0 then
+        return {
+            health = nil,
+            primary = nil,
+            special = nil,
+        }
+    end
 
     local stateByRef = {}
     for index = 1, #baseResources do

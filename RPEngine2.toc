@@ -16,6 +16,7 @@ data/ModelData.lua
 ## Packaged Default Datasets
 data/default/Datasets.lua
 data/default/core.lua
+data/default/core_guild_settings.lua
 data/default/classes/mage.lua
 data/default/classes/paladin.lua
 data/default/classes/priest.lua
@@ -23,15 +24,20 @@ data/default/classes/rogue.lua
 data/default/classes/warrior.lua
 data/default/professions/fishing.lua
 data/default/professions/alchemy.lua
+data/default/professions/alchemy_daily_rewards.lua
 data/default/professions/blacksmithing.lua
-data/default/professions/blacksmithing_materials.lua
+data/default/professions/blacksmithing_daily_rewards.lua
 data/default/professions/enchanting.lua
+data/default/professions/enchanting_daily_rewards.lua
 data/default/professions/inscription.lua
+data/default/professions/inscription_daily_rewards.lua
 data/default/professions/jewelcrafting.lua
+data/default/professions/jewelcrafting_daily_rewards.lua
 data/default/professions/leatherworking.lua
+data/default/professions/leatherworking_daily_rewards.lua
 data/default/professions/misc.lua
-data/default/professions/misc_213_cleanup.lua
 data/default/professions/tailoring.lua
+data/default/professions/tailoring_daily_rewards_cleanup.lua
 data/default/professions/engineering.lua
 
 utils/Common.lua
@@ -41,6 +47,8 @@ core/internal/comms/Diagnostics.lua
 core/internal/tasks/TaskQueue.lua
 core/internal/comms/MessageQueue.lua
 core/internal/comms/Operations.lua
+core/internal/comms/EventUnitHidden.lua
+core/internal/comms/EventTurnComplete.lua
 core/internal/comms/Serialization.lua
 core/internal/comms/EventRejoinState.lua
 core/internal/comms/Core.lua
@@ -67,6 +75,7 @@ core/internal/ruleset/Rules.lua
 core/internal/ruleset/Ruleset.lua
 core/internal/ruleset/NpcDifficulty.lua
 core/internal/Registry.lua
+core/internal/profile/GuildRoleMigration.lua
 core/internal/RegistryLoot.lua
 core/internal/Loot.lua
 core/internal/LootDiagnostics.lua
@@ -80,6 +89,7 @@ client/client_Resources.lua
 client/client_Achievements.lua
 client/client_Guild.lua
 client/client_Commands.lua
+client/client_Help.lua
 client/character/inventory/Inventory.lua
 client/client_AchievementRewards.lua
 client/client_Crafting.lua
@@ -129,24 +139,38 @@ core/internal/database/DatasetSchema23.lua
 core/internal/database/DatasetSchema24.lua
 core/classes/Recipe.lua
 core/classes/Aura.lua
+core/classes/HiddenStatus.lua
 core/classes/Interaction.lua
 core/classes/Achievement.lua
 core/classes/GuildSetting.lua
+core/internal/GuildShopContributions.lua
 core/classes/Currency.lua
 core/classes/Event.lua
 core/classes/EventAutopilotMode.lua
+core/classes/EventNpcMode.lua
 core/classes/EventVariantNetwork.lua
 core/classes/EventVariantSpellEquipmentNetwork.lua
 core/classes/EventEndLoot.lua
 client/client_Event.lua
+client/client_EventUnitHidden.lua
+client/client_EventTurnComplete.lua
+client/conditions/Hidden.lua
 client/client_Loot.lua
+client/client_LootNotifications.lua
+client/client_EventCurrencyRewards.lua
 client/client_CombatLog.lua
+client/client_NPCSpeech.lua
 client/client_CombatLogTurnIdentity.lua
 client/client_Skills.lua
+client/client_SkillProgression.lua
 server/server_Event.lua
+server/server_EventNpcMode.lua
+server/server_EventUnitHidden.lua
+server/server_EventTurnComplete.lua
 server/server_EventEndLoot.lua
 server/server_Loot.lua
 server/server_LootRecentEvent.lua
+server/server_EventEndDistributionConfirmation.lua
 server/server_EventAutopilot.lua
 server/server_EventVariants.lua
 server/server_EventResourceIntegration.lua
@@ -178,6 +202,7 @@ client/spellcasting/effects/RemoveAura.lua
 client/spellcasting/effects/Resource.lua
 client/spellcasting/effects/Stat.lua
 client/spellcasting/effects/Control.lua
+client/spellcasting/effects/RemoveHidden.lua
 client/spellcasting/Handles.lua
 client/client_EventRejoinState.lua
 client/combat/Core.lua
@@ -195,6 +220,7 @@ client/combat/effects/Resource.lua
 client/combat/effects/Interrupt.lua
 client/combat/effects/Revert.lua
 client/combat/effects/SummonPet.lua
+client/combat/effects/Hide.lua
 client/combat/ReactionPerformance.lua
 client/spellcasting/TooltipTemplate.lua
 client/spellcasting/AuraDescriptionBuilder.lua
@@ -203,6 +229,7 @@ client/traits/DescriptionBuilder.lua
 client/client_Targeting.lua
 client/client_ItemUse.lua
 client/spellcasting/ExplicitCasterActivation.lua
+client/client_BasicAttackRepeat.lua
 client/autopilot/MovementAllowanceFrozen.lua
 client/autopilot/PlannerIntegration.lua
 client/autopilot/PlannerEndLoot.lua
@@ -210,6 +237,7 @@ client/autopilot/Authorization.lua
 client/autopilot/Execution.lua
 client/autopilot/AuthorizationSequence.lua
 client/autopilot/AuthorizationBatch.lua
+client/autopilot/ActionCueDispatch.lua
 client/autopilot/AuraEvaluatorPerformance.lua
 client/autopilot/SequencePlanningPerformance.lua
 client/autopilot/MovementSolverPerformance.lua
@@ -284,8 +312,10 @@ client/ui/widgets/widget_Event_CombatLogHistory.lua
 client/ui/widgets/widget_Event_DMHelper.lua
 client/autopilot/Helper.lua
 client/autopilot/EmoteCues.lua
+client/autopilot/SpeechCues.lua
 client/ui/widgets/widget_Event_AutopilotHelper.lua
 client/ui/widgets/widget_Event_AutopilotEmotes.lua
+client/ui/widgets/widget_Event_AutopilotSpeech.lua
 client/ui/widgets/widget_Event_AutopilotPerformance.lua
 client/ui/widgets/widget_Event_PortraitReadiness.lua
 client/ui/widgets/widget_Event_QueueStatus.lua
@@ -321,7 +351,10 @@ client/character/profile/page_ProfileSkills.lua
 client/character/profile/page_ProfileAchievements.lua
 client/character/profile/window_Profile.lua
 client/character/guild/page_GuildRequisitions.lua
+client/character/guild/page_GuildRequisitionsRoles.lua
+client/character/guild/page_GuildRequisitionsContributions.lua
 client/character/guild/page_GuildAdmin.lua
+client/character/guild/page_GuildAdminRoles.lua
 client/character/guild/window_Guild.lua
 core/debug/Clipboard.lua
 server/ui/window_EventUnit.lua
@@ -404,12 +437,14 @@ client/ui/editor/inspectors/page_InspectorLoot.lua
 client/ui/editor/inspectors/page_InspectorLootDiagnostics.lua
 client/ui/editor/inspectors/page_InspectorAchievement.lua
 client/ui/editor/inspectors/page_InspectorGuildSetting.lua
+client/ui/editor/inspectors/page_InspectorGuildSettingRoles.lua
 client/ui/editor/inspectors/aura/page_InspectorAuraShared.lua
 client/ui/editor/inspectors/aura/page_InspectorAuraGeneral.lua
 client/ui/editor/inspectors/aura/page_InspectorAuraEffects.lua
 client/ui/editor/inspectors/aura/page_InspectorAuraEvents.lua
 client/ui/editor/inspectors/page_InspectorAura.lua
 client/ui/editor/inspectors/spell/page_InspectorSpellShared.lua
+client/ui/editor/inspectors/page_InspectorHiddenStatus.lua
 client/ui/editor/inspectors/spell/page_InspectorSpellGeneral.lua
 client/ui/editor/inspectors/spell/page_InspectorSpellCasting.lua
 client/ui/editor/inspectors/spell/page_InspectorSpellCooldown.lua
@@ -425,9 +460,12 @@ client/ui/editor/inspectors/page_InspectorResource.lua
 client/ui/editor/inspectors/page_InspectorRace.lua
 client/ui/editor/inspectors/page_InspectorClass.lua
 client/ui/editor/windows/window_DataEditor.lua
+client/ui/editor/windows/window_DataEditorGuildSetting.lua
+client/ui/editor/windows/window_DataEditorGuildSettingRequisitions.lua
 client/ui/ruleset/inspectors/page_InspectorRuleset.lua
 client/ui/ruleset/window_Ruleset.lua
 
 data/default/Install.lua
+data/default/Ruleset.lua
 BagScanTest.lua
 RuneclothDeleteTest.lua

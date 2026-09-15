@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 1,
+    version = 9,
     dataset = {
         achievements = {},
         auras = {
@@ -642,6 +642,17 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/classicon_paladin.blp",
                 id = "wvirv9um",
                 name = "Paladin",
+                armorWeights = {
+                    "mail",
+                    "plate",
+                    "shield",
+                },
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:i4pivdig",
+                    "f82db71a:9ni3vfas",
+                    "f82db71a:25s5wyry",
+                },
                 resourceProgressions = {
                     {
                         initialValue = 28,
@@ -654,12 +665,7 @@ Addon.Data.DefaultDatasets:Register({
                         resourceRef = "f82db71a:4c8mfm99"
                     }
                 },
-                skillBonuses = {
-                    {
-                        skillRef = "f82db71a:4keh3nf1",
-                        value = 275
-                    }
-                },
+                skillBonuses = {},
                 statProgressions = {
                     {
                         initialValue = 2,
@@ -687,7 +693,10 @@ Addon.Data.DefaultDatasets:Register({
                         statRef = "f82db71a:75y3a8ib"
                     }
                 },
-                traitRefs = {
+                passiveTraitRefs = {
+                    "b0211ab3:c9r5sade"
+                },
+                talentTraitRefs = {
                     "b0211ab3:kl2ug8kz",
                     "b0211ab3:0ditc5z7",
                     "b0211ab3:yz6qglzv"
@@ -4327,16 +4336,32 @@ Addon.Data.DefaultDatasets:Register({
         traits = {
             {
                 automaticAuras = {},
+                category = "Retribution",
+                conditions = {},
+                description = "Increases your damage against Undead targets by 5%.",
+                events = {},
+                icon = "interface/icons/spell_holy_crusaderstrike.blp",
+                id = "c9r5sade",
+                isEnvironmental = false,
+                name = "Crusade",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:qi323bx3",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
                 category = "Protection",
                 conditions = {},
                 description = "",
                 events = {},
                 icon = "interface/icons/spell_holy_sealoffury.blp",
                 id = "kl2ug8kz",
-                isClass = false,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = true,
                 name = "Righteous Fury",
                 skillBonuses = {},
                 statBonuses = {
@@ -4377,10 +4402,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 icon = "interface/icons/spell_holy_layonhands.blp",
                 id = "0ditc5z7",
-                isClass = false,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = true,
                 name = "Empyrean Ward",
                 skillBonuses = {},
                 statBonuses = {},
@@ -4406,10 +4428,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 icon = "interface/icons/spell_magic_managain.blp",
                 id = "yz6qglzv",
-                isClass = false,
                 isEnvironmental = false,
-                isRacial = false,
-                isTalent = true,
                 name = "Illumination",
                 skillBonuses = {},
                 statBonuses = {},

@@ -172,7 +172,7 @@ Add a focused shared module, recommended path:
 
 `core/internal/comms/EventSync.lua`
 
-Load it from `RPEngine_Dev.toc` after the base comms serialization/operations modules and before event runtime code depends on it.
+Load it from `RPEngine2.toc` after the base comms serialization/operations modules and before event runtime code depends on it.
 
 This module must contain protocol/data helpers only. It must not own UI or SavedVariables.
 
@@ -269,7 +269,7 @@ Initialize the runtime only when a genuine event successfully starts.
 
 Clear it when the event ends or the server stops.
 
-Do not persist it in `RPEngine_Dev.toc` SavedVariables.
+Do not persist it in `RPEngine2.toc` SavedVariables.
 
 Host `/reload` therefore still destroys the active event, as required by the PDD.
 
@@ -893,7 +893,7 @@ Expected files to add:
 
 Expected files to modify:
 
-- `RPEngine_Dev.toc`
+- `RPEngine2.toc`
 - `core/internal/comms/Operations.lua`
 - `client/client_Session.lua`
 - `server/server_Session.lua`

@@ -506,6 +506,42 @@ Operations.Opcodes = Operations.Opcodes or {
             return guild:HandleGuildAdminMutationResponse(arguments, sender, distribution, target, message)
         end,
     },
+    [28] = {
+        key = "ACHIEVEMENT_ANNOUNCEMENT",
+        name = "achievement-announcement",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleAchievementAnnouncement) ~= "function" then
+                return false
+            end
+
+            return client:HandleAchievementAnnouncement(arguments, sender, distribution, target, message)
+        end,
+    },
+    [33] = {
+        key = "SKILL_ROLL_REQUEST",
+        name = "skill-roll-request",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleSkillRollRequest) ~= "function" then
+                return false
+            end
+
+            return client:HandleSkillRollRequest(arguments, sender, distribution, target, message)
+        end,
+    },
+    [36] = {
+        key = "NPC_SPEECH",
+        name = "npc-speech",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleNPCSpeech) ~= "function" then
+                return false
+            end
+
+            return client:HandleNPCSpeech(arguments, sender, distribution, target, message)
+        end,
+    },
 }
 
 Operations:ResetRegistry()

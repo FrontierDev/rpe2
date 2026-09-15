@@ -385,6 +385,56 @@ function AchievementsPage:MarkDirty()
     return self
 end
 
+function AchievementsPage:EnsureAchievementContextMenu()
+    if self.AchievementContextMenu then
+        return self.AchievementContextMenu
+    end
+
+    self.AchievementContextMenu = UI.ContextMenu:New({
+        name = "RPEProfileAchievementsContextMenu",
+        width = 132,
+        panelWidth = 132,
+        visibleRows = 1,
+        rowHeight = 18,
+        border = false,
+        onItemInvoked = function(item, menu)
+            local row = self.ContextMenuAchievementRow
+            if item and item.value == "clear-progress"
+                and row
+                and trimString(row.achievementRef) ~= ""
+                and type(Profile.ClearAchievementState) == "function"
+            then
+                Profile.ClearAchievementState(row.achievementRef)
+                if tostring(self.SelectedAchievementRef or "") == row.achievementRef then
+                    self.SelectedAchievementRef = nil
+                end
+                self:MarkDirty()
+                self:Refresh()
+            end
+
+            if menu and menu.HideMenus then
+                menu:HideMenus()
+            end
+        end,
+    })
+    self.AchievementContextMenu:SetParent(self.frame or UIParent)
+    self.AchievementContextMenu:Create()
+    return self.AchievementContextMenu
+end
+
+function AchievementsPage:ShowAchievementContextMenu(anchorFrame, achievementRow)
+    if not anchorFrame or type(achievementRow) ~= "table" or trimString(achievementRow.achievementRef) == "" then
+        return
+    end
+
+    local menu = self:EnsureAchievementContextMenu()
+    self.ContextMenuAchievementRow = achievementRow
+    menu:SetItems({
+        { label = "Clear Progress", value = "clear-progress" },
+    })
+    menu:ShowAt(anchorFrame)
+end
+
 function AchievementsPage:IsVisible()
     if not self.frame or not self.frame.IsShown or not self.frame:IsShown() then
         return false
@@ -593,6 +643,9 @@ function AchievementsPage:Build(parent, owner)
             if button == "LeftButton" and achievementRef ~= "" then
                 self.SelectedAchievementRef = achievementRef
                 self:Refresh()
+            elseif button == "RightButton" and achievementRef ~= "" then
+                local frame = row.GetFrame and row:GetFrame() or nil
+                self:ShowAchievementContextMenu(frame, achievementRow)
             end
         end)
         row:SetAchievementData({

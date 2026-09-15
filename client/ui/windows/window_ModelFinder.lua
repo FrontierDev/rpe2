@@ -663,6 +663,10 @@ function Client:BuildModelFinderWindow()
 end
 
 function Client:ShowModelFinderWindow()
+    if self:RequireSetupCompletion("model-finder-window") ~= true then
+        return nil
+    end
+
     return ModelFinder:Get():Show()
 end
 
@@ -671,5 +675,9 @@ function Client:HideModelFinderWindow()
 end
 
 function Client:OpenModelFinder(callback, options)
+    if self:RequireSetupCompletion("model-finder") ~= true then
+        return nil
+    end
+
     return ModelFinder:Get():Open(callback, options)
 end

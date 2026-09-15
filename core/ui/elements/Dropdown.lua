@@ -7,7 +7,7 @@ local Constants = UI.Constants or {}
 local Font = UI.Font or {}
 
 local MAX_MENU_DEPTH = 4
-local CATEGORY_TEXTURE_PATH = "Interface\\AddOns\\RPEngine_Dev\\data\\textures\\ui\\category.png"
+local CATEGORY_TEXTURE_PATH = "Interface\\AddOns\\RPEngine2\\data\\textures\\ui\\category.png"
 local DEFAULT_POPUP_WIDTH_MULTIPLIER = 0.5
 local DEFAULT_POPUP_MIN_WIDTH = 140
 local DEFAULT_POPUP_MAX_WIDTH = 320

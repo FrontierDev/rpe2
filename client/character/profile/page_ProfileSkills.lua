@@ -388,7 +388,7 @@ local function formatFooterLevelText(row)
         return "Level -- / --"
     end
 
-    local text = ("Level %d / %d"):format(tonumber(row.value) or 0, tonumber(row.maxValue) or 0)
+    local text = ("Level %d / %d"):format(tonumber(row.baseValue) or 0, tonumber(row.maxValue) or 0)
     local bonusValue = tonumber(row.bonusValue) or 0
     if bonusValue > 0 then
         text = text .. (" |cff55ff55(+%d)|r"):format(bonusValue)
@@ -451,6 +451,10 @@ local function getCraftingRecipeLevelColor(detail)
 end
 
 local function getCraftingSkillUpChance(detail)
+    if Crafting and type(Crafting.GetRecipeSkillUpChance) == "function" then
+        return Crafting:GetRecipeSkillUpChance(detail)
+    end
+
     local skillLevel = math.max(0, tonumber(detail and detail.skillLevel) or 0)
     local requiredLevel = math.max(0, tonumber(detail and detail.requiredSkillLevel) or 0)
     local delta = skillLevel - requiredLevel
@@ -571,6 +575,165 @@ local function showCraftCountPopup(page, detail)
             Crafting:QueueRecipe(detail.recipeRef, count)
         end,
     })
+end
+
+function SkillsPage:RefreshAfterSkillManualAdjustment()
+    self.SkillListSession = nil
+    self:MarkDirty()
+    self:Refresh()
+end
+
+function SkillsPage:AddPermanentSkillBonus(skillRef, amount)
+    if getSkillRuleValue("allow_permanent_skill_bonuses_after_setup", false) ~= true then
+        return false
+    end
+
+    local normalizedAmount = math.max(0, math.floor(tonumber(amount) or 0))
+    if normalizedAmount <= 0 or type(Profile.SetSkillPermanentBonus) ~= "function" then
+        return false
+    end
+
+    local current = type(Profile.GetSkillPermanentBonus) == "function"
+        and math.max(0, math.floor(tonumber(Profile.GetSkillPermanentBonus(skillRef)) or 0))
+        or 0
+    if Profile.SetSkillPermanentBonus(skillRef, current + normalizedAmount) == nil then
+        return false
+    end
+
+    self:RefreshAfterSkillManualAdjustment()
+    return true
+end
+
+function SkillsPage:ResetSkillPermanentBonus(skillRef)
+    if type(Profile.ClearSkillPermanentBonus) ~= "function" then
+        return false
+    end
+
+    local changed = Profile.ClearSkillPermanentBonus(skillRef) == true
+    if changed then
+        self:RefreshAfterSkillManualAdjustment()
+    end
+    return changed
+end
+
+function SkillsPage:ResetSkillGainedLevels(skillRef)
+    if type(Profile.ClearSkillLevel) ~= "function" then
+        return false
+    end
+
+    local changed = Profile.ClearSkillLevel(skillRef) == true
+    if changed then
+        self:RefreshAfterSkillManualAdjustment()
+    end
+    return changed
+end
+
+function SkillsPage:ResetSkillBonusAndGainedLevels(skillRef)
+    local bonusChanged = type(Profile.ClearSkillPermanentBonus) == "function"
+        and Profile.ClearSkillPermanentBonus(skillRef) == true
+        or false
+    local levelChanged = type(Profile.ClearSkillLevel) == "function"
+        and Profile.ClearSkillLevel(skillRef) == true
+        or false
+
+    if bonusChanged or levelChanged then
+        self:RefreshAfterSkillManualAdjustment()
+        return true
+    end
+    return false
+end
+
+function SkillsPage:PromptPermanentSkillBonus(skillRef)
+    if getSkillRuleValue("allow_permanent_skill_bonuses_after_setup", false) ~= true then
+        return false
+    end
+    if not (UI.Popup and UI.Popup.ShowConfirmation) then
+        return false
+    end
+
+    local row = self:FindSkillRow(skillRef, self.AllSkillRows)
+    local skillName = tostring(row and row.name or "Skill")
+    return UI.Popup:ShowConfirmation({
+        title = "Permanent Skill Bonus",
+        width = 280,
+        message = ("Add a permanent bonus to %s."):format(skillName),
+        confirmText = "Add",
+        cancelText = "Cancel",
+        inputLabel = "Bonus",
+        inputText = "1",
+        requireInput = true,
+        onConfirm = function(spec)
+            local amount = math.floor(tonumber(spec and spec.inputText or "") or 0)
+            if amount > 0 then
+                self:AddPermanentSkillBonus(skillRef, amount)
+            end
+        end,
+    })
+end
+
+function SkillsPage:EnsureSkillContextMenu()
+    if self.SkillContextMenu then
+        return self.SkillContextMenu
+    end
+
+    self.SkillContextMenu = UI.ContextMenu:New({
+        name = "RPEProfileSkillsSkillContextMenu",
+        width = 210,
+        panelWidth = 210,
+        visibleRows = 4,
+        rowHeight = 18,
+        border = false,
+        onItemInvoked = function(item, menu)
+            local action = item and item.value or nil
+            local skillRef = self.ContextMenuSkillRef
+            if not action or not skillRef then
+                return
+            end
+
+            if menu and menu.HideMenus then
+                menu:HideMenus()
+            end
+
+            if action == "add-permanent-bonus" then
+                self:PromptPermanentSkillBonus(skillRef)
+            elseif action == "reset-permanent-bonus" then
+                self:ResetSkillPermanentBonus(skillRef)
+            elseif action == "reset-gained-levels" then
+                self:ResetSkillGainedLevels(skillRef)
+            elseif action == "reset-bonus-and-levels" then
+                self:ResetSkillBonusAndGainedLevels(skillRef)
+            end
+        end,
+    })
+    self.SkillContextMenu:SetParent(self.frame or UIParent)
+    self.SkillContextMenu:Create()
+    return self.SkillContextMenu
+end
+
+function SkillsPage:ShowSkillContextMenu(anchorFrame, row)
+    if not anchorFrame or type(row) ~= "table" or not row.ref then
+        return
+    end
+
+    local permanentBonus = type(Profile.GetSkillPermanentBonus) == "function"
+        and math.max(0, math.floor(tonumber(Profile.GetSkillPermanentBonus(row.ref)) or 0))
+        or 0
+    local storedLevel = type(Profile.GetSkillLevel) == "function"
+        and math.max(0, math.floor(tonumber(Profile.GetSkillLevel(row.ref)) or 0))
+        or 0
+    local hasBonus = permanentBonus > 0
+    local hasGainedLevels = storedLevel > 0
+    local canAddPermanentBonus = getSkillRuleValue("allow_permanent_skill_bonuses_after_setup", false) == true
+
+    self.ContextMenuSkillRef = row.ref
+    local menu = self:EnsureSkillContextMenu()
+    menu:SetItems({
+        { label = "Add Permanent Bonus...", value = "add-permanent-bonus", enabled = canAddPermanentBonus },
+        { label = "Reset Permanent Bonus", value = "reset-permanent-bonus", enabled = hasBonus },
+        { label = "Reset Gained Levels", value = "reset-gained-levels", enabled = hasGainedLevels },
+        { label = "Reset Bonus & Gained Levels", value = "reset-bonus-and-levels", enabled = hasBonus or hasGainedLevels },
+    })
+    menu:ShowAt(anchorFrame)
 end
 
 function SkillsPage:GetSelectedRows()
@@ -2106,7 +2269,12 @@ function SkillsPage:BuildSkillEntryRenderer()
 
         entry:SetIcon(row.icon ~= "" and row.icon or "Interface\\Icons\\INV_Misc_QuestionMark")
         entry:SetSkillName(row.name or "Unnamed Skill")
-        entry:SetValueText(("%d / %d"):format(tonumber(row.value) or 0, tonumber(row.maxValue) or 0))
+        local bonusValue = tonumber(row.bonusValue) or 0
+        local valueText = ("%d / %d"):format(tonumber(row.value) or 0, tonumber(row.maxValue) or 0)
+        if bonusValue ~= 0 then
+            valueText = valueText .. (" |cff55ff55(%+d)|r"):format(bonusValue)
+        end
+        entry:SetValueText(valueText)
         entry:SetProgress(row.progressValue, row.maxValue, "")
         entry:SetSelected(tostring(row.ref or "") == tostring(self.SelectedSkillRef or ""))
         if tostring(row.ref or "") == tostring(self.SelectedSkillRef or "") then
@@ -2120,6 +2288,10 @@ function SkillsPage:BuildSkillEntryRenderer()
         if frame then
             frame:EnableMouse(true)
             frame:SetScript("OnMouseUp", function(_, button)
+                if button == "RightButton" and row and row.ref then
+                    self:ShowSkillContextMenu(frame, row)
+                    return
+                end
                 if button == "LeftButton" and row and row.ref then
                     if tostring(row.ref or "") == tostring(self.SelectedSkillRef or "") then
                         return
@@ -2193,10 +2365,10 @@ function SkillsPage:RefreshFooter()
     end
 
     if self.FooterValueText and self.FooterValueText.SetText then
-        self.FooterValueText:SetText(row and ("Current Level: %d"):format(tonumber(row.value) or 0) or "Current Level: --")
+        self.FooterValueText:SetText(row and ("Current Level: %d"):format(tonumber(row.baseValue) or 0) or "Current Level: --")
     end
     if self.FooterProgressText and self.FooterProgressText.SetText then
-        self.FooterProgressText:SetText(row and ("Progress: %d / %d"):format(tonumber(row.progressValue) or 0, tonumber(row.maxValue) or 0) or "Progress: --")
+        self.FooterProgressText:SetText(row and ("Progress: %d / %d"):format(tonumber(row.baseValue) or 0, tonumber(row.maxValue) or 0) or "Progress: --")
     end
     if self.FooterBaseText and self.FooterBaseText.SetText then
         if not row then
@@ -2204,16 +2376,12 @@ function SkillsPage:RefreshFooter()
         elseif row.isDerived == true then
             local statName = resolveDerivedStatLabel(row.derivedStatRef)
             local derivedAmount = tonumber(row.derivedValue) or 0
-            local storedAmount = tonumber(row.storedValue) or 0
-            local sourceText = ("%d from %s x %s"):format(
+            local sourceText = ("Derived Stat Bonus: %+d (%s x %s)"):format(
                 derivedAmount,
                 statName ~= "" and statName or "stat",
                 tostring(tonumber(row.derivedMultiplier) or 0)
             )
-            if storedAmount > 0 then
-                sourceText = ("%s, stored +%d"):format(sourceText, storedAmount)
-            end
-            self.FooterBaseText:SetText(("Base Value: %d (%s)"):format(
+            self.FooterBaseText:SetText(("Base Value: %d | %s"):format(
                 tonumber(row.baseValue) or 0,
                 sourceText
             ))

@@ -12,6 +12,11 @@ local function getGuildBinding(guildSetting)
     return guildName ~= "" and guildName or "Any Guild"
 end
 
+local function isShopContribution(guildSetting)
+    return type(guildSetting) == "table"
+        and tostring(guildSetting.targetGuildSettingRef or ""):match("^%s*(.-)%s*$") ~= ""
+end
+
 function DataEditor:BuildGuildSettingPage(page)
     if self.GuildSettingPageRoot then
         self:RefreshGuildSettingDataPage()
@@ -64,17 +69,18 @@ function DataEditor:BuildGuildSettingPage(page)
             row:SetDetail(guildSetting and guildSetting.description or "")
         end
 
+        local rawIndex = self.GuildSettingDisplayRawIndices and self.GuildSettingDisplayRawIndices[itemIndex] or itemIndex
         local frame = row.GetFrame and row:GetFrame() or nil
         if frame then
             frame:EnableMouse(true)
             frame:SetScript("OnMouseUp", function(_, button)
                 if button == "LeftButton" then
-                    self:SetSelectedDatasetEntryIndex("guildSettings", itemIndex)
+                    self:SetSelectedDatasetEntryIndex("guildSettings", rawIndex)
                 end
             end)
 
             local selectedEntry = self.SelectedEntryIndices and self.SelectedEntryIndices.guildSettings or nil
-            local isSelected = tonumber(selectedEntry) == tonumber(itemIndex)
+            local isSelected = tonumber(selectedEntry) == tonumber(rawIndex)
             if row.entryBackground and row.entryBackground.SetColorTexture then
                 local token = isSelected and "list.rowHover" or "list.rowBackground"
                 local color = UI.ResolveColor(nil, token)
@@ -110,18 +116,34 @@ function DataEditor:RefreshGuildSettingDataPage()
 
     local dataset = self:GetSelectedDataset()
     local guildSettings = dataset and dataset.guildSettings or {}
+    local visibleSettings = {}
+    local rawIndices = {}
+    for rawIndex = 1, #guildSettings do
+        local guildSetting = guildSettings[rawIndex]
+        if not isShopContribution(guildSetting) then
+            visibleSettings[#visibleSettings + 1] = guildSetting
+            rawIndices[#rawIndices + 1] = rawIndex
+        end
+    end
+    self.GuildSettingDisplayRawIndices = rawIndices
+
+    local selectedRawIndex = self.SelectedEntryIndices and tonumber(self.SelectedEntryIndices.guildSettings) or nil
+    if selectedRawIndex and isShopContribution(guildSettings[selectedRawIndex]) then
+        self.SelectedEntryIndices.guildSettings = nil
+        self.ActiveInspectorPageKey = "dataset"
+    end
 
     self:RefreshDataPageToolbar(self.GuildSettingPageButtons)
 
     if self.GuildSettingPageScroll and self.GuildSettingPageScroll.SetItems then
-        self.GuildSettingPageScroll:SetItems(guildSettings)
+        self.GuildSettingPageScroll:SetItems(visibleSettings)
     end
 
     if self.GuildSettingPageEmptyText and self.GuildSettingPageEmptyText.SetText then
         if not dataset then
-            self.GuildSettingPageEmptyText:SetText("Create or select a dataset to view Guild Ranks.")
-        elseif #guildSettings == 0 then
-            self.GuildSettingPageEmptyText:SetText("This dataset has no Guild Ranks yet.")
+            self.GuildSettingPageEmptyText:SetText("Create or select a dataset to view Guild Settings.")
+        elseif #visibleSettings == 0 then
+            self.GuildSettingPageEmptyText:SetText("This dataset has no Guild Settings yet.")
         else
             self.GuildSettingPageEmptyText:SetText("")
         end

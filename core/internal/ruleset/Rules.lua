@@ -19,6 +19,8 @@ Rules.Definitions = {
             { key = "starting_item_tags", label = "Starting Item Tags", type = "text", default = "", description = "Comma-separated item tags that qualify items for the setup wizard starting-item picker." },
             { key = "starting_item_budget_copper", label = "Starting Item Budget (Copper)", type = "text", default = "0", description = "Optional copper budget for the setup wizard starting-item picker. Use 0 to disable the budget." },
             { key = "required_starting_item_slot_refs", label = "Required Starting Item Slots", type = "dropdown", default = {}, multiSelect = true, description = "Require the setup wizard selection to include equipable items that satisfy these item slots.", optionsSource = "itemSlotReference" },
+            { key = "enable_skills_page", label = "Enable Skills Page", type = "checkbox", default = true, description = "Show the Skills page in the setup wizard for allocating permanent bonuses to non-combat skills." },
+            { key = "permanent_skill_point_limit", label = "Permanent Skill Point Limit", type = "text", default = "50", description = "Maximum number of permanent non-combat skill points that can be allocated during character setup." },
         },
     },
     {
@@ -178,6 +180,8 @@ Rules.Definitions = {
         label = "Event",
         rules = {
             { key = "max_event_units", label = "Max Event Units", type = "text", default = "5", description = "Maximum number of event units shown per turn page." },
+            { key = "event_end_justice_currency", label = "End Event Justice", type = "text", default = "100", description = "Justice granted automatically to each participant when an event ends. Set to 0 to disable." },
+            { key = "boss_kill_valor_currency", label = "Boss Kill Valor", type = "text", default = "25", description = "Valor granted automatically to each participant when a boss-flag NPC dies. Set to 0 to disable." },
             { key = "initiative_stat", label = "Initiative Stat", type = "dropdown", default = "", description = "Select the stat reference used to resolve initiative.", optionsSource = "statReference", retainedWithoutConsumer = true },
             {
                 key = "allowed_event_difficulties",
@@ -202,6 +206,7 @@ Rules.Definitions = {
             { key = "offhand_slot", label = "Off Hand Slot", type = "dropdown", default = "", description = "Select the item slot reference used for the unit off-hand assignment.", optionsSource = "itemSlotReference" },
             { key = "ranged_slot", label = "Ranged Slot", type = "dropdown", default = "", description = "Select the item slot reference used for the unit ranged assignment.", optionsSource = "itemSlotReference" },
             { key = "shield_slot", label = "Shield Slot", type = "dropdown", default = "", description = "Select the item slot reference used for the unit shield assignment.", optionsSource = "itemSlotReference" },
+            { key = "enforce_class_armor_weight_restrictions", label = "Enforce Class Armor Weight Restrictions", type = "checkbox", default = true, description = "Prevent player characters from equipping armor whose Armor Weight is not allowed by their selected class. A class with no allowed armor types cannot equip armor while this rule is enabled." },
             { key = "allow_dual_wield", label = "Allow Dual Wield", type = "checkbox", default = false, description = "Enable dual-wield logic for weapon handling.", retainedWithoutConsumer = true },
         },
     },
@@ -210,10 +215,11 @@ Rules.Definitions = {
         label = "Traits",
         rules = {
             { key = "max_total_traits", label = "Max Total Traits", type = "text", default = "0", description = "Maximum number of manually learned traits allowed. Use 0 for unlimited." },
-            { key = "base_talent_traits", label = "Base Talent Traits", type = "text", default = "999", description = "Number of manual talent traits allowed before level scaling is added." },
-            { key = "talent_traits_per_level", label = "Talent Traits Per Level", type = "text", default = "0", description = "Additional manual talent traits granted per level above 1." },
-            { key = "auto_enable_race_traits", label = "Auto Enable Race Traits", type = "checkbox", default = true, description = "Automatically activate traits assigned to the selected race." },
-            { key = "auto_enable_class_traits", label = "Auto Enable Class Traits", type = "checkbox", default = true, description = "Automatically activate traits assigned to the selected class." },
+            { key = "enforce_class_talent_limit", label = "Enforce Class Talent Limit", type = "checkbox", default = true, description = "Apply the class-talent progression limit. Disabled keeps class talents opt-in without a cap." },
+            { key = "base_talent_traits", label = "Base Class Talents", type = "text", default = "2", description = "Selected class talents allowed before level scaling is added." },
+            { key = "talent_traits_per_level", label = "Class Talents Per Level", type = "text", default = "0", description = "Additional selected class talents granted per level above 1." },
+            { key = "auto_enable_race_traits", label = "Auto Enable Race Traits (Legacy)", type = "checkbox", default = true, description = "Retained for imported rulesets; race traits are always intrinsic." },
+            { key = "auto_enable_class_traits", label = "Auto Enable Class Traits (Legacy)", type = "checkbox", default = true, description = "Retained for imported rulesets; class passives are always intrinsic and talents remain opt-in." },
             { key = "count_race_traits_toward_total", label = "Count Race Traits Toward Total", type = "checkbox", default = false, description = "Count auto-enabled race traits against the total-trait cap." },
             { key = "count_class_traits_toward_total", label = "Count Class Traits Toward Total", type = "checkbox", default = false, description = "Count auto-enabled class traits against the total-trait cap." },
             { key = "allow_class_traits", label = "Allow Class Traits", type = "checkbox", default = true, description = "Allow learned class traits to affect the character and appear in trait views." },
@@ -245,8 +251,9 @@ Rules.Definitions = {
             { key = "noncombat_skill_max_level", label = "Non-Combat Skill Max Level", type = "text", default = "100", description = "Maximum resolved level shown for non-combat skills." },
             { key = "crafting_skill_max_level", label = "Crafting Skill Max Level", type = "text", default = "100", description = "Maximum resolved level shown for crafting skills." },
             { key = "language_skill_max_level", label = "Language Skill Max Level", type = "text", default = "100", description = "Maximum resolved level shown for language skills." },
-            { key = "weapon_skill_gain_chance_on_hit", label = "Weapon Skill Gain Chance On Hit", type = "text", default = "0", description = "Percent chance to gain weapon skill progression from a valid hit." },
-            { key = "noncombat_skill_gain_chance_on_roll", label = "Non-Combat Skill Gain Chance On Roll", type = "text", default = "0", description = "Percent chance to gain non-combat skill progression from a valid roll." },
+            { key = "allow_permanent_skill_bonuses_after_setup", label = "Allow Permanent Skill Bonuses After Setup", type = "checkbox", default = false, description = "Allow players to manually add permanent skill bonuses from the Skills window after character setup." },
+            { key = "weapon_skill_gain_chance_on_hit", label = "Weapon Skill Gain Chance On Hit", type = "text", default = "66", description = "Percent chance to gain weapon skill progression from a valid hit." },
+            { key = "noncombat_skill_gain_chance_on_roll", label = "Non-Combat Skill Gain Chance On Roll", type = "text", default = "66", description = "Percent chance to gain non-combat skill progression from a valid roll." },
             { key = "language_skill_gain_chance", label = "Language Skill Gain Chance", type = "text", default = "0", description = "Percent chance to gain language skill progression from supported language actions." },
         },
     },
@@ -264,7 +271,18 @@ Rules.Definitions = {
         key = "interface",
         label = "Interface",
         rules = {
-            { key = "action_bar_size", label = "Action Bar Size", type = "text", default = "5", description = "Number of spell slots shown in the player action bar widget." },
+            { key = "action_bar_size", label = "Action Bar Size", type = "text", default = "5", description = "Number of visible slots in the player action bar widget." },
+            {
+                key = "action_bar_layout",
+                label = "Action Bar Layout",
+                type = "dropdown",
+                default = "complex",
+                description = "Complex keeps the visible slot count fixed and scrolls bound spells beside automatic attacks. Simple shows every automatic attack plus every configured slot.",
+                options = {
+                    { label = "Complex", value = "complex" },
+                    { label = "Simple", value = "simple" },
+                },
+            },
             { key = "use_item_level", label = "Use Item Level", type = "checkbox", default = true, description = "Show item level in eligible item tooltips and the profile equipment summary." },
             {
                 key = "trait_display_mode",

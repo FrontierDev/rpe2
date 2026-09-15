@@ -279,6 +279,29 @@ local function refreshSpellcastVisualState(reason, casterEventId)
     end
 end
 
+local function revealLocalCasterForSpell(client, casterUnit, spell)
+    if type(casterUnit) ~= "table"
+        or casterUnit.hidden ~= true
+        or type(spell) ~= "table"
+        or spell.doesNotRevealCaster == true
+    then
+        return false
+    end
+
+    casterUnit.hidden = false
+    if type(client) == "table" and type(client.InvalidatePendingSpellTargetingDisplayState) == "function" then
+        client:InvalidatePendingSpellTargetingDisplayState()
+    end
+    if type(client) == "table"
+        and client.PendingSpellTargeting ~= nil
+        and type(client.QueueTargetingWidgetRefresh) == "function"
+    then
+        client:QueueTargetingWidgetRefresh("spellcast-reveal")
+    end
+    refreshSpellcastVisualState("spellcast-reveal-local", casterUnit.eventID)
+    return true
+end
+
 local function queueSpellcastResourceVisualSync(client, eventState, eventUnit, payload, reason)
     if type(client) ~= "table" or type(payload) ~= "table" or #payload == 0 then
         return false
@@ -450,6 +473,8 @@ function Client:HandleSpellcastComplete(arguments, sender)
     if not payload then
         return false
     end
+
+    revealLocalCasterForSpell(self, payload.casterUnit, payload.spell)
 
     local previous = Spellcasting.RemoveCastEntry(self, payload.eventId, payload.casterEventId)
     local suppressLog = Spellcasting.ShouldSuppressLoopbackLog(self, payload.eventId, payload.casterEventId, payload.spellRef, payload.authorityType, payload.sender, "complete")

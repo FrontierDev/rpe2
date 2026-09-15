@@ -6,6 +6,7 @@ local Database = Addon.Internal.Database or {}
 Addon.Internal.Database = Database
 local Dependecies = Database.Dependecies or {}
 local Runtime = Addon.Internal.Runtime
+local activeDatasetImportTransaction = nil
 
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
@@ -32,9 +33,26 @@ local function stopTiming(timer)
     end
 end
 
+local function logCompatibilityBoundary(stage, reason, revision)
+    local debug = Addon.Debug
+    if not debug or type(debug.Internal) ~= "function" then
+        return
+    end
+
+    local common = Addon.Utils and Addon.Utils.Common or nil
+    local clientName = common and type(common.GetPlayerName) == "function" and common.GetPlayerName() or nil
+    debug.Internal(
+        "Compatibility refresh client=%s revision=%d datasetHash=<pending> rulesetHash=<pending> stage=%s reason=%s.",
+        tostring(clientName or "unknown"),
+        tonumber(revision) or 0,
+        tostring(stage or "unknown"),
+        tostring(reason or "configuration-changed")
+    )
+end
+
 local SCHEMA = {
     profiles = 7,
-    rulesets = 1,
+    rulesets = 3,
     datasets = 20,
     globalSettings = 1,
 }
@@ -75,7 +93,7 @@ local DATASET_ENTRY_DEFINITIONS = {
     auras = { className = "Aura", singular = "Aura", assignsId = true },
     interactions = { className = "Interaction", singular = "Interaction", assignsId = true },
     achievements = { className = "Achievement", singular = "Achievement", assignsId = true },
-    guildSettings = { className = "GuildSetting", singular = "Guild Rank", assignsId = true },
+    guildSettings = { className = "GuildSetting", singular = "Guild Setting", assignsId = true },
     currencies = { className = "Currency", singular = "Currency", assignsId = true },
 }
 
@@ -129,6 +147,7 @@ local CONFIGURATION_CHANGE_CLASSIFICATION = {
     ["profile-primary-resource"] = "structural profile change",
     ["profile-special-resource"] = "structural profile change",
     ["profile-setup-wizard"] = "authored configuration",
+    ["profile-setup-wizard-completed"] = "authored configuration",
     ["profile-action-bar-anchor"] = "authored configuration",
     ["profile-action-bar"] = "authored configuration",
     ["profile-skill-action-bar"] = "authored configuration",
@@ -211,21 +230,42 @@ local function copyAuthoredConfiguration(value)
     return copy
 end
 
-local function markConfigurationChanged()
+local function markConfigurationChanged(reason)
     Addon.Internal = Addon.Internal or {}
     Addon.Internal.ConfigurationRevision = math.max(0, math.floor(tonumber(Addon.Internal.ConfigurationRevision) or 0)) + 1
+    logCompatibilityBoundary("revision", reason, Addon.Internal.ConfigurationRevision)
     return Addon.Internal.ConfigurationRevision
 end
 
-local function notifyConfigurationChanged(reason)
+function Database.MarkConfigurationChanged(reason)
+    return markConfigurationChanged(reason)
+end
+
+local function notifyConfigurationChanged(reason, options)
     if isRuntimeOnlyConfigurationReason(reason) then
         logRuntimeConfigurationBoundaryViolation(reason)
     end
 
     local timer = startTiming("Database:notifyConfigurationChanged", 4, reason or "configuration-changed")
-    markConfigurationChanged()
+    local revision = markConfigurationChanged(reason)
     local client = Addon.Client or nil
-    if client and type(client.TryDeferLocalConfigurationChanged) == "function" and client:TryDeferLocalConfigurationChanged(reason) then
+    logCompatibilityBoundary("database-dispatch", reason, revision)
+    if not (type(options) == "table" and options.bypassEditorDeferral == true)
+        and client
+        and type(client.TryDeferLocalConfigurationChanged) == "function"
+        and client:TryDeferLocalConfigurationChanged(reason)
+    then
+        logCompatibilityBoundary("editor-deferred", reason, revision)
+        stopTiming(timer)
+        return
+    end
+    if type(options) == "table"
+        and options.queueConfigurationRefresh == true
+        and client
+        and type(client.QueueLocalConfigurationRefresh) == "function"
+    then
+        logCompatibilityBoundary("local-refresh-queued", reason, revision)
+        client:QueueLocalConfigurationRefresh(reason)
         stopTiming(timer)
         return
     end
@@ -233,14 +273,30 @@ local function notifyConfigurationChanged(reason)
         and client
         and type(client.QueueLocalConfigurationRefresh) == "function"
     then
+        logCompatibilityBoundary("profile-refresh-queued", reason, revision)
         client:QueueLocalConfigurationRefresh(reason)
         stopTiming(timer)
         return
     end
     if client and type(client.HandleLocalConfigurationChanged) == "function" then
+        logCompatibilityBoundary("client-refresh-dispatched", reason, revision)
         client:HandleLocalConfigurationChanged(reason)
     end
     stopTiming(timer)
+end
+
+local function notifyDatasetConfigurationChanged(reason, options)
+    if type(activeDatasetImportTransaction) == "table" then
+        activeDatasetImportTransaction.configurationChangeReason = reason or activeDatasetImportTransaction.configurationChangeReason or "dataset-import"
+        return true
+    end
+
+    notifyConfigurationChanged(reason, options)
+    return true
+end
+
+function Database.IsDatasetImportTransactionActive()
+    return type(activeDatasetImportTransaction) == "table"
 end
 
 local function runProfileRuntimeMutation(reason, scope, detail, mutation)
@@ -527,22 +583,14 @@ local function normalizeGuildSettingEntry(record)
         local instance = guildSettingClass.FromTable(deepCopy(source))
         local normalized = guildSettingClass.ToTable(instance)
         if type(normalized) == "table" then
-            local merged = deepCopy(source)
-            for key, value in pairs(normalized) do
-                merged[key] = value
-            end
-            return merged
+            return deepCopy(normalized)
         end
     end
 
-    -- GuildSetting.lua loads after Database.lua. This keeps old records safe
-    -- during Database.Initialize; later normalizations apply the full class
-    -- contract once the class is available.
-    local normalized = deepCopy(source)
-    if normalized.wowGuildRankIndices == nil then
-        normalized.wowGuildRankIndices = {}
-    end
-    return normalized
+    -- GuildSetting.lua loads after Database.lua. Preserve the source exactly
+    -- during the first initialization pass; later normalizations apply the
+    -- authoritative class contract once the class is available.
+    return deepCopy(source)
 end
 
 local function normalizeGuildSettings(value)
@@ -970,6 +1018,20 @@ local function normalizeProfileRecipeKnowledge(record)
     }
 end
 
+local function normalizeProfileSkillPermanentBonuses(record)
+    local normalized = {}
+
+    for skillRef, storedValue in pairs(ensureTable(record)) do
+        local normalizedSkillRef = ensureString(skillRef, "")
+        local normalizedValue = math.max(0, math.floor(tonumber(storedValue) or 0))
+        if normalizedSkillRef ~= "" and normalizedValue > 0 then
+            normalized[normalizedSkillRef] = normalizedValue
+        end
+    end
+
+    return normalized
+end
+
 local function normalizeProfileSkillLevels(record)
     local normalized = {}
 
@@ -997,6 +1059,10 @@ local function normalizeProfileTraits(record)
 end
 
 local function normalizeProfileActiveTraits(record)
+    return normalizeProfileTraits(record)
+end
+
+local function normalizeProfileSelectedClassTalentTraits(record)
     return normalizeProfileTraits(record)
 end
 
@@ -1172,8 +1238,12 @@ local function normalizeProfileSetupWizard(record)
     return {
         raceRef = ensureString(data.raceRef, ""),
         classRef = ensureString(data.classRef, ""),
+        primaryResourceRef = ensureString(data.primaryResourceRef, ""),
+        specialResourceRef = ensureString(data.specialResourceRef, ""),
+        completed = data.completed == true,
         startingItemRefs = startingItemRefs,
         actionBarSpellRefs = actionBarSpellRefs,
+        skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(data.skillPermanentBonuses),
     }
 end
 
@@ -1217,7 +1287,9 @@ local function normalizeProfileRecord(record, fallbackCharacterKey, fallbackName
         traits = normalizeProfileTraits(data.traits),
         activeTraits = normalizeProfileActiveTraits(data.activeTraits ~= nil and data.activeTraits or data.traits),
         inactiveTraits = normalizeProfileActiveTraits(data.inactiveTraits),
+        selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(data.selectedClassTalentTraits),
         skillLevels = normalizeProfileSkillLevels(data.skillLevels),
+        skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(data.skillPermanentBonuses),
         preferredConsumables = normalizeProfilePreferredConsumables(data.preferredConsumables),
         actionBar = normalizeProfileActionBar(data.actionBar),
         skillActionBar = normalizeProfileActionBar(data.skillActionBar),
@@ -1314,6 +1386,9 @@ local function isDefaultProfileRecord(record)
         and ensureString(resourceDisplay.specialResourceRef, "") == ""
         and ensureString(setupWizard.raceRef, "") == ""
         and ensureString(setupWizard.classRef, "") == ""
+        and ensureString(setupWizard.primaryResourceRef, "") == ""
+        and ensureString(setupWizard.specialResourceRef, "") == ""
+        and setupWizard.completed ~= true
         and isTableEmpty(setupWizard.startingItemRefs)
         and isTableEmpty(setupWizard.actionBarSpellRefs)
         and isTableEmpty(profile.statBonuses)
@@ -1482,17 +1557,34 @@ local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId
     end
 
     local classObject = getDatasetEntryClassObject(collectionKey)
+    local sourceData = deepCopy(type(data) == "table" and data or {})
+    if collectionKey == "classes" and type(sourceData.traitRefs) == "table" then
+        sourceData.passiveTraitRefs = type(sourceData.passiveTraitRefs) == "table" and sourceData.passiveTraitRefs or {}
+        sourceData.talentTraitRefs = type(sourceData.talentTraitRefs) == "table" and sourceData.talentTraitRefs or {}
+        for index = 1, #sourceData.traitRefs do
+            local traitRef = ensureString(sourceData.traitRefs[index], "")
+            local traitId = traitRef:match("^[^:]+:(.+)$")
+            local legacyTrait = nil
+            for traitIndex = 1, #(dataset and dataset.traits or {}) do
+                local candidate = dataset.traits[traitIndex]
+                if candidate and tostring(candidate.id or "") == tostring(traitId or "") then legacyTrait = candidate; break end
+            end
+            local target = legacyTrait and legacyTrait.isTalent == true and sourceData.talentTraitRefs or sourceData.passiveTraitRefs
+            target[#target + 1] = traitRef
+        end
+        sourceData.traitRefs = nil
+    end
     local normalized = nil
 
     if classObject and type(classObject.FromTable) == "function" then
-        local instance = classObject.FromTable(deepCopy(type(data) == "table" and data or {}))
+        local instance = classObject.FromTable(sourceData)
         if classObject.ToTable then
             normalized = classObject.ToTable(instance)
         else
             normalized = deepCopy(instance)
         end
     elseif classObject and type(classObject.New) == "function" then
-        local instance = classObject:New(deepCopy(type(data) == "table" and data or {}))
+        local instance = classObject:New(sourceData)
         if classObject.ToTable then
             normalized = classObject.ToTable(instance)
         else
@@ -1500,8 +1592,8 @@ local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId
         end
     else
         normalized = createDatasetEntryRecord(dataset, collectionKey, entryId)
-        if type(data) == "table" then
-            applyTable(normalized, deepCopy(data))
+        if type(sourceData) == "table" then
+            applyTable(normalized, sourceData)
         end
     end
 
@@ -1673,6 +1765,34 @@ local function normalizeDatasetsCollection(root)
     end
 
     root.datasets = normalized
+    -- Legacy datasets put both passives and talents in Class.traitRefs and
+    -- repeated the classification on the trait. Convert once at load time so
+    -- runtime ownership has exactly one source of truth.
+    local traitsByRef = {}
+    for datasetId, dataset in pairs(normalized) do
+        for traitIndex = 1, #(dataset.traits or {}) do
+            local trait = dataset.traits[traitIndex]
+            if trait and trait.id then
+                traitsByRef[tostring(datasetId) .. ":" .. tostring(trait.id)] = trait
+            end
+        end
+    end
+    for _, dataset in pairs(normalized) do
+        for classIndex = 1, #(dataset.classes or {}) do
+            local class = dataset.classes[classIndex]
+            if type(class) == "table" and type(class.traitRefs) == "table" then
+                class.passiveTraitRefs = type(class.passiveTraitRefs) == "table" and class.passiveTraitRefs or {}
+                class.talentTraitRefs = type(class.talentTraitRefs) == "table" and class.talentTraitRefs or {}
+                for traitIndex = 1, #class.traitRefs do
+                    local traitRef = ensureString(class.traitRefs[traitIndex], "")
+                    local legacyTrait = traitsByRef[traitRef]
+                    local target = legacyTrait and legacyTrait.isTalent == true and class.talentTraitRefs or class.passiveTraitRefs
+                    target[#target + 1] = traitRef
+                end
+                class.traitRefs = nil
+            end
+        end
+    end
     return root.datasets
 end
 
@@ -1823,6 +1943,7 @@ function Database.GetOrCreateActiveProfile()
         traits = {},
         activeTraits = {},
         inactiveTraits = {},
+        selectedClassTalentTraits = {},
         skillLevels = {},
         preferredConsumables = {},
         actionBar = {},
@@ -2051,6 +2172,89 @@ function Database.ListProfileInactiveTraits()
     return traits
 end
 
+function Database.ListProfileSelectedClassTalentTraits()
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(profile.selectedClassTalentTraits)
+    return deepCopy(profile.selectedClassTalentTraits)
+end
+
+function Database.AddProfileSelectedClassTalentTrait(traitRef)
+    local normalizedRef = ensureString(traitRef, "")
+    if not isValidProfileTraitRef(normalizedRef) then return false end
+    local profileApi = Addon.Internal and Addon.Internal.Profile
+    if type(profileApi) == "table" and type(profileApi.ValidateTraitAssignment) == "function" then
+        local validation = profileApi.ValidateTraitAssignment(normalizedRef, { operation = "select" })
+        if validation.valid ~= true then return false, validation end
+    end
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(profile.selectedClassTalentTraits)
+    for index = 1, #profile.selectedClassTalentTraits do
+        if profile.selectedClassTalentTraits[index] == normalizedRef then return false end
+    end
+    profile.selectedClassTalentTraits[#profile.selectedClassTalentTraits + 1] = normalizedRef
+    notifyConfigurationChanged("profile-selected-class-talents")
+    return true
+end
+
+function Database.RemoveProfileSelectedClassTalentTrait(traitRef)
+    local normalizedRef = ensureString(traitRef, "")
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(profile.selectedClassTalentTraits)
+    for index = 1, #profile.selectedClassTalentTraits do
+        if profile.selectedClassTalentTraits[index] == normalizedRef then
+            table.remove(profile.selectedClassTalentTraits, index)
+            notifyConfigurationChanged("profile-selected-class-talents")
+            return true
+        end
+    end
+    return false
+end
+
+function Database.ClearProfileSelectedClassTalentTraits()
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(profile.selectedClassTalentTraits)
+    if #profile.selectedClassTalentTraits == 0 then return false end
+    profile.selectedClassTalentTraits = {}
+    notifyConfigurationChanged("profile-selected-class-talents")
+    return true
+end
+
+function Database.SetProfileSelectedClassTalentTraits(traitRefs)
+    local normalized = normalizeProfileSelectedClassTalentTraits(traitRefs)
+    local profileApi = Addon.Internal and Addon.Internal.Profile
+    if type(profileApi) == "table" and type(profileApi.ValidateTraitAssignment) == "function" then
+        for index = 1, #normalized do
+            local validation = profileApi.ValidateTraitAssignment(normalized[index], {
+                operation = "select",
+                selectedClassTalentRefs = normalized,
+            })
+            if validation.valid ~= true then return false, validation end
+        end
+        if type(profileApi.GetClassTalentAllowance) == "function" then
+            local level = Database.GetProfileLevel and Database.GetProfileLevel() or 1
+            local allowance = profileApi.GetClassTalentAllowance(level)
+            if allowance.isLimited == true and #normalized > allowance.maxTalentTraits then
+                return false, { valid = false, code = "talent_limit", reason = ("Class talent limit reached: %d / %d."):format(#normalized, allowance.maxTalentTraits) }
+            end
+        end
+    end
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.selectedClassTalentTraits = normalizeProfileSelectedClassTalentTraits(profile.selectedClassTalentTraits)
+    if #profile.selectedClassTalentTraits == #normalized then
+        local unchanged = true
+        for index = 1, #normalized do
+            if profile.selectedClassTalentTraits[index] ~= normalized[index] then
+                unchanged = false
+                break
+            end
+        end
+        if unchanged then return false end
+    end
+    profile.selectedClassTalentTraits = normalized
+    notifyConfigurationChanged("profile-selected-class-talents")
+    return true
+end
+
 function Database.ListProfilePreferredConsumables()
     local profile = Database.GetOrCreateActiveProfile()
     profile.preferredConsumables = normalizeProfilePreferredConsumables(profile.preferredConsumables)
@@ -2067,6 +2271,11 @@ function Database.AddProfileTrait(traitRef)
     local normalizedRef = ensureString(traitRef, "")
     if not isValidProfileTraitRef(normalizedRef) then
         return false
+    end
+    local profileApi = Addon.Internal and Addon.Internal.Profile
+    if type(profileApi) == "table" and type(profileApi.ValidateTraitAssignment) == "function" then
+        local validation = profileApi.ValidateTraitAssignment(normalizedRef, { operation = "add" })
+        if validation.valid ~= true then return false, validation end
     end
 
     local profile = Database.GetOrCreateActiveProfile()
@@ -2087,6 +2296,11 @@ function Database.AddProfileActiveTrait(traitRef)
     local normalizedRef = ensureString(traitRef, "")
     if not isValidProfileTraitRef(normalizedRef) then
         return false
+    end
+    local profileApi = Addon.Internal and Addon.Internal.Profile
+    if type(profileApi) == "table" and type(profileApi.ValidateTraitAssignment) == "function" then
+        local validation = profileApi.ValidateTraitAssignment(normalizedRef, { operation = "activate" })
+        if validation.valid ~= true then return false, validation end
     end
 
     local profile = Database.GetOrCreateActiveProfile()
@@ -2622,9 +2836,72 @@ end
 
 function Database.SetProfileSetupWizardState(state)
     local profile = Database.GetOrCreateActiveProfile()
+    local previousState = normalizeProfileSetupWizard(profile.setupWizard)
     profile.setupWizard = normalizeProfileSetupWizard(state)
+    -- Completion is controlled by the successful finalisation path below.
+    -- Intermediate wizard state writes must never unlock an incomplete profile.
+    profile.setupWizard.completed = previousState.completed == true
     notifyConfigurationChanged("profile-setup-wizard")
     return normalizeProfileSetupWizard(profile.setupWizard)
+end
+
+function Database.SetProfileSetupWizardCompleted(completed)
+    local profile = Database.GetOrCreateActiveProfile()
+    local setupWizard = normalizeProfileSetupWizard(profile.setupWizard)
+    local normalizedCompleted = completed == true
+    if setupWizard.completed == normalizedCompleted then
+        return normalizedCompleted
+    end
+
+    setupWizard.completed = normalizedCompleted
+    profile.setupWizard = setupWizard
+    notifyConfigurationChanged("profile-setup-wizard-completed")
+    return normalizedCompleted
+end
+
+local function isEstablishedProfileForSetupMigration(profile)
+    local normalized = normalizeProfileRecord(profile, "", "")
+    local resourceDisplay = normalizeProfileResourceDisplay(normalized.resourceDisplay)
+
+    if ensureString(normalized.raceRef, "") ~= ""
+        and ensureString(normalized.classRef, "") ~= ""
+    then
+        return true
+    end
+
+    return not isTableEmpty(normalized.equipment)
+        or not isTableEmpty(normalized.mountEquipment)
+        or not isTableEmpty(normalized.petEquipment)
+        or not isTableEmpty(normalized.spellbook)
+        or not isTableEmpty(normalized.recipebook)
+        or not isTableEmpty(normalized.recipeKnowledge)
+        or not isTableEmpty(normalized.traits)
+        or not isTableEmpty(normalized.activeTraits)
+        or not isTableEmpty(normalized.inactiveTraits)
+        or not isTableEmpty(normalized.selectedClassTalentTraits)
+        or not isTableEmpty(normalized.skillLevels)
+        or not isTableEmpty(normalized.actionBar)
+        or not isTableEmpty(normalized.skillActionBar)
+        or not isTableEmpty(normalized.mountedActionBar)
+        or not isTableEmpty(normalized.preferredConsumables)
+        or ensureString(resourceDisplay.primaryResourceRef, "") ~= ""
+        or ensureString(resourceDisplay.specialResourceRef, "") ~= ""
+end
+
+function Database.MigrateProfileSetupWizardCompletion()
+    local profile = Database.GetOrCreateActiveProfile()
+    local setupWizard = normalizeProfileSetupWizard(profile.setupWizard)
+    if setupWizard.completed == true then
+        return true
+    end
+
+    if not isEstablishedProfileForSetupMigration(profile) then
+        return false
+    end
+
+    setupWizard.completed = true
+    profile.setupWizard = setupWizard
+    return true
 end
 
 function Database.GetProfileActionBarAnchor()
@@ -3175,6 +3452,65 @@ function Database.SetProfileGuildState(state)
     return deepCopy(profile.guild)
 end
 
+function Database.ListProfileSkillPermanentBonuses()
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(profile.skillPermanentBonuses)
+
+    local copy = {}
+    for skillRef, value in pairs(profile.skillPermanentBonuses) do
+        copy[skillRef] = value
+    end
+    return copy
+end
+
+function Database.GetProfileSkillPermanentBonus(skillRef)
+    local normalizedSkillRef = ensureString(skillRef, "")
+    if normalizedSkillRef == "" then
+        return 0
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(profile.skillPermanentBonuses)
+    return math.max(0, math.floor(tonumber(profile.skillPermanentBonuses[normalizedSkillRef]) or 0))
+end
+
+function Database.SetProfileSkillPermanentBonus(skillRef, value)
+    local normalizedSkillRef = ensureString(skillRef, "")
+    if normalizedSkillRef == "" then
+        return nil
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(profile.skillPermanentBonuses)
+    local previousValue = math.max(0, math.floor(tonumber(profile.skillPermanentBonuses[normalizedSkillRef]) or 0))
+    local normalizedValue = math.max(0, math.floor(tonumber(value) or 0))
+    if normalizedValue > 0 then
+        profile.skillPermanentBonuses[normalizedSkillRef] = normalizedValue
+    else
+        profile.skillPermanentBonuses[normalizedSkillRef] = nil
+    end
+    if previousValue ~= normalizedValue then
+        notifyConfigurationChanged("profile-skills")
+    end
+    return normalizedValue
+end
+
+function Database.ClearProfileSkillPermanentBonus(skillRef)
+    local normalizedSkillRef = ensureString(skillRef, "")
+    if normalizedSkillRef == "" then
+        return false
+    end
+
+    local profile = Database.GetOrCreateActiveProfile()
+    profile.skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(profile.skillPermanentBonuses)
+    local existed = profile.skillPermanentBonuses[normalizedSkillRef] ~= nil
+    profile.skillPermanentBonuses[normalizedSkillRef] = nil
+    if existed then
+        notifyConfigurationChanged("profile-skills")
+    end
+    return existed
+end
+
 function Database.ListProfileSkillLevels()
     local profile = Database.GetOrCreateActiveProfile()
     profile.skillLevels = normalizeProfileSkillLevels(profile.skillLevels)
@@ -3228,6 +3564,8 @@ function Database.ClearProfileSkillLevel(skillRef)
 end
 
 function Database.EnsureRulesets()
+    local existingRoot = rawget(_G, "RPEngineRulesetDB")
+    local previousSchema = type(existingRoot) == "table" and tonumber(existingRoot._schema) or 0
     local rulesets = ensureSection("RPEngineRulesetDB", SCHEMA.rulesets, {
         rulesets = {},
         activeByChar = {},
@@ -3240,7 +3578,20 @@ function Database.EnsureRulesets()
     rulesets.currentByChar = nil
     rulesets.activeByChar = ensureTable(rulesets.activeByChar)
     normalizeRulesetsCollection(rulesets)
+    local migratedTalentDefaults = false
+    if previousSchema < SCHEMA.rulesets then
+        for _, ruleset in pairs(rulesets.rulesets or {}) do
+            local traitRules = type(ruleset.rules) == "table" and ruleset.rules.traits or nil
+            if type(traitRules) == "table" and tonumber(traitRules.base_talent_traits) == 3 then
+                traitRules.base_talent_traits = 2
+                migratedTalentDefaults = true
+            end
+        end
+    end
     Database.Rulesets = rulesets
+    if migratedTalentDefaults then
+        notifyConfigurationChanged("ruleset-class-talent-default")
+    end
     return rulesets
 end
 
@@ -3304,15 +3655,15 @@ local function hasActivatedDatasetId(root, datasetId)
     return false
 end
 
-function Database.SyncDefaultDatasets(defaultDefinitions)
+function Database.SyncDefaultDatasets(defaultDefinitions, options)
     local changedDatasetIds = {}
     local skippedDefinitions = 0
+    local forceSync = type(options) == "table" and options.force == true
 
     if type(defaultDefinitions) ~= "table" then
         logDefaultDatasetSyncDiagnostic("<definitions>", "definitions must be a table")
         return changedDatasetIds, 1
     end
-
     local root = Database.Datasets
     if type(root) ~= "table" then
         root = Database.EnsureDatasets()
@@ -3359,7 +3710,7 @@ function Database.SyncDefaultDatasets(defaultDefinitions)
             local installedVersion = root.defaultDatasetVersions[datasetId]
             local existingDataset = root.datasets[datasetId]
             local firstInstall = installedVersion == nil
-            local needsWrite = existingDataset == nil or installedVersion ~= packagedVersion
+            local needsWrite = forceSync or existingDataset == nil or installedVersion ~= packagedVersion
 
             if needsWrite then
                 local installedDataset = normalizeDatasetRecord(
@@ -3777,13 +4128,16 @@ function Database.IsDatasetActivated(datasetId)
     return false
 end
 
-function Database.SetDatasetActivated(datasetId, isActivated)
+function Database.SetDatasetActivated(datasetId, isActivated, options)
     local normalizedId = ensureString(datasetId, "")
     if normalizedId == "" then
         return false
     end
 
-    local root = Database.EnsureDatasets()
+    local root = type(options) == "table" and options.root or nil
+    if type(root) ~= "table" then
+        root = Database.EnsureDatasets()
+    end
     local activated = normalizeActivatedDatasets(root)
     local existingIndex = nil
 
@@ -3801,14 +4155,18 @@ function Database.SetDatasetActivated(datasetId, isActivated)
 
         if existingIndex == nil then
             activated[#activated + 1] = normalizedId
-            notifyConfigurationChanged("dataset-activation")
+            if not (type(options) == "table" and options.deferConfigurationChange == true) then
+                notifyDatasetConfigurationChanged("dataset-activation")
+            end
         end
         return true
     end
 
     if existingIndex ~= nil then
         table.remove(activated, existingIndex)
-        notifyConfigurationChanged("dataset-activation")
+        if not (type(options) == "table" and options.deferConfigurationChange == true) then
+            notifyDatasetConfigurationChanged("dataset-activation")
+        end
     end
 
     return true
@@ -4026,7 +4384,9 @@ function Database.ImportDataset(text)
         payloadDataset = decoded.dataset
     end
 
-    local root = Database.EnsureDatasets()
+    local root = type(activeDatasetImportTransaction) == "table"
+        and activeDatasetImportTransaction.root
+        or Database.EnsureDatasets()
     local existingDatasets = {}
     for datasetId, dataset in pairs(root.datasets or {}) do
         existingDatasets[tostring(datasetId)] = dataset
@@ -4045,14 +4405,31 @@ function Database.ImportDataset(text)
     existingDatasets[imported.id] = imported
     root.datasets = existingDatasets
 
-    if Dependecies and Dependecies.RecomputeDatasetDependencies then
-        Dependecies.RecomputeDatasetDependencies(imported.id)
-    end
-    if Dependecies and Dependecies.RecomputeAllDatasetDependencies then
-        Dependecies.RecomputeAllDatasetDependencies()
+    -- Imported datasets are user-authored configuration. Activate them through
+    -- the same canonical path used by the editor, but defer its notification so
+    -- activation, dependency recomputation, and the import notification form a
+    -- single deterministic commit.
+    if not Database.SetDatasetActivated(imported.id, true, {
+        deferConfigurationChange = true,
+        root = root,
+    }) then
+        existingDatasets[imported.id] = nil
+        root.datasets = existingDatasets
+        return nil, "The imported dataset could not be activated."
     end
 
-    notifyConfigurationChanged("dataset-import")
+    if type(activeDatasetImportTransaction) ~= "table" then
+        if Dependecies and Dependecies.RecomputeAllDatasetDependencies then
+            Dependecies.RecomputeAllDatasetDependencies()
+        elseif Dependecies and Dependecies.RecomputeDatasetDependencies then
+            Dependecies.RecomputeDatasetDependencies(imported.id)
+        end
+    end
+
+    notifyDatasetConfigurationChanged("dataset-import", {
+        bypassEditorDeferral = true,
+        queueConfigurationRefresh = true,
+    })
 
     return imported
 end
@@ -4130,12 +4507,53 @@ function Database.ImportDatasets(text)
 
     local pendingDatasets = importBatch.datasetTexts or importBatch.datasets or {}
     local importedDatasets = {}
+    local root = getInitializedDatasetRoot()
+    local transaction = {
+        root = root,
+        originalDatasets = root.datasets,
+        originalActivatedDatasets = deepCopy(root.activatedDatasets),
+        originalNextId = root.nextId,
+    }
+
+    activeDatasetImportTransaction = transaction
+
+    local function rollback()
+        root.datasets = transaction.originalDatasets
+        root.activatedDatasets = transaction.originalActivatedDatasets
+        root.nextId = transaction.originalNextId
+        Database.Datasets = root
+    end
+
     for index = 1, #pendingDatasets do
-        local dataset, err = Database.ImportPreparedDataset(importBatch, index)
+        local ok, dataset, err = pcall(Database.ImportPreparedDataset, importBatch, index)
+        if not ok then
+            activeDatasetImportTransaction = nil
+            rollback()
+            return nil, tostring(dataset or ("Dataset %d failed to import."):format(index))
+        end
         if not dataset then
+            activeDatasetImportTransaction = nil
+            rollback()
             return nil, err or ("Dataset %d failed to import."):format(index)
         end
         importedDatasets[#importedDatasets + 1] = dataset
+    end
+
+    activeDatasetImportTransaction = nil
+
+    if #importedDatasets > 0 then
+        if Dependecies and Dependecies.RecomputeAllDatasetDependencies then
+            Dependecies.RecomputeAllDatasetDependencies()
+        elseif Dependecies and Dependecies.RecomputeDatasetDependencies then
+            for index = 1, #importedDatasets do
+                Dependecies.RecomputeDatasetDependencies(importedDatasets[index].id)
+            end
+        end
+
+        notifyConfigurationChanged(transaction.configurationChangeReason or "dataset-import", {
+            bypassEditorDeferral = true,
+            queueConfigurationRefresh = true,
+        })
     end
 
     return importedDatasets
@@ -4298,7 +4716,7 @@ function Database.NotifyDatasetEntryChanged(datasetId, collectionKey, options)
     local deferConfigurationChanged = type(options) == "table" and options.deferConfigurationChanged == true
     local client = Addon.Client or nil
     if deferConfigurationChanged and client and type(client.QueueLocalConfigurationRefresh) == "function" then
-        markConfigurationChanged()
+        markConfigurationChanged("dataset-entry")
         client:QueueLocalConfigurationRefresh("dataset-entry")
     else
         notifyConfigurationChanged("dataset-entry")

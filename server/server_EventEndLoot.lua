@@ -417,7 +417,7 @@ local baseEndEvent = Server.EndEvent
 if type(baseEndEvent) == "function" then
     function Server:EndEvent(reason, ...)
         local eventState = self.EventState
-        if type(eventState) == "table" and eventState.active == true then
+        if type(eventState) == "table" and eventState.active == true and eventState.distributeEndRewards ~= false then
             local ok, resultOrError = pcall(self.ExecuteEventEndLoot, self, eventState)
             if not ok and type(Debug.Error) == "function" then
                 Debug.Error("Event-end Loot integration failed for %s: %s", tostring(eventState.id or ""), tostring(resultOrError))

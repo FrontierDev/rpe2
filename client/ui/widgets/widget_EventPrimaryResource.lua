@@ -208,7 +208,7 @@ if type(EventWidget.RefreshPortraitSlot) == "function" then
         if not hiddenForClient then
             known, primaryRef = resolveKnownPrimary(eventUnit, state)
         end
-        if known then
+        if known and not (type(context) == "table" and context.npcMode == true) then
             local portrait = nil
             if type(options) == "table" and type(options.ensureSlot) == "function" then
                 portrait = options.ensureSlot(self, index)
