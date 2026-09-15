@@ -1257,6 +1257,10 @@ function Client:BuildTargetingWidget()
 end
 
 function Client:ShowTargetingWidget()
+    if self:RequireSetupCompletion("targeting-widget") ~= true then
+        return nil
+    end
+
     return TargetingWidget:Get():Show()
 end
 

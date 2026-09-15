@@ -947,11 +947,24 @@ function SetupWizard:CaptureSelectionState()
         end
     end
 
+    local primaryResourceRef
+    local specialResourceRef
+    if type(Profile.GetPrimaryResourceRef) == "function" then
+        primaryResourceRef = Profile.GetPrimaryResourceRef()
+    else
+        primaryResourceRef = setupState.primaryResourceRef
+    end
+    if type(Profile.GetSpecialResourceRef) == "function" then
+        specialResourceRef = Profile.GetSpecialResourceRef()
+    else
+        specialResourceRef = setupState.specialResourceRef
+    end
+
     return {
         raceRef = trimString(Profile.GetRaceRef and Profile.GetRaceRef() or setupState.raceRef),
         classRef = trimString(Profile.GetClassRef and Profile.GetClassRef() or setupState.classRef),
-        primaryResourceRef = trimString(Profile.GetPrimaryResourceRef and Profile.GetPrimaryResourceRef()),
-        specialResourceRef = trimString(Profile.GetSpecialResourceRef and Profile.GetSpecialResourceRef()),
+        primaryResourceRef = trimString(primaryResourceRef),
+        specialResourceRef = trimString(specialResourceRef),
         startingItemRefs = type(setupState.startingItemRefs) == "table" and setupState.startingItemRefs or {},
         actionBarSpellRefs = actionBarSpellRefs,
         skillPermanentBonuses = copySetupSkillBonusMap(setupState.skillPermanentBonuses),
@@ -3497,13 +3510,6 @@ function SetupWizard:ApplyCurrentSelection()
             return false
         end
     end
-    if Profile.SetPrimaryResourceRef then
-        Profile.SetPrimaryResourceRef(state.primaryResourceRef)
-    end
-    if Profile.SetSpecialResourceRef then
-        Profile.SetSpecialResourceRef(state.specialResourceRef)
-    end
-
     for index = 1, #(plan.equipped or {}) do
         local assignment = plan.equipped[index]
         if assignment and Profile.EquipItem then
@@ -3544,10 +3550,31 @@ function SetupWizard:ApplyCurrentSelection()
         Profile.SetSetupWizardState(state)
     end
 
+    -- Resource display is an explicit wizard choice. Apply it after every
+    -- class/race/profile mutation so a recalculation cannot replace it with
+    -- an inferred resource before setup is complete.
+    if Profile.SetPrimaryResourceRef then
+        Profile.SetPrimaryResourceRef(state.primaryResourceRef)
+    end
+    if Profile.SetSpecialResourceRef then
+        Profile.SetSpecialResourceRef(state.specialResourceRef)
+    end
+
+    if type(Profile.SetSetupWizardCompleted) ~= "function"
+        or Profile.SetSetupWizardCompleted(true) ~= true
+    then
+        self.traitTalentFeedback = "Setup could not be completed. Please try again."
+        self:RefreshStatus()
+        return false
+    end
+
     self.startingItemFeedback = ""
     self.skillPointFeedback = ""
     if Client.RefreshActionBarWidget then
         Client:RefreshActionBarWidget("setup-wizard-apply")
+    end
+    if Client.RefreshActionBarCompanionBars then
+        Client:RefreshActionBarCompanionBars("setup-wizard-apply")
     end
 
     self.cachedState = state

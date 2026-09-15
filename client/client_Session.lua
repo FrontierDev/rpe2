@@ -27,6 +27,8 @@ Client.LocalConfigurationRefreshQueued = Client.LocalConfigurationRefreshQueued 
 Client.PendingLocalConfigurationRefreshReason = Client.PendingLocalConfigurationRefreshReason or nil
 Client.LocalConfigurationRefreshInProgress = Client.LocalConfigurationRefreshInProgress == true
 
+local SETUP_REQUIRED_MESSAGE = "Complete character setup before using RPE features."
+
 local LOCAL_ONLY_CONFIGURATION_REASONS = {
     ["profile-action-bar-mode"] = true,
     ["profile-action-bar"] = true,
@@ -41,8 +43,70 @@ local RUNTIME_ONLY_CONFIGURATION_REASONS = {
     ["profile-achievement-rewards"] = true,
 }
 
+local EDITOR_IMMEDIATE_CONFIGURATION_REASONS = {
+    ["active-ruleset"] = true,
+    ["ruleset-import"] = true,
+    ["ruleset-delete"] = true,
+    ["ruleset-rename"] = true,
+    ["ruleset-update"] = true,
+    ["dataset-activation"] = true,
+    ["dataset-import"] = true,
+    ["dataset-delete"] = true,
+    ["dataset-rename"] = true,
+    ["dataset-update"] = true,
+    ["dataset-entry"] = true,
+}
+
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
+end
+
+local function getProfileLogic()
+    return Addon.Internal and Addon.Internal.Profile or nil
+end
+
+local function notifySetupRequired()
+    if DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function" then
+        DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00RPE:|r " .. SETUP_REQUIRED_MESSAGE)
+    elseif type(print) == "function" then
+        print("RPE: " .. SETUP_REQUIRED_MESSAGE)
+    end
+end
+
+function Client:CanAccessPostSetupFeatures()
+    local profile = getProfileLogic()
+    if type(profile) ~= "table" or type(profile.IsSetupComplete) ~= "function" then
+        return false, "setup-state-unavailable"
+    end
+
+    if profile.IsSetupComplete() == true then
+        return true
+    end
+
+    return false, "setup-incomplete"
+end
+
+function Client:RequireSetupCompletion(reason)
+    local canAccess, accessReason = self:CanAccessPostSetupFeatures()
+    if canAccess then
+        return true
+    end
+
+    if accessReason == "setup-incomplete"
+        and not self.SetupGateRedirectInProgress
+        and type(self.ShowSetupWizardWindow) == "function"
+    then
+        self.SetupGateRedirectInProgress = true
+        self:ShowSetupWizardWindow()
+        self.SetupGateRedirectInProgress = false
+    end
+
+    notifySetupRequired()
+    return false, accessReason or tostring(reason or "setup-required")
+end
+
+function Client:EnsureSetupWizardAccess(reason)
+    return self:RequireSetupCompletion(reason or "setup-entry")
 end
 
 local function getTimings()
@@ -103,6 +167,31 @@ local function logSessionInternal(message, ...)
     if Debug and type(Debug.Internal) == "function" then
         Debug.Internal(message, ...)
     end
+end
+
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
+local function logCompatibilityRefresh(stage, reason, state, datasetHash, rulesetHash)
+    if not Debug or type(Debug.Internal) ~= "function" then
+        return
+    end
+
+    local clientName = state and type(state._getPlayerName) == "function" and state._getPlayerName() or nil
+    if not clientName and Common and type(Common.GetPlayerName) == "function" then
+        clientName = Common.GetPlayerName()
+    end
+
+    Debug.Internal(
+        "Compatibility refresh client=%s revision=%d datasetHash=%s rulesetHash=%s stage=%s reason=%s.",
+        tostring(clientName or "unknown"),
+        getConfigurationRevision(),
+        tostring(datasetHash or ""),
+        tostring(rulesetHash or ""),
+        tostring(stage or "unknown"),
+        tostring(reason or "configuration-changed")
+    )
 end
 
 local function normalizeConfigurationChangeReason(reason)
@@ -297,6 +386,21 @@ local function buildClientHashArguments()
     return tostring(datasetHash or ""), tostring(rulesetHash or "")
 end
 
+function Client:RefreshCompatibilitySurface(reason, stage)
+    local datasetHash, rulesetHash = buildClientHashArguments()
+    logCompatibilityRefresh(stage or "compatibility-surface", reason, self.State, datasetHash, rulesetHash)
+
+    local eventManage = Addon.Server
+        and Addon.Server.UI
+        and Addon.Server.UI.EventManage
+        or nil
+    if type(eventManage) == "table" and type(eventManage.RefreshActivePage) == "function" then
+        eventManage:RefreshActivePage()
+    end
+
+    return datasetHash, rulesetHash
+end
+
 local function getActiveGroupDistribution()
     local distribution = Common.GetGroupType and Common.GetGroupType() or nil
     if distribution == "PARTY" or distribution == "RAID" then
@@ -418,6 +522,10 @@ function Client:QueueServerQuery(reason)
 end
 
 function Client:SendServerQuery(reason)
+    if self:RequireSetupCompletion("server-query") ~= true then
+        return false
+    end
+
     if self:GetState() ~= nil then
         return false
     end
@@ -435,13 +543,40 @@ function Client:SendServerQuery(reason)
     })
 end
 
+local function queueClientConnectRetry(client, state, reason)
+    if not client or not state or state.connectRefreshRetryQueued == true then
+        return false
+    end
+
+    if not C_Timer or type(C_Timer.After) ~= "function" then
+        return false
+    end
+
+    state.connectRefreshRetryQueued = true
+    C_Timer.After(CHANNEL_RESOLVE_RETRY_DELAY, function()
+        state.connectRefreshRetryQueued = false
+        if client.State ~= state or not state.active or state.connectRefreshPending ~= true then
+            return
+        end
+
+        client:QueueClientConnectRefresh(reason or state.connectRefreshReason or "configuration-changed")
+    end)
+    return true
+end
+
 function Client:QueueClientConnectRefresh(reason)
     local state = self.State
     if not state or state.active ~= true then
         return false
     end
 
+    local refreshReason = normalizeConfigurationChangeReason(reason or state.connectRefreshReason)
+    state.connectRefreshPending = true
+    state.connectRefreshReason = refreshReason
+    logCompatibilityRefresh("refresh-queued", refreshReason, state)
+
     if self.ClientConnectRefreshQueued then
+        logCompatibilityRefresh("refresh-coalesced", refreshReason, state)
         return true
     end
 
@@ -450,11 +585,25 @@ function Client:QueueClientConnectRefresh(reason)
         targetClient.ClientConnectRefreshQueued = false
 
         if targetClient.State ~= expectedState or not expectedState or expectedState.active ~= true then
+            logCompatibilityRefresh("refresh-dropped", refreshReason, expectedState)
             return
         end
 
-        targetClient:SendClientConnect(expectedState, refreshReason)
-    end, self, state, reason)
+        refreshReason = expectedState.connectRefreshReason or refreshReason
+        if hasLiveChannelJoinApi() and expectedState.channelJoinReady ~= true then
+            logCompatibilityRefresh("waiting-channel", refreshReason, expectedState)
+            queueClientConnectRetry(targetClient, expectedState, refreshReason)
+            return
+        end
+
+        local sent = targetClient:SendClientConnect(expectedState, refreshReason)
+        if sent ~= true then
+            logCompatibilityRefresh("send-blocked", refreshReason, expectedState)
+            queueClientConnectRetry(targetClient, expectedState, refreshReason)
+        else
+            logCompatibilityRefresh("refresh-dispatched", refreshReason, expectedState)
+        end
+    end, self, state, refreshReason)
 
     return true
 end
@@ -477,8 +626,20 @@ function Client:TryDeferLocalConfigurationChanged(reason)
         return false
     end
 
-    if type(editor.MarkConfigurationDirty) == "function" then
-        editor:MarkConfigurationDirty(reason)
+    local normalizedReason = normalizeConfigurationChangeReason(reason)
+    -- Dataset editor entry edits use the editor's explicit pending-change
+    -- queue. Activation, imports, metadata, and ruleset changes are already
+    -- persisted by their database mutators and must not become an uncommittable
+    -- editor-dirty state merely because the window is visible.
+    if not EDITOR_IMMEDIATE_CONFIGURATION_REASONS[normalizedReason]
+        and type(editor.MarkConfigurationDirty) == "function"
+    then
+        editor:MarkConfigurationDirty(normalizedReason)
+    end
+
+    if ConfigurationChangeQueuesClientConnectRefresh(normalizedReason) then
+        self:RefreshCompatibilitySurface(normalizedReason, "editor-deferred")
+        self:QueueClientConnectRefresh(normalizedReason)
     end
 
     return true
@@ -486,6 +647,7 @@ end
 
 function Client:HandleLocalConfigurationChanged(reason)
     local normalizedReason = normalizeConfigurationChangeReason(reason)
+    logCompatibilityRefresh("handler-begin", normalizedReason, self.State)
     if isRuntimeOnlyConfigurationReason(normalizedReason) then
         logSessionInternal(
             "Runtime-only Profile reason %s reached HandleLocalConfigurationChanged.",
@@ -494,8 +656,18 @@ function Client:HandleLocalConfigurationChanged(reason)
         return false
     end
 
-    if self.LocalConfigurationRefreshInProgress then
+    if normalizedReason == "active-ruleset" then
+        self:EnsureSetupWizardAccess("active-ruleset")
+    end
+    if self:CanAccessPostSetupFeatures() ~= true then
         return false
+    end
+
+    if self.LocalConfigurationRefreshInProgress then
+        logCompatibilityRefresh("handler-coalesced", normalizedReason, self.State)
+        self:RefreshCompatibilitySurface(normalizedReason, "handler-coalesced")
+        self:QueueLocalConfigurationRefresh(normalizedReason)
+        return true
     end
 
     self.LocalConfigurationRefreshInProgress = true
@@ -519,6 +691,7 @@ function Client:HandleLocalConfigurationChanged(reason)
             resolvedBootstrapReady = profileLogic.IsBootstrapResolvedStateReady() == true
         end
     end
+    logCompatibilityRefresh("resolved-bootstrap", normalizedReason, self.State)
     local eventState = self.GetEventState and self:GetEventState() or nil
     local profileWindowRefreshed = false
     if self.GetTraitRuntimeState and self.SyncAutomaticTraitAuras and type(eventState) == "table" and eventState.active == true then
@@ -596,6 +769,7 @@ function Client:HandleLocalConfigurationChanged(reason)
             tostring(normalizedReason or ""),
             getElapsedMilliseconds(startedAt)
         )
+        self:RefreshCompatibilitySurface(normalizedReason, "handler-complete-local")
         return true
     end
 
@@ -612,6 +786,7 @@ function Client:HandleLocalConfigurationChanged(reason)
         tostring(normalizedReason or ""),
         getElapsedMilliseconds(startedAt)
     )
+    self:RefreshCompatibilitySurface(normalizedReason, "handler-complete")
     return self:QueueClientConnectRefresh(normalizedReason)
 end
 
@@ -661,32 +836,44 @@ function Client:HandleClientDisconnect(arguments, sender)
 end
 
 function Client:SendClientConnect(state, reason)
+    if self:RequireSetupCompletion("client-connect") ~= true then
+        return false
+    end
+
     if not state or not state.channelName then
         return false
     end
 
     bindStateSessionRuntime(state)
     if state.connectPending then
+        logCompatibilityRefresh("connect-in-flight", reason, state, state.pendingDatasetHash, state.pendingRulesetHash)
         return true
     end
 
     local datasetHash, rulesetHash = buildClientHashArguments()
+    logCompatibilityRefresh("hashes-built", reason, state, datasetHash, rulesetHash)
     if state.connectSent
         and state.lastAnnouncedDatasetHash == datasetHash
         and state.lastAnnouncedRulesetHash == rulesetHash
     then
+        state.connectRefreshPending = false
+        state.connectRefreshReason = nil
+        logCompatibilityRefresh("already-current", reason, state, datasetHash, rulesetHash)
         return true
     end
 
     local channelId = resolveChannelId(state)
     if not channelId then
+        logCompatibilityRefresh("channel-unresolved", reason, state, datasetHash, rulesetHash)
         return false
     end
 
     state.connectPending = true
+    state.connectSent = true
     local playerName = getPlayerNameForState(state) or "unknown"
     state.pendingDatasetHash = datasetHash
     state.pendingRulesetHash = rulesetHash
+    logCompatibilityRefresh("client-connect-send", reason, state, datasetHash, rulesetHash)
     if Debug and Debug.CommsTracing == true and Debug.Internal then
         Debug.Internal(
             "Sending CLIENT_CONNECT on channel %s (%s) using channel id %s (%s).",
@@ -710,11 +897,37 @@ function Client:SendClientConnect(state, reason)
                 return
             end
 
+            local announcedDatasetHash = state.pendingDatasetHash
+            local announcedRulesetHash = state.pendingRulesetHash
             state.connectPending = false
-            state.lastAnnouncedDatasetHash = state.pendingDatasetHash
-            state.lastAnnouncedRulesetHash = state.pendingRulesetHash
+            state.lastAnnouncedDatasetHash = announcedDatasetHash
+            state.lastAnnouncedRulesetHash = announcedRulesetHash
             state.pendingDatasetHash = nil
             state.pendingRulesetHash = nil
+
+            local currentDatasetHash, currentRulesetHash = buildClientHashArguments()
+            if currentDatasetHash ~= announcedDatasetHash or currentRulesetHash ~= announcedRulesetHash then
+                state.connectRefreshPending = true
+                state.connectRefreshReason = "configuration-changed-during-connect"
+                logCompatibilityRefresh(
+                    "client-connect-delivered-stale",
+                    state.connectRefreshReason,
+                    state,
+                    currentDatasetHash,
+                    currentRulesetHash
+                )
+                Client:QueueClientConnectRefresh(state.connectRefreshReason)
+            else
+                state.connectRefreshPending = false
+                state.connectRefreshReason = nil
+                logCompatibilityRefresh(
+                    "client-connect-delivered",
+                    reason,
+                    state,
+                    announcedDatasetHash,
+                    announcedRulesetHash
+                )
+            end
         end,
         onFailed = function(_, result)
             if Client.State ~= state then
@@ -723,6 +936,8 @@ function Client:SendClientConnect(state, reason)
 
             state.connectPending = false
             state.connectSent = false
+            state.connectRefreshPending = true
+            state.connectRefreshReason = reason or state.connectRefreshReason or "client-connect-failed"
             state.pendingDatasetHash = nil
             state.pendingRulesetHash = nil
 
@@ -736,12 +951,16 @@ function Client:SendClientConnect(state, reason)
             end
 
             state.channelJoinReady = false
+            logCompatibilityRefresh("client-connect-failed", state.connectRefreshReason, state)
+            queueClientConnectRetry(Client, state, state.connectRefreshReason)
         end,
     })
 
     if not sent then
         state.connectPending = false
         state.connectSent = false
+        state.connectRefreshPending = true
+        state.connectRefreshReason = reason or state.connectRefreshReason or "client-connect-enqueue-failed"
         state.pendingDatasetHash = nil
         state.pendingRulesetHash = nil
         if Debug and Debug.CommsTracing == true and Debug.Internal then
@@ -751,10 +970,10 @@ function Client:SendClientConnect(state, reason)
                 tostring(channelId or "unknown")
             )
         end
+        queueClientConnectRetry(self, state, state.connectRefreshReason)
         return false
     end
 
-    state.connectSent = true
     return true
 end
 
@@ -819,7 +1038,9 @@ end
 function Client:HandleSessionRuntimeEvent(event, ...)
     local handledDiscovery = false
     if event == "PLAYER_ENTERING_WORLD" then
-        handledDiscovery = self:QueueServerQuery("player-entering-world") or handledDiscovery
+        if self:EnsureSetupWizardAccess("player-entering-world") == true then
+            handledDiscovery = self:QueueServerQuery("player-entering-world") or handledDiscovery
+        end
         queueLocalConfigurationRefresh("player-entering-world")
     elseif event == "GROUP_ROSTER_UPDATE" then
         handledDiscovery = self:QueueServerQuery("group-roster-update") or handledDiscovery
@@ -953,6 +1174,10 @@ end
 
 -- When a SERVER_START message is received from the server, this function is called to handle it.
 function Client:HandleServerStart(arguments, sender)
+    if self:RequireSetupCompletion("server-start") ~= true then
+        return false
+    end
+
     local channelName = arguments and arguments[1] or nil
     local announcedChannelId = tonumber(arguments and arguments[2] or nil)
     if type(channelName) ~= "string" or channelName == "" then
@@ -990,6 +1215,9 @@ function Client:HandleServerStart(arguments, sender)
         memberOrder = {},
         connectSent = false,
         connectPending = false,
+        connectRefreshPending = false,
+        connectRefreshReason = nil,
+        connectRefreshRetryQueued = false,
         lastAnnouncedDatasetHash = nil,
         lastAnnouncedRulesetHash = nil,
         joinLogged = false,

@@ -3658,6 +3658,62 @@ function Profile.SetSetupWizardState(state)
     return nil
 end
 
+function Profile.SetSetupWizardCompleted(completed)
+    if Database.SetProfileSetupWizardCompleted then
+        return Database.SetProfileSetupWizardCompleted(completed)
+    end
+
+    return false
+end
+
+function Profile.IsSetupWizardEnabled()
+    local rulesetLogic = Addon.Internal and Addon.Internal.Ruleset or nil
+    if type(rulesetLogic) ~= "table"
+        or type(rulesetLogic.GetActiveRuleset) ~= "function"
+        or type(rulesetLogic.GetRulesetRuleValueByKey) ~= "function"
+    then
+        return nil
+    end
+
+    return rulesetLogic.GetRulesetRuleValueByKey(
+        rulesetLogic.GetActiveRuleset(),
+        "setup",
+        "enable_setup_wizard",
+        false
+    ) == true
+end
+
+function Profile.IsSetupComplete()
+    local wizardEnabled = Profile.IsSetupWizardEnabled()
+    if wizardEnabled == false then
+        return true
+    end
+    if wizardEnabled ~= true then
+        return false
+    end
+
+    if type(Database.GetProfileSetupWizardState) ~= "function" then
+        return false
+    end
+
+    local state = Database.GetProfileSetupWizardState()
+    if type(state) == "table" and state.completed == true then
+        return true
+    end
+
+    if type(Database.MigrateProfileSetupWizardCompletion) == "function"
+        and Database.MigrateProfileSetupWizardCompletion() == true
+    then
+        return true
+    end
+
+    return false
+end
+
+function Profile.IsSetupRequired()
+    return Profile.IsSetupWizardEnabled() == true and not Profile.IsSetupComplete()
+end
+
 function Profile.GetResolvedBaseResourceValue(resourceRef, options)
     local row = Profile.GetResolvedResourceRow(resourceRef, options)
     return tonumber(row and row.baseResourceValue) or 0, row

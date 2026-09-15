@@ -394,6 +394,10 @@ function Client:BuildReactionWidget()
 end
 
 function Client:ShowReactionWidget()
+    if self:RequireSetupCompletion("reaction-widget") ~= true then
+        return nil
+    end
+
     return ReactionWidget:Get():Show()
 end
 

@@ -5,6 +5,7 @@ Addon.Server.UI = Addon.Server.UI or {}
 
 local Server = Addon.Server
 local ServerUI = Addon.Server.UI
+local Debug = Addon.Debug or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local EventUnit = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.EventUnit or nil
 local Event = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Event or nil
@@ -360,10 +361,21 @@ end
 
 function EventManage:RefreshDashboard()
     local layout = self.Layout or {}
-    local hasClientHashMismatch = Server.HasClientHashMismatch and Server:HasClientHashMismatch() or false
+    local mismatches = Server.GetClientHashMismatches and Server:GetClientHashMismatches() or {}
+    local hasClientHashMismatch = #mismatches > 0
     local datasetHash = Registry.GenerateActivatedDatasetsHash and Registry:GenerateActivatedDatasetsHash() or nil
     local rulesetHash = Registry.GenerateActiveRulesetHash and Registry:GenerateActiveRulesetHash() or nil
     local warningText = Server.BuildClientHashMismatchWarning and Server:BuildClientHashMismatchWarning() or nil
+    if type(Debug.Internal) == "function" then
+        Debug.Internal(
+            "Compatibility refresh client=%s revision=%d datasetHash=%s rulesetHash=%s stage=dashboard-refresh reason=state-change mismatches=%d.",
+            tostring(Addon.Utils and Addon.Utils.Common and Addon.Utils.Common.GetPlayerName and Addon.Utils.Common.GetPlayerName() or "unknown"),
+            math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0)),
+            tostring(datasetHash or ""),
+            tostring(rulesetHash or ""),
+            #mismatches
+        )
+    end
     local sessionSummary = self:BuildSessionSummary()
     local eventSummary = self:BuildEventSummary()
     local serverActive = Server.IsActive and Server:IsActive() or false

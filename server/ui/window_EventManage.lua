@@ -183,6 +183,13 @@ function Server:BuildEventManageWindow()
 end
 
 function Server:ShowEventManageWindow()
+    if not Addon.Client
+        or type(Addon.Client.RequireSetupCompletion) ~= "function"
+        or Addon.Client:RequireSetupCompletion("event-manager") ~= true
+    then
+        return nil
+    end
+
     return EventManage:ShowWindow()
 end
 

@@ -30,7 +30,9 @@ function ServerCommands:RegisterSlashCommands()
             return false
         end
 
-        Server:ShowEventManageWindow()
+        if not Server:ShowEventManageWindow() then
+            return false
+        end
         return true
     end, "Show the event management window.")
 

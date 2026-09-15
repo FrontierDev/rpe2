@@ -52,6 +52,10 @@ end
 
 function ClientCommands:RegisterSlashCommands()
     register({ "debug", "currency", "add" }, function(context)
+        if Client:RequireSetupCompletion("debug-currency") ~= true then
+            return false
+        end
+
         local args = context and context.args or {}
         local currencyRef = tostring(args[1] or "")
         local amount = parseDebugCurrencyAmount(args[2])
@@ -107,7 +111,9 @@ function ClientCommands:RegisterSlashCommands()
             return false
         end
 
-        Client:OpenDataEditorLauncherDestination()
+        if not Client:OpenDataEditorLauncherDestination() then
+            return false
+        end
         context.router:Print("Data editor window shown.")
         return true
     end, "Show the data editor window.")
@@ -118,7 +124,9 @@ function ClientCommands:RegisterSlashCommands()
             return false
         end
 
-        Client:OpenRulesetLauncherDestination()
+        if not Client:OpenRulesetLauncherDestination() then
+            return false
+        end
         context.router:Print("Ruleset window shown.")
         return true
     end, "Show the ruleset window.")
@@ -129,7 +137,9 @@ function ClientCommands:RegisterSlashCommands()
             return false
         end
 
-        Client:OpenInventoryLauncherDestination()
+        if not Client:OpenInventoryLauncherDestination() then
+            return false
+        end
         context.router:Print("Inventory window shown.")
         return true
     end, "Show the inventory window.")
@@ -140,7 +150,9 @@ function ClientCommands:RegisterSlashCommands()
             return false
         end
 
-        Client:OpenProfileLauncherDestination()
+        if not Client:OpenProfileLauncherDestination() then
+            return false
+        end
         context.router:Print("Profile window shown.")
         return true
     end, "Show the profile window.")
@@ -151,12 +163,18 @@ function ClientCommands:RegisterSlashCommands()
             return false
         end
 
-        Client:OpenGuildLauncherDestination()
+        if not Client:OpenGuildLauncherDestination() then
+            return false
+        end
         context.router:Print("Guild window shown.")
         return true
     end, "Show the guild window.")
 
     register({ "unlock" }, function(context)
+        if Client:RequireSetupCompletion("widget-unlock") ~= true then
+            return false
+        end
+
         if not Profile or not Profile.SetWidgetsUnlocked then
             context.router:Print("Widget unlock mode is not available.", "warn")
             return false
@@ -168,6 +186,10 @@ function ClientCommands:RegisterSlashCommands()
     end, "Unlock movable widgets for repositioning.")
 
     register({ "lock" }, function(context)
+        if Client:RequireSetupCompletion("widget-lock") ~= true then
+            return false
+        end
+
         if not Profile or not Profile.SetWidgetsUnlocked then
             context.router:Print("Widget lock mode is not available.", "warn")
             return false
@@ -256,6 +278,10 @@ function Client:OpenSetupLauncherDestination()
 end
 
 function Client:OpenEventManagerLauncherDestination()
+    if self:RequireSetupCompletion("event-manager-destination") ~= true then
+        return nil
+    end
+
     local server = Addon.Server or nil
     if type(server) ~= "table" or type(server.ShowEventManageWindow) ~= "function" then
         return nil
@@ -272,8 +298,9 @@ function Client:ToggleActionBarLauncherDestination()
         return nil
     end
 
-    if self.ShowActionBarWidget then
-        self:ShowActionBarWidget()
+    local shown = self.ShowActionBarWidget and self:ShowActionBarWidget() or nil
+    if not shown then
+        return false
     end
     if self.RefreshActionBarWidget then
         self:RefreshActionBarWidget("launcher-toggle")
@@ -299,6 +326,10 @@ end
 
 function Client:OpenDatasetImportLauncherDestination()
     local window = self:OpenDataEditorLauncherDestination()
+    if not window then
+        return nil
+    end
+
     local dataEditor = Addon.Client and Addon.Client.UI and Addon.Client.UI.Editor or nil
     if dataEditor and dataEditor.ShowDatasetImportWindow then
         dataEditor:ShowDatasetImportWindow()
@@ -308,6 +339,10 @@ end
 
 function Client:OpenRulesetImportLauncherDestination()
     local window = self:OpenRulesetLauncherDestination()
+    if not window then
+        return nil
+    end
+
     local rulesetWindow = Addon.Client and Addon.Client.UI and Addon.Client.UI.Ruleset or nil
     if rulesetWindow and rulesetWindow.ShowRulesetImportWindow then
         rulesetWindow:ShowRulesetImportWindow()

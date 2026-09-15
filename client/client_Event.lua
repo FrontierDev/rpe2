@@ -326,6 +326,10 @@ function Client:EndEventTransition(eventId, generation, eventState, reason)
 end
 
 function Client:CanPerformEventAction(eventState, actionKind)
+    if self:RequireSetupCompletion("event-action") ~= true then
+        return false, "setup-incomplete"
+    end
+
     local state = eventState or self:GetEventState()
     if type(state) ~= "table" then
         return false, "event-inactive"
@@ -2814,6 +2818,10 @@ local function hydrateLocalHostAuthoritativeRoster(eventState)
 end
 
 function Client:HandleEventStart(arguments, sender)
+    if self:RequireSetupCompletion("event-start") ~= true then
+        return false
+    end
+
     local totalStartTime = getTimingNowMilliseconds()
     local timingParts = totalStartTime > 0 and {} or nil
     local sessionState = self:GetState()

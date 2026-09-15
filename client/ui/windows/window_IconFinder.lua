@@ -625,6 +625,10 @@ function Client:BuildIconFinderWindow()
 end
 
 function Client:ShowIconFinderWindow()
+    if self:RequireSetupCompletion("icon-finder-window") ~= true then
+        return nil
+    end
+
     return IconFinder:Get():Show()
 end
 
@@ -633,5 +637,9 @@ function Client:HideIconFinderWindow()
 end
 
 function Client:OpenIconFinder(callback, options)
+    if self:RequireSetupCompletion("icon-finder") ~= true then
+        return nil
+    end
+
     return IconFinder:Get():Open(callback, options)
 end

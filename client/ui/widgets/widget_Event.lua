@@ -2698,6 +2698,10 @@ function Client:BuildEventWidget()
 end
 
 function Client:ShowEventWidget()
+    if self:RequireSetupCompletion("event-widget") ~= true then
+        return nil
+    end
+
     return EventWidget:Get():Show()
 end
 

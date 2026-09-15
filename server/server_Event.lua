@@ -1920,6 +1920,13 @@ function Server:ClearEventNpcUnits()
 end
 
 function Server:StartEvent(data)
+    if not Addon.Client
+        or type(Addon.Client.RequireSetupCompletion) ~= "function"
+        or Addon.Client:RequireSetupCompletion("server-event-start") ~= true
+    then
+        return nil
+    end
+
     local totalTimer = startTiming("Server:StartEvent", {
         context = "event-start",
         thresholdMs = 50,

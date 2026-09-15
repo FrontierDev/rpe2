@@ -737,6 +737,10 @@ function Client:BuildRulesetWindow()
 end
 
 function Client:ShowRulesetWindow()
+    if self:RequireSetupCompletion("ruleset-window") ~= true then
+        return nil
+    end
+
     return RulesetWindow:ShowWindow()
 end
 

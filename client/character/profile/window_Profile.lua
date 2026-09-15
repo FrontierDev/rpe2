@@ -501,10 +501,18 @@ function Client:BuildProfileWindow()
 end
 
 function Client:ShowProfileWindow()
+    if self:RequireSetupCompletion("profile-window") ~= true then
+        return nil
+    end
+
     return ProfileWindow:Get():Show()
 end
 
 function Client:ShowProfileWindowTab(tabKey)
+    if self:RequireSetupCompletion("profile-window-tab") ~= true then
+        return nil
+    end
+
     return ProfileWindow:Get():ShowTab(tabKey)
 end
 

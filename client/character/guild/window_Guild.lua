@@ -221,6 +221,10 @@ function Client:BuildGuildWindow()
 end
 
 function Client:ShowGuildWindow()
+    if self:RequireSetupCompletion("guild-window") ~= true then
+        return nil
+    end
+
     return GuildWindow:Get():Show()
 end
 

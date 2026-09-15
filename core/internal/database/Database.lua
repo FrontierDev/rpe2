@@ -33,6 +33,23 @@ local function stopTiming(timer)
     end
 end
 
+local function logCompatibilityBoundary(stage, reason, revision)
+    local debug = Addon.Debug
+    if not debug or type(debug.Internal) ~= "function" then
+        return
+    end
+
+    local common = Addon.Utils and Addon.Utils.Common or nil
+    local clientName = common and type(common.GetPlayerName) == "function" and common.GetPlayerName() or nil
+    debug.Internal(
+        "Compatibility refresh client=%s revision=%d datasetHash=<pending> rulesetHash=<pending> stage=%s reason=%s.",
+        tostring(clientName or "unknown"),
+        tonumber(revision) or 0,
+        tostring(stage or "unknown"),
+        tostring(reason or "configuration-changed")
+    )
+end
+
 local SCHEMA = {
     profiles = 7,
     rulesets = 3,
@@ -130,6 +147,7 @@ local CONFIGURATION_CHANGE_CLASSIFICATION = {
     ["profile-primary-resource"] = "structural profile change",
     ["profile-special-resource"] = "structural profile change",
     ["profile-setup-wizard"] = "authored configuration",
+    ["profile-setup-wizard-completed"] = "authored configuration",
     ["profile-action-bar-anchor"] = "authored configuration",
     ["profile-action-bar"] = "authored configuration",
     ["profile-skill-action-bar"] = "authored configuration",
@@ -212,10 +230,15 @@ local function copyAuthoredConfiguration(value)
     return copy
 end
 
-local function markConfigurationChanged()
+local function markConfigurationChanged(reason)
     Addon.Internal = Addon.Internal or {}
     Addon.Internal.ConfigurationRevision = math.max(0, math.floor(tonumber(Addon.Internal.ConfigurationRevision) or 0)) + 1
+    logCompatibilityBoundary("revision", reason, Addon.Internal.ConfigurationRevision)
     return Addon.Internal.ConfigurationRevision
+end
+
+function Database.MarkConfigurationChanged(reason)
+    return markConfigurationChanged(reason)
 end
 
 local function notifyConfigurationChanged(reason, options)
@@ -224,13 +247,15 @@ local function notifyConfigurationChanged(reason, options)
     end
 
     local timer = startTiming("Database:notifyConfigurationChanged", 4, reason or "configuration-changed")
-    markConfigurationChanged()
+    local revision = markConfigurationChanged(reason)
     local client = Addon.Client or nil
+    logCompatibilityBoundary("database-dispatch", reason, revision)
     if not (type(options) == "table" and options.bypassEditorDeferral == true)
         and client
         and type(client.TryDeferLocalConfigurationChanged) == "function"
         and client:TryDeferLocalConfigurationChanged(reason)
     then
+        logCompatibilityBoundary("editor-deferred", reason, revision)
         stopTiming(timer)
         return
     end
@@ -239,6 +264,7 @@ local function notifyConfigurationChanged(reason, options)
         and client
         and type(client.QueueLocalConfigurationRefresh) == "function"
     then
+        logCompatibilityBoundary("local-refresh-queued", reason, revision)
         client:QueueLocalConfigurationRefresh(reason)
         stopTiming(timer)
         return
@@ -247,11 +273,13 @@ local function notifyConfigurationChanged(reason, options)
         and client
         and type(client.QueueLocalConfigurationRefresh) == "function"
     then
+        logCompatibilityBoundary("profile-refresh-queued", reason, revision)
         client:QueueLocalConfigurationRefresh(reason)
         stopTiming(timer)
         return
     end
     if client and type(client.HandleLocalConfigurationChanged) == "function" then
+        logCompatibilityBoundary("client-refresh-dispatched", reason, revision)
         client:HandleLocalConfigurationChanged(reason)
     end
     stopTiming(timer)
@@ -1210,6 +1238,9 @@ local function normalizeProfileSetupWizard(record)
     return {
         raceRef = ensureString(data.raceRef, ""),
         classRef = ensureString(data.classRef, ""),
+        primaryResourceRef = ensureString(data.primaryResourceRef, ""),
+        specialResourceRef = ensureString(data.specialResourceRef, ""),
+        completed = data.completed == true,
         startingItemRefs = startingItemRefs,
         actionBarSpellRefs = actionBarSpellRefs,
         skillPermanentBonuses = normalizeProfileSkillPermanentBonuses(data.skillPermanentBonuses),
@@ -1355,6 +1386,9 @@ local function isDefaultProfileRecord(record)
         and ensureString(resourceDisplay.specialResourceRef, "") == ""
         and ensureString(setupWizard.raceRef, "") == ""
         and ensureString(setupWizard.classRef, "") == ""
+        and ensureString(setupWizard.primaryResourceRef, "") == ""
+        and ensureString(setupWizard.specialResourceRef, "") == ""
+        and setupWizard.completed ~= true
         and isTableEmpty(setupWizard.startingItemRefs)
         and isTableEmpty(setupWizard.actionBarSpellRefs)
         and isTableEmpty(profile.statBonuses)
@@ -2802,9 +2836,72 @@ end
 
 function Database.SetProfileSetupWizardState(state)
     local profile = Database.GetOrCreateActiveProfile()
+    local previousState = normalizeProfileSetupWizard(profile.setupWizard)
     profile.setupWizard = normalizeProfileSetupWizard(state)
+    -- Completion is controlled by the successful finalisation path below.
+    -- Intermediate wizard state writes must never unlock an incomplete profile.
+    profile.setupWizard.completed = previousState.completed == true
     notifyConfigurationChanged("profile-setup-wizard")
     return normalizeProfileSetupWizard(profile.setupWizard)
+end
+
+function Database.SetProfileSetupWizardCompleted(completed)
+    local profile = Database.GetOrCreateActiveProfile()
+    local setupWizard = normalizeProfileSetupWizard(profile.setupWizard)
+    local normalizedCompleted = completed == true
+    if setupWizard.completed == normalizedCompleted then
+        return normalizedCompleted
+    end
+
+    setupWizard.completed = normalizedCompleted
+    profile.setupWizard = setupWizard
+    notifyConfigurationChanged("profile-setup-wizard-completed")
+    return normalizedCompleted
+end
+
+local function isEstablishedProfileForSetupMigration(profile)
+    local normalized = normalizeProfileRecord(profile, "", "")
+    local resourceDisplay = normalizeProfileResourceDisplay(normalized.resourceDisplay)
+
+    if ensureString(normalized.raceRef, "") ~= ""
+        and ensureString(normalized.classRef, "") ~= ""
+    then
+        return true
+    end
+
+    return not isTableEmpty(normalized.equipment)
+        or not isTableEmpty(normalized.mountEquipment)
+        or not isTableEmpty(normalized.petEquipment)
+        or not isTableEmpty(normalized.spellbook)
+        or not isTableEmpty(normalized.recipebook)
+        or not isTableEmpty(normalized.recipeKnowledge)
+        or not isTableEmpty(normalized.traits)
+        or not isTableEmpty(normalized.activeTraits)
+        or not isTableEmpty(normalized.inactiveTraits)
+        or not isTableEmpty(normalized.selectedClassTalentTraits)
+        or not isTableEmpty(normalized.skillLevels)
+        or not isTableEmpty(normalized.actionBar)
+        or not isTableEmpty(normalized.skillActionBar)
+        or not isTableEmpty(normalized.mountedActionBar)
+        or not isTableEmpty(normalized.preferredConsumables)
+        or ensureString(resourceDisplay.primaryResourceRef, "") ~= ""
+        or ensureString(resourceDisplay.specialResourceRef, "") ~= ""
+end
+
+function Database.MigrateProfileSetupWizardCompletion()
+    local profile = Database.GetOrCreateActiveProfile()
+    local setupWizard = normalizeProfileSetupWizard(profile.setupWizard)
+    if setupWizard.completed == true then
+        return true
+    end
+
+    if not isEstablishedProfileForSetupMigration(profile) then
+        return false
+    end
+
+    setupWizard.completed = true
+    profile.setupWizard = setupWizard
+    return true
 end
 
 function Database.GetProfileActionBarAnchor()
@@ -4619,7 +4716,7 @@ function Database.NotifyDatasetEntryChanged(datasetId, collectionKey, options)
     local deferConfigurationChanged = type(options) == "table" and options.deferConfigurationChanged == true
     local client = Addon.Client or nil
     if deferConfigurationChanged and client and type(client.QueueLocalConfigurationRefresh) == "function" then
-        markConfigurationChanged()
+        markConfigurationChanged("dataset-entry")
         client:QueueLocalConfigurationRefresh("dataset-entry")
     else
         notifyConfigurationChanged("dataset-entry")

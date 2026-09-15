@@ -315,6 +315,10 @@ function Client:BuildLauncherMenu()
 end
 
 function Client:ShowLauncherMenu()
+    if self:RequireSetupCompletion("launcher-menu") ~= true then
+        return nil
+    end
+
     return LauncherMenu:Get():Show()
 end
 
@@ -323,6 +327,10 @@ function Client:HideLauncherMenu()
 end
 
 function Client:ToggleLauncherMenu()
+    if self:RequireSetupCompletion("launcher-menu-toggle") ~= true then
+        return nil
+    end
+
     return LauncherMenu:Get():Toggle()
 end
 

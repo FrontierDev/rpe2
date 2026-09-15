@@ -344,6 +344,10 @@ function Client:BuildInventoryWindow()
 end
 
 function Client:ShowInventoryWindow()
+    if self:RequireSetupCompletion("inventory-window") ~= true then
+        return nil
+    end
+
     return InventoryWindow:Get():Show()
 end
 

@@ -1631,6 +1631,10 @@ function Client:BuildActionBarWidget()
 end
 
 function Client:ShowActionBarWidget()
+    if self:RequireSetupCompletion("action-bar-widget") ~= true then
+        return nil
+    end
+
     return ActionBarWidget:Get():Show()
 end
 

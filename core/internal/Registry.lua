@@ -5,6 +5,8 @@ Addon.Internal.Registry = Addon.Internal.Registry or {}
 
 local Registry = Addon.Internal.Registry
 local Database = Addon.Internal.Database or {}
+local Debug = Addon.Debug or {}
+local Common = Addon.Utils and Addon.Utils.Common or nil
 local HASH_MODULUS = 4294967296
 local HASH_MULTIPLIER = 33
 local DATASET_HASH_SALTS = {
@@ -25,6 +27,23 @@ Registry.RulesetHashCache = Registry.RulesetHashCache or nil
 
 local function getConfigurationRevision()
     return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
+local function logCompatibilityHash(stage, revision, datasetHash, rulesetHash, detail)
+    if type(Debug.Internal) ~= "function" then
+        return
+    end
+
+    local clientName = Common and type(Common.GetPlayerName) == "function" and Common.GetPlayerName() or nil
+    Debug.Internal(
+        "Compatibility refresh client=%s revision=%d datasetHash=%s rulesetHash=%s stage=%s detail=%s.",
+        tostring(clientName or "unknown"),
+        tonumber(revision) or 0,
+        tostring(datasetHash or ""),
+        tostring(rulesetHash or ""),
+        tostring(stage or "hash-regenerated"),
+        tostring(detail or "")
+    )
 end
 
 local function ensureDatasetEntryCache(dataset, collectionKey)
@@ -259,6 +278,7 @@ function Registry:GenerateActivatedDatasetsHash()
         revision = revision,
         value = hash,
     }
+    logCompatibilityHash("hash-datasets", revision, hash, nil, ("datasetCount=%d"):format(#sortedIds))
     return hash
 end
 
@@ -275,6 +295,7 @@ function Registry:GenerateActiveRulesetHash()
             revision = revision,
             value = nil,
         }
+        logCompatibilityHash("hash-ruleset", revision, nil, nil, "rulesetId=<none>")
         return nil
     end
 
@@ -292,6 +313,7 @@ function Registry:GenerateActiveRulesetHash()
         revision = revision,
         value = hash,
     }
+    logCompatibilityHash("hash-ruleset", revision, nil, hash, ("rulesetId=%s"):format(tostring(rulesetId or "")))
     return hash
 end
 
