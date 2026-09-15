@@ -9,6 +9,7 @@ local Inventory = Addon.Client.Inventory or {}
 local ItemUse = Addon.Client.ItemUse or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
+local Equipment = Profile.Equipment or {}
 local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 local UI = Addon.UI or {}
 local TooltipBuilders = Addon.Client.UI and Addon.Client.UI.Tooltips or {}
@@ -187,22 +188,57 @@ local function appendSortedItems(itemsByValue)
     return ordered
 end
 
-local function buildInventoryEquipOptions()
+local function buildInventoryEquipOptions(slotKey, scope)
     local profileWindowModule = Addon.Client and Addon.Client.UI and Addon.Client.UI.Profile and Addon.Client.UI.Profile.Window or nil
     local profileWindow = profileWindowModule and profileWindowModule.Get and profileWindowModule:Get() or nil
     if not profileWindow then
-        return nil
+        return {
+            activeTabKey = "equipment",
+            scope = scope or "character",
+            slotKey = slotKey,
+        }
     end
 
     local equipmentPage = profileWindow.equipmentStatsPage or nil
     local activeTabKey = profileWindow.GetActiveTabKey and profileWindow:GetActiveTabKey() or "equipment"
-    local scope = equipmentPage and equipmentPage.GetActiveEquipmentScope and equipmentPage:GetActiveEquipmentScope() or "character"
+    local activeScope = equipmentPage and equipmentPage.GetActiveEquipmentScope and equipmentPage:GetActiveEquipmentScope() or "character"
 
     return {
         activeTabKey = activeTabKey,
-        scope = scope,
-        slotKey = profileWindow.SelectedSlotKey,
+        scope = scope or activeScope,
+        slotKey = slotKey or profileWindow.SelectedSlotKey,
     }
+end
+
+local function buildEquipSlotActions(resolved)
+    local item = resolved and resolved.item or nil
+    if type(item) ~= "table" or type(Profile.GetEquipmentLayoutByScope) ~= "function" then
+        return {}
+    end
+
+    if type(Equipment.CanEquipItemInScope) == "function" and not Equipment.CanEquipItemInScope("character", item) then
+        return {}
+    end
+
+    local actions = {}
+    local layout = Profile.GetEquipmentLayoutByScope("character") or {}
+    for index = 1, #(layout.entries or {}) do
+        local entry = layout.entries[index]
+        local fits = Equipment.DoesItemFitLayoutEntry and Equipment.DoesItemFitLayoutEntry(item, entry) or false
+        if fits and entry and entry.slotKey then
+            local slotLabel = Equipment.PrettySlotLabel and Equipment.PrettySlotLabel(entry.slotKey) or tostring(entry.name or entry.slotKey)
+            actions[#actions + 1] = {
+                label = "Equip: " .. slotLabel,
+                value = {
+                    action = "equip",
+                    scope = "character",
+                    slotKey = entry.slotKey,
+                },
+            }
+        end
+    end
+
+    return actions
 end
 
 local function selectionCount(selectionSet)
@@ -657,13 +693,14 @@ function InventoryGridPage:EnsureItemContextMenu()
 
     self.ItemContextMenu = UI.ContextMenu:New({
         name = self.contextMenuName,
-        width = 132,
-        panelWidth = 132,
-        visibleRows = 4,
+        width = 160,
+        panelWidth = 160,
+        visibleRows = 6,
         rowHeight = 18,
         border = false,
         onItemInvoked = function(item, menu)
-            local action = item and item.value or nil
+            local actionValue = item and item.value or nil
+            local action = type(actionValue) == "table" and actionValue.action or actionValue
             local resolved = self.ContextMenuResolvedItem
             if not resolved then
                 return
@@ -672,7 +709,10 @@ function InventoryGridPage:EnsureItemContextMenu()
             if action == "use" and resolved.sourceIndex and resolved.stackIdentity and ItemUse.UseInventoryItem then
                 ItemUse:UseInventoryItem(resolved.sourceIndex, resolved.stackIdentity)
             elseif action == "equip" and resolved.sourceIndex and Inventory.EquipItem then
-                Inventory.EquipItem(resolved.sourceIndex, buildInventoryEquipOptions())
+                Inventory.EquipItem(resolved.sourceIndex, buildInventoryEquipOptions(
+                    type(actionValue) == "table" and actionValue.slotKey or nil,
+                    type(actionValue) == "table" and actionValue.scope or nil
+                ))
             elseif action == "modify" and resolved.sourceIndex then
                 local modificationWindow = InventoryUI and InventoryUI.ModificationWindow or nil
                 if modificationWindow and modificationWindow.Get then
@@ -731,10 +771,10 @@ function InventoryGridPage:ShowItemContextMenu(anchorFrame, resolved)
         }
     end
     if canEquip then
-        items[#items + 1] = {
-            label = "Equip",
-            value = "equip",
-        }
+        local equipActions = buildEquipSlotActions(resolved)
+        for index = 1, #equipActions do
+            items[#items + 1] = equipActions[index]
+        end
     end
     if canModify then
         items[#items + 1] = {

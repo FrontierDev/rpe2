@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 3,
+    version = 5,
     dataset = {
         achievements = {},
         auras = {
@@ -427,10 +427,18 @@ Addon.Data.DefaultDatasets:Register({
                     "plate",
                     "shield",
                 },
-                armorWeights = {
-                    "mail",
-                    "plate",
-                    "shield",
+                weaponTypeRefs = {
+                    "f82db71a:z6nh3znw",
+                    "f82db71a:i4pivdig",
+                    "f82db71a:9ni3vfas",
+                    "f82db71a:y0dnlo8g",
+                    "f82db71a:25s5wyry",
+                    "f82db71a:3y1v01e4",
+                    "f82db71a:l3ce0puc",
+                    "f82db71a:j2gceby4",
+                    "f82db71a:anoo8qfp",
+                    "f82db71a:gjz2331m",
+                    "f82db71a:we5ul4ne",
                 },
                 resourceProgressions = {
                     {
@@ -467,19 +475,6 @@ Addon.Data.DefaultDatasets:Register({
                         statRef = "f82db71a:kec9rhli"
                     }
                 },
-                weaponTypeRefs = {
-                    "f82db71a:z6nh3znw",
-                    "f82db71a:i4pivdig",
-                    "f82db71a:9ni3vfas",
-                    "f82db71a:y0dnlo8g",
-                    "f82db71a:25s5wyry",
-                    "f82db71a:3y1v01e4",
-                    "f82db71a:l3ce0puc",
-                    "f82db71a:j2gceby4",
-                    "f82db71a:anoo8qfp",
-                    "f82db71a:gjz2331m",
-                    "f82db71a:we5ul4ne",
-                },
                 traitRefs = {
                     "7bbb4cb9:duukevtq",
                     "7bbb4cb9:r73vv899",
@@ -504,16 +499,6 @@ Addon.Data.DefaultDatasets:Register({
         loot = {},
         mounts = {},
         name = "Warrior",
-                armorWeights = {
-                    "mail",
-                    "plate",
-                    "shield",
-                },
-                armorWeights = {
-                    "mail",
-                    "plate",
-                    "shield",
-                },
         pets = {},
         races = {},
         recipes = {},
@@ -2718,19 +2703,6 @@ Addon.Data.DefaultDatasets:Register({
                         value = -10
                     }
                 },
-                weaponTypeRefs = {
-                    "f82db71a:z6nh3znw",
-                    "f82db71a:i4pivdig",
-                    "f82db71a:9ni3vfas",
-                    "f82db71a:y0dnlo8g",
-                    "f82db71a:25s5wyry",
-                    "f82db71a:3y1v01e4",
-                    "f82db71a:l3ce0puc",
-                    "f82db71a:j2gceby4",
-                    "f82db71a:anoo8qfp",
-                    "f82db71a:gjz2331m",
-                    "f82db71a:we5ul4ne",
-                },
                 unlockLevel = 1
             },
             {
@@ -2784,19 +2756,6 @@ Addon.Data.DefaultDatasets:Register({
                         type = "trait_requirement",
                         unit = "caster"
                     }
-                },
-                weaponTypeRefs = {
-                    "f82db71a:z6nh3znw",
-                    "f82db71a:i4pivdig",
-                    "f82db71a:9ni3vfas",
-                    "f82db71a:y0dnlo8g",
-                    "f82db71a:25s5wyry",
-                    "f82db71a:3y1v01e4",
-                    "f82db71a:l3ce0puc",
-                    "f82db71a:j2gceby4",
-                    "f82db71a:anoo8qfp",
-                    "f82db71a:gjz2331m",
-                    "f82db71a:we5ul4ne",
                 },
                 description = "",
                 events = {
@@ -2855,19 +2814,6 @@ Addon.Data.DefaultDatasets:Register({
                         unit = "caster"
                     }
                 },
-                weaponTypeRefs = {
-                    "f82db71a:z6nh3znw",
-                    "f82db71a:i4pivdig",
-                    "f82db71a:9ni3vfas",
-                    "f82db71a:y0dnlo8g",
-                    "f82db71a:25s5wyry",
-                    "f82db71a:3y1v01e4",
-                    "f82db71a:l3ce0puc",
-                    "f82db71a:j2gceby4",
-                    "f82db71a:anoo8qfp",
-                    "f82db71a:gjz2331m",
-                    "f82db71a:we5ul4ne",
-                },
                 description = "",
                 events = {
                     {
@@ -2899,19 +2845,6 @@ Addon.Data.DefaultDatasets:Register({
                         statRef = "f82db71a:pu05li08",
                         value = -10
                     }
-                },
-                weaponTypeRefs = {
-                    "f82db71a:z6nh3znw",
-                    "f82db71a:i4pivdig",
-                    "f82db71a:9ni3vfas",
-                    "f82db71a:y0dnlo8g",
-                    "f82db71a:25s5wyry",
-                    "f82db71a:3y1v01e4",
-                    "f82db71a:l3ce0puc",
-                    "f82db71a:j2gceby4",
-                    "f82db71a:anoo8qfp",
-                    "f82db71a:gjz2331m",
-                    "f82db71a:we5ul4ne",
                 },
                 unlockLevel = 1
             },

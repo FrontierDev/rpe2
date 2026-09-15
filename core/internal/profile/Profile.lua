@@ -2151,12 +2151,24 @@ function Profile.EquipInventoryItem(slotIndex, record, options)
         ("profile-%s-equipment-equip"):format(equipmentScope),
         function()
             local previousEntry = Equipment.GetEquippedEntryByScope and Equipment.GetEquippedEntryByScope(equipmentScope, slotKey) or nil
+            local clearsOffHand = equipmentScope == "character"
+                and (Equipment.NormalizeSlotKey and Equipment.NormalizeSlotKey(slotKey) or tostring(slotKey or "")) == "mainhand"
+                and item.isTwoHanded == true
+            local offHandEntry = clearsOffHand and Equipment.GetEquippedEntryByScope and Equipment.GetEquippedEntryByScope("character", "offhand") or nil
             if previousEntry and Inventory.AddItem then
                 Inventory.AddItem({
                     dataset = previousEntry.datasetId,
                     id = previousEntry.itemId,
                     modifications = previousEntry.modifications,
                     soulbound = previousEntry.soulbound == true,
+                }, { suppressLootNotification = true })
+            end
+            if offHandEntry and Inventory.AddItem then
+                Inventory.AddItem({
+                    dataset = offHandEntry.datasetId,
+                    id = offHandEntry.itemId,
+                    modifications = offHandEntry.modifications,
+                    soulbound = offHandEntry.soulbound == true,
                 }, { suppressLootNotification = true })
             end
 

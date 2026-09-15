@@ -206,7 +206,7 @@ Rules.Definitions = {
             { key = "offhand_slot", label = "Off Hand Slot", type = "dropdown", default = "", description = "Select the item slot reference used for the unit off-hand assignment.", optionsSource = "itemSlotReference" },
             { key = "ranged_slot", label = "Ranged Slot", type = "dropdown", default = "", description = "Select the item slot reference used for the unit ranged assignment.", optionsSource = "itemSlotReference" },
             { key = "shield_slot", label = "Shield Slot", type = "dropdown", default = "", description = "Select the item slot reference used for the unit shield assignment.", optionsSource = "itemSlotReference" },
-            { key = "enforce_class_armor_weight_restrictions", label = "Enforce Class Armor Weight Restrictions", type = "checkbox", default = false, description = "Prevent player characters from equipping armor whose Armor Weight is not allowed by their selected class. A class with no allowed armor types cannot equip armor while this rule is enabled." },
+            { key = "enforce_class_armor_weight_restrictions", label = "Enforce Class Armor Weight Restrictions", type = "checkbox", default = true, description = "Prevent player characters from equipping armor whose Armor Weight is not allowed by their selected class. A class with no allowed armor types cannot equip armor while this rule is enabled." },
             { key = "allow_dual_wield", label = "Allow Dual Wield", type = "checkbox", default = false, description = "Enable dual-wield logic for weapon handling.", retainedWithoutConsumer = true },
         },
     },

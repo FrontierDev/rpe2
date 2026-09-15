@@ -350,6 +350,8 @@ local function createInstance()
         cachedState = nil,
         selectedRaceRef = "",
         selectedClassRef = "",
+        selectedPrimaryResourceRef = "",
+        selectedSpecialResourceRef = "",
         selectedStartingItemLookup = {},
         selectedSkillPermanentBonuses = {},
         initialSkillPermanentBonuses = {},
@@ -817,6 +819,76 @@ function SetupWizard:BuildAllowedActionBarSpellItems()
     return items
 end
 
+function SetupWizard:GetActionBarResourceChoices()
+    local choices = {}
+    local rows = Profile.ListResolvedResources and Profile.ListResolvedResources() or {}
+    local healthResourceRef = ""
+    if type(RulesetLogic.GetRulesetRuleValueByKey) == "function" then
+        healthResourceRef = trimString(RulesetLogic.GetRulesetRuleValueByKey(
+            self:GetActiveRuleset(),
+            "resources",
+            "health_stat",
+            ""
+        ))
+    end
+
+    for index = 1, #rows do
+        local row = rows[index]
+        local resourceRef = trimString(row and row.ref)
+        if resourceRef ~= "" and resourceRef ~= healthResourceRef then
+            choices[#choices + 1] = {
+                label = trimString(row.name) ~= "" and trimString(row.name) or resourceRef,
+                value = resourceRef,
+                isSpecial = row.isSpecial == true,
+            }
+        end
+    end
+
+    return choices
+end
+
+function SetupWizard:RefreshActionBarResourceSelectors()
+    if not self.ActionBarPrimaryResourceDropdown or not self.ActionBarSpecialResourceDropdown then
+        return
+    end
+
+    local choices = self:GetActionBarResourceChoices()
+    local primaryRef = trimString(self.selectedPrimaryResourceRef)
+    local specialRef = trimString(self.selectedSpecialResourceRef)
+    local primaryItems = { { label = "None", value = "" } }
+    local specialItems = { { label = "None", value = "" } }
+
+    for index = 1, #choices do
+        local choice = choices[index]
+        if choice.value ~= specialRef then
+            primaryItems[#primaryItems + 1] = {
+                label = choice.label,
+                value = choice.value,
+            }
+        end
+        if choice.isSpecial == true and choice.value ~= primaryRef then
+            specialItems[#specialItems + 1] = {
+                label = choice.label,
+                value = choice.value,
+            }
+        end
+    end
+
+    self._refreshingActionBarResourceSelectors = true
+    self.ActionBarPrimaryResourceDropdown:SetItems(primaryItems)
+    self.ActionBarPrimaryResourceDropdown:SetSelectedValue(primaryRef, true)
+    self.ActionBarSpecialResourceDropdown:SetItems(specialItems)
+    self.ActionBarSpecialResourceDropdown:SetSelectedValue(specialRef, true)
+    self._refreshingActionBarResourceSelectors = false
+
+    if self.ActionBarPrimaryResourceDropdown.SetEnabled then
+        self.ActionBarPrimaryResourceDropdown:SetEnabled(#primaryItems > 1)
+    end
+    if self.ActionBarSpecialResourceDropdown.SetEnabled then
+        self.ActionBarSpecialResourceDropdown:SetEnabled(#specialItems > 1)
+    end
+end
+
 function SetupWizard:CaptureSelectionState()
     local setupState = Profile.GetSetupWizardState and Profile.GetSetupWizardState() or {}
     local actionBarSpellRefs = {}
@@ -838,6 +910,8 @@ function SetupWizard:CaptureSelectionState()
     return {
         raceRef = trimString(Profile.GetRaceRef and Profile.GetRaceRef() or setupState.raceRef),
         classRef = trimString(Profile.GetClassRef and Profile.GetClassRef() or setupState.classRef),
+        primaryResourceRef = trimString(Profile.GetPrimaryResourceRef and Profile.GetPrimaryResourceRef()),
+        specialResourceRef = trimString(Profile.GetSpecialResourceRef and Profile.GetSpecialResourceRef()),
         startingItemRefs = type(setupState.startingItemRefs) == "table" and setupState.startingItemRefs or {},
         actionBarSpellRefs = actionBarSpellRefs,
         skillPermanentBonuses = copySetupSkillBonusMap(setupState.skillPermanentBonuses),
@@ -847,6 +921,8 @@ end
 function SetupWizard:SyncSelectionState(state)
     self.selectedRaceRef = trimString(state and state.raceRef)
     self.selectedClassRef = trimString(state and state.classRef)
+    self.selectedPrimaryResourceRef = trimString(state and state.primaryResourceRef)
+    self.selectedSpecialResourceRef = trimString(state and state.specialResourceRef)
     self.selectedStartingItemLookup = selectionLookupFromArray(state and state.startingItemRefs or {})
     self.selectedSkillPermanentBonuses = copySetupSkillBonusMap(state and state.skillPermanentBonuses)
     self.initialSkillPermanentBonuses = copySetupSkillBonusMap(state and state.skillPermanentBonuses)
@@ -1573,13 +1649,69 @@ function SetupWizard:BuildActionBarPage(page)
     self.ActionBarHintText:GetFrame():SetPoint("TOPLEFT", self.ActionBarPageRoot, "TOPLEFT", 0, 0)
     self.ActionBarHintText:GetFrame():SetPoint("TOPRIGHT", self.ActionBarPageRoot, "TOPRIGHT", 0, 0)
 
+    self.ActionBarResourceControls = CreateFrame("Frame", "RPESetupWizardActionBarResourceControls", self.ActionBarPageRoot)
+    self.ActionBarResourceControls:SetPoint("TOPLEFT", self.ActionBarHintText:GetFrame(), "BOTTOMLEFT", 0, -6)
+    self.ActionBarResourceControls:SetPoint("TOPRIGHT", self.ActionBarPageRoot, "TOPRIGHT", 0, 0)
+    self.ActionBarResourceControls:SetHeight(34)
+
+    local resourceFieldWidth = math.floor((CONTENT_WIDTH - 12) / 2)
+    self.ActionBarPrimaryResourceLabel = UI.CreateText(self.ActionBarResourceControls, "RPESetupWizardActionBarPrimaryResourceLabel", "Primary Resource", {
+        width = resourceFieldWidth,
+        height = 12,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.ActionBarPrimaryResourceLabel:GetFrame():SetPoint("TOPLEFT", self.ActionBarResourceControls, "TOPLEFT", 0, 0)
+
+    self.ActionBarPrimaryResourceDropdown = UI.CreateDropdown(self.ActionBarResourceControls, "RPESetupWizardActionBarPrimaryResourceDropdown", {
+        width = resourceFieldWidth,
+        height = 18,
+        items = {},
+        onValueChanged = function(value)
+            if self._refreshingActionBarResourceSelectors then
+                return
+            end
+            self.selectedPrimaryResourceRef = trimString(value)
+            if self.selectedPrimaryResourceRef == self.selectedSpecialResourceRef then
+                self.selectedSpecialResourceRef = ""
+            end
+            self:RefreshActionBarResourceSelectors()
+        end,
+    })
+    self.ActionBarPrimaryResourceDropdown:GetFrame():SetPoint("TOPLEFT", self.ActionBarPrimaryResourceLabel:GetFrame(), "BOTTOMLEFT", 0, -2)
+
+    self.ActionBarSpecialResourceLabel = UI.CreateText(self.ActionBarResourceControls, "RPESetupWizardActionBarSpecialResourceLabel", "Special Resource", {
+        width = resourceFieldWidth,
+        height = 12,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.ActionBarSpecialResourceLabel:GetFrame():SetPoint("TOPLEFT", self.ActionBarPrimaryResourceLabel:GetFrame(), "TOPRIGHT", 12, 0)
+
+    self.ActionBarSpecialResourceDropdown = UI.CreateDropdown(self.ActionBarResourceControls, "RPESetupWizardActionBarSpecialResourceDropdown", {
+        width = resourceFieldWidth,
+        height = 18,
+        items = {},
+        onValueChanged = function(value)
+            if self._refreshingActionBarResourceSelectors then
+                return
+            end
+            self.selectedSpecialResourceRef = trimString(value)
+            if self.selectedSpecialResourceRef == self.selectedPrimaryResourceRef then
+                self.selectedPrimaryResourceRef = ""
+            end
+            self:RefreshActionBarResourceSelectors()
+        end,
+    })
+    self.ActionBarSpecialResourceDropdown:GetFrame():SetPoint("TOPLEFT", self.ActionBarSpecialResourceLabel:GetFrame(), "BOTTOMLEFT", 0, -2)
+
     self.ActionBarDummyBarPanel = UI.CreatePanel(self.ActionBarPageRoot, "RPESetupWizardDummyActionBarPanel", {
         width = CONTENT_WIDTH,
         height = 60,
         contentInset = 6,
     })
-    self.ActionBarDummyBarPanel:GetFrame():SetPoint("TOPLEFT", self.ActionBarHintText:GetFrame(), "BOTTOMLEFT", 0, -6)
-    self.ActionBarDummyBarPanel:GetFrame():SetPoint("TOPRIGHT", self.ActionBarPageRoot, "TOPRIGHT", 0, -20)
+    self.ActionBarDummyBarPanel:GetFrame():SetPoint("TOPLEFT", self.ActionBarResourceControls, "BOTTOMLEFT", 0, -6)
+    self.ActionBarDummyBarPanel:GetFrame():SetPoint("TOPRIGHT", self.ActionBarResourceControls, "BOTTOMRIGHT", 0, -6)
 
     self.ActionBarDummyBarLabel = UI.CreateText(self.ActionBarDummyBarPanel:GetContentFrame(), "RPESetupWizardDummyActionBarLabel", "Action Bar", {
         width = 120,
@@ -1595,17 +1727,17 @@ function SetupWizard:BuildActionBarPage(page)
 
     self.ActionBarBody = UI.CreateLayout(UI.HorizontalLayoutGroup, self.ActionBarPageRoot, "RPESetupWizardActionBarBody", {
         width = CONTENT_WIDTH,
-        height = 208,
+        height = 174,
         spacing = 8,
         fitChildrenWidth = true,
         fitChildrenHeight = true,
     })
     self.ActionBarBody:GetFrame():SetPoint("TOPLEFT", self.ActionBarDummyBarPanel:GetFrame(), "BOTTOMLEFT", 0, -6)
-    self.ActionBarBody:GetFrame():SetPoint("TOPRIGHT", self.ActionBarPageRoot, "TOPRIGHT", 0, -86)
+    self.ActionBarBody:GetFrame():SetPoint("TOPRIGHT", self.ActionBarDummyBarPanel:GetFrame(), "BOTTOMRIGHT", 0, -6)
 
     self.ActionBarDatasetPanel = UI.CreatePanel(self.ActionBarBody:GetFrame(), "RPESetupWizardActionBarDatasetPanel", {
         width = ACTIONBAR_DATASET_PANEL_WIDTH,
-        height = 208,
+        height = 174,
         contentInset = 2,
         showBorder = false,
     })
@@ -1613,7 +1745,7 @@ function SetupWizard:BuildActionBarPage(page)
 
     self.ActionBarGridPanel = UI.CreatePanel(self.ActionBarBody:GetFrame(), "RPESetupWizardActionBarGridPanel", {
         width = 1,
-        height = 208,
+        height = 174,
         expandWidth = true,
         weight = 1,
         contentInset = 0,
@@ -1624,8 +1756,8 @@ function SetupWizard:BuildActionBarPage(page)
     self.ActionBarDatasetList = UI.ScrollLayout:New({
         name = "RPESetupWizardActionBarDatasetList",
         width = ACTIONBAR_DATASET_PANEL_WIDTH - 4,
-        height = 204,
-        visibleRows = 10,
+        height = 170,
+        visibleRows = 8,
         rowHeight = 18,
         rowSpacing = 0,
         border = false,
@@ -2255,7 +2387,7 @@ function SetupWizard:BuildFilteredStartingItems()
         if self.showClassItemsOnly then
             local _, class = Registry:ResolveClassReference(self.selectedClassRef)
             local armorWeights, weaponTypeRefs = class and class.armorWeights or {}, class and class.weaponTypeRefs or {}
-            matchesClass = (item.itemType == "armor" and tContains(armorWeights, item.armorWeight))
+            matchesClass = (item.itemType == "armor" and (normalizeSearchToken(item.armorWeight) == "cosmetic" or tContains(armorWeights, item.armorWeight)))
                 or (item.itemType == "weapon" and tContains(weaponTypeRefs, item.weaponTypeRef))
         end
         if matchesQuery and matchesType and matchesClass then
@@ -2756,6 +2888,8 @@ function SetupWizard:RefreshFinalizePage()
 end
 
 function SetupWizard:RefreshActionBarPage(state)
+    self:RefreshActionBarResourceSelectors()
+
     local actionBarSize = Profile.GetActionBarSize and Profile.GetActionBarSize() or 0
     if self.selectedActionBarSlotIndex > actionBarSize then
         self.selectedActionBarSlotIndex = 1
@@ -2981,6 +3115,8 @@ function SetupWizard:CollectCurrentSelection()
     local collected = {
         raceRef = trimString(self.selectedRaceRef) ~= "" and trimString(self.selectedRaceRef) or trimString(state.raceRef),
         classRef = trimString(self.selectedClassRef) ~= "" and trimString(self.selectedClassRef) or trimString(state.classRef),
+        primaryResourceRef = trimString(self.selectedPrimaryResourceRef),
+        specialResourceRef = trimString(self.selectedSpecialResourceRef),
         startingItemRefs = selectionArrayFromLookup(self.availableStartingItems, self.selectedStartingItemLookup),
         actionBarSpellRefs = state.actionBarSpellRefs or {},
         skillPermanentBonuses = copySetupSkillBonusMap(self.selectedSkillPermanentBonuses or state.skillPermanentBonuses),
@@ -3032,6 +3168,12 @@ function SetupWizard:ApplyCurrentSelection()
     end
     if trimString(state.classRef) ~= "" and Profile.SetClassRef then
         Profile.SetClassRef(state.classRef)
+    end
+    if Profile.SetPrimaryResourceRef then
+        Profile.SetPrimaryResourceRef(state.primaryResourceRef)
+    end
+    if Profile.SetSpecialResourceRef then
+        Profile.SetSpecialResourceRef(state.specialResourceRef)
     end
 
     for index = 1, #(plan.equipped or {}) do

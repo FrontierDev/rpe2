@@ -65,7 +65,7 @@ local function isClassArmorWeightRestrictionEnabled()
         ruleset.GetActiveRuleset(),
         "equipment",
         "enforce_class_armor_weight_restrictions",
-        false
+        true
     ) == true
 end
 
@@ -210,7 +210,12 @@ function Equipment.CanEquipItemInScope(scope, item)
         return true
     end
 
-    if type(item) ~= "table" or string.lower(ensureString(item.itemType)) ~= "armor" then
+    if type(item) ~= "table" then
+        return true
+    end
+
+    local itemType = string.lower(ensureString(item.itemType))
+    if itemType ~= "armor" and itemType ~= "weapon" then
         return true
     end
 
@@ -229,7 +234,20 @@ function Equipment.CanEquipItemInScope(scope, item)
         return false, "class-unavailable"
     end
 
+    if itemType == "weapon" then
+        local weaponTypeRef = ensureString(item.weaponTypeRef)
+        for index = 1, #(class.weaponTypeRefs or {}) do
+            if ensureString(class.weaponTypeRefs[index]) == weaponTypeRef then
+                return true
+            end
+        end
+        return false, "weapon-type-restricted"
+    end
+
     local armorWeight = normalizeArmorWeight(item.armorWeight)
+    if armorWeight == "cosmetic" then
+        return true
+    end
     if armorWeight == "" then
         return false, "armor-weight-restricted"
     end
@@ -473,6 +491,9 @@ function Equipment.EquipItemInScope(scope, slotKey, itemRef, modifications, slot
     end
 
     local normalizedScope = normalizeSlotType(scope)
+    local clearsOffHand = normalizedScope == "character"
+        and normalizedSlotKey == "mainhand"
+        and item.isTwoHanded == true
     local function persistEquipment()
         local entry = Database.SetProfileEquipmentSlotByScope and Database.SetProfileEquipmentSlotByScope(normalizedScope, normalizedSlotKey, {
             datasetId = dataset and dataset.id or "",
@@ -483,7 +504,12 @@ function Equipment.EquipItemInScope(scope, slotKey, itemRef, modifications, slot
             soulbound = soulbound == true,
         }) or nil
 
-        if entry ~= nil then
+        local offHandCleared = false
+        if entry ~= nil and clearsOffHand and Database.ClearProfileEquipmentSlotByScope then
+            offHandCleared = Database.ClearProfileEquipmentSlotByScope("character", "offhand") == true
+        end
+
+        if entry ~= nil or offHandCleared then
             bumpProfileTooltipContextRevision()
         end
         return entry

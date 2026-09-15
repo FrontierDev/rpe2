@@ -14,6 +14,7 @@ local Dependencies = Database and Database.Dependecies or {}
 local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 local Ruleset = Addon.Internal and Addon.Internal.Ruleset or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
+local Equipment = Profile and Profile.Equipment or {}
 local ItemClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Item or nil
 local ModificationService = Profile and Profile.Modifications or {}
 local Common = Addon.Utils and Addon.Utils.Common or nil
@@ -33,7 +34,7 @@ ensureString = function(value, fallback)
     return tostring(value)
 end
 
-local TOOLTIP_CACHE_VERSION = "item-tooltip-v4"
+local TOOLTIP_CACHE_VERSION = "item-tooltip-v5"
 ItemTooltip.BuildCache = ItemTooltip.BuildCache or {}
 ItemTooltip.StaticBuildCache = ItemTooltip.StaticBuildCache or {}
 ItemTooltip.DatasetIndexCache = ItemTooltip.DatasetIndexCache or {}
@@ -597,6 +598,10 @@ end
 
 local function buildWeaponCategoryLine(item)
     local colorR, colorG, colorB = getWhiteLineColor()
+    local restrictionReason = nil
+    if Equipment.CanEquipItemInScope then
+        _, restrictionReason = Equipment.CanEquipItemInScope("character", item)
+    end
     if not hasWeaponType(item) then
         return {
             text = ("Held in %s"):format(resolvePrimarySlotName(item) or "Hand"),
@@ -613,6 +618,9 @@ local function buildWeaponCategoryLine(item)
         r = colorR,
         g = colorG,
         b = colorB,
+        rightR = restrictionReason == "weapon-type-restricted" and 1 or colorR,
+        rightG = restrictionReason == "weapon-type-restricted" and 0.2 or colorG,
+        rightB = restrictionReason == "weapon-type-restricted" and 0.2 or colorB,
         wrap = false,
     }
 end
@@ -621,6 +629,10 @@ local function buildArmorCategoryLine(item)
     local colorR, colorG, colorB = getWhiteLineColor()
     local armorWeight = tostring(item and item.armorWeight or "cosmetic")
     local slotName = resolvePrimarySlotName(item) or "Armor"
+    local restrictionReason = nil
+    if Equipment.CanEquipItemInScope then
+        _, restrictionReason = Equipment.CanEquipItemInScope("character", item)
+    end
     if armorWeight == "cosmetic" then
         return {
             text = slotName,
@@ -637,6 +649,9 @@ local function buildArmorCategoryLine(item)
         r = colorR,
         g = colorG,
         b = colorB,
+        rightR = restrictionReason == "armor-weight-restricted" and 1 or colorR,
+        rightG = restrictionReason == "armor-weight-restricted" and 0.2 or colorG,
+        rightB = restrictionReason == "armor-weight-restricted" and 0.2 or colorB,
         wrap = false,
     }
 end
