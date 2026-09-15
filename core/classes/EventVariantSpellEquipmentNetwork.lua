@@ -25,9 +25,10 @@ local MAIN_HAND_FIELD = 26
 local OFF_HAND_FIELD = 27
 local RANGED_FIELD = 28
 local SHIELD_FIELD = 29
--- Keep this after variant identity (24-25) and equipment (26-29).
-local SHOW_IN_NPC_MODE_FIELD = 30
-local FINAL_FIELD_COUNT = 30
+-- PrimaryResourceSync owns fields 30-31 and wraps this serializer later.
+-- Keep NPC-mode visibility after those fields so neither extension overwrites the other.
+local SHOW_IN_NPC_MODE_FIELD = 32
+local FINAL_FIELD_COUNT = 32
 
 local function splitPreservingEmpty(text, separator)
     if type(Common.SplitPreservingEmpty) == "function" then

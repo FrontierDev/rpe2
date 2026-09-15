@@ -164,6 +164,7 @@ client/client_CombatLogTurnIdentity.lua
 client/client_Skills.lua
 client/client_SkillProgression.lua
 server/server_Event.lua
+server/server_EventNpcMode.lua
 server/server_EventUnitHidden.lua
 server/server_EventTurnComplete.lua
 server/server_EventEndLoot.lua
