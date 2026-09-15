@@ -583,6 +583,10 @@ local function normalizeBoss(value)
     return coerceBoolean(value, false)
 end
 
+local function normalizeShowInNpcMode(value)
+    return coerceBoolean(value, false)
+end
+
 local function normalizeActive(isPlayer, value)
     if isPlayer == true then
         return true
@@ -610,6 +614,7 @@ function EventUnit:New(data)
         active = true,
         hidden = false,
         boss = false,
+        showInNpcMode = false,
         petRef = nil,
         summonedByEventID = nil,
         mainHandWeapon = nil,
@@ -653,6 +658,7 @@ function EventUnit:Merge(data)
     self.active = normalizeActive(self.isPlayer, self.active)
     self.hidden = normalizeHidden(self.hidden)
     self.boss = normalizeBoss(self.boss)
+    self.showInNpcMode = normalizeShowInNpcMode(self.showInNpcMode)
     self.petRef = normalizeRef(self.petRef)
     self.summonedByEventID = tonumber(self.summonedByEventID) or nil
     self.mainHandWeapon = normalizeRef(self.mainHandWeapon)
@@ -751,6 +757,7 @@ function EventUnit:ToTable()
         active = normalizeActive(self.isPlayer, self.active),
         hidden = normalizeHidden(self.hidden),
         boss = normalizeBoss(self.boss),
+        showInNpcMode = normalizeShowInNpcMode(self.showInNpcMode),
         petRef = self.petRef,
         summonedByEventID = tonumber(self.summonedByEventID) or nil,
         mainHandWeapon = self.mainHandWeapon,
@@ -774,6 +781,10 @@ end
 
 function EventUnit.IsBoss(unit)
     return type(unit) == "table" and normalizeBoss(unit.boss)
+end
+
+function EventUnit.IsShownInNpcMode(unit)
+    return type(unit) == "table" and normalizeShowInNpcMode(unit.showInNpcMode)
 end
 
 EventUnit.CoerceBoolean = coerceBoolean

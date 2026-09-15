@@ -147,6 +147,7 @@ core/internal/GuildShopContributions.lua
 core/classes/Currency.lua
 core/classes/Event.lua
 core/classes/EventAutopilotMode.lua
+core/classes/EventNpcMode.lua
 core/classes/EventVariantNetwork.lua
 core/classes/EventVariantSpellEquipmentNetwork.lua
 core/classes/EventEndLoot.lua

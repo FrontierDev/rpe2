@@ -76,6 +76,10 @@ local function isLocalHostForEvent(state)
     return type(Client.IsLocalEventHost) == "function" and Client:IsLocalEventHost(state) == true
 end
 
+local function isNpcEventMode(state)
+    return type(state) == "table" and string.lower(tostring(state.eventMode or "")) == "npc"
+end
+
 local function shallowCopy(entry)
     local copy = {}
     for key, value in pairs(type(entry) == "table" and entry or {}) do
@@ -428,6 +432,25 @@ function EventWidget:EnsureDMHelperUI()
     self.combatLogHistoryButtonRow:AddChild(self.dmHelperButton)
     setShown(self.dmHelperButton, false)
 
+    self.eventModeToggleButton = buildButton(
+        buttonRowFrame,
+        "RPEClientEventWidgetEventModeToggleButton",
+        "NPC Mode",
+        function()
+            local state = getActiveEventState()
+            if not isLocalHostForEvent(state) then
+                return
+            end
+
+            local server = Addon.Server
+            if type(server) == "table" and type(server.SetEventMode) == "function" then
+                server:SetEventMode(isNpcEventMode(state) and "combat" or "npc")
+            end
+        end
+    )
+    self.combatLogHistoryButtonRow:AddChild(self.eventModeToggleButton)
+    setShown(self.eventModeToggleButton, false)
+
     local historyPanelFrame = getFrame(self.combatLogHistoryPanel)
     self._dmHelperBasePanelWidth = historyPanelFrame and historyPanelFrame:GetWidth() or 420
     self._dmHelperBasePanelHeight = historyPanelFrame and historyPanelFrame:GetHeight() or 270
@@ -531,8 +554,16 @@ end
 
 function EventWidget:RefreshDMHelperHostVisibility()
     self:EnsureDMHelperUI()
-    local host = isLocalHostForEvent(getActiveEventState())
+    local state = getActiveEventState()
+    local host = isLocalHostForEvent(state)
     setShown(self.dmHelperButton, host)
+    setShown(self.eventModeToggleButton, host)
+    if self.eventModeToggleButton and type(self.eventModeToggleButton.SetText) == "function" then
+        self.eventModeToggleButton:SetText(isNpcEventMode(state) and "Combat Mode" or "NPC Mode")
+    end
+    if self.eventModeToggleButton and type(self.eventModeToggleButton.SetEnabled) == "function" then
+        self.eventModeToggleButton:SetEnabled(host)
+    end
     if not host then
         self:ClearDMHelperSelection()
         if tostring(self.combatLogHistoryMode or "") == "dm-helper" then

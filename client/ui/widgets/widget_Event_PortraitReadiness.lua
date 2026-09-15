@@ -308,13 +308,15 @@ local function stepStartupStructuralRefresh(work, deadlineMs)
             if type(work.context) ~= "table" then
                 error("Event Widget startup refresh could not build portrait context.")
             end
-            work.maxEventUnits = math.max(1, math.floor(tonumber(work.context.maxEventUnits) or 1))
+            work.normalSlotCount = math.max(0, math.floor(
+                tonumber(work.context.portraitSlotCount) or tonumber(work.context.maxEventUnits) or 0
+            ))
             work.pageUnits = type(work.context.pageUnits) == "table" and work.context.pageUnits or {}
             work.bossUnits = type(work.context.bossUnits) == "table" and work.context.bossUnits or {}
-            work.totalSlots = work.maxEventUnits + #work.bossUnits
+            work.totalSlots = work.normalSlotCount + #work.bossUnits
             work.phase = "ensure-normal"
         elseif work.phase == "ensure-normal" then
-            if work.normalEnsureIndex <= work.maxEventUnits then
+            if work.normalEnsureIndex <= work.normalSlotCount then
                 work.widget:EnsurePortraitSlot(work.normalEnsureIndex)
                 work.normalEnsureIndex = work.normalEnsureIndex + 1
             else
@@ -340,7 +342,7 @@ local function stepStartupStructuralRefresh(work, deadlineMs)
                 work.phase = "refresh-normal"
             end
         elseif work.phase == "refresh-normal" then
-            if work.normalRefreshIndex <= work.maxEventUnits then
+            if work.normalRefreshIndex <= work.normalSlotCount then
                 local index = work.normalRefreshIndex
                 startupBaseRefreshPortraitSlot(
                     work.widget,

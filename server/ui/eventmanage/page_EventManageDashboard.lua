@@ -41,6 +41,7 @@ function EventManage:BuildDashboardPage(page)
         fitChildrenWidth = false,
         fitChildrenHeight = false,
     })
+    self.DashboardToolbarLayout = toolbar
 
     self.StartServerButton = UI.CreateButton(toolbar:GetFrame(), "RPEServerEventManageStartServerButton", "Start Server", toolbarButtonWidth, function()
         if Server.StartServer then
@@ -80,6 +81,7 @@ function EventManage:BuildDashboardPage(page)
             EventManage:RefreshDashboard()
         end
     end)
+    self.AdvanceEventStepButtonWidth = advanceButtonWidth
     self.AdvanceEventStepButton:SetScript("OnEnter", function()
         local client = Addon.Client
         if client and client.ShowPendingTurnChangesTooltip then

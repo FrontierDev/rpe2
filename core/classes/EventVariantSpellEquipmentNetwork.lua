@@ -25,7 +25,9 @@ local MAIN_HAND_FIELD = 26
 local OFF_HAND_FIELD = 27
 local RANGED_FIELD = 28
 local SHIELD_FIELD = 29
-local FINAL_FIELD_COUNT = 29
+-- Keep this after variant identity (24-25) and equipment (26-29).
+local SHOW_IN_NPC_MODE_FIELD = 30
+local FINAL_FIELD_COUNT = 30
 
 local function splitPreservingEmpty(text, separator)
     if type(Common.SplitPreservingEmpty) == "function" then
@@ -128,6 +130,16 @@ local function appendSpellEquipment(record, sourceUnit)
         fields[SHIELD_FIELD] = ""
     end
 
+    local showInNpcMode = false
+    if type(runtimeUnit) == "table" then
+        if type(EventUnit.IsShownInNpcMode) == "function" then
+            showInNpcMode = EventUnit.IsShownInNpcMode(runtimeUnit)
+        else
+            showInNpcMode = runtimeUnit.showInNpcMode == true
+        end
+    end
+    fields[SHOW_IN_NPC_MODE_FIELD] = showInNpcMode and "1" or "0"
+
     return table.concat(fields, UNIT_FIELD_SEPARATOR)
 end
 
@@ -145,6 +157,7 @@ local function applySpellEquipment(unit, record)
     unit.offHandWeapon = normalizeRef(fields[OFF_HAND_FIELD])
     unit.rangedWeapon = normalizeRef(fields[RANGED_FIELD])
     unit.shield = normalizeRef(fields[SHIELD_FIELD])
+    unit.showInNpcMode = tostring(fields[SHOW_IN_NPC_MODE_FIELD] or "") == "1"
     return unit
 end
 

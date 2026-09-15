@@ -327,7 +327,17 @@ end
 
 function Client:CanPerformEventAction(eventState, actionKind)
     local state = eventState or self:GetEventState()
-    if type(state) ~= "table" or state.active ~= true or state.ending == true then
+    if type(state) ~= "table" then
+        return false, "event-inactive"
+    end
+    if tostring(actionKind or "") == "advance-event-step"
+        and Event
+        and type(Event.NormalizeEventMode) == "function"
+        and Event.NormalizeEventMode(state.eventMode) == "npc"
+    then
+        return false, "npc-mode"
+    end
+    if state.active ~= true or state.ending == true then
         return false, "event-inactive"
     end
 

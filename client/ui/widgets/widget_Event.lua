@@ -32,6 +32,14 @@ local function getEventClass()
     return Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Event or nil
 end
 
+local function isNpcEventMode(state)
+    local eventClass = getEventClass()
+    return eventClass
+        and type(eventClass.NormalizeEventMode) == "function"
+        and eventClass.NormalizeEventMode(state and state.eventMode) == "npc"
+        or false
+end
+
 local function coerceEventUnitBoolean(value, defaultValue)
     local eventUnitClass = Addon.Internal
         and Addon.Internal.Database
@@ -66,6 +74,22 @@ local function coerceEventUnitBoolean(value, defaultValue)
     end
 
     return defaultValue == true
+end
+
+local function isNpcWidgetUnit(eventUnit)
+    if type(eventUnit) ~= "table" or eventUnit.isPlayer == true then
+        return false
+    end
+
+    local eventUnitClass = Addon.Internal
+        and Addon.Internal.Database
+        and Addon.Internal.Database.Classes
+        and Addon.Internal.Database.Classes.EventUnit
+        or nil
+    if eventUnitClass and type(eventUnitClass.IsShownInNpcMode) == "function" then
+        return eventUnitClass.IsShownInNpcMode(eventUnit) == true
+    end
+    return coerceEventUnitBoolean(eventUnit.showInNpcMode, false)
 end
 
 local function isEventUnitActive(eventUnit)
@@ -119,6 +143,17 @@ local function getWidgetUnitsForPage(units, pageNumber, pageSize)
     end
 
     return pageUnits
+end
+
+local function getNpcWidgetUnits(units, isBoss)
+    local selectedUnits = {}
+    for index = 1, #(units or {}) do
+        local eventUnit = units[index]
+        if isNpcWidgetUnit(eventUnit) and isEventUnitBoss(eventUnit) == (isBoss == true) then
+            selectedUnits[#selectedUnits + 1] = eventUnit
+        end
+    end
+    return selectedUnits
 end
 
 local function findPageUnitIndexByEventId(pageUnits, targetEventId)
@@ -261,12 +296,18 @@ local function getEventHeaderIconTexture(difficulty)
     return EVENT_ICON_TEXTURE
 end
 
-local function getPortraitPanelHeight(hasBossUnits)
+local function getPortraitPanelHeight(hasBossUnits, normalRows, bossRows)
+    local normalizedNormalRows = math.max(1, math.floor(tonumber(normalRows) or 1))
+    local normalizedBossRows = math.max(1, math.floor(tonumber(bossRows) or 1))
+    local normalHeight = (normalizedNormalRows * PORTRAIT_FRAME_HEIGHT)
+        + ((normalizedNormalRows - 1) * PORTRAIT_SECTION_SPACING)
     if hasBossUnits == true then
-        return BOSS_PORTRAIT_FRAME_HEIGHT + PORTRAIT_SECTION_SPACING + PORTRAIT_FRAME_HEIGHT + PORTRAIT_PANEL_BASE_PADDING
+        local bossHeight = (normalizedBossRows * BOSS_PORTRAIT_FRAME_HEIGHT)
+            + ((normalizedBossRows - 1) * PORTRAIT_SECTION_SPACING)
+        return bossHeight + PORTRAIT_SECTION_SPACING + normalHeight + PORTRAIT_PANEL_BASE_PADDING
     end
 
-    return PORTRAIT_FRAME_HEIGHT + PORTRAIT_PANEL_BASE_PADDING
+    return normalHeight + PORTRAIT_PANEL_BASE_PADDING
 end
 
 ClientUI.EventWidget = ClientUI.EventWidget or {}
@@ -1948,7 +1989,7 @@ function EventWidget:QueueNPCSpeech(entry)
     })
 end
 
-function EventWidget:LayoutPortraitRow(panel, slots, slotCount, portraitSize, portraitSpacing)
+function EventWidget:LayoutPortraitRow(panel, slots, slotCount, portraitSize, portraitSpacing, options)
     if not panel then
         return false
     end
@@ -1958,32 +1999,73 @@ function EventWidget:LayoutPortraitRow(panel, slots, slotCount, portraitSize, po
         return true
     end
 
-    local totalWidth = (count * portraitSize) + ((count - 1) * portraitSpacing)
-    local startOffset = -(totalWidth / 2)
+    local maxColumns = type(options) == "table" and tonumber(options.maxColumns) or nil
+    local rowStep = type(options) == "table" and tonumber(options.rowStep) or nil
+    local columns = maxColumns and math.max(1, math.floor(maxColumns)) or count
+    local resolvedRowStep = rowStep and math.max(1, rowStep) or portraitSize
+    local panelFrame = panel:GetFrame()
 
     for index = 1, count do
         local portrait = slots[index]
         local frame = portrait and portrait.GetFrame and portrait:GetFrame() or nil
 
         if frame then
+            local row = math.floor((index - 1) / columns)
+            local column = ((index - 1) % columns) + 1
+            local rowCount = math.min(columns, count - (row * columns))
+            local totalWidth = (rowCount * portraitSize) + ((rowCount - 1) * portraitSpacing)
+            local startOffset = -(totalWidth / 2)
             frame:ClearAllPoints()
-            frame:SetPoint("TOPLEFT", panel:GetFrame(), "TOP", startOffset + ((index - 1) * (portraitSize + portraitSpacing)), 0)
+            frame:SetPoint(
+                "TOPLEFT",
+                panelFrame,
+                "TOP",
+                startOffset + ((column - 1) * (portraitSize + portraitSpacing)),
+                -(row * resolvedRowStep)
+            )
         end
     end
 
     return true
 end
 
+local function getNpcPortraitColumnCount(maxEventUnits, portraitSize, portraitSpacing)
+    local panelColumns = math.floor((ROOT_WIDTH + portraitSpacing) / (portraitSize + portraitSpacing))
+    return math.max(1, math.min(math.max(1, math.floor(tonumber(maxEventUnits) or DEFAULT_MAX_EVENT_UNITS)), panelColumns))
+end
+
+local function getPortraitRowCount(unitCount, maxColumns)
+    local count = math.max(0, math.floor(tonumber(unitCount) or 0))
+    local columns = math.max(1, math.floor(tonumber(maxColumns) or 1))
+    return math.max(1, math.ceil(count / columns))
+end
+
+local function getPortraitRowPanelHeight(rowCount, portraitFrameHeight)
+    local rows = math.max(1, math.floor(tonumber(rowCount) or 1))
+    return (rows * portraitFrameHeight) + ((rows - 1) * PORTRAIT_SECTION_SPACING) + PORTRAIT_PANEL_BASE_PADDING
+end
+
 function EventWidget:BuildPortraitRefreshContext(state)
     local maxEventUnits = getMaxEventUnits()
     local units = state and state.units or {}
-    local pageNumber = math.max(1, math.floor(tonumber(state and state.tickNumber) or 1))
+    local npcMode = isNpcEventMode(state)
     local isHost = isLocalHostForEvent(state)
-    local pageUnits = getWidgetUnitsForPage(units, pageNumber, maxEventUnits)
-    local bossUnits = collectBossUnits(units)
+    local pageUnits
+    local bossUnits
+    if npcMode then
+        pageUnits = getNpcWidgetUnits(units, false)
+        bossUnits = getNpcWidgetUnits(units, true)
+    else
+        pageUnits = getWidgetUnitsForPage(
+            units,
+            math.max(1, math.floor(tonumber(state and state.tickNumber) or 1)),
+            maxEventUnits
+        )
+        bossUnits = collectBossUnits(units)
+    end
     local controlContext = Client.GetActionBarControlContext and Client:GetActionBarControlContext(state) or nil
     local controlledUnitId = tonumber(controlContext and controlContext.isControlled == true and controlContext.controlledUnit and controlContext.controlledUnit.eventID or 0) or 0
-    local dimOtherPortraits = controlledUnitId > 0
+    local dimOtherPortraits = npcMode ~= true and controlledUnitId > 0
     local actionBarWidget = getActionBarWidget()
     local actionBarResourceContext = type(actionBarWidget) == "table"
         and type(actionBarWidget.BuildActionBarResourceContext) == "function"
@@ -1993,6 +2075,10 @@ function EventWidget:BuildPortraitRefreshContext(state)
 
     return {
         maxEventUnits = maxEventUnits,
+        npcMode = npcMode,
+        portraitSlotCount = npcMode and #pageUnits or maxEventUnits,
+        normalPortraitColumns = npcMode and getNpcPortraitColumnCount(maxEventUnits, PORTRAIT_SIZE, PORTRAIT_SPACING) or #pageUnits,
+        bossPortraitColumns = npcMode and getNpcPortraitColumnCount(maxEventUnits, BOSS_PORTRAIT_SIZE, BOSS_PORTRAIT_SPACING) or #bossUnits,
         pageUnits = pageUnits,
         bossUnits = bossUnits,
         isHost = isHost,
@@ -2025,7 +2111,8 @@ function EventWidget:RefreshPortraitSlot(index, eventUnit, state, context, optio
         or { visible = false, alpha = 0 }
     local isHiddenUnit = type(eventUnit) == "table" and eventUnit.hidden == true
     local hideHiddenUnitDetails = isHiddenUnit and context.isHost ~= true
-    local turnComplete = desiredUnit
+    local turnComplete = context.npcMode ~= true
+        and desiredUnit
         and Client.IsEventUnitTurnComplete
         and Client:IsEventUnitTurnComplete(desiredUnit, state)
         or false
@@ -2128,7 +2215,7 @@ function EventWidget:BuildTargetedPortraitRefreshPlan(eventIds, reason)
     self:Show()
 
     local context = self:BuildPortraitRefreshContext(state)
-    self:EnsurePortraitPool(context.maxEventUnits)
+    self:EnsurePortraitPool(context.portraitSlotCount)
     self:EnsureBossPortraitPool(#(context.bossUnits or {}))
 
     local targetEventIds = {}
@@ -2206,12 +2293,13 @@ end
 
 function EventWidget:Refresh(reason)
     self.lastRefreshReason = reason
-    local maxEventUnits = getMaxEventUnits()
     local state = Client:GetEventState()
     if not state or state.active ~= true then
         self:Hide()
         return false
     end
+    local npcMode = isNpcEventMode(state)
+    self:CancelPendingTargetedPortraitRefresh()
 
     local eventId = tostring(state.id or "")
     if self.presentationEventId ~= nil and self.presentationEventId ~= eventId then
@@ -2221,7 +2309,6 @@ function EventWidget:Refresh(reason)
 
     self:Build()
     self:Show()
-    self:EnsurePortraitPool(maxEventUnits)
 
     self.titleText:SetText(tostring(state.name ~= "" and state.name or state.id or "Active Event"))
     self.subtitleText:SetText(getSubtitleText(state))
@@ -2230,6 +2317,14 @@ function EventWidget:Refresh(reason)
     end
     if self.turnStatusText and self.turnStatusText.SetText then
         self.turnStatusText:SetText(tostring(math.max(1, tonumber(state.turnNumber) or 1)))
+    end
+    local turnStatusFrame = self.turnStatusText and self.turnStatusText.GetFrame and self.turnStatusText:GetFrame() or nil
+    if turnStatusFrame then
+        if npcMode then
+            turnStatusFrame:Hide()
+        else
+            turnStatusFrame:Show()
+        end
     end
     local startupPending = state.unitsReady ~= true or state.startupReady ~= true
     local startupPhase = tostring(
@@ -2314,7 +2409,11 @@ function EventWidget:Refresh(reason)
     if self.turnProgressBar and self.turnProgressBar.SetMinMax and self.turnProgressBar.SetValue then
         local progressFrame = self.turnProgressBar.GetFrame and self.turnProgressBar:GetFrame() or nil
 
-        if startupPending then
+        if npcMode then
+            if progressFrame and progressFrame.Hide then
+                progressFrame:Hide()
+            end
+        elseif startupPending then
             local expectedCount = math.max(
                 0,
                 tonumber(state.startupProgressExpected)
@@ -2399,11 +2498,14 @@ function EventWidget:Refresh(reason)
             end
         end
         if advanceFrame then
-            if isHost then
+            if isHost and not npcMode then
                 advanceFrame:Show()
             else
                 advanceFrame:Hide()
             end
+        end
+        if self.advanceStepButton and self.advanceStepButton.SetWidth then
+            self.advanceStepButton:SetWidth(npcMode and 0 or CONTROL_BUTTON_ADVANCE_WIDTH)
         end
         if self.manageEventButton and self.manageEventButton.SetEnabled then
             self.manageEventButton:SetEnabled(canManage)
@@ -2413,6 +2515,9 @@ function EventWidget:Refresh(reason)
         end
         if self.advanceStepButton.SetEnabled then
             self.advanceStepButton:SetEnabled(canAdvance)
+        end
+        if self.controlButtonRow and self.controlButtonRow.RefreshLayout then
+            self.controlButtonRow:RefreshLayout()
         end
     end
     self:UpdateHeaderLayout()
@@ -2424,8 +2529,34 @@ function EventWidget:Refresh(reason)
     local initiativeHostFrame = self.initiativePortraitPanel and self.initiativePortraitPanel.GetFrame and self.initiativePortraitPanel:GetFrame() or nil
     local portraitHostFrame = self.portraitPanel and self.portraitPanel.GetFrame and self.portraitPanel:GetFrame() or nil
 
+    local normalRows = context.npcMode and getPortraitRowCount(#pageUnits, context.normalPortraitColumns) or 1
+    local bossRows = context.npcMode and getPortraitRowCount(#bossUnits, context.bossPortraitColumns) or 1
+    local normalPanelHeight = context.npcMode
+        and getPortraitRowPanelHeight(normalRows, PORTRAIT_FRAME_HEIGHT)
+        or (PORTRAIT_FRAME_HEIGHT + PORTRAIT_PANEL_BASE_PADDING)
+    local bossPanelHeight = context.npcMode
+        and getPortraitRowPanelHeight(bossRows, BOSS_PORTRAIT_FRAME_HEIGHT)
+        or (BOSS_PORTRAIT_FRAME_HEIGHT + PORTRAIT_PANEL_BASE_PADDING)
+    local portraitPanelHeight = context.npcMode
+        and getPortraitPanelHeight(#bossUnits > 0, normalRows, bossRows)
+        or getPortraitPanelHeight(#bossUnits > 0)
     if portraitHostFrame and portraitHostFrame.SetHeight then
-        portraitHostFrame:SetHeight(getPortraitPanelHeight(#bossUnits > 0))
+        portraitHostFrame:SetHeight(portraitPanelHeight)
+    end
+    if bossHostFrame and bossHostFrame.SetHeight then
+        bossHostFrame:SetHeight(bossPanelHeight)
+    end
+    local initiativePanelFrame = self.initiativePortraitPanel
+        and self.initiativePortraitPanel.GetFrame
+        and self.initiativePortraitPanel:GetFrame()
+        or nil
+    if initiativePanelFrame and initiativePanelFrame.SetHeight then
+        initiativePanelFrame:SetHeight(normalPanelHeight)
+    end
+    local rootFrame = self.rootPanel and self.rootPanel.GetFrame and self.rootPanel:GetFrame() or nil
+    if rootFrame and rootFrame.SetHeight then
+        local standardPortraitHeight = getPortraitPanelHeight(#bossUnits > 0)
+        rootFrame:SetHeight(ROOT_HEIGHT + math.max(0, portraitPanelHeight - standardPortraitHeight))
     end
 
     self:EnsureBossPortraitPool(#bossUnits)
@@ -2462,11 +2593,13 @@ function EventWidget:Refresh(reason)
         end
     end
 
-    for index = 1, maxEventUnits do
+    local normalPortraitSlotCount = context.portraitSlotCount
+    self:EnsurePortraitPool(normalPortraitSlotCount)
+    for index = 1, normalPortraitSlotCount do
         self:RefreshPortraitSlot(index, pageUnits[index] or nil, state, context)
     end
 
-    for index = maxEventUnits + 1, #(self.portraitSlots or {}) do
+    for index = normalPortraitSlotCount + 1, #(self.portraitSlots or {}) do
         local portrait = self.portraitSlots[index]
         local frame = portrait and portrait.GetFrame and portrait:GetFrame() or nil
         if frame and frame.Hide then
@@ -2479,8 +2612,22 @@ function EventWidget:Refresh(reason)
         self.currentVisualKeys[index] = nil
     end
 
-    self:LayoutPortraitRow(self.bossPortraitPanel, self.bossPortraitSlots, #bossUnits, BOSS_PORTRAIT_SIZE, BOSS_PORTRAIT_SPACING)
-    self:LayoutPortraitRow(self.initiativePortraitPanel, self.portraitSlots, maxEventUnits, PORTRAIT_SIZE, PORTRAIT_SPACING)
+    self:LayoutPortraitRow(
+        self.bossPortraitPanel,
+        self.bossPortraitSlots,
+        #bossUnits,
+        BOSS_PORTRAIT_SIZE,
+        BOSS_PORTRAIT_SPACING,
+        context.npcMode and { maxColumns = context.bossPortraitColumns, rowStep = BOSS_PORTRAIT_FRAME_HEIGHT + PORTRAIT_SECTION_SPACING } or nil
+    )
+    self:LayoutPortraitRow(
+        self.initiativePortraitPanel,
+        self.portraitSlots,
+        normalPortraitSlotCount,
+        PORTRAIT_SIZE,
+        PORTRAIT_SPACING,
+        context.npcMode and { maxColumns = context.normalPortraitColumns, rowStep = PORTRAIT_FRAME_HEIGHT + PORTRAIT_SECTION_SPACING } or nil
+    )
     return true
 end
 
