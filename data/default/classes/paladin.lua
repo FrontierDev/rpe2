@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 16,
+    version = 17,
     dataset = {
         achievements = {},
         auras = {
@@ -1861,7 +1861,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_greaterblessingofsalvation.blp",
                 id = "25j5h8f2",
-                ignoreGCD = true,
+                ignoreGCD = false,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Blessing of Salvation",
@@ -1907,7 +1907,7 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
+                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4941,7 +4941,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/spell_holy_arcaneintellect.blp",
+                icon = "interface/icons/spell_nature_sleep.blp",
                 id = "dvinintl",
                 isEnvironmental = false,
                 name = "Divine Intellect",
@@ -4961,7 +4961,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/inv_enchant_essencemagiclarge.blp",
+                icon = "interface/icons/spell_holy_power.blp",
                 id = "holypwr3",
                 isEnvironmental = false,
                 name = "Holy Power",
@@ -4980,7 +4980,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/spell_nature_strength.blp",
+                icon = "interface/icons/ability_golemthunderclap.blp",
                 id = "dvinstrg",
                 isEnvironmental = false,
                 name = "Divine Strength",
@@ -5000,7 +5000,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/petbattle_attack.blp",
+                icon = "interface/icons/ability_rogue_ambush.blp",
                 id = "prcpldn1",
                 isEnvironmental = false,
                 name = "Precision",
@@ -5038,7 +5038,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/ability_warrior_defensive_stance.blp",
+                icon = "interface/icons/spell_magic_lesserinvisibilty.blp",
                 id = "antcpal1",
                 isEnvironmental = false,
                 name = "Anticipation",
