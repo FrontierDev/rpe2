@@ -94,6 +94,9 @@ function ImageButton:SetSelected(selected)
             texture:Hide()
         end
     end
+    if self.RefreshInteractionAlpha then
+        self:RefreshInteractionAlpha()
+    end
     return self.selected
 end
 
@@ -120,7 +123,9 @@ function ImageButton:Create()
         frame:SetDisabledTexture(self.options.disabledTexture)
     end
 
-    self:SetSelected(self.options.selected == true)
+    if self.options.selected ~= nil then
+        self:SetSelected(self.options.selected == true)
+    end
 
     return self.frame
 end
