@@ -28,6 +28,11 @@ local function normalizeCount(value)
     return math.max(0, math.floor(tonumber(value) or 0))
 end
 
+local function normalizeRaidMarker(value)
+    local marker = math.floor(tonumber(value) or 0)
+    return marker >= 1 and marker <= 8 and marker or 0
+end
+
 local function normalizeIntent(value)
     local intent = tostring(value or "")
     if intent == "heal" or intent == "healing" then
@@ -57,6 +62,7 @@ local function normalizePolicy(policy)
         minTargets = minTargets,
         maxTargets = maxTargets,
         allowDeadTargets = source.allowDeadTargets == true,
+        allowHiddenTargets = source.allowHiddenTargets == true,
         disableSelfCast = source.disableSelfCast == true,
     }
 end
@@ -315,7 +321,14 @@ local function markSelected(state, entryIndex)
     return true
 end
 
-local function buildResult(state)
+local buildResult
+
+local function finishSelection(state)
+    state.result = buildResult(state)
+    state.phase = "complete"
+end
+
+buildResult = function(state)
     local targetUnits = {}
     local targetEventIds = {}
     for index = 1, #(state.selectedEntries or {}) do
@@ -370,29 +383,43 @@ local function completeSelectionPass(state)
     state.selectionScanIndex = 1
     state.bestEntryIndex = nil
     if not bestIndex then
-        state.result = buildResult(state)
-        state.phase = "complete"
+        finishSelection(state)
         return true
     end
 
     local bestEntry = state.entries[bestIndex]
-    if state.kind == "healing"
+    if state.targetType ~= "raid_marker"
+        and state.kind == "healing"
         and #state.selectedEntries >= state.minTargets
         and not isOptionalHealingTargetUseful(bestEntry)
     then
-        state.result = buildResult(state)
-        state.phase = "complete"
+        finishSelection(state)
         return true
     end
 
     markSelected(state, bestIndex)
     if #state.selectedEntries >= state.maxTargets then
-        state.result = buildResult(state)
-        state.phase = "complete"
+        finishSelection(state)
         return true
     end
 
-    if state.kind == "hostile" and #state.selectedEntries == 1 and state.maxTargets > 1 then
+    if state.targetType == "raid_marker" then
+        if state.phase == "select" then
+            state.anchorRaidMarker = normalizeRaidMarker(bestEntry.unit and bestEntry.unit.raidMarker)
+            if state.anchorRaidMarker <= 0 then
+                finishSelection(state)
+                return true
+            end
+        end
+        resetSelectionScan(state, "select-raid-marker")
+        return false
+    end
+
+    if state.targetType ~= "raid_marker"
+        and state.kind == "hostile"
+        and #state.selectedEntries == 1
+        and state.maxTargets > 1
+    then
         state.phase = "prepare-secondary"
         state.secondaryPrepareIndex = 1
         return false
@@ -421,6 +448,17 @@ function Selector.CreateState(activationSnapshot, options)
         return nil, groupReason
     end
 
+    local targetType = tostring(policy.type or "single")
+    if targetType == "raid_marker" then
+        local markedCandidates = {}
+        for index = 1, #candidates do
+            if normalizeRaidMarker(candidates[index] and candidates[index].raidMarker) > 0 then
+                markedCandidates[#markedCandidates + 1] = candidates[index]
+            end
+        end
+        candidates = markedCandidates
+    end
+
     local state = {
         activationSnapshot = activationSnapshot,
         eventState = activationSnapshot.eventState,
@@ -431,6 +469,7 @@ function Selector.CreateState(activationSnapshot, options)
         kind = kind,
         targetGroupKey = groupKey,
         policy = policy,
+        targetType = targetType,
         minTargets = policy.minTargets,
         maxTargets = policy.maxTargets,
         candidates = candidates,
@@ -447,8 +486,9 @@ function Selector.CreateState(activationSnapshot, options)
     }
 
     if state.maxTargets <= 0 then
-        state.result = buildResult(state)
-        state.phase = "complete"
+        finishSelection(state)
+    elseif state.targetType == "all_allies" and #state.candidates == 0 then
+        finishSelection(state)
     end
     return state
 end
@@ -479,7 +519,17 @@ function Selector.Step(state, deadlineMs)
                 end
             end
 
-            resetSelectionScan(state, "select")
+            if state.targetType == "all_allies" then
+                for entryIndex = 1, #state.entries do
+                    if #state.selectedEntries >= state.maxTargets then
+                        break
+                    end
+                    markSelected(state, entryIndex)
+                end
+                finishSelection(state)
+            else
+                resetSelectionScan(state, "select")
+            end
             if shouldYield(deadlineMs) then
                 return false
             end
@@ -504,12 +554,18 @@ function Selector.Step(state, deadlineMs)
             if shouldYield(deadlineMs) then
                 return false
             end
-        elseif state.phase == "select" or state.phase == "select-secondary" then
+        elseif state.phase == "select"
+            or state.phase == "select-secondary"
+            or state.phase == "select-raid-marker"
+        then
             while state.selectionScanIndex <= #(state.entries or {}) do
                 local entryIndex = state.selectionScanIndex
                 local entry = state.entries[entryIndex]
                 local eventId = normalizeEventId(entry and entry.eventId)
-                if eventId > 0 and state.selectedByEventId[eventId] ~= true then
+                local entryMarker = normalizeRaidMarker(entry and entry.unit and entry.unit.raidMarker)
+                local markerMatches = state.phase ~= "select-raid-marker"
+                    or entryMarker == state.anchorRaidMarker
+                if eventId > 0 and state.selectedByEventId[eventId] ~= true and markerMatches then
                     local best = state.bestEntryIndex and state.entries[state.bestEntryIndex] or nil
                     if type(best) ~= "table" or compareForPhase(state, entry, best) > 0 then
                         state.bestEntryIndex = entryIndex

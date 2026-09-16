@@ -2859,51 +2859,6 @@ function Database.SetProfileSetupWizardCompleted(completed)
     return normalizedCompleted
 end
 
-local function isEstablishedProfileForSetupMigration(profile)
-    local normalized = normalizeProfileRecord(profile, "", "")
-    local resourceDisplay = normalizeProfileResourceDisplay(normalized.resourceDisplay)
-
-    if ensureString(normalized.raceRef, "") ~= ""
-        and ensureString(normalized.classRef, "") ~= ""
-    then
-        return true
-    end
-
-    return not isTableEmpty(normalized.equipment)
-        or not isTableEmpty(normalized.mountEquipment)
-        or not isTableEmpty(normalized.petEquipment)
-        or not isTableEmpty(normalized.spellbook)
-        or not isTableEmpty(normalized.recipebook)
-        or not isTableEmpty(normalized.recipeKnowledge)
-        or not isTableEmpty(normalized.traits)
-        or not isTableEmpty(normalized.activeTraits)
-        or not isTableEmpty(normalized.inactiveTraits)
-        or not isTableEmpty(normalized.selectedClassTalentTraits)
-        or not isTableEmpty(normalized.skillLevels)
-        or not isTableEmpty(normalized.actionBar)
-        or not isTableEmpty(normalized.skillActionBar)
-        or not isTableEmpty(normalized.mountedActionBar)
-        or not isTableEmpty(normalized.preferredConsumables)
-        or ensureString(resourceDisplay.primaryResourceRef, "") ~= ""
-        or ensureString(resourceDisplay.specialResourceRef, "") ~= ""
-end
-
-function Database.MigrateProfileSetupWizardCompletion()
-    local profile = Database.GetOrCreateActiveProfile()
-    local setupWizard = normalizeProfileSetupWizard(profile.setupWizard)
-    if setupWizard.completed == true then
-        return true
-    end
-
-    if not isEstablishedProfileForSetupMigration(profile) then
-        return false
-    end
-
-    setupWizard.completed = true
-    profile.setupWizard = setupWizard
-    return true
-end
-
 function Database.GetProfileActionBarAnchor()
     local profile = Database.GetOrCreateActiveProfile()
     profile.widgets = normalizeProfileWidgets(profile.widgets)
@@ -3885,7 +3840,7 @@ function Database.ExportRuleset(rulesetId)
     return "RPE_RULESET_V2\n" .. serializeLuaValue(payload)
 end
 
-function Database.ImportRuleset(text)
+function Database.ImportRuleset(text, options)
     local normalizedText = ensureString(text, "")
     normalizedText = normalizedText:gsub("^%s+", ""):gsub("%s+$", "")
     if normalizedText == "" then
@@ -3924,9 +3879,12 @@ function Database.ImportRuleset(text)
     end
 
     local imported = normalizeRulesetRecordPreservingExtras(payloadRuleset, payloadRuleset.id, payloadRuleset.name)
+    local replaceExistingId = type(options) == "table"
+        and ensureString(options.replaceExistingId, "")
+        or ""
     if imported.id == "" then
         imported.id = nextRulesetId(root)
-    elseif existingRulesets[imported.id] ~= nil then
+    elseif existingRulesets[imported.id] ~= nil and imported.id ~= replaceExistingId then
         imported.id = nextRulesetId(root)
     end
 
@@ -4392,16 +4350,12 @@ function Database.ImportDataset(text)
         existingDatasets[tostring(datasetId)] = dataset
     end
     local imported = normalizeDatasetRecord(deepCopy(payloadDataset), payloadDataset.id, payloadDataset.name)
-    local originalDatasetId = ensureString(imported.id, "")
-
     if imported.id == "" then
         imported.id = nextDatasetId(root)
-    elseif existingDatasets[imported.id] ~= nil then
-        imported.id = nextDatasetId(root)
-        rewriteDatasetRefs(imported, originalDatasetId, imported.id)
     end
 
     imported = normalizeDatasetRecord(imported, imported.id, imported.name)
+    local previousDataset = existingDatasets[imported.id]
     existingDatasets[imported.id] = imported
     root.datasets = existingDatasets
 
@@ -4413,7 +4367,7 @@ function Database.ImportDataset(text)
         deferConfigurationChange = true,
         root = root,
     }) then
-        existingDatasets[imported.id] = nil
+        existingDatasets[imported.id] = previousDataset
         root.datasets = existingDatasets
         return nil, "The imported dataset could not be activated."
     end
@@ -4499,14 +4453,14 @@ function Database.ImportPreparedDataset(importBatch, index)
     }))
 end
 
-function Database.ImportDatasets(text)
-    local importBatch, prepareError = Database.PrepareDatasetImport(text)
-    if not importBatch then
-        return nil, prepareError
+function Database.BeginDatasetImportTransaction(importBatch)
+    if type(importBatch) ~= "table" then
+        return nil, "Dataset import is unavailable."
+    end
+    if type(activeDatasetImportTransaction) == "table" then
+        return nil, "A dataset import is already in progress."
     end
 
-    local pendingDatasets = importBatch.datasetTexts or importBatch.datasets or {}
-    local importedDatasets = {}
     local root = getInitializedDatasetRoot()
     local transaction = {
         root = root,
@@ -4516,31 +4470,30 @@ function Database.ImportDatasets(text)
     }
 
     activeDatasetImportTransaction = transaction
+    return transaction
+end
 
-    local function rollback()
-        root.datasets = transaction.originalDatasets
-        root.activatedDatasets = transaction.originalActivatedDatasets
-        root.nextId = transaction.originalNextId
-        Database.Datasets = root
+function Database.RollbackDatasetImportTransaction(transaction)
+    if type(transaction) ~= "table" or activeDatasetImportTransaction ~= transaction then
+        return false
     end
 
-    for index = 1, #pendingDatasets do
-        local ok, dataset, err = pcall(Database.ImportPreparedDataset, importBatch, index)
-        if not ok then
-            activeDatasetImportTransaction = nil
-            rollback()
-            return nil, tostring(dataset or ("Dataset %d failed to import."):format(index))
-        end
-        if not dataset then
-            activeDatasetImportTransaction = nil
-            rollback()
-            return nil, err or ("Dataset %d failed to import."):format(index)
-        end
-        importedDatasets[#importedDatasets + 1] = dataset
-    end
-
+    local root = transaction.root
+    root.datasets = transaction.originalDatasets
+    root.activatedDatasets = transaction.originalActivatedDatasets
+    root.nextId = transaction.originalNextId
+    Database.Datasets = root
     activeDatasetImportTransaction = nil
+    return true
+end
 
+function Database.CommitDatasetImportTransaction(transaction, importedDatasets)
+    if type(transaction) ~= "table" or activeDatasetImportTransaction ~= transaction then
+        return nil, "Dataset import transaction is not active."
+    end
+
+    importedDatasets = importedDatasets or {}
+    activeDatasetImportTransaction = nil
     if #importedDatasets > 0 then
         if Dependecies and Dependecies.RecomputeAllDatasetDependencies then
             Dependecies.RecomputeAllDatasetDependencies()
@@ -4557,6 +4510,31 @@ function Database.ImportDatasets(text)
     end
 
     return importedDatasets
+end
+
+function Database.ImportDatasets(text)
+    local importBatch, prepareError = Database.PrepareDatasetImport(text)
+    if not importBatch then
+        return nil, prepareError
+    end
+
+    local transaction, transactionError = Database.BeginDatasetImportTransaction(importBatch)
+    if not transaction then
+        return nil, transactionError
+    end
+
+    local pendingDatasets = importBatch.datasetTexts or importBatch.datasets or {}
+    local importedDatasets = {}
+    for index = 1, #pendingDatasets do
+        local ok, dataset, err = pcall(Database.ImportPreparedDataset, importBatch, index)
+        if not ok or not dataset then
+            Database.RollbackDatasetImportTransaction(transaction)
+            return nil, (not ok and tostring(dataset)) or err or ("Dataset %d failed to import."):format(index)
+        end
+        importedDatasets[#importedDatasets + 1] = dataset
+    end
+
+    return Database.CommitDatasetImportTransaction(transaction, importedDatasets)
 end
 
 function Database.ImportDatasetEntry(datasetId, collectionKey, text)

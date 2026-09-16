@@ -65,6 +65,19 @@ local function getProfileLogic()
     return Addon.Internal and Addon.Internal.Profile or nil
 end
 
+local function synchronizeDefaultRulesetForCurrentCharacter()
+    local data = Addon.Data or nil
+    if type(data) ~= "table" or type(data.SyncDefaultRuleset) ~= "function" then
+        return false
+    end
+
+    -- PLAYER_ENTERING_WORLD is the first point where character-scoped
+    -- SavedVariables identity is guaranteed to be stable.  Run the idempotent
+    -- Core synchronizer here before setup checks so its activation is stored
+    -- against this character, rather than an early unknown-player identity.
+    return data.SyncDefaultRuleset() == true
+end
+
 local function notifySetupRequired()
     if DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function" then
         DEFAULT_CHAT_FRAME:AddMessage("|cffffcc00RPE:|r " .. SETUP_REQUIRED_MESSAGE)
@@ -660,6 +673,9 @@ function Client:HandleLocalConfigurationChanged(reason)
         self:EnsureSetupWizardAccess("active-ruleset")
     end
     if self:CanAccessPostSetupFeatures() ~= true then
+        if self.HideActionBarWidget then
+            self:HideActionBarWidget()
+        end
         return false
     end
 
@@ -1038,6 +1054,7 @@ end
 function Client:HandleSessionRuntimeEvent(event, ...)
     local handledDiscovery = false
     if event == "PLAYER_ENTERING_WORLD" then
+        synchronizeDefaultRulesetForCurrentCharacter()
         if self:EnsureSetupWizardAccess("player-entering-world") == true then
             handledDiscovery = self:QueueServerQuery("player-entering-world") or handledDiscovery
         end

@@ -207,6 +207,8 @@ local function normalizeTarget(value)
     if targetType ~= "caster"
         and targetType ~= "single"
         and targetType ~= "multi"
+        and targetType ~= "all_allies"
+        and targetType ~= "raid_marker"
         and targetType ~= "pet"
         and targetType ~= "last_attackers"
     then
@@ -216,6 +218,9 @@ local function normalizeTarget(value)
     local targetDisposition = Normalization.TrimText(data.targetDisposition)
     if targetDisposition ~= "ally" and targetDisposition ~= "enemy" and targetDisposition ~= "any" then
         targetDisposition = "enemy"
+    end
+    if targetType == "all_allies" then
+        targetDisposition = "ally"
     end
 
     if targetType == "caster" then
@@ -246,6 +251,19 @@ local function normalizeTarget(value)
 
     local requiresTarget = data.requiresTarget ~= false
     local fallbackMinTargets = requiresTarget and 1 or 0
+    if targetType == "single" then
+        return {
+            type = "single",
+            requiresTarget = requiresTarget,
+            targetDisposition = targetDisposition,
+            minTargets = fallbackMinTargets,
+            maxTargets = 1,
+            allowDeadTargets = Normalization.NormalizeBool(data.allowDeadTargets, false),
+            allowHiddenTargets = Normalization.NormalizeBool(data.allowHiddenTargets, false),
+            disableSelfCast = Normalization.NormalizeBool(data.disableSelfCast, false),
+        }
+    end
+
     local minTargets = math.max(0, math.floor(Normalization.NormalizeNumber(data.minTargets, fallbackMinTargets)))
     local maxTargets = math.max(minTargets, math.floor(Normalization.NormalizeNumber(data.maxTargets, math.max(1, minTargets))))
 

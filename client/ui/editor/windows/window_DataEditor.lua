@@ -1390,7 +1390,12 @@ function DataEditor:ImportDatasetsFromText(text)
 end
 
 function DataEditor:StartDatasetImportFromText(text)
-    if not (self.Database and self.Database.PrepareDatasetImport and self.Database.ImportPreparedDataset) then
+    if not (self.Database and self.Database.PrepareDatasetImport
+        and self.Database.BeginDatasetImportTransaction
+        and self.Database.ImportPreparedDataset
+        and self.Database.CommitDatasetImportTransaction
+        and self.Database.RollbackDatasetImportTransaction)
+    then
         return nil, "Dataset import is unavailable."
     end
 
@@ -1404,10 +1409,16 @@ function DataEditor:StartDatasetImportFromText(text)
         return nil, "The export does not contain any datasets."
     end
 
+    local transaction, transactionError = self.Database.BeginDatasetImportTransaction(importBatch)
+    if not transaction then
+        return nil, transactionError or "Dataset import failed."
+    end
+
     self.DatasetImportSessionId = (tonumber(self.DatasetImportSessionId) or 0) + 1
     local session = {
         id = self.DatasetImportSessionId,
         batch = importBatch,
+        transaction = transaction,
         totalCount = #pendingDatasets,
         importedDatasets = {},
     }
@@ -1454,28 +1465,48 @@ function DataEditor:StartDatasetImportFromText(text)
 
         local nextIndex = #session.importedDatasets + 1
         if nextIndex > session.totalCount then
+            local commitOk, committed, commitError = pcall(
+                self.Database.CommitDatasetImportTransaction,
+                session.transaction,
+                session.importedDatasets
+            )
+            if not commitOk then
+                commitError = tostring(committed)
+                committed = nil
+            end
+            if not committed then
+                self.Database.RollbackDatasetImportTransaction(session.transaction)
+                complete(commitError or "Dataset import failed to commit.")
+                return
+            end
             local selectedDataset = session.importedDatasets[#session.importedDatasets]
             if selectedDataset then
                 self:SetSelectedDatasetId(selectedDataset.id)
+            end
+            if self.RefreshDatasetsPane then
+                self:RefreshDatasetsPane()
             end
             complete(("Imported %d dataset%s."):format(session.totalCount, session.totalCount == 1 and "" or "s"))
             return
         end
 
         updateStatus(("Importing dataset %d of %d..."):format(nextIndex, session.totalCount))
-        local dataset, importError = self.Database.ImportPreparedDataset(session.batch, nextIndex)
+        local importOk, dataset, importError = pcall(
+            self.Database.ImportPreparedDataset,
+            session.batch,
+            nextIndex
+        )
+        if not importOk then
+            importError = tostring(dataset)
+            dataset = nil
+        end
         if not dataset then
+            self.Database.RollbackDatasetImportTransaction(session.transaction)
             complete(importError or ("Dataset %d failed to import."):format(nextIndex))
             return
         end
 
         session.importedDatasets[#session.importedDatasets + 1] = dataset
-        -- Database imports activate the dataset as part of their commit. Keep
-        -- the visible activation indicator in sync while a multi-dataset import
-        -- is progressing across frames.
-        if self.RefreshDatasetsPane then
-            self:RefreshDatasetsPane()
-        end
         scheduleNextFrame(importNext)
     end
 
@@ -1694,6 +1725,7 @@ function DataEditor:BuildDatasetImportWindow()
 
     self.DatasetImportCancelButton = UI.CreateButton(actions:GetFrame(), "RPEDataEditorDatasetImportCancelButton", "Cancel", 60, function()
         if self.DatasetImportSession then
+            self.Database.RollbackDatasetImportTransaction(self.DatasetImportSession.transaction)
             self.DatasetImportSession = nil
             if self.DatasetImportConfirmButton and self.DatasetImportConfirmButton.SetEnabled then
                 self.DatasetImportConfirmButton:SetEnabled(true)
@@ -1705,7 +1737,7 @@ function DataEditor:BuildDatasetImportWindow()
                 self.DatasetImportClearChunksButton:SetEnabled(true)
             end
             if self.DatasetImportStatusText and self.DatasetImportStatusText.SetText then
-                self.DatasetImportStatusText:SetText("Import cancelled. Imported datasets were kept.")
+                self.DatasetImportStatusText:SetText("Import cancelled. No datasets were changed.")
             end
             return
         end

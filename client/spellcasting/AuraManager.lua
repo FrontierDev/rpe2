@@ -1647,6 +1647,66 @@ local function buildAuraPresenceText(prefix, auraName, stacks)
     return ("%s %s"):format(prefix, auraName)
 end
 
+local RPE_CHAT_ICON = "|TInterface\\AddOns\\RPEngine2\\data\\textures\\ui\\rpe.png:14:14:0:0|t"
+
+local function emitLocalPlayerAuraLossChat(eventState, targetEventId, targetUnit, auraName)
+    if not (DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function")
+    then
+        return false
+    end
+
+    local localEventId = type(resolveLocalEventId) == "function" and resolveLocalEventId(eventState) or 0
+    if tonumber(localEventId) > 0 then
+        if tonumber(localEventId) ~= tonumber(targetEventId) then
+            return false
+        end
+    end
+
+    local normalizeName = Common.NormalizeName
+    local localName = type(Common.GetPlayerName) == "function" and Common.GetPlayerName() or ""
+    local targetName = type(targetUnit) == "table" and targetUnit.name or ""
+    if type(normalizeName) == "function" then
+        localName = normalizeName(localName)
+        targetName = normalizeName(targetName)
+    else
+        localName = tostring(localName or "")
+        targetName = tostring(targetName or "")
+    end
+    if tonumber(localEventId) <= 0 and (localName == "" or targetName ~= localName) then
+        return false
+    end
+
+    DEFAULT_CHAT_FRAME:AddMessage(
+        ("%s %s faded from you."):format(RPE_CHAT_ICON, tostring(auraName or "Aura")),
+        0.55,
+        0.55,
+        0.55
+    )
+    return true
+end
+
+local function emitExpiredAuraLossChat(eventState, targetEventId, targetUnit, entry)
+    if type(entry) ~= "table" then
+        return false
+    end
+
+    local auraDefinition = entry.definition
+    if type(auraDefinition) ~= "table" then
+        local _, resolvedAuraDefinition = AuraManager:ResolveAuraDefinition(entry.auraRef, {
+            datasetId = entry.datasetId,
+        })
+        auraDefinition = resolvedAuraDefinition
+    end
+
+    local auraName = tostring(type(auraDefinition) == "table" and auraDefinition.name or entry.auraRef or "Aura")
+    return emitLocalPlayerAuraLossChat(
+        eventState,
+        targetEventId,
+        targetUnit,
+        auraName
+    )
+end
+
 local function publishAuraCombatLog(client, eventState, previousEntry, nextEntry, queueOnly)
     local publish = queueOnly == true
         and client.QueueCombatLogEntry
@@ -1708,6 +1768,10 @@ local function publishAuraCombatLog(client, eventState, previousEntry, nextEntry
     local casterUnit = findEventUnit(eventState, sourceEntry and sourceEntry.casterEventId or 0)
     local targetUnit = findEventUnit(eventState, targetEventId)
 
+    if not gained then
+        emitLocalPlayerAuraLossChat(eventState, targetEventId, targetUnit, auraName)
+    end
+
     return publish(client, {
         eventId = tostring(eventState and eventState.id or ""),
         entryType = "status",
@@ -1716,6 +1780,7 @@ local function publishAuraCombatLog(client, eventState, previousEntry, nextEntry
         targetCount = 1,
         spellIconTexture = auraIcon,
         detailText = detailText,
+        logKind = gained and "aura_gain" or "aura_loss",
         accentColor = Addon.UI and type(Addon.UI.ResolveColor) == "function" and Addon.UI.ResolveColor(nil, accentColorToken) or nil,
     })
 end
@@ -4049,6 +4114,7 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
             localPlayerDerivedStateImpact = buildAuraDerivedStateImpact(entry)
         end
         self:RemoveAura(client, eventState, entry.auraRef, entry.casterEventId, entry.targetEventId)
+        emitExpiredAuraLossChat(eventState, entry.targetEventId, targetUnit, entry)
         changed = true
         local activeBucket = self:GetEventAuraBucket(client, eventId, false)
         if activeBucket then
@@ -4079,11 +4145,13 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
     if shouldExecuteLocalAuraTick(client, eventState, casterUnit) then
         self:TickAura(client, eventState, entry, casterUnit, targetUnit)
     end
+    local previousDurationEntry = cloneAuraTickerState(entry)
     if self:AdvanceAuraDurations(entry) then
         if localPlayerEventId > 0 and tonumber(entry.targetEventId) == localPlayerEventId then
             localPlayerDerivedStateImpact = buildAuraDerivedStateImpact(entry)
         end
         self:RemoveAura(client, eventState, entry.auraRef, entry.casterEventId, entry.targetEventId)
+        emitExpiredAuraLossChat(eventState, entry.targetEventId, targetUnit, previousDurationEntry)
         changed = true
     else
         changed = true

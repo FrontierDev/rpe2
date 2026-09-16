@@ -394,8 +394,11 @@ function EventWidget:Refresh(...)
 end
 
 function EventWidget:QueueCombatLogEntry(entry)
+    local logKind = tostring(type(entry) == "table" and entry.logKind or "")
+    local shouldRetainInHistory = logKind ~= "aura_loss"
+
     local accepted = originalQueueCombatLogEntry(self, entry)
-    if accepted == true then
+    if accepted == true and shouldRetainInHistory then
         self:AppendCombatLogHistoryEntry(entry)
     end
     return accepted

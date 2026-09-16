@@ -278,6 +278,9 @@ function DataEditor:RefreshSpellInspectorPage()
     local targetType = tostring(target.type or "single")
     local isPetTarget = targetType == "pet"
     local isLastAttackersTarget = targetType == "last_attackers"
+    local isAllAlliesTarget = targetType == "all_allies"
+    local isMultiTarget = targetType == "multi"
+    local isTargetCountEditable = isMultiTarget or targetType == "all_allies" or targetType == "raid_marker"
     local supportsScaling = isDamage or isHeal
     local supportsLegacyAuraApplication = isDamage or isHeal
     local showsAuraApplicationControls = isApplyAura or isRemoveAura or (supportsLegacyAuraApplication and effect.applyAura == true)
@@ -318,15 +321,15 @@ function DataEditor:RefreshSpellInspectorPage()
     end
     if self.SpellInspectorComponentTargetDispositionDropdown then
         self.SpellInspectorComponentTargetDispositionDropdown:SetSelectedValue((isSummonPet or isPetTarget) and "ally" or target.targetDisposition or "enemy", true)
-        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorComponentTargetDispositionDropdown, supportsTargetSelection and not isLastAttackersTarget)
+        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorComponentTargetDispositionDropdown, supportsTargetSelection and not isLastAttackersTarget and not isAllAlliesTarget)
     end
     if self.SpellInspectorComponentMinTargetsInput then
         self.SpellInspectorComponentMinTargetsInput:SetText(tostring((isSummonPet or isPetTarget or isLastAttackersTarget) and 1 or target.minTargets or 0))
-        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorComponentMinTargetsInput, supportsTargetSelection and not isLastAttackersTarget)
+        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorComponentMinTargetsInput, supportsTargetSelection and isTargetCountEditable)
     end
     if self.SpellInspectorComponentMaxTargetsInput then
         self.SpellInspectorComponentMaxTargetsInput:SetText(tostring((isSummonPet or isPetTarget or isLastAttackersTarget) and 1 or target.maxTargets or 0))
-        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorComponentMaxTargetsInput, supportsTargetSelection and not isLastAttackersTarget)
+        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorComponentMaxTargetsInput, supportsTargetSelection and isTargetCountEditable)
     end
     if self.SpellInspectorEffectTypeDropdown then
         self.SpellInspectorEffectTypeDropdown:SetSelectedValue(effectType, true)

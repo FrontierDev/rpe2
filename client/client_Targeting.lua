@@ -112,6 +112,7 @@ local function getDefaultTargetPolicy()
         minTargets = 1,
         maxTargets = 1,
         allowDeadTargets = false,
+        allowHiddenTargets = false,
         disableSelfCast = false,
     }
 end
@@ -595,6 +596,11 @@ local function compareCandidateUnits(left, right)
     end
 
     return (tonumber(left and left.eventID) or 0) < (tonumber(right and right.eventID) or 0)
+end
+
+local function getUnitRaidMarker(unit)
+    local marker = math.floor(tonumber(unit and unit.raidMarker) or 0)
+    return marker >= 1 and marker <= 8 and marker or 0
 end
 
 local function buildCandidateMap(units, casterUnit, policy)
@@ -1111,6 +1117,34 @@ function Client:GetPendingSpellTargetingDisplayState()
         local group = pending.groups[index]
         local candidates, byEventId = buildCandidateMap(eventState.units, casterUnit, group.policy)
         local selectedByEventId, selectedCount = normalizeSelectedTargets(group.selectedTargetEventIds, byEventId)
+
+        local targetType = tostring(group.policy and group.policy.type or "single")
+        local lockedRaidMarker = 0
+        if targetType == "raid_marker" then
+            local anchorEventId = tonumber(group.focusedTargetEventId) or 0
+            local anchorUnit = byEventId[anchorEventId]
+            lockedRaidMarker = getUnitRaidMarker(anchorUnit)
+            selectedByEventId = {}
+            selectedCount = 0
+            if anchorUnit and lockedRaidMarker > 0 then
+                selectedByEventId[anchorEventId] = true
+                selectedCount = 1
+                local maxTargets = math.max(1, tonumber(group.policy and group.policy.maxTargets) or 1)
+                for candidateIndex = 1, #candidates do
+                    local candidate = candidates[candidateIndex]
+                    local candidateEventId = tonumber(candidate and candidate.eventID) or 0
+                    if candidateEventId ~= anchorEventId
+                        and getUnitRaidMarker(candidate) == lockedRaidMarker
+                        and selectedCount < maxTargets
+                    then
+                        selectedByEventId[candidateEventId] = true
+                        selectedCount = selectedCount + 1
+                    end
+                end
+            else
+                group.focusedTargetEventId = 0
+            end
+        end
         group.selectedTargetEventIds = selectedByEventId
         if selectedByEventId[tonumber(group.focusedTargetEventId) or 0] ~= true then
             group.focusedTargetEventId = 0
@@ -1128,7 +1162,10 @@ function Client:GetPendingSpellTargetingDisplayState()
                 eventID = numericEventId,
                 unit = eventUnit,
                 selected = selectedByEventId[numericEventId] == true,
-                enabled = true,
+                enabled = targetType ~= "all_allies"
+                    and (targetType ~= "raid_marker"
+                        or lockedRaidMarker == 0
+                        or selectedByEventId[numericEventId] == true),
             }
         end
 
@@ -1171,6 +1208,9 @@ function Client:GetPendingSpellTargetingDisplayState()
     local canConfirm = self:CanConfirmPendingSpellTargeting({
         groups = groupStates,
     })
+    local activeTargetType = tostring(activeGroupState.policy and activeGroupState.policy.type or "single")
+    local recentTargetsEnabled = activeTargetType ~= "all_allies"
+        and not (activeTargetType == "raid_marker" and activeGroupState.selectedCount > 0)
     local recentCandidates = {}
     for index = 1, #(self.TargetHistoryEventIds or {}) do
         local recentEventId = tonumber(self.TargetHistoryEventIds[index]) or 0
@@ -1180,7 +1220,7 @@ function Client:GetPendingSpellTargetingDisplayState()
                 eventID = recentEventId,
                 unit = recentUnit,
                 selected = activeGroupState.selectedTargetEventIds[recentEventId] == true,
-                enabled = true,
+                enabled = recentTargetsEnabled,
             }
         end
     end
@@ -1497,7 +1537,9 @@ function Client:TogglePendingSpellTarget(eventId)
 
     local isCandidate = false
     for index = 1, #displayState.candidates do
-        if tonumber(displayState.candidates[index].eventID) == numericEventId then
+        if tonumber(displayState.candidates[index].eventID) == numericEventId
+            and displayState.candidates[index].enabled ~= false
+        then
             isCandidate = true
             break
         end
@@ -1509,6 +1551,36 @@ function Client:TogglePendingSpellTarget(eventId)
     local activeGroup = getPendingTargetGroup(pending, displayState.activeGroupKey)
     if not activeGroup then
         return false
+    end
+
+    local targetType = tostring(activeGroup.policy and activeGroup.policy.type or "single")
+    if targetType == "all_allies" then
+        return false
+    end
+
+    if targetType == "raid_marker" then
+        if countSelectedTargets(activeGroup.selectedTargetEventIds) > 0 then
+            return false
+        end
+
+        local anchorUnit = nil
+        for candidateIndex = 1, #(displayState.candidates or {}) do
+            local candidate = displayState.candidates[candidateIndex]
+            if tonumber(candidate and candidate.eventID) == numericEventId then
+                anchorUnit = candidate.unit
+                break
+            end
+        end
+        if getUnitRaidMarker(anchorUnit) <= 0 then
+            return false
+        end
+
+        activeGroup.selectedTargetEventIds = {
+            [numericEventId] = true,
+        }
+        activeGroup.focusedTargetEventId = numericEventId
+        self:InvalidatePendingSpellTargetingDisplayState()
+        return self:QueueTargetingWidgetRefresh("raid-marker-target")
     end
 
     activeGroup.selectedTargetEventIds = activeGroup.selectedTargetEventIds or {}
@@ -1560,7 +1632,13 @@ function Client:ActivateSpellReference(spellRef, options)
     for index = 1, #targetGroups do
         local group = targetGroups[index]
         local candidates = type(activationSnapshot.targetCandidatesByGroup) == "table" and activationSnapshot.targetCandidatesByGroup[group.key] or {}
-        if #candidates == 0 and group.policy and group.policy.requiresTarget == true then
+        local targetType = tostring(group.policy and group.policy.type or "single")
+        local minTargets = math.max(0, tonumber(group.policy and group.policy.minTargets) or 0)
+        local maxTargets = math.max(minTargets, tonumber(group.policy and group.policy.maxTargets) or 0)
+        if #candidates == 0
+            and group.policy
+            and (group.policy.requiresTarget == true or targetType == "all_allies")
+        then
             emitTargetingInfo(
                 "No valid %s targets for %s.",
                 string.lower(tostring(group.label or "target")),
@@ -1568,14 +1646,33 @@ function Client:ActivateSpellReference(spellRef, options)
             )
             return false, "cast-rejected"
         end
-        if #candidates > 0 then
+        if #candidates > 0 or targetType == "all_allies" then
             local selectedTargetEventIds = {}
             local focusedTargetEventId = 0
+            if targetType == "all_allies" then
+                local selectedCount = 0
+                for candidateIndex = 1, #candidates do
+                    if maxTargets <= 0 or selectedCount < maxTargets then
+                        local candidateEventId = tonumber(candidates[candidateIndex] and candidates[candidateIndex].eventID) or 0
+                        if candidateEventId > 0 then
+                            selectedTargetEventIds[candidateEventId] = true
+                            selectedCount = selectedCount + 1
+                        end
+                    end
+                end
+                for candidateIndex = 1, #candidates do
+                    local candidateEventId = tonumber(candidates[candidateIndex] and candidates[candidateIndex].eventID) or 0
+                    if selectedTargetEventIds[candidateEventId] then
+                        focusedTargetEventId = candidateEventId
+                        break
+                    end
+                end
+            end
             local initialTargetUnit = type(activationSnapshot.initialTargetUnitByGroup) == "table"
                 and activationSnapshot.initialTargetUnitByGroup[group.key]
                 or nil
             local initialTargetEventId = tonumber(initialTargetUnit and initialTargetUnit.eventID) or 0
-            if initialTargetEventId > 0 then
+            if targetType ~= "all_allies" and targetType ~= "raid_marker" and initialTargetEventId > 0 then
                 for candidateIndex = 1, #candidates do
                     if tonumber(candidates[candidateIndex] and candidates[candidateIndex].eventID) == initialTargetEventId then
                         selectedTargetEventIds[initialTargetEventId] = true

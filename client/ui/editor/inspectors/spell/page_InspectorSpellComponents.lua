@@ -367,7 +367,12 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
                 self:CommitSelectedSpell(function()
                     component.target = component.target or {}
                     component.target.type = value
-                    if value == "caster" then
+                    if value == "single" then
+                        component.target.minTargets = component.target.requiresTarget == false and 0 or 1
+                        component.target.maxTargets = 1
+                    elseif value == "all_allies" then
+                        component.target.targetDisposition = "ally"
+                    elseif value == "caster" then
                         component.target.requiresTarget = false
                         component.target.targetDisposition = "ally"
                         component.target.minTargets = 1
@@ -387,6 +392,7 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
                         component.target.disableSelfCast = false
                     end
                 end)
+                self:RefreshSpellInspectorPage()
             end
         end,
     })
@@ -404,6 +410,7 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
                 component.target = component.target or {}
                 component.target.requiresTarget = checked == true
             end)
+            self:RefreshSpellInspectorPage()
         end
     end)
     self.SpellInspectorComponentTargetGroup:AddChild(self.SpellInspectorComponentRequiresTargetCheckbox)
@@ -1036,7 +1043,11 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
         if component then
             self:CommitSelectedSpell(function()
                 component.target = component.target or {}
-                component.target.minTargets = tonumber(self.SpellInspectorComponentMinTargetsInput:GetText()) or 0
+                if component.target.type == "single" then
+                    component.target.minTargets = component.target.requiresTarget == false and 0 or 1
+                else
+                    component.target.minTargets = tonumber(self.SpellInspectorComponentMinTargetsInput:GetText()) or 0
+                end
             end)
         end
     end)
@@ -1045,7 +1056,9 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
         if component then
             self:CommitSelectedSpell(function()
                 component.target = component.target or {}
-                component.target.maxTargets = tonumber(self.SpellInspectorComponentMaxTargetsInput:GetText()) or 0
+                component.target.maxTargets = component.target.type == "single"
+                    and 1
+                    or (tonumber(self.SpellInspectorComponentMaxTargetsInput:GetText()) or 0)
             end)
         end
     end)

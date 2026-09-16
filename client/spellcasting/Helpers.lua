@@ -259,6 +259,7 @@ local function emitInterruptCombatLog(client, eventState, casterUnit, targetUnit
     return client:EmitCombatLogEntry({
         eventId = eventState.id,
         entryType = "status",
+        logKind = "interrupt",
         casterDisplayName = tostring(casterUnit.name or "Unknown"),
         targetDisplayName = tostring(targetUnit.name or "Unknown"),
         targetCount = 1,
@@ -683,6 +684,7 @@ local function buildTargetGroupLabel(groupKey, groupIndex, groupCount, policy)
     end
 
     if string.sub(normalizedGroupKey, 1, 5) == "auto_" then
+        local targetType = tostring(policy and policy.type or "single")
         local targetDisposition = tostring(policy and policy.targetDisposition or "enemy")
         local maxTargets = math.max(0, tonumber(policy and policy.maxTargets) or 0)
         local isOptional = policy and policy.requiresTarget ~= true
@@ -697,6 +699,11 @@ local function buildTargetGroupLabel(groupKey, groupIndex, groupCount, policy)
             prefix = "Optional " .. prefix
         end
 
+        if targetType == "all_allies" then
+            return "All Allies"
+        elseif targetType == "raid_marker" then
+            return prefix .. " - Raid Marker"
+        end
         return prefix .. " " .. (maxTargets == 1 and "Target" or "Targets")
     end
 
@@ -746,8 +753,21 @@ local function mergeTargetPolicies(existingPolicy, nextPolicy)
         return nil
     end
 
+    local currentType = tostring(current.type or "single")
+    local incomingType = tostring(incoming.type or "single")
+    local mergedType = currentType
+    if currentType ~= incomingType then
+        if (currentType == "single" and incomingType == "multi")
+            or (currentType == "multi" and incomingType == "single")
+        then
+            mergedType = "multi"
+        else
+            return nil
+        end
+    end
+
     return {
-        type = (tostring(current.type or "single") == "multi" or tostring(incoming.type or "single") == "multi") and "multi" or "single",
+        type = mergedType,
         requiresTarget = current.requiresTarget == true or incoming.requiresTarget == true,
         targetDisposition = currentDisposition,
         minTargets = math.max(0, math.max(tonumber(current.minTargets) or 0, tonumber(incoming.minTargets) or 0)),
@@ -2394,6 +2414,19 @@ function Spellcasting.ResolveComponentTargets(eventState, casterUnit, component,
         return true
     end
 
+    if targetType == "single" then
+        if focusedTargetEventId > 0 and pushTarget(focusedTargetEventId) then
+            return targets
+        end
+
+        for index = 1, #selectedTargetEventIds do
+            if pushTarget(selectedTargetEventIds[index]) then
+                return targets
+            end
+        end
+        return targets
+    end
+
     if focusedTargetEventId > 0 then
         pushTarget(focusedTargetEventId)
     end
@@ -2408,15 +2441,6 @@ function Spellcasting.ResolveComponentTargets(eventState, casterUnit, component,
             or {}
         for index = 1, #recentAttackers do
             if pushTarget(recentAttackers[index]) then
-                break
-            end
-        end
-        return targets
-    end
-
-    if targetType == "single" then
-        for index = 1, #selectedTargetEventIds do
-            if pushTarget(selectedTargetEventIds[index]) then
                 break
             end
         end

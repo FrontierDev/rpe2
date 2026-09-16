@@ -37,6 +37,14 @@ local MOUNT_BUTTON_TEXTURE = "Interface\\Icons\\Ability_Mount_RidingHorse"
 local DISMOUNT_BUTTON_TEXTURE = "Interface\\Icons\\INV_Misc_Foot_Centaur"
 local PET_BUTTON_TEXTURE = "Interface\\Icons\\Ability_Hunter_BeastCall"
 
+local function canDisplayActionBar()
+    if type(Client.CanAccessPostSetupFeatures) ~= "function" then
+        return false
+    end
+
+    return Client:CanAccessPostSetupFeatures() == true
+end
+
 local function isStartupPending(eventState)
     return type(eventState) == "table"
         and eventState.active == true
@@ -1039,6 +1047,11 @@ function ActionBarWidget:Build()
 end
 
 function ActionBarWidget:Show()
+    if not canDisplayActionBar() then
+        self:Hide()
+        return false
+    end
+
     self:Build()
     self.rootPanel:Show()
     if self.RefreshActionBarCompanionBars then
@@ -1424,6 +1437,11 @@ end
 
 function ActionBarWidget:Refresh(reason)
     self.lastRefreshReason = reason
+    if not canDisplayActionBar() then
+        self:Hide()
+        return false
+    end
+
     self:Build()
     self:Show()
 
@@ -1487,6 +1505,11 @@ function ActionBarWidget:Refresh(reason)
 end
 
 function ActionBarWidget:BuildIncrementalRefreshPlan(reason)
+    if not canDisplayActionBar() then
+        self:Hide()
+        return nil
+    end
+
     self:Build()
     self:Show()
 
@@ -1531,6 +1554,10 @@ end
 
 function ActionBarWidget:PrepareIncrementalRefresh(reason, dirtyState)
     local plan = self:BuildIncrementalRefreshPlan(reason)
+    if type(plan) ~= "table" then
+        return nil, false
+    end
+
     local structureChanged = self.lastStructureSignature ~= plan.structureSignature
         or (type(dirtyState) == "table" and dirtyState.actionBarStructuralDirty == true)
     if structureChanged then
@@ -1572,6 +1599,11 @@ function ActionBarWidget:PrepareIncrementalRefresh(reason, dirtyState)
 end
 
 function ActionBarWidget:DrainIncrementalRefresh(reason, dirtyState, maxSlots)
+    if not canDisplayActionBar() then
+        self:Hide()
+        return false, false
+    end
+
     local plan = self.PendingIncrementalRefreshPlan
     local currentRevision = type(dirtyState) == "table"
         and math.max(0, math.floor(tonumber(dirtyState.actionBarRevision) or 0))

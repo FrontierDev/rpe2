@@ -1338,7 +1338,12 @@ local function buildTargetCandidateState(self, activation, includeTargetCandidat
                 end
             end
 
-            if #(candidates or {}) == 0 and group.policy and group.policy.requiresTarget == true then
+            if #(candidates or {}) == 0
+                and group.policy
+                and (group.policy.requiresTarget == true
+                    or group.policy.type == "all_allies"
+                    or group.policy.type == "raid_marker")
+            then
                 canCast = false
                 reason = "no-targets"
                 break
@@ -1350,7 +1355,9 @@ local function buildTargetCandidateState(self, activation, includeTargetCandidat
             targetCandidates = candidates
         end
         if activation.policy and activation.policy.type ~= "caster"
-            and activation.policy.requiresTarget == true
+            and (activation.policy.requiresTarget == true
+                or activation.policy.type == "all_allies"
+                or activation.policy.type == "raid_marker")
             and math.max(0, tonumber(activation.policy.maxTargets) or 0) > 0
             and #(candidates or {}) == 0
         then

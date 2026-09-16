@@ -730,6 +730,12 @@ local function resolveTargetPhrase(target)
     if targetType == "last_attackers" then
         return "the last attacker of the target"
     end
+    if targetType == "all_allies" then
+        return "all eligible allies"
+    end
+    if targetType == "raid_marker" then
+        return "targets sharing the anchor's raid marker"
+    end
 
     local disposition = tostring(target and target.targetDisposition or "enemy")
     local singular = "a target"
