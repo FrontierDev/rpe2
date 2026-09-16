@@ -21,6 +21,7 @@ local SERVER_START_OPCODE = Operations:GetOpcode("SERVER_START")
 local SERVER_STOP_OPCODE = Operations:GetOpcode("SERVER_STOP")
 local SERVER_QUERY_OPCODE = Operations:GetOpcode("SERVER_QUERY")
 local RESOURCE_DELTA_OPCODE = Operations:GetOpcode("RESOURCE_DELTA")
+local SKILL_ROLL_RESULT_OPCODE = Operations:GetOpcode("SKILL_ROLL_RESULT")
 local MAX_START_ATTEMPTS = 5
 local START_RETRY_DELAY = 1.5
 local THREAT_UPDATE_RECORD_SEPARATOR = string.char(30)
@@ -452,6 +453,23 @@ function Server:HandleServerQuery(arguments, sender)
     end
 
     return self:SendServerStartToClient(state, clientName)
+end
+
+function Server:HandleSkillRollBroadcast(arguments, sender, distribution, target, message)
+    local state = self.State
+    local sourceName = Common.NormalizeName(arguments and arguments[1] or nil)
+    local senderName = Common.NormalizeName(sender)
+    if type(state) ~= "table" or state.active ~= true
+        or distribution ~= "CHANNEL"
+        or tonumber(target) ~= tonumber(state.channelId)
+        or senderName == "" or sourceName == "" or senderName ~= sourceName
+        or not state.clientsByName or state.clientsByName[senderName] == nil
+        or not SKILL_ROLL_RESULT_OPCODE
+    then
+        return false
+    end
+
+    return Comms:SendToChannel(state.channelId, SKILL_ROLL_RESULT_OPCODE, arguments, buildSendMetadata(SKILL_ROLL_RESULT_OPCODE))
 end
 
 function Server:HandleClientConnect(arguments, sender)

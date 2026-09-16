@@ -47,6 +47,56 @@ function ImageButton:SetDisabledTexture(texture)
     end
 end
 
+function ImageButton:EnsureSelectionBorder()
+    if self.selectionBorder or not self.frame or not self.frame.CreateTexture then
+        return self.selectionBorder
+    end
+
+    local color = self.options.selectionBorderColor or { r = 1, g = 0.78, b = 0.16, a = 1 }
+    local thickness = math.max(1, math.floor(tonumber(self.options.selectionBorderSize) or 2))
+    local frame = self.frame
+    local border = {
+        top = frame:CreateTexture(nil, "OVERLAY"),
+        bottom = frame:CreateTexture(nil, "OVERLAY"),
+        left = frame:CreateTexture(nil, "OVERLAY"),
+        right = frame:CreateTexture(nil, "OVERLAY"),
+    }
+
+    border.top:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+    border.top:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    border.top:SetHeight(thickness)
+    border.bottom:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+    border.bottom:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+    border.bottom:SetHeight(thickness)
+    border.left:SetPoint("TOPLEFT", frame, "TOPLEFT", 0, 0)
+    border.left:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 0, 0)
+    border.left:SetWidth(thickness)
+    border.right:SetPoint("TOPRIGHT", frame, "TOPRIGHT", 0, 0)
+    border.right:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
+    border.right:SetWidth(thickness)
+
+    for _, texture in pairs(border) do
+        texture:SetColorTexture(color.r or 1, color.g or 0.78, color.b or 0.16, color.a or 1)
+        texture:Hide()
+    end
+
+    self.selectionBorder = border
+    return border
+end
+
+function ImageButton:SetSelected(selected)
+    self.selected = selected == true
+    local border = self.selected and self:EnsureSelectionBorder() or self.selectionBorder
+    for _, texture in pairs(border or {}) do
+        if self.selected then
+            texture:Show()
+        else
+            texture:Hide()
+        end
+    end
+    return self.selected
+end
+
 function ImageButton:Create()
     if self.frame then
         return self.frame
@@ -69,6 +119,8 @@ function ImageButton:Create()
     if self.options.disabledTexture and frame.SetDisabledTexture then
         frame:SetDisabledTexture(self.options.disabledTexture)
     end
+
+    self:SetSelected(self.options.selected == true)
 
     return self.frame
 end

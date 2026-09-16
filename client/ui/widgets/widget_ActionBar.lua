@@ -798,9 +798,6 @@ local function applyImageButtonTexture(button, texture)
     if button.SetNormalTexture then
         button:SetNormalTexture(texture)
     end
-    if button.SetHighlightTexture then
-        button:SetHighlightTexture(texture)
-    end
     if button.SetPushedTexture then
         button:SetPushedTexture(texture)
     end
@@ -808,6 +805,26 @@ local function applyImageButtonTexture(button, texture)
         button:SetDisabledTexture(texture)
     end
     return true
+end
+
+local function configureActionRowButton(button, tooltip, selected)
+    if type(button) ~= "table" then
+        return false
+    end
+
+    if button.SetSelected then
+        button:SetSelected(selected == true)
+    end
+    if button.SetTooltip then
+        button:SetTooltip(tooltip)
+    end
+
+    local frame = button.GetFrame and button:GetFrame() or nil
+    if frame and frame.SetMotionScriptsWhileDisabled then
+        -- The active mode and unavailable mount/pet actions are disabled, but still need to explain themselves.
+        frame:SetMotionScriptsWhileDisabled(true)
+    end
+    return frame ~= nil
 end
 
 local function getActionBarModeState(widget)
@@ -1058,14 +1075,14 @@ function ActionBarWidget:EnsureSpellModeButton()
         width = MODE_BUTTON_SIZE,
         height = MODE_BUTTON_SIZE,
         border = false,
+        suppressHighlight = true,
         normalTexture = SPELL_MODE_BUTTON_TEXTURE,
-        highlightTexture = SPELL_MODE_BUTTON_TEXTURE,
         pushedTexture = SPELL_MODE_BUTTON_TEXTURE,
         disabledTexture = SPELL_MODE_BUTTON_TEXTURE,
-        tooltip = getSpellModeButtonTooltipText(self),
     })
     self.spellModeButton:SetParent(self.rootPanel:GetFrame())
     self.spellModeButton:Create()
+    configureActionRowButton(self.spellModeButton, getSpellModeButtonTooltipText(self), true)
     self.spellModeButton:SetScript("OnClick", function(_, button)
         if button ~= "LeftButton" then
             return
@@ -1085,9 +1102,11 @@ function ActionBarWidget:RefreshSpellModeButton()
 
     local controlActive, mountedActionBarActive, mode = getActionBarModeState(self)
     applyImageButtonTexture(spellModeButton, SPELL_MODE_BUTTON_TEXTURE)
-    if spellModeButton.SetTooltip then
-        spellModeButton:SetTooltip(getSpellModeButtonTooltipText(self))
-    end
+    configureActionRowButton(
+        spellModeButton,
+        getSpellModeButtonTooltipText(self),
+        not controlActive and not mountedActionBarActive and mode == "spells"
+    )
     if spellModeButton.SetEnabled then
         spellModeButton:SetEnabled(not controlActive and not mountedActionBarActive and mode ~= "spells")
     end
@@ -1105,14 +1124,14 @@ function ActionBarWidget:EnsureSkillModeButton()
         width = MODE_BUTTON_SIZE,
         height = MODE_BUTTON_SIZE,
         border = false,
+        suppressHighlight = true,
         normalTexture = SKILL_MODE_BUTTON_TEXTURE,
-        highlightTexture = SKILL_MODE_BUTTON_TEXTURE,
         pushedTexture = SKILL_MODE_BUTTON_TEXTURE,
         disabledTexture = SKILL_MODE_BUTTON_TEXTURE,
-        tooltip = getSkillModeButtonTooltipText(self),
     })
     self.skillModeButton:SetParent(self.rootPanel:GetFrame())
     self.skillModeButton:Create()
+    configureActionRowButton(self.skillModeButton, getSkillModeButtonTooltipText(self), false)
     self.skillModeButton:SetScript("OnClick", function(_, button)
         if button ~= "LeftButton" then
             return
@@ -1132,9 +1151,11 @@ function ActionBarWidget:RefreshSkillModeButton()
 
     local controlActive, mountedActionBarActive, mode = getActionBarModeState(self)
     applyImageButtonTexture(skillModeButton, SKILL_MODE_BUTTON_TEXTURE)
-    if skillModeButton.SetTooltip then
-        skillModeButton:SetTooltip(getSkillModeButtonTooltipText(self))
-    end
+    configureActionRowButton(
+        skillModeButton,
+        getSkillModeButtonTooltipText(self),
+        not controlActive and not mountedActionBarActive and mode == "skills"
+    )
     if skillModeButton.SetEnabled then
         skillModeButton:SetEnabled(not controlActive and not mountedActionBarActive and mode ~= "skills")
     end
@@ -1152,14 +1173,14 @@ function ActionBarWidget:EnsureMountButton()
         width = MODE_BUTTON_SIZE,
         height = MODE_BUTTON_SIZE,
         border = false,
+        suppressHighlight = true,
         normalTexture = MOUNT_BUTTON_TEXTURE,
-        highlightTexture = MOUNT_BUTTON_TEXTURE,
         pushedTexture = MOUNT_BUTTON_TEXTURE,
         disabledTexture = MOUNT_BUTTON_TEXTURE,
-        tooltip = getMountButtonTooltipText(),
     })
     self.mountButton:SetParent(self.rootPanel:GetFrame())
     self.mountButton:Create()
+    configureActionRowButton(self.mountButton, getMountButtonTooltipText(), false)
     self.mountButton:SetScript("OnClick", function(_, button)
         if button ~= "LeftButton" or not Profile.ToggleMounted then
             return
@@ -1202,9 +1223,7 @@ function ActionBarWidget:RefreshMountButton()
     end
 
     applyImageButtonTexture(mountButton, mountTexture)
-    if mountButton.SetTooltip then
-        mountButton:SetTooltip(getMountButtonTooltipText())
-    end
+    configureActionRowButton(mountButton, getMountButtonTooltipText(), isMounted)
     if mountButton.SetEnabled then
         mountButton:SetEnabled((Profile.IsMounted and Profile.IsMounted()) or (Profile.IsMountSelectionValid and Profile.IsMountSelectionValid()))
     end
@@ -1222,14 +1241,14 @@ function ActionBarWidget:EnsurePetButton()
         width = MODE_BUTTON_SIZE,
         height = MODE_BUTTON_SIZE,
         border = false,
+        suppressHighlight = true,
         normalTexture = PET_BUTTON_TEXTURE,
-        highlightTexture = PET_BUTTON_TEXTURE,
         pushedTexture = PET_BUTTON_TEXTURE,
         disabledTexture = PET_BUTTON_TEXTURE,
-        tooltip = getPetButtonTooltipText(self, nil),
     })
     self.petButton:SetParent(self.rootPanel:GetFrame())
     self.petButton:Create()
+    configureActionRowButton(self.petButton, getPetButtonTooltipText(self, nil), false)
     self.petButton:SetScript("OnClick", function(_, button)
         if button ~= "LeftButton" or not Client.TakeControlOfEventUnit then
             return
@@ -1255,9 +1274,7 @@ function ActionBarWidget:RefreshPetButton()
     local controlActive = self.IsActionBarControlActive and self:IsActionBarControlActive() or false
     local petUnit = self.ResolveControllablePetUnit and self:ResolveControllablePetUnit() or nil
     applyImageButtonTexture(petButton, PET_BUTTON_TEXTURE)
-    if petButton.SetTooltip then
-        petButton:SetTooltip(getPetButtonTooltipText(self, petUnit))
-    end
+    configureActionRowButton(petButton, getPetButtonTooltipText(self, petUnit), false)
     if petButton.SetEnabled then
         petButton:SetEnabled(not controlActive and petUnit ~= nil)
     end
