@@ -26,6 +26,7 @@ local EFFECT_TYPE_ITEMS = {
     { label = "Heal", value = "heal" },
     { label = "Apply Aura", value = "apply_aura" },
     { label = "Remove Aura", value = "remove_aura" },
+    { label = "Remove Aura by Tag", value = "remove_aura_by_tag" },
     { label = "Resource", value = "resource" },
     { label = "Interrupt", value = "interrupt" },
     { label = "Revert", value = "revert" },
@@ -66,6 +67,7 @@ local TARGET_TYPE_ITEMS = {
     { label = "Raid Marker", value = "raid_marker" },
     { label = "Pet", value = "pet" },
     { label = "Last Attackers", value = "last_attackers" },
+    { label = "Last Melee Attacker", value = "last_melee_attacker" },
 }
 
 local TARGET_DISPOSITION_ITEMS = {
@@ -516,6 +518,9 @@ function DataEditor:GetAutomaticSpellInspectorCastingGroupLabel(component)
     if targetType == "last_attackers" then
         return "Last Attackers"
     end
+    if targetType == "last_melee_attacker" then
+        return "Last Melee Attacker"
+    end
     if targetType == "all_allies" then
         return "All Allies"
     end
@@ -555,6 +560,9 @@ function DataEditor:FormatSpellInspectorTargetSummary(component)
     end
     if targetType == "last_attackers" then
         return ("%s / most recent attacker"):format(castingGroup)
+    end
+    if targetType == "last_melee_attacker" then
+        return ("%s / most recent melee attacker"):format(castingGroup)
     end
     if targetType == "all_allies" or targetType == "raid_marker" then
         return ("%s / %s / %s"):format(castingGroup, targetType, disposition)

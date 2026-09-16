@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 17,
+    version = 20,
     dataset = {
         achievements = {},
         auras = {},
@@ -2183,7 +2183,9 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 traitRefs = {
-                    "f82db71a:dm2h660e"
+                    "f82db71a:dm2h660e",
+                    "f82db71a:qid0o6zv",
+                    "f82db71a:prc5ptn1"
                 }
             },
             {
@@ -2224,6 +2226,12 @@ Addon.Data.DefaultDatasets:Register({
                         perLevelValue = 0,
                         statRef = "f82db71a:kec9rhli"
                     }
+                },
+                traitRefs = {
+                    "f82db71a:tslfl2fq",
+                    "f82db71a:2xvx2wn8",
+                    "f82db71a:trs5fnd1",
+                    "f82db71a:anv15grt"
                 }
             }
         },
@@ -4465,6 +4473,121 @@ Addon.Data.DefaultDatasets:Register({
                         value = 5
                     }
                 },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/inv_sword_27.blp",
+                id = "qid0o6zv",
+                isEnvironmental = false,
+                name = "Sword Specialisation",
+                skillBonuses = {
+                    {
+                        skillRef = "f82db71a:t5wlibfx",
+                        value = 5
+                    }
+                },
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/inv_hammer_04.blp",
+                id = "tslfl2fq",
+                isEnvironmental = false,
+                name = "Mace Specialisation",
+                skillBonuses = {
+                    {
+                        skillRef = "f82db71a:rv0tmq5b",
+                        value = 5
+                    }
+                },
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_frost_wizardmark.blp",
+                id = "2xvx2wn8",
+                isEnvironmental = false,
+                name = "Frost Resistance",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        operation = "flat",
+                        statRef = "f82db71a:jjn0my8k",
+                        value = 15
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/ability_eyeoftheowl.blp",
+                id = "prc5ptn1",
+                isEnvironmental = false,
+                name = "Perception",
+                skillBonuses = {
+                    {
+                        skillRef = "f82db71a:b0sh5zo7",
+                        value = 5
+                    }
+                },
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/inv_professions_inscription_scribesmagnifyingglass_gold.blp",
+                id = "trs5fnd1",
+                isEnvironmental = false,
+                name = "Treasure Finding",
+                skillBonuses = {
+                    {
+                        skillRef = "f82db71a:2eaj9uvp",
+                        value = 5
+                    }
+                },
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/inv_10_specialization_professionbook_blacksmithing_orig.blp",
+                id = "anv15grt",
+                isEnvironmental = false,
+                name = "The Great Anvil",
+                skillBonuses = {
+                    {
+                        skillRef = "f82db71a:6hydytdf",
+                        value = 15
+                    }
+                },
+                statBonuses = {},
                 unlockLevel = 1
             }
         },

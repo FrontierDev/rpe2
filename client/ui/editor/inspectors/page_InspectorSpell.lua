@@ -273,17 +273,22 @@ function DataEditor:RefreshSpellInspectorPage()
     local isHeal = effectType == "heal"
     local isApplyAura = effectType == "apply_aura"
     local isRemoveAura = effectType == "remove_aura"
+    local isRemoveAuraByTag = effectType == "remove_aura_by_tag"
+    local isRemoveAuraTag = isRemoveAuraByTag or (isRemoveAura and tostring(effect.match or "aura") == "tag")
+    local isRemoveAuraExact = isRemoveAura and not isRemoveAuraTag
     local isResource = effectType == "resource"
     local isSummonPet = effectType == "summon_pet"
     local targetType = tostring(target.type or "single")
     local isPetTarget = targetType == "pet"
     local isLastAttackersTarget = targetType == "last_attackers"
+    local isLastMeleeAttackerTarget = targetType == "last_melee_attacker"
     local isAllAlliesTarget = targetType == "all_allies"
     local isMultiTarget = targetType == "multi"
-    local isTargetCountEditable = isMultiTarget or targetType == "all_allies" or targetType == "raid_marker"
+    local isMinTargetCountEditable = isMultiTarget or targetType == "all_allies" or targetType == "raid_marker"
+    local isMaxTargetCountEditable = isMultiTarget or targetType == "raid_marker"
     local supportsScaling = isDamage or isHeal
     local supportsLegacyAuraApplication = isDamage or isHeal
-    local showsAuraApplicationControls = isApplyAura or isRemoveAura or (supportsLegacyAuraApplication and effect.applyAura == true)
+    local showsAuraApplicationControls = isApplyAura or isRemoveAuraExact or (supportsLegacyAuraApplication and effect.applyAura == true)
     local isCasterTarget = targetType == "caster"
     local supportsTargetSelection = component ~= nil and not isCasterTarget and not isSummonPet and not isPetTarget
 
@@ -321,15 +326,17 @@ function DataEditor:RefreshSpellInspectorPage()
     end
     if self.SpellInspectorComponentTargetDispositionDropdown then
         self.SpellInspectorComponentTargetDispositionDropdown:SetSelectedValue((isSummonPet or isPetTarget) and "ally" or target.targetDisposition or "enemy", true)
-        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorComponentTargetDispositionDropdown, supportsTargetSelection and not isLastAttackersTarget and not isAllAlliesTarget)
+        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorComponentTargetDispositionDropdown, supportsTargetSelection and not isLastAttackersTarget and not isLastMeleeAttackerTarget and not isAllAlliesTarget)
     end
     if self.SpellInspectorComponentMinTargetsInput then
-        self.SpellInspectorComponentMinTargetsInput:SetText(tostring((isSummonPet or isPetTarget or isLastAttackersTarget) and 1 or target.minTargets or 0))
-        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorComponentMinTargetsInput, supportsTargetSelection and isTargetCountEditable)
+        self.SpellInspectorComponentMinTargetsInput:SetText(tostring((isSummonPet or isPetTarget or isLastAttackersTarget or isLastMeleeAttackerTarget) and 1 or target.minTargets or 0))
+        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorComponentMinTargetsInput, supportsTargetSelection and isMinTargetCountEditable)
     end
     if self.SpellInspectorComponentMaxTargetsInput then
-        self.SpellInspectorComponentMaxTargetsInput:SetText(tostring((isSummonPet or isPetTarget or isLastAttackersTarget) and 1 or target.maxTargets or 0))
-        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorComponentMaxTargetsInput, supportsTargetSelection and isTargetCountEditable)
+        self.SpellInspectorComponentMaxTargetsInput:SetText(isAllAlliesTarget
+            and "All"
+            or tostring((isSummonPet or isPetTarget or isLastAttackersTarget or isLastMeleeAttackerTarget) and 1 or target.maxTargets or 0))
+        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorComponentMaxTargetsInput, supportsTargetSelection and isMaxTargetCountEditable)
     end
     if self.SpellInspectorEffectTypeDropdown then
         self.SpellInspectorEffectTypeDropdown:SetSelectedValue(effectType, true)
@@ -368,6 +375,21 @@ function DataEditor:RefreshSpellInspectorPage()
         self.SpellInspectorAuraDropdown:SetItems(self:BuildSpellInspectorAurasAcrossDatasets())
         self.SpellInspectorAuraDropdown:SetSelectedValue(effect.auraRef or "", true)
         self:SetSpellInspectorDropdownEnabled(self.SpellInspectorAuraDropdown, showsAuraApplicationControls and component ~= nil)
+    end
+    if self.SpellInspectorRemoveAuraMatchDropdown then
+        self.SpellInspectorRemoveAuraMatchDropdown:SetSelectedValue("aura", true)
+        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorRemoveAuraMatchDropdown, component ~= nil and isRemoveAura)
+    end
+    if self.SpellInspectorRemoveAuraTagInput then
+        local tagText = isRemoveAuraByTag
+            and table.concat(effect.tags or {}, ", ")
+            or (isRemoveAuraTag and tostring(effect.tag or "") or "")
+        self.SpellInspectorRemoveAuraTagInput:SetText(tagText)
+        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorRemoveAuraTagInput, component ~= nil and isRemoveAuraTag)
+    end
+    if self.SpellInspectorRemoveAuraMaxAurasInput then
+        self.SpellInspectorRemoveAuraMaxAurasInput:SetText(isRemoveAuraTag and tostring(effect.maxAuras or "") or "")
+        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorRemoveAuraMaxAurasInput, component ~= nil and isRemoveAuraTag)
     end
     if self.SpellInspectorResourceEffectDropdown then
         self.SpellInspectorResourceEffectDropdown:SetItems(self:BuildSpellInspectorResourcesAcrossDatasets())
@@ -439,6 +461,9 @@ function DataEditor:RefreshSpellInspectorPage()
     self:SetSpellInspectorGroupVisible(self.SpellInspectorScalingGroup, supportsScaling)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorDamageSchoolsGroup, isDamage)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorAuraGroup, showsAuraApplicationControls)
+    self:SetSpellInspectorGroupVisible(self.SpellInspectorRemoveAuraMatchGroup, isRemoveAura)
+    self:SetSpellInspectorGroupVisible(self.SpellInspectorRemoveAuraTagGroup, isRemoveAuraTag)
+    self:SetSpellInspectorGroupVisible(self.SpellInspectorRemoveAuraMaxAurasGroup, isRemoveAuraTag)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceEffectGroup, isResource)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorSummonPetUnitGroup, isSummonPet)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorHitTypeGroup, isDamage)

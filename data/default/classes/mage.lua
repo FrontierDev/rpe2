@@ -1051,7 +1051,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
-                            type = "multi"
+                            type = "raid_marker"
                         }
                     }
                 },
@@ -1082,7 +1082,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Fire damage to up to 5 enemies.",
+                    mainText = "Deal {DAMAGE_1} Fire damage to up to 5 enemies.\n|cff999999Targets must share the same raid marker.|r",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -1942,11 +1942,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 5,
+                            maxTargets = 0,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "multi"
+                            type = "all_allies"
                         }
                     }
                 },
@@ -1988,15 +1988,15 @@ Addon.Data.DefaultDatasets:Register({
                             spellDatasetId = "d7c874c4",
                             stacks = 1,
                             targetContext = {
-                                object = "the affected ally",
-                                possessive = "the affected ally's",
-                                reflexive = "itself",
-                                subject = "the affected ally"
+                                object = "all allies",
+                                possessive = "all allies'",
+                                reflexive = "themselves",
+                                subject = "all allies"
                             },
                             tokens = {}
                         }
                     },
-                    mainText = "Apply Arcane Intellect to up to 5 allies for 10 turns.",
+                    mainText = "Apply Arcane Intellect to all allies for 10 turns.",
                     tokens = {},
                     version = 1
                 },

@@ -372,6 +372,7 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
                         component.target.maxTargets = 1
                     elseif value == "all_allies" then
                         component.target.targetDisposition = "ally"
+                        component.target.maxTargets = 0
                     elseif value == "caster" then
                         component.target.requiresTarget = false
                         component.target.targetDisposition = "ally"
@@ -385,6 +386,12 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
                         component.target.maxTargets = 1
                         component.target.disableSelfCast = false
                     elseif value == "last_attackers" then
+                        component.target.requiresTarget = true
+                        component.target.targetDisposition = "enemy"
+                        component.target.minTargets = 1
+                        component.target.maxTargets = 1
+                        component.target.disableSelfCast = false
+                    elseif value == "last_melee_attacker" then
                         component.target.requiresTarget = true
                         component.target.targetDisposition = "enemy"
                         component.target.minTargets = 1
@@ -502,6 +509,7 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
                         nextEffect.alwaysHits = nil
                         nextEffect.applyAura = nil
                     elseif value == "remove_aura" then
+                        nextEffect.match = tostring(nextEffect.match or "aura") == "tag" and "tag" or "aura"
                         nextEffect.stacks = tonumber(nextEffect.stacks or nextEffect.auraStacks) or 1
                         nextEffect.baseDamage = nil
                         nextEffect.baseHealing = nil
@@ -519,6 +527,38 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
                         nextEffect.projectileSpeed = nil
                         nextEffect.applyAura = nil
                         nextEffect.auraStacks = nil
+                        nextEffect.duration = nil
+                        nextEffect.resourceRef = nil
+                        nextEffect.amount = nil
+                        nextEffect.unitRef = nil
+                    elseif value == "remove_aura_by_tag" then
+                        if type(nextEffect.tags) ~= "table" then
+                            nextEffect.tags = {}
+                            local legacyTag = tostring(nextEffect.tag or "")
+                            legacyTag = legacyTag:gsub("^%s+", ""):gsub("%s+$", "")
+                            if legacyTag ~= "" then
+                                nextEffect.tags[1] = legacyTag
+                            end
+                        end
+                        nextEffect.tag = nil
+                        nextEffect.baseDamage = nil
+                        nextEffect.baseHealing = nil
+                        nextEffect.basePower = nil
+                        nextEffect.threatCoefficient = nil
+                        nextEffect.weaponDamageMode = nil
+                        nextEffect.weaponDamageCoefficient = nil
+                        nextEffect.statScaling = nil
+                        nextEffect.damageSchoolRefs = nil
+                        nextEffect.hitType = nil
+                        nextEffect.damageType = nil
+                        nextEffect.alwaysHits = nil
+                        nextEffect.usesProjectile = nil
+                        nextEffect.projectilePath = nil
+                        nextEffect.projectileSpeed = nil
+                        nextEffect.applyAura = nil
+                        nextEffect.auraRef = nil
+                        nextEffect.auraStacks = nil
+                        nextEffect.stacks = nil
                         nextEffect.duration = nil
                         nextEffect.resourceRef = nil
                         nextEffect.amount = nil
@@ -928,8 +968,43 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
         return group
     end
 
+    self.SpellInspectorRemoveAuraMatchGroup = createGroup("RPEDataEditorSpellInspectorRemoveAuraMatchGroup", "Removal Mode", 18)
+    self.SpellInspectorRemoveAuraMatchDropdown = UI.CreateDropdown(self.SpellInspectorRemoveAuraMatchGroup:GetFrame(), "RPEDataEditorSpellInspectorRemoveAuraMatchDropdown", {
+        width = self.SpellInspectorFieldWidth,
+        height = 18,
+        items = {
+            { label = "Exact Aura", value = "aura" },
+            { label = "By Tag", value = "tag" },
+        },
+        onValueChanged = function(value)
+            if self._refreshingSpellInspector then
+                return
+            end
+
+            local component = self:GetSelectedSpellInspectorComponent()
+            if component and component.effect then
+                self:CommitSelectedSpell(function()
+                    component.effect.match = value == "tag" and "tag" or "aura"
+                    if component.effect.match == "tag" then
+                        component.effect.auraRef = nil
+                        component.effect.stacks = nil
+                    else
+                        component.effect.tag = nil
+                        component.effect.maxAuras = nil
+                        component.effect.stacks = tonumber(component.effect.stacks) or 1
+                    end
+                end)
+                self:RefreshSpellInspectorPage()
+            end
+        end,
+    })
+    self.SpellInspectorRemoveAuraMatchGroup:AddChild(self.SpellInspectorRemoveAuraMatchDropdown)
+    attachMouseWheel(self.SpellInspectorRemoveAuraMatchDropdown)
+
     self.SpellInspectorAuraStacksGroup = createEffectTextGroup("RPEDataEditorSpellInspectorAuraStacksGroup", "Aura Stacks", "SpellInspectorAuraStacksInput")
     self.SpellInspectorApplyAuraDurationGroup = createEffectTextGroup("RPEDataEditorSpellInspectorApplyAuraDurationGroup", "Aura Duration", "SpellInspectorApplyAuraDurationInput")
+    self.SpellInspectorRemoveAuraTagGroup = createEffectTextGroup("RPEDataEditorSpellInspectorRemoveAuraTagGroup", "Aura Tag(s), comma-separated", "SpellInspectorRemoveAuraTagInput")
+    self.SpellInspectorRemoveAuraMaxAurasGroup = createEffectTextGroup("RPEDataEditorSpellInspectorRemoveAuraMaxAurasGroup", "Max Auras (blank = all)", "SpellInspectorRemoveAuraMaxAurasInput")
     self.SpellInspectorResourceAmountGroup = createEffectTextGroup("RPEDataEditorSpellInspectorResourceAmountGroup", "Resource Amount", "SpellInspectorResourceAmountInput")
 
     self.SpellInspectorResourceEffectGroup = createGroup("RPEDataEditorSpellInspectorResourceEffectGroup", "Resource", 18)
@@ -1043,7 +1118,10 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
         if component then
             self:CommitSelectedSpell(function()
                 component.target = component.target or {}
-                if component.target.type == "single" then
+                if component.target.type == "single"
+                    or component.target.type == "last_attackers"
+                    or component.target.type == "last_melee_attacker"
+                then
                     component.target.minTargets = component.target.requiresTarget == false and 0 or 1
                 else
                     component.target.minTargets = tonumber(self.SpellInspectorComponentMinTargetsInput:GetText()) or 0
@@ -1056,9 +1134,16 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
         if component then
             self:CommitSelectedSpell(function()
                 component.target = component.target or {}
-                component.target.maxTargets = component.target.type == "single"
-                    and 1
-                    or (tonumber(self.SpellInspectorComponentMaxTargetsInput:GetText()) or 0)
+                if component.target.type == "single"
+                    or component.target.type == "last_attackers"
+                    or component.target.type == "last_melee_attacker"
+                then
+                    component.target.maxTargets = 1
+                elseif component.target.type == "all_allies" then
+                    component.target.maxTargets = 0
+                else
+                    component.target.maxTargets = tonumber(self.SpellInspectorComponentMaxTargetsInput:GetText()) or 0
+                end
             end)
         end
     end)
@@ -1082,6 +1167,41 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
         if component then
             self:CommitSelectedSpell(function()
                 component.effect.duration = tonumber(self.SpellInspectorApplyAuraDurationInput:GetText()) or 12
+            end)
+        end
+    end)
+    bindInput("SpellInspectorRemoveAuraTagInput", function()
+        local component = self:GetSelectedSpellInspectorComponent()
+        if component then
+            self:CommitSelectedSpell(function()
+                local value = tostring(self.SpellInspectorRemoveAuraTagInput:GetText() or "")
+                value = value:gsub("^%s+", ""):gsub("%s+$", "")
+                if tostring(component.effect.type or "") == "remove_aura_by_tag" then
+                    local tags = {}
+                    for tag in value:gmatch("[^,]+") do
+                        tag = tag:gsub("^%s+", ""):gsub("%s+$", "")
+                        if tag ~= "" then
+                            tags[#tags + 1] = tag
+                        end
+                    end
+                    component.effect.tags = tags
+                else
+                    component.effect.tag = value ~= "" and value or nil
+                end
+            end)
+        end
+    end)
+    bindInput("SpellInspectorRemoveAuraMaxAurasInput", function()
+        local component = self:GetSelectedSpellInspectorComponent()
+        if component then
+            self:CommitSelectedSpell(function()
+                local value = tonumber(self.SpellInspectorRemoveAuraMaxAurasInput:GetText())
+                component.effect.maxAuras = value
+                    and value > 0
+                    and value < math.huge
+                    and math.floor(value) == value
+                    and value
+                    or nil
             end)
         end
     end)

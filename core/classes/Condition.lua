@@ -114,6 +114,9 @@ local TYPE_DEFAULTS = {
         traitRef = nil,
     },
     caster_dead = {},
+    caster_defended_melee_this_turn = {},
+    caster_killed_this_turn = {},
+    target_killed_this_turn = {},
     caster_health_percent = {
         minimumValue = nil,
         maximumValue = nil,
@@ -245,7 +248,11 @@ function Condition.Normalize(value)
         return normalized.traitRef and normalized or nil
     end
 
-    if conditionType == "caster_dead" then
+    if conditionType == "caster_dead"
+        or conditionType == "caster_defended_melee_this_turn"
+        or conditionType == "caster_killed_this_turn"
+        or conditionType == "target_killed_this_turn"
+    then
         return normalized
     end
 

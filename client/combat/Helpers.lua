@@ -829,8 +829,20 @@ function Combat:ApplyResourceDelta(unit, resourceRef, delta, options)
     end
 
     if isHealthResource and currentValue > 0 and nextValue <= 0 then
+        local deathClient = type(options) == "table" and options.client or Addon.Client
+        if deathClient and type(deathClient.RecordCombatDeath) == "function" then
+            deathClient:RecordCombatDeath(
+                type(options) == "table" and options.eventState or nil,
+                unit,
+                (type(options) == "table" and options.eventState and tostring(options.eventState.id or "") or "")
+                    .. ":"
+                    .. tostring(type(options) == "table" and options.eventState and options.eventState.turnNumber or "")
+                    .. ":"
+                    .. tostring(tonumber(unit.eventID) or 0)
+            )
+        end
         self:HandleUnitDeath({
-            client = type(options) == "table" and options.client or Addon.Client,
+            client = deathClient,
             context = options,
             eventState = type(options) == "table" and options.eventState or nil,
             queueAuraSync = type(options) == "table" and options.queueAuraSync == true,

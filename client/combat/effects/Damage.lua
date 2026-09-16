@@ -1400,6 +1400,9 @@ function Combat:BeginHitCheck(context, effect, component)
     then
         local forcedHitStartTime = timingEnabled and getNowMilliseconds() or nil
         local completed, result = Combat:CompleteHitCheck(entry, RESULT_PASS, "forced-hit")
+        if completed and type(Combat.RecordResolvedCombatAttackHistory) == "function" then
+            Combat:RecordResolvedCombatAttackHistory(Client, entry, RESULT_PASS, RESULT_PASS, nil)
+        end
         if completed and type(Combat.ApplyResolvedDamage) == "function" then
             local _, damageResult = self:ApplyResolvedDamage(entry)
             entry.lastDamageResult = damageResult
@@ -1453,6 +1456,9 @@ function Combat:BeginHitCheck(context, effect, component)
         local completed, result = false, nil
         if type(Combat.CompleteHitCheck) == "function" then
             completed, result = Combat:CompleteHitCheck(entry, resultToken, "npc-local")
+        end
+        if completed and type(Combat.RecordResolvedCombatAttackHistory) == "function" then
+            Combat:RecordResolvedCombatAttackHistory(Client, entry, resultToken, action, resolution)
         end
         if completed and resultToken == RESULT_PASS then
             local applyDamageStartTime = timingEnabled and getNowMilliseconds() or nil

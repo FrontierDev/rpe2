@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 10,
+    version = 16,
     dataset = {
         achievements = {},
         auras = {
@@ -828,7 +828,14 @@ Addon.Data.DefaultDatasets:Register({
                 talentTraitRefs = {
                     "b0211ab3:kl2ug8kz",
                     "b0211ab3:0ditc5z7",
-                    "b0211ab3:yz6qglzv"
+                    "b0211ab3:yz6qglzv",
+                    "b0211ab3:sxq460qa",
+                    "b0211ab3:dvinintl",
+                    "b0211ab3:holypwr3",
+                    "b0211ab3:dvinstrg",
+                    "b0211ab3:prcpldn1",
+                    "b0211ab3:dflctpal",
+                    "b0211ab3:antcpal1"
                 }
             }
         },
@@ -1390,11 +1397,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 5,
+                            maxTargets = 0,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "multi"
+                            type = "all_allies"
                         }
                     }
                 },
@@ -1438,15 +1445,15 @@ Addon.Data.DefaultDatasets:Register({
                             spellDatasetId = "b0211ab3",
                             stacks = 1,
                             targetContext = {
-                                object = "the affected ally",
-                                possessive = "the affected ally's",
-                                reflexive = "itself",
-                                subject = "the affected ally"
+                                object = "all allies",
+                                possessive = "all allies'",
+                                reflexive = "themselves",
+                                subject = "all allies"
                             },
                             tokens = {}
                         }
                     },
-                    mainText = "Apply Blessing of Might to up to 5 allies for 10 turns.",
+                    mainText = "Apply Blessing of Might to all allies for 10 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -1488,11 +1495,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 5,
+                            maxTargets = 0,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "multi"
+                            type = "all_allies"
                         }
                     }
                 },
@@ -1536,15 +1543,15 @@ Addon.Data.DefaultDatasets:Register({
                             spellDatasetId = "b0211ab3",
                             stacks = 1,
                             targetContext = {
-                                object = "the affected ally",
-                                possessive = "the affected ally's",
-                                reflexive = "itself",
-                                subject = "the affected ally"
+                                object = "all allies",
+                                possessive = "all allies'",
+                                reflexive = "themselves",
+                                subject = "all allies"
                             },
                             tokens = {}
                         }
                     },
-                    mainText = "Apply Blessing of Kings to up to 5 allies for 10 turns.",
+                    mainText = "Apply Blessing of Kings to all allies for 10 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -1574,11 +1581,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 5,
+                            maxTargets = 0,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "multi"
+                            type = "all_allies"
                         }
                     }
                 },
@@ -1622,15 +1629,15 @@ Addon.Data.DefaultDatasets:Register({
                             spellDatasetId = "b0211ab3",
                             stacks = 1,
                             targetContext = {
-                                object = "the affected ally",
-                                possessive = "the affected ally's",
-                                reflexive = "itself",
-                                subject = "the affected ally"
+                                object = "all allies",
+                                possessive = "all allies'",
+                                reflexive = "themselves",
+                                subject = "all allies"
                             },
                             tokens = {}
                         }
                     },
-                    mainText = "Apply Blessing of Sanctuary to up to 5 allies for 10 turns.",
+                    mainText = "Apply Blessing of Sanctuary to all allies for 10 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -1660,11 +1667,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 5,
+                            maxTargets = 0,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "multi"
+                            type = "all_allies"
                         }
                     }
                 },
@@ -1708,10 +1715,10 @@ Addon.Data.DefaultDatasets:Register({
                             spellDatasetId = "b0211ab3",
                             stacks = 1,
                             targetContext = {
-                                object = "the affected ally",
-                                possessive = "the affected ally's",
-                                reflexive = "itself",
-                                subject = "the affected ally"
+                                object = "all allies",
+                                possessive = "all allies'",
+                                reflexive = "themselves",
+                                subject = "all allies"
                             },
                             tokens = {
                                 {
@@ -1723,7 +1730,7 @@ Addon.Data.DefaultDatasets:Register({
                             }
                         }
                     },
-                    mainText = "Apply Blessing of Wisdom to up to 5 allies for 10 turns.",
+                    mainText = "Apply Blessing of Wisdom to all allies for 10 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -1753,11 +1760,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 5,
+                            maxTargets = 0,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "multi"
+                            type = "all_allies"
                         }
                     }
                 },
@@ -1801,15 +1808,15 @@ Addon.Data.DefaultDatasets:Register({
                             spellDatasetId = "b0211ab3",
                             stacks = 1,
                             targetContext = {
-                                object = "the affected ally",
-                                possessive = "the affected ally's",
-                                reflexive = "itself",
-                                subject = "the affected ally"
+                                object = "all allies",
+                                possessive = "all allies'",
+                                reflexive = "themselves",
+                                subject = "all allies"
                             },
                             tokens = {}
                         }
                     },
-                    mainText = "Apply Blessing of Light to up to 5 allies for 10 turns.",
+                    mainText = "Apply Blessing of Light to all allies for 10 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -3189,7 +3196,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
-                            type = "multi"
+                            type = "raid_marker"
                         }
                     }
                 },
@@ -3229,7 +3236,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. Generates a high amount of threat.",
+                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. Generates a high amount of threat.\n|cff999999Targets must share the same raid marker.|r",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -4021,7 +4028,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
-                            type = "multi"
+                            type = "raid_marker"
                         }
                     }
                 },
@@ -4061,7 +4068,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies.",
+                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies.\n|cff999999Targets must share the same raid marker.|r",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -4459,6 +4466,350 @@ Addon.Data.DefaultDatasets:Register({
                 totalTicks = 0,
                 triggersGCD = false,
                 useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:3qs2oqf1",
+                            basePower = 0,
+                            duration = 1,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "gak8p3v1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_heroism.blp",
+                id = "gak8p3v1",
+                ignoreGCD = true,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Guardian of Ancient Kings",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:3qs2oqf1",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Increases Damage Reduction by 20%. Increases Defense Rating by {AURA_STAT_1}.",
+                            duration = 1,
+                            icon = "interface/icons/spell_holy_heroism.blp",
+                            nameText = "Guardian of Ancient Kings",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "stat_amount",
+                                    baseField = "baseAmount",
+                                    effectIndex = 2,
+                                    key = "AURA_STAT_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Guardian of Ancient Kings to yourself for 1 turn.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                triggersGCD = true,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:7s9prff0",
+                            basePower = 0,
+                            duration = 1,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "hoj2q6x4",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 6,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_sealofmight.blp",
+                id = "hoj2q6x4",
+                ignoreGCD = true,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Hammer of Justice",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:7s9prff0",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                            duration = 1,
+                            icon = "interface/icons/spell_holy_sealofmight.blp",
+                            nameText = "Hammer of Justice",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Hammer of Justice to an enemy for 1 turn.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                triggersGCD = true,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:omfso9hg",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "awr9m5d2",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_avenginewrath.blp",
+                id = "awr9m5d2",
+                ignoreGCD = true,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Avenging Wrath",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Retribution",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:omfso9hg",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Increases Damage Done by 30%.",
+                            duration = 2,
+                            icon = "interface/icons/spell_holy_avenginewrath.blp",
+                            nameText = "Avenging Wrath",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Avenging Wrath to yourself for 2 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                triggersGCD = true,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 1,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:989cf7q9",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "rep7n4c8",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 6,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_prayerofhealing.blp",
+                id = "rep7n4c8",
+                ignoreGCD = true,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Repentance",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Retribution",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:989cf7q9",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Breaks when the affected unit takes damage. Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                            duration = 2,
+                            icon = "interface/icons/spell_holy_prayerofhealing.blp",
+                            nameText = "Repentance",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Repentance to an enemy for 2 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                triggersGCD = true,
+                useCooldownCharges = false
             }
         },
         stats = {},
@@ -4547,7 +4898,8 @@ Addon.Data.DefaultDatasets:Register({
                         combatEventId = "on_critical_heal",
                         effects = {
                             {
-                                amount = 30,
+                                amount = 10,
+                                amountMode = "base_percent",
                                 resourceRef = "f82db71a:4c8mfm99",
                                 type = "resource"
                             }
@@ -4561,6 +4913,142 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Illumination",
                 skillBonuses = {},
                 statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Protection",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_holy_devotion.blp",
+                id = "sxq460qa",
+                isEnvironmental = false,
+                name = "Toughness",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        operation = "percent",
+                        statRef = "f82db71a:v42albuv",
+                        value = 10
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Holy",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_holy_arcaneintellect.blp",
+                id = "dvinintl",
+                isEnvironmental = false,
+                name = "Divine Intellect",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        operation = "percent",
+                        statRef = "f82db71a:75y3a8ib",
+                        value = 10
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Holy",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/inv_enchant_essencemagiclarge.blp",
+                id = "holypwr3",
+                isEnvironmental = false,
+                name = "Holy Power",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:69hfqhne",
+                        value = 3
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Retribution",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_nature_strength.blp",
+                id = "dvinstrg",
+                isEnvironmental = false,
+                name = "Divine Strength",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        operation = "percent",
+                        statRef = "f82db71a:zfqm8dxp",
+                        value = 10
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Retribution",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/petbattle_attack.blp",
+                id = "prcpldn1",
+                isEnvironmental = false,
+                name = "Precision",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:wbj4zuf3",
+                        value = 3
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Protection",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/ability_parry.blp",
+                id = "dflctpal",
+                isEnvironmental = false,
+                name = "Deflection",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:tcn0s8kx",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Protection",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/ability_warrior_defensive_stance.blp",
+                id = "antcpal1",
+                isEnvironmental = false,
+                name = "Anticipation",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:0wyp78x9",
+                        value = 10
+                    }
+                },
                 unlockLevel = 1
             }
         },

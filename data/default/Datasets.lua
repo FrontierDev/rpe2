@@ -12,12 +12,29 @@ DefaultDatasets.Definitions = {}
 -- race/class traits back into an unowned manual trait.
 local REQUIRED_TRAIT_OWNERSHIP = {
     { datasetId = "f82db71a", collection = "races", ownerId = "v17z463g", field = "traitRefs", traitRef = "f82db71a:dm2h660e" },
+    { datasetId = "f82db71a", collection = "races", ownerId = "v17z463g", field = "traitRefs", traitRef = "f82db71a:qid0o6zv" },
+    { datasetId = "f82db71a", collection = "races", ownerId = "v17z463g", field = "traitRefs", traitRef = "f82db71a:prc5ptn1" },
+    { datasetId = "f82db71a", collection = "races", ownerId = "xx3padtj", field = "traitRefs", traitRef = "f82db71a:tslfl2fq" },
+    { datasetId = "f82db71a", collection = "races", ownerId = "xx3padtj", field = "traitRefs", traitRef = "f82db71a:2xvx2wn8" },
+    { datasetId = "f82db71a", collection = "races", ownerId = "xx3padtj", field = "traitRefs", traitRef = "f82db71a:trs5fnd1" },
+    { datasetId = "f82db71a", collection = "races", ownerId = "xx3padtj", field = "traitRefs", traitRef = "f82db71a:anv15grt" },
     { datasetId = "23d5dce2", collection = "classes", ownerId = "ta9uh9xw", field = "talentTraitRefs", traitRef = "23d5dce2:z9yfqvhy" },
     { datasetId = "23d5dce2", collection = "classes", ownerId = "ta9uh9xw", field = "talentTraitRefs", traitRef = "23d5dce2:58pob6kr" },
     { datasetId = "7bbb4cb9", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "7bbb4cb9:duukevtq" },
     { datasetId = "7bbb4cb9", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "7bbb4cb9:r73vv899" },
     { datasetId = "7bbb4cb9", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "7bbb4cb9:0ncx0gfs" },
     { datasetId = "7bbb4cb9", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "7bbb4cb9:a8x4ee34" },
+    { datasetId = "b0211ab3", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "b0211ab3:sxq460qa" },
+    { datasetId = "b0211ab3", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "b0211ab3:dvinintl" },
+    { datasetId = "b0211ab3", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "b0211ab3:holypwr3" },
+    { datasetId = "b0211ab3", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "b0211ab3:dvinstrg" },
+    { datasetId = "b0211ab3", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "b0211ab3:prcpldn1" },
+    { datasetId = "b0211ab3", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "b0211ab3:dflctpal" },
+    { datasetId = "b0211ab3", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "b0211ab3:antcpal1" },
+    { datasetId = "7bbb4cb9", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "7bbb4cb9:sxq460qa" },
+    { datasetId = "7bbb4cb9", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "7bbb4cb9:cruelty3" },
+    { datasetId = "7bbb4cb9", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "7bbb4cb9:antcwar1" },
+    { datasetId = "7bbb4cb9", collection = "classes", ownerId = "wvirv9um", field = "talentTraitRefs", traitRef = "7bbb4cb9:shldspc1" },
 }
 
 local function isPositiveInteger(value)

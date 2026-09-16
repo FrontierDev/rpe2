@@ -261,13 +261,16 @@ local function validateSelectionForPolicy(ids, candidates, policy)
     policy = type(policy) == "table" and policy or {}
     local minTargets = normalizePolicyCount(policy.minTargets)
     local maxTargets = normalizePolicyCount(policy.maxTargets)
-    if maxTargets < minTargets then
+    local targetType = tostring(policy.type or "single")
+    if targetType ~= "all_allies" and maxTargets < minTargets then
         maxTargets = minTargets
     end
-    if #ids < minTargets or (maxTargets > 0 and #ids > maxTargets) then
+    if #ids < minTargets
+        or (targetType ~= "all_allies" and maxTargets > 0 and #ids > maxTargets)
+    then
         return false, "target-count-invalid"
     end
-    if maxTargets == 0 and #ids > 0 then
+    if targetType ~= "all_allies" and maxTargets == 0 and #ids > 0 then
         return false, "target-count-invalid"
     end
 
@@ -279,12 +282,8 @@ local function validateSelectionForPolicy(ids, candidates, policy)
         end
     end
 
-    local targetType = tostring(policy.type or "single")
     if targetType == "all_allies" then
         local expectedCount = #candidates
-        if maxTargets > 0 then
-            expectedCount = math.min(expectedCount, maxTargets)
-        end
         if #ids ~= expectedCount then
             return false, "target-set-invalid"
         end

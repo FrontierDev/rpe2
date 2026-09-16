@@ -1358,7 +1358,8 @@ local function buildTargetCandidateState(self, activation, includeTargetCandidat
             and (activation.policy.requiresTarget == true
                 or activation.policy.type == "all_allies"
                 or activation.policy.type == "raid_marker")
-            and math.max(0, tonumber(activation.policy.maxTargets) or 0) > 0
+            and (activation.policy.type == "all_allies"
+                or math.max(0, tonumber(activation.policy.maxTargets) or 0) > 0)
             and #(candidates or {}) == 0
         then
             canCast = false

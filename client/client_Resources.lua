@@ -1104,6 +1104,9 @@ local function applyInboundResourceDeltasForTarget(targetClient, state, eventSta
             and combat:IsUnitDead(targetUnit, { eventState = eventState })
             and type(combat.HandleUnitDeath) == "function"
         then
+            if wasAlive and type(targetClient.RecordCombatDeath) == "function" then
+                targetClient:RecordCombatDeath(eventState, targetUnit)
+            end
             combat:HandleUnitDeath({
                 client = targetClient,
                 eventState = eventState,

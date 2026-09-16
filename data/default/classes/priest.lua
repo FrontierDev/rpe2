@@ -1451,11 +1451,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 5,
+                            maxTargets = 0,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "single"
+                            type = "all_allies"
                         }
                     }
                 },
@@ -1497,15 +1497,15 @@ Addon.Data.DefaultDatasets:Register({
                             spellDatasetId = "1c1038a7",
                             stacks = 1,
                             targetContext = {
-                                object = "the affected ally",
-                                possessive = "the affected ally's",
-                                reflexive = "itself",
-                                subject = "the affected ally"
+                                object = "all allies",
+                                possessive = "all allies'",
+                                reflexive = "themselves",
+                                subject = "all allies"
                             },
                             tokens = {}
                         }
                     },
-                    mainText = "Apply Divine Spirit to up to 5 allies for 10 turns.",
+                    mainText = "Apply Divine Spirit to all allies for 10 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -1535,11 +1535,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 5,
+                            maxTargets = 0,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "single"
+                            type = "all_allies"
                         }
                     }
                 },
@@ -1581,15 +1581,15 @@ Addon.Data.DefaultDatasets:Register({
                             spellDatasetId = "1c1038a7",
                             stacks = 1,
                             targetContext = {
-                                object = "the affected ally",
-                                possessive = "the affected ally's",
-                                reflexive = "itself",
-                                subject = "the affected ally"
+                                object = "all allies",
+                                possessive = "all allies'",
+                                reflexive = "themselves",
+                                subject = "all allies"
                             },
                             tokens = {}
                         }
                     },
-                    mainText = "Apply Prayer of Fortitude to up to 5 allies for 10 turns.",
+                    mainText = "Apply Prayer of Fortitude to all allies for 10 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -1619,11 +1619,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 5,
+                            maxTargets = 0,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "single"
+                            type = "all_allies"
                         }
                     }
                 },
@@ -1665,10 +1665,10 @@ Addon.Data.DefaultDatasets:Register({
                             spellDatasetId = "1c1038a7",
                             stacks = 1,
                             targetContext = {
-                                object = "the affected ally",
-                                possessive = "the affected ally's",
-                                reflexive = "itself",
-                                subject = "the affected ally"
+                                object = "all allies",
+                                possessive = "all allies'",
+                                reflexive = "themselves",
+                                subject = "all allies"
                             },
                             tokens = {
                                 {
@@ -1681,7 +1681,7 @@ Addon.Data.DefaultDatasets:Register({
                             }
                         }
                     },
-                    mainText = "Apply Prayer of Shadow Protection to up to 5 allies for 10 turns.",
+                    mainText = "Apply Prayer of Shadow Protection to all allies for 10 turns.",
                     tokens = {},
                     version = 1
                 },

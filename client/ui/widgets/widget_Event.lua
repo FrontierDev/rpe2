@@ -441,6 +441,74 @@ local function buildCombatLogText(entry)
     return ""
 end
 
+local function isAuraCombatLogEntry(entry)
+    if type(entry) ~= "table" or tostring(entry.entryType or "") ~= "status" then
+        return false
+    end
+
+    local logKind = tostring(entry.logKind or "")
+    return logKind == "aura_gain" or logKind == "aura_loss"
+end
+
+local function canCoalesceAuraCombatLogEntries(existing, incoming)
+    return isAuraCombatLogEntry(existing)
+        and isAuraCombatLogEntry(incoming)
+        and tostring(existing.eventId or "") == tostring(incoming.eventId or "")
+        and tostring(existing.logKind or "") == tostring(incoming.logKind or "")
+        and tostring(existing.casterDisplayName or "") == tostring(incoming.casterDisplayName or "")
+        and tostring(existing.detailText or "") == tostring(incoming.detailText or "")
+        and tostring(existing.spellIconTexture or "") == tostring(incoming.spellIconTexture or "")
+        and tostring(existing.iconTexture or "") == tostring(incoming.iconTexture or "")
+        and tostring(existing.accentColor or "") == tostring(incoming.accentColor or "")
+end
+
+local function mergeAuraCombatLogEntries(existing, incoming)
+    local merged = {}
+    for key, value in pairs(existing) do
+        merged[key] = value
+    end
+
+    local existingCount = math.max(1, math.floor(tonumber(existing.targetCount) or 1))
+    local incomingCount = math.max(1, math.floor(tonumber(incoming.targetCount) or 1))
+    merged.targetCount = existingCount + incomingCount
+    merged.targetDisplayName = ("%d targets"):format(merged.targetCount)
+    merged.targetColor = nil
+    return merged
+end
+
+function EventWidget:TryCoalesceAuraCombatLogEntry(entry)
+    if not isAuraCombatLogEntry(entry) then
+        return nil
+    end
+
+    local current = self.currentPresentation
+    if type(current) == "table"
+        and current.presentationType == "combat-log"
+        and canCoalesceAuraCombatLogEntries(current.payload, entry)
+    then
+        local merged = mergeAuraCombatLogEntries(current.payload, entry)
+        current.payload = merged
+        if self.combatLogText and self.combatLogText.SetText then
+            self.combatLogText:SetText(buildCombatLogText(merged))
+        end
+        self:StartPresentationTimer()
+        return merged
+    end
+
+    local queue = self.presentationQueue
+    local queued = type(queue) == "table" and queue[#queue] or nil
+    if type(queued) == "table"
+        and queued.presentationType == "combat-log"
+        and canCoalesceAuraCombatLogEntries(queued.payload, entry)
+    then
+        local merged = mergeAuraCombatLogEntries(queued.payload, entry)
+        queued.payload = merged
+        return merged
+    end
+
+    return nil
+end
+
 local function attachControlHandler(slot)
     if type(slot) ~= "table" or slot._controlHandlerAttached == true then
         return false
@@ -1999,9 +2067,24 @@ function EventWidget:QueuePresentation(presentation)
 end
 
 function EventWidget:QueueCombatLogEntry(entry)
+    self.lastCombatLogQueueOutcome = nil
     if type(entry) ~= "table" then
         return false
     end
+
+    local coalescedEntry = self:TryCoalesceAuraCombatLogEntry(entry)
+    if coalescedEntry then
+        self.lastCombatLogQueueOutcome = {
+            entry = coalescedEntry,
+            coalesced = true,
+        }
+        return true
+    end
+
+    self.lastCombatLogQueueOutcome = {
+        entry = entry,
+        coalesced = false,
+    }
     return self:QueuePresentation({
         presentationType = "combat-log",
         payload = entry,

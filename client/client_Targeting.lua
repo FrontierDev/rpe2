@@ -1057,7 +1057,7 @@ function Client:BuildSpellActivationTargetCandidates(activation, targetGroup)
         policy = group and group.policy or nil
     end
     policy = policy or resolvedActivation.policy or getDefaultTargetPolicy()
-    if policy.type == "pet" then
+    if policy.type == "pet" or policy.type == "last_melee_attacker" then
         local targets = Spellcasting.ResolveComponentTargets and Spellcasting.ResolveComponentTargets(
             resolvedActivation.eventState,
             resolvedActivation.casterUnit,
@@ -1068,7 +1068,9 @@ function Client:BuildSpellActivationTargetCandidates(activation, targetGroup)
         ) or {}
         return targets
     end
-    if policy.type == "caster" or (tonumber(policy.maxTargets) or 0) <= 0 then
+    if policy.type == "caster"
+        or ((tonumber(policy.maxTargets) or 0) <= 0 and policy.type ~= "all_allies")
+    then
         return {}
     end
 
@@ -1171,6 +1173,9 @@ function Client:GetPendingSpellTargetingDisplayState()
 
         local minTargets = math.max(0, tonumber(group.policy and group.policy.minTargets) or 0)
         local maxTargets = math.max(minTargets, tonumber(group.policy and group.policy.maxTargets) or 0)
+        if targetType == "all_allies" then
+            maxTargets = #candidates
+        end
         local focusedTargetEventId = tonumber(group.focusedTargetEventId) or 0
         local selectedUnit = nil
         if focusedTargetEventId > 0 and selectedByEventId[focusedTargetEventId] then
@@ -1634,7 +1639,6 @@ function Client:ActivateSpellReference(spellRef, options)
         local candidates = type(activationSnapshot.targetCandidatesByGroup) == "table" and activationSnapshot.targetCandidatesByGroup[group.key] or {}
         local targetType = tostring(group.policy and group.policy.type or "single")
         local minTargets = math.max(0, tonumber(group.policy and group.policy.minTargets) or 0)
-        local maxTargets = math.max(minTargets, tonumber(group.policy and group.policy.maxTargets) or 0)
         if #candidates == 0
             and group.policy
             and (group.policy.requiresTarget == true or targetType == "all_allies")
@@ -1650,14 +1654,10 @@ function Client:ActivateSpellReference(spellRef, options)
             local selectedTargetEventIds = {}
             local focusedTargetEventId = 0
             if targetType == "all_allies" then
-                local selectedCount = 0
                 for candidateIndex = 1, #candidates do
-                    if maxTargets <= 0 or selectedCount < maxTargets then
-                        local candidateEventId = tonumber(candidates[candidateIndex] and candidates[candidateIndex].eventID) or 0
-                        if candidateEventId > 0 then
-                            selectedTargetEventIds[candidateEventId] = true
-                            selectedCount = selectedCount + 1
-                        end
+                    local candidateEventId = tonumber(candidates[candidateIndex] and candidates[candidateIndex].eventID) or 0
+                    if candidateEventId > 0 then
+                        selectedTargetEventIds[candidateEventId] = true
                     end
                 end
                 for candidateIndex = 1, #candidates do

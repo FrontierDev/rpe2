@@ -49,14 +49,15 @@ end
 
 local function normalizePolicy(policy)
     local source = type(policy) == "table" and policy or {}
+    local targetType = tostring(source.type or "single")
     local minTargets = normalizeCount(source.minTargets)
     local maxTargets = normalizeCount(source.maxTargets)
-    if maxTargets < minTargets then
+    if targetType ~= "all_allies" and maxTargets < minTargets then
         maxTargets = minTargets
     end
 
     return {
-        type = tostring(source.type or "single"),
+        type = targetType,
         requiresTarget = source.requiresTarget == true,
         targetDisposition = tostring(source.targetDisposition or "enemy"),
         minTargets = minTargets,
@@ -485,7 +486,7 @@ function Selector.CreateState(activationSnapshot, options)
         result = nil,
     }
 
-    if state.maxTargets <= 0 then
+    if state.maxTargets <= 0 and state.targetType ~= "all_allies" then
         finishSelection(state)
     elseif state.targetType == "all_allies" and #state.candidates == 0 then
         finishSelection(state)
@@ -521,7 +522,7 @@ function Selector.Step(state, deadlineMs)
 
             if state.targetType == "all_allies" then
                 for entryIndex = 1, #state.entries do
-                    if #state.selectedEntries >= state.maxTargets then
+                    if state.maxTargets > 0 and #state.selectedEntries >= state.maxTargets then
                         break
                     end
                     markSelected(state, entryIndex)

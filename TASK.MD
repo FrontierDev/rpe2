@@ -1,148 +1,195 @@
 ## Summary
 
-Add two new spell targeter types to the canonical spell targeting system:
+Review and complete the **partial descriptor templates** used to generate spell tooltip text so every supported spell targeter/effect type has accurate player-facing wording.
+
+This issue is specifically about the composable tooltip fragments used by `client/spellcasting/DescriptionBuilder.lua`, e.g.:
+
+```text
+Deal {damage information} {damage school} damage to {target information}.
+Heal {target information} for {healing information} health.
+Apply {aura} to {target information}.
+```
+
+It is **not** a general tooltip architecture rewrite.
+
+## Current gaps
+
+### Target descriptors
+
+`resolveTargetPhrase()` currently has special handling for `caster`, `pet`, and `last_attackers`, with ordinary `single`/`multi` targets falling through to disposition/count wording.
+
+The new targeters being added need explicit descriptor behaviour where their semantics differ from ordinary `single`/`multi` targeting.
+
+#### `all_allies`
+
+New targeter.
+
+Use:
+
+```text
+all allies
+```
+
+Examples:
+
+```text
+Heal all allies for {amount} health.
+Apply {Aura} to all allies.
+```
+
+Do not render this as `up to N allies`.
+
+#### `raid_marker`
+
+New targeter.
+
+The main target phrase should deliberately use the normal multi-target wording:
+
+```text
+up to {N} allies
+up to {N} enemies
+up to {N} targets
+```
+
+Do **not** mention the raid marker inside the main effect sentence.
+
+Instead, add a separate grey informational line at the bottom of the spell tooltip:
+
+```text
+Targets must share the same raid marker.
+```
+
+This should appear once per spell where a raid-marker targeter is used, not once per component sentence.
+
+#### last melee attacker targeter
+
+The planned targeter for "the unit that last attacked the caster with a melee attack" needs dedicated wording matching its actual semantics.
+
+Use:
+
+```text
+the last enemy to attack you with a melee attack
+```
+
+Do not reuse the existing vague `last_attackers` phrase `the last attacker of the target` for this targeter.
+
+## Spell effect descriptors
+
+### Existing `remove_aura`
+
+`remove_aura` is already an executable/editor-supported spell effect but is missing from the spell description dispatcher.
+
+Add player-facing templates that include aura name, stack count when relevant, and target phrase.
+
+Examples:
+
+```text
+Remove {Aura} from {target}.
+Remove {N} stacks of {Aura} from {target}.
+```
+
+### Existing `hide`
+
+`hide` is already supported by the spell runtime/editor but has no spell tooltip descriptor.
+
+Use player-facing wording such as:
+
+```text
+Cause {target} to become hidden.
+```
+
+Do not expose implementation terminology such as "set hidden status" in the normal tooltip.
+
+### New `remove_aura_by_tag`
+
+Add the new effect type for removing auras by one or more authored tags and add its tooltip descriptor at the same time.
+
+The descriptor must use:
+
+```text
+Remove all {tag, tag, tag, tag} effect(s) from {target}.
+```
+
+Requirements:
+
+- render the complete authored tag list in the effect sentence;
+- preserve authored tag names;
+- comma-separate multiple tags;
+- use the normal resolved target phrase for `{target}`;
+- the effect operates on all matching aura effects, rather than naming a specific aura reference.
+
+If the implementation also supports an optional maximum number of removals, extend the descriptor consistently rather than silently omitting that limit.
+
+### Existing `revert`
+
+`revert` already has a descriptor:
+
+```text
+Reverse the effects of the last spell that affected {target}.
+```
+
+Retain this unless the runtime semantics change.
+
+## Aura-event descriptor gaps
+
+### Existing `remove_hidden`
+
+`remove_hidden` is already supported as an aura event effect but is not handled by the aura-event description builder.
+
+Use player-facing wording based on the resolved event target, e.g.:
+
+```text
+reveal {target}
+```
+
+rather than `remove hidden`.
+
+## Passive aura descriptor gaps
+
+### Existing passive `apply_aura`
+
+The aura schema/editor permits passive `apply_aura` effects, but the passive aura description dispatcher does not currently emit text for them.
+
+Add the equivalent aura application descriptor so authorable passive effects are not silently omitted from generated aura text.
+
+## Effect/target types covered by this work
+
+### New target types
 
 - `all_allies`
 - `raid_marker`
+- dedicated targeter for the unit that last attacked the caster with a melee attack
 
-These are target-selection behaviours. They must work through the same target-policy, targeting UI and spellcasting resolution paths as the existing targeters.
+### New spell effect types
 
-This issue supersedes #313.
+- `remove_aura_by_tag`
 
-Target branch: `dev`.
+### Existing types whose descriptor coverage must be completed/fixed
 
-## 1. All Allies targeter
+- target: `last_attackers` / replacement dedicated last-melee-attacker semantics
+- spell effect: `remove_aura`
+- spell effect: `hide`
+- spell effect: `revert` — verify existing text remains correct
+- aura event effect: `remove_hidden`
+- passive aura effect: `apply_aura`
 
-`all_allies` automatically selects all eligible allied event units for the cast.
+## Implementation guidance
 
-### Behaviour
+Keep the implementation centred on the existing descriptor composition in `client/spellcasting/DescriptionBuilder.lua` and `client/spellcasting/AuraDescriptionBuilder.lua`.
 
-- The spell author selects **All Allies** as the targeter type.
-- No individual target clicking is required.
-- At targeting time, resolve the set of event units which satisfy the spell's normal ally-targeting rules.
-- Respect the existing eligibility rules, including dead-target policy, hidden/targetability rules, self-target restrictions and active event membership.
-- Respect `maxTargets` if the target policy defines one.
-- The resulting unit IDs must enter the normal queued target-selection/cast pipeline; the targeter must not directly execute spell effects.
+The main spell sentence should continue to be assembled from an effect descriptor plus a resolved target phrase. Special targeting constraints that do not belong grammatically inside the sentence, such as `raid_marker`, should be emitted as supplementary grey tooltip lines.
 
-## 2. Raid Marker targeter
-
-`raid_marker` is a distinct spell targeter. It is **not** a multi-target spell authored against a particular marker.
-
-No raid marker is stored on the spell.
-
-### Player targeting behaviour
-
-1. The targeting UI shows the normal individually eligible units for the spell.
-2. The player clicks one eligible unit.
-3. Read that unit's current raid marker from the event unit.
-4. Automatically select the clicked unit and the other eligible units which currently have the same raid marker.
-5. Stop once `maxTargets` is reached.
-6. Pass that selected set through the normal cast-confirmation and spellcasting pipeline.
-
-Example:
-
-- targeter: `raid_marker`
-- disposition: `enemy`
-- `maxTargets = 5`
-- units 2, 4, 7 and 9 have `{skull}`
-- units 3 and 6 have `{cross}`
-- the player clicks unit 7
-- units 2, 4, 7 and 9 are selected automatically
-
-The player does **not** manually select the rest of the units after choosing the first target.
-
-### Raid-marker rules
-
-- The clicked unit is the anchor and must always be included.
-- Only units with exactly the same raid marker as the anchor may be added.
-- Units on different markers must never enter the same resolved target set.
-- If there are more matching units than `maxTargets`, cap the automatic selection at `maxTargets` while retaining the clicked unit.
-- Normal target eligibility remains authoritative for every automatically added unit.
-- Clicking an unmarked unit must not cause all unmarked units to be treated as one raid-marker group. The target selection should fail cleanly for an unmarked anchor.
-- The relevant raid marker is evaluated at targeting time, so the same spell can target different marker groups on different casts.
-
-## Data model / normalization
-
-Extend the existing target `type` contract with the new targeter values, following the current serialization conventions.
-
-Conceptually:
-
-```lua
-target = {
-    type = "raid_marker",
-    targetDisposition = "enemy",
-    minTargets = 1,
-    maxTargets = 5,
-    ...
-}
-```
-
-and:
-
-```lua
-target = {
-    type = "all_allies",
-    targetDisposition = "ally",
-    ...
-}
-```
-
-There must be no `raidMarker`/marker-ID field on the spell.
-
-Update both persisted spell normalization and runtime combat normalization so the new targeter values survive the existing serialization/import/export and cast paths.
-
-## Targeting UI
-
-Update the spell targeting flow to understand the new targeter types.
-
-### `all_allies`
-
-- Resolve the target set automatically.
-- Do not require the player to click each target individually.
-- Show the resolved selection through the existing targeting presentation where appropriate before the cast is confirmed.
-
-### `raid_marker`
-
-- Initially allow the player to choose any individually eligible anchor target.
-- On the first click, derive the anchor's raid marker and build the full same-marker target set automatically.
-- Show the automatically selected targets in the targeting UI.
-- Do not enter the normal manual multi-select flow after the anchor is clicked.
-
-## Spellcasting resolution
-
-Update the component target-resolution path so these targeter types resolve from the queued target selection produced by the targeting system.
-
-Do not add special handling in individual spell effects. Once the targeter has produced the target event IDs, downstream effect execution should remain unchanged.
-
-## Spell editor
-
-Expose the two new targeter types in the spell targeter dropdown:
-
-- **All Allies**
-- **Raid Marker**
-
-For **Raid Marker**, do not show any field for choosing a particular marker.
-
-Keep the normal disposition, minimum/maximum target and other eligibility controls where they are applicable.
-
-## Autopilot / NPC casting
-
-Support the same semantics for NPC/autopilot casts:
-
-- `all_allies`: resolve eligible allied units automatically.
-- `raid_marker`: choose an eligible anchor target through the existing NPC target-selection logic, then expand that anchor to eligible same-marker units up to `maxTargets`.
-
-The marker must always come from the chosen anchor unit, never from spell configuration.
+Avoid introducing spell-specific hard-coded descriptions. The templates must remain generic and data-driven.
 
 ## Acceptance criteria
 
-- **All Allies** is available as a spell targeter and automatically selects eligible allies.
-- **Raid Marker** is available as a spell targeter.
-- No raid marker is authored or stored on a spell using `raid_marker`.
-- Clicking one eligible marked unit automatically selects eligible units with that same marker.
-- The clicked unit is always included.
-- Automatic selection stops at `maxTargets`.
-- Units with other markers are excluded.
-- Unmarked anchor units do not expand into an implicit unmarked group.
-- Both targeters use the existing canonical target-selection and spellcasting paths.
-- Existing targeters continue to behave as before.
+- Every target/effect type listed above produces complete generated tooltip text.
+- `all_allies` renders as `all allies`.
+- `raid_marker` renders the ordinary `up to N allies/enemies/targets` main phrase plus exactly one grey `Targets must share the same raid marker.` line.
+- the last-melee-attacker targeter describes the caster's last melee attacker, not `the last attacker of the target`.
+- `remove_aura` no longer disappears from generated spell descriptions.
+- `hide` no longer disappears from generated spell descriptions.
+- `remove_aura_by_tag` renders `Remove all {tags} effect(s) from {target}.` with the authored tag list.
+- `remove_hidden` is represented in aura-event descriptions with player-facing `reveal` wording.
+- passive aura `apply_aura` effects are represented rather than omitted.
+- existing damage/heal/resource/apply-aura/interrupt/revert/summon-pet descriptors continue to generate normally.

@@ -1442,6 +1442,46 @@ function Combat:CompleteHitCheck(entry, resultToken, reason)
     return true, buildCombatResult(entry, normalizedResult, reason or normalizedResult)
 end
 
+local function isSuccessfulDefensiveResolution(entry, action, resultToken, resolution)
+    if normalizeResultToken(resultToken) ~= RESULT_FAIL or type(action) ~= "table" or action.enabled == false then
+        return false
+    end
+
+    if normalizeResultToken(action.id) == RESULT_PASS or type(resolution) ~= "table" then
+        return false
+    end
+
+    local defenceSystem = tostring(resolution.defenceSystem or entry and entry.defenceSystem or "")
+    return defenceSystem == "ac"
+        or defenceSystem == "simple"
+        or defenceSystem == "complex"
+        or defenceSystem == "percent"
+end
+
+function Combat:RecordResolvedCombatAttackHistory(client, entry, resultToken, action, resolution, defendedOverride)
+    if type(client) ~= "table" or type(client.RecordCombatAttack) ~= "function" or type(entry) ~= "table" then
+        return false
+    end
+
+    local normalizedResult = normalizeResultToken(resultToken)
+    if not normalizedResult then
+        return false
+    end
+
+    local landed = normalizedResult == RESULT_PASS
+    local successfullyDefended = defendedOverride == true
+        or isSuccessfulDefensiveResolution(entry, action, normalizedResult, resolution)
+    return client:RecordCombatAttack(
+        entry.eventState,
+        entry.attackerUnit,
+        entry.defenderUnit,
+        entry.attackType,
+        landed,
+        successfullyDefended,
+        entry.checkId
+    )
+end
+
 function Combat:ResolveDefenceCombatText(entry, resolution)
     if type(entry) ~= "table" then
         return nil
@@ -1524,6 +1564,9 @@ function Client:ResolveCombatReactionAction(actionId)
     if entry.localOnly == true then
         self:HideCombatReaction()
         local completed, result = Combat:CompleteHitCheck(entry, resultToken, "player-local")
+        if completed then
+            Combat:RecordResolvedCombatAttackHistory(self, entry, resultToken, action, resolution)
+        end
         if completed and resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
             local _, damageResult = Combat:ApplyResolvedDamage(entry)
             entry.lastDamageResult = damageResult
@@ -1536,15 +1579,18 @@ function Client:ResolveCombatReactionAction(actionId)
     end
 
     local attackerName = resolveSenderForUnit(entry.eventState, entry.attackerUnit)
+    local successfullyDefended = isSuccessfulDefensiveResolution(entry, action, resultToken, resolution)
     if attackerName == "" or not sendCombatWhisper(attackerName, HIT_CHECK_RESPONSE_OPCODE, {
         entry.checkId,
         entry.eventId,
         resultToken,
+        successfullyDefended and "defended" or "",
     }) then
         return false
     end
 
     self:HideCombatReaction()
+    Combat:RecordResolvedCombatAttackHistory(self, entry, resultToken, action, resolution)
     if resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
         local _, damageResult = Combat:ApplyResolvedDamage(entry)
         entry.lastDamageResult = damageResult
@@ -1639,6 +1685,7 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
     local checkId = normalizeToken(arguments and arguments[1])
     local eventId = normalizeToken(arguments and arguments[2])
     local resultToken = normalizeResultToken(arguments and arguments[3])
+    local successfullyDefended = tostring(arguments and arguments[4] or "") == "defended"
     local entry = checkId and client:GetPendingCombatHitCheck(checkId) or nil
     if not entry or not eventId or eventId ~= entry.eventId or not resultToken then
         return false
@@ -1650,6 +1697,9 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
     end
 
     local completed, result = Combat:CompleteHitCheck(entry, resultToken, "player-response")
+    if completed then
+        Combat:RecordResolvedCombatAttackHistory(client, entry, resultToken, nil, nil, successfullyDefended)
+    end
     if completed and resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
         local _, damageResult = Combat:ApplyResolvedDamage(entry, true)
         entry.lastDamageResult = damageResult

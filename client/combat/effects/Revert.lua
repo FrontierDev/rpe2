@@ -35,7 +35,7 @@ end
 local RevertEffect = Combat:CreateEffectContract({
     type = "revert",
     label = "Revert",
-    description = "Reverses the most recent reversible spell impact on the target.",
+    description = "Reverses the last reversible spell received by the target this turn.",
     defaults = {
         type = "revert",
         targetEvents = {},

@@ -319,14 +319,22 @@ local function getBucketAuraEntriesForTarget(bucket, targetEventId)
         return entries
     end
 
+    local fallbackKeys = {}
     for auraKey, entry in pairs(bucket.byKey or {}) do
         if type(entry) == "table"
             and tonumber(entry.targetEventId) == numericTargetEventId
             and (tonumber(entry.stacks) or 0) > 0
         then
-            entries[#entries + 1] = entry
-            addAuraKeyToTargetIndex(bucket, numericTargetEventId, auraKey)
+            fallbackKeys[#fallbackKeys + 1] = auraKey
         end
+    end
+    table.sort(fallbackKeys, function(left, right)
+        return tostring(left) < tostring(right)
+    end)
+    for index = 1, #fallbackKeys do
+        local auraKey = fallbackKeys[index]
+        entries[#entries + 1] = bucket.byKey[auraKey]
+        addAuraKeyToTargetIndex(bucket, numericTargetEventId, auraKey)
     end
     return entries
 end
@@ -434,6 +442,30 @@ local function normalizeRef(value)
     end
 
     return ref
+end
+
+local function normalizeAuraTag(value)
+    local tag = tostring(value or "")
+    tag = tag:gsub("^%s+", ""):gsub("%s+$", "")
+    if tag == "" then
+        return nil
+    end
+
+    return string.lower(tag)
+end
+
+local function auraDefinitionHasTag(auraDefinition, expectedTag)
+    if type(auraDefinition) ~= "table" or type(auraDefinition.tags) ~= "table" then
+        return false
+    end
+
+    for index = 1, #auraDefinition.tags do
+        if normalizeAuraTag(auraDefinition.tags[index]) == expectedTag then
+            return true
+        end
+    end
+
+    return false
 end
 
 local function sameAuraRef(left, right)
@@ -3482,6 +3514,100 @@ function AuraManager:DispelAuraFromContext(client, context, auraRef, casterEvent
     })
     refreshAuraDisplays("aura-dispel", eventState, targetEventId, derivedStateImpact)
     return true
+end
+
+function AuraManager:RemoveAurasByTagsFromContext(client, context, tags, maxAuras)
+    -- Limited tag removal follows the target index's aura application order.
+    -- Rebuilt indexes use aura-key order so clients choose the same entries.
+    local eventState = type(context) == "table" and context.eventState or nil
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return false, {}, 0
+    end
+
+    local expectedTags = {}
+    local tagValues = type(tags) == "table" and tags or { tags }
+    for index = 1, #tagValues do
+        local expectedTag = normalizeAuraTag(tagValues[index])
+        if expectedTag then
+            expectedTags[expectedTag] = true
+        end
+    end
+    if not next(expectedTags) then
+        return false, {}, 0
+    end
+
+    local targetUnit = type(context) == "table" and (context.targetUnit or context.target) or nil
+    local targetEventId = tonumber(
+        type(context) == "table" and (context.targetEventId or (targetUnit and targetUnit.eventID)) or nil
+    ) or 0
+    if targetEventId <= 0 then
+        return false, {}, 0
+    end
+
+    local bucket = self:GetEventAuraBucket(client, eventState.id, false)
+    if not bucket then
+        return false, {}, 0
+    end
+
+    local limit = tonumber(maxAuras)
+    if not limit or limit <= 0 or limit >= math.huge or math.floor(limit) ~= limit then
+        limit = nil
+    end
+
+    local matchingEntries = {}
+    local targetEntries = getBucketAuraEntriesForTarget(bucket, targetEventId)
+    for index = 1, #targetEntries do
+        local entry = targetEntries[index]
+        if type(entry) == "table" then
+            local _, auraDefinition = self:ResolveAuraDefinition(entry.auraRef, {
+                dataset = type(context) == "table" and context.dataset or nil,
+                datasetId = entry.datasetId or (type(context) == "table" and context.datasetId or nil),
+                sourceDatasetId = type(context) == "table" and context.sourceDatasetId or nil,
+                spellDatasetId = type(context) == "table" and context.spellDatasetId or nil,
+            })
+            if type(auraDefinition) ~= "table" then
+                auraDefinition = entry.definition
+            end
+            local matchesTag = false
+            for expectedTag in pairs(expectedTags) do
+                if auraDefinitionHasTag(auraDefinition, expectedTag) then
+                    matchesTag = true
+                    break
+                end
+            end
+            if matchesTag then
+                matchingEntries[#matchingEntries + 1] = entry
+                if limit and #matchingEntries >= limit then
+                    break
+                end
+            end
+        end
+    end
+
+    if #matchingEntries == 0 then
+        return false, {}, 0
+    end
+
+    local removedEntries = {}
+    for index = 1, #matchingEntries do
+        local entry = matchingEntries[index]
+        if self:DispelAuraFromContext(
+            client,
+            context,
+            entry.auraRef,
+            entry.casterEventId,
+            entry.targetEventId,
+            entry
+        ) then
+            removedEntries[#removedEntries + 1] = entry
+        end
+    end
+
+    return #removedEntries > 0, removedEntries, #removedEntries
+end
+
+function AuraManager:RemoveAurasByTagFromContext(client, context, tag, maxAuras)
+    return self:RemoveAurasByTagsFromContext(client, context, { tag }, maxAuras)
 end
 
 function AuraManager:RemoveAuraStacksFromContext(client, context, auraRef, stacks, casterEventId, targetEventId)

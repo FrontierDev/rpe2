@@ -25,7 +25,8 @@ Client.VisualRefreshFlushQueued = Client.VisualRefreshFlushQueued or false
 Client.PendingEventWidgetRefreshTargetEventIds = Client.PendingEventWidgetRefreshTargetEventIds or {}
 Client.PendingEventWidgetStructuralRefresh = Client.PendingEventWidgetStructuralRefresh or false
 Client.PendingActionBarCompanionBarsRefreshImmediate = Client.PendingActionBarCompanionBarsRefreshImmediate or false
-Client.RecentAttackersByEventId = Client.RecentAttackersByEventId or {}
+Client.CombatHistoryByEventId = Client.CombatHistoryByEventId or Client.RecentAttackersByEventId or {}
+Client.RecentAttackersByEventId = Client.CombatHistoryByEventId
 Client.SpellImpactHistoryByEventId = Client.SpellImpactHistoryByEventId or {}
 
 local DEFAULT_MAX_EVENT_UNITS = 5
@@ -703,6 +704,8 @@ local function buildTargetGroupLabel(groupKey, groupIndex, groupCount, policy)
             return "All Allies"
         elseif targetType == "raid_marker" then
             return prefix .. " - Raid Marker"
+        elseif targetType == "last_melee_attacker" then
+            return "Last Melee Attacker"
         end
         return prefix .. " " .. (maxTargets == 1 and "Target" or "Targets")
     end
@@ -804,6 +807,159 @@ local function getEventHistoryBucket(historyByEventId, eventId, createIfMissing)
     return bucket
 end
 
+local function normalizeCombatHistoryTurn(eventState)
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return nil
+    end
+
+    local turnNumber = math.floor(tonumber(eventState.turnNumber) or 0)
+    return turnNumber > 0 and turnNumber or nil
+end
+
+local function getCombatTurnHistory(client, eventState, createIfMissing)
+    local eventId = type(eventState) == "table" and tostring(eventState.id or "") or ""
+    local turnNumber = normalizeCombatHistoryTurn(eventState)
+    if eventId == "" or not turnNumber then
+        return nil, nil, nil
+    end
+
+    client.CombatHistoryByEventId = client.CombatHistoryByEventId or {}
+    local eventBucket = getEventHistoryBucket(client.CombatHistoryByEventId, eventId, createIfMissing)
+    if not eventBucket then
+        return nil, nil, nil
+    end
+
+    eventBucket.turns = eventBucket.turns or {}
+    local turnBucket = eventBucket.turns[turnNumber]
+    if not turnBucket and createIfMissing then
+        turnBucket = {
+            attacks = {},
+            deaths = {},
+            nextSequence = 0,
+        }
+        eventBucket.turns[turnNumber] = turnBucket
+    end
+    return turnBucket, eventId, turnNumber
+end
+
+function Spellcasting.RecordCombatAttack(client, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
+    local turnHistory, eventId, turnNumber = getCombatTurnHistory(client, eventState, true)
+    local attackerEventId = tonumber(attackerUnit and attackerUnit.eventID) or 0
+    local targetEventId = tonumber(targetUnit and targetUnit.eventID) or 0
+    local normalizedAttackType = tostring(attackType or ""):lower()
+    if not turnHistory or attackerEventId <= 0 or targetEventId <= 0
+        or (normalizedAttackType ~= "melee" and normalizedAttackType ~= "ranged" and normalizedAttackType ~= "spell")
+        or (landed ~= true and successfullyDefended ~= true)
+    then
+        return false
+    end
+
+    local resolutionKey = tostring(identity or "")
+    if resolutionKey ~= "" then
+        for index = 1, #turnHistory.attacks do
+            if turnHistory.attacks[index].resolutionKey == resolutionKey then
+                return true
+            end
+        end
+    end
+
+    turnHistory.nextSequence = (tonumber(turnHistory.nextSequence) or 0) + 1
+    turnHistory.attacks[#turnHistory.attacks + 1] = {
+        eventId = eventId,
+        turnNumber = turnNumber,
+        attackerEventId = attackerEventId,
+        targetEventId = targetEventId,
+        attackType = normalizedAttackType,
+        resolved = true,
+        landed = landed == true,
+        successfullyDefended = successfullyDefended == true,
+        sequence = turnHistory.nextSequence,
+        resolutionKey = resolutionKey ~= "" and resolutionKey or nil,
+    }
+    return true
+end
+
+function Spellcasting.RecordCombatDeath(client, eventState, unit, identity)
+    local turnHistory, eventId, turnNumber = getCombatTurnHistory(client, eventState, true)
+    local unitEventId = tonumber(unit and unit.eventID) or 0
+    if not turnHistory or unitEventId <= 0 then
+        return false
+    end
+
+    local resolutionKey = tostring(identity or (eventId .. ":" .. turnNumber .. ":" .. unitEventId))
+    for index = 1, #turnHistory.deaths do
+        local record = turnHistory.deaths[index]
+        if record.unitEventId == unitEventId and record.resolutionKey == resolutionKey then
+            return false
+        end
+    end
+
+    turnHistory.nextSequence = (tonumber(turnHistory.nextSequence) or 0) + 1
+    turnHistory.deaths[#turnHistory.deaths + 1] = {
+        eventId = eventId,
+        turnNumber = turnNumber,
+        unitEventId = unitEventId,
+        sequence = turnHistory.nextSequence,
+        resolutionKey = resolutionKey,
+    }
+    return true
+end
+
+function Spellcasting.GetLastMeleeAttackerForTarget(client, eventState, targetEventId)
+    local turnHistory = getCombatTurnHistory(client, eventState, false)
+    local numericTargetEventId = tonumber(targetEventId) or 0
+    if not turnHistory or numericTargetEventId <= 0 then
+        return 0
+    end
+
+    for index = #turnHistory.attacks, 1, -1 do
+        local record = turnHistory.attacks[index]
+        if record.resolved == true
+            and record.attackType == "melee"
+            and record.targetEventId == numericTargetEventId
+            and (record.landed == true or record.successfullyDefended == true)
+        then
+            return record.attackerEventId
+        end
+    end
+    return 0
+end
+
+function Spellcasting.HasSuccessfullyDefendedMeleeThisTurn(client, eventState, targetEventId)
+    local turnHistory = getCombatTurnHistory(client, eventState, false)
+    local numericTargetEventId = tonumber(targetEventId) or 0
+    if not turnHistory or numericTargetEventId <= 0 then
+        return false
+    end
+
+    for index = #turnHistory.attacks, 1, -1 do
+        local record = turnHistory.attacks[index]
+        if record.resolved == true
+            and record.attackType == "melee"
+            and record.targetEventId == numericTargetEventId
+            and record.successfullyDefended == true
+        then
+            return true
+        end
+    end
+    return false
+end
+
+function Spellcasting.WasUnitKilledThisTurn(client, eventState, unitEventId)
+    local turnHistory = getCombatTurnHistory(client, eventState, false)
+    local numericUnitEventId = tonumber(unitEventId) or 0
+    if not turnHistory or numericUnitEventId <= 0 then
+        return false
+    end
+
+    for index = 1, #turnHistory.deaths do
+        if turnHistory.deaths[index].unitEventId == numericUnitEventId then
+            return true
+        end
+    end
+    return false
+end
+
 local function cloneResourceDeltas(resourceDeltas)
     local cloned = {}
     for index = 1, #(resourceDeltas or {}) do
@@ -820,6 +976,30 @@ local function cloneResourceDeltas(resourceDeltas)
     return cloned
 end
 
+local function isReversibleSpellImpactOperation(operation)
+    if type(operation) ~= "table" or operation.reversible == false then
+        return false
+    end
+
+    local effectType = tostring(operation.effectType or "")
+    if effectType == "damage" or effectType == "heal" or effectType == "resource" then
+        return type(operation.resourceDeltas) == "table" and #operation.resourceDeltas > 0
+    end
+
+    if effectType == "apply_aura" then
+        return tostring(operation.auraRef or "") ~= ""
+            and (tonumber(operation.stacks) or 0) > 0
+    end
+
+    if effectType == "remove_aura" then
+        return tostring(operation.auraRef or "") ~= ""
+            and (tonumber(operation.stacks) or 0) > 0
+            and (tonumber(operation.turns) or 0) > 0
+    end
+
+    return false
+end
+
 local function cloneSpellImpactOperation(operation)
     if type(operation) ~= "table" then
         return nil
@@ -834,55 +1014,56 @@ local function cloneSpellImpactOperation(operation)
         powerLevel = tonumber(operation.powerLevel) or 0,
         casterEventId = tonumber(operation.casterEventId) or 0,
         targetEventId = tonumber(operation.targetEventId) or 0,
+        reversible = operation.reversible ~= false,
     }
 end
 
-function Spellcasting.RecordRecentAttacker(client, eventState, attackerUnit, targetUnit)
-    local eventId = type(eventState) == "table" and tostring(eventState.id or "") or ""
-    local attackerEventId = tonumber(attackerUnit and attackerUnit.eventID) or 0
-    local targetEventId = tonumber(targetUnit and targetUnit.eventID) or 0
-    if eventId == "" or attackerEventId <= 0 or targetEventId <= 0 then
+function Spellcasting.RecordRecentAttacker(client, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
+    local recorded = Spellcasting.RecordCombatAttack(
+        client,
+        eventState,
+        attackerUnit,
+        targetUnit,
+        attackType or "spell",
+        landed == true,
+        successfullyDefended == true,
+        identity
+    )
+    if not recorded then
         return false
     end
 
-    client.RecentAttackersByEventId = client.RecentAttackersByEventId or {}
-    local eventBucket = getEventHistoryBucket(client.RecentAttackersByEventId, eventId, true)
-    local history = eventBucket[targetEventId] or {}
-    local nextHistory = { attackerEventId }
-    for index = 1, #history do
-        local candidate = tonumber(history[index]) or 0
-        if candidate > 0 and candidate ~= attackerEventId then
-            nextHistory[#nextHistory + 1] = candidate
-        end
-        if #nextHistory >= 8 then
-            break
-        end
-    end
-    eventBucket[targetEventId] = nextHistory
     return true
 end
 
 function Spellcasting.GetRecentAttackersForTarget(client, eventState, targetEventId)
-    local eventId = type(eventState) == "table" and tostring(eventState.id or "") or ""
     local numericTargetEventId = tonumber(targetEventId) or 0
-    if eventId == "" or numericTargetEventId <= 0 then
+    local turnHistory = getCombatTurnHistory(client, eventState, false)
+    if not turnHistory or numericTargetEventId <= 0 then
         return {}
     end
 
-    local eventBucket = getEventHistoryBucket(client.RecentAttackersByEventId or {}, eventId, false)
-    local history = eventBucket and eventBucket[numericTargetEventId] or nil
     local normalized = {}
-    for index = 1, #(history or {}) do
-        local attackerEventId = tonumber(history[index]) or 0
-        if attackerEventId > 0 then
+    local seen = {}
+    for index = #turnHistory.attacks, 1, -1 do
+        local record = turnHistory.attacks[index]
+        local attackerEventId = tonumber(record and record.attackerEventId) or 0
+        if record and record.resolved == true
+            and record.targetEventId == numericTargetEventId
+            and record.landed == true
+            and attackerEventId > 0
+            and not seen[attackerEventId]
+        then
             normalized[#normalized + 1] = attackerEventId
+            seen[attackerEventId] = true
         end
     end
     return normalized
 end
 
 function Spellcasting.RecordSpellImpact(client, eventState, casterUnit, targetUnit, spellRef, result)
-    if type(result) ~= "table" or type(eventState) ~= "table" or eventState.active ~= true then
+    local turnNumber = normalizeCombatHistoryTurn(eventState)
+    if type(result) ~= "table" or not turnNumber then
         return false
     end
 
@@ -906,35 +1087,46 @@ function Spellcasting.RecordSpellImpact(client, eventState, casterUnit, targetUn
     client.SpellImpactHistoryByEventId = client.SpellImpactHistoryByEventId or {}
     local eventBucket = getEventHistoryBucket(client.SpellImpactHistoryByEventId, eventId, true)
     local history = eventBucket[targetEventId] or {}
+    local auraEntry = type(result.auraEntry) == "table" and result.auraEntry or nil
 
     local operation = {
         effectType = effectType,
         resourceDeltas = cloneResourceDeltas(result.resourceDeltas),
-        auraRef = type(result.auraEntry) == "table" and result.auraEntry.auraRef or nil,
-        stacks = tonumber(result.stacks or (result.auraEntry and result.auraEntry.stacks)) or 0,
-        turns = tonumber(result.duration or (result.auraEntry and result.auraEntry.turnsRemaining)) or 0,
-        powerLevel = tonumber(result.powerLevel or (result.auraEntry and result.auraEntry.powerLevel)) or 0,
-        casterEventId = tonumber(type(result.auraEntry) == "table" and result.auraEntry.casterEventId or casterEventId) or casterEventId,
-        targetEventId = tonumber(type(result.auraEntry) == "table" and result.auraEntry.targetEventId or targetEventId) or targetEventId,
+        auraRef = (auraEntry and auraEntry.auraRef) or result.auraRef,
+        stacks = tonumber(result.stacks or (auraEntry and auraEntry.stacks)) or 0,
+        turns = tonumber(result.duration or (auraEntry and auraEntry.turnsRemaining)) or 0,
+        powerLevel = tonumber(result.powerLevel or (auraEntry and auraEntry.powerLevel)) or 0,
+        casterEventId = tonumber((auraEntry and auraEntry.casterEventId) or result.casterEventId or casterEventId) or casterEventId,
+        targetEventId = tonumber((auraEntry and auraEntry.targetEventId) or result.targetEventId or targetEventId) or targetEventId,
     }
 
+    operation.reversible = isReversibleSpellImpactOperation(operation)
+    if not operation.reversible then
+        return false
+    end
+
     local latest = history[#history]
-    local turnNumber = tonumber(eventState.turnNumber) or 0
     local tickNumber = tonumber(eventState.tickNumber) or 0
     if type(latest) == "table"
+        and latest.reverted ~= true
+        and latest.eventId == eventId
         and latest.spellRef == spellRef
         and latest.casterEventId == casterEventId
         and latest.turnNumber == turnNumber
         and latest.tickNumber == tickNumber
+        and type(latest.operations) == "table"
     then
         latest.operations[#latest.operations + 1] = operation
     else
+        eventBucket.nextSequence = (tonumber(eventBucket.nextSequence) or 0) + 1
         history[#history + 1] = {
+            eventId = eventId,
             spellRef = spellRef,
             casterEventId = casterEventId,
             targetEventId = targetEventId,
             turnNumber = turnNumber,
             tickNumber = tickNumber,
+            sequence = eventBucket.nextSequence,
             operations = { operation },
         }
     end
@@ -948,19 +1140,53 @@ end
 
 function Spellcasting.RevertLastSpellImpact(client, eventState, targetUnit, context)
     local eventId = type(eventState) == "table" and tostring(eventState.id or "") or ""
+    local turnNumber = normalizeCombatHistoryTurn(eventState)
     local targetEventId = tonumber(targetUnit and targetUnit.eventID) or 0
-    if eventId == "" or targetEventId <= 0 then
+    if eventId == "" or not turnNumber or targetEventId <= 0 then
         return false, nil
     end
 
     local eventBucket = getEventHistoryBucket(client.SpellImpactHistoryByEventId or {}, eventId, false)
     local history = eventBucket and eventBucket[targetEventId] or nil
-    local bundle = type(history) == "table" and history[#history] or nil
-    if type(bundle) ~= "table" or type(bundle.operations) ~= "table" or #bundle.operations == 0 then
+    if type(history) ~= "table" then
+        return false, nil
+    end
+
+    local bundleIndex
+    local bundle
+    for index = #history, 1, -1 do
+        local candidate = history[index]
+        if type(candidate) == "table"
+            and candidate.reverted ~= true
+            and tostring(candidate.eventId or eventId) == eventId
+            and tonumber(candidate.turnNumber) == turnNumber
+            and tonumber(candidate.targetEventId) == targetEventId
+            and type(candidate.operations) == "table"
+            and #candidate.operations > 0
+        then
+            local hasReversibleOperation = false
+            for operationIndex = 1, #candidate.operations do
+                if isReversibleSpellImpactOperation(candidate.operations[operationIndex]) then
+                    hasReversibleOperation = true
+                    break
+                end
+            end
+            if hasReversibleOperation then
+                bundleIndex = index
+                bundle = candidate
+                break
+            end
+        end
+    end
+
+    if not bundle then
         return false, nil
     end
 
     local reverted = {
+        eventId = eventId,
+        turnNumber = turnNumber,
+        sequence = bundle.sequence,
         spellRef = bundle.spellRef,
         operationCount = 0,
     }
@@ -969,7 +1195,9 @@ function Spellcasting.RevertLastSpellImpact(client, eventState, targetUnit, cont
     for index = #bundle.operations, 1, -1 do
         local operation = cloneSpellImpactOperation(bundle.operations[index])
         local effectType = tostring(operation and operation.effectType or "")
-        if effectType == "damage" or effectType == "heal" or effectType == "resource" then
+        if isReversibleSpellImpactOperation(operation)
+            and (effectType == "damage" or effectType == "heal" or effectType == "resource")
+        then
             for deltaIndex = 1, #(operation.resourceDeltas or {}) do
                 local deltaEntry = operation.resourceDeltas[deltaIndex]
                 if combat and type(combat.ApplyResourceDelta) == "function" then
@@ -977,22 +1205,73 @@ function Spellcasting.RevertLastSpellImpact(client, eventState, targetUnit, cont
                 end
             end
             reverted.operationCount = reverted.operationCount + 1
-        elseif effectType == "apply_aura" and auraManager and type(auraManager.RemoveAuraStacksFromContext) == "function" then
-            auraManager:RemoveAuraStacksFromContext(client, context, operation.auraRef, math.max(1, operation.stacks), operation.casterEventId, operation.targetEventId)
-            reverted.operationCount = reverted.operationCount + 1
-        elseif effectType == "remove_aura" and auraManager and type(auraManager.ApplyAuraFromContext) == "function" then
-            auraManager:ApplyAuraFromContext(client, context, operation.auraRef, math.max(1, operation.stacks), math.max(1, operation.turns), operation.powerLevel)
-            reverted.operationCount = reverted.operationCount + 1
+        elseif isReversibleSpellImpactOperation(operation)
+            and effectType == "apply_aura"
+            and auraManager
+            and type(auraManager.RemoveAuraStacksFromContext) == "function"
+        then
+            local applied = auraManager:RemoveAuraStacksFromContext(
+                client,
+                context,
+                operation.auraRef,
+                math.max(1, operation.stacks),
+                operation.casterEventId,
+                operation.targetEventId
+            )
+            if applied then
+                reverted.operationCount = reverted.operationCount + 1
+            end
+        elseif isReversibleSpellImpactOperation(operation)
+            and effectType == "remove_aura"
+            and auraManager
+            and type(auraManager.ApplyAuraFromContext) == "function"
+        then
+            local applied = auraManager:ApplyAuraFromContext(
+                client,
+                context,
+                operation.auraRef,
+                math.max(1, operation.stacks),
+                math.max(1, operation.turns),
+                operation.powerLevel
+            )
+            if applied then
+                reverted.operationCount = reverted.operationCount + 1
+            end
         end
     end
 
-    table.remove(history, #history)
+    if reverted.operationCount == 0 then
+        return false, nil
+    end
+
+    bundle.reverted = true
+    table.remove(history, bundleIndex)
     eventBucket[targetEventId] = history
-    return reverted.operationCount > 0, reverted
+    return true, reverted
 end
 
-function Client:RecordRecentAttacker(eventState, attackerUnit, targetUnit)
-    return Spellcasting.RecordRecentAttacker(self, eventState, attackerUnit, targetUnit)
+function Client:RecordRecentAttacker(eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
+    return Spellcasting.RecordRecentAttacker(self, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
+end
+
+function Client:RecordCombatAttack(eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
+    return Spellcasting.RecordCombatAttack(self, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
+end
+
+function Client:RecordCombatDeath(eventState, unit, identity)
+    return Spellcasting.RecordCombatDeath(self, eventState, unit, identity)
+end
+
+function Client:GetLastMeleeAttackerForTarget(eventState, targetEventId)
+    return Spellcasting.GetLastMeleeAttackerForTarget(self, eventState, targetEventId)
+end
+
+function Client:HasSuccessfullyDefendedMeleeThisTurn(eventState, targetEventId)
+    return Spellcasting.HasSuccessfullyDefendedMeleeThisTurn(self, eventState, targetEventId)
+end
+
+function Client:WasUnitKilledThisTurn(eventState, unitEventId)
+    return Spellcasting.WasUnitKilledThisTurn(self, eventState, unitEventId)
 end
 
 function Client:GetRecentAttackersForTarget(eventState, targetEventId)
@@ -1826,7 +2105,7 @@ function Spellcasting.BuildSpellTargetGroups(spell)
             and targetType ~= "caster"
             and targetType ~= "pet"
             and policy
-            and maxTargets > 0
+            and (maxTargets > 0 or targetType == "all_allies")
         then
             local normalizedCastingGroup = Spellcasting.NormalizeCastingGroup(normalizedComponent.castingGroup)
             local groupKey = normalizedCastingGroup
@@ -2242,7 +2521,13 @@ function Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, 
     end
 
     if effectType == "damage" and type(self) == "table" and type(self.RecordRecentAttacker) == "function" then
-        self:RecordRecentAttacker(eventState, casterUnit, targetUnit)
+        local damageType = type(component) == "table"
+            and type(component.effect) == "table"
+            and component.effect.damageType
+            or "spell"
+        local resolved = result.pending ~= true
+            and tostring(result.resultType or "") ~= "invalid"
+        self:RecordRecentAttacker(eventState, casterUnit, targetUnit, damageType, resolved, false)
     end
 
     if type(self.MarkEventUnitInteraction) == "function" and shouldMarkResolvedEffectInteraction(result) then
@@ -2363,7 +2648,16 @@ function Spellcasting.ResolveComponentTargets(eventState, casterUnit, component,
         return {}
     end
 
+    if type(castEntry) == "table" and type(castEntry.targetPolicy) == "table" then
+        targetPolicy.allowDeadTargets = targetPolicy.allowDeadTargets == true or castEntry.targetPolicy.allowDeadTargets == true
+        targetPolicy.allowHiddenTargets = targetPolicy.allowHiddenTargets == true or castEntry.targetPolicy.allowHiddenTargets == true
+    end
+
     local selection = Spellcasting.GetComponentTargetSelection(castEntry, component)
+    if type(selection) == "table" and type(selection.policy) == "table" then
+        targetPolicy.allowDeadTargets = targetPolicy.allowDeadTargets == true or selection.policy.allowDeadTargets == true
+        targetPolicy.allowHiddenTargets = targetPolicy.allowHiddenTargets == true or selection.policy.allowHiddenTargets == true
+    end
     targetPolicy.allowDeadTargets = targetPolicy.allowDeadTargets == true
         or (type(selection) == "table" and type(selection.policy) == "table" and selection.policy.allowDeadTargets == true)
         or (type(castEntry) == "table" and type(castEntry.targetPolicy) == "table" and castEntry.targetPolicy.allowDeadTargets == true)
@@ -2422,6 +2716,25 @@ function Spellcasting.ResolveComponentTargets(eventState, casterUnit, component,
         for index = 1, #selectedTargetEventIds do
             if pushTarget(selectedTargetEventIds[index]) then
                 return targets
+            end
+        end
+        return targets
+    end
+
+    if targetType == "last_melee_attacker" then
+        local attackerEventId = type(Client.GetLastMeleeAttackerForTarget) == "function"
+            and Client:GetLastMeleeAttackerForTarget(eventState, casterEventId)
+            or 0
+        if attackerEventId > 0 then
+            local attackerUnit = Lookup.FindEventUnitById and Lookup.FindEventUnitById(eventState.units, attackerEventId) or nil
+            local targetDisposition = tostring(targetPolicy.targetDisposition or "enemy")
+            local casterTeam = tonumber(casterUnit and casterUnit.team) or 0
+            local attackerTeam = tonumber(attackerUnit and attackerUnit.team) or 0
+            local dispositionMatches = targetDisposition == "any"
+                or (targetDisposition == "ally" and casterTeam == attackerTeam)
+                or (targetDisposition == "enemy" and casterTeam ~= attackerTeam)
+            if dispositionMatches then
+                pushTarget(attackerEventId)
             end
         end
         return targets
