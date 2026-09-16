@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 10,
+    version = 11,
     dataset = {
         achievements = {},
         auras = {
@@ -2635,7 +2635,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/spell_holy_mindsooth.blp",
+                icon = "interface/icons/spell_nature_slowingtotem.blp",
                 id = "frcwill5",
                 isEnvironmental = false,
                 name = "Force of Will",
@@ -2659,7 +2659,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/spell_holy_greaterheal.blp",
+                icon = "interface/icons/spell_nature_moonglow.blp",
                 id = "sprheal1",
                 isEnvironmental = false,
                 name = "Spiritual Healing",
@@ -2679,7 +2679,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/spell_arcane_arcaneresilience.blp",
+                icon = "interface/icons/spell_holy_spellwarding.blp",
                 id = "splward5",
                 isEnvironmental = false,
                 name = "Spell Warding",
@@ -2698,7 +2698,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/spell_shadow_twilight.blp",
+                icon = "interface/icons/spell_shadow_burningspirit.blp",
                 id = "shdfocus",
                 isEnvironmental = false,
                 name = "Shadow Focus",
@@ -2745,7 +2745,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/spell_shadow_focusedpower.blp",
+                icon = "interface/icons/spell_nature_enchantarmor.blp",
                 id = "mental10",
                 isEnvironmental = false,
                 name = "Mental Strength",

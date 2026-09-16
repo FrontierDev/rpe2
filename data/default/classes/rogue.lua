@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 12,
+    version = 13,
     dataset = {
         achievements = {},
         auras = {
@@ -2411,7 +2411,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/ability_rogue_focusedattacks.blp",
+                icon = "interface/icons/ability_racial_bloodrage.blp",
                 id = "malice05",
                 isEnvironmental = false,
                 name = "Malice",
@@ -2444,7 +2444,7 @@ Addon.Data.DefaultDatasets:Register({
                         triggerTarget = "aura_caster"
                     }
                 },
-                icon = "interface/icons/ability_rogue_fanofknives.blp",
+                icon = "interface/icons/spell_shadow_chilltouch.blp",
                 id = "sealfate",
                 isEnvironmental = false,
                 name = "Seal Fate",
@@ -2458,7 +2458,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/ability_rogue_lightningreflexes.blp",
+                icon = "interface/icons/spell_nature_invisibilty.blp",
                 id = "lghtref5",
                 isEnvironmental = false,
                 name = "Lightning Reflexes",
@@ -2496,7 +2496,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/ability_hunter_goforthethroat.blp",
+                icon = "interface/icons/spell_holy_blessingofstrength.blp",
                 id = "weapexp6",
                 isEnvironmental = false,
                 name = "Weapon Expertise",
@@ -2523,7 +2523,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/ability_rogue_masterofsubtlety.blp",
+                icon = "interface/icons/spell_shadow_charm.blp",
                 id = "mstdecpt",
                 isEnvironmental = false,
                 name = "Master of Deception",
@@ -2542,7 +2542,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/ability_rogue_sinistercalling.blp",
+                icon = "interface/icons/inv_weapon_crossbow_11.blp",
                 id = "deadly10",
                 isEnvironmental = false,
                 name = "Deadliness",
@@ -2562,10 +2562,10 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/ability_rogue_heightenedsenses.blp",
+                icon = "interface/icons/ability_ambush.blp",
                 id = "hghtsens",
                 isEnvironmental = false,
-                name = "Heightened Sense",
+                name = "Heightened Senses",
                 skillBonuses = {
                     {
                         skillRef = "f82db71a:b0sh5zo7",

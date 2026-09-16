@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 8,
+    version = 9,
     dataset = {
         achievements = {},
         auras = {
@@ -2750,7 +2750,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/spell_arcane_arcane01.blp",
+                icon = "interface/icons/spell_holy_devotion.blp",
                 id = "arcfocus",
                 isEnvironmental = false,
                 name = "Arcane Focus",
@@ -2782,7 +2782,7 @@ Addon.Data.DefaultDatasets:Register({
                         triggerTarget = "aura_caster"
                     }
                 },
-                icon = "interface/icons/spell_arcane_manashield.blp",
+                icon = "interface/icons/spell_nature_astralrecalgroup.blp",
                 id = "magabsrb",
                 isEnvironmental = false,
                 name = "Magic Absorption",
@@ -2801,7 +2801,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/spell_nature_enchantarmor.blp",
+                icon = "interface/icons/spell_shadow_charm.blp",
                 id = "arcmind1",
                 isEnvironmental = false,
                 name = "Arcane Mind",
@@ -2821,7 +2821,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/spell_arcane_arcane03.blp",
+                icon = "interface/icons/spell_shadow_teleport.blp",
                 id = "arcinst3",
                 isEnvironmental = false,
                 name = "Arcane Instability",
