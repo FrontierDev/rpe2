@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 12,
+    version = 13,
     dataset = {
         achievements = {},
         auras = {
@@ -2924,7 +2924,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/petbattle_attack.blp",
+                icon = "interface/icons/ability_rogue_eviscerate.blp",
                 id = "cruelty3",
                 isEnvironmental = false,
                 name = "Cruelty",
@@ -2943,7 +2943,7 @@ Addon.Data.DefaultDatasets:Register({
                 conditions = {},
                 description = "",
                 events = {},
-                icon = "interface/icons/ability_warrior_defensive_stance.blp",
+                icon = "interface/icons/spell_nature_mirrorimage.blp",
                 id = "antcwar1",
                 isEnvironmental = false,
                 name = "Anticipation",
