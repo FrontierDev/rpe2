@@ -26,6 +26,17 @@ local TRAIT_EVENT_EFFECT_TYPE_ITEMS = {
     { label = "Resource", value = "resource" },
 }
 
+local STAT_BONUS_OPERATION_ITEMS = {
+    { label = "Flat", value = "flat" },
+    { label = "Percent", value = "percent" },
+}
+
+local AMOUNT_MODE_ITEMS = {
+    { label = "Flat", value = "flat" },
+    { label = "% Base", value = "base_percent" },
+    { label = "% Max", value = "max_percent" },
+}
+
 local TRAIT_INSPECTOR_PAGE_DEFINITIONS = {
     { key = "general", label = "General" },
     { key = "bonuses", label = "Bonuses & Auras" },
@@ -438,7 +449,7 @@ function DataEditor:BuildTraitInspectorStatRows(trait)
             rowIndex = index,
             datasetName = dataset and self:GetDatasetDisplayName(dataset) or (datasetId ~= nil and datasetId or "-"),
             statName = statName ~= nil and statName or "-",
-            valueText = tostring(entry and entry.value or 0),
+            valueText = tostring(entry and entry.value or 0) .. (tostring(entry and entry.operation or "flat") == "percent" and "%" or ""),
         }
     end
 
@@ -1254,6 +1265,14 @@ local function buildTraitInspectorBonusesPage(self, page)
     })
     self.TraitInspectorPendingStatRow:AddChild(self.TraitInspectorPendingStatValueInput)
 
+    self.TraitInspectorPendingStatOperationGroup = createGroup("RPEDataEditorTraitInspectorPendingStatOperationGroup", "Stat Bonus Type", 18)
+    self.TraitInspectorPendingStatOperationDropdown = UI.CreateDropdown(self.TraitInspectorPendingStatOperationGroup:GetFrame(), "RPEDataEditorTraitInspectorPendingStatOperationDropdown", {
+        width = FIELD_WIDTH,
+        height = 18,
+        items = STAT_BONUS_OPERATION_ITEMS,
+    })
+    self.TraitInspectorPendingStatOperationGroup:AddChild(self.TraitInspectorPendingStatOperationDropdown)
+
     self.TraitInspectorAddStatButton = UI.CreateButton(self.TraitInspectorPendingStatRow:GetFrame(), "RPEDataEditorTraitInspectorAddStatButton", "Add", 34, function()
         if self._refreshingTraitInspector then
             return
@@ -1265,10 +1284,12 @@ local function buildTraitInspectorBonusesPage(self, page)
         end
 
         local value = tonumber(self.TraitInspectorPendingStatValueInput and self.TraitInspectorPendingStatValueInput:GetText()) or 0
+        local operation = self.TraitInspectorPendingStatOperationDropdown and self.TraitInspectorPendingStatOperationDropdown.GetSelectedValue and self.TraitInspectorPendingStatOperationDropdown:GetSelectedValue() or "flat"
         self:CommitSelectedTrait(function(trait)
             local bonuses = normalizeTraitStatBonuses(trait.statBonuses)
             bonuses[#bonuses + 1] = {
                 statRef = statRef,
+                operation = operation,
                 value = value,
             }
             trait.statBonuses = bonuses
@@ -1884,6 +1905,24 @@ local function buildTraitInspectorEventsPage(self, page)
     self.TraitInspectorEventBaseAmountGroup:AddChild(self.TraitInspectorEventBaseAmountInput)
     attachMouseWheel(self.TraitInspectorEventBaseAmountInput)
 
+    self.TraitInspectorEventAmountModeGroup = createGroup("RPEDataEditorTraitInspectorEventAmountModeGroup", "Amount Mode", 18)
+    self.TraitInspectorEventAmountModeDropdown = UI.CreateDropdown(self.TraitInspectorEventAmountModeGroup:GetFrame(), "RPEDataEditorTraitInspectorEventAmountModeDropdown", {
+        width = FIELD_WIDTH,
+        height = 18,
+        items = AMOUNT_MODE_ITEMS,
+        onValueChanged = function(value)
+            if self._refreshingTraitInspector then
+                return
+            end
+
+            self:CommitSelectedTraitInspectorEventEffect(function(effect)
+                effect.amountMode = value
+            end)
+        end,
+    })
+    self.TraitInspectorEventAmountModeGroup:AddChild(self.TraitInspectorEventAmountModeDropdown)
+    attachMouseWheel(self.TraitInspectorEventAmountModeDropdown)
+
     self.TraitInspectorEventDamageSchoolsGroup = createGroup("RPEDataEditorTraitInspectorEventDamageSchoolsGroup", "Damage Schools", 18)
     self.TraitInspectorEventDamageSchoolsDropdown = UI.CreateDropdown(self.TraitInspectorEventDamageSchoolsGroup:GetFrame(), "RPEDataEditorTraitInspectorEventDamageSchoolsDropdown", {
         width = FIELD_WIDTH,
@@ -1938,6 +1977,24 @@ local function buildTraitInspectorEventsPage(self, page)
     self.TraitInspectorEventAuraDurationGroup = createEffectTextGroup("RPEDataEditorTraitInspectorEventAuraDurationGroup", "Aura Duration", "TraitInspectorEventAuraDurationInput")
     self.TraitInspectorEventBasePowerGroup = createEffectTextGroup("RPEDataEditorTraitInspectorEventBasePowerGroup", "Base Power", "TraitInspectorEventBasePowerInput")
     self.TraitInspectorEventResourceAmountGroup = createEffectTextGroup("RPEDataEditorTraitInspectorEventResourceAmountGroup", "Resource Amount", "TraitInspectorEventResourceAmountInput")
+
+    self.TraitInspectorEventResourceAmountModeGroup = createGroup("RPEDataEditorTraitInspectorEventResourceAmountModeGroup", "Amount Mode", 18)
+    self.TraitInspectorEventResourceAmountModeDropdown = UI.CreateDropdown(self.TraitInspectorEventResourceAmountModeGroup:GetFrame(), "RPEDataEditorTraitInspectorEventResourceAmountModeDropdown", {
+        width = FIELD_WIDTH,
+        height = 18,
+        items = AMOUNT_MODE_ITEMS,
+        onValueChanged = function(value)
+            if self._refreshingTraitInspector then
+                return
+            end
+
+            self:CommitSelectedTraitInspectorEventEffect(function(effect)
+                effect.amountMode = value
+            end)
+        end,
+    })
+    self.TraitInspectorEventResourceAmountModeGroup:AddChild(self.TraitInspectorEventResourceAmountModeDropdown)
+    attachMouseWheel(self.TraitInspectorEventResourceAmountModeDropdown)
 
     self.TraitInspectorEventResourceGroup = createGroup("RPEDataEditorTraitInspectorEventResourceGroup", "Resource", 18)
     self.TraitInspectorEventResourceDropdown = UI.CreateDropdown(self.TraitInspectorEventResourceGroup:GetFrame(), "RPEDataEditorTraitInspectorEventResourceDropdown", {
@@ -2287,6 +2344,10 @@ function DataEditor:RefreshTraitInspectorPage()
     if self.TraitInspectorPendingStatValueInput then
         setTextElementEnabled(self.TraitInspectorPendingStatValueInput, hasTrait)
     end
+    if self.TraitInspectorPendingStatOperationDropdown then
+        self.TraitInspectorPendingStatOperationDropdown:SetSelectedValue("flat", true)
+        setDropdownEnabled(self.TraitInspectorPendingStatOperationDropdown, hasTrait)
+    end
     if self.TraitInspectorAddStatButton then
         self.TraitInspectorAddStatButton:SetEnabled(hasTrait)
     end
@@ -2399,6 +2460,10 @@ function DataEditor:RefreshTraitInspectorPage()
         self.TraitInspectorEventBaseAmountInput:SetText(tostring(eventAmount or 0))
         setTextElementEnabled(self.TraitInspectorEventBaseAmountInput, eventEffect ~= nil and (isEventDamage or isEventHeal))
     end
+    if self.TraitInspectorEventAmountModeDropdown then
+        self.TraitInspectorEventAmountModeDropdown:SetSelectedValue(eventEffect and eventEffect.amountMode or "flat", true)
+        setDropdownEnabled(self.TraitInspectorEventAmountModeDropdown, eventEffect ~= nil and (isEventDamage or isEventHeal))
+    end
     if self.TraitInspectorEventDamageSchoolsDropdown then
         self.TraitInspectorEventDamageSchoolsDropdown:SetItems(self:BuildSpellInspectorDamageSchoolsAcrossDatasets())
         self.TraitInspectorEventDamageSchoolsDropdown:SetSelectedValues(eventEffect and eventEffect.damageSchoolRefs or {}, true)
@@ -2430,6 +2495,10 @@ function DataEditor:RefreshTraitInspectorPage()
         self.TraitInspectorEventResourceAmountInput:SetText(tostring(eventEffect and eventEffect.amount or 0))
         setTextElementEnabled(self.TraitInspectorEventResourceAmountInput, eventEffect ~= nil and isEventResource)
     end
+    if self.TraitInspectorEventResourceAmountModeDropdown then
+        self.TraitInspectorEventResourceAmountModeDropdown:SetSelectedValue(eventEffect and eventEffect.amountMode or "flat", true)
+        setDropdownEnabled(self.TraitInspectorEventResourceAmountModeDropdown, eventEffect ~= nil and isEventResource)
+    end
     if self.TraitInspectorEventScalingScroll and self.TraitInspectorEventScalingScroll.SetItems then
         self:RefreshTraitInspectorEventScalingTable()
     end
@@ -2456,6 +2525,7 @@ function DataEditor:RefreshTraitInspectorPage()
     setGroupVisible(self.TraitInspectorEventChanceGroup, traitEvent ~= nil)
     setGroupVisible(self.TraitInspectorEventEffectTypeGroup, eventEffect ~= nil)
     setGroupVisible(self.TraitInspectorEventBaseAmountGroup, eventEffect ~= nil and (isEventDamage or isEventHeal))
+    setGroupVisible(self.TraitInspectorEventAmountModeGroup, eventEffect ~= nil and (isEventDamage or isEventHeal))
     setGroupVisible(self.TraitInspectorEventDamageSchoolsGroup, eventEffect ~= nil and isEventDamage)
     setGroupVisible(self.TraitInspectorEventAuraGroup, eventEffect ~= nil and (isEventApplyAura or eventEffectType == "remove_aura"))
     setGroupVisible(self.TraitInspectorEventAuraStacksGroup, eventEffect ~= nil and (isEventApplyAura or eventEffectType == "remove_aura"))
@@ -2463,6 +2533,7 @@ function DataEditor:RefreshTraitInspectorPage()
     setGroupVisible(self.TraitInspectorEventBasePowerGroup, eventEffect ~= nil and isEventApplyAura)
     setGroupVisible(self.TraitInspectorEventResourceGroup, eventEffect ~= nil and isEventResource)
     setGroupVisible(self.TraitInspectorEventResourceAmountGroup, eventEffect ~= nil and isEventResource)
+    setGroupVisible(self.TraitInspectorEventResourceAmountModeGroup, eventEffect ~= nil and isEventResource)
     setGroupVisible(self.TraitInspectorEventScalingGroup, eventEffect ~= nil and supportsEventScaling)
     if self.TraitInspectorEventsRoot and self.TraitInspectorEventsRoot.RefreshLayout then
         self.TraitInspectorEventsRoot:RefreshLayout()

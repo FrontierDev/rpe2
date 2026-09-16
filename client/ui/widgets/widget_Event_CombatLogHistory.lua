@@ -394,9 +394,25 @@ function EventWidget:Refresh(...)
 end
 
 function EventWidget:QueueCombatLogEntry(entry)
+    local logKind = tostring(type(entry) == "table" and entry.logKind or "")
+    local shouldRetainInHistory = logKind ~= "aura_loss"
+
     local accepted = originalQueueCombatLogEntry(self, entry)
-    if accepted == true then
-        self:AppendCombatLogHistoryEntry(entry)
+    if accepted == true and shouldRetainInHistory then
+        local queueOutcome = self.lastCombatLogQueueOutcome
+        if type(queueOutcome) == "table" and queueOutcome.coalesced == true then
+            local history = self:GetCombatLogHistory()
+            if #history > 0 then
+                history[#history] = shallowCopyEntry(queueOutcome.entry)
+                if self:IsCombatLogHistoryPanelShown() then
+                    self:RefreshCombatLogHistoryPanel()
+                end
+            else
+                self:AppendCombatLogHistoryEntry(queueOutcome.entry)
+            end
+        else
+            self:AppendCombatLogHistoryEntry(entry)
+        end
     end
     return accepted
 end

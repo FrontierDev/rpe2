@@ -737,10 +737,9 @@ function Client:BuildRulesetWindow()
 end
 
 function Client:ShowRulesetWindow()
-    if self:RequireSetupCompletion("ruleset-window") ~= true then
-        return nil
-    end
-
+    -- Ruleset selection is required to recover an incomplete profile when no
+    -- setup-enabled ruleset is active. Keep it available while the post-setup
+    -- feature gate is closed.
     return RulesetWindow:ShowWindow()
 end
 

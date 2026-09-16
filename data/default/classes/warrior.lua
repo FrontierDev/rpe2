@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 7,
+    version = 15,
     dataset = {
         achievements = {},
         auras = {
@@ -476,13 +476,18 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 passiveTraitRefs = {
-                    "7bbb4cb9:gntslayr"
+                    "7bbb4cb9:gntslayr",
+                    "7bbb4cb9:momntm10"
                 },
                 talentTraitRefs = {
                     "7bbb4cb9:duukevtq",
                     "7bbb4cb9:r73vv899",
                     "7bbb4cb9:0ncx0gfs",
-                    "7bbb4cb9:a8x4ee34"
+                    "7bbb4cb9:a8x4ee34",
+                    "7bbb4cb9:sxq460qa",
+                    "7bbb4cb9:cruelty3",
+                    "7bbb4cb9:antcwar1",
+                    "7bbb4cb9:shldspc1"
                 }
             }
         },
@@ -663,7 +668,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
-                            type = "multi"
+                            type = "raid_marker"
                         }
                     }
                 },
@@ -703,7 +708,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to an enemy.",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 1 enemy.\n|cff999999Targets must share the same raid marker.|r",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -1669,7 +1674,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
-                            type = "multi"
+                            type = "raid_marker"
                         }
                     }
                 },
@@ -1709,7 +1714,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies.",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies.\n|cff999999Targets must share the same raid marker.|r",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -1774,7 +1779,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
-                            type = "multi"
+                            type = "raid_marker"
                         }
                     }
                 },
@@ -1814,7 +1819,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies.",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies.\n|cff999999Targets must share the same raid marker.|r",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -2264,7 +2269,7 @@ Addon.Data.DefaultDatasets:Register({
                             statScaling = {
                                 {
                                     coefficient = 0.228,
-                                    statRef = "f82db71a:wbj4zuf3"
+                                    statRef = "f82db71a:u7b49vs9"
                                 }
                             },
                             targetEvents = {
@@ -2285,7 +2290,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
-                            type = "last_attackers"
+                            type = "last_melee_attacker"
                         }
                     }
                 },
@@ -2306,7 +2311,7 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/ability_warrior_revenge.blp",
                 id = "mn1ltzeo",
                 ignoreGCD = true,
-                learnMode = "unavailable",
+                learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Revenge",
                 range = 0,
@@ -2325,7 +2330,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to the last attacker of the target. Generates a moderate amount of threat.",
+                    mainText = "Deal {DAMAGE_1} Physical damage to the last enemy to attack you with a melee attack. Generates a moderate amount of threat.",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -2362,11 +2367,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 1,
+                            maxTargets = 0,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "multi"
+                            type = "all_allies"
                         }
                     }
                 },
@@ -2408,15 +2413,15 @@ Addon.Data.DefaultDatasets:Register({
                             spellDatasetId = "7bbb4cb9",
                             stacks = 1,
                             targetContext = {
-                                object = "the affected ally",
-                                possessive = "the affected ally's",
-                                reflexive = "itself",
-                                subject = "the affected ally"
+                                object = "all allies",
+                                possessive = "all allies'",
+                                reflexive = "themselves",
+                                subject = "all allies"
                             },
                             tokens = {}
                         }
                     },
-                    mainText = "Apply Battle Shout to an ally for 10 turns.",
+                    mainText = "Apply Battle Shout to all allies for 10 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -2446,11 +2451,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 1,
+                            maxTargets = 0,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "multi"
+                            type = "all_allies"
                         }
                     }
                 },
@@ -2492,15 +2497,15 @@ Addon.Data.DefaultDatasets:Register({
                             spellDatasetId = "7bbb4cb9",
                             stacks = 1,
                             targetContext = {
-                                object = "the affected ally",
-                                possessive = "the affected ally's",
-                                reflexive = "itself",
-                                subject = "the affected ally"
+                                object = "all allies",
+                                possessive = "all allies'",
+                                reflexive = "themselves",
+                                subject = "all allies"
                             },
                             tokens = {}
                         }
                     },
-                    mainText = "Apply Commanding Shout to an ally for 10 turns.",
+                    mainText = "Apply Commanding Shout to all allies for 10 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -2594,7 +2599,7 @@ Addon.Data.DefaultDatasets:Register({
                 useCooldownCharges = false
             },
             {
-                allowDeadTargets = true,
+                allowDeadTargets = false,
                 canMoveWhileCasting = false,
                 castTime = 0,
                 casterEvents = {},
@@ -2610,7 +2615,7 @@ Addon.Data.DefaultDatasets:Register({
                         key = "85653990",
                         target = {
                             allowDeadTargets = false,
-                            disableSelfCast = false,
+                            disableSelfCast = true,
                             maxTargets = 1,
                             minTargets = 1,
                             requiresTarget = true,
@@ -2620,25 +2625,33 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 conditions = {},
-                cooldown = 5,
+                cooldown = 6,
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
                 icon = "interface/icons/ability_warrior_victoryrush.blp",
                 id = "0ttffa47",
                 ignoreGCD = true,
-                learnMode = "unavailable",
+                learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Intervene",
                 range = 0,
-                resourceCosts = {},
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:e2tfklq7"
+                    }
+                },
                 seedNPCSpell = false,
                 spellbookCategory = "Protection",
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Reverse the effects of the last spell that affected an ally.",
+                    mainText = "Reverse the effects of the last reversible spell received by an ally this turn.",
                     tokens = {},
                     version = 1
                 },
@@ -2692,15 +2705,16 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 events = {
                     {
-                        combatEventId = "on_auto_attack_hit",
+                        combatEventId = "on_auto_attack_taken",
                         effects = {
                             {
-                                amount = 8,
+                                amount = 2,
+                                amountMode = "flat",
                                 resourceRef = "f82db71a:e2tfklq7",
                                 type = "resource"
                             }
                         },
-                        triggerTarget = "event_source"
+                        triggerTarget = "aura_caster"
                     }
                 },
                 icon = "interface/icons/ability_warrior_defensivestance.blp",
@@ -2779,7 +2793,8 @@ Addon.Data.DefaultDatasets:Register({
                         combatEventId = "on_auto_attack_hit",
                         effects = {
                             {
-                                amount = 10,
+                                amount = 2,
+                                amountMode = "flat",
                                 resourceRef = "f82db71a:e2tfklq7",
                                 type = "resource"
                             }
@@ -2790,7 +2805,8 @@ Addon.Data.DefaultDatasets:Register({
                         combatEventId = "on_critical_hit",
                         effects = {
                             {
-                                amount = 5,
+                                amount = 3,
+                                amountMode = "flat",
                                 resourceRef = "f82db71a:e2tfklq7",
                                 type = "resource"
                             }
@@ -2830,10 +2846,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 events = {
                     {
-                        combatEventId = "on_auto_attack_hit",
+                        combatEventId = "on_critical_hit",
                         effects = {
                             {
                                 amount = 8,
+                                amountMode = "flat",
                                 resourceRef = "f82db71a:e2tfklq7",
                                 type = "resource"
                             }
@@ -2882,6 +2899,120 @@ Addon.Data.DefaultDatasets:Register({
                 id = "0yud4l94",
                 isEnvironmental = false,
                 name = "Deep Wounds",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Protection",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_holy_devotion.blp",
+                id = "sxq460qa",
+                isEnvironmental = false,
+                name = "Toughness",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        operation = "percent",
+                        statRef = "f82db71a:v42albuv",
+                        value = 10
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Fury",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/ability_rogue_eviscerate.blp",
+                id = "cruelty3",
+                isEnvironmental = false,
+                name = "Cruelty",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:jslmczbi",
+                        value = 3
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Protection",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_nature_mirrorimage.blp",
+                id = "antcwar1",
+                isEnvironmental = false,
+                name = "Anticipation",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:0wyp78x9",
+                        value = 10
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Protection",
+                conditions = {
+                    {
+                        invert = false,
+                        requiresShield = true,
+                        showOnTooltip = true,
+                        slotKey = "offhand",
+                        tooltipTextOverride = "Requires a shield equipped in the off-hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                description = "",
+                events = {},
+                icon = "interface/icons/inv_shield_06.blp",
+                id = "shldspc1",
+                isEnvironmental = false,
+                name = "Shield Specialisation",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:p8syz5ba",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "",
+                conditions = {},
+                description = "",
+                events = {
+                    {
+                        combatEventId = "on_auto_attack_hit",
+                        effects = {
+                            {
+                                amount = 10,
+                                amountMode = "flat",
+                                resourceRef = "f82db71a:e2tfklq7",
+                                type = "resource"
+                            }
+                        },
+                        triggerTarget = "aura_caster"
+                    }
+                },
+                icon = "interface/icons/ability_warrior_innerrage.blp",
+                id = "momntm10",
+                isEnvironmental = false,
+                name = "Momentum",
                 skillBonuses = {},
                 statBonuses = {},
                 unlockLevel = 1

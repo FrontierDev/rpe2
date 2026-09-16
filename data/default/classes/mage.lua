@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 7,
+    version = 9,
     dataset = {
         achievements = {},
         auras = {
@@ -425,7 +425,12 @@ Addon.Data.DefaultDatasets:Register({
                 passiveTraitRefs = {
                     "d7c874c4:arcdecon"
                 },
-                talentTraitRefs = {}
+                talentTraitRefs = {
+                    "d7c874c4:arcfocus",
+                    "d7c874c4:magabsrb",
+                    "d7c874c4:arcmind1",
+                    "d7c874c4:arcinst3"
+                }
             }
         },
         currencies = {},
@@ -1051,7 +1056,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
-                            type = "multi"
+                            type = "raid_marker"
                         }
                     }
                 },
@@ -1082,7 +1087,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Fire damage to up to 5 enemies.",
+                    mainText = "Deal {DAMAGE_1} Fire damage to up to 5 enemies.\n|cff999999Targets must share the same raid marker.|r",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -1942,11 +1947,11 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 5,
+                            maxTargets = 0,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "multi"
+                            type = "all_allies"
                         }
                     }
                 },
@@ -1988,15 +1993,15 @@ Addon.Data.DefaultDatasets:Register({
                             spellDatasetId = "d7c874c4",
                             stacks = 1,
                             targetContext = {
-                                object = "the affected ally",
-                                possessive = "the affected ally's",
-                                reflexive = "itself",
-                                subject = "the affected ally"
+                                object = "all allies",
+                                possessive = "all allies'",
+                                reflexive = "themselves",
+                                subject = "all allies"
                             },
                             tokens = {}
                         }
                     },
-                    mainText = "Apply Arcane Intellect to up to 5 allies for 10 turns.",
+                    mainText = "Apply Arcane Intellect to all allies for 10 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -2737,6 +2742,101 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Arcane Attunement",
                 skillBonuses = {},
                 statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Arcane",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_holy_devotion.blp",
+                id = "arcfocus",
+                isEnvironmental = false,
+                name = "Arcane Focus",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:v2g0tw0o",
+                        value = 3
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Arcane",
+                conditions = {},
+                description = "",
+                events = {
+                    {
+                        combatEventId = "on_spell_taken",
+                        effects = {
+                            {
+                                amount = 5,
+                                amountMode = "base_percent",
+                                resourceRef = "f82db71a:4c8mfm99",
+                                type = "resource"
+                            }
+                        },
+                        triggerTarget = "aura_caster"
+                    }
+                },
+                icon = "interface/icons/spell_nature_astralrecalgroup.blp",
+                id = "magabsrb",
+                isEnvironmental = false,
+                name = "Magic Absorption",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:zs1nbz13",
+                        value = 3
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Arcane",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_shadow_charm.blp",
+                id = "arcmind1",
+                isEnvironmental = false,
+                name = "Arcane Mind",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        operation = "percent",
+                        statRef = "f82db71a:75y3a8ib",
+                        value = 10
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Arcane",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_shadow_teleport.blp",
+                id = "arcinst3",
+                isEnvironmental = false,
+                name = "Arcane Instability",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:69hfqhne",
+                        value = 3
+                    },
+                    {
+                        operation = "percent",
+                        statRef = "f82db71a:7t7xgzcx",
+                        value = 3
+                    }
+                },
                 unlockLevel = 1
             }
         },

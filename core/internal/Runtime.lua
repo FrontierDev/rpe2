@@ -43,6 +43,11 @@ function Addon.Internal.DispatchEvent(event, ...)
             return
         end
 
+        local data = Addon.Data or nil
+        if data and type(data.SyncDefaultRuleset) == "function" then
+            safeCall(data.SyncDefaultRuleset)
+        end
+
         if Tasks and Tasks.Initialize then
             safeCall(Tasks.Initialize, Tasks)
         end

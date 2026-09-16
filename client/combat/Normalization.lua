@@ -207,8 +207,11 @@ local function normalizeTarget(value)
     if targetType ~= "caster"
         and targetType ~= "single"
         and targetType ~= "multi"
+        and targetType ~= "all_allies"
+        and targetType ~= "raid_marker"
         and targetType ~= "pet"
         and targetType ~= "last_attackers"
+        and targetType ~= "last_melee_attacker"
     then
         targetType = "single"
     end
@@ -216,6 +219,9 @@ local function normalizeTarget(value)
     local targetDisposition = Normalization.TrimText(data.targetDisposition)
     if targetDisposition ~= "ally" and targetDisposition ~= "enemy" and targetDisposition ~= "any" then
         targetDisposition = "enemy"
+    end
+    if targetType == "all_allies" then
+        targetDisposition = "ally"
     end
 
     if targetType == "caster" then
@@ -244,10 +250,39 @@ local function normalizeTarget(value)
         }
     end
 
+    if targetType == "last_melee_attacker" then
+        return {
+            type = "last_melee_attacker",
+            requiresTarget = true,
+            targetDisposition = "enemy",
+            minTargets = 1,
+            maxTargets = 1,
+            allowDeadTargets = Normalization.NormalizeBool(data.allowDeadTargets, false),
+            allowHiddenTargets = Normalization.NormalizeBool(data.allowHiddenTargets, false),
+            disableSelfCast = Normalization.NormalizeBool(data.disableSelfCast, false),
+        }
+    end
+
     local requiresTarget = data.requiresTarget ~= false
     local fallbackMinTargets = requiresTarget and 1 or 0
+    if targetType == "single" then
+        return {
+            type = "single",
+            requiresTarget = requiresTarget,
+            targetDisposition = targetDisposition,
+            minTargets = fallbackMinTargets,
+            maxTargets = 1,
+            allowDeadTargets = Normalization.NormalizeBool(data.allowDeadTargets, false),
+            allowHiddenTargets = Normalization.NormalizeBool(data.allowHiddenTargets, false),
+            disableSelfCast = Normalization.NormalizeBool(data.disableSelfCast, false),
+        }
+    end
+
     local minTargets = math.max(0, math.floor(Normalization.NormalizeNumber(data.minTargets, fallbackMinTargets)))
     local maxTargets = math.max(minTargets, math.floor(Normalization.NormalizeNumber(data.maxTargets, math.max(1, minTargets))))
+    if targetType == "all_allies" then
+        maxTargets = 0
+    end
 
     return {
         type = targetType,
@@ -352,10 +387,42 @@ end
 
 local function normalizeRemoveAuraEffect(value)
     local data = Normalization.EnsureTable(value)
+    local match = string.lower(Normalization.TrimText(data.match)) == "tag" and "tag" or "aura"
+    local maxAuras = nil
+    local numericMaxAuras = tonumber(data.maxAuras)
+    if match == "tag"
+        and numericMaxAuras
+        and numericMaxAuras > 0
+        and numericMaxAuras < math.huge
+        and math.floor(numericMaxAuras) == numericMaxAuras
+    then
+        maxAuras = numericMaxAuras
+    end
+
     return {
         type = "remove_aura",
-        auraRef = Normalization.NormalizeRef(data.auraRef),
-        stacks = math.max(1, Normalization.NormalizeInteger(data.stacks, 1, 1)),
+        match = match,
+        auraRef = match == "aura" and Normalization.NormalizeRef(data.auraRef) or nil,
+        stacks = match == "aura" and math.max(1, Normalization.NormalizeInteger(data.stacks, 1, 1)) or 1,
+        tag = match == "tag" and Normalization.TrimText(data.tag) or nil,
+        maxAuras = maxAuras,
+        targetEvents = normalizeEventList(data.targetEvents),
+    }
+end
+
+local function normalizeRemoveAuraByTagEffect(value)
+    local data = Normalization.EnsureTable(value)
+    local numericMaxAuras = tonumber(data.maxAuras)
+    local maxAuras = numericMaxAuras
+        and numericMaxAuras > 0
+        and numericMaxAuras < math.huge
+        and math.floor(numericMaxAuras) == numericMaxAuras
+        and numericMaxAuras
+        or nil
+    return {
+        type = "remove_aura_by_tag",
+        tags = Normalization.SplitList(data.tags or data.tag),
+        maxAuras = maxAuras,
         targetEvents = normalizeEventList(data.targetEvents),
     }
 end
@@ -425,6 +492,10 @@ function Normalization.NormalizeRemoveAuraEffect(value)
     return normalizeRemoveAuraEffect(value)
 end
 
+function Normalization.NormalizeRemoveAuraByTagEffect(value)
+    return normalizeRemoveAuraByTagEffect(value)
+end
+
 function Normalization.NormalizeSummonPetEffect(value)
     return normalizeSummonPetEffect(value)
 end
@@ -474,6 +545,10 @@ function Normalization.NormalizeEffectData(effectType, value)
 
     if normalizedType == "remove_aura" then
         return normalizeRemoveAuraEffect(value)
+    end
+
+    if normalizedType == "remove_aura_by_tag" then
+        return normalizeRemoveAuraByTagEffect(value)
     end
 
     if normalizedType == "summon_pet" then

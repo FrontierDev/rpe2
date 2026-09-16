@@ -26,6 +26,7 @@ local EFFECT_TYPE_ITEMS = {
     { label = "Heal", value = "heal" },
     { label = "Apply Aura", value = "apply_aura" },
     { label = "Remove Aura", value = "remove_aura" },
+    { label = "Remove Aura by Tag", value = "remove_aura_by_tag" },
     { label = "Resource", value = "resource" },
     { label = "Interrupt", value = "interrupt" },
     { label = "Revert", value = "revert" },
@@ -62,8 +63,11 @@ local TARGET_TYPE_ITEMS = {
     { label = "Caster", value = "caster" },
     { label = "Single", value = "single" },
     { label = "Multi", value = "multi" },
+    { label = "All Allies", value = "all_allies" },
+    { label = "Raid Marker", value = "raid_marker" },
     { label = "Pet", value = "pet" },
     { label = "Last Attackers", value = "last_attackers" },
+    { label = "Last Melee Attacker", value = "last_melee_attacker" },
 }
 
 local TARGET_DISPOSITION_ITEMS = {
@@ -514,6 +518,15 @@ function DataEditor:GetAutomaticSpellInspectorCastingGroupLabel(component)
     if targetType == "last_attackers" then
         return "Last Attackers"
     end
+    if targetType == "last_melee_attacker" then
+        return "Last Melee Attacker"
+    end
+    if targetType == "all_allies" then
+        return "All Allies"
+    end
+    if targetType == "raid_marker" then
+        return "Raid Marker"
+    end
 
     local targetDisposition = tostring(target.targetDisposition or "enemy")
     local maxTargets = math.max(0, tonumber(target.maxTargets) or 0)
@@ -538,6 +551,7 @@ function DataEditor:FormatSpellInspectorTargetSummary(component)
     end
 
     local targetType = tostring(target.type or "single")
+    local disposition = tostring(target.targetDisposition or "enemy")
     if targetType == "caster" then
         return ("%s / caster only"):format(castingGroup)
     end
@@ -547,8 +561,13 @@ function DataEditor:FormatSpellInspectorTargetSummary(component)
     if targetType == "last_attackers" then
         return ("%s / most recent attacker"):format(castingGroup)
     end
+    if targetType == "last_melee_attacker" then
+        return ("%s / most recent melee attacker"):format(castingGroup)
+    end
+    if targetType == "all_allies" or targetType == "raid_marker" then
+        return ("%s / %s / %s"):format(castingGroup, targetType, disposition)
+    end
 
-    local disposition = tostring(target.targetDisposition or "enemy")
     local minTargets = math.max(0, tonumber(target.minTargets) or 0)
     local maxTargets = math.max(minTargets, tonumber(target.maxTargets) or minTargets)
     local requirementText = target.requiresTarget == false and "optional" or ("%d-%d"):format(minTargets, maxTargets)

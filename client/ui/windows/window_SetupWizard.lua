@@ -3493,6 +3493,13 @@ function SetupWizard:ApplyCurrentSelection()
         return false
     end
 
+    -- Persist the unfinished draft before mutating the live profile. Some
+    -- downstream setters still validate and may fail after identity has been
+    -- written; only the final successful completion write may unlock setup.
+    if Profile.SetSetupWizardState then
+        Profile.SetSetupWizardState(state)
+    end
+
     if Profile.SetLevel then
         Profile.SetLevel(self:GetStartingLevel())
     end
@@ -3544,10 +3551,6 @@ function SetupWizard:ApplyCurrentSelection()
                 quantity = 1,
             })
         end
-    end
-
-    if Profile.SetSetupWizardState then
-        Profile.SetSetupWizardState(state)
     end
 
     -- Resource display is an explicit wizard choice. Apply it after every

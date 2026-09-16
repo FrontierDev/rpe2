@@ -32,6 +32,54 @@ local DATASET_TYPE_ICONS = {
     items = "Interface\\ICONS\\INV_Misc_Bag_08",
 }
 
+local DATASET_LIFETIME_ITEMS = {
+    { label = "Permanent", value = "permanent" },
+    { label = "1 Hour", value = "1-hour" },
+    { label = "6 Hours", value = "6-hour" },
+    { label = "12 Hours", value = "12-hour" },
+    { label = "24 Hours", value = "24-hour" },
+    { label = "3 Days", value = "3-day" },
+    { label = "7 Days", value = "7-day" },
+}
+
+local function formatDatasetExpiry(expiresAt)
+    local timestamp = tonumber(expiresAt)
+    if not timestamp then
+        return "Expires: Permanent"
+    end
+
+    if type(date) == "function" then
+        return ("Expires: %s (server time)"):format(date("%d %b %Y %H:%M", math.floor(timestamp)))
+    end
+
+    return ("Expires: %d (server time)"):format(math.floor(timestamp))
+end
+
+local function updateDatasetExpiryPreview(self, lifetime)
+    local database = self.Database
+    local dataset = database and database.GetDatasetByID and database.GetDatasetByID(self.MetadataWindowDatasetId) or nil
+    if not dataset or not self.DatasetMetadataExpiryText or not self.DatasetMetadataExpiryText.SetText then
+        return
+    end
+
+    if lifetime == "permanent" then
+        self.DatasetMetadataExpiryText:SetText("Expires: Permanent")
+        return
+    end
+
+    if lifetime == dataset.lifetime and dataset.expiresAt ~= nil then
+        self.DatasetMetadataExpiryText:SetText(formatDatasetExpiry(dataset.expiresAt))
+        return
+    end
+
+    local previewExpiry = database.CalculateDatasetExpiry and database.CalculateDatasetExpiry(lifetime) or nil
+    if previewExpiry then
+        self.DatasetMetadataExpiryText:SetText(formatDatasetExpiry(previewExpiry))
+    else
+        self.DatasetMetadataExpiryText:SetText("Expires: calculated when saved")
+    end
+end
+
 local function getDatasetTypeLabel(datasetType)
     local normalized = tostring(datasetType or "general")
     return DATASET_TYPE_LABELS[normalized] or DATASET_TYPE_LABELS.general
@@ -110,6 +158,7 @@ local function buildDatasetTooltip(self, dataset)
             ("ID: %s"):format(dataset.id or "-"),
             ("Group: %s"):format(buildDatasetGroupLabel(self, dataset)),
             ("Type: %s"):format(datasetType),
+            ("Lifetime: %s"):format(dataset.lifetime == "permanent" and "Permanent" or tostring(dataset.lifetime or "Unknown")),
             ("State: %s"):format(activated and "Activated" or "Inactive"),
             ("Depends On: %s"):format(#dependencyNames > 0 and table.concat(dependencyNames, ", ") or "-"),
         },
@@ -175,6 +224,7 @@ local function saveDatasetMetadataWindow(self)
     local name = self.DatasetMetadataNameInput and self.DatasetMetadataNameInput.GetText and self.DatasetMetadataNameInput:GetText() or ""
     local groupName = self.DatasetMetadataGroupInput and self.DatasetMetadataGroupInput.GetText and self.DatasetMetadataGroupInput:GetText() or ""
     local datasetType = self.DatasetMetadataTypeDropdown and self.DatasetMetadataTypeDropdown.GetSelectedValue and self.DatasetMetadataTypeDropdown:GetSelectedValue() or "general"
+    local lifetime = self.DatasetMetadataLifetimeDropdown and self.DatasetMetadataLifetimeDropdown.GetSelectedValue and self.DatasetMetadataLifetimeDropdown:GetSelectedValue() or "permanent"
 
     if database.RenameDataset then
         database.RenameDataset(datasetId, name)
@@ -185,6 +235,10 @@ local function saveDatasetMetadataWindow(self)
             groupName = groupName,
             datasetType = datasetType,
         })
+    end
+
+    if database.SetDatasetLifetime then
+        database.SetDatasetLifetime(datasetId, lifetime)
     end
 
     if self.DatasetMetadataWindow and self.DatasetMetadataWindow.Hide then
@@ -527,7 +581,7 @@ function DataEditor:BuildDatasetMetadataWindow()
     local window = UI.Window:New({
         name = "RPEDataEditorDatasetMetadataWindow",
         width = 340,
-        height = 256,
+        height = 318,
         point = "CENTER",
         relativeTo = UIParent,
         relativePoint = "CENTER",
@@ -607,6 +661,33 @@ function DataEditor:BuildDatasetMetadataWindow()
     })
     root:AddChild(self.DatasetMetadataTypeDropdown)
 
+    self.DatasetMetadataLifetimeLabel = UI.CreateText(root:GetFrame(), "RPEDataEditorDatasetMetadataLifetimeLabel", "Lifetime", {
+        width = 300,
+        height = 12,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    root:AddChild(self.DatasetMetadataLifetimeLabel)
+
+    self.DatasetMetadataLifetimeDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorDatasetMetadataLifetimeDropdown", {
+        width = 300,
+        height = 20,
+        items = DATASET_LIFETIME_ITEMS,
+        selectedValue = "permanent",
+        onValueChanged = function(value)
+            updateDatasetExpiryPreview(self, value)
+        end,
+    })
+    root:AddChild(self.DatasetMetadataLifetimeDropdown)
+
+    self.DatasetMetadataExpiryText = UI.CreateText(root:GetFrame(), "RPEDataEditorDatasetMetadataExpiryText", "Expires: Permanent", {
+        width = 300,
+        height = 12,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    root:AddChild(self.DatasetMetadataExpiryText)
+
     self.DatasetMetadataIdText = UI.CreateText(root:GetFrame(), "RPEDataEditorDatasetMetadataIdText", "ID: -", {
         width = 300,
         height = 12,
@@ -670,6 +751,12 @@ function DataEditor:ShowDatasetMetadataWindow(datasetId)
     end
     if self.DatasetMetadataTypeDropdown and self.DatasetMetadataTypeDropdown.SetSelectedValue then
         self.DatasetMetadataTypeDropdown:SetSelectedValue(dataset.datasetType or "general", true)
+    end
+    if self.DatasetMetadataLifetimeDropdown and self.DatasetMetadataLifetimeDropdown.SetSelectedValue then
+        self.DatasetMetadataLifetimeDropdown:SetSelectedValue(dataset.lifetime or "permanent", true)
+    end
+    if self.DatasetMetadataExpiryText and self.DatasetMetadataExpiryText.SetText then
+        self.DatasetMetadataExpiryText:SetText(formatDatasetExpiry(dataset.expiresAt))
     end
     if self.DatasetMetadataIdText and self.DatasetMetadataIdText.SetText then
         self.DatasetMetadataIdText:SetText(("ID: %s"):format(dataset.id or "-"))

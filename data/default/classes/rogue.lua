@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 11,
+    version = 13,
     dataset = {
         achievements = {},
         auras = {
@@ -388,7 +388,15 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 talentTraitRefs = {
                     "23d5dce2:z9yfqvhy",
-                    "23d5dce2:58pob6kr"
+                    "23d5dce2:58pob6kr",
+                    "23d5dce2:malice05",
+                    "23d5dce2:sealfate",
+                    "23d5dce2:lghtref5",
+                    "23d5dce2:deflect5",
+                    "23d5dce2:weapexp6",
+                    "23d5dce2:mstdecpt",
+                    "23d5dce2:deadly10",
+                    "23d5dce2:hghtsens"
                 }
             }
         },
@@ -2395,6 +2403,181 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Wound Poison",
                 skillBonuses = {},
                 statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Assassination",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/ability_racial_bloodrage.blp",
+                id = "malice05",
+                isEnvironmental = false,
+                name = "Malice",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:jslmczbi",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Assassination",
+                conditions = {},
+                description = "",
+                events = {
+                    {
+                        chance = 100,
+                        combatEventId = "on_critical_hit",
+                        effects = {
+                            {
+                                amount = 1,
+                                amountMode = "flat",
+                                resourceRef = "f82db71a:1h7yfxff",
+                                type = "resource"
+                            }
+                        },
+                        triggerTarget = "aura_caster"
+                    }
+                },
+                icon = "interface/icons/spell_shadow_chilltouch.blp",
+                id = "sealfate",
+                isEnvironmental = false,
+                name = "Seal Fate",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Combat",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_nature_invisibilty.blp",
+                id = "lghtref5",
+                isEnvironmental = false,
+                name = "Lightning Reflexes",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:o6113cir",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Combat",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/ability_parry.blp",
+                id = "deflect5",
+                isEnvironmental = false,
+                name = "Deflection",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:tcn0s8kx",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Combat",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_holy_blessingofstrength.blp",
+                id = "weapexp6",
+                isEnvironmental = false,
+                name = "Weapon Expertise",
+                skillBonuses = {
+                    {
+                        skillRef = "f82db71a:3z6vlkhn",
+                        value = 6
+                    },
+                    {
+                        skillRef = "f82db71a:tbvqz1rq",
+                        value = 6
+                    },
+                    {
+                        skillRef = "f82db71a:t5wlibfx",
+                        value = 6
+                    }
+                },
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Subtlety",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_shadow_charm.blp",
+                id = "mstdecpt",
+                isEnvironmental = false,
+                name = "Master of Deception",
+                skillBonuses = {
+                    {
+                        skillRef = "f82db71a:muuwon1r",
+                        value = 5
+                    }
+                },
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Subtlety",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/inv_weapon_crossbow_11.blp",
+                id = "deadly10",
+                isEnvironmental = false,
+                name = "Deadliness",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        operation = "percent",
+                        statRef = "f82db71a:u7b49vs9",
+                        value = 10
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Subtlety",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/ability_ambush.blp",
+                id = "hghtsens",
+                isEnvironmental = false,
+                name = "Heightened Senses",
+                skillBonuses = {
+                    {
+                        skillRef = "f82db71a:b0sh5zo7",
+                        value = 5
+                    }
+                },
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:zs1nbz13",
+                        value = 3
+                    }
+                },
                 unlockLevel = 1
             }
         },

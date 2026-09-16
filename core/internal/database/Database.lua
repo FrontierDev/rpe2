@@ -73,6 +73,130 @@ local DATASET_TYPE_SORT_ORDER = {
     items = 5,
 }
 
+-- Dataset lifetime keys are persisted identifiers, not editor labels. Keep the
+-- canonical values stable so exports remain portable between clients.
+local DATASET_LIFETIME_DEFINITIONS = {
+    permanent = { duration = nil, label = "Permanent" },
+    ["1-hour"] = { duration = 60 * 60, label = "1 Hour" },
+    ["6-hour"] = { duration = 6 * 60 * 60, label = "6 Hours" },
+    ["12-hour"] = { duration = 12 * 60 * 60, label = "12 Hours" },
+    ["24-hour"] = { duration = 24 * 60 * 60, label = "24 Hours" },
+    ["3-day"] = { duration = 3 * 24 * 60 * 60, label = "3 Days" },
+    ["7-day"] = { duration = 7 * 24 * 60 * 60, label = "7 Days" },
+    -- Retain the earlier preset as an import/backwards-compatibility key even
+    -- though the editor exposes the smaller fixed set from the follow-up task.
+    ["30-day"] = { duration = 30 * 24 * 60 * 60, label = "30 Days" },
+}
+
+local DATASET_LIFETIME_ALIASES = {
+    permanent = "permanent",
+    ["1-hour"] = "1-hour",
+    ["1-hours"] = "1-hour",
+    ["1h"] = "1-hour",
+    ["6-hour"] = "6-hour",
+    ["6-hours"] = "6-hour",
+    ["6h"] = "6-hour",
+    ["12-hour"] = "12-hour",
+    ["12-hours"] = "12-hour",
+    ["12h"] = "12-hour",
+    ["24-hour"] = "24-hour",
+    ["24-hours"] = "24-hour",
+    ["24h"] = "24-hour",
+    day = "24-hour",
+    ["3-day"] = "3-day",
+    ["3-days"] = "3-day",
+    ["3d"] = "3-day",
+    ["7-day"] = "7-day",
+    ["7-days"] = "7-day",
+    ["7d"] = "7-day",
+    ["30-day"] = "30-day",
+    ["30-days"] = "30-day",
+    ["30d"] = "30-day",
+}
+
+Database.DatasetLifetimeDefinitions = DATASET_LIFETIME_DEFINITIONS
+
+local function normalizeDatasetLifetime(value)
+    if type(value) ~= "string" then
+        return nil
+    end
+
+    local key = value:gsub("^%s+", ""):gsub("%s+$", ""):lower()
+    key = key:gsub("[%s_]+", "-")
+    return DATASET_LIFETIME_ALIASES[key]
+end
+
+local function normalizeDatasetExpiry(value)
+    local timestamp = tonumber(value)
+    if timestamp == nil
+        or timestamp ~= timestamp
+        or timestamp == math.huge
+        or timestamp == -math.huge
+        or timestamp <= 0
+    then
+        return nil
+    end
+
+    return timestamp
+end
+
+local function getServerEpoch()
+    if type(GetServerTime) ~= "function" then
+        return nil
+    end
+
+    local timestamp = tonumber(GetServerTime())
+    if timestamp == nil
+        or timestamp ~= timestamp
+        or timestamp == math.huge
+        or timestamp == -math.huge
+    then
+        return nil
+    end
+
+    return timestamp
+end
+
+local function getDatasetLifetimeDuration(lifetimeKey)
+    local normalizedLifetime = normalizeDatasetLifetime(lifetimeKey)
+    local definition = normalizedLifetime and DATASET_LIFETIME_DEFINITIONS[normalizedLifetime] or nil
+    return definition and definition.duration or nil, normalizedLifetime
+end
+
+local function calculateDatasetExpiry(lifetimeKey, serverTime)
+    local duration, normalizedLifetime = getDatasetLifetimeDuration(lifetimeKey)
+    if not normalizedLifetime then
+        return nil, "Unknown dataset lifetime."
+    end
+    if normalizedLifetime == "permanent" then
+        return nil
+    end
+
+    local now = tonumber(serverTime)
+    if now == nil
+        or now ~= now
+        or now == math.huge
+        or now == -math.huge
+    then
+        now = nil
+    end
+    if now == nil then
+        now = getServerEpoch()
+    end
+    if now == nil then
+        return nil, "Server time is unavailable."
+    end
+
+    return now + duration
+end
+
+Database.NormalizeDatasetLifetime = normalizeDatasetLifetime
+Database.GetDatasetLifetimeDuration = function(lifetimeKey)
+    local duration, normalizedLifetime = getDatasetLifetimeDuration(lifetimeKey)
+    return duration, normalizedLifetime
+end
+Database.CalculateDatasetExpiry = calculateDatasetExpiry
+
 local DATASET_ENTRY_DEFINITIONS = {
     units = { className = "Unit", singular = "Unit", assignsId = true },
     mounts = { className = "Mount", singular = "Mount", assignsId = true },
@@ -166,6 +290,8 @@ local CONFIGURATION_CHANGE_CLASSIFICATION = {
     ["dataset-delete"] = "authored configuration",
     ["dataset-rename"] = "authored configuration",
     ["dataset-update"] = "authored configuration",
+    ["dataset-lifetime"] = "authored configuration",
+    ["dataset-expired"] = "authored configuration",
     ["dataset-entry"] = "authored configuration",
 }
 
@@ -652,6 +778,18 @@ local function normalizeDatasetRecord(record, fallbackId, fallbackName)
     local data = ensureTable(record)
     local datasetId = ensureString(data.id or fallbackId, "")
     local name = normalizeDatasetName(data.name or fallbackName)
+    local lifetime = normalizeDatasetLifetime(data.lifetime) or "permanent"
+    local expiresAt = nil
+
+    if lifetime ~= "permanent" then
+        expiresAt = normalizeDatasetExpiry(data.expiresAt)
+        -- A temporary dataset without a valid absolute expiry cannot satisfy
+        -- the lifetime contract. Treat malformed metadata as legacy permanent
+        -- data instead of creating a new expiry during normalization.
+        if expiresAt == nil then
+            lifetime = "permanent"
+        end
+    end
 
     return {
         id = datasetId,
@@ -660,6 +798,8 @@ local function normalizeDatasetRecord(record, fallbackId, fallbackName)
         description = ensureString(data.description, ""),
         authorName = ensureString(data.authorName, getCharacterDisplayName()),
         datasetType = normalizeDatasetState(data.datasetType, DATASET_TYPE_VALUES, "general"),
+        lifetime = lifetime,
+        expiresAt = expiresAt,
         dependencies = ensureTable(data.dependencies),
         units = ensureTable(data.units),
         mounts = ensureTable(data.mounts),
@@ -1863,6 +2003,131 @@ local function normalizeActivatedDatasets(root, preserveMissing)
     return root.activatedDatasets
 end
 
+local function isDatasetExpired(dataset, serverTime)
+    local lifetime = type(dataset) == "table" and normalizeDatasetLifetime(dataset.lifetime) or nil
+    if not lifetime or lifetime == "permanent" then
+        return false
+    end
+
+    local expiresAt = normalizeDatasetExpiry(dataset.expiresAt)
+    local now = tonumber(serverTime)
+    if expiresAt == nil or now == nil then
+        return false
+    end
+
+    return now >= expiresAt
+end
+
+Database.IsDatasetExpired = function(dataset, serverTime)
+    local now = tonumber(serverTime)
+    if now == nil then
+        now = getServerEpoch()
+    end
+    return isDatasetExpired(dataset, now)
+end
+
+local function removeDatasetRecord(root, datasetId)
+    if type(root) ~= "table" or type(root.datasets) ~= "table" then
+        return nil
+    end
+
+    local normalizedId = ensureString(datasetId, "")
+    if normalizedId == "" then
+        return nil
+    end
+
+    local dataset = root.datasets[normalizedId]
+    if not dataset then
+        return nil
+    end
+
+    root.datasets[normalizedId] = nil
+    normalizeActivatedDatasets(root)
+
+    for characterKey, activeDatasetId in pairs(root.activeByChar or {}) do
+        if tostring(activeDatasetId or "") == normalizedId then
+            root.activeByChar[characterKey] = nil
+        end
+    end
+
+    if Dependecies and type(Dependecies.HandleDatasetDeleted) == "function" then
+        Dependecies.HandleDatasetDeleted(normalizedId)
+    end
+
+    return dataset
+end
+
+local function purgeExpiredDatasets(root, now, options)
+    if type(root) ~= "table" or type(root.datasets) ~= "table" then
+        return {}, 0
+    end
+
+    local serverTime = tonumber(now)
+    if serverTime == nil then
+        serverTime = getServerEpoch()
+    end
+    if serverTime == nil then
+        return {}, 0
+    end
+
+    local expiredIds = {}
+    for datasetId, dataset in pairs(root.datasets) do
+        if isDatasetExpired(dataset, serverTime) then
+            expiredIds[#expiredIds + 1] = tostring(datasetId)
+        end
+    end
+
+    if #expiredIds == 0 then
+        return expiredIds, 0
+    end
+
+    table.sort(expiredIds)
+    local removedIds = {}
+    for index = 1, #expiredIds do
+        local datasetId = expiredIds[index]
+        if removeDatasetRecord(root, datasetId) then
+            removedIds[#removedIds + 1] = datasetId
+        end
+    end
+
+    if #removedIds > 0 then
+        if not (type(options) == "table" and options.suppressNotification == true) then
+            notifyDatasetConfigurationChanged("dataset-expired")
+        end
+
+        local debug = Addon.Debug
+        if debug and type(debug.Internal) == "function" then
+            debug.Internal(
+                "Purged %d expired temporary datasets: %s",
+                #removedIds,
+                table.concat(removedIds, ", ")
+            )
+        end
+    end
+
+    return removedIds, #removedIds
+end
+
+Database.PurgeExpiredDatasets = function(now)
+    local root = Database.Datasets
+    if type(root) ~= "table"
+        or root ~= rawget(_G, "RPEngineDatasetDB")
+        or type(root.datasets) ~= "table"
+    then
+        root = Database.EnsureDatasets(now)
+    end
+
+    return purgeExpiredDatasets(root, now)
+end
+
+-- Kept as a compatibility wrapper for callers using the previous internal
+-- name. The public operation returns both the removed IDs and count.
+Database.CleanupExpiredDatasets = function(root, options)
+    local targetRoot = type(root) == "table" and root or Database.EnsureDatasets()
+    local removedIds, count = purgeExpiredDatasets(targetRoot, nil, options)
+    return count, removedIds
+end
+
 local function ensureSection(rootName, schemaVersion, defaults)
     local root = ensureTable(_G[rootName])
     _G[rootName] = root
@@ -2859,51 +3124,6 @@ function Database.SetProfileSetupWizardCompleted(completed)
     return normalizedCompleted
 end
 
-local function isEstablishedProfileForSetupMigration(profile)
-    local normalized = normalizeProfileRecord(profile, "", "")
-    local resourceDisplay = normalizeProfileResourceDisplay(normalized.resourceDisplay)
-
-    if ensureString(normalized.raceRef, "") ~= ""
-        and ensureString(normalized.classRef, "") ~= ""
-    then
-        return true
-    end
-
-    return not isTableEmpty(normalized.equipment)
-        or not isTableEmpty(normalized.mountEquipment)
-        or not isTableEmpty(normalized.petEquipment)
-        or not isTableEmpty(normalized.spellbook)
-        or not isTableEmpty(normalized.recipebook)
-        or not isTableEmpty(normalized.recipeKnowledge)
-        or not isTableEmpty(normalized.traits)
-        or not isTableEmpty(normalized.activeTraits)
-        or not isTableEmpty(normalized.inactiveTraits)
-        or not isTableEmpty(normalized.selectedClassTalentTraits)
-        or not isTableEmpty(normalized.skillLevels)
-        or not isTableEmpty(normalized.actionBar)
-        or not isTableEmpty(normalized.skillActionBar)
-        or not isTableEmpty(normalized.mountedActionBar)
-        or not isTableEmpty(normalized.preferredConsumables)
-        or ensureString(resourceDisplay.primaryResourceRef, "") ~= ""
-        or ensureString(resourceDisplay.specialResourceRef, "") ~= ""
-end
-
-function Database.MigrateProfileSetupWizardCompletion()
-    local profile = Database.GetOrCreateActiveProfile()
-    local setupWizard = normalizeProfileSetupWizard(profile.setupWizard)
-    if setupWizard.completed == true then
-        return true
-    end
-
-    if not isEstablishedProfileForSetupMigration(profile) then
-        return false
-    end
-
-    setupWizard.completed = true
-    profile.setupWizard = setupWizard
-    return true
-end
-
 function Database.GetProfileActionBarAnchor()
     local profile = Database.GetOrCreateActiveProfile()
     profile.widgets = normalizeProfileWidgets(profile.widgets)
@@ -3595,7 +3815,7 @@ function Database.EnsureRulesets()
     return rulesets
 end
 
-function Database.EnsureDatasets()
+function Database.EnsureDatasets(purgeNow)
     local datasets = ensureSection("RPEngineDatasetDB", SCHEMA.datasets, {
         datasets = {},
         activeByChar = {},
@@ -3614,6 +3834,7 @@ function Database.EnsureDatasets()
     -- IDs which do not resolve to a current dataset record.
     normalizeActivatedDatasets(datasets, true)
     Database.Datasets = datasets
+    purgeExpiredDatasets(datasets, purgeNow)
     if Dependecies and Dependecies.RecomputeAllDatasetDependencies then
         Dependecies.RecomputeAllDatasetDependencies()
     end
@@ -3885,7 +4106,7 @@ function Database.ExportRuleset(rulesetId)
     return "RPE_RULESET_V2\n" .. serializeLuaValue(payload)
 end
 
-function Database.ImportRuleset(text)
+function Database.ImportRuleset(text, options)
     local normalizedText = ensureString(text, "")
     normalizedText = normalizedText:gsub("^%s+", ""):gsub("%s+$", "")
     if normalizedText == "" then
@@ -3924,9 +4145,12 @@ function Database.ImportRuleset(text)
     end
 
     local imported = normalizeRulesetRecordPreservingExtras(payloadRuleset, payloadRuleset.id, payloadRuleset.name)
+    local replaceExistingId = type(options) == "table"
+        and ensureString(options.replaceExistingId, "")
+        or ""
     if imported.id == "" then
         imported.id = nextRulesetId(root)
-    elseif existingRulesets[imported.id] ~= nil then
+    elseif existingRulesets[imported.id] ~= nil and imported.id ~= replaceExistingId then
         imported.id = nextRulesetId(root)
     end
 
@@ -4149,7 +4373,8 @@ function Database.SetDatasetActivated(datasetId, isActivated, options)
     end
 
     if isActivated == true then
-        if root.datasets[normalizedId] == nil then
+        local dataset = root.datasets[normalizedId]
+        if dataset == nil or isDatasetExpired(dataset) then
             return false
         end
 
@@ -4225,6 +4450,40 @@ function Database.CreateDataset(name)
     }, datasetId, name)
 
     root.datasets[datasetId] = dataset
+    return dataset
+end
+
+function Database.SetDatasetLifetime(datasetId, lifetimeKey)
+    local dataset = Database.GetDatasetByID(datasetId)
+    if not dataset then
+        return nil, "Dataset was not found."
+    end
+
+    local lifetime = normalizeDatasetLifetime(lifetimeKey)
+    if not lifetime then
+        return nil, "Unknown dataset lifetime."
+    end
+
+    local currentLifetime = normalizeDatasetLifetime(dataset.lifetime) or "permanent"
+    local currentExpiry = normalizeDatasetExpiry(dataset.expiresAt)
+    if currentLifetime == lifetime
+        and ((lifetime == "permanent" and dataset.expiresAt == nil)
+            or (lifetime ~= "permanent" and currentExpiry ~= nil and dataset.expiresAt == currentExpiry))
+    then
+        return dataset
+    end
+
+    local expiresAt, expiryError = calculateDatasetExpiry(lifetime)
+    if expiryError then
+        return nil, expiryError
+    end
+
+    -- Assign both fields in one mutation. In particular, ordinary dataset
+    -- edits never pass through this function and therefore cannot extend an
+    -- existing temporary lifetime.
+    dataset.lifetime = lifetime
+    dataset.expiresAt = expiresAt
+    notifyDatasetConfigurationChanged("dataset-lifetime")
     return dataset
 end
 
@@ -4391,17 +4650,22 @@ function Database.ImportDataset(text)
     for datasetId, dataset in pairs(root.datasets or {}) do
         existingDatasets[tostring(datasetId)] = dataset
     end
+    local payloadLifetime = normalizeDatasetLifetime(payloadDataset.lifetime)
+    if payloadLifetime and payloadLifetime ~= "permanent"
+        and normalizeDatasetExpiry(payloadDataset.expiresAt) == nil
+    then
+        return nil, "Temporary dataset has an invalid expiry."
+    end
     local imported = normalizeDatasetRecord(deepCopy(payloadDataset), payloadDataset.id, payloadDataset.name)
-    local originalDatasetId = ensureString(imported.id, "")
-
     if imported.id == "" then
         imported.id = nextDatasetId(root)
-    elseif existingDatasets[imported.id] ~= nil then
-        imported.id = nextDatasetId(root)
-        rewriteDatasetRefs(imported, originalDatasetId, imported.id)
     end
 
     imported = normalizeDatasetRecord(imported, imported.id, imported.name)
+    if isDatasetExpired(imported) then
+        return nil, "Dataset has expired."
+    end
+    local previousDataset = existingDatasets[imported.id]
     existingDatasets[imported.id] = imported
     root.datasets = existingDatasets
 
@@ -4413,7 +4677,7 @@ function Database.ImportDataset(text)
         deferConfigurationChange = true,
         root = root,
     }) then
-        existingDatasets[imported.id] = nil
+        existingDatasets[imported.id] = previousDataset
         root.datasets = existingDatasets
         return nil, "The imported dataset could not be activated."
     end
@@ -4499,14 +4763,14 @@ function Database.ImportPreparedDataset(importBatch, index)
     }))
 end
 
-function Database.ImportDatasets(text)
-    local importBatch, prepareError = Database.PrepareDatasetImport(text)
-    if not importBatch then
-        return nil, prepareError
+function Database.BeginDatasetImportTransaction(importBatch)
+    if type(importBatch) ~= "table" then
+        return nil, "Dataset import is unavailable."
+    end
+    if type(activeDatasetImportTransaction) == "table" then
+        return nil, "A dataset import is already in progress."
     end
 
-    local pendingDatasets = importBatch.datasetTexts or importBatch.datasets or {}
-    local importedDatasets = {}
     local root = getInitializedDatasetRoot()
     local transaction = {
         root = root,
@@ -4516,31 +4780,30 @@ function Database.ImportDatasets(text)
     }
 
     activeDatasetImportTransaction = transaction
+    return transaction
+end
 
-    local function rollback()
-        root.datasets = transaction.originalDatasets
-        root.activatedDatasets = transaction.originalActivatedDatasets
-        root.nextId = transaction.originalNextId
-        Database.Datasets = root
+function Database.RollbackDatasetImportTransaction(transaction)
+    if type(transaction) ~= "table" or activeDatasetImportTransaction ~= transaction then
+        return false
     end
 
-    for index = 1, #pendingDatasets do
-        local ok, dataset, err = pcall(Database.ImportPreparedDataset, importBatch, index)
-        if not ok then
-            activeDatasetImportTransaction = nil
-            rollback()
-            return nil, tostring(dataset or ("Dataset %d failed to import."):format(index))
-        end
-        if not dataset then
-            activeDatasetImportTransaction = nil
-            rollback()
-            return nil, err or ("Dataset %d failed to import."):format(index)
-        end
-        importedDatasets[#importedDatasets + 1] = dataset
-    end
-
+    local root = transaction.root
+    root.datasets = transaction.originalDatasets
+    root.activatedDatasets = transaction.originalActivatedDatasets
+    root.nextId = transaction.originalNextId
+    Database.Datasets = root
     activeDatasetImportTransaction = nil
+    return true
+end
 
+function Database.CommitDatasetImportTransaction(transaction, importedDatasets)
+    if type(transaction) ~= "table" or activeDatasetImportTransaction ~= transaction then
+        return nil, "Dataset import transaction is not active."
+    end
+
+    importedDatasets = importedDatasets or {}
+    activeDatasetImportTransaction = nil
     if #importedDatasets > 0 then
         if Dependecies and Dependecies.RecomputeAllDatasetDependencies then
             Dependecies.RecomputeAllDatasetDependencies()
@@ -4557,6 +4820,31 @@ function Database.ImportDatasets(text)
     end
 
     return importedDatasets
+end
+
+function Database.ImportDatasets(text)
+    local importBatch, prepareError = Database.PrepareDatasetImport(text)
+    if not importBatch then
+        return nil, prepareError
+    end
+
+    local transaction, transactionError = Database.BeginDatasetImportTransaction(importBatch)
+    if not transaction then
+        return nil, transactionError
+    end
+
+    local pendingDatasets = importBatch.datasetTexts or importBatch.datasets or {}
+    local importedDatasets = {}
+    for index = 1, #pendingDatasets do
+        local ok, dataset, err = pcall(Database.ImportPreparedDataset, importBatch, index)
+        if not ok or not dataset then
+            Database.RollbackDatasetImportTransaction(transaction)
+            return nil, (not ok and tostring(dataset)) or err or ("Dataset %d failed to import."):format(index)
+        end
+        importedDatasets[#importedDatasets + 1] = dataset
+    end
+
+    return Database.CommitDatasetImportTransaction(transaction, importedDatasets)
 end
 
 function Database.ImportDatasetEntry(datasetId, collectionKey, text)
@@ -4636,16 +4924,8 @@ function Database.DeleteDataset(datasetId)
     end
 
     local root = Database.EnsureDatasets()
-    Database.SetDatasetActivated(dataset.id, false)
-    root.datasets[dataset.id] = nil
-    if Dependecies and Dependecies.HandleDatasetDeleted then
-        Dependecies.HandleDatasetDeleted(dataset.id)
-    end
-
-    for characterKey, activeDatasetId in pairs(root.activeByChar or {}) do
-        if activeDatasetId == dataset.id then
-            root.activeByChar[characterKey] = nil
-        end
+    if not removeDatasetRecord(root, dataset.id) then
+        return false
     end
 
     notifyConfigurationChanged("dataset-delete")

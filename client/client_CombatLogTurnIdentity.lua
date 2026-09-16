@@ -62,6 +62,8 @@ function Client:BuildCombatLogArguments(entry)
     end
 
     arguments[15] = normalized.turnNumber or ""
+    arguments[16] = normalized.logKind or ""
+    arguments[17] = normalized.spellRef or ""
     return arguments
 end
 

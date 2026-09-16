@@ -33,6 +33,18 @@ local function normalizeEntryType(value)
     return entryType
 end
 
+local COMBAT_LOG_KINDS = {
+    spellcast_start = true,
+    aura_gain = true,
+    aura_loss = true,
+    interrupt = true,
+}
+
+local function normalizeLogKind(value)
+    local kind = tostring(value or "")
+    return COMBAT_LOG_KINDS[kind] == true and kind or nil
+end
+
 local function normalizePositiveInteger(value)
     local number = math.floor(tonumber(value) or 0)
     if number <= 0 then
@@ -414,6 +426,8 @@ function Client:NormalizeCombatLogEntry(entry)
     local labelText = tostring(entry.labelText or "")
     local detailText = tostring(entry.detailText or "")
     local spellIconTexture = tostring(entry.spellIconTexture or "")
+    local logKind = normalizeLogKind(entry.logKind)
+    local spellRef = tostring(entry.spellRef or "")
     if entryType == "status" then
         if detailText == "" then
             detailText = labelText
@@ -450,6 +464,8 @@ function Client:NormalizeCombatLogEntry(entry)
         spellIconTexture = spellIconTexture ~= "" and spellIconTexture or DEFAULT_ICON,
         labelText = labelText,
         detailText = detailText,
+        logKind = logKind,
+        spellRef = spellRef ~= "" and spellRef or nil,
         accentColor = normalizeColorHex(entry.accentColor),
         casterColor = normalizeColorHex(entry.casterColor),
         targetColor = normalizeColorHex(entry.targetColor),
@@ -481,6 +497,9 @@ function Client:BuildCombatLogArguments(entry)
         normalized.casterColor or "",
         normalized.targetColor or "",
         normalized.detailText ~= "" and normalized.detailText or "",
+        "",
+        normalized.logKind or "",
+        normalized.spellRef or "",
     }
 end
 
@@ -508,6 +527,14 @@ function Client:BuildCombatLogDisplayText(entry)
     local targetText = wrapTextWithColor(normalized.targetDisplayName, normalized.targetColor)
     if string.find(detailText, "|c", 1, true) == nil then
         detailText = wrapTextWithColor(detailText, normalized.accentColor)
+    end
+
+    if normalized.logKind == "spellcast_start" then
+        return ("%s begins casting %s %s"):format(
+            casterText,
+            buildIconMarkup(normalized.spellIconTexture),
+            wrapTextWithColor(normalized.labelText, normalized.accentColor)
+        )
     end
 
     return ("%s %s %s    %s"):format(
@@ -598,7 +625,13 @@ function Client:HandleCombatLog(arguments, sender, distribution, target, message
         casterColor = arguments and arguments[12],
         targetColor = arguments and arguments[13],
         detailText = arguments and arguments[14],
-        turnNumber = arguments and arguments[15],
+        logKind = normalizeLogKind(arguments and arguments[16]),
+        spellRef = arguments and (normalizeLogKind(arguments and arguments[16]) and arguments[17] or ""),
+        -- Argument 15 is the turn number for turn-tagged payloads. Payloads
+        -- without a semantic kind may still contain the legacy turn there.
+        turnNumber = arguments and (
+            arguments[15]
+        ),
     })
     if not normalized or normalized.eventId ~= tostring(eventState.id or "") then
         return false

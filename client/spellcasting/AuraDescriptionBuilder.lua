@@ -345,6 +345,25 @@ local function buildPassiveHealSentence(effect, targetContext, options)
     return ("Heals for %s health each turn."):format(amountText)
 end
 
+local function buildPassiveApplyAuraSentence(effect, targetContext, options)
+    local _, auraDefinition = resolveAuraDefinition(effect and effect.auraRef or nil, options)
+    local auraName = ensureString(auraDefinition and auraDefinition.name, "an aura")
+    local targetObject = targetContext and targetContext.object or "the affected unit"
+    local sentence = targetObject == "you"
+        and ("Applies %s to you"):format(auraName)
+        or ("Applies %s to %s"):format(auraName, targetObject)
+    local stacks = math.max(1, math.floor(tonumber(effect and effect.stacks) or 1))
+    local duration = math.max(0, math.floor(tonumber(effect and effect.duration) or 0))
+    if stacks > 1 then
+        sentence = ("%s with %d stacks"):format(sentence, stacks)
+    end
+    if duration > 0 then
+        sentence = ("%s for %s"):format(sentence, formatTurnLabel(duration))
+    end
+
+    return sentence .. "."
+end
+
 local function buildPassiveResourceSentence(effect, targetContext)
     local amount = tonumber(effect and effect.amount) or 0
     local amountMode = tostring(effect and effect.amountMode or "flat")
@@ -749,12 +768,20 @@ local function buildEventInterruptClause(targetContext)
     return ("interrupt %s"):format(targetContext.object)
 end
 
-local function buildEventRevertClause(targetContext)
+local function buildEventRemoveHiddenClause(targetContext)
     if targetContext.object == "you" then
-        return "revert the last spell that affected you"
+        return "reveal yourself"
     end
 
-    return ("revert the last spell that affected %s"):format(targetContext.object)
+    return ("reveal %s"):format(targetContext.object)
+end
+
+local function buildEventRevertClause(targetContext)
+    if targetContext.object == "you" then
+        return "revert the last reversible spell received by you this turn"
+    end
+
+    return ("revert the last reversible spell received by %s this turn"):format(targetContext.object)
 end
 
 local function buildEventEffectClause(currentAuraName, currentAuraRef, combatEventId, triggerTarget, targetContext, effect, options)
@@ -771,6 +798,9 @@ local function buildEventEffectClause(currentAuraName, currentAuraRef, combatEve
     end
     if effectType == "apply_aura" then
         return buildEventApplyAuraClause(effect, resolvedTargetContext, options)
+    end
+    if effectType == "remove_hidden" then
+        return buildEventRemoveHiddenClause(resolvedTargetContext)
     end
     if effectType == "remove_aura" then
         return buildEventRemoveAuraClause(currentAuraName, currentAuraRef, effect, resolvedTargetContext, options)
@@ -806,6 +836,8 @@ function AuraDescriptionBuilder:BuildGeneratedDescription(auraDefinition, option
             sentence = buildPassiveHealSentence(effect, targetContext, options)
         elseif effectType == "resource" then
             sentence = buildPassiveResourceSentence(effect, targetContext)
+        elseif effectType == "apply_aura" then
+            sentence = buildPassiveApplyAuraSentence(effect, targetContext, options)
         elseif effectType == "stat" then
             sentence = buildPassiveStatSentence(effect, targetContext, options)
         elseif effectType == "skill" then
@@ -923,6 +955,25 @@ local function buildPassiveHealSentenceTemplate(effect, effectIndex, state)
         applyMode = "heal_amount",
     })
     return ("Heals for %s health each turn."):format(amountToken)
+end
+
+local function buildPassiveApplyAuraSentenceTemplate(effect, targetContext, options)
+    local _, auraDefinition = resolveAuraDefinition(effect and effect.auraRef or nil, options)
+    local auraName = ensureString(auraDefinition and auraDefinition.name, "an aura")
+    local targetObject = targetContext and targetContext.object or "the affected unit"
+    local sentence = targetObject == "you"
+        and ("Applies %s to you"):format(auraName)
+        or ("Applies %s to %s"):format(auraName, targetObject)
+    local stacks = math.max(1, math.floor(tonumber(effect and effect.stacks) or 1))
+    local duration = math.max(0, math.floor(tonumber(effect and effect.duration) or 0))
+    if stacks > 1 then
+        sentence = ("%s with %d stacks"):format(sentence, stacks)
+    end
+    if duration > 0 then
+        sentence = ("%s for %s"):format(sentence, formatTurnLabel(duration))
+    end
+
+    return sentence .. "."
 end
 
 local function buildPassiveResourceSentenceTemplate(effect, effectIndex, state)
@@ -1106,6 +1157,9 @@ local function buildEventEffectClauseTemplate(currentAuraName, currentAuraRef, c
     if effectType == "apply_aura" then
         return buildEventApplyAuraClause(effect, resolvedTargetContext, options)
     end
+    if effectType == "remove_hidden" then
+        return buildEventRemoveHiddenClause(resolvedTargetContext)
+    end
     if effectType == "remove_aura" then
         return buildEventRemoveAuraClause(currentAuraName, currentAuraRef, effect, resolvedTargetContext, options)
     end
@@ -1232,6 +1286,8 @@ function AuraDescriptionBuilder:BuildTooltipTemplatePayload(auraDefinition, opti
             sentence = buildPassiveHealSentenceTemplate(effect, effectIndex, bodyState)
         elseif effectType == "resource" then
             sentence = buildPassiveResourceSentenceTemplate(effect, effectIndex, bodyState)
+        elseif effectType == "apply_aura" then
+            sentence = buildPassiveApplyAuraSentenceTemplate(effect, targetContext, options)
         elseif effectType == "stat" then
             sentence = buildPassiveStatSentenceTemplate(effect, effectIndex, bodyState)
         elseif effectType == "skill" then

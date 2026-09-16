@@ -240,24 +240,63 @@ local function buildCandidateSet(candidates)
     return set
 end
 
+local function buildCandidateByEventId(candidates)
+    local byEventId = {}
+    for index = 1, #(candidates or {}) do
+        local candidate = candidates[index]
+        local eventId = normalizeEventId(candidate and candidate.eventID)
+        if eventId > 0 then
+            byEventId[eventId] = candidate
+        end
+    end
+    return byEventId
+end
+
+local function normalizeRaidMarker(value)
+    local marker = math.floor(tonumber(value) or 0)
+    return marker >= 1 and marker <= 8 and marker or 0
+end
+
 local function validateSelectionForPolicy(ids, candidates, policy)
     policy = type(policy) == "table" and policy or {}
     local minTargets = normalizePolicyCount(policy.minTargets)
     local maxTargets = normalizePolicyCount(policy.maxTargets)
-    if maxTargets < minTargets then
+    local targetType = tostring(policy.type or "single")
+    if targetType ~= "all_allies" and maxTargets < minTargets then
         maxTargets = minTargets
     end
-    if #ids < minTargets or (maxTargets > 0 and #ids > maxTargets) then
+    if #ids < minTargets
+        or (targetType ~= "all_allies" and maxTargets > 0 and #ids > maxTargets)
+    then
         return false, "target-count-invalid"
     end
-    if maxTargets == 0 and #ids > 0 then
+    if targetType ~= "all_allies" and maxTargets == 0 and #ids > 0 then
         return false, "target-count-invalid"
     end
 
     local candidateSet = buildCandidateSet(candidates)
+    local candidatesByEventId = buildCandidateByEventId(candidates)
     for index = 1, #ids do
         if candidateSet[ids[index]] ~= true then
             return false, "target-invalid"
+        end
+    end
+
+    if targetType == "all_allies" then
+        local expectedCount = #candidates
+        if #ids ~= expectedCount then
+            return false, "target-set-invalid"
+        end
+    elseif targetType == "raid_marker" then
+        local anchor = candidatesByEventId[ids[1]]
+        local anchorMarker = normalizeRaidMarker(anchor and anchor.raidMarker)
+        if anchorMarker <= 0 then
+            return false, "target-marker-invalid"
+        end
+        for index = 2, #ids do
+            if normalizeRaidMarker(candidatesByEventId[ids[index]] and candidatesByEventId[ids[index]].raidMarker) ~= anchorMarker then
+                return false, "target-marker-mismatch"
+            end
         end
     end
     return true

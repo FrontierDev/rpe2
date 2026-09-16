@@ -37,6 +37,23 @@ AuraManager:RegisterEffect({
         end
 
         local currentAura = type(context) == "table" and context.aura or nil
+        if string.lower(tostring(effect and effect.match or "aura")) == "tag" then
+            local removed, removedEntries, removedCount = AuraManager:RemoveAurasByTagFromContext(
+                Addon.Client,
+                context,
+                effect and effect.tag or nil,
+                effect and effect.maxAuras or nil
+            )
+            return removed, {
+                effectType = "remove_aura",
+                applied = removed,
+                auraEntries = removedEntries,
+                removedCount = removedCount or 0,
+                match = "tag",
+                tag = effect and effect.tag or nil,
+                maxAuras = effect and effect.maxAuras or nil,
+            }
+        end
         local auraRef = effect and effect.auraRef or nil
         if type(auraRef) ~= "string" or auraRef == "" then
             auraRef = currentAura and currentAura.auraRef or nil
@@ -101,6 +118,28 @@ AuraManager:RegisterEffect({
             auraRef = auraRef,
             casterEventId = casterEventId,
             targetEventId = targetEventId,
+        }
+    end,
+})
+
+AuraManager:RegisterEffect("remove_aura_by_tag", {
+    Execute = function(self, context, effect)
+        local targetUnit = type(context) == "table" and context.targetUnit or nil
+        if type(targetUnit) ~= "table" or type(self.RemoveAurasByTagsFromContext) ~= "function" then
+            return false, nil
+        end
+
+        local removed, removedEntries, removedCount = self:RemoveAurasByTagsFromContext(
+            Addon.Client,
+            context,
+            effect and (effect.tags or effect.tag) or nil,
+            effect and effect.maxAuras or nil
+        )
+        return removed, {
+            effectType = "remove_aura_by_tag",
+            applied = removed,
+            auraEntries = removedEntries,
+            removedCount = removedCount or 0,
         }
     end,
 })

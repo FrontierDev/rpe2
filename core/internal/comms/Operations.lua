@@ -542,6 +542,30 @@ Operations.Opcodes = Operations.Opcodes or {
             return client:HandleNPCSpeech(arguments, sender, distribution, target, message)
         end,
     },
+    [37] = {
+        key = "SKILL_ROLL_BROADCAST",
+        name = "skill-roll-broadcast",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local server = Addon.Server
+            if not server or type(server.HandleSkillRollBroadcast) ~= "function" then
+                return false
+            end
+
+            return server:HandleSkillRollBroadcast(arguments, sender, distribution, target, message)
+        end,
+    },
+    [38] = {
+        key = "SKILL_ROLL_RESULT",
+        name = "skill-roll-result",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleSkillRollResult) ~= "function" then
+                return false
+            end
+
+            return client:HandleSkillRollResult(arguments, sender, distribution, target, message)
+        end,
+    },
 }
 
 Operations:ResetRegistry()

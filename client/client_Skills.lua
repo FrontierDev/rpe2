@@ -5,6 +5,7 @@ Addon.Internal = Addon.Internal or {}
 Addon.Utils = Addon.Utils or {}
 
 local Client = Addon.Client
+local Comms = Addon.Internal.Comms or {}
 local Database = Addon.Internal.Database or {}
 local Dependencies = Database.Dependecies or {}
 local Profile = Addon.Internal.Profile or {}
@@ -15,6 +16,10 @@ local Common = Addon.Utils.Common or {}
 
 local DEFAULT_SKILL_ROLL_DICE = "1d20"
 local DEFAULT_SKILL_ICON = "Interface\\Icons\\Ability_Hunter_FocusedAim"
+local Operations = Comms.Operations or {}
+local SKILL_ROLL_BROADCAST_OPCODE = Operations.GetOpcode and Operations:GetOpcode("SKILL_ROLL_BROADCAST") or nil
+local SKILL_ROLL_RESULT_OPCODE = Operations.GetOpcode and Operations:GetOpcode("SKILL_ROLL_RESULT") or nil
+local skillRollBroadcastSequence = 0
 
 local function ensureSkillRollRule()
     local rules = Ruleset.Rules and Ruleset.Rules.Definitions or nil
@@ -319,6 +324,109 @@ local function emitSkillRollChatMessage(result)
     return true
 end
 
+local function buildSkillRollChatMessage(result)
+    return ("%s rolls %s: %s."):format(
+        tostring(result.unitName or "Unknown"),
+        tostring(result.skillName or result.skillRef or "Skill"),
+        buildRollDetailText(result.baseRoll, result.modifier, result.total)
+    )
+end
+
+local function buildSkillRollArguments(result)
+    return {
+        tostring(result.sourceName or ""),
+        tostring(result.rollId or ""),
+        tostring(result.unitName or "Unknown"),
+        tostring(result.skillName or result.skillRef or "Skill"),
+        tostring(result.baseRoll or 0),
+        tostring(result.modifier or 0),
+        tostring(result.total or 0),
+    }
+end
+
+local function normalizeSkillRollArguments(arguments)
+    if type(arguments) ~= "table" then
+        return nil
+    end
+
+    local sourceName = tostring(arguments[1] or ""):match("^%s*(.-)%s*$") or ""
+    local rollId = tostring(arguments[2] or ""):match("^%s*(.-)%s*$") or ""
+    local unitName = tostring(arguments[3] or ""):match("^%s*(.-)%s*$") or ""
+    local skillName = tostring(arguments[4] or ""):match("^%s*(.-)%s*$") or ""
+    local baseRoll = tonumber(arguments[5])
+    local modifier = tonumber(arguments[6])
+    local total = tonumber(arguments[7])
+    if sourceName == "" or rollId == "" or unitName == "" or skillName == ""
+        or #sourceName > 96 or #rollId > 96 or #unitName > 96 or #skillName > 128
+        or not rollId:match("^[%w%._:%-]+$")
+        or baseRoll == nil or modifier == nil or total == nil
+        or baseRoll ~= baseRoll or modifier ~= modifier or total ~= total
+        or baseRoll == math.huge or baseRoll == -math.huge
+        or modifier == math.huge or modifier == -math.huge
+        or total == math.huge or total == -math.huge
+    then
+        return nil
+    end
+
+    return {
+        sourceName = sourceName,
+        rollId = rollId,
+        unitName = unitName,
+        skillName = skillName,
+        baseRoll = baseRoll,
+        modifier = modifier,
+        total = total,
+    }
+end
+
+local function getServerChannelId()
+    local state = type(Client.GetState) == "function" and Client:GetState() or Client.State
+    if type(state) ~= "table" or state.active ~= true then
+        return nil
+    end
+
+    local channelId = tonumber(state.channelId)
+    return channelId and channelId > 0 and channelId or nil
+end
+
+local function markSkillRollSeen(result)
+    Client.SkillRollSeenIds = Client.SkillRollSeenIds or {}
+    Client.SkillRollSeenOrder = Client.SkillRollSeenOrder or {}
+    local key = tostring(result.sourceName or "") .. "\31" .. tostring(result.rollId or "")
+    if Client.SkillRollSeenIds[key] then
+        return false
+    end
+
+    Client.SkillRollSeenIds[key] = true
+    Client.SkillRollSeenOrder[#Client.SkillRollSeenOrder + 1] = key
+    while #Client.SkillRollSeenOrder > 256 do
+        local expiredKey = table.remove(Client.SkillRollSeenOrder, 1)
+        Client.SkillRollSeenIds[expiredKey] = nil
+    end
+    return true
+end
+
+local function sendSkillRollToServer(result)
+    local channelId = getServerChannelId()
+    if not channelId or not SKILL_ROLL_BROADCAST_OPCODE or type(Comms.SendToChannel) ~= "function" then
+        return false
+    end
+
+    return Comms:SendToChannel(channelId, SKILL_ROLL_BROADCAST_OPCODE, buildSkillRollArguments(result), {
+        opcode = SKILL_ROLL_BROADCAST_OPCODE,
+        scope = "client",
+    }) == true
+end
+
+local function sendSkillRollToGroupChat(result)
+    local distribution = type(Common.GetGroupType) == "function" and Common.GetGroupType() or nil
+    if (distribution ~= "PARTY" and distribution ~= "RAID") or type(SendChatMessage) ~= "function" then
+        return false
+    end
+
+    return pcall(SendChatMessage, buildSkillRollChatMessage(result), distribution)
+end
+
 local function emitSkillRollCombatLog(result, skill, eventState, options)
     if type(eventState) ~= "table" or eventState.active ~= true then
         return false
@@ -356,6 +464,29 @@ end
 
 function Client:GetSkillRollDiceExpression()
     return getSkillRollDiceExpression()
+end
+
+function Client:HandleSkillRollResult(arguments, sender, distribution, target, message)
+    local channelId = getServerChannelId()
+    local state = type(self.GetState) == "function" and self:GetState() or self.State
+    local normalizedSender = type(Common.NormalizeName) == "function"
+        and Common.NormalizeName(sender)
+        or tostring(sender or "")
+    local expectedHost = type(Common.NormalizeName) == "function"
+        and Common.NormalizeName(state and state.hostName)
+        or tostring(state and state.hostName or "")
+    if distribution ~= "CHANNEL" or tonumber(target) ~= channelId
+        or normalizedSender == "" or expectedHost == "" or normalizedSender ~= expectedHost
+    then
+        return false
+    end
+
+    local result = normalizeSkillRollArguments(arguments)
+    if not result or markSkillRollSeen(result) ~= true then
+        return result ~= nil
+    end
+
+    return emitSkillRollChatMessage(result)
 end
 
 function Client:ResolveSkillRollModifier(skillRef, options)
@@ -423,7 +554,18 @@ function Client:RollSkill(skillRef, options)
         total = total,
     }
 
-    emitSkillRollChatMessage(result)
+    skillRollBroadcastSequence = skillRollBroadcastSequence + 1
+    result.sourceName = type(Common.GetPlayerName) == "function" and Common.GetPlayerName() or ""
+    result.rollId = ("r%d-%d"):format(
+        math.max(0, math.floor(tonumber(type(Common.GetNow) == "function" and Common.GetNow() or 0) or 0)),
+        skillRollBroadcastSequence
+    )
+    if sendSkillRollToServer(result) then
+        markSkillRollSeen(result)
+        emitSkillRollChatMessage(result)
+    elseif not sendSkillRollToGroupChat(result) then
+        emitSkillRollChatMessage(result)
+    end
     emitSkillRollCombatLog(result, skill, eventState, options)
     local progression = Client.SkillProgression
     if type(progression) == "table"

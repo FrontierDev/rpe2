@@ -319,14 +319,22 @@ local function getBucketAuraEntriesForTarget(bucket, targetEventId)
         return entries
     end
 
+    local fallbackKeys = {}
     for auraKey, entry in pairs(bucket.byKey or {}) do
         if type(entry) == "table"
             and tonumber(entry.targetEventId) == numericTargetEventId
             and (tonumber(entry.stacks) or 0) > 0
         then
-            entries[#entries + 1] = entry
-            addAuraKeyToTargetIndex(bucket, numericTargetEventId, auraKey)
+            fallbackKeys[#fallbackKeys + 1] = auraKey
         end
+    end
+    table.sort(fallbackKeys, function(left, right)
+        return tostring(left) < tostring(right)
+    end)
+    for index = 1, #fallbackKeys do
+        local auraKey = fallbackKeys[index]
+        entries[#entries + 1] = bucket.byKey[auraKey]
+        addAuraKeyToTargetIndex(bucket, numericTargetEventId, auraKey)
     end
     return entries
 end
@@ -434,6 +442,30 @@ local function normalizeRef(value)
     end
 
     return ref
+end
+
+local function normalizeAuraTag(value)
+    local tag = tostring(value or "")
+    tag = tag:gsub("^%s+", ""):gsub("%s+$", "")
+    if tag == "" then
+        return nil
+    end
+
+    return string.lower(tag)
+end
+
+local function auraDefinitionHasTag(auraDefinition, expectedTag)
+    if type(auraDefinition) ~= "table" or type(auraDefinition.tags) ~= "table" then
+        return false
+    end
+
+    for index = 1, #auraDefinition.tags do
+        if normalizeAuraTag(auraDefinition.tags[index]) == expectedTag then
+            return true
+        end
+    end
+
+    return false
 end
 
 local function sameAuraRef(left, right)
@@ -1647,6 +1679,66 @@ local function buildAuraPresenceText(prefix, auraName, stacks)
     return ("%s %s"):format(prefix, auraName)
 end
 
+local RPE_CHAT_ICON = "|TInterface\\AddOns\\RPEngine2\\data\\textures\\ui\\rpe.png:14:14:0:0|t"
+
+local function emitLocalPlayerAuraLossChat(eventState, targetEventId, targetUnit, auraName)
+    if not (DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function")
+    then
+        return false
+    end
+
+    local localEventId = type(resolveLocalEventId) == "function" and resolveLocalEventId(eventState) or 0
+    if tonumber(localEventId) > 0 then
+        if tonumber(localEventId) ~= tonumber(targetEventId) then
+            return false
+        end
+    end
+
+    local normalizeName = Common.NormalizeName
+    local localName = type(Common.GetPlayerName) == "function" and Common.GetPlayerName() or ""
+    local targetName = type(targetUnit) == "table" and targetUnit.name or ""
+    if type(normalizeName) == "function" then
+        localName = normalizeName(localName)
+        targetName = normalizeName(targetName)
+    else
+        localName = tostring(localName or "")
+        targetName = tostring(targetName or "")
+    end
+    if tonumber(localEventId) <= 0 and (localName == "" or targetName ~= localName) then
+        return false
+    end
+
+    DEFAULT_CHAT_FRAME:AddMessage(
+        ("%s %s faded from you."):format(RPE_CHAT_ICON, tostring(auraName or "Aura")),
+        0.55,
+        0.55,
+        0.55
+    )
+    return true
+end
+
+local function emitExpiredAuraLossChat(eventState, targetEventId, targetUnit, entry)
+    if type(entry) ~= "table" then
+        return false
+    end
+
+    local auraDefinition = entry.definition
+    if type(auraDefinition) ~= "table" then
+        local _, resolvedAuraDefinition = AuraManager:ResolveAuraDefinition(entry.auraRef, {
+            datasetId = entry.datasetId,
+        })
+        auraDefinition = resolvedAuraDefinition
+    end
+
+    local auraName = tostring(type(auraDefinition) == "table" and auraDefinition.name or entry.auraRef or "Aura")
+    return emitLocalPlayerAuraLossChat(
+        eventState,
+        targetEventId,
+        targetUnit,
+        auraName
+    )
+end
+
 local function publishAuraCombatLog(client, eventState, previousEntry, nextEntry, queueOnly)
     local publish = queueOnly == true
         and client.QueueCombatLogEntry
@@ -1708,6 +1800,10 @@ local function publishAuraCombatLog(client, eventState, previousEntry, nextEntry
     local casterUnit = findEventUnit(eventState, sourceEntry and sourceEntry.casterEventId or 0)
     local targetUnit = findEventUnit(eventState, targetEventId)
 
+    if not gained then
+        emitLocalPlayerAuraLossChat(eventState, targetEventId, targetUnit, auraName)
+    end
+
     return publish(client, {
         eventId = tostring(eventState and eventState.id or ""),
         entryType = "status",
@@ -1716,6 +1812,7 @@ local function publishAuraCombatLog(client, eventState, previousEntry, nextEntry
         targetCount = 1,
         spellIconTexture = auraIcon,
         detailText = detailText,
+        logKind = gained and "aura_gain" or "aura_loss",
         accentColor = Addon.UI and type(Addon.UI.ResolveColor) == "function" and Addon.UI.ResolveColor(nil, accentColorToken) or nil,
     })
 end
@@ -3419,6 +3516,100 @@ function AuraManager:DispelAuraFromContext(client, context, auraRef, casterEvent
     return true
 end
 
+function AuraManager:RemoveAurasByTagsFromContext(client, context, tags, maxAuras)
+    -- Limited tag removal follows the target index's aura application order.
+    -- Rebuilt indexes use aura-key order so clients choose the same entries.
+    local eventState = type(context) == "table" and context.eventState or nil
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return false, {}, 0
+    end
+
+    local expectedTags = {}
+    local tagValues = type(tags) == "table" and tags or { tags }
+    for index = 1, #tagValues do
+        local expectedTag = normalizeAuraTag(tagValues[index])
+        if expectedTag then
+            expectedTags[expectedTag] = true
+        end
+    end
+    if not next(expectedTags) then
+        return false, {}, 0
+    end
+
+    local targetUnit = type(context) == "table" and (context.targetUnit or context.target) or nil
+    local targetEventId = tonumber(
+        type(context) == "table" and (context.targetEventId or (targetUnit and targetUnit.eventID)) or nil
+    ) or 0
+    if targetEventId <= 0 then
+        return false, {}, 0
+    end
+
+    local bucket = self:GetEventAuraBucket(client, eventState.id, false)
+    if not bucket then
+        return false, {}, 0
+    end
+
+    local limit = tonumber(maxAuras)
+    if not limit or limit <= 0 or limit >= math.huge or math.floor(limit) ~= limit then
+        limit = nil
+    end
+
+    local matchingEntries = {}
+    local targetEntries = getBucketAuraEntriesForTarget(bucket, targetEventId)
+    for index = 1, #targetEntries do
+        local entry = targetEntries[index]
+        if type(entry) == "table" then
+            local _, auraDefinition = self:ResolveAuraDefinition(entry.auraRef, {
+                dataset = type(context) == "table" and context.dataset or nil,
+                datasetId = entry.datasetId or (type(context) == "table" and context.datasetId or nil),
+                sourceDatasetId = type(context) == "table" and context.sourceDatasetId or nil,
+                spellDatasetId = type(context) == "table" and context.spellDatasetId or nil,
+            })
+            if type(auraDefinition) ~= "table" then
+                auraDefinition = entry.definition
+            end
+            local matchesTag = false
+            for expectedTag in pairs(expectedTags) do
+                if auraDefinitionHasTag(auraDefinition, expectedTag) then
+                    matchesTag = true
+                    break
+                end
+            end
+            if matchesTag then
+                matchingEntries[#matchingEntries + 1] = entry
+                if limit and #matchingEntries >= limit then
+                    break
+                end
+            end
+        end
+    end
+
+    if #matchingEntries == 0 then
+        return false, {}, 0
+    end
+
+    local removedEntries = {}
+    for index = 1, #matchingEntries do
+        local entry = matchingEntries[index]
+        if self:DispelAuraFromContext(
+            client,
+            context,
+            entry.auraRef,
+            entry.casterEventId,
+            entry.targetEventId,
+            entry
+        ) then
+            removedEntries[#removedEntries + 1] = entry
+        end
+    end
+
+    return #removedEntries > 0, removedEntries, #removedEntries
+end
+
+function AuraManager:RemoveAurasByTagFromContext(client, context, tag, maxAuras)
+    return self:RemoveAurasByTagsFromContext(client, context, { tag }, maxAuras)
+end
+
 function AuraManager:RemoveAuraStacksFromContext(client, context, auraRef, stacks, casterEventId, targetEventId)
     local eventState = type(context) == "table" and context.eventState or nil
     if type(eventState) ~= "table" or eventState.active ~= true then
@@ -4049,6 +4240,7 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
             localPlayerDerivedStateImpact = buildAuraDerivedStateImpact(entry)
         end
         self:RemoveAura(client, eventState, entry.auraRef, entry.casterEventId, entry.targetEventId)
+        emitExpiredAuraLossChat(eventState, entry.targetEventId, targetUnit, entry)
         changed = true
         local activeBucket = self:GetEventAuraBucket(client, eventId, false)
         if activeBucket then
@@ -4079,11 +4271,13 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
     if shouldExecuteLocalAuraTick(client, eventState, casterUnit) then
         self:TickAura(client, eventState, entry, casterUnit, targetUnit)
     end
+    local previousDurationEntry = cloneAuraTickerState(entry)
     if self:AdvanceAuraDurations(entry) then
         if localPlayerEventId > 0 and tonumber(entry.targetEventId) == localPlayerEventId then
             localPlayerDerivedStateImpact = buildAuraDerivedStateImpact(entry)
         end
         self:RemoveAura(client, eventState, entry.auraRef, entry.casterEventId, entry.targetEventId)
+        emitExpiredAuraLossChat(eventState, entry.targetEventId, targetUnit, previousDurationEntry)
         changed = true
     else
         changed = true

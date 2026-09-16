@@ -699,7 +699,7 @@ local function formatEventAmountText(amount, amountMode, suffix)
         return ("%g%% of Max%s"):format(math.abs(tonumber(amount) or 0), normalizedSuffix)
     end
 
-    return tostring(math.abs(tonumber(amount) or 0))
+    return tostring(math.abs(tonumber(amount) or 0)) .. normalizedSuffix
 end
 
 local function buildSkillBonusSentence(entry)

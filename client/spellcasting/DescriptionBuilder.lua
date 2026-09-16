@@ -29,6 +29,7 @@ local appendThreatDescription
 
 local MIN_VARIANCE = 0.9
 local MAX_VARIANCE = 1.1
+local RAID_MARKER_TOOLTIP_NOTE = "|cff999999Targets must share the same raid marker.|r"
 
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
@@ -730,6 +731,12 @@ local function resolveTargetPhrase(target)
     if targetType == "last_attackers" then
         return "the last attacker of the target"
     end
+    if targetType == "last_melee_attacker" then
+        return "the last enemy to attack you with a melee attack"
+    end
+    if targetType == "all_allies" then
+        return "all allies"
+    end
 
     local disposition = tostring(target and target.targetDisposition or "enemy")
     local singular = "a target"
@@ -744,6 +751,9 @@ local function resolveTargetPhrase(target)
 
     local minTargets = math.max(0, tonumber(target and target.minTargets) or 0)
     local maxTargets = math.max(minTargets, tonumber(target and target.maxTargets) or 0)
+    if targetType == "raid_marker" then
+        return ("up to %d %s"):format(math.max(1, maxTargets), plural)
+    end
     if maxTargets <= 1 and minTargets <= 1 then
         return singular
     end
@@ -779,6 +789,22 @@ local function buildAuraTargetContext(target)
             object = "the last attacker of the target",
             possessive = "the last attacker of the target's",
             reflexive = "itself",
+        }
+    end
+    if targetType == "last_melee_attacker" then
+        return {
+            subject = "the last enemy to attack you with a melee attack",
+            object = "the last enemy to attack you with a melee attack",
+            possessive = "the last enemy to attack you with a melee attack's",
+            reflexive = "itself",
+        }
+    end
+    if targetType == "all_allies" then
+        return {
+            subject = "all allies",
+            object = "all allies",
+            possessive = "all allies'",
+            reflexive = "themselves",
         }
     end
 
@@ -966,6 +992,11 @@ local function buildApplyAuraSentence(detail, component)
     return sentence .. "."
 end
 
+local function buildHideSentence(component)
+    local targetPhrase = resolveTargetPhrase(component and component.target or nil)
+    return ("Cause %s to become hidden."):format(targetPhrase)
+end
+
 local function buildSummonPetSentence()
     return "Summon the selected unit under your control."
 end
@@ -982,7 +1013,127 @@ end
 
 local function buildRevertSentence(component)
     local targetPhrase = resolveTargetPhrase(component and component.target or nil)
-    return ("Reverse the effects of the last spell that affected %s."):format(targetPhrase)
+    return ("Reverse the effects of the last reversible spell received by %s this turn."):format(targetPhrase)
+end
+
+local function formatAuraTagLabel(tag)
+    local normalizedTag = trimText(tag)
+    if normalizedTag == "" then
+        return nil
+    end
+
+    return string.upper(normalizedTag:sub(1, 1)) .. normalizedTag:sub(2)
+end
+
+local function formatAuraTagList(tags, fallbackTag)
+    local values = {}
+    if type(tags) == "table" then
+        for index = 1, #tags do
+            local value = trimText(tags[index])
+            if value ~= "" then
+                values[#values + 1] = value
+            end
+        end
+    elseif type(tags) == "string" then
+        for tag in tags:gmatch("[^,]+") do
+            tag = trimText(tag)
+            if tag ~= "" then
+                values[#values + 1] = tag
+            end
+        end
+    end
+
+    if #values == 0 and fallbackTag ~= nil then
+        local value = trimText(fallbackTag)
+        if value ~= "" then
+            values[1] = value
+        end
+    end
+
+    return table.concat(values, ", ")
+end
+
+local function buildRemoveAuraSentence(detail, component)
+    local effect = component and component.effect or nil
+    if type(effect) ~= "table" then
+        return nil
+    end
+
+    if tostring(effect.match or "aura") == "tag" then
+        local tagLabel = formatAuraTagLabel(effect.tag)
+        if not tagLabel then
+            return nil
+        end
+
+        local targetPhrase = resolveTargetPhrase(component.target)
+
+        local maxAuras = tonumber(effect.maxAuras)
+        if maxAuras and maxAuras > 0 and maxAuras < math.huge and math.floor(maxAuras) == maxAuras then
+            return ("Remove up to %d auras tagged %s from %s."):format(maxAuras, tagLabel, targetPhrase)
+        end
+
+        return ("Remove all auras tagged %s from %s."):format(tagLabel, targetPhrase)
+    end
+
+    local auraRef = effect.auraRef
+    if type(auraRef) ~= "string" or auraRef == "" then
+        return ("Remove an aura from %s."):format(resolveTargetPhrase(component.target))
+    end
+
+    local metadata = resolveAuraMetadata(detail, auraRef)
+    if metadata.unresolved == true then
+        error(buildTemplateResolutionError(detail, metadata.auraRef or auraRef))
+    end
+    local targetPhrase = resolveTargetPhrase(component.target)
+    local stacks = math.max(1, math.floor(tonumber(effect.stacks) or 1))
+    if stacks > 1 then
+        return ("Remove %d stacks of %s from %s."):format(stacks, metadata.name, targetPhrase)
+    end
+
+    return ("Remove %s from %s."):format(metadata.name, targetPhrase)
+end
+
+local function buildRemoveAuraByTagSentence(component)
+    local effect = component and component.effect or nil
+    if type(effect) ~= "table" then
+        return nil
+    end
+
+    local tagList = formatAuraTagList(effect.tags, effect.tag)
+    if tagList == "" then
+        return nil
+    end
+
+    local targetPhrase = resolveTargetPhrase(component.target)
+    local maxAuras = tonumber(effect.maxAuras)
+    if maxAuras and maxAuras > 0 and maxAuras < math.huge and math.floor(maxAuras) == maxAuras then
+        return ("Remove up to %d %s effects from %s."):format(maxAuras, tagList, targetPhrase)
+    end
+
+    return ("Remove all %s effects from %s."):format(tagList, targetPhrase)
+end
+
+local function hasRaidMarkerTarget(components)
+    for index = 1, #(components or {}) do
+        local target = components[index] and components[index].target or nil
+        if tostring(target and target.type or "") == "raid_marker" then
+            return true
+        end
+    end
+    return false
+end
+
+local function appendRaidMarkerTooltipNote(description, components)
+    if not hasRaidMarkerTarget(components) then
+        return description
+    end
+
+    local text = trimText(description)
+    if text == "" then
+        return RAID_MARKER_TOOLTIP_NOTE
+    end
+
+    return text .. "\n" .. RAID_MARKER_TOOLTIP_NOTE
 end
 
 local function buildSentence(detail, casterUnit, component)
@@ -999,6 +1150,9 @@ local function buildSentence(detail, casterUnit, component)
     if effectType == "apply_aura" then
         return buildApplyAuraSentence(detail, component)
     end
+    if effectType == "hide" then
+        return buildHideSentence(component)
+    end
     if effectType == "summon_pet" then
         return buildSummonPetSentence()
     end
@@ -1007,6 +1161,12 @@ local function buildSentence(detail, casterUnit, component)
     end
     if effectType == "revert" then
         return buildRevertSentence(component)
+    end
+    if effectType == "remove_aura" then
+        return buildRemoveAuraSentence(detail, component)
+    end
+    if effectType == "remove_aura_by_tag" then
+        return buildRemoveAuraByTagSentence(component)
     end
 
     return nil
@@ -1177,6 +1337,9 @@ local function buildTemplateSentence(detail, componentIndex, component, state)
     if effectType == "apply_aura" then
         return buildApplyAuraSentence(detail, component)
     end
+    if effectType == "hide" then
+        return buildHideSentence(component)
+    end
     if effectType == "summon_pet" then
         return buildSummonPetSentence()
     end
@@ -1185,6 +1348,12 @@ local function buildTemplateSentence(detail, componentIndex, component, state)
     end
     if effectType == "revert" then
         return buildRevertSentence(component)
+    end
+    if effectType == "remove_aura" then
+        return buildRemoveAuraSentence(detail, component)
+    end
+    if effectType == "remove_aura_by_tag" then
+        return buildRemoveAuraByTagSentence(component)
     end
 
     return nil
@@ -1312,6 +1481,7 @@ function DescriptionBuilder:BuildTooltipTemplatePayload(detail)
     end
 
     local mainText = appendThreatDescription(detail, prependBasicAttackPrefix(detail, table.concat(sentences, " ")))
+    mainText = appendRaidMarkerTooltipNote(mainText, normalizedComponents)
     local casterUnit = resolveCasterUnit(detail)
     local targetUnit = resolveTooltipTargetUnit(detail)
     local auraSections = {}
@@ -1551,7 +1721,8 @@ function DescriptionBuilder:BuildGeneratedDescription(detail, casterUnit)
         end
     end
 
-    return appendThreatDescription(detail, prependBasicAttackPrefix(detail, table.concat(sentences, " ")))
+    local description = appendThreatDescription(detail, prependBasicAttackPrefix(detail, table.concat(sentences, " ")))
+    return appendRaidMarkerTooltipNote(description, normalizedComponents)
 end
 
 function DescriptionBuilder:BuildGeneratedAuraSections(detail, casterUnit)

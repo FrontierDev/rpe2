@@ -3675,8 +3675,17 @@ function Profile.IsSetupWizardEnabled()
         return nil
     end
 
+    -- An active ruleset is resolved during addon startup.  Treat an
+    -- unresolved ruleset as an unavailable setup decision rather than
+    -- interpreting the rule helper's default as "disabled" and allowing the
+    -- profile through the post-setup gate.
+    local activeRuleset = rulesetLogic.GetActiveRuleset()
+    if type(activeRuleset) ~= "table" then
+        return nil
+    end
+
     return rulesetLogic.GetRulesetRuleValueByKey(
-        rulesetLogic.GetActiveRuleset(),
+        activeRuleset,
         "setup",
         "enable_setup_wizard",
         false
@@ -3698,12 +3707,6 @@ function Profile.IsSetupComplete()
 
     local state = Database.GetProfileSetupWizardState()
     if type(state) == "table" and state.completed == true then
-        return true
-    end
-
-    if type(Database.MigrateProfileSetupWizardCompletion) == "function"
-        and Database.MigrateProfileSetupWizardCompletion() == true
-    then
         return true
     end
 

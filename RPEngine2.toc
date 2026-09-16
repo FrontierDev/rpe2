@@ -1,7 +1,7 @@
 ## Interface: 120100
 ## Title: RPEngine 2.0
 ## Notes: Fully-integrated roll system and associated RP tools.
-## Version: 2.0.0
+## Version: 2.0.alpha4
 ## Author: Ortellus @ Argent Dawn (Discord: ortellus)
 ## SavedVariables: RPEngineProfilesDB, RPEngineRulesetDB, RPEngineDatasetDB, RPEngineGlobalSettingsDB, RPEngineInventoryDB
 
@@ -102,6 +102,9 @@ client/conditions/ItemEquipped.lua
 client/conditions/AuraRequirement.lua
 client/conditions/TraitRequirement.lua
 client/conditions/CasterDead.lua
+client/conditions/CasterDefendedMeleeThisTurn.lua
+client/conditions/CasterKilledThisTurn.lua
+client/conditions/TargetKilledThisTurn.lua
 client/conditions/CasterHealthPercent.lua
 client/conditions/TargetHealthPercent.lua
 client/conditions/TargetCreatureType.lua

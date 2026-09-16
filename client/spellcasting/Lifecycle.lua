@@ -418,6 +418,36 @@ function Spellcasting.InterruptUnitSpellcast(self, eventState, targetUnit, optio
     return true, removedEntry
 end
 
+local function emitSpellcastStartCombatLog(client, eventState, casterUnit, spell, spellRef)
+    if type(client) ~= "table"
+        or type(client.QueueCombatLogEntryEmission) ~= "function"
+        or type(eventState) ~= "table"
+        or eventState.active ~= true
+        or type(casterUnit) ~= "table"
+    then
+        return false
+    end
+
+    local spellName = tostring(Spellcasting.ResolveSpellName(spellRef) or spellRef or "spell")
+    local spellIcon = type(client.ResolveCombatLogSpellIcon) == "function"
+        and client:ResolveCombatLogSpellIcon(spell, spellRef)
+        or nil
+
+    return client:QueueCombatLogEntryEmission({
+        eventId = tostring(eventState.id or ""),
+        entryType = "status",
+        logKind = "spellcast_start",
+        spellRef = spellRef,
+        casterDisplayName = tostring(casterUnit.name or "Unknown"),
+        targetDisplayName = tostring(casterUnit.name or "Unknown"),
+        targetCount = 1,
+        labelText = spellName,
+        detailText = ("Begins casting %s."):format(spellName),
+        spellIconTexture = spellIcon,
+        turnNumber = eventState.turnNumber,
+    })
+end
+
 function Client:HandleSpellcastStart(arguments, sender)
     local payload = Spellcasting.ValidateInboundSpellcast and Spellcasting.ValidateInboundSpellcast(self, arguments, sender) or nil
     if not payload then
@@ -666,6 +696,7 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
 
     Spellcasting.SetCastEntry(self, eventState.id, casterUnit.eventID, entry)
     Spellcasting.LogLifecycle("start", casterUnit.isPlayer == true and "player" or "npc", casterUnit.name, Spellcasting.ResolveSpellName(spellRef), numericCastTime)
+    emitSpellcastStartCombatLog(self, eventState, casterUnit, spell, spellRef)
     if timingEnabled then
         appendTimingPhase(timingPhases, "state", getNowMilliseconds() - stateStartTime, SPELLCAST_SLOW_HELPER_MS)
     end

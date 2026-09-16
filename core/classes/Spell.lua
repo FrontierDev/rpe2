@@ -35,6 +35,45 @@ local function trimText(value)
     return text
 end
 
+local function normalizeRemoveAuraMatch(value)
+    if string.lower(trimText(value)) == "tag" then
+        return "tag"
+    end
+
+    return "aura"
+end
+
+local function normalizePositiveIntegerOrNil(value)
+    local numeric = tonumber(value)
+    if numeric and numeric > 0 and numeric < math.huge and math.floor(numeric) == numeric then
+        return numeric
+    end
+
+    return nil
+end
+
+local function normalizeTagList(value)
+    local source = type(value) == "table" and value or { value }
+    local normalized = {}
+    for index = 1, #source do
+        local rawTag = source[index]
+        if type(rawTag) == "string" then
+            for tag in rawTag:gmatch("[^,]+") do
+                tag = trimText(tag)
+                if tag ~= "" then
+                    normalized[#normalized + 1] = tag
+                end
+            end
+        else
+            local tag = trimText(rawTag)
+            if tag ~= "" then
+                normalized[#normalized + 1] = tag
+            end
+        end
+    end
+    return normalized
+end
+
 local function copyScalarFields(source, keys)
     local copied = {}
     for index = 1, #keys do
@@ -413,6 +452,15 @@ local function buildDefaultEffect(effectType)
         }
     end
 
+    if normalizedType == "remove_aura_by_tag" then
+        return {
+            type = "remove_aura_by_tag",
+            tags = {},
+            maxAuras = nil,
+            targetEvents = {},
+        }
+    end
+
     if normalizedType == "summon_pet" then
         return {
             type = "summon_pet",
@@ -451,8 +499,11 @@ local function buildDefaultEffect(effectType)
     if normalizedType == "remove_aura" then
         return {
             type = "remove_aura",
+            match = "aura",
             auraRef = nil,
             stacks = 1,
+            tag = nil,
+            maxAuras = nil,
             targetEvents = {},
         }
     end
@@ -538,8 +589,25 @@ local function normalizeEffect(value)
     end
 
     if effect.type == "remove_aura" then
-        effect.auraRef = normalizeRef(data.auraRef)
-        effect.stacks = math.max(1, math.floor(tonumber(data.stacks) or 1))
+        effect.match = normalizeRemoveAuraMatch(data.match)
+        if effect.match == "tag" then
+            effect.auraRef = nil
+            effect.stacks = 1
+            effect.tag = trimText(data.tag)
+            effect.maxAuras = normalizePositiveIntegerOrNil(data.maxAuras)
+        else
+            effect.auraRef = normalizeRef(data.auraRef)
+            effect.stacks = math.max(1, math.floor(tonumber(data.stacks) or 1))
+            effect.tag = nil
+            effect.maxAuras = nil
+        end
+        effect.targetEvents = normalizeEventList(data.targetEvents)
+        return effect
+    end
+
+    if effect.type == "remove_aura_by_tag" then
+        effect.tags = normalizeTagList(data.tags or data.tag)
+        effect.maxAuras = normalizePositiveIntegerOrNil(data.maxAuras)
         effect.targetEvents = normalizeEventList(data.targetEvents)
         return effect
     end
@@ -568,8 +636,11 @@ local function normalizeTarget(value)
     if targetType ~= "caster"
         and targetType ~= "single"
         and targetType ~= "multi"
+        and targetType ~= "all_allies"
+        and targetType ~= "raid_marker"
         and targetType ~= "pet"
         and targetType ~= "last_attackers"
+        and targetType ~= "last_melee_attacker"
     then
         targetType = "single"
     end
@@ -577,6 +648,9 @@ local function normalizeTarget(value)
     local targetDisposition = tostring(data.targetDisposition or "enemy")
     if targetDisposition ~= "ally" and targetDisposition ~= "enemy" and targetDisposition ~= "any" then
         targetDisposition = "enemy"
+    end
+    if targetType == "all_allies" then
+        targetDisposition = "ally"
     end
 
     if targetType == "caster" then
@@ -605,10 +679,39 @@ local function normalizeTarget(value)
         }
     end
 
+    if targetType == "last_melee_attacker" then
+        return {
+            type = "last_melee_attacker",
+            requiresTarget = true,
+            targetDisposition = "enemy",
+            minTargets = 1,
+            maxTargets = 1,
+            allowDeadTargets = normalizeBool(data.allowDeadTargets, false),
+            allowHiddenTargets = normalizeBool(data.allowHiddenTargets, false),
+            disableSelfCast = normalizeBool(data.disableSelfCast, false),
+        }
+    end
+
     local requiresTarget = data.requiresTarget ~= false
     local fallbackMinTargets = requiresTarget and 1 or 0
+    if targetType == "single" then
+        return {
+            type = "single",
+            requiresTarget = requiresTarget,
+            targetDisposition = targetDisposition,
+            minTargets = fallbackMinTargets,
+            maxTargets = 1,
+            allowDeadTargets = normalizeBool(data.allowDeadTargets, false),
+            allowHiddenTargets = normalizeBool(data.allowHiddenTargets, false),
+            disableSelfCast = normalizeBool(data.disableSelfCast, false),
+        }
+    end
+
     local minTargets = math.max(0, math.floor(tonumber(data.minTargets) or fallbackMinTargets))
     local maxTargets = math.max(minTargets, math.floor(tonumber(data.maxTargets) or math.max(1, minTargets)))
+    if targetType == "all_allies" then
+        maxTargets = 0
+    end
 
     return {
         type = targetType,
