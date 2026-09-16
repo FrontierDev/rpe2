@@ -1,195 +1,188 @@
 ## Summary
 
-Review and complete the **partial descriptor templates** used to generate spell tooltip text so every supported spell targeter/effect type has accurate player-facing wording.
+Implement the user-facing and lifecycle behavior for temporary datasets introduced by #320:
 
-This issue is specifically about the composable tooltip fragments used by `client/spellcasting/DescriptionBuilder.lua`, e.g.:
+1. expose a simple **Lifetime** field in dataset metadata editing;
+2. show the resulting absolute expiry for temporary datasets;
+3. automatically remove expired temporary datasets during addon/database initialization;
+4. ensure expired datasets are removed from activation/configuration state cleanly and in one batched operation.
 
-```text
-Deal {damage information} {damage school} damage to {target information}.
-Heal {target information} for {healing information} health.
-Apply {aura} to {target information}.
-```
+Target branch: `dev`.
 
-It is **not** a general tooltip architecture rewrite.
+Depends on: #320.
 
-## Current gaps
+## Existing architecture
 
-### Target descriptors
+The Data Editor already has a dataset-level inspector (`client/ui/editor/inspectors/page_InspectorDataset.lua`) which directs the user to edit dataset metadata from the dataset entry in the left pane. Extend the existing dataset metadata editing flow rather than adding a separate temporary-dataset window.
 
-`resolveTargetPhrase()` currently has special handling for `caster`, `pet`, and `last_attackers`, with ordinary `single`/`multi` targets falling through to disposition/count wording.
+`core/internal/database/Database.lua` already owns `Database.Initialize()`, `Database.EnsureDatasets()`, activation state and `Database.DeleteDataset()`. Expiry cleanup belongs in this existing database lifecycle.
 
-The new targeters being added need explicit descriptor behaviour where their semantics differ from ordinary `single`/`multi` targeting.
+## Data Editor: Lifetime field
 
-#### `all_allies`
-
-New targeter.
-
-Use:
+Add a dataset metadata field:
 
 ```text
-all allies
+Lifetime: [ Permanent v ]
 ```
 
-Examples:
+`Permanent` is the default.
+
+Provide a small fixed set of practical temporary durations. The exact labels can follow the existing dropdown conventions; a suitable initial set is:
 
 ```text
-Heal all allies for {amount} health.
-Apply {Aura} to all allies.
+Permanent
+1 Hour
+6 Hours
+12 Hours
+24 Hours
+3 Days
+7 Days
 ```
 
-Do not render this as `up to N allies`.
+The dropdown must call the central lifetime mutation API from #320. Do not calculate/write `expiresAt` independently in the UI.
 
-#### `raid_marker`
-
-New targeter.
-
-The main target phrase should deliberately use the normal multi-target wording:
+When a temporary lifetime is selected, also display the resolved absolute expiry as read-only information, e.g.:
 
 ```text
-up to {N} allies
-up to {N} enemies
-up to {N} targets
+Expires: 17 Sep 2026 18:00 (server time)
 ```
 
-Do **not** mention the raid marker inside the main effect sentence.
+The display is informational only; the persisted `expiresAt` timestamp remains authoritative.
 
-Instead, add a separate grey informational line at the bottom of the spell tooltip:
+Changing unrelated dataset fields must not alter the expiry.
+
+## Expiry cleanup API
+
+Add a database operation equivalent to:
+
+```lua
+Database.PurgeExpiredDatasets(now)
+```
+
+Behavior:
+
+1. inspect normalized datasets;
+2. identify temporary datasets where `expiresAt <= now`;
+3. remove each expired dataset using the same underlying deletion semantics as normal dataset deletion;
+4. remove stale references from all relevant dataset activation/selection state;
+5. leave permanent datasets untouched;
+6. return the IDs/count of datasets removed for diagnostics/tests.
+
+`now` may be optional in production and default to `GetServerTime()`, but allowing it to be supplied makes deterministic testing straightforward.
+
+## Do not call full public deletion repeatedly
+
+Avoid implementing purge as a simple loop over:
+
+```lua
+Database.DeleteDataset(id)
+```
+
+if that causes a complete configuration refresh/notification for every expired dataset.
+
+Instead, factor the existing dataset removal mechanics into an internal helper if necessary, for example:
+
+```lua
+removeDatasetRecord(root, datasetId, options)
+```
+
+Then use it from both:
+
+- `Database.DeleteDataset()` for normal interactive deletion;
+- `Database.PurgeExpiredDatasets()` for batched startup cleanup.
+
+The purge should issue at most one configuration invalidation/refresh after all expired datasets have been removed.
+
+## Activation/state cleanup
+
+Expiry is deletion, not merely deactivation.
+
+For every expired dataset, ensure cleanup covers all places that can keep a dataset logically present, including the current structures used by the database such as:
+
+- `root.datasets`;
+- `root.activatedDatasets`;
+- character-scoped active/selected dataset references where applicable;
+- dependency bookkeeping/caches that normal dataset deletion currently updates;
+- registry/configuration state that must be rebuilt after deletion.
+
+Do not leave an expired dataset hidden in storage but still referenced by activation or compatibility hashes.
+
+## Addon-load ordering
+
+Run expiry cleanup during the normal database/addon initialization path after dataset SavedVariables have been loaded/normalized, but **before expired datasets can be treated as active configuration for the session**.
+
+The intended startup flow is conceptually:
 
 ```text
-Targets must share the same raid marker.
+load SavedVariables
+    ↓
+Ensure/normalize datasets
+    ↓
+PurgeExpiredDatasets(GetServerTime())
+    ↓
+continue normal registry/configuration startup
 ```
 
-This should appear once per spell where a raid-marker targeter is used, not once per component sentence.
+This is specifically an addon-load/login cleanup. No background timer is required for this issue.
 
-#### last melee attacker targeter
+A dataset that expires while the player remains logged in may remain until the next addon load unless another existing configuration boundary naturally invokes the purge. Do not add periodic polling solely for this feature.
 
-The planned targeter for "the unit that last attacked the caster with a melee attack" needs dedicated wording matching its actual semantics.
+## Import interaction
 
-Use:
+Coordinate with #320 so an already-expired dataset cannot survive just because it is imported after initialization.
+
+Either:
+
+- reject an expired import before installation; or
+- run the same expiry predicate/removal immediately as part of import.
+
+In either case, the expired dataset must not appear as activated usable content.
+
+## UI refresh behavior
+
+If cleanup occurs before the Data Editor is opened, expired datasets simply must not appear.
+
+If the purge function is invoked while the editor is already open for any reason, existing configuration refresh behavior should safely clear invalid dataset/entry selections rather than leaving references to the removed object.
+
+No special archive/trash view is required: expiry means permanent local removal.
+
+## Diagnostics
+
+Add an `RPE INTERNAL` diagnostic entry when cleanup removes datasets, preferably summarized rather than one line per dataset, e.g.:
 
 ```text
-the last enemy to attack you with a melee attack
+Purged 3 expired temporary datasets: event_foo, event_bar, event_baz
 ```
 
-Do not reuse the existing vague `last_attackers` phrase `the last attacker of the target` for this targeter.
+Do not log anything on every login when nothing expired.
 
-## Spell effect descriptors
+## Tests / validation
 
-### Existing `remove_aura`
+Exercise at minimum:
 
-`remove_aura` is already an executable/editor-supported spell effect but is missing from the spell description dispatcher.
-
-Add player-facing templates that include aura name, stack count when relevant, and target phrase.
-
-Examples:
-
-```text
-Remove {Aura} from {target}.
-Remove {N} stacks of {Aura} from {target}.
-```
-
-### Existing `hide`
-
-`hide` is already supported by the spell runtime/editor but has no spell tooltip descriptor.
-
-Use player-facing wording such as:
-
-```text
-Cause {target} to become hidden.
-```
-
-Do not expose implementation terminology such as "set hidden status" in the normal tooltip.
-
-### New `remove_aura_by_tag`
-
-Add the new effect type for removing auras by one or more authored tags and add its tooltip descriptor at the same time.
-
-The descriptor must use:
-
-```text
-Remove all {tag, tag, tag, tag} effect(s) from {target}.
-```
-
-Requirements:
-
-- render the complete authored tag list in the effect sentence;
-- preserve authored tag names;
-- comma-separate multiple tags;
-- use the normal resolved target phrase for `{target}`;
-- the effect operates on all matching aura effects, rather than naming a specific aura reference.
-
-If the implementation also supports an optional maximum number of removals, extend the descriptor consistently rather than silently omitting that limit.
-
-### Existing `revert`
-
-`revert` already has a descriptor:
-
-```text
-Reverse the effects of the last spell that affected {target}.
-```
-
-Retain this unless the runtime semantics change.
-
-## Aura-event descriptor gaps
-
-### Existing `remove_hidden`
-
-`remove_hidden` is already supported as an aura event effect but is not handled by the aura-event description builder.
-
-Use player-facing wording based on the resolved event target, e.g.:
-
-```text
-reveal {target}
-```
-
-rather than `remove hidden`.
-
-## Passive aura descriptor gaps
-
-### Existing passive `apply_aura`
-
-The aura schema/editor permits passive `apply_aura` effects, but the passive aura description dispatcher does not currently emit text for them.
-
-Add the equivalent aura application descriptor so authorable passive effects are not silently omitted from generated aura text.
-
-## Effect/target types covered by this work
-
-### New target types
-
-- `all_allies`
-- `raid_marker`
-- dedicated targeter for the unit that last attacked the caster with a melee attack
-
-### New spell effect types
-
-- `remove_aura_by_tag`
-
-### Existing types whose descriptor coverage must be completed/fixed
-
-- target: `last_attackers` / replacement dedicated last-melee-attacker semantics
-- spell effect: `remove_aura`
-- spell effect: `hide`
-- spell effect: `revert` — verify existing text remains correct
-- aura event effect: `remove_hidden`
-- passive aura effect: `apply_aura`
-
-## Implementation guidance
-
-Keep the implementation centred on the existing descriptor composition in `client/spellcasting/DescriptionBuilder.lua` and `client/spellcasting/AuraDescriptionBuilder.lua`.
-
-The main spell sentence should continue to be assembled from an effect descriptor plus a resolved target phrase. Special targeting constraints that do not belong grammatically inside the sentence, such as `raid_marker`, should be emitted as supplementary grey tooltip lines.
-
-Avoid introducing spell-specific hard-coded descriptions. The templates must remain generic and data-driven.
+- Permanent dataset survives startup purge.
+- Temporary dataset with future expiry survives startup purge.
+- Temporary dataset with `expiresAt == now` is removed.
+- Temporary dataset with past expiry is removed.
+- Multiple expired datasets are removed in one purge.
+- Purging removes activation references as well as the dataset records.
+- Purging several datasets emits only one configuration refresh/invalidation.
+- Non-expired activated datasets remain activated.
+- Data Editor does not list an expired dataset after startup.
+- Lifetime dropdown updates through the database API and shows the new expiry.
+- Reopening the editor does not recalculate/extend expiry.
+- `/reload` after the expiry removes the dataset.
+- An imported dataset whose absolute expiry is already in the past is not left installed/active.
 
 ## Acceptance criteria
 
-- Every target/effect type listed above produces complete generated tooltip text.
-- `all_allies` renders as `all allies`.
-- `raid_marker` renders the ordinary `up to N allies/enemies/targets` main phrase plus exactly one grey `Targets must share the same raid marker.` line.
-- the last-melee-attacker targeter describes the caster's last melee attacker, not `the last attacker of the target`.
-- `remove_aura` no longer disappears from generated spell descriptions.
-- `hide` no longer disappears from generated spell descriptions.
-- `remove_aura_by_tag` renders `Remove all {tags} effect(s) from {target}.` with the authored tag list.
-- `remove_hidden` is represented in aura-event descriptions with player-facing `reveal` wording.
-- passive aura `apply_aura` effects are represented rather than omitted.
-- existing damage/heal/resource/apply-aura/interrupt/revert/summon-pet descriptors continue to generate normally.
+- [ ] Dataset metadata exposes a `Lifetime` selector with `Permanent` as the default.
+- [ ] Temporary selections show the absolute server-time expiry.
+- [ ] UI changes use the central lifetime API from #320.
+- [ ] Expired temporary datasets are deleted during addon/database initialization.
+- [ ] Cleanup uses the normal dataset deletion semantics for activation/dependency state.
+- [ ] Multiple expired datasets are cleaned in one batched configuration change.
+- [ ] Permanent and non-expired temporary datasets are untouched.
+- [ ] No periodic expiry polling is introduced.
+- [ ] Expired imports cannot remain active/usable.
+- [ ] Cleanup produces concise INTERNAL diagnostics only when something was removed.

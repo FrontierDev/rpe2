@@ -73,6 +73,130 @@ local DATASET_TYPE_SORT_ORDER = {
     items = 5,
 }
 
+-- Dataset lifetime keys are persisted identifiers, not editor labels. Keep the
+-- canonical values stable so exports remain portable between clients.
+local DATASET_LIFETIME_DEFINITIONS = {
+    permanent = { duration = nil, label = "Permanent" },
+    ["1-hour"] = { duration = 60 * 60, label = "1 Hour" },
+    ["6-hour"] = { duration = 6 * 60 * 60, label = "6 Hours" },
+    ["12-hour"] = { duration = 12 * 60 * 60, label = "12 Hours" },
+    ["24-hour"] = { duration = 24 * 60 * 60, label = "24 Hours" },
+    ["3-day"] = { duration = 3 * 24 * 60 * 60, label = "3 Days" },
+    ["7-day"] = { duration = 7 * 24 * 60 * 60, label = "7 Days" },
+    -- Retain the earlier preset as an import/backwards-compatibility key even
+    -- though the editor exposes the smaller fixed set from the follow-up task.
+    ["30-day"] = { duration = 30 * 24 * 60 * 60, label = "30 Days" },
+}
+
+local DATASET_LIFETIME_ALIASES = {
+    permanent = "permanent",
+    ["1-hour"] = "1-hour",
+    ["1-hours"] = "1-hour",
+    ["1h"] = "1-hour",
+    ["6-hour"] = "6-hour",
+    ["6-hours"] = "6-hour",
+    ["6h"] = "6-hour",
+    ["12-hour"] = "12-hour",
+    ["12-hours"] = "12-hour",
+    ["12h"] = "12-hour",
+    ["24-hour"] = "24-hour",
+    ["24-hours"] = "24-hour",
+    ["24h"] = "24-hour",
+    day = "24-hour",
+    ["3-day"] = "3-day",
+    ["3-days"] = "3-day",
+    ["3d"] = "3-day",
+    ["7-day"] = "7-day",
+    ["7-days"] = "7-day",
+    ["7d"] = "7-day",
+    ["30-day"] = "30-day",
+    ["30-days"] = "30-day",
+    ["30d"] = "30-day",
+}
+
+Database.DatasetLifetimeDefinitions = DATASET_LIFETIME_DEFINITIONS
+
+local function normalizeDatasetLifetime(value)
+    if type(value) ~= "string" then
+        return nil
+    end
+
+    local key = value:gsub("^%s+", ""):gsub("%s+$", ""):lower()
+    key = key:gsub("[%s_]+", "-")
+    return DATASET_LIFETIME_ALIASES[key]
+end
+
+local function normalizeDatasetExpiry(value)
+    local timestamp = tonumber(value)
+    if timestamp == nil
+        or timestamp ~= timestamp
+        or timestamp == math.huge
+        or timestamp == -math.huge
+        or timestamp <= 0
+    then
+        return nil
+    end
+
+    return timestamp
+end
+
+local function getServerEpoch()
+    if type(GetServerTime) ~= "function" then
+        return nil
+    end
+
+    local timestamp = tonumber(GetServerTime())
+    if timestamp == nil
+        or timestamp ~= timestamp
+        or timestamp == math.huge
+        or timestamp == -math.huge
+    then
+        return nil
+    end
+
+    return timestamp
+end
+
+local function getDatasetLifetimeDuration(lifetimeKey)
+    local normalizedLifetime = normalizeDatasetLifetime(lifetimeKey)
+    local definition = normalizedLifetime and DATASET_LIFETIME_DEFINITIONS[normalizedLifetime] or nil
+    return definition and definition.duration or nil, normalizedLifetime
+end
+
+local function calculateDatasetExpiry(lifetimeKey, serverTime)
+    local duration, normalizedLifetime = getDatasetLifetimeDuration(lifetimeKey)
+    if not normalizedLifetime then
+        return nil, "Unknown dataset lifetime."
+    end
+    if normalizedLifetime == "permanent" then
+        return nil
+    end
+
+    local now = tonumber(serverTime)
+    if now == nil
+        or now ~= now
+        or now == math.huge
+        or now == -math.huge
+    then
+        now = nil
+    end
+    if now == nil then
+        now = getServerEpoch()
+    end
+    if now == nil then
+        return nil, "Server time is unavailable."
+    end
+
+    return now + duration
+end
+
+Database.NormalizeDatasetLifetime = normalizeDatasetLifetime
+Database.GetDatasetLifetimeDuration = function(lifetimeKey)
+    local duration, normalizedLifetime = getDatasetLifetimeDuration(lifetimeKey)
+    return duration, normalizedLifetime
+end
+Database.CalculateDatasetExpiry = calculateDatasetExpiry
+
 local DATASET_ENTRY_DEFINITIONS = {
     units = { className = "Unit", singular = "Unit", assignsId = true },
     mounts = { className = "Mount", singular = "Mount", assignsId = true },
@@ -166,6 +290,8 @@ local CONFIGURATION_CHANGE_CLASSIFICATION = {
     ["dataset-delete"] = "authored configuration",
     ["dataset-rename"] = "authored configuration",
     ["dataset-update"] = "authored configuration",
+    ["dataset-lifetime"] = "authored configuration",
+    ["dataset-expired"] = "authored configuration",
     ["dataset-entry"] = "authored configuration",
 }
 
@@ -652,6 +778,18 @@ local function normalizeDatasetRecord(record, fallbackId, fallbackName)
     local data = ensureTable(record)
     local datasetId = ensureString(data.id or fallbackId, "")
     local name = normalizeDatasetName(data.name or fallbackName)
+    local lifetime = normalizeDatasetLifetime(data.lifetime) or "permanent"
+    local expiresAt = nil
+
+    if lifetime ~= "permanent" then
+        expiresAt = normalizeDatasetExpiry(data.expiresAt)
+        -- A temporary dataset without a valid absolute expiry cannot satisfy
+        -- the lifetime contract. Treat malformed metadata as legacy permanent
+        -- data instead of creating a new expiry during normalization.
+        if expiresAt == nil then
+            lifetime = "permanent"
+        end
+    end
 
     return {
         id = datasetId,
@@ -660,6 +798,8 @@ local function normalizeDatasetRecord(record, fallbackId, fallbackName)
         description = ensureString(data.description, ""),
         authorName = ensureString(data.authorName, getCharacterDisplayName()),
         datasetType = normalizeDatasetState(data.datasetType, DATASET_TYPE_VALUES, "general"),
+        lifetime = lifetime,
+        expiresAt = expiresAt,
         dependencies = ensureTable(data.dependencies),
         units = ensureTable(data.units),
         mounts = ensureTable(data.mounts),
@@ -1861,6 +2001,131 @@ local function normalizeActivatedDatasets(root, preserveMissing)
 
     root.activatedDatasets = normalized
     return root.activatedDatasets
+end
+
+local function isDatasetExpired(dataset, serverTime)
+    local lifetime = type(dataset) == "table" and normalizeDatasetLifetime(dataset.lifetime) or nil
+    if not lifetime or lifetime == "permanent" then
+        return false
+    end
+
+    local expiresAt = normalizeDatasetExpiry(dataset.expiresAt)
+    local now = tonumber(serverTime)
+    if expiresAt == nil or now == nil then
+        return false
+    end
+
+    return now >= expiresAt
+end
+
+Database.IsDatasetExpired = function(dataset, serverTime)
+    local now = tonumber(serverTime)
+    if now == nil then
+        now = getServerEpoch()
+    end
+    return isDatasetExpired(dataset, now)
+end
+
+local function removeDatasetRecord(root, datasetId)
+    if type(root) ~= "table" or type(root.datasets) ~= "table" then
+        return nil
+    end
+
+    local normalizedId = ensureString(datasetId, "")
+    if normalizedId == "" then
+        return nil
+    end
+
+    local dataset = root.datasets[normalizedId]
+    if not dataset then
+        return nil
+    end
+
+    root.datasets[normalizedId] = nil
+    normalizeActivatedDatasets(root)
+
+    for characterKey, activeDatasetId in pairs(root.activeByChar or {}) do
+        if tostring(activeDatasetId or "") == normalizedId then
+            root.activeByChar[characterKey] = nil
+        end
+    end
+
+    if Dependecies and type(Dependecies.HandleDatasetDeleted) == "function" then
+        Dependecies.HandleDatasetDeleted(normalizedId)
+    end
+
+    return dataset
+end
+
+local function purgeExpiredDatasets(root, now, options)
+    if type(root) ~= "table" or type(root.datasets) ~= "table" then
+        return {}, 0
+    end
+
+    local serverTime = tonumber(now)
+    if serverTime == nil then
+        serverTime = getServerEpoch()
+    end
+    if serverTime == nil then
+        return {}, 0
+    end
+
+    local expiredIds = {}
+    for datasetId, dataset in pairs(root.datasets) do
+        if isDatasetExpired(dataset, serverTime) then
+            expiredIds[#expiredIds + 1] = tostring(datasetId)
+        end
+    end
+
+    if #expiredIds == 0 then
+        return expiredIds, 0
+    end
+
+    table.sort(expiredIds)
+    local removedIds = {}
+    for index = 1, #expiredIds do
+        local datasetId = expiredIds[index]
+        if removeDatasetRecord(root, datasetId) then
+            removedIds[#removedIds + 1] = datasetId
+        end
+    end
+
+    if #removedIds > 0 then
+        if not (type(options) == "table" and options.suppressNotification == true) then
+            notifyDatasetConfigurationChanged("dataset-expired")
+        end
+
+        local debug = Addon.Debug
+        if debug and type(debug.Internal) == "function" then
+            debug.Internal(
+                "Purged %d expired temporary datasets: %s",
+                #removedIds,
+                table.concat(removedIds, ", ")
+            )
+        end
+    end
+
+    return removedIds, #removedIds
+end
+
+Database.PurgeExpiredDatasets = function(now)
+    local root = Database.Datasets
+    if type(root) ~= "table"
+        or root ~= rawget(_G, "RPEngineDatasetDB")
+        or type(root.datasets) ~= "table"
+    then
+        root = Database.EnsureDatasets(now)
+    end
+
+    return purgeExpiredDatasets(root, now)
+end
+
+-- Kept as a compatibility wrapper for callers using the previous internal
+-- name. The public operation returns both the removed IDs and count.
+Database.CleanupExpiredDatasets = function(root, options)
+    local targetRoot = type(root) == "table" and root or Database.EnsureDatasets()
+    local removedIds, count = purgeExpiredDatasets(targetRoot, nil, options)
+    return count, removedIds
 end
 
 local function ensureSection(rootName, schemaVersion, defaults)
@@ -3550,7 +3815,7 @@ function Database.EnsureRulesets()
     return rulesets
 end
 
-function Database.EnsureDatasets()
+function Database.EnsureDatasets(purgeNow)
     local datasets = ensureSection("RPEngineDatasetDB", SCHEMA.datasets, {
         datasets = {},
         activeByChar = {},
@@ -3569,6 +3834,7 @@ function Database.EnsureDatasets()
     -- IDs which do not resolve to a current dataset record.
     normalizeActivatedDatasets(datasets, true)
     Database.Datasets = datasets
+    purgeExpiredDatasets(datasets, purgeNow)
     if Dependecies and Dependecies.RecomputeAllDatasetDependencies then
         Dependecies.RecomputeAllDatasetDependencies()
     end
@@ -4107,7 +4373,8 @@ function Database.SetDatasetActivated(datasetId, isActivated, options)
     end
 
     if isActivated == true then
-        if root.datasets[normalizedId] == nil then
+        local dataset = root.datasets[normalizedId]
+        if dataset == nil or isDatasetExpired(dataset) then
             return false
         end
 
@@ -4183,6 +4450,40 @@ function Database.CreateDataset(name)
     }, datasetId, name)
 
     root.datasets[datasetId] = dataset
+    return dataset
+end
+
+function Database.SetDatasetLifetime(datasetId, lifetimeKey)
+    local dataset = Database.GetDatasetByID(datasetId)
+    if not dataset then
+        return nil, "Dataset was not found."
+    end
+
+    local lifetime = normalizeDatasetLifetime(lifetimeKey)
+    if not lifetime then
+        return nil, "Unknown dataset lifetime."
+    end
+
+    local currentLifetime = normalizeDatasetLifetime(dataset.lifetime) or "permanent"
+    local currentExpiry = normalizeDatasetExpiry(dataset.expiresAt)
+    if currentLifetime == lifetime
+        and ((lifetime == "permanent" and dataset.expiresAt == nil)
+            or (lifetime ~= "permanent" and currentExpiry ~= nil and dataset.expiresAt == currentExpiry))
+    then
+        return dataset
+    end
+
+    local expiresAt, expiryError = calculateDatasetExpiry(lifetime)
+    if expiryError then
+        return nil, expiryError
+    end
+
+    -- Assign both fields in one mutation. In particular, ordinary dataset
+    -- edits never pass through this function and therefore cannot extend an
+    -- existing temporary lifetime.
+    dataset.lifetime = lifetime
+    dataset.expiresAt = expiresAt
+    notifyDatasetConfigurationChanged("dataset-lifetime")
     return dataset
 end
 
@@ -4349,12 +4650,21 @@ function Database.ImportDataset(text)
     for datasetId, dataset in pairs(root.datasets or {}) do
         existingDatasets[tostring(datasetId)] = dataset
     end
+    local payloadLifetime = normalizeDatasetLifetime(payloadDataset.lifetime)
+    if payloadLifetime and payloadLifetime ~= "permanent"
+        and normalizeDatasetExpiry(payloadDataset.expiresAt) == nil
+    then
+        return nil, "Temporary dataset has an invalid expiry."
+    end
     local imported = normalizeDatasetRecord(deepCopy(payloadDataset), payloadDataset.id, payloadDataset.name)
     if imported.id == "" then
         imported.id = nextDatasetId(root)
     end
 
     imported = normalizeDatasetRecord(imported, imported.id, imported.name)
+    if isDatasetExpired(imported) then
+        return nil, "Dataset has expired."
+    end
     local previousDataset = existingDatasets[imported.id]
     existingDatasets[imported.id] = imported
     root.datasets = existingDatasets
@@ -4614,16 +4924,8 @@ function Database.DeleteDataset(datasetId)
     end
 
     local root = Database.EnsureDatasets()
-    Database.SetDatasetActivated(dataset.id, false)
-    root.datasets[dataset.id] = nil
-    if Dependecies and Dependecies.HandleDatasetDeleted then
-        Dependecies.HandleDatasetDeleted(dataset.id)
-    end
-
-    for characterKey, activeDatasetId in pairs(root.activeByChar or {}) do
-        if activeDatasetId == dataset.id then
-            root.activeByChar[characterKey] = nil
-        end
+    if not removeDatasetRecord(root, dataset.id) then
+        return false
     end
 
     notifyConfigurationChanged("dataset-delete")

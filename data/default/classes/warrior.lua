@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 13,
+    version = 15,
     dataset = {
         achievements = {},
         auras = {
@@ -476,7 +476,8 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 passiveTraitRefs = {
-                    "7bbb4cb9:gntslayr"
+                    "7bbb4cb9:gntslayr",
+                    "7bbb4cb9:momntm10"
                 },
                 talentTraitRefs = {
                     "7bbb4cb9:duukevtq",
@@ -2704,15 +2705,16 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 events = {
                     {
-                        combatEventId = "on_auto_attack_hit",
+                        combatEventId = "on_auto_attack_taken",
                         effects = {
                             {
-                                amount = 8,
+                                amount = 2,
+                                amountMode = "flat",
                                 resourceRef = "f82db71a:e2tfklq7",
                                 type = "resource"
                             }
                         },
-                        triggerTarget = "event_source"
+                        triggerTarget = "aura_caster"
                     }
                 },
                 icon = "interface/icons/ability_warrior_defensivestance.blp",
@@ -2791,7 +2793,8 @@ Addon.Data.DefaultDatasets:Register({
                         combatEventId = "on_auto_attack_hit",
                         effects = {
                             {
-                                amount = 10,
+                                amount = 2,
+                                amountMode = "flat",
                                 resourceRef = "f82db71a:e2tfklq7",
                                 type = "resource"
                             }
@@ -2802,7 +2805,8 @@ Addon.Data.DefaultDatasets:Register({
                         combatEventId = "on_critical_hit",
                         effects = {
                             {
-                                amount = 5,
+                                amount = 3,
+                                amountMode = "flat",
                                 resourceRef = "f82db71a:e2tfklq7",
                                 type = "resource"
                             }
@@ -2842,10 +2846,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 events = {
                     {
-                        combatEventId = "on_auto_attack_hit",
+                        combatEventId = "on_critical_hit",
                         effects = {
                             {
                                 amount = 8,
+                                amountMode = "flat",
                                 resourceRef = "f82db71a:e2tfklq7",
                                 type = "resource"
                             }
@@ -2983,6 +2988,33 @@ Addon.Data.DefaultDatasets:Register({
                         value = 5
                     }
                 },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "",
+                conditions = {},
+                description = "",
+                events = {
+                    {
+                        combatEventId = "on_auto_attack_hit",
+                        effects = {
+                            {
+                                amount = 10,
+                                amountMode = "flat",
+                                resourceRef = "f82db71a:e2tfklq7",
+                                type = "resource"
+                            }
+                        },
+                        triggerTarget = "aura_caster"
+                    }
+                },
+                icon = "interface/icons/ability_warrior_innerrage.blp",
+                id = "momntm10",
+                isEnvironmental = false,
+                name = "Momentum",
+                skillBonuses = {},
+                statBonuses = {},
                 unlockLevel = 1
             }
         },

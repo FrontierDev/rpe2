@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 7,
+    version = 10,
     dataset = {
         achievements = {},
         auras = {
@@ -438,6 +438,34 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     version = 1
                 }
+            },
+            {
+                description = "",
+                duration = 3,
+                effects = {
+                    {
+                        baseAmount = 25,
+                        operation = "percent",
+                        statRef = "f82db71a:v42albuv",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_holy_layonhands.blp",
+                id = "inspirat",
+                maxStacks = 1,
+                name = "Inspiration",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Armor by 25%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
             }
         },
         authorName = "Ortellus-ArgentDawn",
@@ -499,7 +527,15 @@ Addon.Data.DefaultDatasets:Register({
                 passiveTraitRefs = {
                     "1c1038a7:icnfaith"
                 },
-                talentTraitRefs = {}
+                talentTraitRefs = {
+                    "1c1038a7:silres20",
+                    "1c1038a7:frcwill5",
+                    "1c1038a7:sprheal1",
+                    "1c1038a7:splward5",
+                    "1c1038a7:shdfocus",
+                    "1c1038a7:inspirit",
+                    "1c1038a7:mental10"
+                }
             }
         },
         currencies = {},
@@ -2569,6 +2605,155 @@ Addon.Data.DefaultDatasets:Register({
                 statBonuses = {
                     {
                         statRef = "f82db71a:pu05li08",
+                        value = 10
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Discipline",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_nature_manaregentotem.blp",
+                id = "silres20",
+                isEnvironmental = false,
+                name = "Silent Resolve",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:j8n012e6",
+                        value = -20
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Discipline",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_holy_mindsooth.blp",
+                id = "frcwill5",
+                isEnvironmental = false,
+                name = "Force of Will",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        operation = "percent",
+                        statRef = "f82db71a:7t7xgzcx",
+                        value = 5
+                    },
+                    {
+                        statRef = "f82db71a:69hfqhne",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Holy",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_holy_greaterheal.blp",
+                id = "sprheal1",
+                isEnvironmental = false,
+                name = "Spiritual Healing",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        operation = "percent",
+                        statRef = "f82db71a:hj6d4kvy",
+                        value = 10
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Holy",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_arcane_arcaneresilience.blp",
+                id = "splward5",
+                isEnvironmental = false,
+                name = "Spell Warding",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:zs1nbz13",
+                        value = 5
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Shadow",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_shadow_twilight.blp",
+                id = "shdfocus",
+                isEnvironmental = false,
+                name = "Shadow Focus",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        statRef = "f82db71a:v2g0tw0o",
+                        value = 3
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Holy",
+                conditions = {},
+                description = "",
+                events = {
+                    {
+                        combatEventId = "on_critical_heal",
+                        effects = {
+                            {
+                                auraRef = "1c1038a7:inspirat",
+                                basePower = 0,
+                                duration = 3,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "event_other"
+                    }
+                },
+                icon = "interface/icons/spell_holy_layonhands.blp",
+                id = "inspirit",
+                isEnvironmental = false,
+                name = "Inspiration",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Discipline",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_shadow_focusedpower.blp",
+                id = "mental10",
+                isEnvironmental = false,
+                name = "Mental Strength",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        operation = "percent",
+                        statRef = "f82db71a:75y3a8ib",
                         value = 10
                     }
                 },
