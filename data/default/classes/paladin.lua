@@ -1394,7 +1394,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "single"
+                            type = "multi"
                         }
                     }
                 },
@@ -1492,7 +1492,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "single"
+                            type = "multi"
                         }
                     }
                 },
@@ -1578,7 +1578,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "single"
+                            type = "multi"
                         }
                     }
                 },
@@ -1664,7 +1664,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "single"
+                            type = "multi"
                         }
                     }
                 },
@@ -1757,7 +1757,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "single"
+                            type = "multi"
                         }
                     }
                 },
@@ -1843,7 +1843,7 @@ Addon.Data.DefaultDatasets:Register({
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "ally",
-                            type = "single"
+                            type = "multi"
                         }
                     }
                 },
