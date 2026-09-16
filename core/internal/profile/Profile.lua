@@ -1680,16 +1680,6 @@ function Profile.ValidateTraitAssignment(traitRef, options)
     end
 
     local alreadySelected = selectedTalentLookup[normalizedRef] == true
-    local exclusiveTraitRefs = type(trait.exclusiveTraitRefs) == "table" and trait.exclusiveTraitRefs or {}
-    for index = 1, #exclusiveTraitRefs do
-        local exclusiveTraitRef = ensureString(exclusiveTraitRefs[index])
-        if exclusiveTraitRef ~= "" and exclusiveTraitRef ~= normalizedRef and selectedTalentLookup[exclusiveTraitRef] == true then
-            return traitAssignmentFailure("mutually_exclusive", "This trait cannot be selected with a mutually exclusive trait.", {
-                typeCategory = isClassTalent and "talent" or "talent",
-                exclusiveTraitRef = exclusiveTraitRef,
-            })
-        end
-    end
     local allowance = Profile.GetClassTalentAllowance(profile.level)
     if isClassTalent and not alreadySelected and allowance.isLimited == true and #selectedTalentRefs >= allowance.maxTalentTraits then
         return traitAssignmentFailure("talent_limit", ("Class talent limit reached: %d / %d."):format(#selectedTalentRefs, allowance.maxTalentTraits), {

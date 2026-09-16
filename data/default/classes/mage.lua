@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 11,
+    version = 13,
     dataset = {
         achievements = {},
         auras = {
@@ -152,6 +152,62 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     bodyText = "Increases Spell Crit. Chance by 100%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 2,
+                effects = {
+                    {
+                        baseAmount = 100,
+                        operation = "flat",
+                        statRef = "f82db71a:0w7c7p09",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_fire_firearmor.blp",
+                id = "frwdau01",
+                maxStacks = 1,
+                name = "Fire Ward",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Fire Resistance by 100.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 2,
+                effects = {
+                    {
+                        baseAmount = 100,
+                        operation = "flat",
+                        statRef = "f82db71a:jjn0my8k",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_frost_frostward.blp",
+                id = "fowdau01",
+                maxStacks = 1,
+                name = "Frost Ward",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Frost Resistance by 100.",
                     bodyTokens = {},
                     stackingText = "",
                     stackingTokens = {},
@@ -431,7 +487,8 @@ Addon.Data.DefaultDatasets:Register({
                     "d7c874c4:arcmind1",
                     "d7c874c4:arcinst3",
                     "d7c874c4:misbarge",
-                    "d7c874c4:arcconc1"
+                    "d7c874c4:arcconc1",
+                    "d7c874c4:mastelms"
                 }
             }
         },
@@ -1219,6 +1276,136 @@ Addon.Data.DefaultDatasets:Register({
                             tokenType = "spell_resource_amount"
                         }
                     },
+                    version = 1
+                },
+                totalTicks = 0,
+                triggersGCD = true,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d7c874c4:frwdau01",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "fward001",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 5,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_fire_firearmor.blp",
+                id = "fireward",
+                ignoreGCD = false,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Fire Ward",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Fire",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Increase your Fire Resistance by 100 for 2 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                triggersGCD = true,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d7c874c4:fowdau01",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "fward002",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 5,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_frost_frostward.blp",
+                id = "frostwrd",
+                ignoreGCD = false,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Frost Ward",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Frost",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Increase your Frost Resistance by 100 for 2 turns.",
+                    tokens = {},
                     version = 1
                 },
                 totalTicks = 0,
@@ -2769,7 +2956,43 @@ Addon.Data.DefaultDatasets:Register({
                 automaticAuras = {},
                 category = "Arcane",
                 conditions = {},
-                description = "When you hit with a spell, you have a 25% chance to gain Arcane Missiles for 5 turns. Mutually exclusive with Arcane Concentration.",
+                description = "",
+                events = {
+                    {
+                        combatEventId = "on_critical_hit",
+                        effects = {
+                            {
+                                amount = 10,
+                                amountMode = "base_percent",
+                                resourceRef = "f82db71a:4c8mfm99",
+                                type = "resource"
+                            }
+                        },
+                        triggerTarget = "event_source"
+                    }
+                },
+                icon = "interface/icons/spell_fire_masterofelements.blp",
+                id = "mastelms",
+                isEnvironmental = false,
+                name = "Master of Elements",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Arcane",
+                conditions = {
+                    {
+                        invert = true,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Does not have Arcane Concentration",
+                        traitRef = "d7c874c4:arcconc1",
+                        type = "trait_requirement",
+                        unit = "caster"
+                    }
+                },
+                description = "When you hit with a spell, you have a 25% chance to gain Arcane Missiles for 5 turns.",
                 events = {
                     {
                         chance = 25,
@@ -2786,10 +3009,7 @@ Addon.Data.DefaultDatasets:Register({
                         triggerTarget = "aura_caster"
                     }
                 },
-                exclusiveTraitRefs = {
-                    "d7c874c4:arcconc1"
-                },
-                icon = "interface/icons/spell_arcane_arcane04.blp",
+                icon = "interface/icons/ability_mage_missilebarrage.blp",
                 id = "misbarge",
                 isEnvironmental = false,
                 name = "Missile Barrage",
@@ -2800,8 +3020,17 @@ Addon.Data.DefaultDatasets:Register({
             {
                 automaticAuras = {},
                 category = "Arcane",
-                conditions = {},
-                description = "When you hit with a spell, you have a 20% chance to gain 1 Arcane Charge. Mutually exclusive with Missile Barrage.",
+                conditions = {
+                    {
+                        invert = true,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Does not have Missile Barrage",
+                        traitRef = "d7c874c4:misbarge",
+                        type = "trait_requirement",
+                        unit = "caster"
+                    }
+                },
+                description = "When you hit with a spell, you have a 20% chance to gain 1 Arcane Charge.",
                 events = {
                     {
                         chance = 20,
@@ -2817,10 +3046,7 @@ Addon.Data.DefaultDatasets:Register({
                         triggerTarget = "aura_caster"
                     }
                 },
-                exclusiveTraitRefs = {
-                    "d7c874c4:misbarge"
-                },
-                icon = "interface/icons/spell_nature_wispsplode.blp",
+                icon = "interface/icons/spell_shadow_manaburn.blp",
                 id = "arcconc1",
                 isEnvironmental = false,
                 name = "Arcane Concentration",
