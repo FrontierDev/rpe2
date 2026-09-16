@@ -854,6 +854,47 @@ function Combat:ApplyResourceDelta(unit, resourceRef, delta, options)
     return true, entry, nextValue - currentValue
 end
 
+function Combat:ResolveResourceEffectAmount(context, effect)
+    local amount = tonumber(type(effect) == "table" and effect.amount or nil) or 0
+    local amountMode = tostring(type(effect) == "table" and effect.amountMode or "flat")
+    if amountMode == "flat" then
+        return amount
+    end
+
+    local targetUnit = type(context) == "table" and (context.targetUnit or context.target) or nil
+    local resourceRef = tostring(type(effect) == "table" and effect.resourceRef or "")
+    local resourceEntry = type(targetUnit) == "table" and Lookup.GetResourceEntry and Lookup.GetResourceEntry(targetUnit, resourceRef) or nil
+    local resourceValue = 0
+
+    if amountMode == "base_percent" then
+        local client = type(context) == "table" and context.client or Addon.Client
+        local eventState = type(context) == "table" and context.eventState or nil
+        local localUnit = type(client) == "table" and type(client.ResolveLocalEventUnit) == "function"
+            and client:ResolveLocalEventUnit(eventState)
+            or nil
+        local targetEventId = tonumber(type(targetUnit) == "table" and targetUnit.eventID or nil)
+        local localEventId = tonumber(type(localUnit) == "table" and localUnit.eventID or nil)
+        local isLocalPlayer = type(targetUnit) == "table"
+            and targetUnit.isPlayer == true
+            and ((localUnit == targetUnit) or (targetEventId and localEventId and targetEventId == localEventId))
+
+        if isLocalPlayer and type(Profile.GetResolvedBaseResourceValue) == "function" then
+            resourceValue = tonumber(Profile.GetResolvedBaseResourceValue(resourceRef, {
+                includeAuraBonuses = false,
+            })) or 0
+        end
+    end
+
+    if resourceValue <= 0 then
+        resourceValue = tonumber(resourceEntry and resourceEntry.maxValue)
+            or tonumber(resourceEntry and resourceEntry.currentValue)
+            or 0
+    end
+
+    local resolvedAmount = math.ceil(resourceValue * math.abs(amount) / 100)
+    return amount < 0 and -resolvedAmount or resolvedAmount
+end
+
 function Combat:PreviewResourceDelta(unit, resourceRef, delta, options)
     if type(unit) ~= "table" then
         return false, nil, 0

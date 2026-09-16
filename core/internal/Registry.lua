@@ -10,10 +10,10 @@ local Common = Addon.Utils and Addon.Utils.Common or nil
 local HASH_MODULUS = 4294967296
 local HASH_MULTIPLIER = 33
 local DATASET_HASH_SALTS = {
-    "RPE_ACTIVATED_DATASETS_V1:A",
-    "RPE_ACTIVATED_DATASETS_V1:B",
-    "RPE_ACTIVATED_DATASETS_V1:C",
-    "RPE_ACTIVATED_DATASETS_V1:D",
+    "RPE_ACTIVATED_DATASETS_V2:A",
+    "RPE_ACTIVATED_DATASETS_V2:B",
+    "RPE_ACTIVATED_DATASETS_V2:C",
+    "RPE_ACTIVATED_DATASETS_V2:D",
 }
 local RULESET_HASH_SALTS = {
     "RPE_ACTIVE_RULESET_V1:A",
@@ -263,7 +263,11 @@ function Registry:GenerateActivatedDatasetsHash()
 
     for index = 1, #sortedIds do
         local datasetId = tostring(sortedIds[index] or "")
-        local exportText = Database.ExportDataset and Database.ExportDataset(datasetId) or nil
+        -- Lifecycle metadata determines local dataset availability, not the
+        -- playable definition that compatibility validates.
+        local exportText = Database.ExportDatasetForCompatibilityHash
+            and Database.ExportDatasetForCompatibilityHash(datasetId)
+            or nil
         if type(exportText) ~= "string" or exportText == "" then
             local dataset = Database.GetDatasetByID and Database.GetDatasetByID(datasetId) or nil
             exportText = tostring(dataset and dataset.name or "")

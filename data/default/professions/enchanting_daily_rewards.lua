@@ -82,5 +82,5 @@ if type(dataset) == "table" then
         dataset.loot[#dataset.loot + 1] = definition
     end
 
-    enchanting.version = math.max(2, math.floor(tonumber(enchanting.version) or 1))
+    enchanting.version = math.max(3, math.floor(tonumber(enchanting.version) or 1))
 end

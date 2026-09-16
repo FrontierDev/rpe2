@@ -219,6 +219,7 @@ function EventManage:BuildDashboardPage(page)
         local eventState, reason = nil, nil
         if Server.StartEvent then
             local startData = {}
+            startData.forceHashMismatchStart = type(IsShiftKeyDown) == "function" and IsShiftKeyDown() == true
             if self.EventStartModeDropdown and self.EventStartModeDropdown.GetSelectedValue then
                 startData.eventMode = normalizeEventMode(self.EventStartModeDropdown:GetSelectedValue())
             end

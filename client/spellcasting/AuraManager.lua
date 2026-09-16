@@ -1945,39 +1945,6 @@ local function resolveTriggeredAuraTarget(auraEvent, auraCasterUnit, auraTargetU
     return eventOtherUnit
 end
 
-function AuraManager:ResolveAuraEffectAmount(targetUnit, effect)
-    if type(effect) ~= "table" then
-        return 0
-    end
-
-    local amountMode = tostring(effect.amountMode or "flat")
-    local amount = math.max(0, tonumber(effect.amount) or tonumber(effect.baseAmount) or tonumber(effect.baseDamage) or tonumber(effect.baseHealing) or 0)
-
-    if amountMode == "flat" then
-        return amount
-    end
-
-    local resourceRef = tostring(effect.resourceRef or "")
-    local resourceValue = 0
-
-    if type(targetUnit) == "table" and targetUnit.resources ~= nil then
-        local resources = targetUnit.resources or {}
-        for index = 1, #resources do
-            local entry = resources[index]
-            if type(entry) == "table" and tostring(entry.resourceRef or entry.resourceID or entry.id or "") == resourceRef then
-                if amountMode == "base_percent" then
-                    resourceValue = tonumber(entry.maxValue) or tonumber(entry.currentValue) or 0
-                else -- max_percent
-                    resourceValue = tonumber(entry.maxValue) or tonumber(entry.currentValue) or 0
-                end
-                break
-            end
-        end
-    end
-
-    return math.max(0, math.ceil(resourceValue * amount / 100))
-end
-
 function AuraManager:RegisterEffect(definition)
     if type(definition) ~= "table" or type(definition.type) ~= "string" or definition.type == "" then
         return nil

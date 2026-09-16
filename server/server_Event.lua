@@ -1927,6 +1927,7 @@ function Server:StartEvent(data)
         return nil
     end
 
+    local eventData = type(data) == "table" and data or {}
     local totalTimer = startTiming("Server:StartEvent", {
         context = "event-start",
         thresholdMs = 50,
@@ -1938,11 +1939,16 @@ function Server:StartEvent(data)
     end
 
     if self.HasClientHashMismatch and self:HasClientHashMismatch(sessionState) then
-        if Addon.Debug and Addon.Debug.Warn then
-            Addon.Debug.Warn("StartEvent blocked: one or more connected clients have dataset or ruleset hash mismatches.")
+        if eventData.forceHashMismatchStart ~= true then
+            if Addon.Debug and Addon.Debug.Warn then
+                Addon.Debug.Warn("StartEvent blocked: one or more connected clients have dataset or ruleset hash mismatches.")
+            end
+            stopTiming(totalTimer)
+            return nil, "client-hash-mismatch"
         end
-        stopTiming(totalTimer)
-        return nil
+        if Addon.Debug and Addon.Debug.Warn then
+            Addon.Debug.Warn("StartEvent proceeding despite client dataset or ruleset hash mismatches (dashboard Shift override).")
+        end
     end
 
     if self:IsEventActive() then
@@ -1958,7 +1964,6 @@ function Server:StartEvent(data)
     end
 
     local hostName = Common.NormalizeName(Common.GetPlayerName())
-    local eventData = type(data) == "table" and data or {}
     local draftState = self:GetEventDraftState()
     local eventName = eventData.name or (draftState and draftState.name) or ""
     local eventSubtext = eventData.subtext or (draftState and draftState.subtext) or ""

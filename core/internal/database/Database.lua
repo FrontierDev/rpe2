@@ -4502,6 +4502,26 @@ function Database.ExportDataset(datasetId)
     return "RPE_DATASET_V1\n" .. serializeLuaValue(payload)
 end
 
+-- Compatibility compares gameplay definitions. Keep ordinary exports lossless
+-- so temporary datasets still retain their lifetime and absolute expiry when
+-- shared with another client.
+function Database.ExportDatasetForCompatibilityHash(datasetId)
+    local dataset = Database.GetDatasetByID(datasetId)
+    if not dataset then
+        return nil
+    end
+
+    local normalized = normalizeDatasetRecord(copyAuthoredConfiguration(dataset), dataset.id, dataset.name)
+    normalized.lifetime = nil
+    normalized.expiresAt = nil
+
+    return "RPE_DATASET_V1\n" .. serializeLuaValue({
+        format = "rpe-dataset",
+        version = 1,
+        dataset = normalized,
+    })
+end
+
 function Database.ExportDatasets(datasetIds)
     if type(datasetIds) ~= "table" or #datasetIds == 0 then
         return nil

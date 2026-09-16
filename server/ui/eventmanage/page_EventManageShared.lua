@@ -436,7 +436,9 @@ function EventManage:RefreshDashboard()
     end
 
     if self.StartEventButton and self.StartEventButton.SetEnabled then
-        self.StartEventButton:SetEnabled(serverActive and not eventActive and not hasClientHashMismatch)
+        -- Keep the button clickable during a mismatch so its Shift-held
+        -- dashboard override can deliberately start the event.
+        self.StartEventButton:SetEnabled(serverActive and not eventActive)
     end
 
     if self.StopEventButton and self.StopEventButton.SetEnabled then

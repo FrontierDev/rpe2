@@ -15,7 +15,7 @@ function Combat:ExecuteResourceEffect(context, effect, component)
         }
     end
 
-    local amount = tonumber(effect and effect.amount) or 0
+    local amount = self:ResolveResourceEffectAmount(context, effect)
     local applied, entry, appliedDelta = self:ApplyResourceDelta(target, effect and effect.resourceRef or nil, amount, context)
     local result = {
         effectType = "resource",

@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 9,
+    version = 11,
     dataset = {
         achievements = {},
         auras = {
@@ -429,7 +429,9 @@ Addon.Data.DefaultDatasets:Register({
                     "d7c874c4:arcfocus",
                     "d7c874c4:magabsrb",
                     "d7c874c4:arcmind1",
-                    "d7c874c4:arcinst3"
+                    "d7c874c4:arcinst3",
+                    "d7c874c4:misbarge",
+                    "d7c874c4:arcconc1"
                 }
             }
         },
@@ -2761,6 +2763,69 @@ Addon.Data.DefaultDatasets:Register({
                         value = 3
                     }
                 },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Arcane",
+                conditions = {},
+                description = "When you hit with a spell, you have a 25% chance to gain Arcane Missiles for 5 turns. Mutually exclusive with Arcane Concentration.",
+                events = {
+                    {
+                        chance = 25,
+                        combatEventId = "on_spell_hit",
+                        effects = {
+                            {
+                                auraRef = "d7c874c4:xq18639s",
+                                basePower = 0,
+                                duration = 5,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "aura_caster"
+                    }
+                },
+                exclusiveTraitRefs = {
+                    "d7c874c4:arcconc1"
+                },
+                icon = "interface/icons/spell_arcane_arcane04.blp",
+                id = "misbarge",
+                isEnvironmental = false,
+                name = "Missile Barrage",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Arcane",
+                conditions = {},
+                description = "When you hit with a spell, you have a 20% chance to gain 1 Arcane Charge. Mutually exclusive with Missile Barrage.",
+                events = {
+                    {
+                        chance = 20,
+                        combatEventId = "on_spell_hit",
+                        effects = {
+                            {
+                                amount = 1,
+                                amountMode = "flat",
+                                resourceRef = "f82db71a:v7uxqb9z",
+                                type = "resource"
+                            }
+                        },
+                        triggerTarget = "aura_caster"
+                    }
+                },
+                exclusiveTraitRefs = {
+                    "d7c874c4:misbarge"
+                },
+                icon = "interface/icons/spell_nature_wispsplode.blp",
+                id = "arcconc1",
+                isEnvironmental = false,
+                name = "Arcane Concentration",
+                skillBonuses = {},
+                statBonuses = {},
                 unlockLevel = 1
             },
             {

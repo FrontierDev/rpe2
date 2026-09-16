@@ -108,6 +108,21 @@ local function normalizeSkillBonuses(values)
     return normalized
 end
 
+local function normalizeExclusiveTraitRefs(values)
+    local normalized = {}
+    local seen = {}
+
+    for index = 1, #(values or {}) do
+        local traitRef = normalizeRef(values[index])
+        if traitRef and not seen[traitRef] then
+            seen[traitRef] = true
+            normalized[#normalized + 1] = traitRef
+        end
+    end
+
+    return normalized
+end
+
 local function normalizeStatScaling(values)
     local normalized = {}
 
@@ -348,6 +363,10 @@ function Trait.NormalizeAutomaticAuras(values)
     return normalizeAutomaticAuras(values)
 end
 
+function Trait.NormalizeExclusiveTraitRefs(values)
+    return normalizeExclusiveTraitRefs(values)
+end
+
 function Trait.NormalizeEvents(values)
     return normalizeEvents(values)
 end
@@ -363,6 +382,7 @@ function Trait.NormalizeRuntimePayload(value)
         conditions = Condition.NormalizeList and Condition.NormalizeList(payload.conditions) or {},
         statBonuses = normalizeStatBonuses(payload.statBonuses),
         skillBonuses = normalizeSkillBonuses(payload.skillBonuses),
+        exclusiveTraitRefs = normalizeExclusiveTraitRefs(payload.exclusiveTraitRefs),
         automaticAuras = normalizeAutomaticAuras(payload.automaticAuras),
         events = normalizeEvents(payload.events),
     }
@@ -380,6 +400,7 @@ function Trait:New(data)
         conditions = {},
         statBonuses = {},
         skillBonuses = {},
+        exclusiveTraitRefs = {},
         automaticAuras = {},
         events = {},
     }, Trait):Merge(data)
@@ -391,7 +412,7 @@ function Trait:Merge(data)
     end
 
     for key, value in pairs(data) do
-        if key ~= "conditions" and key ~= "statBonuses" and key ~= "skillBonuses" and key ~= "automaticAuras" and key ~= "events" then
+        if key ~= "conditions" and key ~= "statBonuses" and key ~= "skillBonuses" and key ~= "exclusiveTraitRefs" and key ~= "automaticAuras" and key ~= "events" then
             self[key] = value
         end
     end
@@ -405,6 +426,7 @@ function Trait:Merge(data)
     self.conditions = Condition.NormalizeList and Condition.NormalizeList(data.conditions or self.conditions) or {}
     self.statBonuses = normalizeStatBonuses(data.statBonuses or self.statBonuses)
     self.skillBonuses = normalizeSkillBonuses(data.skillBonuses or self.skillBonuses)
+    self.exclusiveTraitRefs = normalizeExclusiveTraitRefs(data.exclusiveTraitRefs or self.exclusiveTraitRefs)
     self.automaticAuras = normalizeAutomaticAuras(data.automaticAuras or self.automaticAuras)
     self.events = normalizeEvents(data.events or self.events)
 
@@ -423,6 +445,7 @@ function Trait:ToTable()
         conditions = Condition.NormalizeList and Condition.NormalizeList(self.conditions) or {},
         statBonuses = normalizeStatBonuses(self.statBonuses),
         skillBonuses = normalizeSkillBonuses(self.skillBonuses),
+        exclusiveTraitRefs = normalizeExclusiveTraitRefs(self.exclusiveTraitRefs),
         automaticAuras = normalizeAutomaticAuras(self.automaticAuras),
         events = normalizeEvents(self.events),
     }

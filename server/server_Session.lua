@@ -420,10 +420,10 @@ function Server:BuildClientHashMismatchWarning(state)
     end
 
     if pendingCount > 0 then
-        return ("Warning: Waiting for compatibility hashes from %s. Event start is locked."):format(table.concat(details, ", "))
+        return ("Warning: Waiting for compatibility hashes from %s. Hold Shift while clicking Start Event on the Event Manager dashboard to override."):format(table.concat(details, ", "))
     end
 
-    return ("Warning: Client hash mismatch detected for %s. Event start is locked."):format(table.concat(details, ", "))
+    return ("Warning: Client hash mismatch detected for %s. Hold Shift while clicking Start Event on the Event Manager dashboard to override."):format(table.concat(details, ", "))
 end
 
 function Server:SendServerStartToClient(state, clientName)

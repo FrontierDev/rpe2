@@ -19,8 +19,7 @@ AuraManager:RegisterEffect({
             return false, nil
         end
 
-        -- Resolve amount based on amountMode (flat, base_percent, or max_percent)
-        local amount = self:ResolveAuraEffectAmount(targetUnit, effect)
+        local amount = Combat:ResolveResourceEffectAmount(context, effect)
         local applied, resourceEntry, appliedDelta = Combat:ApplyResourceDelta(targetUnit, effect and effect.resourceRef or nil, amount, context)
         local result = {
             effectType = "resource",
