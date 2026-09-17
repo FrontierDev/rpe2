@@ -17,7 +17,13 @@ then
 end
 
 local DASHBOARD_PANEL_WIDTH = 560
-local DASHBOARD_PANEL_HEIGHT = 460
+-- Keep this in sync with widget_Event_AutopilotHelper.lua. The dashboard's
+-- fixed-height sections are laid out for 654px; forcing it to 460px causes
+-- the pending/outcome/cue-authoring regions to overlap and clip.
+local DASHBOARD_PANEL_HEIGHT = 654
+local COMBAT_LOG_HISTORY_LIMIT = 15
+local COMBAT_LOG_ROW_HEIGHT = 20
+local COMBAT_LOG_ROW_SPACING = 0
 
 Client.AutopilotHelperRefreshState = type(Client.AutopilotHelperRefreshState) == "table"
     and Client.AutopilotHelperRefreshState
@@ -70,6 +76,101 @@ local function getEventWidget()
         and type(widgetNamespace.Get) == "function"
         and widgetNamespace:Get()
         or widgetNamespace
+end
+
+local function refreshScrollGeometry(scroll)
+    if type(scroll) ~= "table" then
+        return false
+    end
+    if type(scroll.EnsureVisibleRowCount) == "function" then
+        scroll:EnsureVisibleRowCount()
+    end
+    if type(scroll.UpdateGeometry) == "function" then
+        scroll:UpdateGeometry()
+    end
+    return true
+end
+
+-- Combat Log is hosted by the shared Event utility window. The original
+-- history implementation retained only eight 27px rows, leaving a large
+-- amount of the 340px window unused. Compact the rows and retain enough
+-- history to fill the available viewport.
+local originalEnsureEventUtilityWindow = EventWidget.EnsureEventUtilityWindow
+if type(originalEnsureEventUtilityWindow) == "function" then
+    function EventWidget:EnsureEventUtilityWindow(...)
+        local result = originalEnsureEventUtilityWindow(self, ...)
+        local scroll = self.combatLogUtilityScroll
+        if type(scroll) == "table" and self._compactCombatLogLayoutApplied ~= true then
+            scroll.rowHeight = COMBAT_LOG_ROW_HEIGHT
+            scroll.rowSpacing = COMBAT_LOG_ROW_SPACING
+            scroll.visibleRows = COMBAT_LOG_HISTORY_LIMIT
+            scroll.minVisibleRows = COMBAT_LOG_HISTORY_LIMIT
+            scroll.maxVisibleRows = COMBAT_LOG_HISTORY_LIMIT
+            refreshScrollGeometry(scroll)
+            self._compactCombatLogLayoutApplied = true
+        end
+        return result
+    end
+end
+
+function EventWidget:AppendCombatLogHistoryEntry(entry)
+    if type(entry) ~= "table" then
+        return false
+    end
+
+    local eventId = tostring(entry.eventId or "")
+    if eventId ~= "" and type(self.SyncCombatLogHistoryEvent) == "function" then
+        self:SyncCombatLogHistoryEvent(eventId)
+    end
+
+    local history = type(self.GetCombatLogHistory) == "function" and self:GetCombatLogHistory() or nil
+    if type(history) ~= "table" then
+        return false
+    end
+
+    local copy = {}
+    for key, value in pairs(entry) do
+        copy[key] = value
+    end
+    history[#history + 1] = copy
+    while #history > COMBAT_LOG_HISTORY_LIMIT do
+        table.remove(history, 1)
+    end
+
+    if type(self.IsCombatLogHistoryPanelShown) == "function"
+        and self:IsCombatLogHistoryPanelShown() == true
+        and type(self.RefreshCombatLogHistoryPanel) == "function"
+    then
+        self:RefreshCombatLogHistoryPanel()
+    end
+    return true
+end
+
+local baseRefreshCombatLogHistoryPanel = EventWidget.RefreshCombatLogHistoryPanel
+function EventWidget:RefreshCombatLogHistoryPanel(...)
+    local result = baseRefreshCombatLogHistoryPanel(self, ...)
+    if tostring(self.eventUtilityMode or "") == "combat-log"
+        and type(self.combatLogUtilityScroll) == "table"
+    then
+        local sourceEntries = type(self.GetCombatLogHistoryViewEntries) == "function"
+            and self:GetCombatLogHistoryViewEntries()
+            or {}
+        local entries = {}
+        local firstIndex = math.max(1, #sourceEntries - COMBAT_LOG_HISTORY_LIMIT + 1)
+        for index = firstIndex, #sourceEntries do
+            entries[#entries + 1] = sourceEntries[index]
+        end
+        self.combatLogUtilityScroll:SetItems(entries)
+        local emptyFrame = getFrame(self.combatLogUtilityEmptyText)
+        if emptyFrame then
+            if #entries == 0 and type(emptyFrame.Show) == "function" then
+                emptyFrame:Show()
+            elseif #entries > 0 and type(emptyFrame.Hide) == "function" then
+                emptyFrame:Hide()
+            end
+        end
+    end
+    return result
 end
 
 function EventWidget:RefreshAutopilotDMHelperNow(eventStateOverride)
