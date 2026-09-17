@@ -30,11 +30,10 @@ local DEFAULT_CAST_ICON_SIZE = 14
 local DEFAULT_RAID_MARKER_ICON_SIZE = 14
 local DEFAULT_CORNER_BADGE_ICON_SIZE = 21
 local DEFAULT_TURN_COMPLETE_ICON = "Interface\\RaidFrame\\ReadyCheck-Ready"
-local DEFAULT_ABSORPTION_TEXTURE = "Interface\\RaidFrame\\Shield-Fill"
-local DEFAULT_ABSORPTION_OVERLAY_TEXTURE = "Interface\\RaidFrame\\Shield-Overlay"
-local DEFAULT_ABSORPTION_EDGE_TEXTURE = "Interface\\RaidFrame\\Shield-Overshield"
-local DEFAULT_ABSORPTION_COLOR = { r = 0.35, g = 0.75, b = 1, a = 0.55 }
-local DEFAULT_ABSORPTION_EDGE_COLOR = { r = 0.75, g = 0.92, b = 1, a = 0.95 }
+local DEFAULT_ABSORPTION_TEXTURE = "Interface\\Buttons\\WHITE8X8"
+local DEFAULT_ABSORPTION_EDGE_TEXTURE = "Interface\\Buttons\\WHITE8X8"
+local DEFAULT_ABSORPTION_COLOR = { r = 1, g = 1, b = 1, a = 1 }
+local DEFAULT_ABSORPTION_EDGE_COLOR = { r = 1, g = 1, b = 1, a = 0.95 }
 
 local function getMaxFrameLevel(...)
     local maxLevel = 0
@@ -640,8 +639,8 @@ function UnitPortrait:SetAbsorptionState(state)
     if edgeFrame then
         if healthBarFrame then
             edgeFrame:ClearAllPoints()
-            edgeFrame:SetPoint("TOPRIGHT", healthBarFrame, "TOPRIGHT", 0, 0)
-            edgeFrame:SetPoint("BOTTOMRIGHT", healthBarFrame, "BOTTOMRIGHT", 0, 0)
+            edgeFrame:SetPoint("TOPLEFT", healthBarFrame, "TOPRIGHT", 0, 0)
+            edgeFrame:SetPoint("BOTTOMLEFT", healthBarFrame, "BOTTOMRIGHT", 0, 0)
             edgeFrame:SetWidth(2)
             if overshield then
                 edgeFrame:Show()
@@ -1036,7 +1035,7 @@ function UnitPortrait:Create()
         primaryColor = self.options.progressPrimaryColor or defaults.ProgressPrimaryColor,
         secondaryColor = self.options.progressSecondaryColor or defaults.ProgressSecondaryColor,
         secondaryTexture = self.options.absorptionTexture or DEFAULT_ABSORPTION_TEXTURE,
-        secondaryOverlayTexture = self.options.absorptionOverlayTexture or DEFAULT_ABSORPTION_OVERLAY_TEXTURE,
+        secondaryOverlayTexture = self.options.absorptionOverlayTexture,
         textColor = self.options.progressTextColor or defaults.ProgressTextColor,
         border = false,
     })

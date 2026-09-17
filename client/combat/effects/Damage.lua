@@ -445,24 +445,6 @@ local function getAbsorptionRuntimeSources(auraManager, eventState, targetEventI
     ))
 end
 
-local function getAbsorptionChanges(changes)
-    if type(changes) ~= "table" then
-        return {}
-    end
-
-    return type(changes.changes) == "table" and changes.changes or changes
-end
-
-local function sumAbsorptionChanges(changes)
-    local total = 0
-    local normalizedChanges = getAbsorptionChanges(changes)
-    for index = 1, #normalizedChanges do
-        local change = normalizedChanges[index]
-        total = total + math.max(0, tonumber(change and change.absorbed) or 0)
-    end
-    return total
-end
-
 local function setDamageAbsorptionResult(result, absorbedAmount)
     local preAbsorbAmount = math.max(0, tonumber(result and result.preAbsorbAmount) or 0)
     local normalizedAbsorbed = math.min(
@@ -476,7 +458,34 @@ local function setDamageAbsorptionResult(result, absorbedAmount)
     return normalizedAbsorbed
 end
 
-local function updateAbsorptionPreviewDiagnostics(result, absorptionPreview, runtimeSourcesBeforeCommit)
+local function logAbsorptionResolution(entry, result)
+    if not Debug or type(Debug.Internal) ~= "function" then
+        return
+    end
+
+    Debug.Internal(
+        "Absorption resolve: target=%s preAbsorb=%s absorbed=%s remainder=%s healthRef=%s healthDelta=%s",
+        tostring(entry and entry.defenderEventId or 0),
+        tostring(tonumber(result and result.preAbsorbAmount) or 0),
+        tostring(tonumber(result and result.absorbedAmount) or 0),
+        tostring(tonumber(result and result.amount) or 0),
+        tostring(result and result.healthResourceRef or "nil"),
+        tostring(tonumber(result and result.appliedDelta) or 0)
+    )
+end
+
+local function logMissingDamageHealthResource(entry, result)
+    local message = "Absorption resolve failed: target=%s has post-absorb damage=%s but no health resource ref."
+    local targetEventId = tostring(entry and entry.defenderEventId or 0)
+    local damageAmount = tostring(tonumber(result and result.amount) or 0)
+    if Debug and type(Debug.Error) == "function" then
+        Debug.Error(message, targetEventId, damageAmount)
+    elseif Debug and type(Debug.Internal) == "function" then
+        Debug.Internal(message, targetEventId, damageAmount)
+    end
+end
+
+local function updateAbsorptionPreviewDiagnostics(result, absorptionPreview, runtimeSourcesBeforeConsume)
     if type(result) ~= "table" then
         return 0
     end
@@ -501,7 +510,7 @@ local function updateAbsorptionPreviewDiagnostics(result, absorptionPreview, run
             and previewRemainingDamage
             or (preAbsorbAmount - previewAbsorbedAmount)
     )
-    result.absorptionDiagnostics.runtimeSourcesBeforeCommit = runtimeSourcesBeforeCommit or {}
+    result.absorptionDiagnostics.runtimeSourcesBeforeConsume = runtimeSourcesBeforeConsume or {}
     return previewAbsorbedAmount
 end
 
@@ -516,7 +525,7 @@ local function buildCurrentAbsorptionPreview(result, entry, auraManager)
     local hitContext = type(entry.hitResolutionContext) == "table" and entry.hitResolutionContext or nil
     local effect = type(hitContext) == "table" and hitContext.effect or entry.effect
     local targetEventId = entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID)
-    local runtimeSourcesBeforeCommit = getAbsorptionRuntimeSources(auraManager, entry.eventState, targetEventId)
+    local runtimeSourcesBeforeConsume = getAbsorptionRuntimeSources(auraManager, entry.eventState, targetEventId)
     local absorptionPreview = auraManager:PreviewAbsorption(
         Client,
         entry.eventState,
@@ -527,12 +536,12 @@ local function buildCurrentAbsorptionPreview(result, entry, auraManager)
     if type(absorptionPreview) ~= "table" then
         setDamageAbsorptionResult(result, 0)
         result.absorptionChanges = {}
-        updateAbsorptionPreviewDiagnostics(result, nil, runtimeSourcesBeforeCommit)
+        updateAbsorptionPreviewDiagnostics(result, nil, runtimeSourcesBeforeConsume)
         return nil
     end
 
     result.absorptionChanges = absorptionPreview.changes or absorptionPreview.plan or {}
-    updateAbsorptionPreviewDiagnostics(result, absorptionPreview, runtimeSourcesBeforeCommit)
+    updateAbsorptionPreviewDiagnostics(result, absorptionPreview, runtimeSourcesBeforeConsume)
     return absorptionPreview
 end
 
@@ -1178,9 +1187,9 @@ buildResolvedDamageResult = function(self, entry)
             preAbsorbAmount = 0,
             previewAbsorbedAmount = 0,
             previewRemainingDamage = 0,
-            runtimeSourcesBeforeCommit = {},
-            committedAbsorbedAmount = 0,
-            runtimeSourcesAfterCommit = {},
+            runtimeSourcesBeforeConsume = {},
+            consumedAbsorbedAmount = 0,
+            runtimeSourcesAfterConsume = {},
             finalResultAmount = 0,
             finalHealthResourceDelta = 0,
         },
@@ -1344,139 +1353,59 @@ function Combat:ApplyResolvedDamage(entry, previewOnly)
     local preAbsorbAmount = math.max(0, tonumber(result.preAbsorbAmount) or 0)
     local auraManager = getAuraManager()
     local targetEventId = entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID)
-    local absorptionChanges = getAbsorptionChanges(result.absorptionChanges)
     local absorbedAmount = math.max(0, tonumber(result.absorbedAmount) or 0)
 
-    -- Authoritative absorption must be committed before the health delta is
-    -- built. A cached preview is only a plan; the committed total is the
-    -- source of truth for the final damage remainder.
     if previewOnly ~= true then
-        local commitResult = type(entry) == "table" and entry.absorptionCommitResult or nil
-        local runtimeSourcesBeforeCommit = getAbsorptionRuntimeSources(auraManager, entry.eventState, targetEventId)
-        if type(commitResult) ~= "table" and #absorptionChanges > 0 then
-            local plannedAbsorbedAmount = sumAbsorptionChanges(absorptionChanges)
-            if plannedAbsorbedAmount > preAbsorbAmount then
-                setDamageAbsorptionResult(result, 0)
-                result.absorptionChanges = {}
-                result.absorptionDiagnostics = result.absorptionDiagnostics or {}
-                result.absorptionDiagnostics.commitFailure = "absorption_exceeds_pre_absorb_damage"
-                result.absorptionDiagnostics.runtimeSourcesBeforeCommit = runtimeSourcesBeforeCommit
-                return false, result
-            end
-
-            local context = type(entry.context) == "table" and entry.context or {}
-            local sessionState = context.sessionState
-                or (Client.GetState and Client:GetState() or nil)
-            local commitOk, committed = false, nil
-            if auraManager and type(auraManager.CommitAbsorptionChanges) == "function" then
-                commitOk, committed = auraManager:CommitAbsorptionChanges(
-                    Client,
-                    entry.eventState,
-                    targetEventId,
-                    absorptionChanges,
-                    {
-                        removeDepletedAbsorbAuras = true,
-                        context = {
-                            sessionState = sessionState,
-                            eventState = entry.eventState,
-                            pendingScope = context.pendingScope,
-                            immediate = context.immediate == true,
-                        },
-                    }
-                )
-            end
-
-            -- A preview can become stale while a reaction is pending. The
-            -- failed commit is atomic, so refresh once and retry using the
-            -- current runtime pool; no shield is consumed by the failed pass.
-            if not commitOk
-                and type(committed) == "table"
-                and committed.reason == "stale_or_invalid_change"
-                and auraManager
-                and type(auraManager.PreviewAbsorption) == "function"
-            then
-                buildCurrentAbsorptionPreview(result, entry, auraManager)
-                absorptionChanges = getAbsorptionChanges(result.absorptionChanges)
-                plannedAbsorbedAmount = sumAbsorptionChanges(absorptionChanges)
-                if plannedAbsorbedAmount <= preAbsorbAmount then
-                    if #absorptionChanges == 0 then
-                        commitOk = true
-                        committed = {
-                            changes = {},
-                            absorbedAmount = 0,
-                        }
-                    else
-                        commitOk, committed = auraManager:CommitAbsorptionChanges(
-                            Client,
-                            entry.eventState,
-                            targetEventId,
-                            absorptionChanges,
-                            {
-                                removeDepletedAbsorbAuras = true,
-                                context = {
-                                    sessionState = sessionState,
-                                    eventState = entry.eventState,
-                                    pendingScope = context.pendingScope,
-                                    immediate = context.immediate == true,
-                                },
-                            }
-                        )
-                    end
-                end
-            end
-
-            if not commitOk then
-                setDamageAbsorptionResult(result, 0)
-                result.absorptionChanges = {}
-                result.absorptionDiagnostics = result.absorptionDiagnostics or {}
-                result.absorptionDiagnostics.commitFailure = type(committed) == "table"
-                    and committed.reason
-                    or "absorption_commit_failed"
-                result.absorptionDiagnostics.runtimeSourcesBeforeCommit = runtimeSourcesBeforeCommit
-                return false, result
-            end
-            commitResult = committed
-            entry.absorptionCommitResult = commitResult
+        local context = type(entry.context) == "table" and entry.context or {}
+        local sessionState = context.sessionState
+            or entry.sessionState
+            or (Client.GetState and Client:GetState() or nil)
+        local absorption = {
+            absorbedAmount = 0,
+            remainingDamage = preAbsorbAmount,
+            changes = {},
+        }
+        local hitEffect = type(hitContext) == "table" and hitContext.effect or entry.effect
+        if preAbsorbAmount > 0
+            and auraManager
+            and type(auraManager.ConsumeAbsorption) == "function"
+        then
+            absorption = auraManager:ConsumeAbsorption(
+                Client,
+                entry.eventState,
+                targetEventId,
+                preAbsorbAmount,
+                type(hitEffect) == "table" and hitEffect.damageSchoolRefs or {},
+                {
+                    sessionState = sessionState,
+                    eventState = entry.eventState,
+                    pendingScope = context.pendingScope,
+                    scope = context.scope,
+                    immediate = context.immediate == true,
+                }
+            ) or absorption
         end
 
-        if type(commitResult) == "table" then
-            result.absorptionChanges = commitResult.changes or absorptionChanges
-            absorbedAmount = tonumber(commitResult.absorbedAmount or commitResult.absorbed)
-            if absorbedAmount == nil then
-                absorbedAmount = sumAbsorptionChanges(commitResult.changes or absorptionChanges)
-            end
-        else
-            -- No committed plan means no absorption was actually consumed.
-            absorbedAmount = 0
+        local authoritativeRemainder = tonumber(absorption.remainingDamage)
+        if authoritativeRemainder == nil then
+            authoritativeRemainder = preAbsorbAmount
         end
-        absorbedAmount = setDamageAbsorptionResult(result, absorbedAmount)
+        result.absorptionChanges = type(absorption.changes) == "table"
+            and absorption.changes
+            or {}
+        result.absorbedAmount = math.max(
+            0,
+            math.min(preAbsorbAmount, tonumber(absorption.absorbedAmount) or 0)
+        )
+        result.amount = math.max(0, math.min(preAbsorbAmount, authoritativeRemainder))
+        absorbedAmount = result.absorbedAmount
         result.absorptionDiagnostics = result.absorptionDiagnostics or {}
-        result.absorptionDiagnostics.committedAbsorbedAmount = absorbedAmount
-        result.absorptionDiagnostics.runtimeSourcesAfterCommit = getAbsorptionRuntimeSources(
+        result.absorptionDiagnostics.consumedAbsorbedAmount = absorbedAmount
+        result.absorptionDiagnostics.runtimeSourcesAfterConsume = getAbsorptionRuntimeSources(
             auraManager,
             entry.eventState,
             targetEventId
         )
-        if #result.absorptionDiagnostics.runtimeSourcesAfterCommit == 0
-            and type(commitResult) == "table"
-        then
-            -- Depleted auras may be removed as part of the commit. Preserve
-            -- the committed zero state in diagnostics even when the live
-            -- source is no longer present in the aura bucket.
-            local committedChanges = getAbsorptionChanges(commitResult.changes)
-            local afterCommitSources = {}
-            for index = 1, #committedChanges do
-                local change = committedChanges[index]
-                afterCommitSources[#afterCommitSources + 1] = {
-                    auraKey = change.auraKey,
-                    effectIndex = change.effectIndex,
-                    maximum = tonumber(change.maximum) or 0,
-                    remaining = math.max(0, tonumber(change.remaining) or 0),
-                    revision = tonumber(change.revision) or 0,
-                }
-            end
-            result.absorptionDiagnostics.runtimeSourcesAfterCommit = afterCommitSources
-        end
     else
         absorbedAmount = setDamageAbsorptionResult(result, absorbedAmount)
     end
@@ -1486,15 +1415,17 @@ function Combat:ApplyResolvedDamage(entry, previewOnly)
     result.resourceEntry = nil
     result.applied = false
     result.appliedDelta = 0
-    local hasHealthDamage = healthResourceRef ~= nil and finalDamage > 0
-    if not hasHealthDamage and absorbedAmount <= 0 then
-        result.absorptionDiagnostics = result.absorptionDiagnostics or {}
-        result.absorptionDiagnostics.finalResultAmount = finalDamage
-        result.absorptionDiagnostics.finalHealthResourceDelta = 0
-        return false, result
-    end
+    if finalDamage > 0 then
+        if not healthResourceRef then
+            logMissingDamageHealthResource(entry, result)
+            result.applied = false
+            result.appliedDelta = 0
+            result.absorptionDiagnostics = result.absorptionDiagnostics or {}
+            result.absorptionDiagnostics.finalResultAmount = finalDamage
+            result.absorptionDiagnostics.finalHealthResourceDelta = 0
+            return false, result
+        end
 
-    if hasHealthDamage then
         local resourceUnit = entry.defenderUnit
         if previewOnly == true then
             resourceUnit = self:CloneValue(entry.defenderUnit)
@@ -1527,6 +1458,7 @@ function Combat:ApplyResolvedDamage(entry, previewOnly)
             }
         end
         if not applied then
+            logAbsorptionResolution(entry, result)
             return false, result
         end
     else
@@ -1539,6 +1471,9 @@ function Combat:ApplyResolvedDamage(entry, previewOnly)
     result.absorptionDiagnostics = result.absorptionDiagnostics or {}
     result.absorptionDiagnostics.finalResultAmount = finalDamage
     result.absorptionDiagnostics.finalHealthResourceDelta = tonumber(result.appliedDelta) or 0
+    if previewOnly ~= true then
+        logAbsorptionResolution(entry, result)
+    end
 
     if previewOnly ~= true then
         commitResolvedDamageThreat(entry, result)

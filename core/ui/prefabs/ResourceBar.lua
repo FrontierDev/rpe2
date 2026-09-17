@@ -15,6 +15,9 @@ ResourceBar.__index = ResourceBar
 setmetatable(ResourceBar, { __index = BaseElement })
 
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+local ABSORPTION_TEXTURE = "Interface\\Buttons\\WHITE8X8"
+local ABSORPTION_COLOR = { r = 1, g = 1, b = 1, a = 1 }
+local ABSORPTION_EDGE_COLOR = { r = 1, g = 1, b = 1, a = 0.95 }
 
 local function ResolveDefaults(options)
     local defaults = (Constants.Prefabs and Constants.Prefabs.ResourceBar) or {}
@@ -50,14 +53,6 @@ local function ApplyLabelStyle(labelRegion, fontSize)
     return true
 end
 
-local function ApplyColor(texture, color)
-    if not texture or not texture.SetColorTexture or type(color) ~= "table" then
-        return
-    end
-
-    texture:SetColorTexture(color.r or 0, color.g or 0, color.b or 0, color.a or 1)
-end
-
 local function DimColor(color)
     local source = type(color) == "table" and color or { r = 0.18, g = 0.18, b = 0.18, a = 1 }
     return {
@@ -76,6 +71,7 @@ function ResourceBar:New(options)
     instance.icon = nil
     instance.valueText = nil
     instance.progressBar = nil
+    instance.absorptionOvershieldIndicator = nil
     instance.state = nil
     return instance
 end
@@ -111,25 +107,49 @@ function ResourceBar:SetState(state)
     self:SetIcon(resolvedState.icon or self.options.iconTexture or DEFAULT_ICON)
     self:SetValueText(resolvedState.currentText or "")
 
+    local maximum = math.max(1, tonumber(resolvedState.maxValue) or 1)
+    local current = math.max(0, math.min(maximum, tonumber(resolvedState.currentValue) or 0))
+    local absorption = math.max(0, tonumber(resolvedState.absorption) or tonumber(resolvedState.totalAbsorption) or 0)
+    local hasAbsorption = absorption > 0
+    local secondaryColor = hasAbsorption
+        and ABSORPTION_COLOR
+        or resolvedState.secondaryColor
+        or self.options.secondaryColor
+        or DimColor(resolvedState.color or self.options.primaryColor)
+
     if self.progressBar and self.progressBar.SetOption then
         self.progressBar:SetOption("primaryColor", resolvedState.color or self.options.primaryColor)
-        self.progressBar:SetOption("secondaryColor", resolvedState.secondaryColor or self.options.secondaryColor or DimColor(resolvedState.color or self.options.primaryColor))
+        self.progressBar:SetOption("secondaryColor", secondaryColor)
+        self.progressBar:SetOption("secondaryTexture", hasAbsorption and ABSORPTION_TEXTURE or nil)
+        self.progressBar:SetOption("secondaryOverlayTexture", nil)
         self.progressBar:ApplyColors()
     end
-    if self.progressBar and self.progressBar.primaryBar then
-        ApplyColor(self.progressBar.primaryBar, resolvedState.color or self.options.primaryColor)
-    end
-    if self.progressBar and self.progressBar.secondaryBar then
-        local secondaryColor = resolvedState.secondaryColor or self.options.secondaryColor or DimColor(resolvedState.color or self.options.primaryColor)
-        if secondaryColor then
-            ApplyColor(self.progressBar.secondaryBar, secondaryColor)
-        end
-    end
     if self.progressBar and self.progressBar.SetMinMax then
-        self.progressBar:SetMinMax(0, math.max(1, tonumber(resolvedState.maxValue) or 1))
+        self.progressBar:SetMinMax(0, maximum)
     end
     if self.progressBar and self.progressBar.SetValue then
-        self.progressBar:SetValue(tonumber(resolvedState.currentValue) or 0)
+        self.progressBar:SetValue(current)
+    end
+    if self.progressBar and self.progressBar.SetSecondaryValue then
+        self.progressBar:SetSecondaryValue(hasAbsorption and math.min(maximum, current + absorption) or nil)
+    end
+
+    local edgeFrame = self.absorptionOvershieldIndicator
+        and self.absorptionOvershieldIndicator.GetFrame
+        and self.absorptionOvershieldIndicator:GetFrame()
+        or nil
+    local barFrame = self.progressBar and self.progressBar.barFrame or nil
+    local overAbsorb = hasAbsorption and absorption > math.max(0, maximum - current)
+    if edgeFrame then
+        if overAbsorb and barFrame then
+            edgeFrame:ClearAllPoints()
+            edgeFrame:SetPoint("TOPLEFT", barFrame, "TOPRIGHT", 0, 0)
+            edgeFrame:SetPoint("BOTTOMLEFT", barFrame, "BOTTOMRIGHT", 0, 0)
+            edgeFrame:SetWidth(2)
+            edgeFrame:Show()
+        else
+            edgeFrame:Hide()
+        end
     end
     if self.progressBar and self.progressBar.SetText then
         self.progressBar:SetText(resolvedState.progressText or "")
@@ -209,6 +229,24 @@ function ResourceBar:Create()
     })
     self.progressBar:SetParent(frame)
     self.progressBar:Create()
+
+    self.absorptionOvershieldIndicator = Image:New({
+        name = (self.name or "ResourceBar") .. "AbsorptionOvershield",
+        width = 2,
+        height = defaults.height,
+        texture = ABSORPTION_TEXTURE,
+        border = false,
+        layer = "OVERLAY",
+        textureInsetLeft = 0,
+        textureInsetTop = 0,
+        textureInsetRight = 0,
+        textureInsetBottom = 0,
+        vertexColor = ABSORPTION_EDGE_COLOR,
+        showWhenUIHidden = false,
+    })
+    self.absorptionOvershieldIndicator:SetParent(frame)
+    self.absorptionOvershieldIndicator:Create()
+    self.absorptionOvershieldIndicator:GetFrame():Hide()
 
     self:ApplyLayout()
     self:SetState(self.options.state or {})

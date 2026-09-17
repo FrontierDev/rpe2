@@ -63,28 +63,6 @@ local function getEventState(entry)
     return type(Client.GetEventState) == "function" and Client:GetEventState() or nil
 end
 
-local function copyAbsorptionRuntimeSources(auraManager, eventState, targetEventId)
-    if not auraManager or type(auraManager.GetAbsorptionSources) ~= "function" then
-        return {}
-    end
-
-    local copied = {}
-    local sources = auraManager:GetAbsorptionSources(Client, eventState, targetEventId) or {}
-    for index = 1, #sources do
-        local source = sources[index]
-        if type(source) == "table" then
-            copied[#copied + 1] = {
-                auraKey = source.auraKey,
-                effectIndex = source.effectIndex,
-                maximum = tonumber(source.maximum) or 0,
-                remaining = tonumber(source.remaining) or 0,
-                revision = tonumber(source.revision) or 0,
-            }
-        end
-    end
-    return copied
-end
-
 local function getDifficultyModifiers(unit, eventState)
     if type(unit) ~= "table" or unit.isPlayer == true then
         return {
@@ -332,51 +310,9 @@ local function applyDifficultyDamageResult(entry, result)
     finalDamage = math.max(0, round(finalDamage))
     scaledRawDamage = math.max(0, round(scaledRawDamage))
     result.preAbsorbAmount = finalDamage
-    result.absorbedAmount = 0
-    result.absorptionChanges = {}
     result.amount = finalDamage
     result.mitigated = math.max(0, scaledRawDamage - finalDamage)
     result.mitigationPercent = scaledRawDamage > 0 and ((result.mitigated / scaledRawDamage) * 100) or 0
-
-    local auraManager = Client.Spellcasting and Client.Spellcasting.AuraManager or nil
-    local targetEventId = entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID)
-    local runtimeSourcesBeforeCommit = copyAbsorptionRuntimeSources(auraManager, getEventState(entry), targetEventId)
-    local previewRemainingDamage = nil
-    if finalDamage > 0
-        and auraManager
-        and type(auraManager.PreviewAbsorption) == "function"
-    then
-        local absorptionPreview = auraManager:PreviewAbsorption(
-            Client,
-            getEventState(entry),
-            entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID),
-            finalDamage,
-            effect.damageSchoolRefs or {}
-        )
-        if type(absorptionPreview) == "table" then
-            local previewAbsorbedAmount = tonumber(absorptionPreview.absorbedAmount or absorptionPreview.absorbed)
-            previewRemainingDamage = tonumber(absorptionPreview.remainingDamage or absorptionPreview.healthRemainder)
-            if previewAbsorbedAmount == nil then
-                previewAbsorbedAmount = finalDamage - (previewRemainingDamage or finalDamage)
-            end
-            result.absorbedAmount = math.min(finalDamage, math.max(0, previewAbsorbedAmount))
-            result.absorptionChanges = absorptionPreview.changes or absorptionPreview.plan or {}
-            -- Keep the same authoritative arithmetic as the base combat path;
-            -- never trust a cached remainder independently of absorbedAmount.
-            result.amount = math.max(0, finalDamage - result.absorbedAmount)
-        end
-    end
-
-    result.absorptionDiagnostics = result.absorptionDiagnostics or {}
-    result.absorptionDiagnostics.preAbsorbAmount = finalDamage
-    result.absorptionDiagnostics.previewAbsorbedAmount = math.max(0, tonumber(result.absorbedAmount) or 0)
-    result.absorptionDiagnostics.previewRemainingDamage = math.max(
-        0,
-        previewRemainingDamage ~= nil
-            and previewRemainingDamage
-            or (finalDamage - result.absorbedAmount)
-    )
-    result.absorptionDiagnostics.runtimeSourcesBeforeCommit = runtimeSourcesBeforeCommit
 
     rebuildThreatPreview(entry, result, combatRules, effect)
     return result

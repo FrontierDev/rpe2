@@ -69,6 +69,8 @@ local mergeDerivedStateImpact
 local resolveLocalEventUnit
 local resolveLocalEventId
 local sortedNumericKeys
+local queueOutboundAuraFlush
+local shouldDeferTurnAuraOperations
 
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
@@ -2396,45 +2398,213 @@ function AuraManager:GetTotalAbsorption(client, eventState, targetEventId)
     return total
 end
 
-function AuraManager:PreviewAbsorption(client, eventState, targetEventId, damageAmount, damageSchoolRefs)
-    local incomingAmount = normalizeAbsorptionCapacity(damageAmount)
-    local remainingDamage = incomingAmount
+local function buildAbsorptionConsumptionChange(source, previousRemaining, remaining, absorbed, previousRevision)
+    return {
+        auraKey = source.auraKey,
+        auraRef = source.auraRef,
+        casterEventId = source.casterEventId,
+        targetEventId = source.targetEventId,
+        kind = "absorb",
+        effectIndex = source.effectIndex,
+        maximum = source.maximum,
+        previousRemaining = previousRemaining,
+        remaining = remaining,
+        nextRemaining = remaining,
+        absorbed = absorbed,
+        previousRevision = previousRevision,
+        revision = previousRevision + 1,
+    }
+end
+
+local function calculateAbsorptionConsumption(sources, damageAmount, onConsume)
+    local remainingDamage = normalizeAbsorptionCapacity(damageAmount)
     local absorbedAmount = 0
     local changes = {}
-    local sources = self:GetEligibleAbsorptionSources(client, eventState, targetEventId, damageSchoolRefs)
 
-    for index = 1, #sources do
+    for index = 1, #(sources or {}) do
         if remainingDamage <= 0 then
             break
         end
 
-        local source = sources[index]
-        local sourceRemaining = math.max(0, tonumber(source.remaining) or 0)
+        local record = sources[index]
+        local source = type(record) == "table" and record.source or record
+        local state = type(record) == "table" and record.state or nil
+        local maximum = normalizeAbsorptionCapacity(
+            state and state.maximum or source and source.maximum
+        )
+        local sourceRemaining = math.min(
+            maximum,
+            normalizeAbsorptionCapacity(state and state.remaining or source and source.remaining)
+        )
         local absorbed = math.min(sourceRemaining, remainingDamage)
         if absorbed > 0 then
             local nextRemaining = sourceRemaining - absorbed
-            changes[#changes + 1] = {
-                auraKey = source.auraKey,
-                auraRef = source.auraRef,
-                targetEventId = source.targetEventId,
-                effectIndex = source.effectIndex,
-                maximum = source.maximum,
-                previousRemaining = sourceRemaining,
-                remaining = nextRemaining,
-                nextRemaining = nextRemaining,
-                absorbed = absorbed,
-                previousRevision = source.revision,
-                revision = source.revision + 1,
-            }
-            absorbedAmount = absorbedAmount + absorbed
-            remainingDamage = remainingDamage - absorbed
+            local change = type(onConsume) == "function"
+                and onConsume(record, source, maximum, sourceRemaining, nextRemaining, absorbed)
+                or buildAbsorptionConsumptionChange(
+                    source,
+                    sourceRemaining,
+                    nextRemaining,
+                    absorbed,
+                    math.max(1, math.floor(tonumber(source.revision) or 1))
+                )
+            if type(change) == "table" then
+                changes[#changes + 1] = change
+                absorbedAmount = absorbedAmount + absorbed
+                remainingDamage = remainingDamage - absorbed
+            end
         end
     end
+
+    return changes, absorbedAmount, remainingDamage
+end
+
+local function getLiveAbsorptionSourceState(bucket, source, targetEventId)
+    if type(bucket) ~= "table" or type(source) ~= "table" then
+        return nil, nil, nil
+    end
+
+    local auraKey = tostring(source.auraKey or "")
+    local entry = auraKey ~= "" and bucket.byKey and bucket.byKey[auraKey] or nil
+    local numericEffectIndex = tonumber(source.effectIndex)
+    local effects = type(entry) == "table" and type(entry.definition) == "table"
+        and entry.definition.effects
+        or nil
+    local effect = numericEffectIndex and type(effects) == "table"
+        and (effects[numericEffectIndex] or effects[tostring(numericEffectIndex)])
+        or nil
+    local state = numericEffectIndex and type(entry) == "table" and type(entry.effectState) == "table"
+        and (entry.effectState[numericEffectIndex] or entry.effectState[tostring(numericEffectIndex)])
+        or nil
+    if type(entry) ~= "table"
+        or tonumber(entry.targetEventId) ~= targetEventId
+        or type(effect) ~= "table"
+        or tostring(effect.type or "") ~= "absorb"
+        or type(state) ~= "table"
+        or state.kind ~= "absorb"
+    then
+        return nil, nil, nil
+    end
+
+    return entry, effect, state
+end
+
+function AuraManager:PreviewAbsorption(client, eventState, targetEventId, damageAmount, damageSchoolRefs)
+    local sources = self:GetEligibleAbsorptionSources(client, eventState, targetEventId, damageSchoolRefs)
+    local changes, absorbedAmount, remainingDamage = calculateAbsorptionConsumption(sources, damageAmount)
 
     return {
         changes = changes,
         plan = changes,
         consumptionPlan = changes,
+        absorbed = absorbedAmount,
+        absorbedAmount = absorbedAmount,
+        remainingDamage = remainingDamage,
+        damageRemainder = remainingDamage,
+        healthRemainder = remainingDamage,
+    }
+end
+
+function AuraManager:ConsumeAbsorption(client, eventState, targetEventId, incomingDamage, damageSchoolRefs, context)
+    local bucket = self:GetEventAuraBucket(client, eventState and eventState.id or nil, false)
+    local numericTargetEventId = tonumber(targetEventId) or 0
+    local normalizedDamage = normalizeAbsorptionCapacity(incomingDamage)
+    if not bucket or numericTargetEventId <= 0 or normalizedDamage <= 0 then
+        return {
+            changes = {},
+            absorbedAmount = 0,
+            remainingDamage = normalizedDamage,
+        }
+    end
+
+    local eligibleSources = self:GetEligibleAbsorptionSources(
+        client,
+        eventState,
+        numericTargetEventId,
+        damageSchoolRefs
+    )
+    local liveSources = {}
+    for index = 1, #eligibleSources do
+        local source = eligibleSources[index]
+        local entry, effect, state = getLiveAbsorptionSourceState(
+            bucket,
+            source,
+            numericTargetEventId
+        )
+        if entry and effect and state
+            and isAbsorptionSourceEligible(source, damageSchoolRefs)
+            and normalizeAbsorptionCapacity(state.remaining) > 0
+        then
+            liveSources[#liveSources + 1] = {
+                source = source,
+                entry = entry,
+                state = state,
+            }
+        end
+    end
+
+    local changes, absorbedAmount, remainingDamage = calculateAbsorptionConsumption(
+        liveSources,
+        normalizedDamage,
+        function(record, source, maximum, previousRemaining, nextRemaining, absorbed)
+            local state = record.state
+            local previousRevision = math.max(1, math.floor(tonumber(state.revision) or 1))
+            state.remaining = nextRemaining
+            state.revision = previousRevision + 1
+            source.maximum = maximum
+            source.remaining = nextRemaining
+            source.revision = state.revision
+            return buildAbsorptionConsumptionChange(
+                source,
+                previousRemaining,
+                nextRemaining,
+                absorbed,
+                previousRevision
+            )
+        end
+    )
+
+    if #changes == 0 then
+        return {
+            changes = {},
+            absorbedAmount = 0,
+            remainingDamage = normalizedDamage,
+        }
+    end
+
+    bumpAuraBucketRevision(bucket)
+    local requestedContext = type(context) == "table" and context or {}
+    local syncContext = {
+        sessionState = requestedContext.sessionState,
+        eventState = eventState,
+        pendingScope = requestedContext.pendingScope,
+        scope = requestedContext.scope,
+        immediate = requestedContext.immediate == true,
+    }
+    syncContext.deferFlush = true
+    for index = 1, #changes do
+        self:QueueAuraRuntimeUpdate(client, syncContext, changes[index])
+    end
+
+    self:RemoveDepletedAbsorbAuras(client, eventState, numericTargetEventId, {
+        queueSync = true,
+        context = syncContext,
+    })
+
+    if not shouldDeferTurnAuraOperations(client, syncContext) then
+        queueOutboundAuraFlush(
+            self,
+            client,
+            normalizePendingScope(syncContext.pendingScope or syncContext.scope),
+            eventState,
+            math.floor(tonumber(eventState and eventState.turnNumber) or 0),
+            math.floor(tonumber(eventState and eventState.tickNumber) or 0)
+        )
+    end
+    refreshAuraDisplays("aura-absorption-consume", eventState, numericTargetEventId)
+
+    return {
+        changes = changes,
         absorbed = absorbedAmount,
         absorbedAmount = absorbedAmount,
         remainingDamage = remainingDamage,
@@ -3469,8 +3639,6 @@ local function flushOutboundAuraOperationBatch(manager, state)
     return true, true
 end
 
-local queueOutboundAuraFlush
-
 function AuraManager:FlushOutboundAuraOperations(client, scopeOverride, eventStateOverride, sourceTurnNumber, sourceTickNumber)
     return queueOutboundAuraFlush(
         self,
@@ -3514,7 +3682,7 @@ function AuraManager:GetOutboundAuraFlushStatus(client, scopeOverride)
     return tostring(type(statusByScope) == "table" and statusByScope[scope] or "idle")
 end
 
-local function shouldDeferTurnAuraOperations(client, context)
+shouldDeferTurnAuraOperations = function(client, context)
     if type(context) == "table" and context.immediate == true then
         return false
     end
