@@ -56,6 +56,18 @@ local function installAuraSnapshot(client, eventState, records, replaceExisting)
         })
         if applied == true then
             installed = installed + 1
+            if type(AuraManager.ApplyAuraRuntimeSnapshot) == "function"
+                and type(record.effectState) == "table"
+            then
+                AuraManager:ApplyAuraRuntimeSnapshot(
+                    client,
+                    eventState,
+                    record.casterEventId,
+                    record.targetEventId,
+                    record.auraRef,
+                    record.effectState
+                )
+            end
         else
             failed = failed + 1
         end

@@ -2408,6 +2408,34 @@ local function showTrackedTargetDelta(client, eventState, targetUnit, delta, siz
     })
 end
 
+local function showTrackedAbsorptionText(client, eventState, targetUnit, casterUnit, amount, size)
+    local numericAmount = math.max(0, math.floor(tonumber(amount) or 0))
+    if numericAmount <= 0 then
+        return false
+    end
+
+    local text = ("Absorbed %d"):format(numericAmount)
+    local color = UI.ResolveColor(nil, "text.secondary")
+    if Spellcasting.IsCombatTextTrackedUnit(client, eventState, targetUnit) then
+        return enqueueCombatText({
+            text = text,
+            color = color,
+            size = size,
+            direction = "DOWN",
+        })
+    end
+    if Spellcasting.IsCombatTextTrackedUnit(client, eventState, casterUnit) then
+        return enqueueCombatText({
+            text = text,
+            color = color,
+            size = size,
+            direction = "UP",
+        })
+    end
+
+    return false
+end
+
 local function formatOutgoingDeltaText(delta, labelPrefix)
     local numericDelta = tonumber(delta) or 0
     if numericDelta > 0 then
@@ -2419,9 +2447,11 @@ end
 
 function Spellcasting.ShowLocalResourceDeltaCombatText(client, eventState, casterUnit, targetUnit, resourceDeltas, hitType, result)
     local healthResourceRef = type(eventState) == "table" and eventState.healthResourceRef or Spellcasting.GetHealthResourceRef()
-    if healthResourceRef == nil or type(resourceDeltas) ~= "table" then
+    local absorbedAmount = math.max(0, math.floor(tonumber(type(result) == "table" and result.absorbedAmount or 0) or 0))
+    if healthResourceRef == nil and absorbedAmount <= 0 then
         return false
     end
+    resourceDeltas = type(resourceDeltas) == "table" and resourceDeltas or {}
 
     local size = isCriticalResult(result) and "critical" or "normal"
     local showed = false
@@ -2430,6 +2460,7 @@ function Spellcasting.ShowLocalResourceDeltaCombatText(client, eventState, caste
     local healDisplayAmount = isHealResult and math.max(0, tonumber(result.amount) or 0) or 0
     local resultLabelPrefix = type(result) == "table" and tostring(result.resultType or "") == "crushing" and "Crushing " or ""
     local resultSuffix = (not isHealResult and isCriticalStrikeResult(result)) and "!" or ""
+    local absorptionSuffix = absorbedAmount > 0 and (" (absorbed %d)"):format(absorbedAmount) or ""
 
     for index = 1, #resourceDeltas do
         local deltaEntry = resourceDeltas[index]
@@ -2438,11 +2469,12 @@ function Spellcasting.ShowLocalResourceDeltaCombatText(client, eventState, caste
             local numericDelta = tonumber(deltaEntry.delta) or 0
             local displayDelta = isHealResult and healDisplayAmount > 0 and healDisplayAmount or numericDelta
             if displayDelta ~= 0 then
-                if showTrackedTargetDelta(client, eventState, targetUnit, displayDelta, size, resultLabelPrefix, resultSuffix) then
+                if showTrackedTargetDelta(client, eventState, targetUnit, displayDelta, size, resultLabelPrefix, absorptionSuffix .. resultSuffix) then
                     showed = true
                 elseif Spellcasting.IsCombatTextTrackedUnit(client, eventState, casterUnit) then
                     local isHealing = displayDelta > 0
                     local text = formatOutgoingDeltaText(displayDelta, resultLabelPrefix)
+                    text = text .. absorptionSuffix
                     if not isHealing and resultSuffix ~= "" then
                         text = text .. "!"
                     end
@@ -2455,6 +2487,10 @@ function Spellcasting.ShowLocalResourceDeltaCombatText(client, eventState, caste
                 end
             end
         end
+    end
+
+    if not showed and absorbedAmount > 0 then
+        showed = showTrackedAbsorptionText(client, eventState, targetUnit, casterUnit, absorbedAmount, size) or showed
     end
 
     if not showed
@@ -2540,19 +2576,25 @@ function Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, 
 
     local resourceDeltas = Spellcasting.BuildResourceDeltaPayload(result.resourceDeltas)
     local hasResourceDeltas = type(resourceDeltas) == "table" and #resourceDeltas > 0
+    local hasAbsorptionPresentation = effectType == "damage"
+        and (tonumber(result.absorbedAmount) or 0) > 0
     local isPureDisplayedHeal = tostring(result.effectType or "") == "heal" and (tonumber(result.amount) or 0) > 0
     if not hasResourceDeltas then
-        if not isPureDisplayedHeal then
+        if not isPureDisplayedHeal and not hasAbsorptionPresentation then
             return false
         end
-        resourceDeltas = {
-            {
-                resourceRef = type(eventState) == "table" and eventState.healthResourceRef or Spellcasting.GetHealthResourceRef(),
-                delta = 0,
-                maxValue = 0,
-                currentValue = 0,
-            },
-        }
+        if isPureDisplayedHeal then
+            resourceDeltas = {
+                {
+                    resourceRef = type(eventState) == "table" and eventState.healthResourceRef or Spellcasting.GetHealthResourceRef(),
+                    delta = 0,
+                    maxValue = 0,
+                    currentValue = 0,
+                },
+            }
+        else
+            resourceDeltas = {}
+        end
     end
 
     local sessionState = self.GetState and self:GetState() or nil

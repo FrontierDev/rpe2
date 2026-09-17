@@ -8,7 +8,7 @@ local Comms = Addon.Internal.Comms
 local EventRejoinState = Comms.EventRejoinState
 local Operations = Comms.Operations or {}
 
-EventRejoinState.ProtocolVersion = 1
+EventRejoinState.ProtocolVersion = 2
 EventRejoinState.Opcode = 31
 
 local function normalizeNonNegativeInteger(value)
@@ -129,6 +129,51 @@ local function deserializeScalarNumberList(text)
     return values
 end
 
+local function serializeAuraRuntimeStates(effectState)
+    local records = {}
+    for effectIndex, state in pairs(type(effectState) == "table" and effectState or {}) do
+        if type(state) == "table" and state.kind == "absorb" then
+            local maximum = math.max(0, tonumber(state.maximum) or 0)
+            local remaining = math.max(0, math.min(maximum, tonumber(state.remaining) or 0))
+            records[#records + 1] = encodeFields({
+                math.floor(tonumber(effectIndex) or 0),
+                maximum,
+                remaining,
+                math.max(0, math.floor(tonumber(state.revision) or 0)),
+            })
+        end
+    end
+    table.sort(records)
+    return encodeFields({ tostring(#records), encodeFields(records) })
+end
+
+local function deserializeAuraRuntimeStates(payload)
+    local fields = decodeFields(payload)
+    if type(fields) ~= "table" or #fields ~= 2 then
+        return {}
+    end
+    local count = normalizeNonNegativeInteger(fields[1]) or 0
+    local states = {}
+    local records = decodeFields(fields[2]) or {}
+    for index = 1, count do
+        local record = decodeFields(records[index])
+        if type(record) ~= "table" or #record < 1 then
+            break
+        end
+        local effectIndex = math.floor(tonumber(record[1]) or 0)
+        if effectIndex > 0 then
+            local maximum = math.max(0, tonumber(record[2]) or 0)
+            states[effectIndex] = {
+                kind = "absorb",
+                maximum = maximum,
+                remaining = math.max(0, math.min(maximum, tonumber(record[3]) or 0)),
+                revision = math.max(0, math.floor(tonumber(record[4]) or 0)),
+            }
+        end
+    end
+    return states
+end
+
 local function serializeTargetSelections(targetSelections, targetSelectionOrder)
     local keys = {}
     local seen = {}
@@ -197,12 +242,13 @@ local function serializeAuraRecord(entry)
         math.max(1, math.floor(tonumber(entry and entry.stacks) or 1)),
         math.max(1, math.floor(tonumber(entry and entry.turnsRemaining) or 1)),
         tonumber(entry and entry.powerLevel) or 0,
+        serializeAuraRuntimeStates(entry and entry.effectState),
     })
 end
 
 local function deserializeAuraRecord(payload)
     local fields = decodeFields(payload)
-    if type(fields) ~= "table" or #fields ~= 6 then
+    if type(fields) ~= "table" or (#fields ~= 6 and #fields ~= 7) then
         return nil
     end
     local casterEventId = math.floor(tonumber(fields[1]) or 0)
@@ -218,6 +264,7 @@ local function deserializeAuraRecord(payload)
         stacks = math.max(1, math.floor(tonumber(fields[4]) or 1)),
         turnsRemaining = math.max(1, math.floor(tonumber(fields[5]) or 1)),
         powerLevel = tonumber(fields[6]) or 0,
+        effectState = #fields >= 7 and deserializeAuraRuntimeStates(fields[7]) or {},
     }
 end
 
@@ -314,7 +361,8 @@ function EventRejoinState.DeserializeSnapshot(payload)
     if type(fields) ~= "table" then
         return nil, reason or "invalid-snapshot"
     end
-    if #fields ~= 3 or tonumber(fields[1]) ~= EventRejoinState.ProtocolVersion then
+    local protocolVersion = tonumber(fields[1])
+    if #fields ~= 3 or (protocolVersion ~= 1 and protocolVersion ~= EventRejoinState.ProtocolVersion) then
         return nil, "unsupported-version"
     end
     local auras = deserializeRecordList(fields[2], deserializeAuraRecord)

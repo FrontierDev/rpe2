@@ -605,6 +605,8 @@ function DataEditor:BuildAuraInspectorEffectsPage(page)
             local effectType = tostring(effect.type or "damage")
             if effectType == "heal" then
                 effect.baseHealing = amount
+            elseif effectType == "absorb" then
+                effect.baseAbsorption = amount
             elseif effectType == "stat" or effectType == "skill" then
                 effect.baseAmount = amount
             else

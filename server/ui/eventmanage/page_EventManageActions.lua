@@ -262,7 +262,7 @@ local function hookRefresh(name)
     Client[name]=function(self,...) local result=original(self,...); if result==true then refreshActions() end; return result end
 end
 if Client._eventManagerActionRefreshHooksInstalled~=true then
-    for _,name in ipairs({"HandleResource","HandleResourceDelta","HandleResourceDeltaBatch","HandleAuraApply","HandleAuraApplyBatch","HandleAuraDispel","HandleAuraDispelBatch"}) do hookRefresh(name) end
+    for _,name in ipairs({"HandleResource","HandleResourceDelta","HandleResourceDeltaBatch","HandleAuraApply","HandleAuraApplyBatch","HandleAuraDispel","HandleAuraDispelBatch","HandleAuraRuntimeUpdate","HandleAuraRuntimeUpdateBatch"}) do hookRefresh(name) end
     Client._eventManagerActionRefreshHooksInstalled=true
 end
 

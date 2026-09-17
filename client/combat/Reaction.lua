@@ -879,6 +879,8 @@ function Combat:FinalizeLocalDamageResult(entry, damageResult)
     end
 
     local auraManager = Client.Spellcasting and Client.Spellcasting.AuraManager or nil
+    -- appliedDelta is the resulting health delta, so fully absorbed hits do
+    -- not trigger cancelOnDamage.
     if auraManager
         and type(auraManager.HandleDamageTaken) == "function"
         and (tonumber(damageResult.appliedDelta) or 0) < 0
@@ -893,7 +895,8 @@ function Combat:FinalizeLocalDamageResult(entry, damageResult)
         end
     end
 
-    if type(resourceDeltas) ~= "table" or #resourceDeltas == 0 then
+    local hasAbsorptionPresentation = (tonumber(damageResult.absorbedAmount) or 0) > 0
+    if (type(resourceDeltas) ~= "table" or #resourceDeltas == 0) and not hasAbsorptionPresentation then
         if timingEnabled then
             logDamageFinalizeTimingLine(
                 ("%s/%s"):format(tostring(entry.spellRef or "spell"), tostring(entry.componentKey or "component")),
@@ -1738,6 +1741,7 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
         end
 
         local auraManager = Client.Spellcasting and Client.Spellcasting.AuraManager or nil
+        -- The player-response path uses the same post-absorb health contract.
         if auraManager
             and type(auraManager.HandleDamageTaken) == "function"
             and (tonumber(damageResult and damageResult.appliedDelta) or 0) < 0

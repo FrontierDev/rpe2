@@ -202,4 +202,20 @@ function Client:HandleAuraDispelBatch(arguments, sender)
     return handleInboundAuraWithTeamColors(AuraManager.HandleAuraDispelBatch, self, arguments, sender)
 end
 
+function Client:HandleAuraRuntimeUpdate(arguments, sender)
+    if not AuraManager or type(AuraManager.HandleAuraRuntimeUpdate) ~= "function" then
+        return false
+    end
+
+    return AuraManager:HandleAuraRuntimeUpdate(self, arguments, sender)
+end
+
+function Client:HandleAuraRuntimeUpdateBatch(arguments, sender)
+    if not AuraManager or type(AuraManager.HandleAuraRuntimeUpdateBatch) ~= "function" then
+        return false
+    end
+
+    return AuraManager:HandleAuraRuntimeUpdateBatch(self, arguments, sender)
+end
+
 return Client

@@ -199,6 +199,7 @@ end
 local function normalizeEffectType(value)
     local effectType = string.lower(ensureString(value))
     if effectType == "heal"
+        or effectType == "absorb"
         or effectType == "stat"
         or effectType == "skill"
         or effectType == "control"
@@ -230,6 +231,17 @@ local function normalizeAmountMode(value)
     end
 
     return "flat"
+end
+
+local function normalizeNonNegativeNumber(value)
+    local numericValue = tonumber(value)
+    if numericValue == nil or numericValue ~= numericValue
+        or numericValue == math.huge or numericValue == -math.huge
+    then
+        return 0
+    end
+
+    return math.max(0, numericValue)
 end
 
 local function normalizeCombatEventId(value)
@@ -321,6 +333,16 @@ local function normalizeEffect(value)
             resourceRef = normalizeRef(value.resourceRef),
             amount = tonumber(value.amount) or tonumber(value.baseAmount) or 0,
             amountMode = normalizeAmountMode(value.amountMode),
+        }
+    end
+
+    if effectType == "absorb" then
+        return {
+            type = "absorb",
+            baseAbsorption = normalizeNonNegativeNumber(value.baseAbsorption),
+            amountMode = normalizeAmountMode(value.amountMode),
+            statScaling = normalizeStatScaling(value.statScaling),
+            damageSchoolRefs = normalizeDamageSchoolRefs(value.damageSchoolRefs),
         }
     end
 
@@ -520,6 +542,35 @@ end
 
 function Aura.FromTable(data)
     return Aura:New(data)
+end
+
+function Aura:HasAbsorbEffect()
+    for index = 1, #(self.effects or {}) do
+        local effect = self.effects[index]
+        if type(effect) == "table" and effect.type == "absorb" then
+            return true
+        end
+    end
+
+    return false
+end
+
+function Aura:Validate()
+    local errors = {}
+    if self:HasAbsorbEffect() then
+        if (tonumber(self.maxStacks) or 1) > 1 then
+            errors[#errors + 1] = "Absorb effects require Max Stacks to be 1 in V1."
+        end
+        if self.stackBehavior == "independent_duration" then
+            errors[#errors + 1] = "Absorb effects do not support Independent Duration stacking in V1."
+        end
+    end
+
+    return {
+        valid = #errors == 0,
+        errors = errors,
+        reason = errors[1] or "",
+    }
 end
 
 Addon.Internal.Database.Classes.Aura = Aura

@@ -69,7 +69,15 @@ local function buildDamageAmountText(amountMin, amountMax)
 end
 
 local function buildAggregateDamageDetailText(aggregate)
-    if type(aggregate) ~= "table" or type(aggregate.bonusDamageEntries) ~= "table" or #aggregate.bonusDamageEntries == 0 then
+    if type(aggregate) ~= "table" then
+        return nil
+    end
+
+    local absorbedMin = tonumber(aggregate.absorbedMin)
+    local absorbedMax = tonumber(aggregate.absorbedMax)
+    local hasAbsorption = absorbedMin ~= nil and absorbedMax ~= nil and absorbedMax > 0
+    local hasBonusDamage = type(aggregate.bonusDamageEntries) == "table" and #aggregate.bonusDamageEntries > 0
+    if not hasAbsorption and not hasBonusDamage then
         return nil
     end
 
@@ -77,19 +85,27 @@ local function buildAggregateDamageDetailText(aggregate)
         buildDamageAmountText(aggregate.amountMin, aggregate.amountMax),
         tostring(aggregate.labelText or "") ~= "" and tostring(aggregate.labelText) or "True"
     )
+    if hasAbsorption then
+        baseText = ("%s (absorbed %s)"):format(baseText, buildDamageAmountText(absorbedMin, absorbedMax))
+    end
     baseText = wrapTextWithColor(baseText, aggregate.accentColor)
 
     local bonusParts = {}
     for index = 1, #aggregate.bonusDamageEntries do
         local bonusEntry = aggregate.bonusDamageEntries[index]
         local amount = math.max(0, math.floor(tonumber(bonusEntry and bonusEntry.amount) or 0))
-        if amount > 0 then
-            bonusParts[#bonusParts + 1] = wrapTextWithColor(("+" .. tostring(amount)), bonusEntry and bonusEntry.colorHex or nil)
+        local absorbedAmount = math.max(0, math.floor(tonumber(bonusEntry and bonusEntry.absorbedAmount) or 0))
+        if amount > 0 or absorbedAmount > 0 then
+            local bonusText = "+" .. tostring(amount)
+            if absorbedAmount > 0 then
+                bonusText = ("%s (absorbed %d)"):format(bonusText, absorbedAmount)
+            end
+            bonusParts[#bonusParts + 1] = wrapTextWithColor(bonusText, bonusEntry and bonusEntry.colorHex or nil)
         end
     end
 
     if #bonusParts == 0 then
-        return nil
+        return baseText
     end
 
     return ("%s (%s)"):format(baseText, table.concat(bonusParts, ", "))
@@ -1008,6 +1024,8 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
             targetDisplayName = "Unknown",
             amountMin = nil,
             amountMax = nil,
+            absorbedMin = nil,
+            absorbedMax = nil,
             iconTexture = nil,
             spellIconTexture = type(Addon.Client) == "table" and type(Addon.Client.ResolveCombatLogSpellIcon) == "function"
                 and Addon.Client:ResolveCombatLogSpellIcon(spell, type(context) == "table" and context.spellRef or nil)
@@ -1031,6 +1049,13 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
     end
     if aggregate.amountMax == nil or amount > aggregate.amountMax then
         aggregate.amountMax = amount
+    end
+    local absorbedAmount = math.max(0, math.floor(tonumber(type(damageResult) == "table" and damageResult.absorbedAmount or 0) or 0))
+    if aggregate.absorbedMin == nil or absorbedAmount < aggregate.absorbedMin then
+        aggregate.absorbedMin = absorbedAmount
+    end
+    if aggregate.absorbedMax == nil or absorbedAmount > aggregate.absorbedMax then
+        aggregate.absorbedMax = absorbedAmount
     end
     if tostring(type(damageResult) == "table" and damageResult.damageSchoolIcon or "") ~= "" then
         aggregate.iconTexture = tostring(damageResult.damageSchoolIcon)
@@ -1104,7 +1129,8 @@ function Combat:RegisterTriggeredActionBonusDamage(actionContext, targetUnit, da
                 or 0
         )
     )
-    if amount <= 0 then
+    local absorbedAmount = math.max(0, math.floor(tonumber(damageResult.absorbedAmount) or 0))
+    if amount <= 0 and absorbedAmount <= 0 then
         return false
     end
 
@@ -1126,6 +1152,7 @@ function Combat:RegisterTriggeredActionBonusDamage(actionContext, targetUnit, da
     aggregate.bonusDamageEntries = aggregate.bonusDamageEntries or {}
     aggregate.bonusDamageEntries[#aggregate.bonusDamageEntries + 1] = {
         amount = amount,
+        absorbedAmount = absorbedAmount,
         colorHex = colorHex,
         targetEventId = tonumber(targetUnit and targetUnit.eventID) or 0,
         combatEventId = tostring(combatEventId or ""),

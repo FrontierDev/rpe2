@@ -309,9 +309,31 @@ local function applyDifficultyDamageResult(entry, result)
 
     finalDamage = math.max(0, round(finalDamage))
     scaledRawDamage = math.max(0, round(scaledRawDamage))
+    result.preAbsorbAmount = finalDamage
+    result.absorbedAmount = 0
+    result.absorptionChanges = {}
     result.amount = finalDamage
     result.mitigated = math.max(0, scaledRawDamage - finalDamage)
     result.mitigationPercent = scaledRawDamage > 0 and ((result.mitigated / scaledRawDamage) * 100) or 0
+
+    local auraManager = Client.Spellcasting and Client.Spellcasting.AuraManager or nil
+    if finalDamage > 0
+        and auraManager
+        and type(auraManager.PreviewAbsorption) == "function"
+    then
+        local absorptionPreview = auraManager:PreviewAbsorption(
+            Client,
+            getEventState(entry),
+            entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID),
+            finalDamage,
+            effect.damageSchoolRefs or {}
+        )
+        if type(absorptionPreview) == "table" then
+            result.absorbedAmount = math.max(0, tonumber(absorptionPreview.absorbedAmount or absorptionPreview.absorbed) or 0)
+            result.absorptionChanges = absorptionPreview.changes or absorptionPreview.plan or {}
+            result.amount = math.max(0, tonumber(absorptionPreview.remainingDamage or absorptionPreview.healthRemainder) or finalDamage)
+        end
+    end
 
     rebuildThreatPreview(entry, result, combatRules, effect)
     return result

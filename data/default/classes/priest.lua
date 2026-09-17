@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 12,
+    version = 13,
     dataset = {
         achievements = {},
         auras = {
@@ -129,6 +129,47 @@ Addon.Data.DefaultDatasets:Register({
                             baseField = "baseHealing",
                             effectIndex = 1,
                             key = "AURA_HEAL_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 5,
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseAbsorption = 65,
+                        damageSchoolRefs = {},
+                        statScaling = {
+                            {
+                                coefficient = 0.325,
+                                statRef = "f82db71a:7t7xgzcx"
+                            }
+                        },
+                        type = "absorb"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_holy_powerwordshield.blp",
+                id = "pwrshld1",
+                maxStacks = 1,
+                name = "Power Word: Shield",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Absorbs {AURA_ABSORB_1} damage.",
+                    bodyTokens = {
+                        {
+                            applyMode = "absorb_amount",
+                            baseField = "baseAbsorption",
+                            effectIndex = 1,
+                            key = "AURA_ABSORB_1",
                             tokenType = "aura_amount"
                         }
                     },
@@ -653,6 +694,99 @@ Addon.Data.DefaultDatasets:Register({
                             tokenType = "spell_heal_range"
                         }
                     },
+                    version = 1
+                },
+                totalTicks = 0,
+                triggersGCD = true,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "1c1038a7:pwrshld1",
+                            basePower = 0,
+                            duration = 5,
+                            stacks = 1,
+                            targetEvents = {},
+                            threatCoefficient = 0.38,
+                            type = "apply_aura"
+                        },
+                        key = "pwshldc1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_powerwordshield.blp",
+                id = "pwshld01",
+                ignoreGCD = false,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Power Word: Shield",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 15,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Discipline",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "1c1038a7:pwrshld1",
+                            datasetId = "1c1038a7",
+                            descriptionText = "Absorbs {AURA_ABSORB_1} damage.",
+                            duration = 5,
+                            icon = "interface/icons/spell_holy_powerwordshield.blp",
+                            nameText = "Power Word: Shield",
+                            powerLevel = 0,
+                            spellDatasetId = "1c1038a7",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected ally",
+                                possessive = "the affected ally's",
+                                reflexive = "itself",
+                                subject = "the affected ally"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "absorb_amount",
+                                    baseField = "baseAbsorption",
+                                    effectIndex = 1,
+                                    key = "AURA_ABSORB_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Power Word: Shield to an ally for 5 turns.",
+                    tokens = {},
                     version = 1
                 },
                 totalTicks = 0,

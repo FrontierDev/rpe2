@@ -329,6 +329,23 @@ local function buildPassiveDamageSentence(effect, targetContext, options)
     return ("Deals %s %s damage each turn."):format(amountText, schoolLabel)
 end
 
+local function buildPassiveAbsorbSentence(effect, targetContext, options)
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    local amountText = nil
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base"):format(tonumber(effect and effect.baseAbsorption) or 0)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max"):format(tonumber(effect and effect.baseAbsorption) or 0)
+    else
+        amountText = tostring(math.max(0, resolveAmount(options, effect, "baseAbsorption")))
+    end
+
+    local schoolLabel = #((effect and effect.damageSchoolRefs) or {}) > 0
+        and (resolveDamageSchoolLabel(effect) .. " damage")
+        or "damage"
+    return ("Absorbs %s %s."):format(amountText, schoolLabel)
+end
+
 local function buildPassiveHealSentence(effect, targetContext, options)
     local amount = math.max(0, resolveAmount(options, effect, "baseHealing"))
     local amountMode = tostring(effect and effect.amountMode or "flat")
@@ -832,6 +849,8 @@ function AuraDescriptionBuilder:BuildGeneratedDescription(auraDefinition, option
         local sentence = nil
         if effectType == "damage" then
             sentence = buildPassiveDamageSentence(effect, targetContext, options)
+        elseif effectType == "absorb" then
+            sentence = buildPassiveAbsorbSentence(effect, targetContext, options)
         elseif effectType == "heal" then
             sentence = buildPassiveHealSentence(effect, targetContext, options)
         elseif effectType == "resource" then
@@ -939,6 +958,27 @@ local function buildPassiveDamageSentenceTemplate(effect, effectIndex, state)
         applyMode = "damage_amount",
     })
     return ("Deals %s %s damage each turn."):format(amountToken, schoolLabel)
+end
+
+local function buildPassiveAbsorbSentenceTemplate(effect, effectIndex, state)
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    local amountText = nil
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base"):format(tonumber(effect and effect.baseAbsorption) or 0)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max"):format(tonumber(effect and effect.baseAbsorption) or 0)
+    else
+        amountText = buildAuraAmountToken(state, "AURA_ABSORB", {
+            effectIndex = effectIndex,
+            baseField = "baseAbsorption",
+            applyMode = "absorb_amount",
+        })
+    end
+
+    local schoolLabel = #((effect and effect.damageSchoolRefs) or {}) > 0
+        and (resolveDamageSchoolLabel(effect) .. " damage")
+        or "damage"
+    return ("Absorbs %s %s."):format(amountText, schoolLabel)
 end
 
 local function buildPassiveHealSentenceTemplate(effect, effectIndex, state)
@@ -1211,10 +1251,10 @@ local function resolveAuraTemplateToken(auraDefinition, token, options)
         return nil
     end
 
-    if applyMode == "damage_amount" or applyMode == "heal_amount" or applyMode == "stat_amount" or applyMode == "skill_amount" then
+    if applyMode == "damage_amount" or applyMode == "heal_amount" or applyMode == "absorb_amount" or applyMode == "stat_amount" or applyMode == "skill_amount" then
         local amount = resolveAmount(options, effect, tostring(token.baseField or "baseAmount"))
         local numericAmount = math.abs(amount)
-        if applyMode == "damage_amount" or applyMode == "heal_amount" then
+        if applyMode == "damage_amount" or applyMode == "heal_amount" or applyMode == "absorb_amount" then
             local amountMode = tostring(effect.amountMode or "flat")
             if amountMode == "base_percent" then
                 return ("%g%% of Base"):format(math.abs(tonumber(effect[token.baseField or "baseAmount"]) or 0))
@@ -1282,6 +1322,8 @@ function AuraDescriptionBuilder:BuildTooltipTemplatePayload(auraDefinition, opti
         local sentence = nil
         if effectType == "damage" then
             sentence = buildPassiveDamageSentenceTemplate(effect, effectIndex, bodyState)
+        elseif effectType == "absorb" then
+            sentence = buildPassiveAbsorbSentenceTemplate(effect, effectIndex, bodyState)
         elseif effectType == "heal" then
             sentence = buildPassiveHealSentenceTemplate(effect, effectIndex, bodyState)
         elseif effectType == "resource" then

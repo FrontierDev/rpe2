@@ -194,6 +194,17 @@ function DataEditor:BuildAuraInspectorGeneralPage(page)
     end)
     root:AddChild(self.AuraInspectorMaxStacksInput)
 
+    self.AuraInspectorAbsorbValidationText = UI.CreateText(root:GetFrame(), "RPEDataEditorAuraInspectorAbsorbValidationText", "", {
+        fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
+        fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Body) or 8,
+        textColor = UI.ResolveColor(nil, "warning"),
+        width = self.AuraInspectorFieldWidth,
+        height = 24,
+        justifyH = "LEFT",
+        wordWrap = true,
+    })
+    root:AddChild(self.AuraInspectorAbsorbValidationText)
+
     self.AuraInspectorTooltipTemplateStatusText = self:BuildAuraInspectorLabel(root:GetFrame(), "RPEDataEditorAuraInspectorTooltipTemplateLabel", "Tooltip Template")
     root:AddChild(self.AuraInspectorTooltipTemplateStatusText)
 

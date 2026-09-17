@@ -423,6 +423,9 @@ local function buildCombatResult(entry, resultToken, resultType)
         hitCheckResult = resultToken,
         landed = resultToken == RESULT_PASS,
         pending = resultToken == nil,
+        preAbsorbAmount = 0,
+        absorbedAmount = 0,
+        absorptionChanges = {},
         amount = 0,
         checkId = entry and entry.checkId or nil,
         eventId = entry and entry.eventId or nil,
@@ -1027,6 +1030,9 @@ buildResolvedDamageResult = function(self, entry)
         resultType = resultType,
         wasCritical = resultType == "critical" or resultType == "crushing",
         rawDamage = rawDamage,
+        preAbsorbAmount = 0,
+        absorbedAmount = 0,
+        absorptionChanges = {},
         amount = 0,
         mitigated = 0,
         applied = false,
@@ -1127,12 +1133,35 @@ buildResolvedDamageResult = function(self, entry)
 
     finalDamage = math.max(0, Common.Round(finalDamage))
     scaledRawDamage = math.max(0, Common.Round(scaledRawDamage))
+    result.preAbsorbAmount = finalDamage
     result.amount = finalDamage
     result.mitigated = math.max(0, scaledRawDamage - finalDamage)
     result.mitigationPercent = scaledRawDamage > 0 and ((result.mitigated / scaledRawDamage) * 100) or 0
     result.damageSchoolName = table.concat(hitContext.schoolNames or {}, ", ")
     if result.damageSchoolName == "" then
         result.damageSchoolName = "True"
+    end
+
+    -- Absorption is previewed after all mitigation and final rounding. The
+    -- preview is deliberately pure; authoritative state is committed only by
+    -- ApplyResolvedDamage once the hit can be finalized.
+    local auraManager = getAuraManager()
+    if finalDamage > 0
+        and auraManager
+        and type(auraManager.PreviewAbsorption) == "function"
+    then
+        local absorptionPreview = auraManager:PreviewAbsorption(
+            Client,
+            entry.eventState,
+            entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID),
+            finalDamage,
+            effect.damageSchoolRefs or {}
+        )
+        if type(absorptionPreview) == "table" then
+            result.absorbedAmount = math.max(0, tonumber(absorptionPreview.absorbedAmount or absorptionPreview.absorbed) or 0)
+            result.absorptionChanges = absorptionPreview.changes or absorptionPreview.plan or {}
+            result.amount = math.max(0, tonumber(absorptionPreview.remainingDamage or absorptionPreview.healthRemainder) or finalDamage)
+        end
     end
 
     if entry.defenderUnit.isPlayer ~= true and tonumber(result.amount) > 0 then
@@ -1177,58 +1206,117 @@ function Combat:BuildDamagePreview(entry)
 end
 
 function Combat:ApplyResolvedDamage(entry, previewOnly)
+    if previewOnly ~= true and type(entry) == "table" and type(entry.authoritativeDamageResult) == "table" then
+        return true, entry.authoritativeDamageResult
+    end
+
     local computed, result = buildResolvedDamageResult(self, entry)
     if not computed or type(result) ~= "table" then
         return false, result
     end
-    local finalDamage = tonumber(result.amount) or 0
+    local finalDamage = math.max(0, tonumber(result.amount) or 0)
     local hitContext = ensureHitResolutionContext(self, entry)
     local healthResourceRef = type(hitContext) == "table"
         and type(hitContext.healthResourceContext) == "table"
         and normalizeToken(hitContext.healthResourceContext.healthResourceRef)
         or nil
     result.healthResourceRef = healthResourceRef
-    if not healthResourceRef or finalDamage <= 0 then
+    local absorbedAmount = math.max(0, tonumber(result.absorbedAmount) or 0)
+    local preAbsorbAmount = math.max(0, tonumber(result.preAbsorbAmount) or 0)
+    if preAbsorbAmount > 0 and absorbedAmount > 0 then
+        -- The resource delta must always be the post-absorption remainder. A
+        -- damage preview may be cached before application, but shield capacity
+        -- consumption cannot turn a partially absorbed hit into a full absorb.
+        absorbedAmount = math.min(preAbsorbAmount, absorbedAmount)
+        finalDamage = math.max(0, preAbsorbAmount - absorbedAmount)
+        result.absorbedAmount = absorbedAmount
+        result.amount = finalDamage
+    end
+    local hasHealthDamage = healthResourceRef ~= nil and finalDamage > 0
+    if not hasHealthDamage and absorbedAmount <= 0 then
         return false, result
     end
 
-    local resourceUnit = entry.defenderUnit
-    if previewOnly == true then
-        resourceUnit = self:CloneValue(entry.defenderUnit)
-        local previewHitContext = {
-            healthResourceContext = self:CloneValue(hitContext.healthResourceContext),
-        }
-        ensureHealthResourceEntry({
-            context = entry.context,
-            defenderUnit = resourceUnit,
-            eventState = entry.eventState,
-        }, previewHitContext)
+    if hasHealthDamage then
+        local resourceUnit = entry.defenderUnit
+        if previewOnly == true then
+            resourceUnit = self:CloneValue(entry.defenderUnit)
+            local previewHitContext = {
+                healthResourceContext = self:CloneValue(hitContext.healthResourceContext),
+            }
+            ensureHealthResourceEntry({
+                context = entry.context,
+                defenderUnit = resourceUnit,
+                eventState = entry.eventState,
+            }, previewHitContext)
+        else
+            ensureHealthResourceEntry(entry, hitContext)
+        end
+
+        -- Damage results are always previewed locally and become authoritative only once
+        -- the corresponding RESOURCE_DELTA message is handled back through the client.
+        local applied, resourceEntry, appliedDelta = self:PreviewResourceDelta(resourceUnit, healthResourceRef, -finalDamage)
+        result.applied = applied
+        result.resourceEntry = resourceEntry
+        result.appliedDelta = appliedDelta
+        if applied and resourceEntry then
+            result.resourceDeltas = {
+                {
+                    resourceRef = healthResourceRef,
+                    delta = appliedDelta,
+                    maxValue = tonumber(resourceEntry.maxValue) or 0,
+                    currentValue = tonumber(resourceEntry.currentValue) or 0,
+                },
+            }
+        end
+        if not applied then
+            return false, result
+        end
     else
-        ensureHealthResourceEntry(entry, hitContext)
-    end
-
-    -- Damage results are always previewed locally and become authoritative only once
-    -- the corresponding RESOURCE_DELTA message is handled back through the client.
-    local applied, resourceEntry, appliedDelta = self:PreviewResourceDelta(resourceUnit, healthResourceRef, -finalDamage)
-    result.applied = applied
-    result.resourceEntry = resourceEntry
-    result.appliedDelta = appliedDelta
-    if applied and resourceEntry then
-        result.resourceDeltas = {
-            {
-                resourceRef = healthResourceRef,
-                delta = appliedDelta,
-                maxValue = tonumber(resourceEntry.maxValue) or 0,
-                currentValue = tonumber(resourceEntry.currentValue) or 0,
-            },
-        }
-    end
-    if not applied then
-        return false, result
+        -- A fully absorbed hit is still a landed hit, but it must not invent a
+        -- zero-valued health RESOURCE_DELTA.
+        result.applied = true
+        result.appliedDelta = 0
     end
 
     if previewOnly ~= true then
+        local auraManager = getAuraManager()
+        local absorptionChanges = result.absorptionChanges
+        if type(absorptionChanges) == "table" and #absorptionChanges > 0 then
+            local commitResult = type(entry) == "table" and entry.absorptionCommitResult or nil
+            if type(commitResult) ~= "table" then
+                local context = type(entry.context) == "table" and entry.context or {}
+                local sessionState = context.sessionState
+                    or (Client.GetState and Client:GetState() or nil)
+                local commitOk, committed = false, nil
+                if auraManager and type(auraManager.CommitAbsorptionChanges) == "function" then
+                    commitOk, committed = auraManager:CommitAbsorptionChanges(
+                        Client,
+                        entry.eventState,
+                        entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID),
+                        absorptionChanges,
+                        {
+                            removeDepletedAbsorbAuras = true,
+                            context = {
+                                sessionState = sessionState,
+                                eventState = entry.eventState,
+                                pendingScope = context.pendingScope,
+                                immediate = context.immediate == true,
+                            },
+                        }
+                    )
+                end
+                if not commitOk then
+                    return false, result
+                end
+                commitResult = committed
+                entry.absorptionCommitResult = commitResult
+            end
+            result.absorptionChanges = commitResult.changes or absorptionChanges
+            result.absorbedAmount = tonumber(commitResult.absorbedAmount or commitResult.absorbed) or absorbedAmount
+        end
         commitResolvedDamageThreat(entry, result)
+        entry.authoritativeDamageResult = result
     end
 
     return true, result

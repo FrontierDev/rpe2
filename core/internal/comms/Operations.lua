@@ -566,6 +566,30 @@ Operations.Opcodes = Operations.Opcodes or {
             return client:HandleSkillRollResult(arguments, sender, distribution, target, message)
         end,
     },
+    [39] = {
+        key = "AURA_RUNTIME_UPDATE",
+        name = "aura-runtime-update",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleAuraRuntimeUpdate) ~= "function" then
+                return false
+            end
+
+            return client:HandleAuraRuntimeUpdate(arguments, sender, distribution, target, message)
+        end,
+    },
+    [40] = {
+        key = "AURA_RUNTIME_UPDATE_BATCH",
+        name = "aura-runtime-update-batch",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleAuraRuntimeUpdateBatch) ~= "function" then
+                return false
+            end
+
+            return client:HandleAuraRuntimeUpdateBatch(arguments, sender, distribution, target, message)
+        end,
+    },
 }
 
 Operations:ResetRegistry()
