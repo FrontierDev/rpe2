@@ -228,6 +228,7 @@ client/combat/effects/Revert.lua
 client/combat/effects/SummonPet.lua
 client/combat/effects/Hide.lua
 client/combat/effects/Taunt.lua
+client/client_EventMeters.lua
 client/combat/ReactionPerformance.lua
 client/spellcasting/TooltipTemplate.lua
 client/spellcasting/AuraDescriptionBuilder.lua
@@ -316,6 +317,7 @@ client/ui/widgets/widget_Event.lua
 client/ui/widgets/widget_EventPrimaryResource.lua
 client/ui/widgets/widget_EventAutopilotSchedule.lua
 client/ui/widgets/widget_Event_CombatLogHistory.lua
+client/ui/widgets/widget_Event_Meters.lua
 client/ui/widgets/widget_Event_DMHelper.lua
 client/autopilot/Helper.lua
 client/autopilot/EmoteCues.lua

@@ -151,48 +151,8 @@ local function resolveCreatureTypeDamageStatRef(combatRules, defenderUnit)
 end
 
 local function rebuildThreatPreview(entry, result, combatRules, effect)
-    result.threatGenerated = 0
-    result.threatSourceEventId = 0
-    result.threatTargetEventId = 0
-    result.threatTotal = 0
-    result.threatUpdate = nil
-
-    if type(entry.defenderUnit) ~= "table"
-        or entry.defenderUnit.isPlayer == true
-        or (tonumber(result.amount) or 0) <= 0
-    then
-        return
-    end
-
-    local attackerEventId = math.floor(tonumber(entry.attackerEventId or (entry.attackerUnit and entry.attackerUnit.eventID)) or 0)
-    local defenderEventId = math.floor(tonumber(entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID)) or 0)
-    if attackerEventId <= 0 or defenderEventId <= 0 then
-        return
-    end
-
-    local threatCoefficient = tonumber(effect and effect.threatCoefficient) or 1
-    local threatAmount = math.max(0, round((tonumber(result.amount) or 0) * threatCoefficient))
-    threatAmount = math.max(0, round(applyPercentModifier(
-        threatAmount,
-        getStatValue(entry.hitResolutionContext or entry.context, entry.attackerUnit, combatRules and combatRules.threatGeneratedStat),
-        false
-    )))
-
-    local previousThreat = 0
-    if type(entry.defenderUnit.threatTable) == "table" then
-        previousThreat = tonumber(entry.defenderUnit.threatTable[attackerEventId]) or 0
-    end
-
-    result.threatGenerated = threatAmount
-    result.threatSourceEventId = attackerEventId
-    result.threatTargetEventId = defenderEventId
-    result.threatTotal = previousThreat + threatAmount
-    if threatAmount > 0 then
-        result.threatUpdate = {
-            targetEventId = defenderEventId,
-            sourceEventId = attackerEventId,
-            amount = threatAmount,
-        }
+    if type(Combat.RefreshDamageThreatPreview) == "function" then
+        Combat:RefreshDamageThreatPreview(entry, result)
     end
 end
 

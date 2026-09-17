@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 16,
+        version = 17,
     dataset = {
         achievements = {},
         auras = {
@@ -1326,6 +1326,68 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 totalTicks = 0,
                 triggersGCD = false,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            duration = 3,
+                            targetEvents = {},
+                            type = "taunt"
+                        },
+                        key = "tntcmp01",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 3,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_nature_reincarnation.blp",
+                id = "tntwar01",
+                ignoreGCD = false,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Taunt",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 1,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Taunt an enemy for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                triggersGCD = true,
                 useCooldownCharges = false
             },
             {

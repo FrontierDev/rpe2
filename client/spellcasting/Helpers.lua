@@ -191,6 +191,7 @@ local function emitResolvedHealCombatLog(client, eventState, casterUnit, targetR
     end
 
     local targetCount = 0
+    local exactTotal = 0
     local amountMin = nil
     local amountMax = nil
     local singleTargetName = nil
@@ -202,6 +203,7 @@ local function emitResolvedHealCombatLog(client, eventState, casterUnit, targetR
         local resultType = tostring(type(result) == "table" and result.resultType or "")
         if type(targetUnit) == "table" and amount > 0 and resultType ~= "invalid" then
             targetCount = targetCount + 1
+            exactTotal = exactTotal + amount
             if targetCount == 1 then
                 singleTargetName = tostring(targetUnit.name or "Unknown")
             end
@@ -222,6 +224,8 @@ local function emitResolvedHealCombatLog(client, eventState, casterUnit, targetR
     return client:EmitCombatLogEntry({
         eventId = eventState.id,
         entryType = "heal",
+        casterEventId = tonumber(casterUnit.eventID) or nil,
+        meterAmount = exactTotal,
         casterDisplayName = tostring(casterUnit.name or "Unknown"),
         targetDisplayName = targetCount > 1 and ("%d targets"):format(targetCount) or singleTargetName,
         targetCount = targetCount,

@@ -172,6 +172,8 @@ local function emitSingleTargetDamageCombatLog(entry, damageResult)
     return client:EmitCombatLogEntry({
         eventId = tostring((eventState and eventState.id) or entry.eventId or ""),
         entryType = "damage",
+        casterEventId = tonumber(entry.attackerUnit and entry.attackerUnit.eventID) or nil,
+        meterAmount = amount,
         casterDisplayName = tostring(entry.attackerUnit and entry.attackerUnit.name or "Unknown"),
         targetDisplayName = tostring(entry.defenderUnit and entry.defenderUnit.name or "Unknown"),
         targetCount = 1,
@@ -1100,6 +1102,7 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
         aggregate = {
             eventId = tostring(type(entry) == "table" and ((entry.eventState and entry.eventState.id) or entry.eventId) or ""),
             entryType = "damage",
+            casterEventId = tonumber(type(entry) == "table" and entry.attackerUnit and entry.attackerUnit.eventID) or nil,
             casterDisplayName = tostring(type(entry) == "table" and entry.attackerUnit and entry.attackerUnit.name or "Unknown"),
             targetCount = 0,
             targetDisplayName = "Unknown",
@@ -1114,9 +1117,15 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
             labelText = "",
             accentColor = nil,
             bonusDamageEntries = {},
+            meterAmount = 0,
         }
         state.damageLogsByComponentKey[componentKey] = aggregate
     end
+
+    if not aggregate.casterEventId then
+        aggregate.casterEventId = tonumber(type(entry) == "table" and entry.attackerUnit and entry.attackerUnit.eventID) or nil
+    end
+    aggregate.meterAmount = math.max(0, math.floor(tonumber(aggregate.meterAmount) or 0)) + amount
 
     aggregate.targetCount = math.max(0, math.floor(tonumber(aggregate.targetCount) or 0)) + 1
     if aggregate.targetCount == 1 then
@@ -1238,6 +1247,11 @@ function Combat:RegisterTriggeredActionBonusDamage(actionContext, targetUnit, da
         targetEventId = tonumber(targetUnit and targetUnit.eventID) or 0,
         combatEventId = tostring(combatEventId or ""),
     }
+    local casterUnit = actionContext.casterUnit or actionContext.attackerUnit
+    if not aggregate.casterEventId then
+        aggregate.casterEventId = tonumber(casterUnit and casterUnit.eventID) or nil
+    end
+    aggregate.meterAmount = math.max(0, math.floor(tonumber(aggregate.meterAmount) or 0)) + amount
     return true
 end
 
@@ -1267,6 +1281,8 @@ function Combat:FlushActionDamageCombatLog(client, context, castEntry, spell, co
     return client:EmitCombatLogEntry({
         eventId = aggregate.eventId,
         entryType = "damage",
+        casterEventId = aggregate.casterEventId,
+        meterAmount = aggregate.meterAmount,
         casterDisplayName = aggregate.casterDisplayName,
         targetDisplayName = aggregate.targetDisplayName,
         targetCount = aggregate.targetCount,

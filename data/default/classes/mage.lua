@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 14,
+    version = 15,
     dataset = {
         achievements = {},
         auras = {
@@ -3212,6 +3212,44 @@ Addon.Data.DefaultDatasets:Register({
                         operation = "percent",
                         statRef = "f82db71a:7t7xgzcx",
                         value = 3
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Frost",
+                conditions = {},
+                description = "Increases armor by 100% and Frost Resistance by 30. On melee hit taken, apply Chilled to the attacker.",
+                events = {
+                    {
+                        combatEventId = "on_melee_taken",
+                        effects = {
+                            {
+                                auraRef = "d7c874c4:m5d3gzpj",
+                                basePower = 0,
+                                duration = 2,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "event_source"
+                    }
+                },
+                icon = "interface/icons/spell_frost_frostarmor02.blp",
+                id = "icearm01",
+                isEnvironmental = false,
+                name = "Ice Armor",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        operation = "percent",
+                        statRef = "f82db71a:v42albuv",
+                        value = 100
+                    },
+                    {
+                        statRef = "f82db71a:jjn0my8k",
+                        value = 30
                     }
                 },
                 unlockLevel = 1

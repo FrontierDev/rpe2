@@ -8,7 +8,7 @@ local Comms = Addon.Internal.Comms
 local EventRejoinState = Comms.EventRejoinState
 local Operations = Comms.Operations or {}
 
-EventRejoinState.ProtocolVersion = 2
+EventRejoinState.ProtocolVersion = 3
 EventRejoinState.Opcode = 31
 
 local function normalizeNonNegativeInteger(value)
@@ -18,6 +18,26 @@ local function normalizeNonNegativeInteger(value)
     end
     numeric = math.floor(numeric)
     if numeric < 0 then
+        return nil
+    end
+    return numeric
+end
+
+local function normalizePositiveInteger(value)
+    local numeric = tonumber(value)
+    if numeric == nil then
+        return nil
+    end
+    if numeric ~= math.floor(numeric) then
+        return nil
+    end
+    numeric = math.floor(numeric)
+    return numeric > 0 and numeric or nil
+end
+
+local function normalizeNonNegativeNumber(value)
+    local numeric = tonumber(value)
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge or numeric < 0 then
         return nil
     end
     return numeric
@@ -343,11 +363,75 @@ local function deserializeRecordList(payload, deserializer)
     return records
 end
 
+local function serializeMeterRecord(entry)
+    return encodeFields({
+        math.floor(tonumber(entry and entry.eventId) or 0),
+        tonumber(entry and entry.amount) or -1,
+        tostring(entry and entry.name or ""),
+        entry and entry.team ~= nil and tostring(entry.team) or "",
+    })
+end
+
+local function deserializeMeterRecord(payload)
+    local fields = decodeFields(payload)
+    if type(fields) ~= "table" or #fields ~= 4 then
+        return nil
+    end
+
+    local eventId = normalizePositiveInteger(fields[1])
+    local amount = normalizeNonNegativeNumber(fields[2])
+    if not eventId or amount == nil then
+        return nil
+    end
+
+    local name = tostring(fields[3] or "")
+    local team = nil
+    if tostring(fields[4] or "") ~= "" then
+        team = normalizeNonNegativeNumber(fields[4])
+        if team == nil then
+            return nil
+        end
+    end
+
+    return {
+        eventId = eventId,
+        amount = amount,
+        name = name ~= "" and name or nil,
+        team = team,
+    }
+end
+
+local function serializeMeterSnapshot(snapshot)
+    return encodeFields({
+        serializeRecordList(type(snapshot) == "table" and snapshot.damage or {}, serializeMeterRecord),
+        serializeRecordList(type(snapshot) == "table" and snapshot.healing or {}, serializeMeterRecord),
+    })
+end
+
+local function deserializeMeterSnapshot(payload)
+    local fields = decodeFields(payload)
+    if type(fields) ~= "table" or #fields ~= 2 then
+        return nil
+    end
+
+    local damage = deserializeRecordList(fields[1], deserializeMeterRecord)
+    local healing = deserializeRecordList(fields[2], deserializeMeterRecord)
+    if type(damage) ~= "table" or type(healing) ~= "table" then
+        return nil
+    end
+
+    return {
+        damage = damage,
+        healing = healing,
+    }
+end
+
 function EventRejoinState.SerializeSnapshot(snapshot)
     local body = encodeFields({
         EventRejoinState.ProtocolVersion,
         serializeRecordList(type(snapshot) == "table" and snapshot.auras or {}, serializeAuraRecord),
         serializeRecordList(type(snapshot) == "table" and snapshot.casts or {}, serializeCastRecord),
+        serializeMeterSnapshot(type(snapshot) == "table" and snapshot.meters or nil),
     })
     return toHex(body)
 end
@@ -362,7 +446,11 @@ function EventRejoinState.DeserializeSnapshot(payload)
         return nil, reason or "invalid-snapshot"
     end
     local protocolVersion = tonumber(fields[1])
-    if #fields ~= 3 or (protocolVersion ~= 1 and protocolVersion ~= EventRejoinState.ProtocolVersion) then
+    if protocolVersion ~= 1 and protocolVersion ~= 2 and protocolVersion ~= EventRejoinState.ProtocolVersion then
+        return nil, "unsupported-version"
+    end
+    local expectedFieldCount = protocolVersion >= 3 and 4 or 3
+    if #fields ~= expectedFieldCount then
         return nil, "unsupported-version"
     end
     local auras = deserializeRecordList(fields[2], deserializeAuraRecord)
@@ -370,10 +458,22 @@ function EventRejoinState.DeserializeSnapshot(payload)
     if type(auras) ~= "table" or type(casts) ~= "table" then
         return nil, "invalid-record-list"
     end
+    local meters = {
+        damage = {},
+        healing = {},
+    }
+    if protocolVersion >= 3 then
+        meters = deserializeMeterSnapshot(fields[4])
+        if type(meters) ~= "table" then
+            return nil, "invalid-meter-snapshot"
+        end
+    end
+
     return {
         protocolVersion = EventRejoinState.ProtocolVersion,
         auras = auras,
         casts = casts,
+        meters = meters,
     }, nil
 end
 

@@ -229,6 +229,54 @@ local function refreshEventManageDashboard()
     return eventManage:RefreshDashboard() == true
 end
 
+local function hideVisibleMeters(client)
+    local ui = type(client) == "table" and client.UI or nil
+    if type(ui) ~= "table" then
+        return false
+    end
+
+    local candidates = {
+        { namespace = ui.EventMeters, genericHide = true },
+        { namespace = ui.EventMeter, genericHide = true },
+        { namespace = ui.EventWidget, genericHide = false },
+    }
+    for index = 1, #candidates do
+        local candidate = candidates[index]
+        local namespace = candidate.namespace
+        local target = namespace
+        if type(namespace) == "table" and type(namespace.Get) == "function" then
+            target = namespace:Get()
+        end
+        if type(target) == "table" then
+            local visible = true
+            if type(target.IsShown) == "function" then
+                visible = target:IsShown() == true
+            elseif type(target.IsVisible) == "function" then
+                visible = target:IsVisible() == true
+            end
+            if visible then
+                local methods = {
+                    "HideMeters",
+                    "HideMeterPanel",
+                    "HideEventMeters",
+                }
+                if candidate.genericHide then
+                    methods[#methods + 1] = "Hide"
+                end
+                for methodIndex = 1, #methods do
+                    local method = methods[methodIndex]
+                    if type(target[method]) == "function" then
+                        target[method](target)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+
+    return false
+end
+
 local EVENT_STARTUP_STEP_COUNT = 9
 
 local function getTransitionGeneration(client)
@@ -2436,6 +2484,10 @@ local function clearEventStateNow(client, state, reason, options)
     local transition = client.EventTransition
     local eventState = type(state) == "table" and state or (transition and transition.eventState)
     local eventId = eventState and eventState.id or nil
+    local eventMeters = client.EventMeters
+    if type(eventMeters) == "table" and type(eventMeters.ResetEvent) == "function" and eventId ~= nil then
+        eventMeters:ResetEvent(eventId)
+    end
     local combat = client.Combat or (Addon.Client and Addon.Client.Combat) or nil
     if type(combat) == "table" and type(combat.ClearDefensiveReactionUseLedger) == "function" then
         combat:ClearDefensiveReactionUseLedger(eventId)
@@ -2485,6 +2537,7 @@ local function clearEventStateNow(client, state, reason, options)
     if client.ClearEventWidgetCombatLog then
         client:ClearEventWidgetCombatLog(reason or "ended")
     end
+    hideVisibleMeters(client)
     if combatLogTimer then
         stopEventTiming(combatLogTimer, eventState, { teardownPhase = "combat-log" })
     end
@@ -2861,6 +2914,10 @@ function Client:HandleEventStart(arguments, sender)
             })
         end
         return true
+    end
+    local eventMeters = self.EventMeters
+    if type(eventMeters) == "table" and type(eventMeters.ResetEvent) == "function" then
+        eventMeters:ResetEvent(nextState.id)
     end
     nextState.rosterReady = false
     nextState.unitsReady = false

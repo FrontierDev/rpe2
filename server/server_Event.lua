@@ -2230,6 +2230,9 @@ function Server:StartEvent(data)
     stopTiming(buildStateTimer)
 
     self.EventState = eventState
+    if type(Client.EventMeters) == "table" and type(Client.EventMeters.ResetEvent) == "function" then
+        Client.EventMeters:ResetEvent(eventState.id)
+    end
     local buildDraftTimer = startTiming("buildEventDraftState", {
         context = "event-start",
         thresholdMs = 10,
@@ -2322,6 +2325,12 @@ function Server:EndEvent(reason)
     end
     if type(self.EventTauntRuntimeByEventId) == "table" then
         self.EventTauntRuntimeByEventId[tostring(eventState.id or "")] = nil
+    end
+    if type(Client) == "table"
+        and type(Client.EventMeters) == "table"
+        and type(Client.EventMeters.ResetEvent) == "function"
+    then
+        Client.EventMeters:ResetEvent(eventState.id)
     end
     self.EventState = nil
     refreshEventManagePage()

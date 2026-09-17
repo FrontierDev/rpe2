@@ -1163,6 +1163,10 @@ function Client:Reset(reason, options)
     else
         self.EventState = nil
     end
+    local eventMeters = self.EventMeters
+    if type(eventMeters) == "table" and type(eventMeters.ClearAll) == "function" then
+        eventMeters:ClearAll()
+    end
 
     self.State = nil
 

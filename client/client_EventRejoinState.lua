@@ -32,6 +32,54 @@ local function findUnit(eventState, eventId)
     return nil
 end
 
+local function refreshVisibleMeters(client, reason)
+    local ui = type(client) == "table" and client.UI or nil
+    if type(ui) ~= "table" then
+        return false
+    end
+
+    local candidates = {
+        { namespace = ui.EventMeters, genericRefresh = true },
+        { namespace = ui.EventMeter, genericRefresh = true },
+        { namespace = ui.EventWidget, genericRefresh = false },
+    }
+    for index = 1, #candidates do
+        local candidate = candidates[index]
+        local namespace = candidate.namespace
+        local target = namespace
+        if type(namespace) == "table" and type(namespace.Get) == "function" then
+            target = namespace:Get()
+        end
+        if type(target) == "table" then
+            local visible = true
+            if type(target.IsShown) == "function" then
+                visible = target:IsShown() == true
+            elseif type(target.IsVisible) == "function" then
+                visible = target:IsVisible() == true
+            end
+            if visible then
+                local methods = {
+                    "RefreshMeters",
+                    "RefreshMeterPanel",
+                    "RefreshEventMeters",
+                }
+                if candidate.genericRefresh then
+                    methods[#methods + 1] = "Refresh"
+                end
+                for methodIndex = 1, #methods do
+                    local method = methods[methodIndex]
+                    if type(target[method]) == "function" then
+                        target[method](target, reason)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+
+    return false
+end
+
 local function installAuraSnapshot(client, eventState, records, replaceExisting)
     if replaceExisting == true and type(Spellcasting.ResetAuraState) == "function" then
         Spellcasting.ResetAuraState(client, eventState.id)
@@ -139,6 +187,11 @@ function Client:ApplyEventRejoinState(eventId)
     local replaceExisting = pending.replaceExisting == true
     local auraInstalled, auraFailed = installAuraSnapshot(self, eventState, pending.auras, replaceExisting)
     local castInstalled, castFailed = installCastSnapshot(self, eventState, pending.casts, replaceExisting)
+    local meters = pending.meters or { damage = {}, healing = {} }
+    local eventMeters = self.EventMeters
+    if type(eventMeters) == "table" and type(eventMeters.InstallSnapshot) == "function" then
+        eventMeters:InstallSnapshot(normalizedEventId, meters, replaceExisting)
+    end
 
     if type(AuraManager) == "table" and type(AuraManager.RefreshLocalPlayerDerivedState) == "function" then
         AuraManager:RefreshLocalPlayerDerivedState(eventState)
@@ -146,19 +199,22 @@ function Client:ApplyEventRejoinState(eventId)
     if type(self.QueueEventWidgetRefresh) == "function" then
         self:QueueEventWidgetRefresh("event-rejoin-state")
     end
+    refreshVisibleMeters(self, "event-rejoin-state")
     if type(Spellcasting.RefreshVisiblePlayerTooltip) == "function" then
         Spellcasting.RefreshVisiblePlayerTooltip("event-rejoin-state")
     end
 
     if type(Debug.Internal) == "function" then
         Debug.Internal(
-            "Event rejoin state applied: event=%s mode=%s auras=%d failedAuras=%d casts=%d failedCasts=%d.",
+            "Event rejoin state applied: event=%s mode=%s auras=%d failedAuras=%d casts=%d failedCasts=%d damageRows=%d healingRows=%d.",
             normalizedEventId,
             replaceExisting and "replace" or "merge",
             auraInstalled,
             auraFailed,
             castInstalled,
-            castFailed
+            castFailed,
+            #(meters.damage or {}),
+            #(meters.healing or {})
         )
     end
     return auraFailed == 0 and castFailed == 0

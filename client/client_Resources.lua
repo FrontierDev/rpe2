@@ -161,6 +161,39 @@ local function normalizeThreatUpdates(threatUpdates)
     return normalized
 end
 
+local function findEventUnitById(units, eventId)
+    local numericEventId = math.floor(tonumber(eventId) or 0)
+    if type(units) ~= "table" or numericEventId <= 0 then
+        return nil
+    end
+
+    for index = 1, #units do
+        local unit = units[index]
+        if type(unit) == "table" and math.floor(tonumber(unit.eventID) or 0) == numericEventId then
+            return unit
+        end
+    end
+
+    return nil
+end
+
+local function filterThreatUpdatesForEvent(threatUpdates, eventState)
+    local normalized = normalizeThreatUpdates(threatUpdates)
+    local units = type(eventState) == "table" and eventState.units or nil
+    if type(units) ~= "table" then
+        return normalized
+    end
+
+    local filtered = {}
+    for index = 1, #normalized do
+        local entry = normalized[index]
+        if findEventUnitById(units, entry.sourceEventId) then
+            filtered[#filtered + 1] = entry
+        end
+    end
+    return filtered
+end
+
 local function coalesceThreatUpdates(threatUpdates, additionalThreatUpdates)
     local totals = {}
     local order = {}
@@ -1731,14 +1764,17 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
     end
 
     bindStateSessionRuntime(state)
-    local eventState = self.GetEventState and self:GetEventState() or nil
+    local eventState = self.GetEventState and self:GetEventState() or self.EventState
     local eventId = type(eventState) == "table" and eventState.id or nil
     local sourceTurnNumber = type(eventState) == "table" and math.floor(tonumber(eventState.turnNumber) or 0) or nil
     local sourceTickNumber = type(eventState) == "table" and math.floor(tonumber(eventState.tickNumber) or 0) or nil
     local playerName = getPlayerNameForState(state) or "unknown"
     local allowLocalEchoApply = type(options) == "table" and options.allowLocalEchoApply == true or false
     local scope = normalizePendingScope(type(options) == "table" and options.scope or nil)
-    local threatUpdates = coalesceThreatUpdates(type(options) == "table" and options.threatUpdates or nil)
+    local threatUpdates = filterThreatUpdatesForEvent(
+        type(options) == "table" and options.threatUpdates or nil,
+        eventState
+    )
     self.PendingResourceDeltaBatches = self.PendingResourceDeltaBatches or {}
     local batchKey = buildResourceDeltaBatchKey(
         state.channelName,
@@ -1958,7 +1994,10 @@ function Client:SendClientResourceDeltas(state, reason, playerNameOverride, reso
 
     local targetEventId = tonumber(targetEventIdOverride) or nil
     local allowLocalEchoApply = type(options) == "table" and options.allowLocalEchoApply == true or false
-    local threatUpdates = coalesceThreatUpdates(type(options) == "table" and options.threatUpdates or nil)
+    local threatUpdates = filterThreatUpdatesForEvent(
+        type(options) == "table" and options.threatUpdates or nil,
+        self.GetEventState and self:GetEventState() or self.EventState
+    )
     local signature = buildResourceDeltaSignature(state.channelName, playerName, payload, targetEventId)
     if allowLocalEchoApply then
         self.PendingLocalResourceDeltaEchoSignatures = self.PendingLocalResourceDeltaEchoSignatures or {}
@@ -2057,7 +2096,10 @@ function Client:SendClientResourceDeltaBatch(state, reason, playerNameOverride, 
     end
 
     local allowLocalEchoApply = type(options) == "table" and options.allowLocalEchoApply == true or false
-    local threatUpdates = coalesceThreatUpdates(type(options) == "table" and options.threatUpdates or nil)
+    local threatUpdates = filterThreatUpdatesForEvent(
+        type(options) == "table" and options.threatUpdates or nil,
+        self.GetEventState and self:GetEventState() or self.EventState
+    )
     local signature = buildResourceDeltaBatchSignature(state.channelName, playerName, payload)
     local targetOrder = nil
     if allowLocalEchoApply then

@@ -400,6 +400,8 @@ local function emitTriggeredDamageCombatLog(client, eventState, casterUnit, targ
     local entry = {
         eventId = eventState.id,
         entryType = "damage",
+        casterEventId = tonumber(casterUnit and casterUnit.eventID) or nil,
+        meterAmount = amount,
         casterDisplayName = tostring(casterUnit and casterUnit.name or "Unknown"),
         targetDisplayName = tostring(targetUnit and targetUnit.name or "Unknown"),
         targetCount = 1,
