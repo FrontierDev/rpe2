@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 19,
+    version = 20,
     dataset = {
         achievements = {},
         auras = {
@@ -1171,7 +1171,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Fire damage to up to 5 enemies. |cffffcc00Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Fire damage to up to 5 enemies. Targets must share the same raid marker.",
                     tokens = {
                         {
                             applyMode = "damage_range",
