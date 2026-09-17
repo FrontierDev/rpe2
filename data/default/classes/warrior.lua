@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 20,
+        version = 21,
     dataset = {
         achievements = {},
         auras = {
@@ -707,7 +707,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to up to 1 enemy. |cffffcc00Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 1 enemy. Targets must share the same raid marker.",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -1765,7 +1765,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. |cffffcc00Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. Targets must share the same raid marker.",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -1869,7 +1869,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. |cffffcc00Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. Targets must share the same raid marker.",
                     tokens = {
                         {
                             applyMode = "damage_range",
