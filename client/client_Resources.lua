@@ -154,6 +154,9 @@ local function normalizeThreatUpdates(threatUpdates)
                 targetEventId = targetEventId,
                 sourceEventId = sourceEventId,
                 amount = amount,
+                turnNumber = math.floor(tonumber(entry and entry.turnNumber) or 0) > 0
+                    and math.floor(tonumber(entry and entry.turnNumber) or 0)
+                    or nil,
             }
         end
     end
@@ -187,7 +190,12 @@ local function filterThreatUpdatesForEvent(threatUpdates, eventState)
     local filtered = {}
     for index = 1, #normalized do
         local entry = normalized[index]
-        if findEventUnitById(units, entry.sourceEventId) then
+        local sourceUnit = findEventUnitById(units, entry.sourceEventId)
+        local targetUnit = findEventUnitById(units, entry.targetEventId)
+        -- Keep all valid gameplay threat updates on the transport. EventMeters applies
+        -- the player-character source filter independently when it records a row.
+        if sourceUnit and targetUnit and targetUnit.isPlayer ~= true then
+            entry.turnNumber = entry.turnNumber or math.floor(tonumber(eventState.turnNumber) or 0)
             filtered[#filtered + 1] = entry
         end
     end
@@ -201,12 +209,13 @@ local function coalesceThreatUpdates(threatUpdates, additionalThreatUpdates)
         local normalized = normalizeThreatUpdates(list)
         for index = 1, #normalized do
             local entry = normalized[index]
-            local key = tostring(entry.targetEventId) .. "\31" .. tostring(entry.sourceEventId)
+            local key = tostring(entry.targetEventId) .. "\31" .. tostring(entry.sourceEventId) .. "\31" .. tostring(entry.turnNumber or 0)
             if not totals[key] then
                 totals[key] = {
                     targetEventId = entry.targetEventId,
                     sourceEventId = entry.sourceEventId,
                     amount = 0,
+                    turnNumber = entry.turnNumber,
                 }
                 order[#order + 1] = key
             end
@@ -237,9 +246,52 @@ local function serializeThreatUpdates(threatUpdates)
             tostring(entry.targetEventId),
             tostring(entry.sourceEventId),
             tostring(entry.amount),
+            tostring(entry.turnNumber or 0),
         }, THREAT_UPDATE_FIELD_SEPARATOR)
     end
     return table.concat(records, THREAT_UPDATE_RECORD_SEPARATOR)
+end
+
+local function deserializeThreatUpdates(payload)
+    local normalized = {}
+    if type(payload) ~= "string" or payload == "" then return normalized end
+    local records = Common.SplitPreservingEmpty and Common.SplitPreservingEmpty(payload, THREAT_UPDATE_RECORD_SEPARATOR) or {}
+    for index = 1, #records do
+        local values = Common.SplitPreservingEmpty and Common.SplitPreservingEmpty(records[index], THREAT_UPDATE_FIELD_SEPARATOR) or {}
+        local targetEventId = math.floor(tonumber(values[1]) or 0)
+        local sourceEventId = math.floor(tonumber(values[2]) or 0)
+        local amount = math.max(0, tonumber(values[3]) or 0)
+        local turnNumber = math.floor(tonumber(values[4]) or 0)
+        if targetEventId > 0 and sourceEventId > 0 and amount > 0 then
+            normalized[#normalized + 1] = {
+                targetEventId = targetEventId,
+                sourceEventId = sourceEventId,
+                amount = amount,
+                turnNumber = turnNumber > 0 and turnNumber or nil,
+            }
+        end
+    end
+    return normalized
+end
+
+local function recordThreatUpdates(client, eventState, threatUpdates)
+    local meters = type(client) == "table" and client.EventMeters or nil
+    if type(meters) ~= "table" or type(meters.RecordThreatUpdate) ~= "function" then return end
+    for index = 1, #(threatUpdates or {}) do
+        meters:RecordThreatUpdate(eventState, threatUpdates[index])
+    end
+end
+
+local function refreshThreatMeterWidget(client)
+    local namespace = type(client) == "table" and client.UI and client.UI.EventWidget or nil
+    local widget = type(namespace) == "table" and type(namespace.Get) == "function" and namespace:Get() or nil
+    if type(widget) == "table"
+        and type(widget.IsMetersPanelShown) == "function"
+        and widget:IsMetersPanelShown() == true
+        and type(widget.RefreshMetersPanel) == "function"
+    then
+        widget:RefreshMetersPanel()
+    end
 end
 
 local function getPlayerNameForState(state)
@@ -1775,6 +1827,10 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
         type(options) == "table" and options.threatUpdates or nil,
         eventState
     )
+    if allowLocalEchoApply and #threatUpdates > 0 then
+        recordThreatUpdates(self, eventState, threatUpdates)
+        refreshThreatMeterWidget(self)
+    end
     self.PendingResourceDeltaBatches = self.PendingResourceDeltaBatches or {}
     local batchKey = buildResourceDeltaBatchKey(
         state.channelName,
@@ -2362,6 +2418,12 @@ function Client:HandleResourceDelta(arguments, sender)
     end
 
     local eventState = self:GetEventState()
+    local threatUpdates = filterThreatUpdatesForEvent(
+        deserializeThreatUpdates(arguments and arguments[5] or ""),
+        eventState
+    )
+    recordThreatUpdates(self, eventState, threatUpdates)
+    if #threatUpdates > 0 then refreshThreatMeterWidget(self) end
     local result = applyInboundResourceDeltasForTarget(self, state, eventState, playerName, sender, targetEventId, resourceDeltas)
     grantBossKillValor(self, eventState, result)
     if transportActionOwner then
@@ -2473,6 +2535,12 @@ function Client:HandleResourceDeltaBatch(arguments, sender)
     end
 
     local eventState = self:GetEventState()
+    local threatUpdates = filterThreatUpdatesForEvent(
+        deserializeThreatUpdates(arguments and arguments[4] or ""),
+        eventState
+    )
+    recordThreatUpdates(self, eventState, threatUpdates)
+    if #threatUpdates > 0 then refreshThreatMeterWidget(self) end
     local changed = false
     local anyEventUpdated = false
     local anyCompanionBarRelevantTarget = false

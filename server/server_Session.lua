@@ -103,11 +103,13 @@ local function normalizeThreatUpdates(text)
         local targetEventId = math.floor(tonumber(values[1]) or 0)
         local sourceEventId = math.floor(tonumber(values[2]) or 0)
         local amount = math.max(0, tonumber(values[3]) or 0)
+        local turnNumber = math.floor(tonumber(values[4]) or 0)
         if targetEventId > 0 and sourceEventId > 0 and amount > 0 then
             normalized[#normalized + 1] = {
                 targetEventId = targetEventId,
                 sourceEventId = sourceEventId,
                 amount = amount,
+                turnNumber = turnNumber > 0 and turnNumber or nil,
             }
         end
     end

@@ -404,7 +404,8 @@ function EventWidget:EnsureDMHelperUI()
 
     self:EnsureCombatLogHistoryUI()
     local buttonRowFrame = getFrame(self.combatLogHistoryButtonRow)
-    if not buttonRowFrame then
+    local controlRowFrame = getFrame(self.controlButtonRow)
+    if not buttonRowFrame or not controlRowFrame then
         return nil
     end
 
@@ -433,7 +434,7 @@ function EventWidget:EnsureDMHelperUI()
     setShown(self.dmHelperButton, false)
 
     self.eventModeToggleButton = buildButton(
-        buttonRowFrame,
+        controlRowFrame,
         "RPEClientEventWidgetEventModeToggleButton",
         "NPC Mode",
         function()
@@ -448,7 +449,29 @@ function EventWidget:EnsureDMHelperUI()
             end
         end
     )
-    self.combatLogHistoryButtonRow:AddChild(self.eventModeToggleButton)
+    self.controlButtonRow:AddChild(self.eventModeToggleButton)
+    local controlChildren = self.controlButtonRow.children or {}
+    local modeButtonIndex = nil
+    for index = 1, #controlChildren do
+        if controlChildren[index] == self.eventModeToggleButton then
+            modeButtonIndex = index
+            break
+        end
+    end
+    if modeButtonIndex then
+        table.remove(controlChildren, modeButtonIndex)
+        local advanceButtonIndex = #controlChildren + 1
+        for index = 1, #controlChildren do
+            if controlChildren[index] == self.advanceStepButton then
+                advanceButtonIndex = index
+                break
+            end
+        end
+        table.insert(controlChildren, advanceButtonIndex, self.eventModeToggleButton)
+        if type(self.controlButtonRow.RefreshLayout) == "function" then
+            self.controlButtonRow:RefreshLayout()
+        end
+    end
     setShown(self.eventModeToggleButton, false)
 
     local historyPanelFrame = getFrame(self.combatLogHistoryPanel)

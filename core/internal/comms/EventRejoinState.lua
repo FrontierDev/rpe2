@@ -8,7 +8,7 @@ local Comms = Addon.Internal.Comms
 local EventRejoinState = Comms.EventRejoinState
 local Operations = Comms.Operations or {}
 
-EventRejoinState.ProtocolVersion = 3
+EventRejoinState.ProtocolVersion = 4
 EventRejoinState.Opcode = 31
 
 local function normalizeNonNegativeInteger(value)
@@ -401,28 +401,98 @@ local function deserializeMeterRecord(payload)
     }
 end
 
-local function serializeMeterSnapshot(snapshot)
+local function serializeThreatMeterRecords(records)
+    local normalized = {}
+    for index = 1, #(records or {}) do
+        local record = records[index]
+        local targetEventId = normalizePositiveInteger(record and record.targetEventId)
+        if targetEventId and type(record) == "table" and type(record.rows) == "table" then
+            normalized[#normalized + 1] = encodeFields({
+                targetEventId,
+                serializeRecordList(record.rows, serializeMeterRecord),
+            })
+        end
+    end
+    return serializeRecordList(normalized, function(value) return value end)
+end
+
+local function deserializeThreatMeterRecords(payload)
+    local encoded = deserializeRecordList(payload, function(value) return value end)
+    if type(encoded) ~= "table" then
+        return nil
+    end
+    local records = {}
+    for index = 1, #encoded do
+        local fields = decodeFields(encoded[index])
+        if type(fields) ~= "table" or #fields ~= 2 then
+            return nil
+        end
+        local targetEventId = normalizePositiveInteger(fields[1])
+        local rows = deserializeRecordList(fields[2], deserializeMeterRecord)
+        if not targetEventId or type(rows) ~= "table" then
+            return nil
+        end
+        records[#records + 1] = { targetEventId = targetEventId, rows = rows }
+    end
+    return records
+end
+
+local function serializeMeterGroup(group)
+    group = type(group) == "table" and group or {}
     return encodeFields({
-        serializeRecordList(type(snapshot) == "table" and snapshot.damage or {}, serializeMeterRecord),
-        serializeRecordList(type(snapshot) == "table" and snapshot.healing or {}, serializeMeterRecord),
+        serializeRecordList(group.damage or {}, serializeMeterRecord),
+        serializeRecordList(group.healing or {}, serializeMeterRecord),
+        serializeThreatMeterRecords(group.threat or {}),
+    })
+end
+
+local function deserializeMeterGroup(payload)
+    local fields = decodeFields(payload)
+    if type(fields) ~= "table" or #fields ~= 3 then
+        return nil
+    end
+    local damage = deserializeRecordList(fields[1], deserializeMeterRecord)
+    local healing = deserializeRecordList(fields[2], deserializeMeterRecord)
+    local threat = deserializeThreatMeterRecords(fields[3])
+    if type(damage) ~= "table" or type(healing) ~= "table" or type(threat) ~= "table" then
+        return nil
+    end
+    return { damage = damage, healing = healing, threat = threat }
+end
+
+local function serializeMeterSnapshot(snapshot)
+    snapshot = type(snapshot) == "table" and snapshot or {}
+    return encodeFields({
+        normalizePositiveInteger(snapshot.currentTurn) or 1,
+        serializeMeterGroup(snapshot.total or snapshot),
+        serializeMeterGroup(snapshot.turn or {}),
     })
 end
 
 local function deserializeMeterSnapshot(payload)
     local fields = decodeFields(payload)
-    if type(fields) ~= "table" or #fields ~= 2 then
+    if type(fields) ~= "table" then
         return nil
     end
-
-    local damage = deserializeRecordList(fields[1], deserializeMeterRecord)
-    local healing = deserializeRecordList(fields[2], deserializeMeterRecord)
-    if type(damage) ~= "table" or type(healing) ~= "table" then
-        return nil
+    -- Protocol 3 snapshots contained only total damage and healing.
+    if #fields == 2 then
+        local damage = deserializeRecordList(fields[1], deserializeMeterRecord)
+        local healing = deserializeRecordList(fields[2], deserializeMeterRecord)
+        if type(damage) ~= "table" or type(healing) ~= "table" then return nil end
+        return { currentTurn = 1, total = { damage = damage, healing = healing, threat = {} }, turn = {}, damage = damage, healing = healing }
     end
-
+    if #fields ~= 3 then return nil end
+    local currentTurn = normalizePositiveInteger(fields[1])
+    local total = deserializeMeterGroup(fields[2])
+    local turn = deserializeMeterGroup(fields[3])
+    if not currentTurn or type(total) ~= "table" or type(turn) ~= "table" then return nil end
     return {
-        damage = damage,
-        healing = healing,
+        currentTurn = currentTurn,
+        total = total,
+        turn = turn,
+        damage = total.damage,
+        healing = total.healing,
+        threat = total.threat,
     }
 end
 
@@ -446,7 +516,7 @@ function EventRejoinState.DeserializeSnapshot(payload)
         return nil, reason or "invalid-snapshot"
     end
     local protocolVersion = tonumber(fields[1])
-    if protocolVersion ~= 1 and protocolVersion ~= 2 and protocolVersion ~= EventRejoinState.ProtocolVersion then
+    if protocolVersion ~= 1 and protocolVersion ~= 2 and protocolVersion ~= 3 and protocolVersion ~= EventRejoinState.ProtocolVersion then
         return nil, "unsupported-version"
     end
     local expectedFieldCount = protocolVersion >= 3 and 4 or 3

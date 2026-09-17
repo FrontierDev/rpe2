@@ -6,6 +6,7 @@ Addon.Client.UI = Addon.Client.UI or {}
 local Client = Addon.Client
 local ClientUI = Addon.Client.UI
 local UI = Addon.UI or {}
+local Font = UI.Font or {}
 local EventWidget = ClientUI.EventWidget
 local EventClass = Addon.Internal
     and Addon.Internal.Database
@@ -38,10 +39,15 @@ local METER_SELECTOR_HEIGHT = 20
 local METER_ROW_HEIGHT = 27
 local METER_ROW_SPACING = 1
 local METER_TYPES = { "damage", "healing", "threat" }
+local METER_SCOPES = { "total", "turn" }
 local METER_LABELS = {
     damage = "Damage",
     healing = "Healing",
     threat = "Threat",
+}
+local METER_SCOPE_LABELS = {
+    total = "Total",
+    turn = "Per Turn",
 }
 
 local function getFrame(element)
@@ -191,16 +197,23 @@ local function hasPositiveThreat(threatTable)
     return false
 end
 
-local function buildThreatTargets(eventState)
+local function buildThreatTargets(eventState, scope)
     local targets = {}
+    local eventMeters = Client.EventMeters
     for index = 1, #((eventState and eventState.units) or {}) do
         local unit = eventState.units[index]
         if type(unit) == "table" and unit.isPlayer ~= true and isUnitActive(unit) then
+            local ledgerRows = type(eventMeters) == "table" and type(eventMeters.GetRows) == "function"
+                and eventMeters:GetRows(eventState.id, "threat", scope, {
+                    targetEventId = unit.eventID,
+                    turnNumber = eventState.turnNumber,
+                })
+                or {}
             targets[#targets + 1] = {
                 eventId = tonumber(unit.eventID) or 0,
                 name = tostring(unit.name or "Unknown"),
                 boss = isUnitBoss(unit),
-                hasThreat = hasPositiveThreat(unit.threatTable),
+                hasThreat = hasPositiveThreat(unit.threatTable) or #ledgerRows > 0,
                 order = index,
             }
         end
@@ -219,35 +232,6 @@ local function buildThreatTargets(eventState)
         return left.eventId < right.eventId
     end)
     return targets
-end
-
-local function buildThreatRows(eventState, selectedEventId)
-    local target = findEventUnit(eventState, selectedEventId)
-    local rows = {}
-    if type(target) ~= "table" then
-        return rows, 0
-    end
-
-    for sourceEventId, value in pairs(type(target.threatTable) == "table" and target.threatTable or {}) do
-        local amount = tonumber(value) or 0
-        local sourceUnit = findEventUnit(eventState, sourceEventId)
-        if amount > 0 and type(sourceUnit) == "table" then
-            rows[#rows + 1] = {
-                eventId = tonumber(sourceUnit.eventID) or tonumber(sourceEventId) or 0,
-                name = tostring(sourceUnit.name or "Unknown"),
-                team = tonumber(sourceUnit.team) or 0,
-                amount = amount,
-            }
-        end
-    end
-
-    table.sort(rows, function(left, right)
-        if left.amount ~= right.amount then
-            return left.amount > right.amount
-        end
-        return left.eventId < right.eventId
-    end)
-    return rows, rows[1] and rows[1].amount or 0
 end
 
 local function ensureMeterRowTextures(row)
@@ -270,8 +254,88 @@ local function ensureMeterRowTextures(row)
     return row.meterBarFill, row.meterBarBackground, frame
 end
 
+local function ensureMeterRowLabels(row)
+    local frame = row and row.GetFrame and row:GetFrame() or nil
+    if not frame or not frame.CreateFontString then
+        return nil, nil, frame
+    end
+
+    if not row.meterLeftLabel then
+        row.meterLeftLabel = frame:CreateFontString(nil, "OVERLAY")
+        row.meterRightLabel = frame:CreateFontString(nil, "OVERLAY")
+
+        row.meterRightLabel:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -4, -2)
+        row.meterRightLabel:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 2)
+        row.meterRightLabel:SetWidth(112)
+        row.meterRightLabel:SetJustifyH("RIGHT")
+        row.meterRightLabel:SetJustifyV("MIDDLE")
+        row.meterRightLabel:SetWordWrap(false)
+
+        row.meterLeftLabel:SetPoint("TOPLEFT", frame, "TOPLEFT", 4, -2)
+        row.meterLeftLabel:SetPoint("BOTTOMRIGHT", row.meterRightLabel, "BOTTOMLEFT", -4, 2)
+        row.meterLeftLabel:SetJustifyH("LEFT")
+        row.meterLeftLabel:SetJustifyV("MIDDLE")
+        row.meterLeftLabel:SetWordWrap(false)
+
+        local fontOptions = row.options or {}
+        if type(Font.Apply) == "function" then
+            Font:Apply(row.meterLeftLabel, fontOptions, { fontSize = 10, fontFlags = "OUTLINE" })
+            Font:Apply(row.meterRightLabel, fontOptions, { fontSize = 10, fontFlags = "OUTLINE" })
+        end
+    end
+
+    row.meterLeftLabel:SetTextColor(1, 1, 1, 1)
+    row.meterRightLabel:SetTextColor(1, 1, 1, 1)
+    return row.meterLeftLabel, row.meterRightLabel, frame
+end
+
+local function getFontStringWidth(fontString, text)
+    if fontString.SetText then
+        fontString:SetText(text)
+    end
+    if fontString.GetUnboundedStringWidth then
+        return tonumber(fontString:GetUnboundedStringWidth()) or 0
+    end
+    if fontString.GetStringWidth then
+        return tonumber(fontString:GetStringWidth()) or 0
+    end
+    return 0
+end
+
+local function setMeterLeftText(label, text, availableWidth)
+    if not label then
+        return
+    end
+    text = tostring(text or "")
+    availableWidth = math.max(0, tonumber(availableWidth) or 0)
+    if availableWidth <= 0 or getFontStringWidth(label, text) <= availableWidth then
+        label:SetText(text)
+        return
+    end
+
+    local suffix = "..."
+    local length = #text
+    while length > 0 do
+        while length > 0 do
+            local byte = string.byte(text, length)
+            if not byte or byte < 128 or byte > 191 then
+                break
+            end
+            length = length - 1
+        end
+        local candidate = string.sub(text, 1, length) .. suffix
+        if getFontStringWidth(label, candidate) <= availableWidth then
+            label:SetText(candidate)
+            return
+        end
+        length = length - 1
+    end
+    label:SetText(suffix)
+end
+
 local function renderMeterRow(row, item, _, _, scroll)
     local fill, _, frame = ensureMeterRowTextures(row)
+    local leftLabel, rightLabel = ensureMeterRowLabels(row)
     local amount = tonumber(item and item.amount) or 0
     local largest = tonumber(scroll and scroll.meterLargestAmount) or 0
     local ratio = largest > 0 and math.max(0, math.min(1, amount / largest)) or 0
@@ -285,71 +349,72 @@ local function renderMeterRow(row, item, _, _, scroll)
         fill:SetColorTexture(color.r or 0.3, color.g or 0.6, color.b or 1, 0.28)
     end
 
-    local percentage = tonumber(item and item.percentage) or 0
-    row:SetText(("%d. %s   %s   %.1f%%"):format(
+    local percentage = math.floor((tonumber(item and item.percentage) or 0) + 0.5)
+    local leftText = ("%d. %s"):format(
         tonumber(item and item.rank) or 0,
-        tostring(item and item.name or "Unknown"),
-        formatAmount(amount),
-        percentage
-    ))
-    row:SetJustifyH("LEFT")
-    row:SetJustifyV("MIDDLE")
-    row:SetWordWrap(false)
-    local color = item and item.color
-    if type(color) == "table" then
-        row:SetTextColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
+        tostring(item and item.name or "Unknown")
+    )
+    local rightText = ("%s (%d%%)"):format(formatAmount(amount), percentage)
+    if leftLabel and rightLabel then
+        local rightWidth = rightLabel.GetWidth and rightLabel:GetWidth() or 112
+        if rightWidth <= 0 then
+            rightWidth = 112
+        end
+        local rowWidth = frame and frame.GetWidth and frame:GetWidth() or METER_PANEL_WIDTH
+        if rowWidth <= 0 then
+            rowWidth = METER_PANEL_WIDTH - (METER_PANEL_INSET * 2)
+        end
+        setMeterLeftText(leftLabel, leftText, rowWidth - rightWidth - 12)
+        rightLabel:SetText(rightText)
+        -- Keep the prefab's original FontString empty; the two aligned labels own the text.
+        row:SetText("")
     else
-        local textColor = UI.ResolveColor(nil, "text.primary")
-        row:SetTextColor(textColor.r, textColor.g, textColor.b, textColor.a)
+        row:SetText(leftText .. "   " .. rightText)
+        row:SetJustifyH("LEFT")
     end
+    row:SetTextColor(1, 1, 1, 1)
 end
 
-local function buildMeterRows(eventState, eventId, meterType)
+local function buildMeterRows(eventState, eventId, meterType, scope, threatEventId)
     local rows = {}
     local largest = 0
-    if meterType == "threat" then
-        rows, largest = buildThreatRows(eventState, eventId)
-    else
-        local eventMeters = Client.EventMeters
-        local sourceRows = type(eventMeters) == "table" and type(eventMeters.GetRows) == "function"
-            and eventMeters:GetRows(eventId, meterType)
-            or {}
-        local total = 0
-        for index = 1, #sourceRows do
-            total = total + math.max(0, tonumber(sourceRows[index].amount) or 0)
-            largest = math.max(largest, tonumber(sourceRows[index].amount) or 0)
-        end
-        for index = 1, #sourceRows do
-            local source = sourceRows[index]
-            local color = getTeamColor(eventState, source.team)
-            rows[#rows + 1] = {
-                rank = index,
-                eventId = source.eventId,
-                name = source.name,
-                amount = source.amount,
-                percentage = total > 0 and (source.amount / total) * 100 or 0,
-                color = color,
-            }
-        end
+    local eventMeters = Client.EventMeters
+    local sourceRows = type(eventMeters) == "table" and type(eventMeters.GetRows) == "function"
+        and eventMeters:GetRows(eventId, meterType, scope, {
+            targetEventId = threatEventId,
+            turnNumber = eventState and eventState.turnNumber,
+        })
+        or {}
+    local total = 0
+    for index = 1, #sourceRows do
+        total = total + math.max(0, tonumber(sourceRows[index].amount) or 0)
+        largest = math.max(largest, tonumber(sourceRows[index].amount) or 0)
     end
-
-    if meterType == "threat" then
-        for index = 1, #rows do
-            local source = rows[index]
-            source.rank = index
-            source.percentage = largest > 0 and (source.amount / largest) * 100 or 0
-            source.color = getTeamColor(eventState, source.team)
-        end
+    for index = 1, #sourceRows do
+        local source = sourceRows[index]
+        local color = getTeamColor(eventState, source.team)
+        rows[#rows + 1] = {
+            rank = index,
+            eventId = source.eventId,
+            name = source.name,
+            amount = source.amount,
+            percentage = total > 0 and (source.amount / total) * 100 or 0,
+            color = color,
+        }
     end
     return rows, largest
 end
 
 function EventWidget:IsMetersPanelShown()
-    return isFrameShown(self.metersPanel)
+    return self.eventUtilityMode == "meters" and isFrameShown(self.eventUtilityWindow)
 end
 
 function EventWidget:HideMetersPanel()
-    setShown(self.metersPanel, false)
+    if self.eventUtilityMode == "meters" then
+        self:HideEventUtilityWindow()
+    else
+        setShown(self.metersPanel, false)
+    end
     return true
 end
 
@@ -363,12 +428,19 @@ function EventWidget:SetMetersViewType(meterType)
     return self.metersViewType
 end
 
+function EventWidget:SetMetersScope(scope)
+    scope = tostring(scope or "total") == "turn" and "turn" or "total"
+    self.metersScope = scope
+    self:RefreshMetersPanel()
+    return scope
+end
+
 function EventWidget:RefreshMetersThreatTargets(eventState)
     if not self.metersThreatDropdown then
         return
     end
 
-    local targets = buildThreatTargets(eventState)
+    local targets = buildThreatTargets(eventState, self.metersScope)
     local items = {}
     for index = 1, #targets do
         local target = targets[index]
@@ -415,12 +487,21 @@ function EventWidget:RefreshMetersPanel()
     if self.metersEventId ~= eventId then
         self.metersEventId = eventId
         self.metersViewType = "damage"
+        self.metersScope = "total"
         self.metersThreatEventId = nil
     end
     self.metersViewType = normalizeMeterType(self.metersViewType)
+    self.metersScope = tostring(self.metersScope or "total") == "turn" and "turn" or "total"
 
     local meterType = self.metersViewType
-    self.metersTitle:SetText((METER_LABELS[meterType] or "Damage") .. " Meter")
+    self.metersTitle:SetText((METER_LABELS[meterType] or "Damage") .. " Meter - " .. METER_SCOPE_LABELS[self.metersScope])
+    for index = 1, #METER_SCOPES do
+        local scope = METER_SCOPES[index]
+        local button = self.metersScopeButtons and self.metersScopeButtons[scope]
+        if button then
+            button:SetText(METER_SCOPE_LABELS[scope])
+        end
+    end
     setShown(self.metersThreatLabel, meterType == "threat")
     setShown(self.metersThreatDropdown, meterType == "threat")
     if meterType == "threat" then
@@ -428,17 +509,18 @@ function EventWidget:RefreshMetersPanel()
     end
 
     local scrollFrame = getFrame(self.metersScroll)
-    if scrollFrame then
+    if scrollFrame and self.metersLayoutMeterType ~= meterType then
         scrollFrame:ClearAllPoints()
         if meterType == "threat" then
             scrollFrame:SetPoint("TOPLEFT", getFrame(self.metersThreatDropdown), "BOTTOMLEFT", 0, -4)
         else
-            scrollFrame:SetPoint("TOPLEFT", getFrame(self.metersTabs), "BOTTOMLEFT", 0, -4)
+            scrollFrame:SetPoint("TOPLEFT", getFrame(self.metersScopeTabs), "BOTTOMLEFT", 0, -4)
         end
         scrollFrame:SetPoint("BOTTOMRIGHT", self.metersPanel:GetContentFrame(), "BOTTOMRIGHT", 0, 0)
+        self.metersLayoutMeterType = meterType
     end
 
-    local rows, largest = buildMeterRows(state, eventId, meterType)
+    local rows, largest = buildMeterRows(state, eventId, meterType, self.metersScope, self.metersThreatEventId)
     self.metersScroll.meterLargestAmount = largest
     self.metersScroll:SetItems(rows)
     setShown(self.metersEmptyText, #rows == 0)
@@ -454,14 +536,10 @@ end
 
 function EventWidget:ShowMetersPanel()
     self:EnsureMetersUI()
-    if type(self.HideCombatLogHistoryPanel) == "function" then
-        self:HideCombatLogHistoryPanel()
-    end
     if self:RefreshMetersPanel() ~= true then
         return false
     end
-    setShown(self.metersPanel, true)
-    return true
+    return self:ShowEventUtilityWindow("meters")
 end
 
 function EventWidget:ToggleMetersPanel()
@@ -475,15 +553,19 @@ function EventWidget:EnsureMetersUI()
     if self.metersPanel then
         return self.metersPanel
     end
-    if type(self.EnsureCombatLogHistoryUI) ~= "function" or not self.rootPanel or not self.headerBannerPanel then
+    if type(self.EnsureCombatLogHistoryUI) ~= "function"
+        or type(self.EnsureEventUtilityWindow) ~= "function"
+        or not self.rootPanel
+        or not self.headerBannerPanel
+    then
         return nil
     end
 
     self:EnsureCombatLogHistoryUI()
-    local rootFrame = getFrame(self.rootPanel)
-    local headerBannerFrame = getFrame(self.headerBannerPanel)
+    local utilityWindow = self:EnsureEventUtilityWindow()
+    local utilityContentFrame = utilityWindow and utilityWindow:GetContentFrame()
     local buttonRowFrame = getFrame(self.combatLogHistoryButtonRow)
-    if not rootFrame or not headerBannerFrame or not buttonRowFrame then
+    if not utilityContentFrame or not buttonRowFrame then
         return nil
     end
 
@@ -497,17 +579,17 @@ function EventWidget:EnsureMetersUI()
     )
     self.combatLogHistoryButtonRow:AddChild(self.metersButton)
 
-    self.metersPanel = UI.CreatePanel(rootFrame, "RPEClientEventWidgetMetersPanel", {
+    self.metersPanel = UI.CreatePanel(utilityContentFrame, "RPEClientEventWidgetMetersPanel", {
         width = METER_PANEL_WIDTH,
         height = METER_PANEL_HEIGHT,
         contentInset = METER_PANEL_INSET,
-        showBorder = true,
-        panelBorderSize = 1,
-        panelBorderColor = UI.ResolveColor(nil, "panel.border"),
-        panelBackgroundColor = UI.ResolveColor(nil, "panel.background"),
+        showBorder = false,
+        panelBackgroundColor = { r = 0, g = 0, b = 0, a = 0 },
     })
     local panelFrame = getFrame(self.metersPanel)
-    panelFrame:SetPoint("TOPLEFT", rootFrame, "TOPRIGHT", METER_PANEL_GAP, 0)
+    panelFrame:ClearAllPoints()
+    panelFrame:SetPoint("TOPLEFT", utilityContentFrame, "TOPLEFT", 0, 0)
+    panelFrame:SetPoint("BOTTOMRIGHT", utilityContentFrame, "BOTTOMRIGHT", 0, 0)
     panelFrame:Hide()
 
     local contentFrame = self.metersPanel:GetContentFrame()
@@ -521,8 +603,7 @@ function EventWidget:EnsureMetersUI()
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
     local titleFrame = getFrame(self.metersTitle)
-    titleFrame:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 2, 0)
-    titleFrame:SetPoint("TOPRIGHT", contentFrame, "TOPRIGHT", -2, 0)
+    titleFrame:Hide()
 
     self.metersTabs = UI.CreateLayout(UI.HorizontalLayoutGroup, contentFrame, "RPEClientEventWidgetMetersTabs", {
         spacing = 4,
@@ -532,7 +613,7 @@ function EventWidget:EnsureMetersUI()
         fitChildrenHeight = false,
     })
     local tabsFrame = getFrame(self.metersTabs)
-    tabsFrame:SetPoint("TOPLEFT", titleFrame, "BOTTOMLEFT", 0, -4)
+    tabsFrame:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 0, 0)
     for index = 1, #METER_TYPES do
         local meterType = METER_TYPES[index]
         local tab = buildMeterButton(tabsFrame, "RPEClientEventWidgetMetersTab" .. meterType, METER_LABELS[meterType], function()
@@ -541,6 +622,27 @@ function EventWidget:EnsureMetersUI()
         tab.options.width = 72
         tab:GetFrame():SetWidth(72)
         self.metersTabs:AddChild(tab)
+    end
+
+    self.metersScopeTabs = UI.CreateLayout(UI.HorizontalLayoutGroup, contentFrame, "RPEClientEventWidgetMetersScopeTabs", {
+        spacing = 4,
+        width = METER_PANEL_WIDTH - (METER_PANEL_INSET * 2),
+        height = METER_TAB_HEIGHT,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    local scopeTabsFrame = getFrame(self.metersScopeTabs)
+    scopeTabsFrame:SetPoint("TOPLEFT", tabsFrame, "BOTTOMLEFT", 0, -3)
+    self.metersScopeButtons = {}
+    for index = 1, #METER_SCOPES do
+        local scope = METER_SCOPES[index]
+        local button = buildMeterButton(scopeTabsFrame, "RPEClientEventWidgetMetersScope" .. scope, METER_SCOPE_LABELS[scope], function()
+            self:SetMetersScope(scope)
+        end)
+        button.options.width = 72
+        button:GetFrame():SetWidth(72)
+        self.metersScopeTabs:AddChild(button)
+        self.metersScopeButtons[scope] = button
     end
 
     self.metersThreatLabel = UI.CreateText(contentFrame, "RPEClientEventWidgetMetersThreatLabel", "Target", {
@@ -553,8 +655,8 @@ function EventWidget:EnsureMetersUI()
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
     local threatLabelFrame = getFrame(self.metersThreatLabel)
-    threatLabelFrame:SetPoint("TOPLEFT", tabsFrame, "BOTTOMLEFT", 0, -4)
-    threatLabelFrame:SetPoint("TOPRIGHT", tabsFrame, "BOTTOMRIGHT", 0, -4)
+    threatLabelFrame:SetPoint("TOPLEFT", scopeTabsFrame, "BOTTOMLEFT", 0, -3)
+    threatLabelFrame:SetPoint("TOPRIGHT", scopeTabsFrame, "BOTTOMRIGHT", 0, -3)
 
     self.metersThreatDropdown = UI.CreateDropdown(contentFrame, "RPEClientEventWidgetMetersThreatDropdown", {
         width = METER_PANEL_WIDTH - (METER_PANEL_INSET * 2),
@@ -575,7 +677,7 @@ function EventWidget:EnsureMetersUI()
     self.metersScroll = UI.ScrollLayout:New({
         name = "RPEClientEventWidgetMetersScroll",
         width = METER_PANEL_WIDTH - (METER_PANEL_INSET * 2),
-        height = METER_PANEL_HEIGHT - METER_TITLE_HEIGHT - METER_TAB_HEIGHT - 16,
+        height = METER_PANEL_HEIGHT - METER_TITLE_HEIGHT - (METER_TAB_HEIGHT * 2) - 20,
         visibleRows = 8,
         rowHeight = METER_ROW_HEIGHT,
         rowSpacing = METER_ROW_SPACING,
@@ -591,7 +693,7 @@ function EventWidget:EnsureMetersUI()
     self.metersScroll:SetRowRenderer(renderMeterRow)
     self.metersScroll:Create()
     local scrollFrame = getFrame(self.metersScroll)
-    scrollFrame:SetPoint("TOPLEFT", tabsFrame, "BOTTOMLEFT", 0, -4)
+    scrollFrame:SetPoint("TOPLEFT", scopeTabsFrame, "BOTTOMLEFT", 0, -4)
     scrollFrame:SetPoint("BOTTOMRIGHT", contentFrame, "BOTTOMRIGHT", 0, 0)
 
     self.metersEmptyText = UI.CreateText(contentFrame, "RPEClientEventWidgetMetersEmpty", "", {
@@ -606,6 +708,7 @@ function EventWidget:EnsureMetersUI()
     emptyFrame:SetPoint("BOTTOMRIGHT", scrollFrame, "BOTTOMRIGHT", 0, 0)
 
     self.metersViewType = self.metersViewType or "damage"
+    self.metersScope = self.metersScope or "total"
     self:RefreshMetersPanel()
     return self.metersPanel
 end

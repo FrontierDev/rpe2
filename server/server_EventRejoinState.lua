@@ -113,7 +113,7 @@ function Server:SendEventRejoinState(clientName, options)
         healing = {},
     }
     if type(Client.EventMeters) == "table" and type(Client.EventMeters.GetSnapshot) == "function" then
-        meters = Client.EventMeters:GetSnapshot(eventId) or meters
+        meters = Client.EventMeters:GetSnapshot(eventId, { currentTurn = eventState.turnNumber }) or meters
     end
     local payload = EventRejoinState.SerializeSnapshot({
         auras = auraRecords,
@@ -149,8 +149,8 @@ function Server:SendEventRejoinState(clientName, options)
             mode,
             #auraRecords,
             #castRecords,
-            #(meters.damage or {}),
-            #(meters.healing or {}),
+            #((meters.total and meters.total.damage) or meters.damage or {}),
+            #((meters.total and meters.total.healing) or meters.healing or {}),
             tostring(sent)
         )
     end
