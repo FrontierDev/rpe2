@@ -22,5 +22,5 @@ if type(dataset) == "table" then
         end
     end
 
-    tailoring.version = math.max(11, math.floor(tonumber(tailoring.version) or 1))
+    tailoring.version = math.max(12, math.floor(tonumber(tailoring.version) or 1))
 end

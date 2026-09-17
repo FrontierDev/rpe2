@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 18,
+    version = 19,
     dataset = {
         achievements = {},
         auras = {
@@ -1171,7 +1171,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Fire damage to up to 5 enemies.\n|cff999999Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Fire damage to up to 5 enemies. |cffffcc00Targets must share the same raid marker.|r",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -1882,7 +1882,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_arcane_arcane04.blp",
                 id = "1e8l0iyi",
-                cooldownChannel = 2,
+                cooldownChannel = 4,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Arcane Missiles",

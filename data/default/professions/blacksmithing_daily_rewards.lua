@@ -78,5 +78,5 @@ if type(dataset) == "table" then
         }
     end
 
-    blacksmithing.version = math.max(7, math.floor(tonumber(blacksmithing.version) or 1))
+    blacksmithing.version = math.max(8, math.floor(tonumber(blacksmithing.version) or 1))
 end

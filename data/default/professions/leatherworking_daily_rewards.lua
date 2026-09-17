@@ -69,5 +69,5 @@ if type(dataset) == "table" then
         dataset.loot[#dataset.loot + 1] = definition
     end
 
-    leatherworking.version = math.max(16, math.floor(tonumber(leatherworking.version) or 1))
+    leatherworking.version = math.max(17, math.floor(tonumber(leatherworking.version) or 1))
 end

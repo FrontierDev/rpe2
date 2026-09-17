@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 26,
+    version = 27,
     dataset = {
         achievements = {},
         auras = {
@@ -3357,7 +3357,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. Generates a high amount of threat.\n|cff999999Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. Generates a high amount of threat. |cffffcc00Targets must share the same raid marker.|r",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -4292,7 +4292,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies.\n|cff999999Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. |cffffcc00Targets must share the same raid marker.|r",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -4489,7 +4489,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_unyieldingfaith.blp",
                 id = "hork7m2p",
-                cooldownChannel = 1,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Hand of Reckoning",
@@ -4784,7 +4784,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_heroism.blp",
                 id = "gak8p3v1",
-                cooldownChannel = 3,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Guardian of Ancient Kings",
@@ -5041,7 +5041,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_paladin_shieldofthetemplar.blp",
                 id = "tplblwsp",
-                cooldownChannel = 3,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Templar's Bulwark",
@@ -5124,7 +5124,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_prayerofhealing.blp",
                 id = "rep7n4c8",
-                cooldownChannel = 2,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Repentance",

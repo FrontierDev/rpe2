@@ -51,5 +51,5 @@ if type(dataset) == "table" then
         dataset.loot[#dataset.loot + 1] = definition
     end
 
-    jewelcrafting.version = math.max(3, math.floor(tonumber(jewelcrafting.version) or 1))
+    jewelcrafting.version = math.max(4, math.floor(tonumber(jewelcrafting.version) or 1))
 end

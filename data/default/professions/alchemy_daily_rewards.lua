@@ -101,5 +101,5 @@ if type(dataset) == "table" then
         dataset.loot[#dataset.loot + 1] = definition
     end
 
-    alchemy.version = math.max(27, math.floor(tonumber(alchemy.version) or 1))
+    alchemy.version = math.max(28, math.floor(tonumber(alchemy.version) or 1))
 end

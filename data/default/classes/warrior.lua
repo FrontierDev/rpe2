@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 19,
+        version = 20,
     dataset = {
         achievements = {},
         auras = {
@@ -707,7 +707,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to up to 1 enemy.\n|cff999999Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 1 enemy. |cffffcc00Targets must share the same raid marker.|r",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -1355,7 +1355,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_nature_reincarnation.blp",
                 id = "tntwar01",
-                cooldownChannel = 1,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Taunt",
@@ -1765,7 +1765,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies.\n|cff999999Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. |cffffcc00Targets must share the same raid marker.|r",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -1869,7 +1869,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies.\n|cff999999Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. |cffffcc00Targets must share the same raid marker.|r",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -2355,7 +2355,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_revenge.blp",
                 id = "mn1ltzeo",
-                cooldownChannel = 5,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Revenge",

@@ -400,20 +400,6 @@ local function buildCooldownRemainingText(runtimeState)
     return ("Cooldown Remaining: %s"):format(formatTurnCount(cooldownRemaining))
 end
 
-local function buildChannelCooldownRemainingText(runtimeState)
-    if type(runtimeState) ~= "table" or runtimeState.cooldownChannelTriggersGCD ~= true then
-        return nil
-    end
-
-    local channelName = tostring(runtimeState.cooldownChannelName or "")
-    local channelCooldownRemaining = math.max(0, math.floor(tonumber(runtimeState.channelCooldownRemaining) or 0))
-    if channelName == "" or channelCooldownRemaining <= 0 then
-        return nil
-    end
-
-    return ("%s cooldown: %s"):format(channelName, formatTurnCount(channelCooldownRemaining))
-end
-
 local function isBasicAttack(spell)
     if type(spell) ~= "table" then
         return false
@@ -501,17 +487,6 @@ function SpellTooltip:Build(detail, owner)
     if cooldownRemainingText then
         lines[#lines + 1] = {
             text = cooldownRemainingText,
-            r = 1,
-            g = 1,
-            b = 1,
-            wrap = true,
-        }
-    end
-
-    local channelCooldownRemainingText = buildChannelCooldownRemainingText(runtimeState)
-    if channelCooldownRemainingText then
-        lines[#lines + 1] = {
-            text = channelCooldownRemainingText,
             r = 1,
             g = 1,
             b = 1,
