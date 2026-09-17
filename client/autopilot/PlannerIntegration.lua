@@ -5,6 +5,7 @@ Addon.Internal = Addon.Internal or {}
 Addon.Utils = Addon.Utils or {}
 
 local Client = Addon.Client
+local Server = Addon.Server or {}
 local Planner = Client.AutopilotPlanner or {}
 local SpellEvaluator = Client.AutopilotSpellEvaluator or {}
 local AuraEvaluator = Client.AutopilotAuraEvaluator or {}
@@ -107,6 +108,31 @@ local function copyThreatTable(values)
     return copied
 end
 
+local function copyTauntState(value)
+    if type(value) ~= "table" then
+        return nil
+    end
+
+    local sourceEventId = math.floor(tonumber(value.sourceEventId or value.sourceId) or 0)
+    local remainingTurns = math.floor(tonumber(value.remainingTurns or value.duration) or 0)
+    if sourceEventId <= 0 or remainingTurns <= 0 then
+        return nil
+    end
+
+    return {
+        sourceEventId = sourceEventId,
+        remainingTurns = remainingTurns,
+    }
+end
+
+local function buildTauntSignature(value)
+    local tauntState = copyTauntState(value)
+    if type(tauntState) ~= "table" then
+        return "0:0"
+    end
+    return tostring(tauntState.sourceEventId) .. ":" .. tostring(tauntState.remainingTurns)
+end
+
 local function buildEntryListSignature(entries, fields)
     local records = {}
     for index = 1, #(entries or {}) do
@@ -149,6 +175,7 @@ local function buildUnitFrozenSignature(unit)
         buildEntryListSignature(unit and unit.resources, { "resourceRef", "currentValue", "maxValue" }),
         buildEntryListSignature(unit and unit.stats, { "statRef", "value", "currentValue" }),
         buildThreatSignature(unit and unit.threatTable),
+        buildTauntSignature(unit and unit.tauntState),
     }, "\31")
 end
 
@@ -181,6 +208,7 @@ local function cloneEventUnit(unit)
     copy.stats = copyStatEntries(unit.stats)
     copy.spells = copyArray(unit.spells)
     copy.threatTable = copyThreatTable(unit.threatTable)
+    copy.tauntState = copyTauntState(unit.tauntState)
     copy._networkStatMode = unit._networkStatMode
 
     local mt = getmetatable(unit)
@@ -704,6 +732,7 @@ local function snapshotUnitSummary(unit, spellRefs, movementSnapshot)
         raidMarker = normalizeRaidMarker(unit and unit.raidMarker),
         resources = copyResourceEntries(unit and unit.resources),
         threatTable = copyThreatTable(unit and unit.threatTable),
+        tauntState = copyTauntState(unit and unit.tauntState),
         spellRefs = copyArray(spellRefs),
         movement = type(movementSnapshot) == "table" and copyMap(movementSnapshot) or nil,
     }
@@ -2146,6 +2175,52 @@ function Planner.ReleaseScratch(state)
 end
 
 function Planner.IsFrozenSnapshotStale(state)
+    if type(state) ~= "table"
+        or type(state.snapshot) ~= "table"
+        or type(state.snapshot.eventState) ~= "table"
+    then
+        return true
+    end
+
+    local liveEventState = type(Server.EventState) == "table"
+        and Server.EventState
+        or state.sourceEventState
+    if type(liveEventState) ~= "table" then
+        return true
+    end
+
+    local frozenByEventId = {}
+    for index = 1, #(state.snapshot.eventState.units or {}) do
+        local frozenUnit = state.snapshot.eventState.units[index]
+        local eventId = normalizeEventId(frozenUnit and frozenUnit.eventID)
+        if eventId > 0 then
+            frozenByEventId[eventId] = frozenUnit
+        end
+    end
+
+    local liveByEventId = {}
+    for index = 1, #(liveEventState.units or {}) do
+        local liveUnit = liveEventState.units[index]
+        local eventId = normalizeEventId(liveUnit and liveUnit.eventID)
+        if eventId > 0 then
+            liveByEventId[eventId] = liveUnit
+        end
+    end
+
+    for eventId, frozenUnit in pairs(frozenByEventId) do
+        local liveUnit = liveByEventId[eventId]
+        if type(liveUnit) ~= "table"
+            or buildTauntSignature(frozenUnit and frozenUnit.tauntState)
+                ~= buildTauntSignature(liveUnit.tauntState)
+        then
+            return true
+        end
+    end
+    for eventId in pairs(liveByEventId) do
+        if frozenByEventId[eventId] == nil then
+            return true
+        end
+    end
     return false
 end
 

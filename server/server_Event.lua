@@ -615,6 +615,14 @@ local function resolveControllingPlayerEventId(casterUnit)
     return tonumber(casterUnit.controllerID) or nil
 end
 
+local function isEventUnitActive(unit)
+    if EventUnit and type(EventUnit.IsActive) == "function" then
+        return EventUnit.IsActive(unit)
+    end
+
+    return type(unit) == "table" and (unit.isPlayer == true or unit.active ~= false)
+end
+
 local function resolveControllerEventID(controllerValue, playerEventIds, fallbackEventId)
     local numericControllerId = tonumber(controllerValue) or 0
     if numericControllerId > 0 then
@@ -1387,6 +1395,187 @@ Server.EventDraftState = Server.EventDraftState or nil
 Server.PendingEventAdvanceCommit = Server.PendingEventAdvanceCommit or nil
 Server.EventAdvanceRequestGeneration = math.max(0, math.floor(tonumber(Server.EventAdvanceRequestGeneration) or 0))
 Server.LastEventAdvanceCommit = Server.LastEventAdvanceCommit or nil
+Server.EventTauntLifetimeByEventId = Server.EventTauntLifetimeByEventId or {}
+
+local function resolveTauntOwnerPageIndex(eventState, targetEventId)
+    if type(eventState) ~= "table" then
+        return nil
+    end
+
+    local normalizedTargetEventId = math.floor(tonumber(targetEventId) or 0)
+    if normalizedTargetEventId <= 0 then
+        return nil
+    end
+
+    local turnMode = Event and type(Event.NormalizeTurnMode) == "function"
+        and Event.NormalizeTurnMode(eventState.turnMode)
+        or tostring(eventState.turnMode or "manual")
+    if turnMode == "autopilot" and Event and type(Event.GetUnitTurnStepIndex) == "function" then
+        return Event.GetUnitTurnStepIndex(eventState, normalizedTargetEventId, getMaxEventUnits())
+    end
+
+    if Event and type(Event.GetUnitPageIndex) == "function" then
+        return Event.GetUnitPageIndex(eventState.units, normalizedTargetEventId, getMaxEventUnits())
+    end
+
+    return nil
+end
+
+local function resolveTauntActivationTurn(eventState, targetEventId, turnNumber, tickNumber)
+    local currentTurn = math.max(1, math.floor(tonumber(turnNumber) or 1))
+    local currentTick = math.max(1, math.floor(tonumber(tickNumber) or 1))
+    local ownerPage = resolveTauntOwnerPageIndex(eventState, targetEventId)
+    if ownerPage ~= nil and currentTick < ownerPage then
+        return currentTurn
+    end
+
+    return currentTurn + 1
+end
+
+-- Taunt is consumed after the target's planning page completes. This keeps a
+-- newly active one-turn Taunt available for that page, while the next page in
+-- a later turn cannot observe an already-expired state.
+local function getEventTauntLifetimeState(server, eventState)
+    if type(server) ~= "table" or type(eventState) ~= "table" then
+        return nil
+    end
+
+    local eventId = tostring(eventState.id or "")
+    if eventId == "" then
+        return nil
+    end
+
+    server.EventTauntLifetimeByEventId = server.EventTauntLifetimeByEventId or {}
+    local state = server.EventTauntLifetimeByEventId[eventId]
+    if type(state) ~= "table" then
+        state = {
+            targets = {},
+            lastAdvancedStepKey = nil,
+        }
+        server.EventTauntLifetimeByEventId[eventId] = state
+    end
+
+    state.targets = state.targets or {}
+    return state
+end
+
+local function clearEventTauntStates(eventState)
+    if type(eventState) ~= "table" then
+        return
+    end
+
+    for index = 1, #(eventState.units or {}) do
+        local unit = eventState.units[index]
+        if type(unit) == "table" then
+            unit.tauntState = nil
+        end
+    end
+end
+
+local function resetTauntLifetimeRecord(server, eventState, targetEventId, sourceEventId)
+    local lifetimeState = getEventTauntLifetimeState(server, eventState)
+    if not lifetimeState then
+        return nil
+    end
+
+    local normalizedTargetEventId = math.floor(tonumber(targetEventId) or 0)
+    local normalizedSourceEventId = math.floor(tonumber(sourceEventId) or 0)
+    if normalizedTargetEventId <= 0 or normalizedSourceEventId <= 0 then
+        return nil
+    end
+
+    local record = {
+        sourceEventId = normalizedSourceEventId,
+        activationTurnNumber = resolveTauntActivationTurn(
+            eventState,
+            normalizedTargetEventId,
+            eventState.turnNumber,
+            eventState.tickNumber
+        ),
+    }
+    lifetimeState.targets[normalizedTargetEventId] = record
+    lifetimeState.lastAdvancedStepKey = nil
+    return record
+end
+
+local function advanceEventUnitTaunts(server, eventState, sourceTurnNumber, sourceTickNumber)
+    if type(server) ~= "table"
+        or type(eventState) ~= "table"
+        or eventState.active ~= true
+    then
+        return {}
+    end
+
+    local lifetimeState = getEventTauntLifetimeState(server, eventState)
+    if not lifetimeState then
+        return {}
+    end
+
+    local normalizedTurnNumber = math.max(1, math.floor(tonumber(sourceTurnNumber) or 1))
+    local normalizedTickNumber = math.max(1, math.floor(tonumber(sourceTickNumber) or 1))
+    local stepKey = ("%d:%d"):format(normalizedTurnNumber, normalizedTickNumber)
+    if lifetimeState.lastAdvancedStepKey == stepKey then
+        return {}
+    end
+    lifetimeState.lastAdvancedStepKey = stepKey
+
+    local entries = {}
+    for index = 1, #(eventState.units or {}) do
+        local targetUnit = eventState.units[index]
+        local targetEventId = math.floor(tonumber(targetUnit and targetUnit.eventID) or 0)
+        local tauntState = targetUnit and targetUnit.tauntState or nil
+        if targetEventId > 0
+            and type(targetUnit) == "table"
+            and targetUnit.isPlayer ~= true
+            and isEventUnitActive(targetUnit)
+            and type(tauntState) == "table"
+        then
+            local sourceEventId = math.floor(tonumber(tauntState.sourceEventId) or 0)
+            local remainingTurns = math.floor(tonumber(tauntState.remainingTurns) or 0)
+            if sourceEventId <= 0 or remainingTurns <= 0 then
+                targetUnit.tauntState = nil
+                lifetimeState.targets[targetEventId] = nil
+            else
+                local record = lifetimeState.targets[targetEventId]
+                if type(record) ~= "table" or record.sourceEventId ~= sourceEventId then
+                    record = {
+                        sourceEventId = sourceEventId,
+                        activationTurnNumber = resolveTauntActivationTurn(
+                            eventState,
+                            targetEventId,
+                            normalizedTurnNumber,
+                            normalizedTickNumber
+                        ),
+                    }
+                    lifetimeState.targets[targetEventId] = record
+                end
+
+                local ownerPage = resolveTauntOwnerPageIndex(eventState, targetEventId)
+                if ownerPage ~= nil
+                    and normalizedTickNumber == math.floor(tonumber(ownerPage) or 0)
+                    and normalizedTurnNumber >= math.floor(tonumber(record.activationTurnNumber) or normalizedTurnNumber + 1)
+                then
+                    if remainingTurns <= 1 then
+                        targetUnit.tauntState = nil
+                        lifetimeState.targets[targetEventId] = nil
+                    else
+                        targetUnit.tauntState.remainingTurns = remainingTurns - 1
+                    end
+
+                    entries[#entries + 1] = {
+                        operation = "upsert",
+                        eventID = targetUnit.eventID,
+                        unit = targetUnit,
+                    }
+                end
+            end
+        elseif targetEventId > 0 then
+            lifetimeState.targets[targetEventId] = nil
+        end
+    end
+
+    return entries
+end
 
 function Server:GetEventState()
     return self.EventState
@@ -1742,6 +1931,58 @@ function Server:SetEventUnitHidden(eventId, isHidden)
     end
 
     refreshEventManagePage()
+    return true
+end
+
+function Server:SetEventUnitTauntState(eventId, sourceEventId, remainingTurns)
+    local eventState = self:GetEditableEventState()
+    if not eventState then
+        return false
+    end
+
+    local normalizedTargetEventId = math.floor(tonumber(eventId) or 0)
+    local normalizedSourceId = math.floor(tonumber(sourceEventId) or 0)
+    local targetUnit = findEventUnitById(eventState.units, normalizedTargetEventId)
+    local sourceUnit = findEventUnitById(eventState.units, normalizedSourceId)
+    local normalizedSourceEventId = math.floor(tonumber(sourceUnit and sourceUnit.eventID) or 0)
+    local normalizedRemainingTurns = math.floor(tonumber(remainingTurns) or 0)
+    if type(targetUnit) ~= "table"
+        or targetUnit.isPlayer == true
+        or not isEventUnitActive(targetUnit)
+        or type(sourceUnit) ~= "table"
+        or normalizedTargetEventId <= 0
+        or normalizedSourceId <= 0
+        or normalizedSourceEventId <= 0
+        or normalizedRemainingTurns <= 0
+    then
+        return false
+    end
+
+    local currentState = targetUnit.tauntState
+    if type(currentState) == "table"
+        and tonumber(currentState.sourceEventId) == normalizedSourceEventId
+        and tonumber(currentState.remainingTurns) == normalizedRemainingTurns
+    then
+        return true
+    end
+
+    targetUnit.tauntState = {
+        sourceEventId = normalizedSourceEventId,
+        remainingTurns = normalizedRemainingTurns,
+    }
+
+    if eventState.active == true then
+        resetTauntLifetimeRecord(self, eventState, targetUnit.eventID, normalizedSourceEventId)
+        copyLiveEventToDraft(self, eventState)
+        broadcastEventDeltaBatch(self, eventState, {
+            {
+                operation = "upsert",
+                eventID = targetUnit.eventID,
+                unit = targetUnit,
+            },
+        }, false)
+    end
+
     return true
 end
 
@@ -2112,6 +2353,11 @@ function Server:EndEvent(reason)
     if self.ResetSpellcastingState then
         self:ResetSpellcastingState(eventState.id)
     end
+    clearEventTauntStates(eventState)
+    clearEventTauntStates(self.EventDraftState)
+    if type(self.EventTauntLifetimeByEventId) == "table" then
+        self.EventTauntLifetimeByEventId[tostring(eventState.id or "")] = nil
+    end
     self.EventState = nil
     refreshEventManagePage()
     return true
@@ -2180,10 +2426,22 @@ function Server:_AdvanceEventStepAfterCommit(commit, completed)
 
     normalizeEventStepState(eventState)
 
+    local tauntEntries = advanceEventUnitTaunts(
+        self,
+        eventState,
+        commit.sourceTurnNumber,
+        commit.sourceTickNumber
+    )
+
     if self.EventDraftState then
         self.EventDraftState.turnNumber = eventState.turnNumber
         self.EventDraftState.tickNumber = eventState.tickNumber
         self.EventDraftState.totalTicks = eventState.totalTicks
+    end
+
+    if #tauntEntries > 0 then
+        copyLiveEventToDraft(self, eventState)
+        broadcastEventDeltaBatch(self, eventState, tauntEntries, false)
     end
 
     local stateArguments = buildEventStateArguments(eventState)

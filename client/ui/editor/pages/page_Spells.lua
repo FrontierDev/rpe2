@@ -103,6 +103,10 @@ local function matchesSpellDropdownFilter(spell, filterValue)
         return spellHasEffectType(spell, "interrupt")
     end
 
+    if filterValue == "effect:taunt" then
+        return spellHasEffectType(spell, "taunt")
+    end
+
     if filterValue == "effect:revert" then
         return spellHasEffectType(spell, "revert")
     end
@@ -170,6 +174,7 @@ function DataEditor:BuildSpellsPage(page)
                         { label = "Apply Aura", value = "effect:apply_aura" },
                         { label = "Resource", value = "effect:resource" },
                         { label = "Interrupt", value = "effect:interrupt" },
+                        { label = "Taunt", value = "effect:taunt" },
                         { label = "Revert", value = "effect:revert" },
                         { label = "Summon Pet", value = "effect:summon_pet" },
                     },

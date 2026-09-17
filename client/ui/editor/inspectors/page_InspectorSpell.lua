@@ -277,6 +277,7 @@ function DataEditor:RefreshSpellInspectorPage()
     local isRemoveAuraTag = isRemoveAuraByTag or (isRemoveAura and tostring(effect.match or "aura") == "tag")
     local isRemoveAuraExact = isRemoveAura and not isRemoveAuraTag
     local isResource = effectType == "resource"
+    local isTaunt = effectType == "taunt"
     local isSummonPet = effectType == "summon_pet"
     local targetType = tostring(target.type or "single")
     local isPetTarget = targetType == "pet"
@@ -441,6 +442,10 @@ function DataEditor:RefreshSpellInspectorPage()
         self.SpellInspectorApplyAuraDurationInput:SetText(tostring(effect.duration or 12))
         self:SetSpellInspectorTextElementEnabled(self.SpellInspectorApplyAuraDurationInput, isApplyAura and component ~= nil)
     end
+    if self.SpellInspectorTauntDurationInput then
+        self.SpellInspectorTauntDurationInput:SetText(tostring(effect.duration or 2))
+        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorTauntDurationInput, isTaunt and component ~= nil)
+    end
     if self.SpellInspectorResourceAmountInput then
         self.SpellInspectorResourceAmountInput:SetText(tostring(effect.amount or 0))
         self:SetSpellInspectorTextElementEnabled(self.SpellInspectorResourceAmountInput, isResource and component ~= nil)
@@ -470,6 +475,7 @@ function DataEditor:RefreshSpellInspectorPage()
     self:SetSpellInspectorGroupVisible(self.SpellInspectorDamageTypeGroup, isDamage)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorAuraStacksGroup, showsAuraApplicationControls)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorApplyAuraDurationGroup, isApplyAura)
+    self:SetSpellInspectorGroupVisible(self.SpellInspectorTauntDurationGroup, isTaunt)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceAmountGroup, isResource)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceAmountModeGroup, isResource)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorTargetEventsGroup, not isSummonPet)

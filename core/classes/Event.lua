@@ -498,6 +498,7 @@ local function serializeUnit(unit)
             or "",
         toNetworkBoolean(EventUnit and EventUnit.IsBoss and EventUnit.IsBoss(unit) or coerceUnitBoolean(unit and unit.boss, false)),
         EventUnit and EventUnit.SerializeThreatTableForNetwork and EventUnit.SerializeThreatTableForNetwork(unit and unit.threatTable or nil) or "",
+        EventUnit and EventUnit.SerializeTauntStateForNetwork and EventUnit.SerializeTauntStateForNetwork(unit and unit.tauntState or nil) or "",
     }, UNIT_FIELD_SEPARATOR)
 end
 
@@ -553,6 +554,7 @@ local function deserializeUnit(record)
         _networkStatMode = #values >= 20 and values[20] ~= "" and values[20] or nil,
         boss = #values >= 22 and fromNetworkBoolean(values[22]) or false,
         threatTable = #values >= 23 and EventUnit and EventUnit.DeserializeThreatTableFromNetwork and EventUnit.DeserializeThreatTableFromNetwork(values[23] or "") or {},
+        tauntState = #values >= 24 and EventUnit and EventUnit.DeserializeTauntStateFromNetwork and EventUnit.DeserializeTauntStateFromNetwork(values[24] or "") or nil,
     })
 end
 

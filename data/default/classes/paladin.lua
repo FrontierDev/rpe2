@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 18,
+    version = 21,
     dataset = {
         achievements = {},
         auras = {
@@ -503,6 +503,34 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         baseAmount = 30,
                         operation = "flat",
+                        statRef = "f82db71a:p8syz5ba",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/ability_defend.blp",
+                id = "rdbtaura",
+                maxStacks = 1,
+                name = "Redoubt",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Block Chance by 30%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 1,
+                effects = {
+                    {
+                        baseAmount = 30,
+                        operation = "flat",
                         statRef = "f82db71a:pu05li08",
                         statScaling = {},
                         type = "stat"
@@ -762,6 +790,47 @@ Addon.Data.DefaultDatasets:Register({
                     stackingTokens = {},
                     version = 1
                 }
+            },
+            {
+                description = "",
+                duration = 1,
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseAbsorption = 0,
+                        damageSchoolRefs = {},
+                        statScaling = {
+                            {
+                                coefficient = 8,
+                                statRef = "f82db71a:ygjno50i"
+                            }
+                        },
+                        type = "absorb"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/ability_paladin_shieldofthetemplar.blp",
+                id = "tplblw01",
+                maxStacks = 1,
+                name = "Templar's Bulwark",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Absorbs {AURA_ABSORB_1} damage.",
+                    bodyTokens = {
+                        {
+                            applyMode = "absorb_amount",
+                            baseField = "baseAbsorption",
+                            effectIndex = 1,
+                            key = "AURA_ABSORB_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
             }
         },
         authorName = "Ortellus-ArgentDawn",
@@ -835,7 +904,8 @@ Addon.Data.DefaultDatasets:Register({
                     "b0211ab3:dvinstrg",
                     "b0211ab3:prcpldn1",
                     "b0211ab3:dflctpal",
-                    "b0211ab3:antcpal1"
+                    "b0211ab3:antcpal1",
+                    "b0211ab3:rdbttrait"
                 }
             }
         },
@@ -4730,6 +4800,90 @@ Addon.Data.DefaultDatasets:Register({
             {
                 allowDeadTargets = false,
                 canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:tplblw01",
+                            basePower = 0,
+                            duration = 1,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "tplblwc1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_paladin_shieldofthetemplar.blp",
+                id = "tplblwsp",
+                ignoreGCD = true,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Templar's Bulwark",
+                range = 0,
+                resourceCosts = {},
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:tplblw01",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Absorbs {AURA_ABSORB_1} damage.",
+                            duration = 1,
+                            icon = "interface/icons/ability_paladin_shieldofthetemplar.blp",
+                            nameText = "Templar's Bulwark",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "absorb_amount",
+                                    baseField = "baseAbsorption",
+                                    effectIndex = 1,
+                                    key = "AURA_ABSORB_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Templar's Bulwark to yourself for 1 turn.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                triggersGCD = true,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
                 castTime = 1,
                 casterEvents = {},
                 charges = 0,
@@ -4831,6 +4985,35 @@ Addon.Data.DefaultDatasets:Register({
                         value = 5
                     }
                 },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Protection",
+                conditions = {},
+                description = "When you take melee damage, you have a 50% chance to gain 30% Block Chance for 1 turn.",
+                events = {
+                    {
+                        chance = 50,
+                        combatEventId = "on_melee_taken",
+                        effects = {
+                            {
+                                auraRef = "b0211ab3:rdbtaura",
+                                basePower = 0,
+                                duration = 1,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "aura_caster"
+                    }
+                },
+                icon = "interface/icons/ability_defend.blp",
+                id = "rdbttrait",
+                isEnvironmental = false,
+                name = "Redoubt",
+                skillBonuses = {},
+                statBonuses = {},
                 unlockLevel = 1
             },
             {

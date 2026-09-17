@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 21,
+    version = 22,
     dataset = {
         achievements = {},
         auras = {},
@@ -2185,7 +2185,8 @@ Addon.Data.DefaultDatasets:Register({
                 traitRefs = {
                     "f82db71a:dm2h660e",
                     "f82db71a:qid0o6zv",
-                    "f82db71a:prc5ptn1"
+                    "f82db71a:prc5ptn1",
+                    "f82db71a:diplomcy"
                 }
             },
             {
@@ -4110,6 +4111,29 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 baseValue = 0,
+                category = "Resistances",
+                color = {
+                    a = 1,
+                    b = 1,
+                    g = 1,
+                    r = 1
+                },
+                defenceLabel = "",
+                derivedSources = {},
+                description = "",
+                displayMode = "signed_value",
+                icon = "interface/icons/paladin_holy.blp",
+                id = "hlyrsstn",
+                itemLevelWeight = 0,
+                name = "Holy Resistance",
+                priority = 71,
+                seedNPCStat = false,
+                tags = {},
+                valueMode = "manual",
+                visibility = true
+            },
+            {
+                baseValue = 0,
                 category = "Special",
                 color = {
                     a = 1,
@@ -4473,6 +4497,25 @@ Addon.Data.DefaultDatasets:Register({
                         value = 5
                     }
                 },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "",
+                conditions = {},
+                description = "Increases Persuasion skill by 5.",
+                events = {},
+                icon = "interface/icons/spell_shadow_seduction.blp",
+                id = "diplomcy",
+                isEnvironmental = false,
+                name = "Diplomacy",
+                skillBonuses = {
+                    {
+                        skillRef = "f82db71a:6cqclth4",
+                        value = 5
+                    }
+                },
+                statBonuses = {},
                 unlockLevel = 1
             },
             {

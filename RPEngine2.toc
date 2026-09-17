@@ -48,6 +48,7 @@ core/internal/tasks/TaskQueue.lua
 core/internal/comms/MessageQueue.lua
 core/internal/comms/Operations.lua
 core/internal/comms/EventUnitHidden.lua
+core/internal/comms/EventUnitTaunt.lua
 core/internal/comms/EventTurnComplete.lua
 core/internal/comms/Serialization.lua
 core/internal/comms/EventRejoinState.lua
@@ -156,6 +157,7 @@ core/classes/EventVariantSpellEquipmentNetwork.lua
 core/classes/EventEndLoot.lua
 client/client_Event.lua
 client/client_EventUnitHidden.lua
+client/client_EventUnitTaunt.lua
 client/client_EventTurnComplete.lua
 client/conditions/Hidden.lua
 client/client_Loot.lua
@@ -169,6 +171,7 @@ client/client_SkillProgression.lua
 server/server_Event.lua
 server/server_EventNpcMode.lua
 server/server_EventUnitHidden.lua
+server/server_EventUnitTaunt.lua
 server/server_EventTurnComplete.lua
 server/server_EventEndLoot.lua
 server/server_Loot.lua
@@ -224,6 +227,7 @@ client/combat/effects/Interrupt.lua
 client/combat/effects/Revert.lua
 client/combat/effects/SummonPet.lua
 client/combat/effects/Hide.lua
+client/combat/effects/Taunt.lua
 client/combat/ReactionPerformance.lua
 client/spellcasting/TooltipTemplate.lua
 client/spellcasting/AuraDescriptionBuilder.lua

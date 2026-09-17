@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 13,
+    version = 14,
     dataset = {
         achievements = {},
         auras = {
@@ -163,11 +163,18 @@ Addon.Data.DefaultDatasets:Register({
                 duration = 2,
                 effects = {
                     {
-                        baseAmount = 100,
-                        operation = "flat",
-                        statRef = "f82db71a:0w7c7p09",
-                        statScaling = {},
-                        type = "stat"
+                        amountMode = "flat",
+                        baseAbsorption = 104,
+                        damageSchoolRefs = {
+                            "f82db71a:esjguw6d"
+                        },
+                        statScaling = {
+                            {
+                                coefficient = 0.520,
+                                statRef = "f82db71a:7t7xgzcx"
+                            }
+                        },
+                        type = "absorb"
                     }
                 },
                 events = {},
@@ -179,8 +186,16 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "Increases Fire Resistance by 100.",
-                    bodyTokens = {},
+                    bodyText = "Absorbs {AURA_ABSORB_1} Fire damage.",
+                    bodyTokens = {
+                        {
+                            applyMode = "absorb_amount",
+                            baseField = "baseAbsorption",
+                            effectIndex = 1,
+                            key = "AURA_ABSORB_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
                     stackingText = "",
                     stackingTokens = {},
                     version = 1
@@ -191,11 +206,18 @@ Addon.Data.DefaultDatasets:Register({
                 duration = 2,
                 effects = {
                     {
-                        baseAmount = 100,
-                        operation = "flat",
-                        statRef = "f82db71a:jjn0my8k",
-                        statScaling = {},
-                        type = "stat"
+                        amountMode = "flat",
+                        baseAbsorption = 104,
+                        damageSchoolRefs = {
+                            "f82db71a:hx7pnwv4"
+                        },
+                        statScaling = {
+                            {
+                                coefficient = 0.520,
+                                statRef = "f82db71a:7t7xgzcx"
+                            }
+                        },
+                        type = "absorb"
                     }
                 },
                 events = {},
@@ -207,8 +229,16 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "Increases Frost Resistance by 100.",
-                    bodyTokens = {},
+                    bodyText = "Absorbs {AURA_ABSORB_1} Frost damage.",
+                    bodyTokens = {
+                        {
+                            applyMode = "absorb_amount",
+                            baseField = "baseAbsorption",
+                            effectIndex = 1,
+                            key = "AURA_ABSORB_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
                     stackingText = "",
                     stackingTokens = {},
                     version = 1
@@ -1298,6 +1328,7 @@ Addon.Data.DefaultDatasets:Register({
                             duration = 2,
                             stacks = 1,
                             targetEvents = {},
+                            threatCoefficient = 0.38,
                             type = "apply_aura"
                         },
                         key = "fward001",
@@ -1326,7 +1357,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 5,
+                        amount = 15,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1338,8 +1369,35 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    auraSections = {},
-                    mainText = "Increase your Fire Resistance by 100 for 2 turns.",
+                    auraSections = {
+                        {
+                            auraRef = "d7c874c4:frwdau01",
+                            datasetId = "d7c874c4",
+                            descriptionText = "Absorbs {AURA_ABSORB_1} Fire damage.",
+                            duration = 2,
+                            icon = "interface/icons/spell_fire_firearmor.blp",
+                            nameText = "Fire Ward",
+                            powerLevel = 0,
+                            spellDatasetId = "d7c874c4",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "absorb_amount",
+                                    baseField = "baseAbsorption",
+                                    effectIndex = 1,
+                                    key = "AURA_ABSORB_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Fire Ward to yourself for 2 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -1363,6 +1421,7 @@ Addon.Data.DefaultDatasets:Register({
                             duration = 2,
                             stacks = 1,
                             targetEvents = {},
+                            threatCoefficient = 0.38,
                             type = "apply_aura"
                         },
                         key = "fward002",
@@ -1391,7 +1450,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 5,
+                        amount = 15,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1403,8 +1462,35 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    auraSections = {},
-                    mainText = "Increase your Frost Resistance by 100 for 2 turns.",
+                    auraSections = {
+                        {
+                            auraRef = "d7c874c4:fowdau01",
+                            datasetId = "d7c874c4",
+                            descriptionText = "Absorbs {AURA_ABSORB_1} Frost damage.",
+                            duration = 2,
+                            icon = "interface/icons/spell_frost_frostward.blp",
+                            nameText = "Frost Ward",
+                            powerLevel = 0,
+                            spellDatasetId = "d7c874c4",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "absorb_amount",
+                                    baseField = "baseAbsorption",
+                                    effectIndex = 1,
+                                    key = "AURA_ABSORB_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Frost Ward to yourself for 2 turns.",
                     tokens = {},
                     version = 1
                 },

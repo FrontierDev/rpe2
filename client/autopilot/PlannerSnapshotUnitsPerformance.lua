@@ -194,6 +194,23 @@ local function normalizeEventId(value)
     return eventId > 0 and eventId or 0
 end
 
+local function copyTauntState(value)
+    if type(value) ~= "table" then
+        return nil
+    end
+
+    local sourceEventId = math.floor(tonumber(value.sourceEventId or value.sourceId) or 0)
+    local remainingTurns = math.floor(tonumber(value.remainingTurns or value.duration) or 0)
+    if sourceEventId <= 0 or remainingTurns <= 0 then
+        return nil
+    end
+
+    return {
+        sourceEventId = sourceEventId,
+        remainingTurns = remainingTurns,
+    }
+end
+
 local function isUnitActive(unit)
     if type(Event) == "table" and type(Event.IsUnitActive) == "function" then
         return Event.IsUnitActive(unit) == true
@@ -294,6 +311,7 @@ local function stepCloneState(clone, deadlineMs)
     end
 
     if clone.stage == "finalize" then
+        result.tauntState = copyTauntState(source.tauntState)
         result._networkStatMode = source._networkStatMode
         local mt = getmetatable(source)
         if mt ~= nil then setmetatable(result, mt) end

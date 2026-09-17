@@ -1011,6 +1011,17 @@ local function buildInterruptSentence(component)
     return ("Interrupt the spellcasting of %s."):format(targetPhrase)
 end
 
+local function buildTauntSentence(component)
+    local effect = component and component.effect or nil
+    if type(effect) ~= "table" then
+        return nil
+    end
+
+    local targetPhrase = resolveTargetPhrase(component.target)
+    local duration = math.max(1, math.floor(tonumber(effect.duration) or 2))
+    return ("Taunt %s for %s."):format(targetPhrase, formatTurnLabel(duration))
+end
+
 local function buildRevertSentence(component)
     local targetPhrase = resolveTargetPhrase(component and component.target or nil)
     return ("Reverse the effects of the last reversible spell received by %s this turn."):format(targetPhrase)
@@ -1158,6 +1169,9 @@ local function buildSentence(detail, casterUnit, component)
     end
     if effectType == "interrupt" then
         return buildInterruptSentence(component)
+    end
+    if effectType == "taunt" then
+        return buildTauntSentence(component)
     end
     if effectType == "revert" then
         return buildRevertSentence(component)
@@ -1345,6 +1359,9 @@ local function buildTemplateSentence(detail, componentIndex, component, state)
     end
     if effectType == "interrupt" then
         return buildInterruptSentence(component)
+    end
+    if effectType == "taunt" then
+        return buildTauntSentence(component)
     end
     if effectType == "revert" then
         return buildRevertSentence(component)

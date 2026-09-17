@@ -276,6 +276,44 @@ local function emitInterruptCombatLog(client, eventState, casterUnit, targetUnit
     })
 end
 
+local function emitTauntCombatLog(client, eventState, casterUnit, targetUnit, result, spell, spellRef)
+    if type(client) ~= "table"
+        or type(client.EmitCombatLogEntry) ~= "function"
+        or type(eventState) ~= "table"
+        or eventState.active ~= true
+        or type(casterUnit) ~= "table"
+        or type(targetUnit) ~= "table"
+        or targetUnit.isPlayer == true
+        or type(result) ~= "table"
+        or tostring(result.effectType or "") ~= "taunt"
+        or result.applied ~= true
+    then
+        return false
+    end
+
+    local duration = math.max(1, math.floor(tonumber(result.duration) or 1))
+    local durationLabel = duration == 1 and "1 turn" or ("%d turns"):format(duration)
+    return client:EmitCombatLogEntry({
+        eventId = eventState.id,
+        entryType = "status",
+        logKind = "taunt",
+        casterDisplayName = tostring(casterUnit.name or "Unknown"),
+        targetDisplayName = tostring(targetUnit.name or "Unknown"),
+        targetCount = 1,
+        amountMin = 1,
+        amountMax = 1,
+        iconTexture = nil,
+        spellIconTexture = type(client.ResolveCombatLogSpellIcon) == "function"
+            and client:ResolveCombatLogSpellIcon(spell, spellRef)
+            or nil,
+        labelText = "Taunt",
+        detailText = ("Taunt (%s)"):format(durationLabel),
+        duration = duration,
+        accentColor = "ffcf6d2a",
+        spellRef = spellRef,
+    })
+end
+
 local refreshVisiblePlayerTooltipImmediate
 local enqueueVisualWork
 
@@ -2544,7 +2582,7 @@ local function shouldMarkResolvedEffectInteraction(result)
     return resultType ~= "invalid"
 end
 
-function Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, targetUnit, component, result, spellRef)
+function Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, targetUnit, component, result, spellRef, spell)
     if type(result) ~= "table" then
         return false
     end
@@ -2572,6 +2610,9 @@ function Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, 
 
     if effectType == "interrupt" then
         emitInterruptCombatLog(self, eventState, casterUnit, targetUnit, result, spellRef)
+    end
+    if effectType == "taunt" then
+        emitTauntCombatLog(self, eventState, casterUnit, targetUnit, result, spell, spellRef)
     end
 
     local resourceDeltas = Spellcasting.BuildResourceDeltaPayload(result.resourceDeltas)
@@ -2984,7 +3025,7 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
                     result = result,
                 }
                 local processStartTime = timingEnabled and getNowMilliseconds() or nil
-                Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, targetUnit, normalizedComponent, result, spellRef)
+                Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, targetUnit, normalizedComponent, result, spellRef, spell)
                 if timingEnabled then
                     processElapsed = processElapsed + (getNowMilliseconds() - processStartTime)
                 end

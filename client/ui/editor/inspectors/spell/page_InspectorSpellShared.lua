@@ -29,6 +29,7 @@ local EFFECT_TYPE_ITEMS = {
     { label = "Remove Aura by Tag", value = "remove_aura_by_tag" },
     { label = "Resource", value = "resource" },
     { label = "Interrupt", value = "interrupt" },
+    { label = "Taunt", value = "taunt" },
     { label = "Revert", value = "revert" },
     { label = "Summon Pet", value = "summon_pet" },
 }

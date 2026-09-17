@@ -445,6 +445,14 @@ local function buildDefaultEffect(effectType)
         }
     end
 
+    if normalizedType == "taunt" then
+        return {
+            type = "taunt",
+            duration = 2,
+            targetEvents = {},
+        }
+    end
+
     if normalizedType == "revert" then
         return {
             type = "revert",
@@ -614,6 +622,12 @@ local function normalizeEffect(value)
 
     if effect.type == "summon_pet" then
         effect.unitRef = normalizeRef(data.unitRef)
+        effect.targetEvents = normalizeEventList(data.targetEvents)
+        return effect
+    end
+
+    if effect.type == "taunt" then
+        effect.duration = math.max(1, math.floor(tonumber(data.duration) or 2))
         effect.targetEvents = normalizeEventList(data.targetEvents)
         return effect
     end

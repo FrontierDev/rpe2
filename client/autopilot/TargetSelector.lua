@@ -5,6 +5,7 @@ Addon.Internal = Addon.Internal or {}
 
 local Client = Addon.Client
 local Tasks = Addon.Internal.Tasks or {}
+local Debug = Addon.Debug or {}
 local Spatial = Client.AutopilotSpatial or {}
 local SpellEvaluator = Client.AutopilotSpellEvaluator or {}
 
@@ -116,6 +117,28 @@ local function getThreat(casterUnit, targetUnit)
     return math.max(0, tonumber(threatTable and threatTable[targetEventId]) or 0)
 end
 
+local function resolveTauntOverride(casterUnit, candidates)
+    local tauntState = type(casterUnit) == "table" and casterUnit.tauntState or nil
+    if type(tauntState) ~= "table" then
+        return 0, 0
+    end
+
+    local sourceEventId = normalizeEventId(tauntState.sourceEventId or tauntState.sourceId)
+    local remainingTurns = math.max(0, math.floor(tonumber(tauntState.remainingTurns or tauntState.duration) or 0))
+    if sourceEventId <= 0 or remainingTurns <= 0 then
+        return 0, 0
+    end
+
+    -- Candidate membership is the legality check. The selector deliberately
+    -- does not duplicate disposition, active, dead, or hidden-target rules.
+    for index = 1, #(candidates or {}) do
+        if normalizeEventId(candidates[index] and candidates[index].eventID) == sourceEventId then
+            return sourceEventId, remainingTurns
+        end
+    end
+    return 0, 0
+end
+
 local function getCachedDistance(runtime, eventState, leftUnit, rightUnit)
     if type(Spatial.DistanceBetweenCachedUnits) ~= "function" then
         return nil
@@ -213,6 +236,61 @@ local function compareHostilePrimary(left, right)
         return leftEventId < rightEventId and 1 or -1
     end
     return 0
+end
+
+local function compareHostilePrimaryWithTaunt(state, left, right)
+    local tauntSourceEventId = normalizeEventId(state and state.tauntSourceEventId)
+    if tauntSourceEventId > 0 then
+        local leftIsTaunt = normalizeEventId(left and left.eventId) == tauntSourceEventId
+        local rightIsTaunt = normalizeEventId(right and right.eventId) == tauntSourceEventId
+        if leftIsTaunt ~= rightIsTaunt then
+            return leftIsTaunt and 1 or -1
+        end
+    end
+    return compareHostilePrimary(left, right)
+end
+
+local function resolveHostileSelectionReason(state, selectedEntry)
+    if type(selectedEntry) ~= "table" then
+        return "none"
+    end
+    if state.tauntSourceEventId > 0
+        and normalizeEventId(selectedEntry.eventId) == state.tauntSourceEventId
+    then
+        return "taunt"
+    end
+
+    local selectedThreat = math.max(0, tonumber(selectedEntry.threat) or 0)
+    local hasLowerThreat = false
+    local hasEqualThreat = false
+    for index = 1, #(state.entries or {}) do
+        local other = state.entries[index]
+        if other ~= selectedEntry then
+            local otherThreat = math.max(0, tonumber(other and other.threat) or 0)
+            if otherThreat < selectedThreat then
+                hasLowerThreat = true
+            elseif otherThreat == selectedThreat then
+                hasEqualThreat = true
+            end
+        end
+    end
+    if hasLowerThreat then
+        return "threat"
+    end
+    if hasEqualThreat then
+        local selectedDistance = tonumber(selectedEntry.casterDistance)
+        for index = 1, #(state.entries or {}) do
+            local other = state.entries[index]
+            if other ~= selectedEntry
+                and math.max(0, tonumber(other and other.threat) or 0) == selectedThreat
+                and compareKnownDistance(selectedDistance, tonumber(other.casterDistance)) ~= 0
+            then
+                return "distance"
+            end
+        end
+        return "eventID"
+    end
+    return "threat"
 end
 
 local function compareHostileSecondary(left, right)
@@ -318,6 +396,7 @@ local function markSelected(state, entryIndex)
     state.selectedByEventId[eventId] = true
     if state.kind == "hostile" and state.primaryEntry == nil then
         state.primaryEntry = entry
+        state.primarySelectionReason = resolveHostileSelectionReason(state, entry)
     end
     return true
 end
@@ -326,6 +405,21 @@ local buildResult
 
 local function finishSelection(state)
     state.result = buildResult(state)
+    if type(Debug.Internal) == "function" and state.kind == "hostile" then
+        local casterEventId = normalizeEventId(state.casterUnit and state.casterUnit.eventID)
+        local selectedEventId = normalizeEventId(state.result.primaryTargetEventId)
+        local reason = tostring(state.result.selectionReason or "none")
+        local suffix = reason == "taunt"
+            and (" remaining=" .. tostring(normalizeCount(state.result.tauntRemainingTurns)))
+            or ""
+        Debug.Internal(
+            "Autopilot target: npc=%d selected=%d reason=%s%s",
+            casterEventId,
+            selectedEventId,
+            reason,
+            suffix
+        )
+    end
     state.phase = "complete"
 end
 
@@ -353,6 +447,9 @@ buildResult = function(state)
         targetEventIds = targetEventIds,
         primaryTargetUnit = targetUnits[1],
         primaryTargetEventId = targetEventIds[1],
+        selectionReason = tostring(state.primarySelectionReason or "none"),
+        tauntSourceEventId = normalizeEventId(state.tauntSourceEventId),
+        tauntRemainingTurns = normalizeCount(state.tauntRemainingTurns),
     }
 end
 
@@ -376,7 +473,7 @@ local function compareForPhase(state, left, right)
     if state.phase == "select-secondary" then
         return compareHostileSecondary(left, right)
     end
-    return compareHostilePrimary(left, right)
+    return compareHostilePrimaryWithTaunt(state, left, right)
 end
 
 local function completeSelectionPass(state)
@@ -460,6 +557,14 @@ function Selector.CreateState(activationSnapshot, options)
         candidates = markedCandidates
     end
 
+    local tauntSourceEventId, tauntRemainingTurns = 0, 0
+    if kind == "hostile" then
+        tauntSourceEventId, tauntRemainingTurns = resolveTauntOverride(
+            activationSnapshot.casterUnit,
+            candidates
+        )
+    end
+
     local state = {
         activationSnapshot = activationSnapshot,
         eventState = activationSnapshot.eventState,
@@ -478,6 +583,9 @@ function Selector.CreateState(activationSnapshot, options)
         entries = {},
         selectedEntries = {},
         selectedByEventId = {},
+        tauntSourceEventId = tauntSourceEventId,
+        tauntRemainingTurns = tauntRemainingTurns,
+        primarySelectionReason = nil,
         selectionScanIndex = 1,
         bestEntryIndex = nil,
         secondaryPrepareIndex = 1,
@@ -610,6 +718,9 @@ function Selector.CopyResult(state)
         targetEventIds = copyArray(source.targetEventIds),
         primaryTargetUnit = source.primaryTargetUnit,
         primaryTargetEventId = normalizeEventId(source.primaryTargetEventId),
+        selectionReason = tostring(source.selectionReason or "none"),
+        tauntSourceEventId = normalizeEventId(source.tauntSourceEventId),
+        tauntRemainingTurns = normalizeCount(source.tauntRemainingTurns),
     }
 end
 

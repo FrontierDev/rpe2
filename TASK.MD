@@ -1,184 +1,181 @@
-## Context
-
-Depends on #333.
-
-This is the final implementation chunk split out of superseded #331.
-
-After #333, authoritative damage should already contain the simple contract:
-
-```lua
-result.preAbsorbAmount
-result.absorbedAmount
-result.amount -- post-absorb health damage
-```
-
-This issue is limited to making sure that `result.amount` is actually applied to health correctly, invalid states do not masquerade as full absorption, and INTERNAL diagnostics expose the live values needed for in-game verification.
-
 ## Goal
 
-If authoritative damage resolves to:
+Make NPC Autopilot respect active synchronized Taunt state when choosing hostile targets, while preserving canonical target legality and the existing threat-first fallback.
+
+Depends on #337, #338, and #339.
+
+This issue assumes:
+
+- authoritative threat state is correct (#336/#337);
+- synchronized `tauntState` exists (#338);
+- Taunt duration/expiry is correct (#339).
+
+It does **not** add effect authoring or combat-log UI (#340).
+
+Split from #335.
+
+---
+
+## Required targeting policy
+
+For a hostile target group, primary selection becomes:
 
 ```text
-preAbsorbAmount = 200
-absorbedAmount = 65
-amount = 135
+1. active valid Taunt source
+2. threat descending
+3. existing distance tie-break
+4. eventID ascending
 ```
 
-the normal health resource path must queue/apply exactly `-135` health damage.
+Taunt is a **temporary targeting override**, not a threat mutation.
 
-A genuinely fully absorbed hit is only:
+Never write fake/infinite threat values.
+
+---
+
+## Current-source areas to inspect
+
+Trace the current planner snapshot and target-selection paths before editing:
 
 ```text
-amount = 0
+client/autopilot/PlannerIntegration.lua
+client/autopilot/PlannerSnapshotUnitsPerformance.lua
+client/autopilot/TargetSelector.lua
+client/autopilot/Spatial.lua
+client/client_Targeting.lua
+client/client_AutopilotPlanner.lua
 ```
 
-## Required changes
+Also re-read the EventUnit Taunt representation implemented by #338 rather than assuming field names from this issue.
 
-### 1. Remove the silent invalid-state fallback in `ApplyResolvedDamage()`
+---
 
-Current logic effectively conflates:
+## Required implementation
+
+### 1. Copy Taunt state into the frozen planner snapshot
+
+The frozen NPC representation must include the active Taunt source and remaining duration.
+
+Copy nested state safely; do not retain a mutable reference to live EventUnit state.
+
+### 2. Include Taunt in snapshot/revalidation identity
+
+A planner started with one Taunt state must not publish if live Taunt state changes before finalization.
+
+The frozen unit signature/current equivalent must distinguish at least:
+
+- no Taunt vs active Taunt;
+- different source EventUnit IDs;
+- different remaining durations.
+
+Use the existing stale-snapshot mechanism. Do not add a second planner lifecycle or auto-replan subsystem.
+
+### 3. Force the Taunt source only when it is a canonical legal candidate
+
+An active Taunt source is selected only if the source is present in the already-built canonical candidates for that hostile target group.
+
+Taunt must **not** make an otherwise illegal target legal.
+
+Therefore a Taunt source which is dead/inactive/hidden when hidden targets are not allowed/wrong disposition/otherwise absent from the canonical candidate set must be ignored for this selection and the selector falls back to normal threat ordering.
+
+Do not reimplement target legality inside `TargetSelector`; use candidate membership.
+
+### 4. Single-target behavior
+
+Given:
 
 ```text
-finalDamage == 0
+NPC threat:
+  Player A = 200
+  Player B = 50
+active Taunt source = Player B
 ```
 
-with:
+and both are legal candidates:
 
 ```text
-finalDamage > 0 but healthResourceRef == nil
+selected primary = Player B
 ```
 
-because health application is gated by both conditions and the fallback branch treats the result as an absorbed landed hit.
-
-That must be removed.
-
-Required structure:
-
-```lua
-if finalDamage > 0 then
-    if not healthResourceRef then
-        Debug.Error(...)
-        result.applied = false
-        result.appliedDelta = 0
-        return false, result
-    end
-
-    -- Build the ordinary health resource delta from -finalDamage.
-else
-    -- This is the only fully absorbed/no-health-delta path.
-    result.applied = true
-    result.appliedDelta = 0
-end
-```
-
-Do not add another fallback that silently converts missing/invalid health state into success.
-
-### 2. Preserve the normal resource-delta path
-
-For `result.amount > 0`, use the existing health-resource lookup and existing `PreviewResourceDelta()` / resource-delta queue path.
-
-Do not create a new absorption-specific health transport.
-
-The absorption mechanic should end before resource application. From this point onward, `result.amount` is ordinary health damage.
-
-Expected example:
+After Taunt expires:
 
 ```text
-result.amount = 135
-PreviewResourceDelta(..., -135)
-result.appliedDelta = -135
-result.resourceDeltas[1].delta = -135
+selected primary = Player A
 ```
 
-### 3. Audit `FinalizeLocalDamageResult()` handoff
+with the original threat values untouched.
 
-Trace the authoritative result from `ApplyResolvedDamage()` through `FinalizeLocalDamageResult()` into `QueueClientResourceDeltas()`.
+### 5. Multi-target/AoE behavior
 
-Confirm that:
+For hostile multi-target selection:
 
-- partial absorption does not suppress a non-empty health delta;
-- fully absorbed hits may have no health delta but can still retain absorption presentation;
-- the existing resource queue receives the post-absorb remainder unchanged;
-- no coalescing or presentation branch overwrites `result.amount` or `result.appliedDelta`.
+- valid active Taunt source becomes the primary target;
+- existing secondary-target ordering around that primary remains unchanged;
+- existing `minTargets` / `maxTargets` semantics remain unchanged.
 
-Only change code where a concrete problem is found. Do not redesign resource synchronization.
+Do not force Taunt source into multiple target groups where it is not a legal member.
 
-### 4. Add a real INTERNAL debug line
+### 6. Do not affect non-hostile selection
 
-#327 added transient `absorptionDiagnostics` fields but did not emit them.
+Taunt must not modify:
 
-Add an actual INTERNAL diagnostic from the authoritative damage path after absorption has been consumed and the health delta has been built.
+- healing target selection;
+- allied utility target selection;
+- caster/self target selection;
+- interrupt utility ordering except insofar as normal target legality/selection already applies;
+- spell utility scores.
 
-It should contain at least:
+It only changes hostile primary target ordering.
+
+### 7. Manual mode remains unconstrained
+
+Normal/manual NPC targeting must not automatically redirect because of Taunt.
+
+The synchronized state may exist and expire normally, but only Autopilot consumes it as a targeting override.
+
+Do not modify manual targeting widgets or normal player target-selection behavior.
+
+### 8. Extend bounded target diagnostics
+
+Extend the diagnostic added by #337/current equivalent so an active successful override reports a reason equivalent to:
 
 ```text
-target event id
-pre-absorb/post-mitigation damage
-live absorption consumed
-post-absorb remainder
-health resource ref
-health delta
+Autopilot target: npc=12 selected=2 reason=taunt remaining=2
 ```
 
-Example:
+If the Taunt source is invalid and fallback occurs, the final diagnostic should show the actual fallback reason/selection rather than falsely claiming `reason=taunt`.
 
-```text
-Absorption resolve: target=4 preAbsorb=200 absorbed=65 remainder=135 healthRef=f82db71a:... healthDelta=-135
-```
+---
 
-If useful, also include the live source capacities consumed, but keep the line concise enough to use during an event.
+## Mandatory deterministic regression cases
 
-If `result.amount > 0` and the health ref cannot be resolved, emit an ERROR/INTERNAL diagnostic that makes that failure explicit.
+1. Higher threat on A, active Taunt from B -> B selected.
+2. Taunt expires -> A selected from untouched threat table.
+3. Taunt source is not in canonical candidates -> normal threat selection.
+4. Taunt source is inactive/dead and therefore excluded -> normal threat selection.
+5. Hidden Taunt source excluded by normal policy -> normal threat selection.
+6. Re-Taunt to a different valid caster -> new source selected.
+7. Same-caster refreshed Taunt remains selected with new duration.
+8. AoE uses valid Taunt source as primary and preserves secondary ordering.
+9. Healing/allied selection is unchanged by NPC Taunt state.
+10. Threat values are never modified by planning or selection.
+11. Taunt change during planning invalidates stale output.
+12. Explicit Replan reads current Taunt state but does not consume duration.
+13. Manual mode ignores Taunt for automatic targeting.
+14. No-Taunt cases preserve all #337 threat-ordering tests exactly.
 
-### 5. Keep combat presentation compatible
+---
 
-Do not redesign the combat log/ticker in this issue.
+## Acceptance criteria
 
-Ensure the existing presentation receives the authoritative fields from #333:
-
-```lua
-result.amount
-result.absorbedAmount
-```
-
-so partial absorption can present equivalent to:
-
-```text
-135 Physical damage (Absorbed 65)
-```
-
-and a full absorb can still present 0 health damage with the absorbed amount.
-
-## Scope
-
-Primary files to inspect:
-
-- `client/combat/effects/Damage.lua`
-- `client/combat/Reaction.lua`
-- `client/client_Resources.lua` only to trace/repair an actual post-absorb resource-delta handoff problem
-- `client/combat/Helpers.lua` only if required for the existing presentation fields
-
-Do not modify AuraManager consumption logic from #332 unless a direct integration defect is discovered.
-
-## Manual verification criteria
-
-There is no executable automated test harness. Do not add regression-test files.
-
-In-game verification should cover:
-
-- 200 post-mitigation damage + 65 absorb -> shield loses 65 and health loses 135;
-- INTERNAL output shows `preAbsorb≈200`, `absorbed=65`, `remainder≈135`, `healthDelta≈-135`;
-- 50 damage + 65 absorb -> health delta 0, shield retains 15;
-- no shield -> ordinary damage behaviour unchanged;
-- missing/invalid health ref with non-zero remainder produces an explicit failure diagnostic rather than appearing as a full absorb;
-- partial absorption still reaches the ordinary RESOURCE_DELTA path.
-
-## Completion requirements
-
-Before closing:
-
-- trace the full authoritative handoff through `FinalizeLocalDamageResult()` and `QueueClientResourceDeltas()`;
-- identify every modified API/call site and review for regressions;
-- review the resulting diff for unrelated changes;
-- verify the diagnostic is an actual `Debug.Internal(...)`/appropriate error call, not just a stored table field;
-- do not claim automated tests were run.
+- [ ] Frozen Autopilot state contains synchronized Taunt source + duration.
+- [ ] Taunt state participates in normal planner stale-snapshot validation.
+- [ ] Valid active Taunt source overrides higher threat for hostile primary selection.
+- [ ] Taunt cannot make an illegal target legal.
+- [ ] Invalid Taunt source falls back cleanly to threat > distance > eventID.
+- [ ] AoE uses Taunt as primary without changing secondary selection rules.
+- [ ] Expiry restores existing threat ordering immediately.
+- [ ] Threat values remain untouched by Taunt planning/selection.
+- [ ] Non-hostile and manual target selection remain unchanged.
+- [ ] Debug diagnostics distinguish `reason=taunt` from normal threat fallback.
+- [ ] No new planner lifecycle, threat system, or target-legality implementation is introduced.

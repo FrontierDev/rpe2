@@ -38,6 +38,7 @@ local COMBAT_LOG_KINDS = {
     aura_gain = true,
     aura_loss = true,
     interrupt = true,
+    taunt = true,
 }
 
 local function normalizeLogKind(value)
