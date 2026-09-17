@@ -1950,6 +1950,24 @@ local function resolveTraitTriggeredTarget(ownerUnit, triggerTarget, eventSource
     return eventOtherUnit
 end
 
+local function normalizeDefenceStatRef(value)
+    local reference = ensureString(value)
+    return reference ~= "" and reference or nil
+end
+
+local function matchesTraitCombatEvent(eventEntry, combatEventId, resolvedDefenceStatRef)
+    if combatEventId ~= "on_defence" then
+        return true
+    end
+
+    local requestedRef = normalizeDefenceStatRef(eventEntry and eventEntry.defenceStatRef)
+    if not requestedRef then
+        return true
+    end
+
+    return requestedRef == normalizeDefenceStatRef(resolvedDefenceStatRef)
+end
+
 function Client:HandleTraitCombatEvent(context)
     local eventState = type(context) == "table" and context.eventState or nil
     local recipientEventId = tonumber(type(context) == "table" and context.recipientEventId or nil) or 0
@@ -2043,12 +2061,14 @@ function Client:HandleTraitCombatEvent(context)
     for index = 1, #(registeredEvents or {}) do
         local registeredEntry = registeredEvents[index]
         local eventEntry = registeredEntry and registeredEntry.event or nil
-        local targetUnit = resolveTraitTriggeredTarget(
-            ownerUnit,
-            ensureString(eventEntry and eventEntry.triggerTarget),
-            type(context) == "table" and context.eventSourceUnit or nil,
-            type(context) == "table" and context.eventOtherUnit or nil
-        )
+        local targetUnit = matchesTraitCombatEvent(eventEntry, combatEventId, context.defenceStatRef)
+            and resolveTraitTriggeredTarget(
+                ownerUnit,
+                ensureString(eventEntry and eventEntry.triggerTarget),
+                type(context) == "table" and context.eventSourceUnit or nil,
+                type(context) == "table" and context.eventOtherUnit or nil
+            )
+            or nil
         if type(targetUnit) ~= "table" then
             logTraitProcDebug(
                 registeredEntry,

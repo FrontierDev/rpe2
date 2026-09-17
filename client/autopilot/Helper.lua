@@ -547,8 +547,9 @@ end
 
 local function buildSpellAnnotations(action)
     local labels = {}
-    if tostring(type(action) == "table" and action.actionEconomyClass or "") == "auxiliary" then
-        labels[#labels + 1] = "Off GCD"
+    local channelName = type(action) == "table" and tostring(action.cooldownChannelName or "") or ""
+    if channelName ~= "" then
+        labels[#labels + 1] = channelName
     end
     if (tonumber(type(action) == "table" and action.periodicDamage) or 0) > 0 then
         labels[#labels + 1] = "DoT"
@@ -616,7 +617,7 @@ local function buildSpellRow(eventState, action)
     if sequenceCount > 1 then
         appendDetail(lines, "Sequence", ("%d / %d"):format(sequenceIndex, sequenceCount))
     end
-    appendDetail(lines, "Action economy", action and action.actionEconomyClass)
+    appendDetail(lines, "Cooldown Channel", action and action.cooldownChannelName)
     appendDetail(lines, "Annotations", annotationText ~= "" and annotationText or nil)
     appendDetail(lines, "Targets", targets)
     appendDetail(lines, "Status", statusLabel(status))
@@ -633,6 +634,9 @@ local function buildSpellRow(eventState, action)
         casterSequenceIndex = sequenceIndex,
         casterSequenceCount = sequenceCount,
         actionEconomyClass = action and action.actionEconomyClass or nil,
+        cooldownChannelId = action and action.cooldownChannelId or nil,
+        cooldownChannelName = action and action.cooldownChannelName or nil,
+        cooldownChannelTriggersGCD = action and action.cooldownChannelTriggersGCD == true or false,
         spellRef = action and action.spellRef or nil,
         targetEventIds = action and action.targetEventIds or nil,
         annotations = annotations,

@@ -1461,6 +1461,43 @@ local function isSuccessfulDefensiveResolution(entry, action, resultToken, resol
         or defenceSystem == "percent"
 end
 
+local function normalizeDefenceStatRef(value)
+    local reference = normalizeToken(value)
+    return reference and reference ~= "" and reference or nil
+end
+
+function Combat:EmitSuccessfulDefenceEvent(client, entry, action, resultToken, resolution)
+    if type(client) ~= "table"
+        or type(entry) ~= "table"
+        or not isSuccessfulDefensiveResolution(entry, action, resultToken, resolution)
+        or entry.defenceEventEmitted == true
+    then
+        return false
+    end
+
+    local attackerEventId = math.floor(tonumber(entry.attackerEventId or entry.attackerUnit and entry.attackerUnit.eventID) or 0)
+    local defenderEventId = math.floor(tonumber(entry.defenderEventId or entry.defenderUnit and entry.defenderUnit.eventID) or 0)
+    local events = self.Events
+    if attackerEventId <= 0 or defenderEventId <= 0 or type(events) ~= "table" or type(events.Run) ~= "function" then
+        return false
+    end
+
+    entry.defenceEventEmitted = true
+    return events:Run(client, {
+        eventState = entry.eventState,
+        sessionState = entry.sessionState or (client.GetState and client:GetState() or nil),
+        combatEventId = "on_defence",
+        sourceEventId = attackerEventId,
+        targetEventIds = { defenderEventId },
+        eventSourceUnit = entry.attackerUnit,
+        eventOtherUnit = entry.defenderUnit,
+        sourceUnit = entry.attackerUnit,
+        targetUnit = entry.defenderUnit,
+        defenceStatRef = normalizeDefenceStatRef(resolution and resolution.defenceStatRef),
+        actionContext = entry.context,
+    })
+end
+
 function Combat:RecordResolvedCombatAttackHistory(client, entry, resultToken, action, resolution, defendedOverride)
     if type(client) ~= "table" or type(client.RecordCombatAttack) ~= "function" or type(entry) ~= "table" then
         return false
@@ -1569,6 +1606,9 @@ function Client:ResolveCombatReactionAction(actionId)
         local completed, result = Combat:CompleteHitCheck(entry, resultToken, "player-local")
         if completed then
             Combat:RecordResolvedCombatAttackHistory(self, entry, resultToken, action, resolution)
+            if resultToken == RESULT_FAIL then
+                Combat:EmitSuccessfulDefenceEvent(self, entry, action, resultToken, resolution)
+            end
         end
         if completed and resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
             local _, damageResult = Combat:ApplyResolvedDamage(entry)
@@ -1583,15 +1623,18 @@ function Client:ResolveCombatReactionAction(actionId)
 
     local attackerName = resolveSenderForUnit(entry.eventState, entry.attackerUnit)
     local successfullyDefended = isSuccessfulDefensiveResolution(entry, action, resultToken, resolution)
+    local defenceStatRef = successfullyDefended and normalizeDefenceStatRef(resolution and resolution.defenceStatRef) or nil
     if attackerName == "" or not sendCombatWhisper(attackerName, HIT_CHECK_RESPONSE_OPCODE, {
         entry.checkId,
         entry.eventId,
         resultToken,
         successfullyDefended and "defended" or "",
+        defenceStatRef or "",
     }) then
         return false
     end
 
+    Combat:EmitSuccessfulDefenceEvent(self, entry, action, resultToken, resolution)
     self:HideCombatReaction()
     Combat:RecordResolvedCombatAttackHistory(self, entry, resultToken, action, resolution)
     if resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
@@ -1688,7 +1731,9 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
     local checkId = normalizeToken(arguments and arguments[1])
     local eventId = normalizeToken(arguments and arguments[2])
     local resultToken = normalizeResultToken(arguments and arguments[3])
-    local successfullyDefended = tostring(arguments and arguments[4] or "") == "defended"
+    local successfullyDefended = resultToken == RESULT_FAIL
+        and tostring(arguments and arguments[4] or "") == "defended"
+    local defenceStatRef = successfullyDefended and normalizeDefenceStatRef(arguments and arguments[5]) or nil
     local entry = checkId and client:GetPendingCombatHitCheck(checkId) or nil
     if not entry or not eventId or eventId ~= entry.eventId or not resultToken then
         return false
@@ -1697,6 +1742,13 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
     local expectedSender = resolveSenderForUnit(entry.eventState, entry.defenderUnit)
     if expectedSender ~= "" and expectedSender ~= getResolvedName(sender) then
         return false
+    end
+
+    if successfullyDefended then
+        entry.lastResolution = {
+            defenceSystem = entry.defenceSystem,
+            defenceStatRef = defenceStatRef,
+        }
     end
 
     local completed, result = Combat:CompleteHitCheck(entry, resultToken, "player-response")

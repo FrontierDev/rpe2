@@ -689,6 +689,24 @@ local function normalizeChancePercent(value)
     return math.max(0, math.min(100, numericValue))
 end
 
+local function normalizeDefenceStatRef(value)
+    local reference = normalizeRef(value)
+    return reference and reference ~= "" and reference or nil
+end
+
+local function matchesCombatEvent(auraEvent, combatEventId, resolvedDefenceStatRef)
+    if combatEventId ~= "on_defence" then
+        return true
+    end
+
+    local requestedRef = normalizeDefenceStatRef(auraEvent and auraEvent.defenceStatRef)
+    if not requestedRef then
+        return true
+    end
+
+    return requestedRef == normalizeDefenceStatRef(resolvedDefenceStatRef)
+end
+
 local function rollSucceedsForChance(chancePercent)
     local normalizedChance = normalizeChancePercent(chancePercent)
     if normalizedChance <= 0 then
@@ -4991,13 +5009,15 @@ function AuraManager:HandleCombatEvent(client, context)
                 local auraEventEntry = auraEventEntries[auraEventEntryIndex]
                 local auraEvent = auraEventEntry.auraEvent
                 local auraEventIndex = auraEventEntry.auraEventIndex
-                local targetUnit = resolveTriggeredAuraTarget(
-                    auraEvent,
-                    auraCasterUnit,
-                    auraTargetUnit,
-                    eventSourceUnit,
-                    eventOtherUnit
-                )
+                local targetUnit = matchesCombatEvent(auraEvent, combatEventId, context.defenceStatRef)
+                    and resolveTriggeredAuraTarget(
+                        auraEvent,
+                        auraCasterUnit,
+                        auraTargetUnit,
+                        eventSourceUnit,
+                        eventOtherUnit
+                    )
+                    or nil
                 if type(targetUnit) ~= "table" then
                     logAuraProcDebug(
                         entry,

@@ -141,7 +141,7 @@ local function copyTargetSelectionMap(targetUnits, targetGroupKey)
     return { [key] = eventIds }, { key }, eventIds
 end
 
-local function buildSpellAction(state, actorKey, unit, candidate, movementActionId, sequenceIndex, sequenceCount, actionClass, previousActionId)
+local function buildSpellAction(state, actorKey, unit, candidate, movementActionId, sequenceIndex, sequenceCount, actionClass, previousActionId, actionEconomyEntry)
     local eventId = normalizeEventId(unit and unit.eventID)
     if eventId <= 0 or type(candidate) ~= "table" then return nil end
     local resolvedSequenceIndex = math.max(1, math.floor(tonumber(sequenceIndex) or 1))
@@ -164,6 +164,11 @@ local function buildSpellAction(state, actorKey, unit, candidate, movementAction
         casterSequenceIndex = resolvedSequenceIndex,
         casterSequenceCount = resolvedSequenceCount,
         actionEconomyClass = tostring(actionClass or ""),
+        cooldownChannelId = actionEconomyEntry and actionEconomyEntry.cooldownChannelId or nil,
+        cooldownChannelName = actionEconomyEntry and actionEconomyEntry.cooldownChannelName or nil,
+        cooldownChannelTriggersGCD = actionEconomyEntry
+            and actionEconomyEntry.cooldownChannelTriggersGCD == true
+            or false,
         previousCasterActionId = previousActionId,
         targetSelections = selections,
         targetSelectionOrder = selectionOrder,
@@ -212,7 +217,7 @@ local function emitSequenceActions(state, actor, unit, sequence, movementActionI
         if type(candidate) == "table" then
             local action = buildSpellAction(
                 state, actor.key, unit, candidate, movementActionId,
-                sequenceIndex, #entries, entry.actionClass, previousActionId
+                sequenceIndex, #entries, entry.actionClass, previousActionId, entry
             )
             if action then
                 state.output.actions[#state.output.actions + 1] = action

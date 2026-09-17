@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 14,
+    version = 15,
     dataset = {
         achievements = {},
         auras = {
@@ -513,7 +513,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_ritualofsacrifice.blp",
                 id = "g9o4t7uj",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Sinister Strike",
@@ -551,7 +551,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -658,7 +657,7 @@ Addon.Data.DefaultDatasets:Register({
                 doesNotRevealCaster = false,
                 icon = "interface/icons/ability_rogue_ambush.blp",
                 id = "pfskjkhi",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Ambush",
@@ -696,7 +695,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -735,7 +733,7 @@ Addon.Data.DefaultDatasets:Register({
                 doesNotRevealCaster = true,
                 icon = "interface/icons/ability_stealth.blp",
                 id = "stealth01",
-                ignoreGCD = false,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Stealth",
@@ -752,7 +750,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -848,7 +845,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_backstab.blp",
                 id = "3yvu5lwf",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Backstab",
@@ -886,7 +883,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -959,7 +955,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_rogue_eviscerate.blp",
                 id = "am7ew5wl",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Eviscerate",
@@ -998,7 +994,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1094,7 +1089,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_rogue_shadowstrikes.blp",
                 id = "7scy4qhi",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Mutilate",
@@ -1132,7 +1127,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1172,7 +1166,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_shadowward.blp",
                 id = "kbifnqpj",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Evasion",
@@ -1208,7 +1202,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1248,7 +1241,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_shadowworddominate.blp",
                 id = "wf9orqz9",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Adrenaline Rush",
@@ -1291,7 +1284,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1340,7 +1332,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_rogue_slicedice.blp",
                 id = "gp51edzy",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Slice and Dice",
@@ -1391,7 +1383,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1507,7 +1498,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_curse.blp",
                 id = "i2uuda23",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Ghostly Strike",
@@ -1564,7 +1555,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1659,7 +1649,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_lifedrain.blp",
                 id = "7x7itakn",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Hemmorhage",
@@ -1726,7 +1716,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1781,7 +1770,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_rogue_rupture.blp",
                 id = "ugc0mlrz",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Rupture",
@@ -1840,7 +1829,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1923,7 +1911,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_rogue_garrote.blp",
                 id = "v0mihgpd",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Garrote",
@@ -1982,7 +1970,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2018,7 +2005,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_kick.blp",
                 id = "300h0gls",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Kick",
@@ -2043,7 +2030,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2104,7 +2090,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_gouge.blp",
                 id = "i8x4n8kh",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Gouge",
@@ -2155,7 +2141,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2195,7 +2180,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_rogue_kidneyshot.blp",
                 id = "yql2eonk",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Kidney Shot",
@@ -2246,7 +2231,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2286,7 +2270,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_ice_lament.blp",
                 id = "t7gns8bg",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Cold Blood",
@@ -2297,7 +2281,6 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = false,
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             }
         },

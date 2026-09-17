@@ -231,6 +231,23 @@ local function resolveStatName(statRef)
     return ensureString(statId or statRef, "a stat")
 end
 
+local function resolveDefenceLabel(statRef)
+    local normalizedRef = ensureString(statRef)
+    if normalizedRef == "" then
+        return nil
+    end
+
+    if type(Registry.ResolveStatReference) == "function" then
+        local _, stat = Registry:ResolveStatReference(normalizedRef)
+        local defenceLabel = trimText(stat and stat.defenceLabel or "")
+        if defenceLabel ~= "" then
+            return defenceLabel
+        end
+    end
+
+    return resolveStatName(normalizedRef)
+end
+
 local function resolveSkillName(skillRef)
     local resolvedRow = type(Profile.GetResolvedSkillRow) == "function" and Profile.GetResolvedSkillRow(skillRef) or nil
     local resolvedName = resolvedRow and resolvedRow.name or nil
@@ -472,8 +489,34 @@ local function buildPassiveControlSentence(effect, targetContext, options)
     return table.concat(sentences, " ")
 end
 
-local function resolveCombatTriggerLabel(combatEventId, targetContext)
+local function resolveCombatTriggerLabel(combatEventId, targetContext, defenceStatRef)
     local eventId = tostring(combatEventId or "")
+    if eventId == "on_taunt" then
+        if targetContext.subject == "you" then
+            return "When you taunt an enemy"
+        end
+        return ("When %s taunts an enemy"):format(targetContext.subject)
+    end
+    if eventId == "on_taunted" then
+        if targetContext.subject == "you" then
+            return "When you are taunted"
+        end
+        return ("When %s is taunted"):format(targetContext.subject)
+    end
+    if eventId == "on_defence" then
+        local defenceLabel = resolveDefenceLabel(defenceStatRef)
+        if defenceLabel then
+            defenceLabel = string.lower(defenceLabel)
+            if targetContext.subject == "you" then
+                return ("When you successfully %s an attack"):format(defenceLabel)
+            end
+            return ("When %s successfully %s an attack"):format(targetContext.subject, defenceLabel)
+        end
+        if targetContext.subject == "you" then
+            return "When you successfully defend against an attack"
+        end
+        return ("When %s successfully defends against an attack"):format(targetContext.subject)
+    end
     if eventId == "on_auto_attack_hit" then
         if targetContext.subject == "you" then
             return "When you hit with a basic attack"
@@ -655,6 +698,22 @@ local function resolveTriggeredTargetContext(combatEventId, triggerTarget, auraT
         or eventId == "on_critical_heal_taken"
     then
         return auraTargetContext
+    end
+    if eventId == "on_taunt" then
+        return {
+            subject = "the taunted target",
+            object = "the taunted target",
+            possessive = "the taunted target's",
+            reflexive = "itself",
+        }
+    end
+    if eventId == "on_taunted" then
+        return {
+            subject = "the taunter",
+            object = "the taunter",
+            possessive = "the taunter's",
+            reflexive = "itself",
+        }
     end
 
     return auraTargetContext
@@ -892,7 +951,11 @@ function AuraDescriptionBuilder:BuildGeneratedDescription(auraDefinition, option
         end
 
         if #clauses > 0 then
-            local prefix = resolveCombatTriggerLabel(auraEvent and auraEvent.combatEventId or nil, targetContext)
+            local prefix = resolveCombatTriggerLabel(
+                auraEvent and auraEvent.combatEventId or nil,
+                targetContext,
+                auraEvent and auraEvent.defenceStatRef or nil
+            )
             local chance = normalizeChancePercent(auraEvent and auraEvent.chance)
             if chance < 100 then
                 prefix = ("%s (%g%% chance)"):format(prefix, chance)
@@ -1369,7 +1432,11 @@ function AuraDescriptionBuilder:BuildTooltipTemplatePayload(auraDefinition, opti
         end
 
         if #clauses > 0 then
-            local prefix = resolveCombatTriggerLabel(auraEvent and auraEvent.combatEventId or nil, targetContext)
+            local prefix = resolveCombatTriggerLabel(
+                auraEvent and auraEvent.combatEventId or nil,
+                targetContext,
+                auraEvent and auraEvent.defenceStatRef or nil
+            )
             local chance = normalizeChancePercent(auraEvent and auraEvent.chance)
             if chance < 100 then
                 prefix = ("%s (%g%% chance)"):format(prefix, chance)

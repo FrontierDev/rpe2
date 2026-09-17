@@ -40,34 +40,6 @@ function DataEditor:BuildSpellInspectorCastingPage(page)
     self.SpellInspectorCastTimeSlider:Create()
     root:AddChild(self.SpellInspectorCastTimeSlider)
 
-    self.SpellInspectorTriggersGCDCheckbox = self:CreateSpellInspectorCheckbox(root:GetFrame(), "RPEDataEditorSpellInspectorTriggersGCDCheckbox", "Triggers GCD", true, function(checked)
-        if self._refreshingSpellInspector then
-            return
-        end
-
-        self:CommitSelectedSpell(function(spell)
-            spell.triggersGCD = checked == true
-            if checked == true then
-                spell.ignoreGCD = false
-            end
-        end)
-    end)
-    root:AddChild(self.SpellInspectorTriggersGCDCheckbox)
-
-    self.SpellInspectorIgnoreGCDCheckbox = self:CreateSpellInspectorCheckbox(root:GetFrame(), "RPEDataEditorSpellInspectorIgnoreGCDCheckbox", "Ignores GCD", false, function(checked)
-        if self._refreshingSpellInspector then
-            return
-        end
-
-        self:CommitSelectedSpell(function(spell)
-            spell.ignoreGCD = checked == true
-            if checked == true then
-                spell.triggersGCD = false
-            end
-        end)
-    end)
-    root:AddChild(self.SpellInspectorIgnoreGCDCheckbox)
-
     self.SpellInspectorMountedCombatOnlyCheckbox = self:CreateSpellInspectorCheckbox(root:GetFrame(), "RPEDataEditorSpellInspectorMountedCombatOnlyCheckbox", "Mounted Combat Only", false, function(checked)
         if self._refreshingSpellInspector then
             return

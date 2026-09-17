@@ -1451,6 +1451,7 @@ local function getEventTauntRuntimeState(server, eventState)
         state = {
             targets = {},
             lastAdvancedStepKey = nil,
+            nextApplicationId = 0,
         }
         server.EventTauntRuntimeByEventId[eventId] = state
     end
@@ -1481,6 +1482,8 @@ local function resetTauntRuntimeRecord(server, eventState, targetEventId, source
             eventState.tickNumber
         ),
     }
+    runtimeState.nextApplicationId = math.max(0, math.floor(tonumber(runtimeState.nextApplicationId) or 0)) + 1
+    record.applicationId = runtimeState.nextApplicationId
     runtimeState.targets[normalizedTargetEventId] = record
     runtimeState.lastAdvancedStepKey = nil
     return record
@@ -1940,16 +1943,28 @@ function Server:SetEventTauntRuntimeState(eventId, sourceEventId, remainingTurns
         and tonumber(currentState.sourceEventId) == normalizedSourceEventId
         and tonumber(currentState.remainingTurns) == normalizedRemainingTurns
     then
-        return true
+        return true, false, currentState
+    elseif type(currentState) == "table" then
+        -- Re-applying an already active taunt updates its runtime duration/source
+        -- but is not a new taunt application for combat-event purposes.
+        local record = resetTauntRuntimeRecord(
+            self,
+            eventState,
+            targetUnit.eventID,
+            normalizedSourceEventId,
+            normalizedRemainingTurns
+        )
+        return record ~= nil, false, record
     end
 
-    return resetTauntRuntimeRecord(
+    local record = resetTauntRuntimeRecord(
         self,
         eventState,
         targetUnit.eventID,
         normalizedSourceEventId,
         normalizedRemainingTurns
-    ) ~= nil
+    )
+    return record ~= nil, record ~= nil, record
 end
 
 function Server:SetEventUnitShowInNpcMode(eventId, shown)

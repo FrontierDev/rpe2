@@ -11,6 +11,7 @@ local EventUnit = Addon.Internal.Database
     and Addon.Internal.Database.Classes
     and Addon.Internal.Database.Classes.EventUnit
     or nil
+local Common = Addon.Utils and Addon.Utils.Common or {}
 local EVENT_UNIT_TAUNT_OPCODE = type(Operations.GetOpcode) == "function"
     and Operations:GetOpcode("EVENT_UNIT_TAUNT")
     or nil
@@ -127,4 +128,81 @@ function Client:SetEventUnitTauntState(context, targetUnit, duration)
         opcode = EVENT_UNIT_TAUNT_OPCODE,
         scope = "client",
     }) == true
+end
+
+function Client:HandleEventUnitTauntApplied(arguments, sender)
+    local sessionState = type(self.GetState) == "function" and self:GetState() or nil
+    local eventState = type(self.GetEventState) == "function" and self:GetEventState() or nil
+    local channelName = type(arguments) == "table" and arguments[1] or nil
+    local eventId = type(arguments) == "table" and arguments[2] or nil
+    local sourceEventId = math.floor(tonumber(arguments and arguments[3]) or 0)
+    local targetEventId = math.floor(tonumber(arguments and arguments[4]) or 0)
+    local applicationId = math.floor(tonumber(arguments and arguments[5]) or 0)
+    if type(sessionState) ~= "table"
+        or sessionState.active ~= true
+        or type(eventState) ~= "table"
+        or eventState.active ~= true
+        or type(channelName) ~= "string"
+        or channelName == ""
+        or channelName ~= sessionState.channelName
+        or tostring(eventId or "") == ""
+        or tostring(eventId) ~= tostring(eventState.id or "")
+        or sourceEventId <= 0
+        or targetEventId <= 0
+        or applicationId <= 0
+    then
+        return false
+    end
+
+    local expectedHost = tostring(eventState.hostName or "")
+    local normalizedSender = type(Common.NormalizeName) == "function" and Common.NormalizeName(sender) or tostring(sender or "")
+    local normalizedHost = type(Common.NormalizeName) == "function" and Common.NormalizeName(expectedHost) or expectedHost
+    if normalizedHost ~= "" and normalizedSender ~= "" and normalizedHost ~= normalizedSender then
+        return false
+    end
+
+    self.EventUnitTauntApplications = self.EventUnitTauntApplications or {}
+    local eventApplications = self.EventUnitTauntApplications[eventState.id]
+    if type(eventApplications) ~= "table" then
+        eventApplications = {}
+        self.EventUnitTauntApplications[eventState.id] = eventApplications
+    end
+    if eventApplications[applicationId] then
+        return true
+    end
+
+    local sourceUnit = findEventUnit(eventState, sourceEventId)
+    local targetUnit = findEventUnit(eventState, targetEventId)
+    if type(sourceUnit) ~= "table" or type(targetUnit) ~= "table" then
+        return false
+    end
+
+    local combat = self.Combat or (Addon.Client and Addon.Client.Combat) or nil
+    local events = type(combat) == "table" and combat.Events or nil
+    if type(events) ~= "table" or type(events.Run) ~= "function" then
+        return false
+    end
+
+    eventApplications[applicationId] = true
+    local context = {
+        eventState = eventState,
+        sessionState = sessionState,
+        sourceEventId = sourceEventId,
+        targetEventIds = { targetEventId },
+        sourceUnit = sourceUnit,
+        targetUnit = targetUnit,
+        eventSourceUnit = sourceUnit,
+        eventOtherUnit = targetUnit,
+        actionContext = {
+            eventState = eventState,
+            sessionState = sessionState,
+            sourceUnit = sourceUnit,
+            targetUnit = targetUnit,
+        },
+    }
+    context.combatEventId = "on_taunt"
+    local changed = events:Run(self, context) or false
+    context.combatEventId = "on_taunted"
+    changed = events:Run(self, context) or changed
+    return changed or true
 end

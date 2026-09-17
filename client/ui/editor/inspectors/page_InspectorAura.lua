@@ -188,6 +188,7 @@ function DataEditor:RefreshAuraInspectorPage()
     local isResource = effectType == "resource"
     local auraEvent = self:GetSelectedAuraInspectorEvent()
     local hasAuraEventTrigger = auraEvent ~= nil and type(auraEvent.combatEventId) == "string" and auraEvent.combatEventId ~= ""
+    local isDefenceEvent = hasAuraEventTrigger and auraEvent.combatEventId == "on_defence"
     local eventEffect = self:GetSelectedAuraInspectorEventEffect()
     local eventEffectType = tostring(eventEffect and eventEffect.type or "damage")
     local isEventDamage = eventEffectType == "damage"
@@ -410,6 +411,11 @@ function DataEditor:RefreshAuraInspectorPage()
         self.AuraInspectorTriggerTargetDropdown:SetSelectedValue(auraEvent and auraEvent.triggerTarget or "event_other", true)
         self:SetAuraInspectorDropdownEnabled(self.AuraInspectorTriggerTargetDropdown, auraEvent ~= nil and hasAuraEventTrigger)
     end
+    if self.AuraInspectorDefenceStatDropdown then
+        self.AuraInspectorDefenceStatDropdown:SetItems(self:BuildSpellInspectorDefenceStatsAcrossDatasets())
+        self.AuraInspectorDefenceStatDropdown:SetSelectedValue(auraEvent and auraEvent.defenceStatRef or "", true)
+        self:SetAuraInspectorDropdownEnabled(self.AuraInspectorDefenceStatDropdown, isDefenceEvent)
+    end
     if self.AuraInspectorEventChanceInput then
         self.AuraInspectorEventChanceInput:SetText(tostring(auraEvent and auraEvent.chance or 100))
         self:SetAuraInspectorTextElementEnabled(self.AuraInspectorEventChanceInput, auraEvent ~= nil)
@@ -490,6 +496,7 @@ function DataEditor:RefreshAuraInspectorPage()
 
     self:SetAuraInspectorGroupVisible(self.AuraInspectorCombatEventGroup, auraEvent ~= nil)
     self:SetAuraInspectorGroupVisible(self.AuraInspectorTriggerTargetGroup, auraEvent ~= nil and hasAuraEventTrigger)
+    self:SetAuraInspectorGroupVisible(self.AuraInspectorDefenceStatGroup, isDefenceEvent)
     self:SetAuraInspectorGroupVisible(self.AuraInspectorEventChanceGroup, auraEvent ~= nil)
     self:SetAuraInspectorGroupVisible(self.AuraInspectorEventEffectTypeGroup, eventEffect ~= nil)
     self:SetAuraInspectorGroupVisible(self.AuraInspectorEventBaseAmountGroup, eventEffect ~= nil and (isEventDamage or isEventHeal))

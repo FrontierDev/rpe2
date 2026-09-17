@@ -599,7 +599,7 @@ local function appendNoAction(state, actorKey, unit, reason)
     }
 end
 
-local function buildSpellAction(state, actorKey, unit, candidate, movementActionId, sequenceIndex, sequenceCount, actionClass, previousActionId)
+local function buildSpellAction(state, actorKey, unit, candidate, movementActionId, sequenceIndex, sequenceCount, actionClass, previousActionId, actionEconomyEntry)
     local eventId = normalizeEventId(unit and unit.eventID)
     if eventId <= 0 or type(candidate) ~= "table" then
         return nil
@@ -629,6 +629,11 @@ local function buildSpellAction(state, actorKey, unit, candidate, movementAction
         casterSequenceIndex = resolvedSequenceIndex,
         casterSequenceCount = resolvedSequenceCount,
         actionEconomyClass = tostring(actionClass or ""),
+        cooldownChannelId = actionEconomyEntry and actionEconomyEntry.cooldownChannelId or nil,
+        cooldownChannelName = actionEconomyEntry and actionEconomyEntry.cooldownChannelName or nil,
+        cooldownChannelTriggersGCD = actionEconomyEntry
+            and actionEconomyEntry.cooldownChannelTriggersGCD == true
+            or false,
         previousCasterActionId = previousActionId,
         targetSelections = selections,
         targetSelectionOrder = selectionOrder,
@@ -726,7 +731,8 @@ local function emitSequenceActions(state, actor, unit, sequence, movementActionI
                 sequenceIndex,
                 sequenceCount,
                 entry.actionClass,
-                previousActionId
+                previousActionId,
+                entry
             )
             if action then
                 state.output.actions[#state.output.actions + 1] = action

@@ -1864,6 +1864,9 @@ function Combat:BeginHitCheck(context, effect, component)
                 end
             end
         elseif completed and resultToken == RESULT_FAIL then
+            if type(Combat.EmitSuccessfulDefenceEvent) == "function" then
+                Combat:EmitSuccessfulDefenceEvent(Client, entry, action, resultToken, resolution)
+            end
             if type(Combat.CompleteActionDamageResolution) == "function" then
                 Combat:CompleteActionDamageResolution(Client, entry, false)
             end

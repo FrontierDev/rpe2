@@ -2,9 +2,16 @@ local _, Addon = ...
 
 Addon.Server = Addon.Server or {}
 Addon.Utils = Addon.Utils or {}
+Addon.Internal = Addon.Internal or {}
+Addon.Internal.Comms = Addon.Internal.Comms or {}
 
 local Server = Addon.Server
 local Common = Addon.Utils.Common or {}
+local Comms = Addon.Internal.Comms
+local Operations = Comms.Operations or {}
+local EVENT_UNIT_TAUNT_APPLIED_OPCODE = type(Operations.GetOpcode) == "function"
+    and Operations:GetOpcode("EVENT_UNIT_TAUNT_APPLIED")
+    or nil
 local EventUnit = Addon.Internal
     and Addon.Internal.Database
     and Addon.Internal.Database.Classes
@@ -105,5 +112,45 @@ function Server:HandleEventUnitTaunt(arguments, sender)
         return false
     end
 
-    return self:SetEventTauntRuntimeState(targetEventId, sourceEventId, remainingTurns) == true
+    local accepted, isNewApplication, record = self:SetEventTauntRuntimeState(targetEventId, sourceEventId, remainingTurns)
+    if accepted ~= true then
+        return false
+    end
+
+    if isNewApplication == true and type(record) == "table" then
+        local applicationId = math.floor(tonumber(record.applicationId) or 0)
+        local sessionState = type(self.GetState) == "function" and self:GetState() or nil
+        local channelId = sessionState and sessionState.channelId or nil
+        if (channelId == nil or channelId == "") and type(Comms.ResolveChannelId) == "function" then
+            channelId = Comms:ResolveChannelId(sessionState and sessionState.channelName or nil)
+        end
+
+        local client = Addon.Client
+        if client and type(client.HandleEventUnitTauntApplied) == "function" then
+            client:HandleEventUnitTauntApplied({
+                sessionState and sessionState.channelName or "",
+                eventState.id,
+                sourceEventId,
+                targetEventId,
+                applicationId,
+                remainingTurns,
+            })
+        end
+
+        if EVENT_UNIT_TAUNT_APPLIED_OPCODE and channelId and channelId ~= "" and type(Comms.SendToChannel) == "function" then
+            Comms:SendToChannel(channelId, EVENT_UNIT_TAUNT_APPLIED_OPCODE, {
+                sessionState and sessionState.channelName or "",
+                eventState.id,
+                sourceEventId,
+                targetEventId,
+                applicationId,
+                remainingTurns,
+            }, {
+                opcode = EVENT_UNIT_TAUNT_APPLIED_OPCODE,
+                scope = "client",
+            })
+        end
+    end
+
+    return true
 end

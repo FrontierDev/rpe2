@@ -11,6 +11,8 @@ local Condition = Addon.Internal.Database.Classes.Condition or {}
 local FIXED_ID_LENGTH = 8
 local GUID_ALPHABET = "0123456789abcdef"
 local guidRandomSeeded = false
+local COOLDOWN_CHANNEL_MIN_ID = 1
+local COOLDOWN_CHANNEL_MAX_ID = 10
 
 local function ensureTable(value)
     if type(value) == "table" then
@@ -50,6 +52,22 @@ local function normalizePositiveIntegerOrNil(value)
     end
 
     return nil
+end
+
+local function normalizeCooldownChannelId(value)
+    local numeric = tonumber(value)
+    if numeric == nil
+        or numeric ~= numeric
+        or numeric == math.huge
+        or numeric == -math.huge
+        or numeric < COOLDOWN_CHANNEL_MIN_ID
+        or numeric > COOLDOWN_CHANNEL_MAX_ID
+        or math.floor(numeric) ~= numeric
+    then
+        return nil
+    end
+
+    return numeric
 end
 
 local function normalizeTagList(value)
@@ -218,6 +236,18 @@ local function normalizeBool(value, fallback)
     return value == true
 end
 
+local function resolveLegacyCooldownChannel(spell)
+    if normalizeBool(spell and spell.ignoreGCD, false) then
+        return 2
+    end
+
+    if normalizeBool(spell and spell.triggersGCD, true) then
+        return 1
+    end
+
+    return 4
+end
+
 local function ensureGuidRandomSeed()
     if guidRandomSeeded then
         return
@@ -347,6 +377,9 @@ local function normalizeEventKey(value)
         or key == "on_critical_hit_taken"
         or key == "on_critical_heal"
         or key == "on_critical_heal_taken"
+        or key == "on_taunt"
+        or key == "on_taunted"
+        or key == "on_defence"
     then
         return key
     end
@@ -758,6 +791,45 @@ local function normalizeComponents(values)
     return normalized
 end
 
+function Spell.NormalizeCooldownChannelId(value)
+    return normalizeCooldownChannelId(value)
+end
+
+function Spell.ResolveCooldownChannel(spell)
+    if type(spell) ~= "table" then
+        return nil, "invalid", "spell-is-not-a-table"
+    end
+
+    local source = rawget(spell, "_cooldownChannelSource")
+    if source == "invalid" then
+        return 1, "explicit", "invalid-explicit-cooldown-channel"
+    end
+
+    if source == "legacy" then
+        local normalizedChannel = normalizeCooldownChannelId(rawget(spell, "cooldownChannel"))
+        if normalizedChannel ~= nil then
+            return normalizedChannel, source
+        end
+        return resolveLegacyCooldownChannel(spell), source
+    end
+
+    if rawget(spell, "cooldownChannel") ~= nil then
+        local explicitChannel = normalizeCooldownChannelId(spell.cooldownChannel)
+        if explicitChannel == nil then
+            return 1, "explicit", "invalid-explicit-cooldown-channel"
+        end
+
+        return explicitChannel, "explicit"
+    end
+
+    return resolveLegacyCooldownChannel(spell), "legacy"
+end
+
+function Spell.GetCooldownChannelSource(spell)
+    local _, source = Spell.ResolveCooldownChannel(spell)
+    return source
+end
+
 function Spell:New(data)
     return setmetatable({
         id = nil,
@@ -775,8 +847,7 @@ function Spell:New(data)
         charges = 0,
         useCooldownCharges = false,
         cooldownScalesWithHaste = false,
-        triggersGCD = true,
-        ignoreGCD = false,
+        cooldownChannel = 1,
         range = 0,
         canMoveWhileCasting = false,
         allowDeadTargets = false,
@@ -797,8 +868,20 @@ function Spell:Merge(data)
         return self
     end
 
+    local suppliedCooldownChannel = data.cooldownChannel
+    local hasSuppliedCooldownChannel = suppliedCooldownChannel ~= nil
+    local hasLegacyCooldownFlags = data.triggersGCD ~= nil or data.ignoreGCD ~= nil
+
     for key, value in pairs(data) do
-        if key ~= "resourceCosts" and key ~= "components" and key ~= "cost" and key ~= "effects" and key ~= "conditions" and key ~= "isChanneled" then
+        if key ~= "resourceCosts"
+            and key ~= "components"
+            and key ~= "cost"
+            and key ~= "effects"
+            and key ~= "conditions"
+            and key ~= "isChanneled"
+            and key ~= "triggersGCD"
+            and key ~= "ignoreGCD"
+        then
             self[key] = value
         end
     end
@@ -816,11 +899,31 @@ function Spell:Merge(data)
     self.charges = tonumber(self.charges) or 0
     self.useCooldownCharges = normalizeBool(self.useCooldownCharges, false)
     self.cooldownScalesWithHaste = normalizeBool(self.cooldownScalesWithHaste, false)
-    self.triggersGCD = normalizeBool(self.triggersGCD, true)
-    self.ignoreGCD = normalizeBool(self.ignoreGCD, false)
-    if self.ignoreGCD then
-        self.triggersGCD = false
+    if hasSuppliedCooldownChannel then
+        local explicitChannel = normalizeCooldownChannelId(suppliedCooldownChannel)
+        if explicitChannel ~= nil then
+            self.cooldownChannel = explicitChannel
+            self._cooldownChannelSource = "explicit"
+            self._cooldownChannelRaw = nil
+        else
+            -- Invalid authored input follows the normalized Spell fallback:
+            -- Main Action is the safe default channel.
+            self.cooldownChannel = 1
+            self._cooldownChannelSource = "explicit"
+            self._cooldownChannelRaw = nil
+        end
+    elseif self._cooldownChannelSource == "explicit" or self._cooldownChannelSource == "invalid" then
+        -- Preserve an already-authored channel when Merge is used for a
+        -- partial edit that does not include the channel field.
+        self.cooldownChannel = normalizeCooldownChannelId(self.cooldownChannel) or 1
+        self._cooldownChannelSource = "explicit"
+        self._cooldownChannelRaw = nil
+    elseif hasLegacyCooldownFlags or self._cooldownChannelSource ~= "legacy" then
+        self.cooldownChannel = resolveLegacyCooldownChannel(data)
+        self._cooldownChannelSource = "legacy"
+        self._cooldownChannelRaw = nil
     end
+
     self.range = tonumber(self.range) or 0
     self.canMoveWhileCasting = normalizeBool(self.canMoveWhileCasting, false)
     self.allowDeadTargets = normalizeBool(self.allowDeadTargets, false)
@@ -838,7 +941,7 @@ function Spell:Merge(data)
 end
 
 function Spell:ToTable()
-    return {
+    local values = {
         id = self.id,
         name = self.name,
         description = self.description,
@@ -854,8 +957,7 @@ function Spell:ToTable()
         charges = self.charges,
         useCooldownCharges = self.useCooldownCharges == true,
         cooldownScalesWithHaste = self.cooldownScalesWithHaste == true,
-        triggersGCD = self.triggersGCD == true,
-        ignoreGCD = self.ignoreGCD == true,
+        cooldownChannel = normalizeCooldownChannelId(self.cooldownChannel) or 1,
         range = self.range,
         canMoveWhileCasting = self.canMoveWhileCasting == true,
         allowDeadTargets = self.allowDeadTargets == true,
@@ -869,6 +971,8 @@ function Spell:ToTable()
         components = normalizeComponents(self.components),
         tags = self.tags,
     }
+
+    return values
 end
 
 function Spell.FromTable(data)

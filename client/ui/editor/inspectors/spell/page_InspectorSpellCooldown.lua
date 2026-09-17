@@ -88,4 +88,26 @@ function DataEditor:BuildSpellInspectorCooldownPage(page)
         end)
     end)
     root:AddChild(self.SpellInspectorCooldownGroupInput)
+
+    root:AddChild(self:BuildSpellInspectorLabel(root:GetFrame(), "RPEDataEditorSpellInspectorCooldownChannelLabel", "Cooldown Channel"))
+    self.SpellInspectorCooldownChannelDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorSpellInspectorCooldownChannelDropdown", {
+        width = self.SpellInspectorFieldWidth,
+        height = self.SpellInspectorControlHeight - 2,
+        items = {},
+        onValueChanged = function(value)
+            if self._refreshingSpellInspector then
+                return
+            end
+
+            local channelId = tonumber(value)
+            if channelId == nil then
+                return
+            end
+
+            self:CommitSelectedSpell(function(spell)
+                spell.cooldownChannel = channelId
+            end)
+        end,
+    })
+    root:AddChild(self.SpellInspectorCooldownChannelDropdown)
 end

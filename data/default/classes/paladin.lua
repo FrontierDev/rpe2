@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 22,
+    version = 25,
     dataset = {
         achievements = {},
         auras = {
@@ -164,7 +164,7 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         baseAmount = 5,
-                        operation = "percent",
+                        operation = "flat",
                         statRef = "f82db71a:ok80ohz3",
                         statScaling = {},
                         type = "stat"
@@ -547,6 +547,73 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplateData = {
                     bodyText = "Increases Damage Reduction by 30%.",
                     bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 3,
+                effects = {
+                    {
+                        baseAmount = 30,
+                        operation = "flat",
+                        statRef = "f82db71a:p8syz5ba",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {
+                    {
+                        chance = 100,
+                        combatEventId = "on_defence",
+                        defenceStatRef = "f82db71a:p8syz5ba",
+                        effects = {
+                            {
+                                amountMode = "flat",
+                                baseDamage = 96,
+                                damageSchoolRefs = {
+                                    "f82db71a:wwctys5s"
+                                },
+                                statScaling = {
+                                    {
+                                        coefficient = 0.2,
+                                        statRef = "f82db71a:7t7xgzcx"
+                                    }
+                                },
+                                type = "damage"
+                            }
+                        },
+                        triggerTarget = "event_source"
+                    }
+                },
+                icon = "interface/icons/spell_holy_blessingofprotection.blp",
+                id = "hlyshlda",
+                maxStacks = 1,
+                name = "Holy Shield",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Block Chance by {AURA_STAT_1}. When you successfully block an attack, deal {AURA_EVENT_DAMAGE_1} Holy damage to the attacker.",
+                    bodyTokens = {
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 1,
+                            key = "AURA_STAT_1",
+                            tokenType = "aura_amount"
+                        },
+                        {
+                            applyMode = "damage_amount",
+                            baseField = "baseDamage",
+                            effectIndex = 1,
+                            eventIndex = 1,
+                            key = "AURA_EVENT_DAMAGE_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
                     stackingText = "",
                     stackingTokens = {},
                     version = 1
@@ -1482,7 +1549,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_greaterblessingofkings.blp",
                 id = "h981ofan",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Blessing of Might",
@@ -1528,7 +1595,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1580,7 +1646,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_magic_greaterblessingofkings.blp",
                 id = "wfq254qz",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Blessing of Kings",
@@ -1626,7 +1692,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1666,7 +1731,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_greaterblessingofsanctuary.blp",
                 id = "zg4n0a1f",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Blessing of Sanctuary",
@@ -1712,7 +1777,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1752,7 +1816,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_greaterblessingofwisdom.blp",
                 id = "xdt25qxt",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Blessing of Wisdom",
@@ -1805,7 +1869,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1845,7 +1908,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_greaterblessingoflight.blp",
                 id = "ms0v0du4",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Blessing of Light",
@@ -1891,7 +1954,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1931,7 +1993,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_greaterblessingofsalvation.blp",
                 id = "25j5h8f2",
-                ignoreGCD = false,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Blessing of Salvation",
@@ -1977,7 +2039,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2082,7 +2143,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_righteousfury.blp",
                 id = "wmp0b1zn",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Judgement of the Righteous",
@@ -2114,7 +2175,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2175,7 +2235,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/inv_hammer_01.blp",
                 id = "xvfmhwn2",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Seal of Righteousness",
@@ -2230,7 +2290,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2323,7 +2382,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_righteousfury.blp",
                 id = "kyzga5f2",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Judgement of Command",
@@ -2355,7 +2414,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2404,7 +2462,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_innerrage.blp",
                 id = "uesn7obf",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Seal of Command",
@@ -2459,7 +2517,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2565,7 +2622,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_righteousfury.blp",
                 id = "pb305qze",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Judgement of the Light",
@@ -2616,7 +2673,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2665,7 +2721,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_healingaura.blp",
                 id = "25h4rwgt",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Seal of Light",
@@ -2711,7 +2767,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2809,7 +2864,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_righteousfury.blp",
                 id = "j1my2871",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Judgement of Wisdom",
@@ -2845,7 +2900,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2906,7 +2960,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_righteousnessaura.blp",
                 id = "vuotim0h",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Seal of Wisdom",
@@ -2952,7 +3006,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -3058,7 +3111,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_crusaderstrike.blp",
                 id = "27baiuv3",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Crusader Strike",
@@ -3096,7 +3149,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = true
             },
             {
@@ -3181,7 +3233,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_paladin_templarsverdict.blp",
                 id = "eg4gydsa",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Templar's Verdict",
@@ -3213,7 +3265,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -3286,7 +3337,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_paladin_hammeroftherighteous.blp",
                 id = "d1pmq58z",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Hammer of the Righteous",
@@ -3318,7 +3369,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = true
             },
             {
@@ -3413,7 +3463,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_paladin_shieldofvengeance.blp",
                 id = "pz4cufo7",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Shield of the Righteous",
@@ -3475,8 +3525,118 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = true
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 5,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:hlyshlda",
+                            basePower = 0,
+                            duration = 3,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "hshld001",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 3,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_blessingofprotection.blp",
+                id = "hlyshlds",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Holy Shield",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:hlyshlda",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Increases Block Chance by {AURA_STAT_1}. When you successfully block an attack, deal {AURA_EVENT_DAMAGE_1} Holy damage to the attacker.",
+                            duration = 3,
+                            icon = "interface/icons/spell_holy_blessingofprotection.blp",
+                            nameText = "Holy Shield",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "stat_amount",
+                                    baseField = "baseAmount",
+                                    effectIndex = 1,
+                                    key = "AURA_STAT_1",
+                                    tokenType = "aura_amount"
+                                },
+                                {
+                                    applyMode = "damage_amount",
+                                    baseField = "baseDamage",
+                                    effectIndex = 1,
+                                    eventIndex = 1,
+                                    key = "AURA_EVENT_DAMAGE_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Holy Shield to yourself for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
             },
             {
                 _resourceCostsByPhase = {
@@ -3527,7 +3687,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_divineprotection.blp",
                 id = "0opb1tte",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Divine Protection",
@@ -3571,7 +3731,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -3637,7 +3796,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_holybolt.blp",
                 id = "9nwvhorx",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Holy Light",
@@ -3669,7 +3828,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -3723,7 +3881,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_flashheal.blp",
                 id = "znfbmec8",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Flash of Light",
@@ -3755,7 +3913,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -3795,7 +3952,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_heal.blp",
                 id = "bk0uyunm",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Divine Favor",
@@ -3831,7 +3988,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -3906,7 +4062,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_excorcism_02.blp",
                 id = "4wt3pl5q",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Exorcism",
@@ -3938,7 +4094,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4013,7 +4168,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_excorcism.blp",
                 id = "x8ljrb7w",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Holy Wrath",
@@ -4045,7 +4200,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4118,7 +4272,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_paladin_divinestorm.blp",
                 id = "tu5g28q8",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Divine Storm",
@@ -4150,7 +4304,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4236,7 +4389,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_paladin_bladeofjustice.blp",
                 id = "pznrmr50",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Blade of Wrath",
@@ -4300,7 +4453,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4337,7 +4489,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_unyieldingfaith.blp",
                 id = "hork7m2p",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Hand of Reckoning",
@@ -4362,7 +4514,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4398,7 +4549,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_rebuke.blp",
                 id = "kskvgnmw",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Rebuke",
@@ -4423,7 +4574,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -4478,7 +4628,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/inv_helmet_96.blp",
                 id = "5ouonxor",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Word of Glory",
@@ -4510,7 +4660,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4564,7 +4713,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_paladin_lightoftheprotector.blp",
                 id = "x2qgj4wy",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Light of the Protector",
@@ -4596,7 +4745,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -4636,7 +4784,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_heroism.blp",
                 id = "gak8p3v1",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Guardian of Ancient Kings",
@@ -4688,7 +4836,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4728,7 +4875,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_sealofmight.blp",
                 id = "hoj2q6x4",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Hammer of Justice",
@@ -4772,7 +4919,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4812,7 +4958,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_avenginewrath.blp",
                 id = "awr9m5d2",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Avenging Wrath",
@@ -4856,7 +5002,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4896,7 +5041,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_paladin_shieldofthetemplar.blp",
                 id = "tplblwsp",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Templar's Bulwark",
@@ -4940,7 +5085,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4980,7 +5124,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_prayerofhealing.blp",
                 id = "rep7n4c8",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Repentance",
@@ -5024,7 +5168,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             }
         },

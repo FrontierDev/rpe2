@@ -6,15 +6,12 @@ Addon.Internal = Addon.Internal or {}
 
 local Client = Addon.Client
 local Spellcasting = Client.Spellcasting
-local Registry = Addon.Internal.Registry or {}
-local Ruleset = Addon.Internal.Ruleset or {}
 local Event = Addon.Internal
     and Addon.Internal.Database
     and Addon.Internal.Database.Classes
     and Addon.Internal.Database.Classes.Event
     or nil
 
-local BASIC_ATTACK_RULE_KEY = "basic_attacks_do_not_consume_gcd"
 local BASIC_ATTACK_TYPE_FAILURE_TEXT = "A basic attack of another damage type was already used this turn."
 
 local baseBuildSpellActivationSnapshot = Spellcasting.BuildSpellActivationSnapshot
@@ -25,51 +22,6 @@ if type(baseBuildSpellActivationSnapshot) ~= "function"
     or type(Client.ResolveSpellActivation) ~= "function"
 then
     return
-end
-
-local function registerBasicAttackRule()
-    local definitions = Addon.Internal
-        and Addon.Internal.Ruleset
-        and Addon.Internal.Ruleset.Rules
-        and Addon.Internal.Ruleset.Rules.Definitions
-        or nil
-    if type(definitions) ~= "table" then
-        return false
-    end
-
-    for categoryIndex = 1, #definitions do
-        local category = definitions[categoryIndex]
-        if type(category) == "table" and category.key == "combat" then
-            category.rules = type(category.rules) == "table" and category.rules or {}
-            for ruleIndex = 1, #category.rules do
-                if category.rules[ruleIndex] and category.rules[ruleIndex].key == BASIC_ATTACK_RULE_KEY then
-                    return true
-                end
-            end
-
-            category.rules[#category.rules + 1] = {
-                key = BASIC_ATTACK_RULE_KEY,
-                label = "Basic Attacks Do Not Consume Global Cooldown",
-                type = "checkbox",
-                default = true,
-                description = "Basic attacks (auto hit type) do not consume the global cooldown. Each basic attack may still be used only once per turn, and after using one basic attack only other basic attacks of the same damage type (melee, ranged, or spell) may be used that turn.",
-            }
-            return true
-        end
-    end
-
-    return false
-end
-
-registerBasicAttackRule()
-
-local function isBasicAttackRuleEnabled()
-    if type(Ruleset.GetRulesetRuleValueByKey) ~= "function" then
-        return true
-    end
-
-    local activeRuleset = type(Ruleset.GetActiveRuleset) == "function" and Ruleset.GetActiveRuleset() or nil
-    return Ruleset.GetRulesetRuleValueByKey(activeRuleset, "combat", BASIC_ATTACK_RULE_KEY, true) == true
 end
 
 local function normalizeDamageType(value)
@@ -97,15 +49,6 @@ local function resolveBasicAttackDamageType(spell)
     end
 
     return nil
-end
-
-local function resolveSpell(spellRef)
-    if type(Registry.ResolveSpellReference) ~= "function" then
-        return nil
-    end
-
-    local _, spell = Registry:ResolveSpellReference(spellRef)
-    return type(spell) == "table" and spell or nil
 end
 
 local function normalizeEventUnitId(value)
@@ -162,39 +105,6 @@ local function recordBasicAttackUsage(client, eventState, casterUnit, damageType
     unitState.basicAttackTurnNumber = normalizeTurnNumber(eventState)
     unitState.basicAttackDamageType = normalizedDamageType
     return true
-end
-
-local function cloneSpellForBasicAttackCooldown(spell)
-    local clone = {}
-    for key, value in pairs(spell or {}) do
-        clone[key] = value
-    end
-
-    clone.triggersGCD = false
-    clone.cooldown = math.max(1, math.floor(tonumber(spell and spell.cooldown) or 0))
-    return clone
-end
-
-local function callWithoutBasicAttackGcd(spellRef, fn)
-    if not isBasicAttackRuleEnabled() then
-        return fn()
-    end
-
-    local spell = resolveSpell(spellRef)
-    if not spell or not resolveBasicAttackDamageType(spell) then
-        return fn()
-    end
-
-    local originalTriggersGCD = spell.triggersGCD
-    spell.triggersGCD = false
-    local results = { pcall(fn) }
-    spell.triggersGCD = originalTriggersGCD
-
-    if results[1] ~= true then
-        error(results[2], 0)
-    end
-
-    return unpack(results, 2)
 end
 
 local function findEventUnitById(units, eventId)
@@ -373,7 +283,7 @@ local function buildActivationSnapshot(self, spellRef, options)
 end
 
 local function applyBasicAttackTypeRestriction(self, snapshot)
-    if not isBasicAttackRuleEnabled() or type(snapshot) ~= "table" or snapshot.canCast ~= true then
+    if type(snapshot) ~= "table" or snapshot.canCast ~= true then
         return snapshot
     end
 
@@ -392,9 +302,7 @@ local function applyBasicAttackTypeRestriction(self, snapshot)
 end
 
 function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
-    local snapshot = callWithoutBasicAttackGcd(spellRef, function()
-        return buildActivationSnapshot(self, spellRef, options)
-    end)
+    local snapshot = buildActivationSnapshot(self, spellRef, options)
 
     snapshot = applyBasicAttackTypeRestriction(self, snapshot)
     if self ~= Client and type(snapshot) == "table" and snapshot.canCast ~= true then
@@ -405,10 +313,6 @@ end
 
 if type(baseApplyLocalSpellCooldown) == "function" then
     function Spellcasting.ApplyLocalSpellCooldown(self, eventState, casterUnit, spellRef, spell)
-        if not isBasicAttackRuleEnabled() then
-            return baseApplyLocalSpellCooldown(self, eventState, casterUnit, spellRef, spell)
-        end
-
         local damageType = resolveBasicAttackDamageType(spell)
         if not damageType then
             return baseApplyLocalSpellCooldown(self, eventState, casterUnit, spellRef, spell)
@@ -419,7 +323,7 @@ if type(baseApplyLocalSpellCooldown) == "function" then
             eventState,
             casterUnit,
             spellRef,
-            cloneSpellForBasicAttackCooldown(spell)
+            spell
         )
         recordBasicAttackUsage(self, eventState, casterUnit, damageType)
         return changed

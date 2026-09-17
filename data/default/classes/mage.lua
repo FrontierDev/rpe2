@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 16,
+    version = 17,
     dataset = {
         achievements = {},
         auras = {
@@ -606,7 +606,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_fire_firebolt02.blp",
                 id = "68dy7na1",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Fireball",
@@ -664,7 +664,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -729,7 +728,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_fire_fireball02.blp",
                 id = "kwn6xary",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Pyroblast",
@@ -787,7 +786,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -852,7 +850,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_fire_fireball.blp",
                 id = "96ygwvhq",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Fire Blast",
@@ -884,7 +882,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = true
             },
             {
@@ -949,7 +946,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_fire_soulburn.blp",
                 id = "hsr88j7d",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Scorch",
@@ -1010,7 +1007,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1050,7 +1046,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_fire_sealoffire.blp",
                 id = "m3u708kt",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Combustion",
@@ -1094,7 +1090,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1156,7 +1151,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_fire_selfdestruct.blp",
                 id = "zilla37l",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Flamestrike",
@@ -1188,7 +1183,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1271,7 +1265,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_nature_wispsplode.blp",
                 id = "1s5lq169",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Arcane Explosion",
@@ -1309,7 +1303,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1350,7 +1343,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_fire_firearmor.blp",
                 id = "fireward",
-                ignoreGCD = false,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Fire Ward",
@@ -1402,7 +1395,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1443,7 +1435,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_frost_frostward.blp",
                 id = "frostwrd",
-                ignoreGCD = false,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Frost Ward",
@@ -1495,7 +1487,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1593,7 +1584,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_arcane_blast.blp",
                 id = "n6jbep9e",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Arcane Blast",
@@ -1631,7 +1622,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1717,7 +1707,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_mage_arcanebarrage.blp",
                 id = "r760qxbn",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Arcane Barrage",
@@ -1779,7 +1769,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1893,7 +1882,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_arcane_arcane04.blp",
                 id = "1e8l0iyi",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Arcane Missiles",
@@ -1931,7 +1920,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2017,7 +2005,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_arcane_arcanetorrent.blp",
                 id = "7r260xa0",
-                ignoreGCD = false,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Arcane Surge",
@@ -2068,7 +2056,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2107,7 +2094,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_nature_purge.blp",
                 id = "s9nxh61d",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Evocation",
@@ -2124,7 +2111,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2172,7 +2158,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_frost_iceshock.blp",
                 id = "300h0gls",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Counterspell",
@@ -2197,7 +2183,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2237,7 +2222,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_magicalsentry.blp",
                 id = "7ldwq2a9",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Arcane Intellect",
@@ -2281,7 +2266,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2368,7 +2352,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_frost_frostbolt02.blp",
                 id = "lywroiqu",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Frostbolt",
@@ -2436,7 +2420,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2499,7 +2482,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_frost_freezingbreath.blp",
                 id = "7ha8pdoy",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Frost Nova",
@@ -2549,7 +2532,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2598,7 +2580,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_mage_deepfreeze.blp",
                 id = "5p4lvyfy",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Deep Freeze",
@@ -2642,7 +2624,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2715,7 +2696,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_frost_chillingblast.blp",
                 id = "4yxpy77f",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Ice Lance",
@@ -2747,7 +2728,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2810,7 +2790,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_frost_glacier.blp",
                 id = "apgdbmji",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Cone of Cold",
@@ -2860,7 +2840,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2934,7 +2913,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_mage_glacialspike.blp",
                 id = "jg39ti4j",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Glacial Spike",
@@ -2966,7 +2945,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             }
         },

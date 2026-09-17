@@ -9,6 +9,8 @@ local Spellcasting = Client.Spellcasting
 local Conditions = Client.Conditions or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
+local COOLDOWN_CHANNEL_MIN_ID = 1
+local COOLDOWN_CHANNEL_MAX_ID = 10
 local function getAuraManager()
     return Addon.Client and Addon.Client.Spellcasting and Addon.Client.Spellcasting.AuraManager or nil
 end
@@ -135,6 +137,22 @@ local function normalizeEventId(eventId)
     return type(eventId) == "string" and eventId or ""
 end
 
+local function normalizeCooldownChannelId(channelId)
+    local numericChannelId = tonumber(channelId)
+    if numericChannelId == nil
+        or numericChannelId ~= numericChannelId
+        or numericChannelId == math.huge
+        or numericChannelId == -math.huge
+        or numericChannelId % 1 ~= 0
+        or numericChannelId < COOLDOWN_CHANNEL_MIN_ID
+        or numericChannelId > COOLDOWN_CHANNEL_MAX_ID
+    then
+        return nil
+    end
+
+    return numericChannelId
+end
+
 local function buildSignature(...)
     local parts = {}
     for index = 1, select("#", ...) do
@@ -178,6 +196,15 @@ local function buildUnitCooldownSignature(unitState)
         return ""
     end
 
+    local channelIds = {}
+    for channelId, remaining in pairs(unitState.channelCooldowns or {}) do
+        local normalizedChannelId = type(channelId) == "number" and normalizeCooldownChannelId(channelId) or nil
+        if normalizedChannelId and math.max(0, math.floor(tonumber(remaining) or 0)) > 0 then
+            channelIds[#channelIds + 1] = normalizedChannelId
+        end
+    end
+    table.sort(channelIds)
+
     local spellRefs = {}
     for spellRef in pairs(unitState.spells or {}) do
         spellRefs[#spellRefs + 1] = spellRef
@@ -186,10 +213,16 @@ local function buildUnitCooldownSignature(unitState)
 
     local parts = {
         buildSignature(
-            tonumber(unitState.globalCooldownRemaining) or 0,
             tonumber(unitState.lastAdvancedTurnNumber) or 0
         ),
     }
+    for index = 1, #channelIds do
+        local channelId = channelIds[index]
+        parts[#parts + 1] = buildSignature(
+            channelId,
+            math.max(0, math.floor(tonumber(unitState.channelCooldowns[channelId]) or 0))
+        )
+    end
     for index = 1, #spellRefs do
         local spellRef = spellRefs[index]
         parts[#parts + 1] = buildSignature(spellRef, buildSpellStateSignature(unitState.spells[spellRef]))
@@ -238,8 +271,18 @@ local function getConfigurationRevision()
     return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
 end
 
-local spellIgnoresGlobalCooldown = Spellcasting.SpellIgnoresGlobalCooldown
-local spellUsesGlobalCooldown = Spellcasting.SpellUsesGlobalCooldown
+local function resolveSpellCooldownChannel(spell)
+    if type(Spellcasting.ResolveSpellCooldownChannel) ~= "function" then
+        return nil, nil, "unavailable", "spell-channel-resolver-unavailable"
+    end
+
+    local channelId, channel, source, reason = Spellcasting.ResolveSpellCooldownChannel(spell)
+    if not channelId or type(channel) ~= "table" or channel.enabled ~= true then
+        return channelId, channel, source, reason or "invalid-cooldown-channel"
+    end
+
+    return channelId, channel, source, reason
+end
 
 local function normalizeCooldownTurns(spell, requirePositive)
     local turns = Spellcasting.NormalizeTurnCount and Spellcasting.NormalizeTurnCount(spell and spell.cooldown) or nil
@@ -263,13 +306,14 @@ local function formatTurnLabel(turns)
     return ("%d turns"):format(numericTurns)
 end
 
-local function buildGlobalCooldownText(turns)
+local function buildChannelCooldownText(channelName, turns)
     local numericTurns = math.max(0, math.floor(tonumber(turns) or 0))
-    if numericTurns <= 0 then
+    local normalizedName = ensureString(channelName, "")
+    if numericTurns <= 0 or normalizedName == "" then
         return nil
     end
 
-    return ("Global cooldown: %s"):format(formatTurnLabel(numericTurns))
+    return ("%s cooldown: %s"):format(normalizedName, formatTurnLabel(numericTurns))
 end
 
 local function cloneSpellState(state)
@@ -333,15 +377,21 @@ local function cleanupUnitState(unitState)
         return true
     end
 
-    if math.max(0, math.floor(tonumber(unitState.globalCooldownRemaining) or 0)) > 0 then
+    local channelCooldowns = type(unitState.channelCooldowns) == "table" and unitState.channelCooldowns or nil
+    if channelCooldowns then
+        for channelId, remaining in pairs(channelCooldowns) do
+            local normalizedChannelId = type(channelId) == "number" and normalizeCooldownChannelId(channelId) or nil
+            if not normalizedChannelId or math.max(0, math.floor(tonumber(remaining) or 0)) <= 0 then
+                channelCooldowns[channelId] = nil
+            end
+        end
+    end
+
+    if channelCooldowns and next(channelCooldowns) ~= nil then
         return false
     end
 
-    if type(unitState.spells) ~= "table" then
-        return true
-    end
-
-    return next(unitState.spells) == nil
+    return type(unitState.spells) ~= "table" or next(unitState.spells) == nil
 end
 
 local function getSpellCooldownState(unitState, spellRef)
@@ -420,7 +470,7 @@ local function listCasterSpellRefs(self, eventState, casterUnit)
 
     if type(casterUnit) == "table" and casterUnit.isPlayer == true then
         -- Optimization: Use cache instead of listing all known spells
-        local cacheKey = casterUnit.isPetCaster == true and "_cachedPetSpellRefsForGCD" or "_cachedSpellRefsForGCD"
+        local cacheKey = casterUnit.isPetCaster == true and "_cachedPetSpellRefs" or "_cachedSpellRefs"
         
         -- Check if we have a cached list from the last action bar refresh
         if type(self[cacheKey]) == "table" and #self[cacheKey] > 0 then
@@ -472,7 +522,6 @@ local function buildCooldownSpellMetadata(self, eventState, casterUnit)
         spellRefs = spellRefs,
         spellByRef = {},
         cooldownGroups = {},
-        ignoreGCDSpellRefs = {},
     }
 
     for index = 1, #spellRefs do
@@ -491,9 +540,6 @@ local function buildCooldownSpellMetadata(self, eventState, casterUnit)
                 metadata.cooldownGroups[cooldownGroup][#metadata.cooldownGroups[cooldownGroup] + 1] = spellRef
             end
 
-            if spell.ignoreGCD == true then
-                metadata.ignoreGCDSpellRefs[#metadata.ignoreGCDSpellRefs + 1] = spellRef
-            end
         end
     end
 
@@ -580,7 +626,7 @@ local function buildCooldownText(activationState)
     local cooldownRemaining = math.max(0, math.floor(tonumber(activationState.cooldownRemaining) or 0))
     local rechargeRemaining = math.max(0, math.floor(tonumber(activationState.rechargeRemaining) or 0))
     local lockoutRemaining = math.max(0, math.floor(tonumber(activationState.lockoutRemaining) or 0))
-    local globalCooldownRemaining = math.max(0, math.floor(tonumber(activationState.globalCooldownRemaining) or 0))
+    local channelCooldownRemaining = math.max(0, math.floor(tonumber(activationState.channelCooldownRemaining) or 0))
 
     local text
     if currentCharges ~= nil and maxCharges ~= nil then
@@ -604,18 +650,20 @@ local function buildCooldownText(activationState)
         text = "No Cooldown"
     end
 
-    local gcdText = not spellIgnoresGlobalCooldown(activationState.spell) and spellUsesGlobalCooldown(activationState.spell) and buildGlobalCooldownText(globalCooldownRemaining) or nil
-    if gcdText and gcdText ~= "" then
+    local channelText = activationState.cooldownChannelTriggersGCD == true
+        and buildChannelCooldownText(activationState.cooldownChannelName, channelCooldownRemaining)
+        or nil
+    if channelText and channelText ~= "" then
         if text ~= "" then
-            return ("%s | %s"):format(text, gcdText)
+            return ("%s | %s"):format(text, channelText)
         end
-        return gcdText
+        return channelText
     end
 
     return text
 end
 
-local function buildFailureReason(reason, cooldownRemaining, globalCooldownRemaining, conditionFailureText)
+local function buildFailureReason(reason, cooldownRemaining, cooldownChannelName, channelCooldownRemaining, conditionFailureText)
     if reason == "inactive" then
         return "Unavailable"
     end
@@ -628,8 +676,11 @@ local function buildFailureReason(reason, cooldownRemaining, globalCooldownRemai
     if reason == "casting" then
         return "Casting"
     end
-    if reason == "global-cooldown" then
-        return buildGlobalCooldownText(globalCooldownRemaining) or "On Global Cooldown"
+    if reason == "channel-cooldown" then
+        return buildChannelCooldownText(cooldownChannelName, channelCooldownRemaining) or "On Cooldown"
+    end
+    if reason == "invalid-cooldown-channel" then
+        return "Invalid Cooldown Channel"
     end
     if reason == "cooldown" then
         return ("%s remaining"):format(formatTurnLabel(cooldownRemaining))
@@ -812,8 +863,8 @@ end
 
 function Client:QueueActionBarRefresh(reason)
     -- Invalidate spell ref caches since action bars changed
-    self._cachedSpellRefsForGCD = nil
-    self._cachedPetSpellRefsForGCD = nil
+    self._cachedSpellRefs = nil
+    self._cachedPetSpellRefs = nil
     self._cachedCooldownSpellMetadata = nil
     self._cachedPetCooldownSpellMetadata = nil
 
@@ -896,7 +947,7 @@ function Spellcasting.GetUnitCooldownState(self, eventId, unitEventId, createIfM
 
     unitState = {
         spells = {},
-        globalCooldownRemaining = 0,
+        channelCooldowns = {},
         lastAdvancedTurnNumber = 0,
     }
     bucket[numericUnitEventId] = unitState
@@ -1000,11 +1051,24 @@ function Spellcasting.AdvanceCooldownState(self, previousTurnNumber, previousTic
             if currentTurnNumber > lastAdvancedTurnNumber then
                 local advancedTurns = currentTurnNumber - lastAdvancedTurnNumber
                 unitState.lastAdvancedTurnNumber = currentTurnNumber
-                if math.max(0, math.floor(tonumber(unitState.globalCooldownRemaining) or 0)) > 0 then
-                    local nextGlobalCooldownRemaining = math.max(0, math.floor(tonumber(unitState.globalCooldownRemaining) or 0) - advancedTurns)
-                    if nextGlobalCooldownRemaining ~= unitState.globalCooldownRemaining then
-                        unitState.globalCooldownRemaining = nextGlobalCooldownRemaining
+                local channelCooldowns = type(unitState.channelCooldowns) == "table" and unitState.channelCooldowns or {}
+                unitState.channelCooldowns = channelCooldowns
+                for channelId, remaining in pairs(channelCooldowns) do
+                    local normalizedChannelId = type(channelId) == "number" and normalizeCooldownChannelId(channelId) or nil
+                    local currentRemaining = math.max(0, math.floor(tonumber(remaining) or 0))
+                    if not normalizedChannelId or currentRemaining <= 0 then
+                        channelCooldowns[channelId] = nil
                         changed = true
+                    else
+                        local nextRemaining = math.max(0, currentRemaining - advancedTurns)
+                        if nextRemaining <= 0 then
+                            channelCooldowns[channelId] = nil
+                        elseif nextRemaining ~= currentRemaining then
+                            channelCooldowns[channelId] = nextRemaining
+                        end
+                        if nextRemaining ~= currentRemaining then
+                            changed = true
+                        end
                     end
                 end
 
@@ -1135,7 +1199,7 @@ function Spellcasting.ApplyLocalSpellCooldown(self, eventState, casterUnit, spel
 
     local triggerCooldownTurns = math.max(0, math.floor(tonumber(normalizeCooldownTurns(spell, false)) or 0))
     local cooldownGroup = normalizeCooldownGroup(spell.cooldownGroup)
-    local cooldownMetadata = (cooldownGroup or spell.ignoreGCD == true)
+    local cooldownMetadata = cooldownGroup
         and getCooldownSpellMetadata(self, eventState, casterUnit)
         or nil
     if cooldownGroup and triggerCooldownTurns > 0 then
@@ -1151,24 +1215,13 @@ function Spellcasting.ApplyLocalSpellCooldown(self, eventState, casterUnit, spel
         end
     end
 
-    if spell.ignoreGCD == true then
-        local casterSpellRefs = cooldownMetadata and cooldownMetadata.ignoreGCDSpellRefs or {}
-        for index = 1, #casterSpellRefs do
-            local candidateSpellRef = casterSpellRefs[index]
-            if candidateSpellRef ~= spellRef then
-                local candidateSpell = cooldownMetadata and cooldownMetadata.spellByRef and cooldownMetadata.spellByRef[candidateSpellRef] or nil
-                if type(candidateSpell) == "table" and candidateSpell.ignoreGCD == true then
-                    changed = applyExternalSpellLockout(unitState, candidateSpellRef, candidateSpell, 1) or changed
-                end
-            end
+    local channelId, channel = resolveSpellCooldownChannel(spell)
+    if channelId and channel and channel.enabled == true and channel.triggersGCD == true then
+        unitState.channelCooldowns = type(unitState.channelCooldowns) == "table" and unitState.channelCooldowns or {}
+        if math.max(0, math.floor(tonumber(unitState.channelCooldowns[channelId]) or 0)) ~= 1 then
+            unitState.channelCooldowns[channelId] = 1
+            changed = true
         end
-    end
-
-    if spellUsesGlobalCooldown(spell) and math.max(0, math.floor(tonumber(unitState.globalCooldownRemaining) or 0)) ~= 1 then
-        unitState.globalCooldownRemaining = 1
-        changed = true
-    elseif spellUsesGlobalCooldown(spell) ~= true and tonumber(unitState.globalCooldownRemaining) == nil then
-        unitState.globalCooldownRemaining = 0
     end
 
     if changed and type(self.QueueActionBarRefresh) == "function" then
@@ -1416,7 +1469,22 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
         cooldownRemaining = lockoutRemaining
     end
 
-    local globalCooldownRemaining = math.max(0, math.floor(tonumber(unitState and unitState.globalCooldownRemaining) or 0))
+    local cooldownChannelId, cooldownChannel = resolveSpellCooldownChannel(activation.spell)
+    local cooldownChannelName = cooldownChannel and cooldownChannel.name or nil
+    local cooldownChannelTriggersGCD = cooldownChannel
+        and cooldownChannel.enabled == true
+        and cooldownChannel.triggersGCD == true
+        or false
+    local channelCooldownRemaining = math.max(
+        0,
+        math.floor(tonumber(
+            unitState
+                and type(unitState.channelCooldowns) == "table"
+                and cooldownChannelId
+                and unitState.channelCooldowns[cooldownChannelId]
+                or 0
+        ) or 0)
+    )
     local reason = nil
     local canCast = true
     local conditionState = {
@@ -1462,9 +1530,12 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
         end
     end
 
-    if canCast and spellUsesGlobalCooldown(activation.spell) and globalCooldownRemaining > 0 then
+    if canCast and (not cooldownChannelId or type(cooldownChannel) ~= "table" or cooldownChannel.enabled ~= true) then
         canCast = false
-        reason = "global-cooldown"
+        reason = "invalid-cooldown-channel"
+    elseif canCast and cooldownChannelTriggersGCD and channelCooldownRemaining > 0 then
+        canCast = false
+        reason = "channel-cooldown"
     end
 
     if canCast and lockoutRemaining > 0 then
@@ -1553,7 +1624,10 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
         cooldownRemaining = cooldownRemaining,
         rechargeRemaining = rechargeRemaining,
         lockoutRemaining = lockoutRemaining,
-        globalCooldownRemaining = globalCooldownRemaining,
+        cooldownChannelId = cooldownChannelId,
+        cooldownChannelName = cooldownChannelName,
+        cooldownChannelTriggersGCD = cooldownChannelTriggersGCD,
+        channelCooldownRemaining = channelCooldownRemaining,
         currentCharges = currentCharges,
         maxCharges = maxCharges,
         targetCandidates = targetCandidates,
@@ -1590,7 +1664,9 @@ function Spellcasting.ResolveSpellActivationState(self, spellRef, options)
             spell = nil,
             spellRef = spellRef,
             cooldownRemaining = 0,
-            globalCooldownRemaining = 0,
+            cooldownChannelId = nil,
+            cooldownChannelName = nil,
+            channelCooldownRemaining = 0,
             currentCharges = nil,
             maxCharges = nil,
             cooldownText = "Unavailable",
@@ -1616,7 +1692,9 @@ function Spellcasting.ResolveSpellActivationState(self, spellRef, options)
             spell = nil,
             spellRef = spellRef,
             cooldownRemaining = 0,
-            globalCooldownRemaining = 0,
+            cooldownChannelId = nil,
+            cooldownChannelName = nil,
+            channelCooldownRemaining = 0,
             currentCharges = nil,
             maxCharges = nil,
             cooldownText = "Unavailable",
@@ -1639,7 +1717,10 @@ function Spellcasting.ResolveSpellActivationState(self, spellRef, options)
         cooldownRemaining = snapshot.cooldownRemaining,
         rechargeRemaining = snapshot.rechargeRemaining,
         lockoutRemaining = snapshot.lockoutRemaining,
-        globalCooldownRemaining = snapshot.globalCooldownRemaining,
+        cooldownChannelId = snapshot.cooldownChannelId,
+        cooldownChannelName = snapshot.cooldownChannelName,
+        cooldownChannelTriggersGCD = snapshot.cooldownChannelTriggersGCD == true,
+        channelCooldownRemaining = snapshot.channelCooldownRemaining,
         currentCharges = snapshot.currentCharges,
         maxCharges = snapshot.maxCharges,
         targetCandidates = options.includeTargetCandidates == true and snapshot.targetCandidates or nil,
@@ -1658,7 +1739,8 @@ function Spellcasting.ResolveSpellActivationState(self, spellRef, options)
         state.failureText = state.canCast and "" or buildFailureReason(
             state.reason,
             state.cooldownRemaining,
-            state.globalCooldownRemaining,
+            state.cooldownChannelName,
+            state.channelCooldownRemaining,
             snapshot.conditionState and snapshot.conditionState.failureText or ""
         )
     else

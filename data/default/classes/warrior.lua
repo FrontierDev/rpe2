@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 17,
+        version = 18,
     dataset = {
         achievements = {},
         auras = {
@@ -583,7 +583,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_rogue_ambush.blp",
                 id = "c1s93sif",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Heroic Strike",
@@ -615,7 +615,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -688,7 +687,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_cleave.blp",
                 id = "e0mooybr",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Cleave",
@@ -720,7 +719,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -806,7 +804,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_savageblow.blp",
                 id = "0jiq0uoc",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Mortal Strike",
@@ -856,7 +854,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -930,7 +927,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_decisivestrike.blp",
                 id = "68qm26aq",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Slam",
@@ -962,7 +959,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1036,7 +1032,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_sunder.blp",
                 id = "etsuhe6x",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Sunder Armor",
@@ -1097,7 +1093,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1170,7 +1165,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/inv_shield_05.blp",
                 id = "kejakdxo",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Shield Slam",
@@ -1202,7 +1197,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1293,7 +1287,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_shieldbash.blp",
                 id = "ti2j4umn",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Shield Bash",
@@ -1325,7 +1319,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1362,7 +1355,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_nature_reincarnation.blp",
                 id = "tntwar01",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Taunt",
@@ -1387,7 +1380,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1448,7 +1440,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_racial_bloodrage.blp",
                 id = "yn5l4xkq",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Bloodrage",
@@ -1506,7 +1498,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1546,7 +1537,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/warrior_talent_icon_innerrage.blp",
                 id = "lzan8taw",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Inner Rage",
@@ -1582,7 +1573,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1631,7 +1621,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_gouge.blp",
                 id = "xniv44uu",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Rend",
@@ -1683,7 +1673,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1756,7 +1745,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_whirlwind.blp",
                 id = "k7ndyn09",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Whirlwind",
@@ -1788,7 +1777,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1861,7 +1849,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_bladestorm.blp",
                 id = "bblnsvg2",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Bladestorm",
@@ -1893,7 +1881,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1933,7 +1920,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/inv_mace_62.blp",
                 id = "9870xnra",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Knockdown",
@@ -1977,7 +1964,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2017,7 +2003,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_golemthunderclap.blp",
                 id = "s4nfrf2l",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Intimidating Shout",
@@ -2061,7 +2047,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2110,7 +2095,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_defend.blp",
                 id = "g36ujwt9",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Shield Block",
@@ -2154,7 +2139,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = true
             },
             {
@@ -2261,7 +2245,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_nature_bloodlust.blp",
                 id = "05yeh7qb",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Bloodthirst",
@@ -2299,7 +2283,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2372,7 +2355,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_revenge.blp",
                 id = "mn1ltzeo",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Revenge",
@@ -2404,7 +2387,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2444,7 +2426,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_battleshout.blp",
                 id = "9gh28pe5",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Battle Shout",
@@ -2488,7 +2470,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2528,7 +2509,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_rallyingcry.blp",
                 id = "c6j8zcqx",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Commanding Shout",
@@ -2572,7 +2553,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2621,7 +2601,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_shieldwall.blp",
                 id = "tkb4huco",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Shield Wall",
@@ -2657,7 +2637,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2693,7 +2672,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_victoryrush.blp",
                 id = "0ttffa47",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Intervene",
@@ -2718,7 +2697,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             }
         },

@@ -9,7 +9,8 @@ local SpellEvaluator = Client.AutopilotSpellEvaluator or {}
 Client.AutopilotActionEconomy = Client.AutopilotActionEconomy or {}
 local ActionEconomy = Client.AutopilotActionEconomy
 
-ActionEconomy.MAX_AUXILIARY_ACTIONS_PER_NPC = 2
+local COOLDOWN_CHANNEL_MIN_ID = 1
+local COOLDOWN_CHANNEL_MAX_ID = 10
 
 local function normalizeNonNegative(value)
     return math.max(0, tonumber(value) or 0)
@@ -31,6 +32,23 @@ end
 local function normalizeCooldownGroup(value)
     local group = tostring(value or "")
     return group ~= "" and group or nil
+end
+
+local function normalizeCooldownChannelId(value)
+    local channelId = tonumber(value)
+    if channelId == nil
+        or channelId % 1 ~= 0
+        or channelId < COOLDOWN_CHANNEL_MIN_ID
+        or channelId > COOLDOWN_CHANNEL_MAX_ID
+    then
+        return nil
+    end
+    return channelId
+end
+
+local function normalizeCooldownChannelName(value)
+    local name = tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    return name ~= "" and name or nil
 end
 
 local function copyResourceMap(values)
@@ -128,13 +146,25 @@ function ActionEconomy.CreateInput(candidate, activationMetadata)
         return nil, "spell-ref-unavailable"
     end
 
-    local usesGlobalCooldown = metadata.usesGlobalCooldown
-    local ignoresGlobalCooldown = metadata.ignoresGlobalCooldown
-    if type(usesGlobalCooldown) ~= "boolean" then
-        usesGlobalCooldown = nil
+    local cooldownChannelId = normalizeCooldownChannelId(
+        metadata.cooldownChannelId
+            or type(activationSnapshot) == "table" and activationSnapshot.cooldownChannelId
+    )
+    local cooldownChannelTriggersGCD = metadata.cooldownChannelTriggersGCD
+    if cooldownChannelTriggersGCD == nil and type(activationSnapshot) == "table" then
+        cooldownChannelTriggersGCD = activationSnapshot.cooldownChannelTriggersGCD
     end
-    if type(ignoresGlobalCooldown) ~= "boolean" then
-        ignoresGlobalCooldown = nil
+    if type(cooldownChannelTriggersGCD) ~= "boolean" then
+        cooldownChannelTriggersGCD = nil
+    end
+    local cooldownChannelConfigured = metadata.cooldownChannelConfigured
+    if cooldownChannelConfigured == nil and type(activationSnapshot) == "table" then
+        cooldownChannelConfigured = activationSnapshot.cooldownChannelId ~= nil
+            and type(activationSnapshot.cooldownChannelTriggersGCD) == "boolean"
+            and normalizeCooldownChannelName(activationSnapshot.cooldownChannelName) ~= nil
+    end
+    if type(cooldownChannelConfigured) ~= "boolean" then
+        cooldownChannelConfigured = cooldownChannelId ~= nil and cooldownChannelTriggersGCD ~= nil
     end
 
     return {
@@ -142,8 +172,14 @@ function ActionEconomy.CreateInput(candidate, activationMetadata)
         spellRef = spellRef,
         canCast = canCast == true,
         persistentCastTurns = normalizePositiveTurnCount(metadata.persistentCastTurns),
-        usesGlobalCooldown = usesGlobalCooldown,
-        ignoresGlobalCooldown = ignoresGlobalCooldown,
+        cooldownChannelId = cooldownChannelId,
+        cooldownChannelName = normalizeCooldownChannelName(
+            metadata.cooldownChannelName
+                or type(activationSnapshot) == "table" and activationSnapshot.cooldownChannelName
+        ),
+        cooldownChannelTriggersGCD = cooldownChannelTriggersGCD,
+        cooldownChannelConfigured = cooldownChannelConfigured == true,
+        cooldownChannelReason = tostring(metadata.cooldownChannelReason or ""),
         cooldownGroup = normalizeCooldownGroup(metadata.cooldownGroup),
         resourceCommitments = copyResourceMap(metadata.resourceCommitments),
         inputIndex = 0,
@@ -154,6 +190,15 @@ function ActionEconomy.ClassifyInput(entry)
     if type(entry) ~= "table" then
         return nil, "candidate-unavailable"
     end
+    if normalizeRef(entry.spellRef) == nil then
+        return nil, "spell-ref-unavailable"
+    end
+    if entry.cooldownChannelConfigured ~= true
+        or normalizeCooldownChannelId(entry.cooldownChannelId) == nil
+        or type(entry.cooldownChannelTriggersGCD) ~= "boolean"
+    then
+        return nil, entry.cooldownChannelReason ~= "" and entry.cooldownChannelReason or "invalid-cooldown-channel"
+    end
     if entry.canCast ~= true then
         return nil, "illegal-activation"
     end
@@ -161,21 +206,11 @@ function ActionEconomy.ClassifyInput(entry)
         return nil, "not-useful"
     end
 
-    if type(entry.usesGlobalCooldown) ~= "boolean" or type(entry.ignoresGlobalCooldown) ~= "boolean" then
-        return nil, "gcd-metadata-unavailable"
-    end
-    if entry.usesGlobalCooldown == true and entry.ignoresGlobalCooldown == true then
-        return nil, "gcd-metadata-conflict"
-    end
-
     if normalizePositiveTurnCount(entry.persistentCastTurns) ~= nil then
         return "terminal"
     end
 
-    if entry.usesGlobalCooldown == true then
-        return "primary"
-    end
-    return "auxiliary"
+    return "action"
 end
 
 function ActionEconomy.CreateLedger(availableResources)
@@ -184,8 +219,7 @@ function ActionEconomy.CreateLedger(availableResources)
         reservedResources = {},
         reservedCooldownGroups = {},
         reservedSpellRefs = {},
-        ignoreGCDCommitted = false,
-        primaryGCDCommitted = false,
+        reservedCooldownChannels = {},
         terminalCastCommitted = false,
     }
 end
@@ -197,13 +231,12 @@ function ActionEconomy.CloneLedger(ledger)
         reservedResources = copyResourceMap(source.reservedResources),
         reservedCooldownGroups = copyMap(source.reservedCooldownGroups),
         reservedSpellRefs = copyMap(source.reservedSpellRefs),
-        ignoreGCDCommitted = source.ignoreGCDCommitted == true,
-        primaryGCDCommitted = source.primaryGCDCommitted == true,
+        reservedCooldownChannels = copyMap(source.reservedCooldownChannels),
         terminalCastCommitted = source.terminalCastCommitted == true,
     }
 end
 
-local function reserveEntry(ledger, entry, actionClass)
+local function reserveEntry(ledger, entry)
     ledger.reservedSpellRefs[entry.spellRef] = true
 
     for resourceRef, amount in pairs(entry.resourceCommitments or {}) do
@@ -214,16 +247,11 @@ local function reserveEntry(ledger, entry, actionClass)
     if entry.cooldownGroup then
         ledger.reservedCooldownGroups[entry.cooldownGroup] = entry.spellRef
     end
-    if entry.ignoresGlobalCooldown == true then
-        ledger.ignoreGCDCommitted = true
+    if entry.cooldownChannelTriggersGCD == true then
+        ledger.reservedCooldownChannels[entry.cooldownChannelId] = entry.spellRef
     end
-    if actionClass == "primary" then
-        ledger.primaryGCDCommitted = true
-    elseif actionClass == "terminal" then
+    if entry.actionClass == "terminal" then
         ledger.terminalCastCommitted = true
-        if entry.usesGlobalCooldown == true then
-            ledger.primaryGCDCommitted = true
-        end
     end
 end
 
@@ -244,13 +272,13 @@ local function resourceConflictReason(ledger, entry)
     return nil
 end
 
-function ActionEconomy.CanReserveAuxiliary(ledger, entry)
+function ActionEconomy.CanReserve(ledger, entry)
     if type(ledger) ~= "table" or type(entry) ~= "table" then
         return false, "reservation-context-unavailable"
     end
     local actionClass, classReason = ActionEconomy.ClassifyInput(entry)
-    if actionClass ~= "auxiliary" then
-        return false, classReason or "not-auxiliary"
+    if not actionClass then
+        return false, classReason or "unclassified"
     end
     if ledger.reservedSpellRefs[entry.spellRef] == true then
         return false, "spell-already-reserved"
@@ -258,8 +286,13 @@ function ActionEconomy.CanReserveAuxiliary(ledger, entry)
     if entry.cooldownGroup and ledger.reservedCooldownGroups[entry.cooldownGroup] ~= nil then
         return false, "cooldown-group-conflict"
     end
-    if entry.ignoresGlobalCooldown == true and ledger.ignoreGCDCommitted == true then
-        return false, "ignore-gcd-peer-lockout"
+    if entry.cooldownChannelTriggersGCD == true
+        and ledger.reservedCooldownChannels[entry.cooldownChannelId] ~= nil
+    then
+        return false, "cooldown-channel-conflict"
+    end
+    if actionClass == "terminal" and ledger.terminalCastCommitted == true then
+        return false, "terminal-cast-conflict"
     end
 
     local resourceReason = resourceConflictReason(ledger, entry)
@@ -277,31 +310,12 @@ local function appendRejected(rejected, entry, reason)
     }
 end
 
-local function selectBestMain(mainCandidates, compareCandidates)
-    local best = nil
-    for index = 1, #mainCandidates do
-        local entry = mainCandidates[index]
-        if type(best) ~= "table" then
-            best = entry
-        else
-            local compared = compareEntries(entry, best, compareCandidates)
-            if compared == nil then
-                return nil, "comparator-unavailable"
-            end
-            if compared > 0 then
-                best = entry
-            end
-        end
-    end
-    return best
-end
-
-local function sortAuxiliaries(auxiliaries, compareCandidates)
-    if #auxiliaries <= 1 then
+local function sortEntries(entries, compareCandidates)
+    if #entries <= 1 then
         return true
     end
     local comparatorAvailable = true
-    table.sort(auxiliaries, function(left, right)
+    table.sort(entries, function(left, right)
         local compared = compareEntries(left, right, compareCandidates)
         if compared == nil then
             comparatorAvailable = false
@@ -312,12 +326,36 @@ local function sortAuxiliaries(auxiliaries, compareCandidates)
     return comparatorAvailable
 end
 
+local function buildSequenceResult(status, reason, ledger, rejected, actions, selectedByChannel, terminal)
+    local selectedActions = type(actions) == "table" and actions or {}
+    local selectedTerminal = type(terminal) == "table" and terminal or nil
+    local regularActions = {}
+    for index = 1, #selectedActions do
+        if selectedActions[index] ~= selectedTerminal then
+            regularActions[#regularActions + 1] = selectedActions[index]
+        end
+    end
+
+    return {
+        status = status,
+        reason = reason,
+        actions = selectedActions,
+        selectedByChannel = copyMap(selectedByChannel),
+        terminal = selectedTerminal,
+        ledger = ActionEconomy.CloneLedger(ledger),
+        rejected = rejected or {},
+        -- Compatibility views. `actions`, `selectedByChannel` and `terminal`
+        -- are authoritative for channel-aware planning.
+        auxiliaries = regularActions,
+        main = selectedTerminal,
+    }
+end
+
 function ActionEconomy.BuildSequence(inputs, options)
     options = type(options) == "table" and options or {}
     local compareCandidates = options.compareCandidates
     local ledger = ActionEconomy.CreateLedger(options.availableResources)
-    local mainCandidates = {}
-    local auxiliaries = {}
+    local entries = {}
     local rejected = {}
 
     for index = 1, #(inputs or {}) do
@@ -325,21 +363,21 @@ function ActionEconomy.BuildSequence(inputs, options)
         local entry = nil
         local reason = nil
         if type(source) == "table" and type(source.candidate) == "table" and source.spellRef ~= nil then
-            local usesGlobalCooldown = nil
-            local ignoresGlobalCooldown = nil
-            if type(source.usesGlobalCooldown) == "boolean" then
-                usesGlobalCooldown = source.usesGlobalCooldown
-            end
-            if type(source.ignoresGlobalCooldown) == "boolean" then
-                ignoresGlobalCooldown = source.ignoresGlobalCooldown
-            end
             entry = {
                 candidate = source.candidate,
                 spellRef = normalizeRef(source.spellRef),
                 canCast = source.canCast == true,
                 persistentCastTurns = normalizePositiveTurnCount(source.persistentCastTurns),
-                usesGlobalCooldown = usesGlobalCooldown,
-                ignoresGlobalCooldown = ignoresGlobalCooldown,
+                cooldownChannelId = normalizeCooldownChannelId(source.cooldownChannelId),
+                cooldownChannelName = normalizeCooldownChannelName(source.cooldownChannelName),
+                cooldownChannelTriggersGCD = type(source.cooldownChannelTriggersGCD) == "boolean"
+                    and source.cooldownChannelTriggersGCD
+                    or nil,
+                cooldownChannelConfigured = type(source.cooldownChannelConfigured) == "boolean"
+                    and source.cooldownChannelConfigured
+                    or (normalizeCooldownChannelId(source.cooldownChannelId) ~= nil
+                        and type(source.cooldownChannelTriggersGCD) == "boolean"),
+                cooldownChannelReason = tostring(source.cooldownChannelReason or ""),
                 cooldownGroup = normalizeCooldownGroup(source.cooldownGroup),
                 resourceCommitments = copyResourceMap(source.resourceCommitments),
                 inputIndex = index,
@@ -356,75 +394,44 @@ function ActionEconomy.BuildSequence(inputs, options)
         else
             local actionClass, classReason = ActionEconomy.ClassifyInput(entry)
             entry.actionClass = actionClass
-            if actionClass == "auxiliary" then
-                auxiliaries[#auxiliaries + 1] = entry
-            elseif actionClass == "primary" or actionClass == "terminal" then
-                mainCandidates[#mainCandidates + 1] = entry
+            if actionClass then
+                entries[#entries + 1] = entry
             else
                 appendRejected(rejected, entry, classReason or "unclassified")
             end
         end
     end
 
-    local main, mainReason = selectBestMain(mainCandidates, compareCandidates)
-    if mainReason then
-        return {
-            status = "failed",
-            reason = mainReason,
-            actions = {},
-            auxiliaries = {},
-            main = nil,
-            ledger = ActionEconomy.CloneLedger(ledger),
-            rejected = rejected,
-        }
-    end
-    if type(main) == "table" then
-        reserveEntry(ledger, main, main.actionClass)
+    if sortEntries(entries, compareCandidates) ~= true then
+        return buildSequenceResult("failed", "comparator-unavailable", ledger, rejected, {}, {}, nil)
     end
 
-    if sortAuxiliaries(auxiliaries, compareCandidates) ~= true then
-        return {
-            status = "failed",
-            reason = "comparator-unavailable",
-            actions = {},
-            auxiliaries = {},
-            main = nil,
-            ledger = ActionEconomy.CloneLedger(ledger),
-            rejected = rejected,
-        }
-    end
-    local selectedAuxiliaries = {}
-    for index = 1, #auxiliaries do
-        local entry = auxiliaries[index]
-        if #selectedAuxiliaries >= ActionEconomy.MAX_AUXILIARY_ACTIONS_PER_NPC then
-            appendRejected(rejected, entry, "auxiliary-cap")
-        else
-            local compatible, compatibilityReason = ActionEconomy.CanReserveAuxiliary(ledger, entry)
-            if compatible then
-                reserveEntry(ledger, entry, "auxiliary")
-                selectedAuxiliaries[#selectedAuxiliaries + 1] = entry
+    local selectedActions = {}
+    local selectedByChannel = {}
+    local terminal = nil
+    for index = 1, #entries do
+        local entry = entries[index]
+        local compatible, compatibilityReason = ActionEconomy.CanReserve(ledger, entry)
+        if compatible then
+            reserveEntry(ledger, entry)
+            if entry.actionClass == "terminal" then
+                terminal = entry
             else
-                appendRejected(rejected, entry, compatibilityReason)
+                selectedActions[#selectedActions + 1] = entry
             end
+            if entry.cooldownChannelTriggersGCD == true then
+                selectedByChannel[entry.cooldownChannelId] = entry.spellRef
+            end
+        else
+            appendRejected(rejected, entry, compatibilityReason)
         end
     end
 
-    local actions = {}
-    for index = 1, #selectedAuxiliaries do
-        actions[#actions + 1] = selectedAuxiliaries[index]
-    end
-    if type(main) == "table" then
-        actions[#actions + 1] = main
+    if terminal then
+        selectedActions[#selectedActions + 1] = terminal
     end
 
-    return {
-        status = "ready",
-        actions = actions,
-        auxiliaries = selectedAuxiliaries,
-        main = main,
-        ledger = ActionEconomy.CloneLedger(ledger),
-        rejected = rejected,
-    }
+    return buildSequenceResult("ready", nil, ledger, rejected, selectedActions, selectedByChannel, terminal)
 end
 
 return ActionEconomy

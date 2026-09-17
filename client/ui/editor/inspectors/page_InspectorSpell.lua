@@ -199,14 +199,6 @@ function DataEditor:RefreshSpellInspectorPage()
         self.SpellInspectorCastTimeSlider:SetValue(spell and spell.castTime or 0, true)
         self:SetSpellInspectorSliderEnabled(self.SpellInspectorCastTimeSlider, hasSpell)
     end
-    if self.SpellInspectorTriggersGCDCheckbox then
-        self.SpellInspectorTriggersGCDCheckbox:SetChecked(spell and spell.ignoreGCD ~= true and spell.triggersGCD == true or false, true)
-        self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorTriggersGCDCheckbox, hasSpell and spell and spell.ignoreGCD ~= true)
-    end
-    if self.SpellInspectorIgnoreGCDCheckbox then
-        self.SpellInspectorIgnoreGCDCheckbox:SetChecked(spell and spell.ignoreGCD == true or false, true)
-        self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorIgnoreGCDCheckbox, hasSpell)
-    end
     if self.SpellInspectorCooldownSlider then
         self.SpellInspectorCooldownSlider:SetValue(spell and spell.cooldown or 1, true)
         self:SetSpellInspectorSliderEnabled(self.SpellInspectorCooldownSlider, hasSpell)
@@ -222,6 +214,12 @@ function DataEditor:RefreshSpellInspectorPage()
     if self.SpellInspectorCooldownGroupInput then
         self.SpellInspectorCooldownGroupInput:SetText(spell and (spell.cooldownGroup or "") or "")
         self:SetSpellInspectorTextElementEnabled(self.SpellInspectorCooldownGroupInput, hasSpell)
+    end
+    if self.SpellInspectorCooldownChannelDropdown then
+        local channelItems, effectiveChannelId = self:BuildSpellInspectorCooldownChannelItems(spell)
+        self.SpellInspectorCooldownChannelDropdown:SetItems(channelItems)
+        self.SpellInspectorCooldownChannelDropdown:SetSelectedValue(effectiveChannelId, true)
+        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorCooldownChannelDropdown, hasSpell and effectiveChannelId ~= nil)
     end
     if self.SpellInspectorMountedCombatOnlyCheckbox then
         self.SpellInspectorMountedCombatOnlyCheckbox:SetChecked(spell and spell.mountedCombatOnly == true or false, true)

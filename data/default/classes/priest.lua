@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 13,
+    version = 14,
     dataset = {
         achievements = {},
         auras = {
@@ -665,7 +665,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_heal.blp",
                 id = "eet5xd4t",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Heal",
@@ -697,7 +697,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -738,7 +737,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_powerwordshield.blp",
                 id = "pwshld01",
-                ignoreGCD = false,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Power Word: Shield",
@@ -790,7 +789,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -845,7 +843,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_greaterheal.blp",
                 id = "dbk3frh2",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Greater Heal",
@@ -877,7 +875,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -932,7 +929,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_lesserheal.blp",
                 id = "h3n22bv2",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Lesser Heal",
@@ -964,7 +961,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1052,7 +1048,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_blindingheal.blp",
                 id = "b7dot26a",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Binding Heal",
@@ -1090,7 +1086,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1145,7 +1140,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_flashheal.blp",
                 id = "5yht8j0f",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Flash Heal",
@@ -1177,7 +1172,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1217,7 +1211,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_renew.blp",
                 id = "qqkkenuw",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Renew",
@@ -1269,7 +1263,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1345,7 +1338,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_holysmite.blp",
                 id = "rm9rekvj",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Smite",
@@ -1377,7 +1370,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1454,7 +1446,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_searinglight.blp",
                 id = "1x1q35og",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Holy Fire",
@@ -1512,7 +1504,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1552,7 +1543,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_painsupression.blp",
                 id = "mnuc5di4",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Pain Suppression",
@@ -1596,7 +1587,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1636,7 +1626,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_divinespirit.blp",
                 id = "lg9aex8t",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Divine Spirit",
@@ -1680,7 +1670,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1720,7 +1709,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_wordfortitude.blp",
                 id = "hhxhszcv",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Prayer of Fortitude",
@@ -1764,7 +1753,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1804,7 +1792,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_prayerofshadowprotection.blp",
                 id = "ilkjmlyk",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Prayer of Shadow Protection",
@@ -1856,7 +1844,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1896,7 +1883,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_psychicscream.blp",
                 id = "3ctxnb99",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Psychic Scream",
@@ -1940,7 +1927,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1980,7 +1966,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_psychichorrors.blp",
                 id = "5q7jx4c1",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Psychic Horror",
@@ -2024,7 +2010,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2076,7 +2061,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_shadowwordpain.blp",
                 id = "drza38ax",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Shadow Word: Pain",
@@ -2128,7 +2113,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2190,7 +2174,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_stoicism.blp",
                 id = "k71jmcz0",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Vampiric Touch",
@@ -2278,7 +2262,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2342,7 +2325,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_unholyfrenzy.blp",
                 id = "oe32yzws",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Mind Blast",
@@ -2374,7 +2357,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2439,7 +2421,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_priest_mindspike.blp",
                 id = "vmtnl0y4",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Mind Spike",
@@ -2500,7 +2482,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2564,7 +2545,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_siphonmana.blp",
                 id = "u8dvti6t",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Mind Flay",
@@ -2596,7 +2577,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2668,7 +2648,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_demonicfortitude.blp",
                 id = "3z4hi35b",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Shadow Word: Death",
@@ -2700,7 +2680,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             }
         },

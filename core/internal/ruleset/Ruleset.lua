@@ -19,9 +19,50 @@ local function refreshVisibleProfileWindow()
 
     return false
 end
+
+local function refreshVisibleDataEditor()
+    local dataEditor = Addon.Client and Addon.Client.UI and Addon.Client.UI.Editor or nil
+    if not (dataEditor and dataEditor.IsWindowVisible and dataEditor:IsWindowVisible()) then
+        return false
+    end
+
+    if dataEditor.RefreshSpellInspectorPage then
+        dataEditor:RefreshSpellInspectorPage()
+        return true
+    end
+
+    return false
+end
 local Rules = Addon.Internal.Ruleset.Rules or {}
 local Database = Addon.Internal.Database or {}
 local RULESET_CATEGORY_DEFINITIONS = Rules.Definitions or {}
+local COOLDOWN_CHANNEL_MIN_ID = 1
+local COOLDOWN_CHANNEL_MAX_ID = 10
+
+local function normalizeCooldownChannelId(channelId)
+    if type(channelId) ~= "number"
+        or channelId % 1 ~= 0
+        or channelId < COOLDOWN_CHANNEL_MIN_ID
+        or channelId > COOLDOWN_CHANNEL_MAX_ID
+    then
+        return nil
+    end
+
+    return channelId
+end
+
+local function trimText(value)
+    if type(value) ~= "string" then
+        return ""
+    end
+
+    local trimmed = value:gsub("^%s+", ""):gsub("%s+$", "")
+    return trimmed
+end
+
+local function getCooldownChannelRuleKey(channelId, suffix)
+    return ("cooldown_channel_%d_%s"):format(channelId, suffix)
+end
 
 local function findCategoryDefinition(categoryKey)
     for index = 1, #RULESET_CATEGORY_DEFINITIONS do
@@ -148,6 +189,7 @@ function Ruleset.SetActiveRulesetId(rulesetId)
 
     local activeId = Database.SetActiveRulesetId(rulesetId)
     refreshVisibleProfileWindow()
+    refreshVisibleDataEditor()
     return activeId
 end
 
@@ -261,6 +303,63 @@ function Ruleset.GetRulesetRuleValueByKey(ruleset, categoryKey, ruleKey, default
     return value
 end
 
+function Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    local normalizedChannelId = normalizeCooldownChannelId(channelId)
+    if not normalizedChannelId then
+        return nil
+    end
+
+    local ruleset = rulesetOverride
+    if ruleset == nil then
+        ruleset = Ruleset.GetActiveRuleset()
+    end
+
+    local name = Ruleset.GetRulesetRuleValueByKey(
+        ruleset,
+        "action_economy",
+        getCooldownChannelRuleKey(normalizedChannelId, "name"),
+        ""
+    )
+    local triggersGCD = Ruleset.GetRulesetRuleValueByKey(
+        ruleset,
+        "action_economy",
+        getCooldownChannelRuleKey(normalizedChannelId, "triggers_gcd"),
+        false
+    ) == true
+    local normalizedName = trimText(name)
+
+    return {
+        id = normalizedChannelId,
+        name = normalizedName,
+        triggersGCD = triggersGCD,
+        enabled = normalizedName ~= "",
+    }
+end
+
+function Ruleset.GetCooldownChannels(rulesetOverride)
+    local channels = {}
+    for channelId = COOLDOWN_CHANNEL_MIN_ID, COOLDOWN_CHANNEL_MAX_ID do
+        channels[#channels + 1] = Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    end
+
+    return channels
+end
+
+function Ruleset.IsCooldownChannelEnabled(channelId, rulesetOverride)
+    local channel = Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    return channel ~= nil and channel.enabled == true
+end
+
+function Ruleset.DoesCooldownChannelTriggerGCD(channelId, rulesetOverride)
+    local channel = Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    return channel ~= nil and channel.triggersGCD == true
+end
+
+function Ruleset.GetCooldownChannelName(channelId, rulesetOverride)
+    local channel = Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    return channel and channel.name or nil
+end
+
 function Ruleset.SetRulesetRuleValue(rulesetId, categoryKey, ruleDefinition, value)
     local ruleset = Ruleset.GetRulesetByID(rulesetId)
     if not ruleset or not ruleDefinition then
@@ -274,10 +373,12 @@ function Ruleset.SetRulesetRuleValue(rulesetId, categoryKey, ruleDefinition, val
     if Database and Database.UpdateRulesetMetadata then
         local updated = Database.UpdateRulesetMetadata(ruleset.id, { rules = ruleset.rules })
         refreshVisibleProfileWindow()
+        refreshVisibleDataEditor()
         return updated
     end
 
     refreshVisibleProfileWindow()
+    refreshVisibleDataEditor()
     return ruleset
 end
 

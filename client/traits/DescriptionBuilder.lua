@@ -437,6 +437,23 @@ local function resolveStatName(statRef)
     return ensureString(statId or statRef, "a stat")
 end
 
+local function resolveDefenceLabel(statRef)
+    local normalizedRef = ensureString(statRef)
+    if normalizedRef == "" then
+        return nil
+    end
+
+    if type(Registry.ResolveStatReference) == "function" then
+        local _, stat = Registry:ResolveStatReference(normalizedRef)
+        local defenceLabel = trimText(stat and stat.defenceLabel or "")
+        if defenceLabel ~= "" then
+            return defenceLabel
+        end
+    end
+
+    return resolveStatName(normalizedRef)
+end
+
 local function resolveSkillName(skillRef)
     local resolvedRow = type(Profile.GetResolvedSkillRow) == "function" and Profile.GetResolvedSkillRow(skillRef) or nil
     local resolvedName = resolvedRow and resolvedRow.name or nil
@@ -604,12 +621,31 @@ local function resolveTriggeredTargetContext(combatEventId, triggerTarget)
     then
         return buildOwnerTargetContext()
     end
+    if eventId == "on_taunt" then
+        return buildGenericTargetContext("the taunted target", "the taunted target", "the taunted target's")
+    end
+    if eventId == "on_taunted" then
+        return buildGenericTargetContext("the taunter", "the taunter", "the taunter's")
+    end
 
     return buildGenericTargetContext("the other unit", "the other unit", "the other unit's")
 end
 
-local function resolveCombatTriggerLabel(combatEventId)
+local function resolveCombatTriggerLabel(combatEventId, defenceStatRef)
     local eventId = tostring(combatEventId or "")
+    if eventId == "on_taunt" then
+        return "When you taunt an enemy"
+    end
+    if eventId == "on_taunted" then
+        return "When you are taunted"
+    end
+    if eventId == "on_defence" then
+        local defenceLabel = resolveDefenceLabel(defenceStatRef)
+        if defenceLabel then
+            return ("When you successfully %s an attack"):format(string.lower(defenceLabel))
+        end
+        return "When you successfully defend against an attack"
+    end
     if eventId == "on_auto_attack_hit" then
         return "When you hit with a basic attack"
     end
@@ -880,7 +916,10 @@ function TraitDescriptionBuilder:BuildGeneratedDescription(detail, casterUnit)
         end
 
         if #clauses > 0 then
-            local prefix = resolveCombatTriggerLabel(eventEntry and eventEntry.combatEventId or nil)
+            local prefix = resolveCombatTriggerLabel(
+                eventEntry and eventEntry.combatEventId or nil,
+                eventEntry and eventEntry.defenceStatRef or nil
+            )
             local chance = normalizeChancePercent(eventEntry and eventEntry.chance)
             if chance < 100 then
                 prefix = ("%s (%g%% chance)"):format(prefix, chance)

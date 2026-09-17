@@ -1336,6 +1336,9 @@ local function isOutcomeBoundHookEventId(eventId)
         or eventId == "on_critical_hit_taken"
         or eventId == "on_critical_heal"
         or eventId == "on_critical_heal_taken"
+        or eventId == "on_taunt"
+        or eventId == "on_taunted"
+        or eventId == "on_defence"
 end
 
 local function shouldEmitHookEvent(eventId, emission)
@@ -1348,6 +1351,10 @@ local function shouldEmitHookEvent(eventId, emission)
     local attackType = tostring(type(emission) == "table" and emission.attackType or "")
     local hitType = tostring(type(emission) == "table" and emission.hitType or "")
     local wasCritical = type(emission) == "table" and emission.wasCritical == true or false
+
+    if eventId == "on_taunt" or eventId == "on_taunted" or eventId == "on_defence" then
+        return false
+    end
 
     if eventId == "on_auto_attack_hit" then
         return role == "caster" and effectType == "damage" and hitType == "auto"

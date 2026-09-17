@@ -274,6 +274,11 @@ local function normalizeChancePercent(value)
     return math.max(0, math.min(100, numericValue))
 end
 
+local function normalizeDefenceStatRef(value)
+    local reference = ensureString(value)
+    return reference ~= "" and reference or nil
+end
+
 local function normalizeEffect(value)
     if type(value) ~= "table" then
         return nil
@@ -460,6 +465,7 @@ local function normalizeEvent(value)
 
     return {
         combatEventId = combatEventId,
+        defenceStatRef = combatEventId == "on_defence" and normalizeDefenceStatRef(value.defenceStatRef) or nil,
         triggerTarget = triggerTarget,
         chance = normalizeChancePercent(value.chance),
         effects = normalizeEventEffects(value.effects),

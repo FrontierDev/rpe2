@@ -80,6 +80,21 @@ local EVENT_DEFINITIONS = {
         label = "On Critical Heal Taken",
         recipientRole = "target",
     },
+    {
+        id = "on_taunt",
+        label = "On Taunt",
+        recipientRole = "caster",
+    },
+    {
+        id = "on_taunted",
+        label = "On Taunted",
+        recipientRole = "target",
+    },
+    {
+        id = "on_defence",
+        label = "On Defence",
+        recipientRole = "target",
+    },
 }
 
 local EVENT_DEFINITIONS_BY_ID = {}
@@ -204,6 +219,7 @@ function Events:Run(client, context)
                 recipientEventId = definition.recipientRole == "target" and targetEventId or sourceEventId,
                 eventSourceUnit = sourceUnit,
                 eventOtherUnit = targetUnit,
+                defenceStatRef = context.defenceStatRef,
                 casterEventId = sourceEventId,
                 targetEventId = targetEventId,
                 actionContext = context.actionContext or context,

@@ -1539,14 +1539,27 @@ end
 
 -- Canonical pure spell classification helpers. Keep planner projections and
 -- live cooldown/lifecycle rules on the same definitions.
-function Spellcasting.SpellIgnoresGlobalCooldown(spell)
-    return type(spell) == "table" and spell.ignoreGCD == true
-end
+function Spellcasting.ResolveSpellCooldownChannel(spell, rulesetOverride)
+    local classes = Addon.Internal
+        and Addon.Internal.Database
+        and Addon.Internal.Database.Classes
+        or nil
+    local spellClass = classes and classes.Spell or nil
+    if type(spellClass) ~= "table" or type(spellClass.ResolveCooldownChannel) ~= "function" then
+        return nil, nil, "unavailable", "spell-channel-resolver-unavailable"
+    end
 
-function Spellcasting.SpellUsesGlobalCooldown(spell)
-    return Spellcasting.SpellIgnoresGlobalCooldown(spell) ~= true
-        and type(spell) == "table"
-        and spell.triggersGCD == true
+    local channelId, source, reason = spellClass.ResolveCooldownChannel(spell)
+    if channelId == nil then
+        return nil, nil, source, reason
+    end
+
+    local channel = nil
+    if type(Ruleset.GetCooldownChannel) == "function" then
+        channel = Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    end
+
+    return channelId, channel, source, reason
 end
 
 function Spellcasting.ResolvePersistentCastTurns(spell, turnCountOverride)

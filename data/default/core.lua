@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 22,
+    version = 23,
     dataset = {
         achievements = {},
         auras = {},
@@ -2980,7 +2980,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/petbattle_attack.blp",
                 id = "z36xzk0w",
-                ignoreGCD = false,
+                cooldownChannel = 4,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Main Hand Attack",
@@ -3004,7 +3004,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -3074,7 +3073,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_rogue_slicedice.blp",
                 id = "wydraqj8",
-                ignoreGCD = false,
+                cooldownChannel = 4,
                 learnMode = "always_learned",
                 mountedCombatOnly = true,
                 name = "Mounted Attack",
@@ -3091,7 +3090,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -3153,7 +3151,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_ghoulfrenzy.blp",
                 id = "6uix049h",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "trainer",
                 mountedCombatOnly = false,
                 name = "Pet Attack",
@@ -3172,7 +3170,6 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -3209,7 +3206,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_hunter_beastcall.blp",
                 id = "gn37lpvz",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Summon Pet",
@@ -3220,7 +3217,6 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -3265,7 +3261,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_marksmanship.blp",
                 id = "shoota01",
-                ignoreGCD = false,
+                cooldownChannel = 4,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Shoot",
@@ -3289,7 +3285,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -3316,7 +3311,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 conditions = { { invert = false, showOnTooltip = true, slotKey = "ranged", tooltipTextOverride = "Requires a thrown weapon", type = "item_equipped", weaponTypeRefs = { "f82db71a:we5ul4ne" } } },
                 cooldown = 0, cooldownGroup = "", cooldownScalesWithHaste = false, description = "",
-                icon = "interface/icons/inv_throwingknife_02.blp", id = "throwa01", ignoreGCD = false, learnMode = "always_learned", mountedCombatOnly = false,
+                icon = "interface/icons/inv_throwingknife_02.blp", id = "throwa01", cooldownChannel = 4, learnMode = "always_learned", mountedCombatOnly = false,
                 name = "Throw", range = 0, resourceCosts = {}, seedNPCSpell = true, spellbookCategory = "", tags = {}, tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
@@ -3324,7 +3319,7 @@ Addon.Data.DefaultDatasets:Register({
                     tokens = { { applyMode = "damage_range", componentIndex = 1, key = "DAMAGE_1", tokenType = "spell_damage_range" } },
                     version = 1
                 },
-                totalTicks = 0, triggersGCD = true, useCooldownCharges = false
+                totalTicks = 0,  useCooldownCharges = false
             },
             {
                 allowDeadTargets = false,
@@ -3350,7 +3345,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 conditions = { { invert = false, showOnTooltip = true, slotKey = "ranged", tooltipTextOverride = "Requires a wand", type = "item_equipped", weaponTypeRefs = { "f82db71a:s4q9t5f3" } } },
                 cooldown = 0, cooldownGroup = "", cooldownScalesWithHaste = false, description = "",
-                icon = "interface/icons/ability_shootwand.blp", id = "wandauto", ignoreGCD = false, learnMode = "always_learned", mountedCombatOnly = false,
+                icon = "interface/icons/ability_shootwand.blp", id = "wandauto", cooldownChannel = 4, learnMode = "always_learned", mountedCombatOnly = false,
                 name = "Wand", range = 0, resourceCosts = {}, seedNPCSpell = true, spellbookCategory = "", tags = {}, tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
@@ -3358,7 +3353,7 @@ Addon.Data.DefaultDatasets:Register({
                     tokens = { { applyMode = "damage_range", componentIndex = 1, key = "DAMAGE_1", tokenType = "spell_damage_range" } },
                     version = 1
                 },
-                totalTicks = 0, triggersGCD = true, useCooldownCharges = false
+                totalTicks = 0,  useCooldownCharges = false
             },
             {
                 _resourceCostsByPhase = {
@@ -3442,7 +3437,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/petbattle_attack-down.blp",
                 id = "zd3t6feq",
-                ignoreGCD = true,
+                cooldownChannel = 4,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Off Hand Attack",
@@ -3466,7 +3461,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             }
         },

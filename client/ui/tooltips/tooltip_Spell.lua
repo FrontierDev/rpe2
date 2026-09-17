@@ -150,11 +150,19 @@ local function buildRuntimeActivationState(detail)
     local cooldownRemaining = tonumber(detail.cooldownRemaining)
     local currentCharges = tonumber(detail.currentCharges)
     local maxCharges = tonumber(detail.maxCharges)
-    if cooldownRemaining ~= nil or currentCharges ~= nil or maxCharges ~= nil then
+    local hasChannelState = detail.cooldownChannelId ~= nil or detail.channelCooldownRemaining ~= nil
+    local hasSpellRef = type(detail.spellRef) == "string" and detail.spellRef ~= ""
+    if hasChannelState
+        or ((cooldownRemaining ~= nil or currentCharges ~= nil or maxCharges ~= nil) and not hasSpellRef)
+    then
         return {
             cooldownRemaining = cooldownRemaining,
             currentCharges = currentCharges,
             maxCharges = maxCharges,
+            cooldownChannelId = detail.cooldownChannelId,
+            cooldownChannelName = detail.cooldownChannelName,
+            cooldownChannelTriggersGCD = detail.cooldownChannelTriggersGCD == true,
+            channelCooldownRemaining = tonumber(detail.channelCooldownRemaining),
         }
     end
 
@@ -296,6 +304,20 @@ local function buildCooldownRemainingText(runtimeState)
     return ("Cooldown Remaining: %s"):format(formatTurnCount(cooldownRemaining))
 end
 
+local function buildChannelCooldownRemainingText(runtimeState)
+    if type(runtimeState) ~= "table" or runtimeState.cooldownChannelTriggersGCD ~= true then
+        return nil
+    end
+
+    local channelName = tostring(runtimeState.cooldownChannelName or "")
+    local channelCooldownRemaining = math.max(0, math.floor(tonumber(runtimeState.channelCooldownRemaining) or 0))
+    if channelName == "" or channelCooldownRemaining <= 0 then
+        return nil
+    end
+
+    return ("%s cooldown: %s"):format(channelName, formatTurnCount(channelCooldownRemaining))
+end
+
 local function isBasicAttack(spell)
     if type(spell) ~= "table" then
         return false
@@ -383,6 +405,17 @@ function SpellTooltip:Build(detail, owner)
     if cooldownRemainingText then
         lines[#lines + 1] = {
             text = cooldownRemainingText,
+            r = 1,
+            g = 1,
+            b = 1,
+            wrap = true,
+        }
+    end
+
+    local channelCooldownRemainingText = buildChannelCooldownRemainingText(runtimeState)
+    if channelCooldownRemainingText then
+        lines[#lines + 1] = {
+            text = channelCooldownRemainingText,
             r = 1,
             g = 1,
             b = 1,

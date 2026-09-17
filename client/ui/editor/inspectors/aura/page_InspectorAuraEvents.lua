@@ -228,6 +228,24 @@ function DataEditor:BuildAuraInspectorEventsPage(page)
     self.AuraInspectorCombatEventGroup:AddChild(self.AuraInspectorCombatEventDropdown)
     attachMouseWheel(self.AuraInspectorCombatEventDropdown)
 
+    self.AuraInspectorDefenceStatGroup = createGroup("RPEDataEditorAuraInspectorDefenceStatGroup", "Defence Type", 18)
+    self.AuraInspectorDefenceStatDropdown = UI.CreateDropdown(self.AuraInspectorDefenceStatGroup:GetFrame(), "RPEDataEditorAuraInspectorDefenceStatDropdown", {
+        width = self.AuraInspectorFieldWidth,
+        height = 18,
+        items = self:BuildSpellInspectorDefenceStatsAcrossDatasets(),
+        onValueChanged = function(value)
+            if self._refreshingAuraInspector then
+                return
+            end
+            self:CommitSelectedAuraInspectorEvent(function(auraEvent)
+                auraEvent.defenceStatRef = value ~= "" and value or nil
+                self:NormalizeAuraInspectorEvent(auraEvent)
+            end)
+        end,
+    })
+    self.AuraInspectorDefenceStatGroup:AddChild(self.AuraInspectorDefenceStatDropdown)
+    attachMouseWheel(self.AuraInspectorDefenceStatDropdown)
+
     self.AuraInspectorTriggerTargetGroup = createGroup("RPEDataEditorAuraInspectorTriggerTargetGroup", "Trigger Target", 18)
     self.AuraInspectorTriggerTargetDropdown = UI.CreateDropdown(self.AuraInspectorTriggerTargetGroup:GetFrame(), "RPEDataEditorAuraInspectorTriggerTargetDropdown", {
         width = self.AuraInspectorFieldWidth,
