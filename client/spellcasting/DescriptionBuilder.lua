@@ -29,7 +29,7 @@ local appendThreatDescription
 
 local MIN_VARIANCE = 0.9
 local MAX_VARIANCE = 1.1
-local RAID_MARKER_TOOLTIP_NOTE = "|cffffcc00Targets must share the same raid marker.|r"
+local RAID_MARKER_TOOLTIP_NOTE = "Targets must share the same raid marker."
 
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
