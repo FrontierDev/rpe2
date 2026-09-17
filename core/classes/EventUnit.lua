@@ -13,7 +13,6 @@ local STAT_RECORD_SEPARATOR = string.char(20)
 local STAT_FIELD_SEPARATOR = string.char(19)
 local THREAT_RECORD_SEPARATOR = string.char(18)
 local THREAT_FIELD_SEPARATOR = string.char(17)
-local TAUNT_FIELD_SEPARATOR = string.char(16)
 
 local function coerceBoolean(value, defaultValue)
     if value == nil then
@@ -327,27 +326,6 @@ local function cloneThreatTable(threatTable)
     return normalizeThreatTable(threatTable)
 end
 
-local function normalizeTauntState(value)
-    if type(value) ~= "table" then
-        return nil
-    end
-
-    local sourceEventId = math.floor(tonumber(value.sourceEventId or value.sourceId) or 0)
-    local remainingTurns = math.floor(tonumber(value.remainingTurns or value.duration) or 0)
-    if sourceEventId <= 0 or remainingTurns <= 0 then
-        return nil
-    end
-
-    return {
-        sourceEventId = sourceEventId,
-        remainingTurns = remainingTurns,
-    }
-end
-
-local function cloneTauntState(value)
-    return normalizeTauntState(value)
-end
-
 local resolveSpellValue
 
 local function buildResolvedResources(eventUnit, playerCount)
@@ -597,30 +575,6 @@ local function deserializeThreatTable(text)
     return normalized
 end
 
-local function serializeTauntState(value)
-    local normalized = normalizeTauntState(value)
-    if not normalized then
-        return ""
-    end
-
-    return table.concat({
-        tostring(normalized.sourceEventId),
-        tostring(normalized.remainingTurns),
-    }, TAUNT_FIELD_SEPARATOR)
-end
-
-local function deserializeTauntState(text)
-    if type(text) ~= "string" or text == "" then
-        return nil
-    end
-
-    local values = splitPreservingEmpty(text, TAUNT_FIELD_SEPARATOR)
-    return normalizeTauntState({
-        sourceEventId = values[1],
-        remainingTurns = values[2],
-    })
-end
-
 local function normalizeHidden(value)
     return coerceBoolean(value, false)
 end
@@ -657,7 +611,6 @@ function EventUnit:New(data)
         spells = {},
         stats = {},
         threatTable = {},
-        tauntState = nil,
         active = true,
         hidden = false,
         boss = false,
@@ -677,7 +630,9 @@ function EventUnit:Merge(data)
     end
 
     for key, value in pairs(data) do
-        if key == "team" then
+        if key == "tauntState" then
+            -- Ignore legacy synchronized Taunt data; runtime ownership is host-local.
+        elseif key == "team" then
             self.team = normalizeTeam(value)
         elseif key == "initiative" then
             self.initiative = normalizeInitiative(value)
@@ -689,8 +644,6 @@ function EventUnit:Merge(data)
             self.stats = normalizeStats(value)
         elseif key == "threatTable" then
             self.threatTable = normalizeThreatTable(value)
-        elseif key == "tauntState" then
-            self.tauntState = cloneTauntState(value)
         else
             self[key] = value
         end
@@ -704,7 +657,6 @@ function EventUnit:Merge(data)
     self.spells = normalizeSpellRefs(self.spells)
     self.stats = normalizeStats(self.stats)
     self.threatTable = normalizeThreatTable(self.threatTable)
-    self.tauntState = cloneTauntState(self.tauntState)
     self.active = normalizeActive(self.isPlayer, self.active)
     self.hidden = normalizeHidden(self.hidden)
     self.boss = normalizeBoss(self.boss)
@@ -804,7 +756,6 @@ function EventUnit:ToTable()
         spells = normalizeSpellRefs(self.spells),
         stats = normalizeStats(self.stats),
         threatTable = normalizeThreatTable(self.threatTable),
-        tauntState = cloneTauntState(self.tauntState),
         active = normalizeActive(self.isPlayer, self.active),
         hidden = normalizeHidden(self.hidden),
         boss = normalizeBoss(self.boss),
@@ -929,18 +880,6 @@ end
 
 function EventUnit.DeserializeThreatTableFromNetwork(text)
     return deserializeThreatTable(text)
-end
-
-function EventUnit.SerializeTauntStateForNetwork(tauntState)
-    return serializeTauntState(tauntState)
-end
-
-function EventUnit.DeserializeTauntStateFromNetwork(text)
-    return deserializeTauntState(text)
-end
-
-function EventUnit.NormalizeTauntState(value)
-    return normalizeTauntState(value)
 end
 
 function EventUnit.FromTable(data)

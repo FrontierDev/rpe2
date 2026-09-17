@@ -101,9 +101,9 @@ function Server:HandleEventUnitTaunt(arguments, sender)
         return false
     end
 
-    if type(self.SetEventUnitTauntState) ~= "function" then
+    if type(self.SetEventTauntRuntimeState) ~= "function" then
         return false
     end
 
-    return self:SetEventUnitTauntState(targetEventId, sourceEventId, remainingTurns) == true
+    return self:SetEventTauntRuntimeState(targetEventId, sourceEventId, remainingTurns) == true
 end

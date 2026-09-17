@@ -133,6 +133,26 @@ local function buildTauntSignature(value)
     return tostring(tauntState.sourceEventId) .. ":" .. tostring(tauntState.remainingTurns)
 end
 
+local function getHostLocalTauntState(eventState, targetEventId)
+    if type(eventState) ~= "table" then
+        return nil
+    end
+
+    local eventId = tostring(eventState.id or "")
+    local normalizedTargetEventId = normalizeEventId(targetEventId)
+    local runtimeByEventId = type(Server.EventTauntRuntimeByEventId) == "table"
+        and Server.EventTauntRuntimeByEventId
+        or nil
+    local eventRuntime = eventId ~= "" and runtimeByEventId and runtimeByEventId[eventId] or nil
+    local targetRuntime = type(eventRuntime) == "table"
+        and type(eventRuntime.targets) == "table"
+        and eventRuntime.targets[normalizedTargetEventId]
+        or nil
+    return copyTauntState(targetRuntime)
+end
+
+Planner.GetHostLocalTauntState = getHostLocalTauntState
+
 local function buildEntryListSignature(entries, fields)
     local records = {}
     for index = 1, #(entries or {}) do
@@ -208,7 +228,6 @@ local function cloneEventUnit(unit)
     copy.stats = copyStatEntries(unit.stats)
     copy.spells = copyArray(unit.spells)
     copy.threatTable = copyThreatTable(unit.threatTable)
-    copy.tauntState = copyTauntState(unit.tauntState)
     copy._networkStatMode = unit._networkStatMode
 
     local mt = getmetatable(unit)
@@ -944,6 +963,10 @@ local function phaseSnapshotUnits(state, deadlineMs)
     while state.cursors.unit <= #sourceUnits do
         local frozenUnit = cloneEventUnit(sourceUnits[state.cursors.unit])
         if frozenUnit then
+            frozenUnit.tauntState = getHostLocalTauntState(
+                state.sourceEventState,
+                frozenUnit.eventID
+            )
             frozenUnit.__autopilotFrozenSignature = buildUnitFrozenSignature(frozenUnit)
             state.snapshot.eventState.units[#state.snapshot.eventState.units + 1] = frozenUnit
             local eventId = normalizeEventId(frozenUnit.eventID)
@@ -972,6 +995,7 @@ local function phaseSnapshotUnits(state, deadlineMs)
         end
     end
 
+    state.snapshot.unitsFrozen = true
     state.phase = "snapshot-positions"
     state.cursors.unit = 1
     return true
@@ -2181,6 +2205,9 @@ function Planner.IsFrozenSnapshotStale(state)
     then
         return true
     end
+    if state.snapshot.unitsFrozen ~= true then
+        return false
+    end
 
     local liveEventState = type(Server.EventState) == "table"
         and Server.EventState
@@ -2209,9 +2236,10 @@ function Planner.IsFrozenSnapshotStale(state)
 
     for eventId, frozenUnit in pairs(frozenByEventId) do
         local liveUnit = liveByEventId[eventId]
+        local liveTauntState = getHostLocalTauntState(liveEventState, eventId)
         if type(liveUnit) ~= "table"
             or buildTauntSignature(frozenUnit and frozenUnit.tauntState)
-                ~= buildTauntSignature(liveUnit.tauntState)
+                ~= buildTauntSignature(liveTauntState)
         then
             return true
         end
