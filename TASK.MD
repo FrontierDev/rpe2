@@ -1,233 +1,254 @@
 ## Context
 
-Regression in the absorption presentation added in the latest `dev` absorption update. This follows #326.
+Supersedes #329, which specified the wrong visual semantics for absorption.
 
-Observed behaviour:
+The current absorption implementation should match Blizzard's default WoW unit-frame behaviour more closely: absorption is **appended to the end of the visible health fill**, not drawn as an independent overlay from the right-hand side of the whole bar.
 
-- an incoming hit is absorbed partially or fully;
-- shield capacity is consumed;
-- there is no combat-log entry;
-- there is no event-widget ticker entry.
+Blizzard's current UI source (`Blizzard_PersonalResourceDisplay.lua`) does the following:
 
-Expected partial example:
+- obtains current health and total absorbs;
+- clamps visible absorb so it does not extend beyond the health bar;
+- appends the absorb texture after the current health/incoming-heal section;
+- shows an over-absorb glow when health + absorb exceeds the available bar width;
+- uses `Interface\\RaidFrame\\Shield-Fill`, `Shield-Overlay`, and `Shield-Overshield` textures.
 
-```text
-Incoming post-mitigation damage: 116
-Absorbed: 65
-Health damage: 51
-```
+For RPE, incoming-heal prediction is out of scope. The relevant model is therefore simply current health + absorption.
 
-The resulting damage presentation should report the actual health damage and append the absorbed amount, e.g.:
+## Correct visual behaviour
 
-```text
-... 51 Fire damage (Absorbed 65)
-```
-
-The same emitted combat-log entry should populate both combat-log history and the event-widget ticker through the existing combat-log presentation queue.
-
-## Root cause traced on current `dev`
-
-The absorption-aware formatter itself exists.
-
-`client/combat/Helpers.lua` already aggregates:
-
-```lua
-amount = damageResult.amount
-absorbedAmount = damageResult.absorbedAmount
-```
-
-and `buildAggregateDamageDetailText()` appends the absorbed amount.
-
-The problem is earlier in the remote-defender reaction path.
-
-`Combat:HandleDamageHitCheckRequest()` in `client/combat/Reaction.lua` reconstructs the defender-side damage entry from the combat whisper. Its context currently contains:
-
-```lua
-{
-    spellRef = spellRef,
-    eventState = eventState,
-    sessionState = sessionState,
-    healthResourceRef = ...,
-    immediate = true,
-    pendingScope = "reaction",
-}
-```
-
-but it does **not** contain the attacker's original `castEntry`, `spell`, or action combat-event aggregate state.
-
-Later, defender-side finalization calls:
-
-```lua
-Combat:RegisterActionDamageCombatLog(entry, damageResult)
-```
-
-which internally does:
-
-```lua
-local castEntry = context and context.castEntry
-local spell = context and context.spell
-local state = self:GetOrCreateActionCombatEventState(castEntry, spell)
-```
-
-`GetOrCreateActionCombatEventState()` returns `nil` when `castEntry` is absent. Therefore registration silently returns false and no aggregate exists to flush.
-
-This explains why damage resolved by the remote defending player can consume absorption but produce no combat-log/ticker entry.
-
-## Required architectural fix
-
-Do not make defender-side damage presentation depend on possessing the attacker's in-memory `castEntry` object.
-
-The remote defender cannot and should not share Lua object identity with the attacker's local cast state.
-
-Introduce a stable presentation/action identity that survives the hit-check request/response boundary. Reuse an existing stable combat/cast/action identifier if one already exists; otherwise extend the hit-check payload minimally with the required identity.
-
-A suitable contract is conceptually:
-
-```lua
-{
-    spellRef = "...",
-    componentKey = "...",
-    combatEventId = "...", -- or other stable cast/action id
-}
-```
-
-Then make damage combat-log registration capable of one of the following clean behaviours:
-
-1. associate the remote defender's result with an existing stable action aggregate by ID; or
-2. directly emit a complete single-target damage combat-log entry when no local aggregate object exists.
-
-Prefer preserving the current aggregation behaviour for multi-target casts where possible, but do not require an impossible cross-client `castEntry` pointer.
-
-## Avoid duplicate emission
-
-There are two clients involved in a remote-player hit:
-
-- attacker owns the original spell/cast action;
-- defender owns authoritative reaction/damage resolution.
-
-Only one authoritative damage result should be emitted for the target.
-
-Audit both:
-
-- `HandleDamageHitCheckRequest()` / defender `FinalizeLocalDamageResult()`;
-- `HandleDamageHitCheckResponse()` / attacker preview/finalization path.
-
-Do not fix the missing entry by independently emitting the same final damage line from both clients.
-
-The chosen authority must have the final post-absorption result:
-
-```lua
-preAbsorbAmount
-absorbedAmount
-amount
-```
-
-so the line cannot be generated from the attacker's pre-reaction/pre-runtime preview if that preview is not authoritative.
-
-## Combat-log data contract
-
-For partial absorption:
-
-```lua
-amountMin = 51
-amountMax = 51
-absorbedAmount = 65
-```
-
-Presentation text should be equivalent to:
+For a unit with 100 max health:
 
 ```text
-51 Fire (Absorbed 65)
+50 health, 25 absorb
+[ HEALTH 50 ][ ABSORB 25 ][ EMPTY 25 ]
 ```
-
-For full absorption:
-
-```lua
-amountMin = 0
-amountMax = 0
-absorbedAmount = 80
-```
-
-A zero-health-damage entry is valid and must still be emitted.
-
-The current `Client:NormalizeCombatLogEntry()` already accepts non-negative damage values, including zero. Do not reintroduce a positive-only gate.
-
-## Event-widget ticker
-
-Do not create a separate absorption ticker system.
-
-The existing path is:
 
 ```text
-EmitCombatLogEntry
--> HandleCombatLog / QueueCombatLogEntry
--> EventWidget:QueueCombatLogEntry
--> combat-log presentation queue
+50 health, 50 absorb
+[ HEALTH 50 ][      ABSORB 50       ]
 ```
 
-Fix the missing damage emission so the existing event-widget ticker receives the same entry automatically.
+```text
+80 health, 50 absorb
+[       HEALTH 80       ][ABSORB 20]
+                              ^
+                       overshield glow
+```
 
-This preserves:
+```text
+100 health, 50 absorb
+[            HEALTH 100            ]
+                                  ^
+                           overshield glow
+```
 
-- history/ticker consistency;
-- team colours;
-- spell icon;
-- damage-school colour/icon;
-- existing queue/coalescing behaviour.
+Absorption must **not** overlap/cover the existing health fill as its main representation.
 
-## Triggered / aura damage
+The visible absorb segment is:
 
-Audit `AuraManager.lua`'s triggered damage emission as well. It already has absorb-aware formatting and must remain consistent with direct spell damage.
+```lua
+missingHealth = math.max(0, maxHealth - currentHealth)
+visibleAbsorption = math.min(totalAbsorption, missingHealth)
+overAbsorb = totalAbsorption > missingHealth
+```
 
-Avoid ending up with one format for normal attacks and another for aura-triggered damage.
+Equivalent bar-end representation:
+
+```lua
+healthEnd = currentHealth
+absorbEnd = math.min(maxHealth, currentHealth + totalAbsorption)
+```
+
+The absorb segment occupies only the range between `healthEnd` and `absorbEnd`.
+
+## Reuse the existing ProgressBar layering
+
+`core/ui/elements/ProgressBar.lua` already has two fill layers:
+
+- `secondaryBar` on `ARTWORK`;
+- `primaryBar` on `OVERLAY`.
+
+Both are left-anchored and sized independently from `minValue`/`maxValue`.
+
+This is actually a good fit for Blizzard-style appended absorbs:
+
+```lua
+primaryValue   = currentHealth
+secondaryValue = math.min(maxHealth, currentHealth + totalAbsorption)
+```
+
+Because `secondaryBar` sits behind `primaryBar`, the secondary layer from 0 -> currentHealth is hidden by the opaque health fill, leaving only the visible segment from currentHealth -> health+absorb.
+
+This means the existing two-layer `ProgressBar` should be reused rather than maintaining the bespoke `UnitPortrait.absorptionOverlay` width/anchor system introduced for #329/#326.
+
+### Important limitation
+
+`ProgressBar` supports **two fill layers**, not arbitrary stacked layers. That is sufficient for current RPE health + absorption semantics.
+
+The current secondary layer is colour-based (`SetColorTexture`). If the intended WoW appearance requires the actual shield texture rather than a flat colour, extend `ProgressBar` cleanly with optional primary/secondary texture support rather than creating another independently-sized frame in `UnitPortrait`.
+
+A suitable extension could support options such as:
+
+```lua
+secondaryTexture = "Interface\\RaidFrame\\Shield-Fill"
+secondaryOverlayTexture = "Interface\\RaidFrame\\Shield-Overlay"
+```
+
+while retaining existing solid-colour behaviour for all current callers.
+
+Do not introduce an API that is absorb-specific into generic `ProgressBar` if a general optional texture-layer API is sufficient.
+
+## Overshield presentation
+
+If:
+
+```lua
+totalAbsorption > (maxHealth - currentHealth)
+```
+
+then the visible absorb segment is capped at the end of the health bar and an overshield indicator/glow is shown at the right edge.
+
+Use Blizzard's `Interface\\RaidFrame\\Shield-Overshield` where practical, or an equivalent treatment if the texture does not scale cleanly at the event portrait bar height.
+
+The exact absorption amount remains available in the unit tooltip; the bar does not need to encode overflow magnitude.
+
+Examples:
+
+- 80/100 HP + 10 absorb -> 10-point absorb segment, no glow.
+- 80/100 HP + 20 absorb -> absorb fills remaining 20 points; follow Blizzard's inclusive threshold semantics when deciding glow visibility.
+- 80/100 HP + 50 absorb -> 20-point visible segment + overshield glow.
+- 100/100 HP + any positive absorb -> no visible appended segment; overshield glow indicates the shield.
+
+## ProgressBar resize behaviour
+
+`ProgressBar:Create()` already installs:
+
+```lua
+frame:SetScript("OnSizeChanged", function()
+    self:UpdateLayout()
+end)
+```
+
+and `UpdateLayout()` recalculates both bar widths.
+
+This is preferable to the current bespoke absorb overlay implementation, which samples `barFrame:GetWidth()` once in `UnitPortrait:SetAbsorptionState()` and can remain hidden if the width is zero during initial layout.
+
+By expressing absorption through `secondaryValue`, resize/layout changes should automatically keep the appended segment correct.
+
+## UnitPortrait changes
+
+Refactor `core/ui/prefabs/UnitPortrait.lua` so health state is applied approximately as:
+
+```lua
+progressBar:SetMinMax(0, maxHealth)
+progressBar:SetValue(currentHealth)
+progressBar:SetSecondaryValue(
+    totalAbsorption > 0
+        and math.min(maxHealth, currentHealth + totalAbsorption)
+        or nil
+)
+```
+
+Configure the secondary layer as the absorption visual layer.
+
+Remove or retire the current bespoke width-based `absorptionOverlay` if it becomes redundant. Do not leave two different absorption rendering systems active simultaneously.
+
+The overshield indicator may remain a separate small frame/texture because it represents overflow rather than another fill value.
+
+## State source and invalidation
+
+Keep the existing data flow from `client/ui/widgets/widget_Event.lua`:
+
+```lua
+healthState.currentValue
+healthState.maxValue
+healthState.absorption
+healthState.absorptionRevision
+```
+
+`buildPortraitDisplayKey()` already includes absorption amount/revision, which allows shield-only changes to redraw a portrait even when health is unchanged.
+
+Do not store aggregate absorption on the event unit or health resource itself.
+
+Do not force a full event-widget rebuild when only one target's absorption changes.
+
+## Tooltip behaviour
+
+Tooltip state must continue to show the exact aggregate absorption and source-level shield data.
+
+Example:
+
+```text
+Health: 80 / 100
+Absorption: 50
+
+Power Word: Shield
+50 / 50 absorption
+2 turns
+```
+
+The health-bar segment may display only 20 points in that example because the remaining 30 points are overflow; the tooltip still reports the true 50-point shield.
 
 ## Primary files / call paths
 
-At minimum inspect current `dev` versions of:
+Inspect current `dev` before implementation:
 
-- `client/combat/Reaction.lua`
-  - `HandleDamageHitCheckRequest()`
-  - `HandleDamageHitCheckResponse()`
-  - `FinalizeLocalDamageResult()`
-  - `finalizeDamageCombatEvents()`
-- `client/combat/Helpers.lua`
-  - `GetOrCreateActionCombatEventState()`
-  - `RegisterActionDamageCombatLog()`
-  - `CompleteActionDamageResolution()`
-  - `FlushActionDamageCombatLog()`
-  - `buildAggregateDamageDetailText()`
-- `client/combat/effects/Damage.lua`
-  - hit-check request payload and stable identifiers
-- `client/client_CombatLog.lua`
-  - normalization
-  - emission/broadcast
-  - ticker queue path
+- `core/ui/elements/ProgressBar.lua`
+  - `secondaryValue`
+  - `secondaryBar`
+  - `UpdateBars()`
+  - `ApplyColors()`
+  - `OnSizeChanged`
+- `core/ui/prefabs/UnitPortrait.lua`
+  - `SetProgressState()`
+  - `SetAbsorptionState()`
+  - current bespoke `absorptionOverlay`
+  - overshield indicator
 - `client/ui/widgets/widget_Event.lua`
-  - `QueueCombatLogEntry()`
+  - `addPortraitAbsorptionState()`
+  - `buildPortraitDisplayKey()`
+  - `RefreshPortraitSlot()`
+  - targeted refresh path
 - `client/spellcasting/AuraManager.lua`
-  - triggered absorb-aware damage log path
+  - `GetTotalAbsorption()`
+  - runtime-update refresh invalidation
+
+## Do not change
+
+- health current/max values;
+- absorption runtime mechanics;
+- resource synchronization;
+- damage calculation;
+- secondary resource bar beneath the health bar (`UnitPortrait.secondaryProgressBar`), which is a separate `ProgressBar` instance and is unrelated to `progressBar.secondaryBar`.
+
+Be careful with terminology: `UnitPortrait.secondaryProgressBar` is the unit's second resource bar; `UnitPortrait.progressBar.secondaryBar` is the second fill layer inside the health bar. Absorption belongs in the latter.
 
 ## Acceptance criteria
 
-- [ ] A remote-player hit that deals post-absorb health damage emits exactly one damage combat-log entry.
-- [ ] That same entry appears in the event-widget ticker.
-- [ ] Partial absorption reports post-absorb health damage, not pre-absorb damage.
-- [ ] Partial absorption appends the absorbed amount.
-- [ ] A fully absorbed hit still produces a combat-log/ticker entry with zero health damage or equivalent full-absorb wording.
-- [ ] Damage-school icon/label/colour remain intact.
-- [ ] Spell icon remains intact.
-- [ ] Attacker/target display names and team colouring remain intact.
-- [ ] Local-target, remote-target and NPC-target attack paths do not duplicate entries.
-- [ ] Existing multi-target aggregation still works.
-- [ ] Triggered/aura damage uses equivalent absorption wording.
-- [ ] No new independent ticker mechanism is introduced.
+- [ ] Absorption is appended directly after the current health fill, matching WoW behaviour.
+- [ ] It is not independently right-anchored or drawn over the existing health fill as the primary representation.
+- [ ] 50/100 HP + 25 absorb visually shows 50% health + 25% absorb + 25% empty.
+- [ ] 50/100 HP + 50 absorb visually fills the bar exactly to 100% with health then absorb.
+- [ ] 80/100 HP + 50 absorb shows only 20 points of absorb in-bar plus an overshield indicator.
+- [ ] 100/100 HP + positive absorb shows the overshield indicator even though there is no free in-bar region for an appended absorb segment.
+- [ ] Zero absorption hides the secondary absorb fill and overshield indicator.
+- [ ] Shield-only consumption redraws correctly with no health change.
+- [ ] Resizing/re-layout keeps the segment aligned automatically.
+- [ ] Existing `ProgressBar` two-layer support is reused rather than duplicating fill geometry in `UnitPortrait`.
+- [ ] Existing ProgressBar callers that use only the primary layer are unaffected.
+- [ ] Existing callers that already use `secondaryValue` retain their current behaviour.
+- [ ] The separate secondary resource bar under the portrait is unchanged.
+- [ ] Exact absorption amount remains available in tooltips, including overflow beyond visible bar capacity.
 
-## Deterministic regression tests
+## Regression / visual tests
 
-1. Local attacker -> local/NPC defender, 116 damage, 65 absorbed -> one `51 ... (Absorbed 65)` entry.
-2. Player A attacks Player B remotely, 116 damage, 65 absorbed -> exactly one identical entry visible to the group.
-3. Player A attacks Player B, 80 damage, 80 absorbed -> exactly one zero-damage/full-absorb entry.
-4. Remote hit with no absorption -> existing damage log behaviour unchanged.
-5. Multi-target spell where one target absorbs and one does not -> aggregation remains valid and no target resolution disappears.
-6. Triggered aura damage with partial absorption -> one absorb-aware entry.
-7. Physical self-copy/group transport does not duplicate the host/local ticker entry.
+1. 100/100 HP, 0 absorb -> ordinary full health bar, no shield visuals.
+2. 50/100 HP, 25 absorb -> health 0-50%, absorb 50-75%, empty 75-100%.
+3. 50/100 HP, 50 absorb -> health 0-50%, absorb 50-100%.
+4. 80/100 HP, 10 absorb -> health 0-80%, absorb 80-90%, no overshield.
+5. 80/100 HP, 50 absorb -> health 0-80%, absorb 80-100%, overshield indicator shown.
+6. 100/100 HP, 50 absorb -> full health fill + overshield indicator; no fake 50%-wide overlay over health.
+7. Shield 50 -> 20 while health is unchanged -> appended segment/overshield state updates immediately.
+8. Shield consumed to 0 -> secondary fill and overshield disappear.
+9. Resize portrait/bar after applying shield -> appended segment remains correct.
+10. Boss portrait/talking-head portrait use the same shared health-bar behaviour wherever health bars are shown.

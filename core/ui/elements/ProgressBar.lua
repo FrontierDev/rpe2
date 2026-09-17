@@ -29,6 +29,24 @@ local function Clamp(value, minValue, maxValue)
     return value, minValue, maxValue
 end
 
+local function applyBarTexture(texture, texturePath, color)
+    if not texture then
+        return
+    end
+
+    if texturePath ~= nil and texturePath ~= "" and texture.SetTexture then
+        texture:SetTexture(texturePath)
+        if color and texture.SetVertexColor then
+            texture:SetVertexColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
+        end
+        return
+    end
+
+    if texture.SetColorTexture and color then
+        texture:SetColorTexture(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
+    end
+end
+
 function ProgressBar:New(options)
     local instance = BaseElement.New(self, options)
     instance.value = options and options.value or 0
@@ -45,6 +63,7 @@ function ProgressBar:New(options)
     instance.borderLeft = nil
     instance.borderRight = nil
     instance.secondaryBar = nil
+    instance.secondaryOverlayBar = nil
     instance.primaryBar = nil
     instance.valueText = nil
     instance.backgroundColor = nil
@@ -149,10 +168,21 @@ function ProgressBar:UpdateBars()
 
         if self.secondaryValue == nil then
             self.secondaryBar:Hide()
+            if self.secondaryOverlayBar then
+                self.secondaryOverlayBar:Hide()
+            end
         else
             self.secondaryBar:Show()
             local normalizedSecondary = self:GetNormalizedValue(self.secondaryValue)
             self.secondaryBar:SetWidth(math.max(0, barWidth * normalizedSecondary))
+            if self.secondaryOverlayBar then
+                if self.options.secondaryOverlayTexture ~= nil and self.options.secondaryOverlayTexture ~= "" then
+                    self.secondaryOverlayBar:Show()
+                else
+                    self.secondaryOverlayBar:Hide()
+                end
+                self.secondaryOverlayBar:SetWidth(math.max(0, barWidth * normalizedSecondary))
+            end
         end
     end
 
@@ -187,14 +217,16 @@ function ProgressBar:ApplyColors()
         if self.borderRight and self.borderRight.SetColorTexture then self.borderRight:SetColorTexture(r, g, b, a) end
     end
 
-    if self.secondaryBar and self.secondaryBar.SetColorTexture and self.secondaryColor then
-        local c = self.secondaryColor
-        self.secondaryBar:SetColorTexture(c.r or 0.25, c.g or 0.42, c.b or 0.68, c.a or 1)
+    if self.secondaryBar and self.secondaryColor then
+        applyBarTexture(self.secondaryBar, self.options.secondaryTexture, self.secondaryColor)
     end
 
-    if self.primaryBar and self.primaryBar.SetColorTexture and self.primaryColor then
-        local c = self.primaryColor
-        self.primaryBar:SetColorTexture(c.r or 0.42, c.g or 0.66, c.b or 0.98, c.a or 1)
+    if self.secondaryOverlayBar and self.secondaryColor then
+        applyBarTexture(self.secondaryOverlayBar, self.options.secondaryOverlayTexture, self.secondaryColor)
+    end
+
+    if self.primaryBar and self.primaryColor then
+        applyBarTexture(self.primaryBar, self.options.primaryTexture, self.primaryColor)
     end
 
     if self.textColor and self.label and self.label.SetTextColor then
@@ -264,6 +296,12 @@ function ProgressBar:Create()
     self.secondaryBar:SetPoint("BOTTOM", self.barFrame, "BOTTOM", 0, 0)
     self.secondaryBar:SetPoint("TOP", self.barFrame, "TOP", 0, 0)
 
+    self.secondaryOverlayBar = self.barFrame:CreateTexture(nil, "ARTWORK")
+    self.secondaryOverlayBar:SetPoint("LEFT", self.barFrame, "LEFT", 0, 0)
+    self.secondaryOverlayBar:SetPoint("BOTTOM", self.barFrame, "BOTTOM", 0, 0)
+    self.secondaryOverlayBar:SetPoint("TOP", self.barFrame, "TOP", 0, 0)
+    self.secondaryOverlayBar:Hide()
+
     self.primaryBar = self.barFrame:CreateTexture(nil, "OVERLAY")
     self.primaryBar:SetPoint("LEFT", self.barFrame, "LEFT", 0, 0)
     self.primaryBar:SetPoint("BOTTOM", self.barFrame, "BOTTOM", 0, 0)
@@ -290,13 +328,12 @@ function ProgressBar:Create()
     end
 
     if self.secondaryColor then
-        local c = self.secondaryColor
-        self.secondaryBar:SetColorTexture(c.r or 0.25, c.g or 0.42, c.b or 0.68, c.a or 1)
+        applyBarTexture(self.secondaryBar, self.options.secondaryTexture, self.secondaryColor)
+        applyBarTexture(self.secondaryOverlayBar, self.options.secondaryOverlayTexture, self.secondaryColor)
     end
 
     if self.primaryColor then
-        local c = self.primaryColor
-        self.primaryBar:SetColorTexture(c.r or 0.42, c.g or 0.66, c.b or 0.98, c.a or 1)
+        applyBarTexture(self.primaryBar, self.options.primaryTexture, self.primaryColor)
     end
 
     if self.textColor and self.label.SetTextColor then

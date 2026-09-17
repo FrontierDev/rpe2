@@ -30,7 +30,9 @@ local DEFAULT_CAST_ICON_SIZE = 14
 local DEFAULT_RAID_MARKER_ICON_SIZE = 14
 local DEFAULT_CORNER_BADGE_ICON_SIZE = 21
 local DEFAULT_TURN_COMPLETE_ICON = "Interface\\RaidFrame\\ReadyCheck-Ready"
-local DEFAULT_ABSORPTION_TEXTURE = "Interface\\Buttons\\WHITE8X8"
+local DEFAULT_ABSORPTION_TEXTURE = "Interface\\RaidFrame\\Shield-Fill"
+local DEFAULT_ABSORPTION_OVERLAY_TEXTURE = "Interface\\RaidFrame\\Shield-Overlay"
+local DEFAULT_ABSORPTION_EDGE_TEXTURE = "Interface\\RaidFrame\\Shield-Overshield"
 local DEFAULT_ABSORPTION_COLOR = { r = 0.35, g = 0.75, b = 1, a = 0.55 }
 local DEFAULT_ABSORPTION_EDGE_COLOR = { r = 0.75, g = 0.92, b = 1, a = 0.95 }
 
@@ -375,8 +377,6 @@ function UnitPortrait:New(options)
     instance.hiddenOverlayFrame = nil
     instance.hiddenOverlayTexture = nil
     instance.progressBar = nil
-    instance.absorptionOverlay = nil
-    instance.absorptionOverlayTexture = nil
     instance.absorptionOvershieldIndicator = nil
     instance.absorptionOvershieldTexture = nil
     instance.secondaryProgressBar = nil
@@ -576,10 +576,6 @@ function UnitPortrait:SetHiddenPresentation(hidden, hideDetails)
         progressFrame:Hide()
     end
 
-    local absorptionFrame = self.absorptionOverlay and self.absorptionOverlay.GetFrame and self.absorptionOverlay:GetFrame() or nil
-    if absorptionFrame and shouldHideDetails then
-        absorptionFrame:Hide()
-    end
     local overshieldFrame = self.absorptionOvershieldIndicator
         and self.absorptionOvershieldIndicator.GetFrame
         and self.absorptionOvershieldIndicator:GetFrame()
@@ -611,40 +607,47 @@ function UnitPortrait:SetProgressState(state)
 end
 
 function UnitPortrait:SetAbsorptionState(state)
-    local overlayFrame = self.absorptionOverlay and self.absorptionOverlay.GetFrame and self.absorptionOverlay:GetFrame() or nil
     local edgeFrame = self.absorptionOvershieldIndicator
         and self.absorptionOvershieldIndicator.GetFrame
         and self.absorptionOvershieldIndicator:GetFrame()
         or nil
-    local healthBarFrame = self.progressBar and self.progressBar.barFrame or nil
-    if not overlayFrame or not healthBarFrame then
+    local progressBar = self.progressBar
+    if not progressBar then
         return false
     end
 
     local maximum = math.max(0, tonumber(state and state.maxValue) or 0)
+    local current = math.max(0, tonumber(state and state.currentValue) or 0)
+    if maximum > 0 then
+        current = math.min(maximum, current)
+    end
     local totalAbsorption = math.max(0, tonumber(state and state.absorption) or tonumber(state and state.total) or 0)
-    local healthBarWidth = tonumber(healthBarFrame.GetWidth and healthBarFrame:GetWidth()) or 0
-    local ratio = maximum > 0 and math.min(totalAbsorption / maximum, 1) or 0
-    local overlayWidth = math.max(0, healthBarWidth * ratio)
-
-    overlayFrame:ClearAllPoints()
-    overlayFrame:SetPoint("TOPRIGHT", healthBarFrame, "TOPRIGHT", 0, 0)
-    overlayFrame:SetPoint("BOTTOMRIGHT", healthBarFrame, "BOTTOMRIGHT", 0, 0)
-    overlayFrame:SetWidth(overlayWidth)
-    if totalAbsorption > 0 and overlayWidth > 0 then
-        overlayFrame:Show()
-    else
-        overlayFrame:Hide()
+    local absorptionColor = self.options.absorptionColor or DEFAULT_ABSORPTION_COLOR
+    progressBar:SetOption("secondaryColor", absorptionColor)
+    if progressBar.ApplyColors then
+        progressBar:ApplyColors()
     end
 
-    local overshield = maximum > 0 and totalAbsorption > maximum
+    if maximum > 0 and totalAbsorption > 0 then
+        progressBar:SetSecondaryValue(math.min(maximum, current + totalAbsorption))
+    else
+        progressBar:SetSecondaryValue(nil)
+    end
+
+    local missingHealth = math.max(0, maximum - current)
+    local overshield = maximum > 0 and totalAbsorption > missingHealth
+    local healthBarFrame = progressBar.barFrame
     if edgeFrame then
-        edgeFrame:ClearAllPoints()
-        edgeFrame:SetPoint("TOPRIGHT", healthBarFrame, "TOPRIGHT", 0, 0)
-        edgeFrame:SetPoint("BOTTOMRIGHT", healthBarFrame, "BOTTOMRIGHT", 0, 0)
-        edgeFrame:SetWidth(2)
-        if overshield then
-            edgeFrame:Show()
+        if healthBarFrame then
+            edgeFrame:ClearAllPoints()
+            edgeFrame:SetPoint("TOPRIGHT", healthBarFrame, "TOPRIGHT", 0, 0)
+            edgeFrame:SetPoint("BOTTOMRIGHT", healthBarFrame, "BOTTOMRIGHT", 0, 0)
+            edgeFrame:SetWidth(2)
+            if overshield then
+                edgeFrame:Show()
+            else
+                edgeFrame:Hide()
+            end
         else
             edgeFrame:Hide()
         end
@@ -774,7 +777,6 @@ function UnitPortrait:RefreshOverlayFrameLevels()
         self.petIndicator and self.petIndicator.GetFrame and self.petIndicator:GetFrame() or nil,
         self.targetIndicator and self.targetIndicator.GetFrame and self.targetIndicator:GetFrame() or nil,
         self.turnCompleteIndicator and self.turnCompleteIndicator.GetFrame and self.turnCompleteIndicator:GetFrame() or nil,
-        self.absorptionOverlay and self.absorptionOverlay.GetFrame and self.absorptionOverlay:GetFrame() or nil,
         self.absorptionOvershieldIndicator and self.absorptionOvershieldIndicator.GetFrame and self.absorptionOvershieldIndicator:GetFrame() or nil,
     }
 
@@ -1033,6 +1035,8 @@ function UnitPortrait:Create()
         borderColor = self.options.progressBorderColor or defaults.ProgressBorderColor,
         primaryColor = self.options.progressPrimaryColor or defaults.ProgressPrimaryColor,
         secondaryColor = self.options.progressSecondaryColor or defaults.ProgressSecondaryColor,
+        secondaryTexture = self.options.absorptionTexture or DEFAULT_ABSORPTION_TEXTURE,
+        secondaryOverlayTexture = self.options.absorptionOverlayTexture or DEFAULT_ABSORPTION_OVERLAY_TEXTURE,
         textColor = self.options.progressTextColor or defaults.ProgressTextColor,
         border = false,
     })
@@ -1040,30 +1044,11 @@ function UnitPortrait:Create()
     self.progressBar:Create()
     self.progressBar:SetPoint("TOPLEFT", self.portraitFrame, "BOTTOMLEFT", 0, -spacing)
 
-    self.absorptionOverlay = Image:New({
-        name = (self.name or "UnitPortrait") .. "AbsorptionOverlay",
-        width = 1,
-        height = progressHeight,
-        texture = self.options.absorptionTexture or DEFAULT_ABSORPTION_TEXTURE,
-        border = false,
-        layer = "OVERLAY",
-        frameStrata = self.options.frameStrata,
-        textureInsetLeft = 0,
-        textureInsetTop = 0,
-        textureInsetRight = 0,
-        textureInsetBottom = 0,
-        vertexColor = self.options.absorptionColor or DEFAULT_ABSORPTION_COLOR,
-    })
-    self.absorptionOverlay:SetParent(frame)
-    self.absorptionOverlay:Create()
-    self.absorptionOverlayTexture = self.absorptionOverlay.textureRegion
-    self.absorptionOverlay:GetFrame():Hide()
-
     self.absorptionOvershieldIndicator = Image:New({
         name = (self.name or "UnitPortrait") .. "AbsorptionOvershield",
         width = 2,
         height = progressHeight,
-        texture = self.options.absorptionEdgeTexture or DEFAULT_ABSORPTION_TEXTURE,
+        texture = self.options.absorptionEdgeTexture or DEFAULT_ABSORPTION_EDGE_TEXTURE,
         border = false,
         layer = "OVERLAY",
         frameStrata = self.options.frameStrata,
