@@ -1,204 +1,187 @@
 ## Summary
 
-Replace the Event Widget-attached Combat Log and Meters side panels with a standard movable RPE window.
+The current meter implementation on `dev` has two separate problems:
 
-The current implementations in:
+1. **Total** is not displaying accumulated values even though damage/healing/threat are being recorded.
+2. **Per Turn** currently means “amount generated during the current turn”, but the intended meaning is simply:
 
 ```text
-client/ui/widgets/widget_Event_CombatLogHistory.lua
-client/ui/widgets/widget_Event_Meters.lua
+Per Turn = Total / Number of Turns
 ```
 
-create plain `UI.CreatePanel(...)` side panels anchored to the Event Widget. They therefore do not match other RPE windows and cannot be independently moved.
+This issue should fix both behaviors without maintaining separate per-turn meter ledgers.
 
-Use the existing `UI.Window` abstraction so the utility UI has the normal RPE chrome:
+## Root cause of empty Total view
 
-- header bar;
-- title;
-- close button;
-- draggable/movable header;
-- standard window background and border.
-
-Observed against `dev` at `55876f93db4cdc16b7dd500f8afdc929bb96dbb2`.
-
-## Existing UI support
-
-`core/ui/elements/Window.lua` already provides the required behavior.
-
-A window created with:
+In `client/client_EventMeters.lua`, event data is stored under:
 
 ```lua
-UI.Window:New({
-    ...,
-    movable = true,
-})
+bucket.total[meterType]
 ```
 
-receives standard RPE window chrome, a close button, and header dragging through `StartMoving()` / `StopMovingOrSizing()`.
-
-Do not hand-build a second custom title bar or drag implementation.
-
-## Desired architecture
-
-Use **one shared Event utility window** for Combat Log and Meters rather than two overlapping side panels.
-
-Conceptually:
-
-```text
-Event Widget
-  ├─ Combat Log button ─┐
-  └─ Meters button ─────┴─> shared movable RPE utility window
-                              mode = combat-log | meters
-```
-
-When Combat Log is selected:
-
-```text
-┌──────────────────────────────┐
-│ Combat Log                [X]│
-├──────────────────────────────┤
-│ ... history ...              │
-└──────────────────────────────┘
-```
-
-When Meters is selected:
-
-```text
-┌──────────────────────────────┐
-│ Meters                    [X]│
-├──────────────────────────────┤
-│ Damage | Healing | Threat    │
-│ ...                          │
-└──────────────────────────────┘
-```
-
-The Event Widget buttons remain the entry points; the content/window should no longer be physically attached to the Event Widget once opened.
-
-## Scope
-
-### 1. Add/reuse a shared `UI.Window`
-
-Create the utility window with the normal RPE `UI.Window` abstraction.
-
-Requirements:
-
-- `movable = true`;
-- normal RPE header background/border;
-- normal RPE close button;
-- title updated according to active mode;
-- content frame hosts either Combat Log or Meters content;
-- appropriate strata/level so it behaves like other RPE windows.
-
-Use a neutral name such as:
-
-```text
-RPEClientEventUtilityWindow
-```
-
-or equivalent.
-
-### 2. Combat Log button behavior
-
-The existing `Combat Log` button under the Event Widget should:
-
-- open the utility window in Combat Log mode if closed;
-- switch an already-open utility window from Meters to Combat Log;
-- toggle/hide it when Combat Log is already the active mode, if preserving the current toggle behavior is desirable.
-
-Preserve the existing combat-log history model and eight-entry retention behavior unless separately changed.
-
-Do not make the combat log depend on its old side-panel anchor.
-
-### 3. Meters button behavior
-
-The existing `Meters` button should:
-
-- open the same utility window in Meters mode if closed;
-- switch an already-open Combat Log window to Meters;
-- retain the active Damage/Healing/Threat and Total/Per Turn selections while the same event remains active.
-
-The meter content should resize/layout against the utility window content frame rather than `EventWidget.rootPanel`.
-
-### 4. Positioning and movement
-
-The window should initially open in a sensible location near the Event Widget or screen center, but after the user moves it during the session it must not snap back to the Event Widget on every refresh.
-
-Do not call `ClearAllPoints()`/re-anchor during normal content refreshes.
-
-No SavedVariables persistence is required for the initial implementation unless there is already a standard RPE window-position persistence mechanism that can be reused without extra architecture.
-
-### 5. Event lifecycle
-
-Preserve current event behavior:
-
-- ending/hiding the active event hides the utility window;
-- changing event IDs resets event-specific Combat Log history/meter state as appropriate;
-- reopening during the same event shows current content;
-- close button hides the window without destroying the underlying event data.
-
-### 6. Decouple DM Helper from the Combat Log presentation panel
-
-`widget_Event_DMHelper.lua` currently reuses and resizes `combatLogHistoryPanel`, `combatLogHistoryScroll`, title state, and `combatLogHistoryMode = "dm-helper"`.
-
-Do **not** accidentally migrate or redesign DM Helper as part of this task unless required.
-
-Refactor the shared pieces so:
-
-- Combat Log history **data APIs** remain available to DM Helper, including `GetCombatLogHistory()`;
-- Combat Log presentation can move into the utility window without forcing DM Helper to use that same window;
-- host-only DM Helper controls continue to work as before;
-- opening DM Helper does not corrupt the utility window's Combat Log/Meters mode or dimensions.
-
-If the cleanest implementation retains a dedicated DM Helper panel, that is acceptable. The requirement is specifically that **Combat Log and Meters** use the standard movable RPE window.
-
-### 7. Remove obsolete side-panel assumptions
-
-After migration, remove or simplify code that exists only to:
-
-- anchor Combat Log/Meters to `rootFrame`'s right edge;
-- maintain separate overlapping side panels;
-- hide one side panel solely because the other occupies the same anchor.
-
-Keep public/helper method compatibility where other Event Widget extensions currently call those methods, or update every call site in the same change.
-
-## Regression checks
-
-Inspect all call sites for at least:
+but `getRowsMap()` currently does:
 
 ```lua
-ShowCombatLogHistoryPanel
-HideCombatLogHistoryPanel
-ToggleCombatLogHistoryPanel
-IsCombatLogHistoryPanelShown
-EnsureCombatLogHistoryUI
-ShowMetersPanel
-HideMetersPanel
-ToggleMetersPanel
-IsMetersPanelShown
-EnsureMetersUI
+local source = bucket
+if scope == "turn" then
+    source = bucket.turns[...]
+end
+return type(source) == "table" and source[meterType] or nil
 ```
 
-and the DM Helper mode overrides/extensions before changing their semantics.
+For `scope == "total"`, this attempts to read:
+
+```lua
+bucket.damage
+bucket.healing
+bucket.threat
+```
+
+instead of:
+
+```lua
+bucket.total.damage
+bucket.total.healing
+bucket.total.threat
+```
+
+As a result, Total can appear empty despite `RecordCombatLogEntry()` and `RecordThreatUpdate()` accumulating into `bucket.total` correctly.
+
+Fix the total lookup so all Total meter queries read the cumulative event totals from `bucket.total`.
+
+## Correct meaning of Per Turn
+
+Do **not** treat Per Turn as a separate current-turn bucket.
+
+The intended metric is an event-wide average:
+
+```text
+perTurnAmount = totalAmount / numberOfTurns
+```
+
+For example:
+
+```text
+Total damage = 1,200
+Event turnNumber = 6
+Per Turn = 200
+```
+
+This applies identically to:
+
+- Damage
+- Healing
+- Threat
+
+Threat remains target-specific, so for a selected NPC:
+
+```text
+player threat per turn = total threat generated against that NPC / number of turns
+```
+
+## Turn divisor
+
+Use the active event's turn count/number as the divisor.
+
+At minimum:
+
+```lua
+turnCount = math.max(1, tonumber(eventState.turnNumber) or 1)
+```
+
+so turn 1 never divides by zero.
+
+If the event model already exposes a more precise completed/current turn count, use that existing canonical value, but do not count only turns where a player generated meter activity.
+
+The denominator is the number of event turns elapsed/currently reached, not the number of non-empty meter buckets.
+
+## Simplify `EventMeters`
+
+The current implementation introduced:
+
+```lua
+bucket.turns[turnNumber]
+```
+
+for damage/healing/threat.
+
+That storage is unnecessary for the intended feature.
+
+Refactor the runtime so the authoritative meter state is cumulative event totals only:
+
+```lua
+byEventId[eventId] = {
+    total = {
+        damage = {},
+        healing = {},
+        threat = {},
+    },
+}
+```
+
+or an equivalent simpler shape.
+
+`RecordCombatLogEntry()` should only increment event totals.
+
+`RecordThreatUpdate()` should only increment event-total target-specific threat.
+
+`GetRows()` should return:
+
+- **Total**: stored cumulative amount;
+- **Per Turn**: a derived copy of Total rows with `amount = total / turnCount`.
+
+Do not mutate stored totals when producing Per Turn rows.
+
+## Snapshot/rejoin behavior
+
+Because Per Turn is derived, snapshots only need to preserve cumulative totals.
+
+Update the meter snapshot/rejoin code so it does not depend on restoring current-turn buckets.
+
+A reload or late join should restore:
+
+```text
+cumulative damage totals
+cumulative healing totals
+cumulative target-specific threat totals
+```
+
+and then derive Per Turn from the current event turn number locally.
+
+Retain compatibility with the currently supported meter snapshot formats where practical, but do not continue carrying redundant per-turn state merely for compatibility.
+
+## UI behavior
+
+The existing `Total | Per Turn` toggle can remain.
+
+When `Per Turn` is selected:
+
+- rank using the derived per-turn values;
+- bar widths use the derived per-turn values;
+- percentages remain mathematically identical to Total because every row is divided by the same turn count;
+- changing/advancing the event turn should refresh the displayed averages automatically.
+
+Do not rename the toggle.
 
 ## Acceptance criteria
 
-- Combat Log opens in a standard RPE window with header bar and close button.
-- Meters opens in the same standard RPE window.
-- The window can be dragged by its header.
-- Moving the window is not undone by Event Widget refreshes.
-- Combat Log and Meters buttons switch the shared window's content correctly.
-- The close button hides the utility window and the buttons can reopen it.
-- Combat Log history continues updating while its view is open.
-- Meters continue updating live while their view is open.
-- Damage/Healing/Threat and scope selections are retained appropriately while switching views.
-- Event end/change does not leave stale utility-window content visible.
-- DM Helper remains functional and does not inherit unintended utility-window sizing/mode behavior.
-- No duplicate custom window chrome is introduced; use `UI.Window`.
+- Total Damage accumulates continuously throughout the event and remains visible after multiple turns.
+- Total Healing accumulates continuously throughout the event.
+- Total Threat accumulates continuously per selected NPC target.
+- Total no longer returns an empty list because of the `bucket.total` lookup bug.
+- Per Turn is **not** current-turn activity.
+- Per Turn equals `Total / event turn count` for every player row.
+- Example: 1,200 total damage on turn 6 displays 200 Per Turn.
+- Example: 600 total healing on turn 3 displays 200 Per Turn.
+- Example: 900 total threat against NPC A on turn 3 displays 300 Per Turn for NPC A.
+- Advancing from turn 3 to turn 4 changes a 900 total value from 300/turn to 225/turn without changing Total.
+- No separate turn ledger is required to calculate Per Turn.
+- Reload/late join restores cumulative totals and derives the same Per Turn values from the current event turn count.
+- Existing player-only filtering remains intact.
+- Existing damage/healing/threat recording paths continue to accumulate exactly once.
 
-## References
+## Primary file
 
-- #349
-- `client/ui/widgets/widget_Event_CombatLogHistory.lua`
-- `client/ui/widgets/widget_Event_Meters.lua`
-- `client/ui/widgets/widget_Event_DMHelper.lua`
-- `core/ui/elements/Window.lua`
+`client/client_EventMeters.lua`
+
+Also inspect/update the current meter snapshot/rejoin code and `client/ui/widgets/widget_Event_Meters.lua` where needed so the UI derives Per Turn from cumulative totals rather than current-turn buckets.

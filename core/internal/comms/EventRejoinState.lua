@@ -465,7 +465,6 @@ local function serializeMeterSnapshot(snapshot)
     return encodeFields({
         normalizePositiveInteger(snapshot.currentTurn) or 1,
         serializeMeterGroup(snapshot.total or snapshot),
-        serializeMeterGroup(snapshot.turn or {}),
     })
 end
 
@@ -476,6 +475,19 @@ local function deserializeMeterSnapshot(payload)
     end
     -- Protocol 3 snapshots contained only total damage and healing.
     if #fields == 2 then
+        local currentTurn = normalizePositiveInteger(fields[1])
+        if currentTurn then
+            local total = deserializeMeterGroup(fields[2])
+            if type(total) ~= "table" then return nil end
+            return {
+                currentTurn = currentTurn,
+                total = total,
+                damage = total.damage,
+                healing = total.healing,
+                threat = total.threat,
+            }
+        end
+
         local damage = deserializeRecordList(fields[1], deserializeMeterRecord)
         local healing = deserializeRecordList(fields[2], deserializeMeterRecord)
         if type(damage) ~= "table" or type(healing) ~= "table" then return nil end
@@ -489,7 +501,6 @@ local function deserializeMeterSnapshot(payload)
     return {
         currentTurn = currentTurn,
         total = total,
-        turn = turn,
         damage = total.damage,
         healing = total.healing,
         threat = total.threat,

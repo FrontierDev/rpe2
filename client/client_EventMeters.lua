@@ -65,11 +65,13 @@ end
 
 local function ensureMeterMaps(bucket)
     bucket.total = type(bucket.total) == "table" and bucket.total or {}
-    bucket.turns = type(bucket.turns) == "table" and bucket.turns or {}
     for index = 1, #METER_TYPES do
         local meterType = METER_TYPES[index]
         bucket.total[meterType] = type(bucket.total[meterType]) == "table" and bucket.total[meterType] or {}
     end
+    -- Older clients kept redundant per-turn ledgers.  Totals are now authoritative.
+    bucket.turns = nil
+    bucket.currentTurn = normalizePositiveInteger(bucket.currentTurn) or 1
     return bucket
 end
 
@@ -82,7 +84,6 @@ local function migrateLegacyBucket(bucket)
             healing = type(bucket.healing) == "table" and bucket.healing or {},
             threat = {},
         },
-        turns = {},
         currentTurn = normalizePositiveInteger(bucket.currentTurn) or 1,
     })
 end
@@ -94,28 +95,21 @@ local function ensureEventBucket(self, eventId)
     return bucket
 end
 
-local function ensureTurnBucket(bucket, turnNumber)
-    local normalizedTurn = normalizePositiveInteger(turnNumber) or 1
-    local turn = bucket.turns[normalizedTurn]
-    if type(turn) ~= "table" then turn = {}; bucket.turns[normalizedTurn] = turn end
-    for index = 1, #METER_TYPES do
-        local meterType = METER_TYPES[index]
-        turn[meterType] = type(turn[meterType]) == "table" and turn[meterType] or {}
-    end
-    bucket.currentTurn = normalizedTurn
-    return turn
+local function getRowsMap(bucket, meterType)
+    local total = type(bucket) == "table" and bucket.total or nil
+    return type(total) == "table" and total[meterType] or nil
 end
 
-local function getRowsMap(bucket, meterType, scope, turnNumber)
-    local source = bucket
-    if scope == "turn" then source = bucket.turns[normalizePositiveInteger(turnNumber) or bucket.currentTurn or 1] end
-    return type(source) == "table" and source[meterType] or nil
-end
-
-local function cloneRows(rows)
+local function cloneRows(rows, divisor)
     local result = {}
+    divisor = math.max(1, tonumber(divisor) or 1)
     for _, row in pairs(rows or {}) do
         if type(row) == "table" and (tonumber(row.eventId) or 0) > 0 and (tonumber(row.amount) or 0) > 0 then result[#result + 1] = cloneRow(row) end
+    end
+    if divisor ~= 1 then
+        for index = 1, #result do
+            result[index].amount = result[index].amount / divisor
+        end
     end
     table.sort(result, function(left, right)
         if left.amount ~= right.amount then return left.amount > right.amount end
@@ -141,12 +135,17 @@ local function cloneThreatRows(threatRows, targetEventId)
     return result
 end
 
-local function getCurrentTurn(self, eventId, bucket, options)
-    local requested = type(options) == "table" and options.turnNumber or nil
+local function getTurnCount(self, eventId, bucket, options)
+    local requested = type(options) == "table"
+        and (options.turnCount or options.turnNumber or options.currentTurn)
+        or nil
     if normalizePositiveInteger(requested) then return normalizePositiveInteger(requested) end
     local eventState = type(Client.GetEventState) == "function" and Client:GetEventState() or Client.EventState
     if type(eventState) == "table" and normalizeEventId(eventState.id) == eventId then
-        return normalizePositiveInteger(eventState.turnNumber) or bucket.currentTurn or 1
+        return normalizePositiveInteger(eventState.turnNumber)
+            or normalizePositiveInteger(eventState.turnCount)
+            or bucket.currentTurn
+            or 1
     end
     return bucket.currentTurn or 1
 end
@@ -184,10 +183,8 @@ function EventMeters:RecordCombatLogEntry(entry, eventState)
     local sourceUnit = findEventUnit(eventState, sourceEventId)
     if meterType == "threat" or not meterType or not sourceEventId or not amount or type(sourceUnit) ~= "table" or sourceUnit.isPlayer ~= true then return false end
     local bucket = ensureEventBucket(self, eventId)
-    local turnNumber = normalizePositiveInteger(eventState.turnNumber) or bucket.currentTurn or 1
-    local turn = ensureTurnBucket(bucket, turnNumber)
     addRow(bucket.total[meterType], sourceUnit, sourceEventId, amount)
-    addRow(turn[meterType], sourceUnit, sourceEventId, amount)
+    bucket.currentTurn = normalizePositiveInteger(eventState.turnNumber) or bucket.currentTurn or 1
     return true
 end
 
@@ -203,12 +200,9 @@ function EventMeters:RecordThreatUpdate(eventState, threatUpdate)
         or type(targetUnit) ~= "table" or targetUnit.isPlayer == true
         or type(sourceUnit) ~= "table" or sourceUnit.isPlayer ~= true then return false end
     local bucket = ensureEventBucket(self, eventId)
-    local turnNumber = normalizePositiveInteger(threatUpdate.turnNumber) or normalizePositiveInteger(eventState.turnNumber) or bucket.currentTurn or 1
-    local turn = ensureTurnBucket(bucket, turnNumber)
     bucket.total.threat[targetEventId] = bucket.total.threat[targetEventId] or {}
-    turn.threat[targetEventId] = turn.threat[targetEventId] or {}
     addRow(bucket.total.threat[targetEventId], sourceUnit, sourceEventId, amount)
-    addRow(turn.threat[targetEventId], sourceUnit, sourceEventId, amount)
+    bucket.currentTurn = normalizePositiveInteger(eventState.turnNumber) or bucket.currentTurn or 1
     return true
 end
 
@@ -222,23 +216,20 @@ function EventMeters:GetRows(eventId, meterType, scope, options)
     if type(bucket) ~= "table" then return {} end
     bucket = migrateLegacyBucket(bucket)
     self.byEventId[normalizedEventId] = bucket
-    local turnNumber = getCurrentTurn(self, normalizedEventId, bucket, options)
+    local turnCount = getTurnCount(self, normalizedEventId, bucket, options)
     local targetEventId = type(options) == "table" and normalizePositiveInteger(options.targetEventId) or nil
-    local rows = getRowsMap(bucket, normalizedMeterType, scope, turnNumber)
-    if normalizedMeterType == "threat" then return cloneRows(rows and rows[targetEventId] or nil) end
-    return cloneRows(rows)
+    local rows = getRowsMap(bucket, normalizedMeterType)
+    if normalizedMeterType == "threat" then
+        return cloneRows(rows and rows[targetEventId] or nil, scope == "turn" and turnCount or 1)
+    end
+    return cloneRows(rows, scope == "turn" and turnCount or 1)
 end
 
 function EventMeters:GetSnapshot(eventId, options)
     local normalizedEventId = normalizeEventId(eventId)
     if not normalizedEventId then return nil end
     local bucket = ensureEventBucket(self, normalizedEventId)
-    local currentTurn = getCurrentTurn(self, normalizedEventId, bucket, options)
-    local currentTurnGroup = {
-        damage = self:GetRows(normalizedEventId, "damage", "turn", { turnNumber = currentTurn }),
-        healing = self:GetRows(normalizedEventId, "healing", "turn", { turnNumber = currentTurn }),
-        threat = cloneThreatRows(bucket.turns[currentTurn] and bucket.turns[currentTurn].threat),
-    }
+    local currentTurn = getTurnCount(self, normalizedEventId, bucket, options)
     return {
         eventId = normalizedEventId,
         currentTurn = currentTurn,
@@ -247,8 +238,6 @@ function EventMeters:GetSnapshot(eventId, options)
             healing = self:GetRows(normalizedEventId, "healing", "total"),
             threat = cloneThreatRows(bucket.total.threat),
         },
-        turn = currentTurnGroup,
-        turns = { [currentTurn] = currentTurnGroup },
         damage = self:GetRows(normalizedEventId, "damage", "total"),
         healing = self:GetRows(normalizedEventId, "healing", "total"),
         threat = cloneThreatRows(bucket.total.threat),
@@ -301,19 +290,14 @@ function EventMeters:InstallSnapshot(eventId, snapshot, replaceExisting)
     if not normalizedEventId or type(snapshot) ~= "table" then return false end
     local total = type(snapshot.total) == "table" and snapshot.total or snapshot
     local currentTurn = normalizePositiveInteger(snapshot.currentTurn) or 1
-    local turn = type(snapshot.turn) == "table" and snapshot.turn or nil
-    if not turn and type(snapshot.turns) == "table" then turn = snapshot.turns[currentTurn] end
     local stagedTotal = { damage = {}, healing = {}, threat = {} }
-    local stagedTurn = { damage = {}, healing = {}, threat = {} }
     local eventState = type(Client.GetEventState) == "function" and Client:GetEventState() or Client.EventState
     for _, meterType in ipairs({ "damage", "healing" }) do
         local rows = total[meterType]
         if rows == nil and meterType == "healing" then rows = total.heal end
         if not stageRows(stagedTotal[meterType], rows, eventState) then return false end
-        if turn and not stageRows(stagedTurn[meterType], turn[meterType], eventState) then return false end
     end
     if not stageThreatRows(stagedTotal.threat, total.threat or snapshot.threat, eventState) then return false end
-    if turn and not stageThreatRows(stagedTurn.threat, turn.threat, eventState) then return false end
     if replaceExisting == true then self:ResetEvent(normalizedEventId) end
     local bucket = ensureEventBucket(self, normalizedEventId)
     mergeMaps(bucket.total.damage, stagedTotal.damage, replaceExisting)
@@ -323,17 +307,7 @@ function EventMeters:InstallSnapshot(eventId, snapshot, replaceExisting)
         mergeMaps(bucket.total.threat[targetEventId], rows, replaceExisting)
     end
     currentTurn = normalizePositiveInteger(snapshot.currentTurn) or bucket.currentTurn or 1
-    if turn then
-        local turnBucket = ensureTurnBucket(bucket, currentTurn)
-        mergeMaps(turnBucket.damage, stagedTurn.damage, replaceExisting)
-        mergeMaps(turnBucket.healing, stagedTurn.healing, replaceExisting)
-        for targetEventId, rows in pairs(stagedTurn.threat) do
-            turnBucket.threat[targetEventId] = turnBucket.threat[targetEventId] or {}
-            mergeMaps(turnBucket.threat[targetEventId], rows, replaceExisting)
-        end
-    else
-        bucket.currentTurn = currentTurn
-    end
+    bucket.currentTurn = currentTurn
     return true
 end
 
