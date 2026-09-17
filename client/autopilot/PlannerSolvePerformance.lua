@@ -169,6 +169,9 @@ local function buildSpellAction(state, actorKey, unit, candidate, movementAction
         cooldownChannelTriggersGCD = actionEconomyEntry
             and actionEconomyEntry.cooldownChannelTriggersGCD == true
             or false,
+        cooldownChannelCanUseOffTurn = actionEconomyEntry
+            and actionEconomyEntry.cooldownChannelCanUseOffTurn == true
+            or false,
         previousCasterActionId = previousActionId,
         targetSelections = selections,
         targetSelectionOrder = selectionOrder,

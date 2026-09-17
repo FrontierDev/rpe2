@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 15,
+    version = 16,
     dataset = {
         achievements = {},
         auras = {
@@ -1166,7 +1166,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_shadowward.blp",
                 id = "kbifnqpj",
-                cooldownChannel = 3,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Evasion",
@@ -2005,7 +2005,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_kick.blp",
                 id = "300h0gls",
-                cooldownChannel = 2,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Kick",

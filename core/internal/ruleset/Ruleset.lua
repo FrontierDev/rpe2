@@ -326,13 +326,21 @@ function Ruleset.GetCooldownChannel(channelId, rulesetOverride)
         getCooldownChannelRuleKey(normalizedChannelId, "triggers_gcd"),
         false
     ) == true
+    local canUseOffTurn = Ruleset.GetRulesetRuleValueByKey(
+        ruleset,
+        "action_economy",
+        getCooldownChannelRuleKey(normalizedChannelId, "can_use_off_turn"),
+        false
+    ) == true
     local normalizedName = trimText(name)
+    local enabled = normalizedName ~= ""
 
     return {
         id = normalizedChannelId,
         name = normalizedName,
         triggersGCD = triggersGCD,
-        enabled = normalizedName ~= "",
+        canUseOffTurn = enabled and canUseOffTurn or false,
+        enabled = enabled,
     }
 end
 
@@ -353,6 +361,11 @@ end
 function Ruleset.DoesCooldownChannelTriggerGCD(channelId, rulesetOverride)
     local channel = Ruleset.GetCooldownChannel(channelId, rulesetOverride)
     return channel ~= nil and channel.triggersGCD == true
+end
+
+function Ruleset.CanCooldownChannelBeUsedOffTurn(channelId, rulesetOverride)
+    local channel = Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    return channel ~= nil and channel.enabled == true and channel.canUseOffTurn == true
 end
 
 function Ruleset.GetCooldownChannelName(channelId, rulesetOverride)

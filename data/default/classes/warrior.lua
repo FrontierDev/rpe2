@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 18,
+        version = 19,
     dataset = {
         achievements = {},
         auras = {
@@ -1287,7 +1287,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_shieldbash.blp",
                 id = "ti2j4umn",
-                cooldownChannel = 2,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Shield Bash",
@@ -2095,7 +2095,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_defend.blp",
                 id = "g36ujwt9",
-                cooldownChannel = 3,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Shield Block",
@@ -2355,7 +2355,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_revenge.blp",
                 id = "mn1ltzeo",
-                cooldownChannel = 2,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Revenge",
@@ -2601,7 +2601,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_shieldwall.blp",
                 id = "tkb4huco",
-                cooldownChannel = 3,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Shield Wall",
@@ -2672,7 +2672,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_victoryrush.blp",
                 id = "0ttffa47",
-                cooldownChannel = 2,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Intervene",

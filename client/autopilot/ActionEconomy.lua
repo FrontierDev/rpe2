@@ -157,6 +157,13 @@ function ActionEconomy.CreateInput(candidate, activationMetadata)
     if type(cooldownChannelTriggersGCD) ~= "boolean" then
         cooldownChannelTriggersGCD = nil
     end
+    local cooldownChannelCanUseOffTurn = metadata.cooldownChannelCanUseOffTurn
+    if cooldownChannelCanUseOffTurn == nil and type(activationSnapshot) == "table" then
+        cooldownChannelCanUseOffTurn = activationSnapshot.cooldownChannelCanUseOffTurn
+    end
+    if type(cooldownChannelCanUseOffTurn) ~= "boolean" then
+        cooldownChannelCanUseOffTurn = false
+    end
     local cooldownChannelConfigured = metadata.cooldownChannelConfigured
     if cooldownChannelConfigured == nil and type(activationSnapshot) == "table" then
         cooldownChannelConfigured = activationSnapshot.cooldownChannelId ~= nil
@@ -178,6 +185,7 @@ function ActionEconomy.CreateInput(candidate, activationMetadata)
                 or type(activationSnapshot) == "table" and activationSnapshot.cooldownChannelName
         ),
         cooldownChannelTriggersGCD = cooldownChannelTriggersGCD,
+        cooldownChannelCanUseOffTurn = cooldownChannelCanUseOffTurn,
         cooldownChannelConfigured = cooldownChannelConfigured == true,
         cooldownChannelReason = tostring(metadata.cooldownChannelReason or ""),
         cooldownGroup = normalizeCooldownGroup(metadata.cooldownGroup),
@@ -373,6 +381,7 @@ function ActionEconomy.BuildSequence(inputs, options)
                 cooldownChannelTriggersGCD = type(source.cooldownChannelTriggersGCD) == "boolean"
                     and source.cooldownChannelTriggersGCD
                     or nil,
+                cooldownChannelCanUseOffTurn = source.cooldownChannelCanUseOffTurn == true,
                 cooldownChannelConfigured = type(source.cooldownChannelConfigured) == "boolean"
                     and source.cooldownChannelConfigured
                     or (normalizeCooldownChannelId(source.cooldownChannelId) ~= nil

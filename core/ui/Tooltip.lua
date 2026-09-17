@@ -556,8 +556,14 @@ function Tooltip:ShowGameTooltip(owner, spec, resolvedSpec)
                     )
                 else
                     local text = line.text
-                    if text ~= nil and text ~= "" then
-                        tooltip:AddLine(tostring(text), colorR, colorG, colorB, allowWrap)
+                    if text ~= nil then
+                        tooltip:AddLine(
+                            text == "" and " " or tostring(text),
+                            colorR,
+                            colorG,
+                            colorB,
+                            allowWrap
+                        )
                     end
                 end
             elseif line ~= nil and line ~= "" then
@@ -611,10 +617,10 @@ function Tooltip:ShowForElement(owner, spec)
     return self:ShowCustomTooltip(owner, spec, resolvedSpec)
 end
 
-function Tooltip:RefreshForElement(owner, spec)
+function Tooltip:RefreshForElement(owner, spec, resolvedSpec)
     local ownerFrame = ResolveOwnerFrame(owner)
     local rawSpec = spec or self.currentSpec or nil
-    local resolvedSpec = ResolveTooltipSpec(owner, rawSpec)
+    resolvedSpec = resolvedSpec or ResolveTooltipSpec(owner, rawSpec)
     if ownerFrame == nil or resolvedSpec == nil then
         return false
     end
@@ -646,6 +652,58 @@ function Tooltip:RefreshForElement(owner, spec)
     end
 
     return false
+end
+
+function Tooltip:RefreshVisibleSpellTooltip()
+    if self.currentMode ~= "custom" and self.currentMode ~= "game" then
+        return false
+    end
+
+    local tooltip = self.currentMode == "custom" and self.customTooltip or _G.GameTooltip
+    if not (tooltip and tooltip.IsShown and tooltip:IsShown() == true) then
+        return false
+    end
+
+    local ownerFrame = self.currentOwnerFrame
+    local rawSpec = self.currentSpec
+    if self.currentMode == "game"
+        and tooltip.GetOwner
+        and tooltip:GetOwner() ~= ownerFrame
+    then
+        return false
+    end
+
+    local resolvedSpec = ResolveTooltipSpec(ownerFrame, rawSpec)
+    if type(resolvedSpec) ~= "table" or resolvedSpec.rpeTooltipKind ~= "spell" then
+        return false
+    end
+
+    return self:RefreshForElement(ownerFrame, rawSpec, resolvedSpec)
+end
+
+local function isShiftModifierKey(key)
+    local normalizedKey = string.upper(tostring(key or ""))
+    return normalizedKey == "LSHIFT" or normalizedKey == "RSHIFT" or normalizedKey == "SHIFT"
+end
+
+if type(CreateFrame) == "function" then
+    local modifierRefreshFrame = CreateFrame("Frame")
+    modifierRefreshFrame:RegisterEvent("MODIFIER_STATE_CHANGED")
+    Tooltip._lastShiftDown = type(IsShiftKeyDown) == "function" and IsShiftKeyDown() == true or false
+    modifierRefreshFrame:SetScript("OnEvent", function(_, event, key)
+        if event ~= "MODIFIER_STATE_CHANGED" or not isShiftModifierKey(key) then
+            return
+        end
+
+        local shiftDown = type(IsShiftKeyDown) == "function" and IsShiftKeyDown() == true or false
+        if shiftDown == Tooltip._lastShiftDown then
+            return
+        end
+
+        Tooltip._lastShiftDown = shiftDown
+        Tooltip:RefreshVisibleSpellTooltip()
+    end)
+    Tooltip._modifierRefreshFrame = modifierRefreshFrame
 end
 
 UI.Tooltip = Tooltip

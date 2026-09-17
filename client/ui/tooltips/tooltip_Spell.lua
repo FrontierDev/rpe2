@@ -7,6 +7,8 @@ Addon.Client.UI.Tooltips = Addon.Client.UI.Tooltips or {}
 local Tooltips = Addon.Client.UI.Tooltips
 local Client = Addon.Client or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
+local Registry = Addon.Internal and Addon.Internal.Registry or {}
+local Ruleset = Addon.Internal and Addon.Internal.Ruleset or {}
 local ResourceSync = Addon.Internal and Addon.Internal.Comms and Addon.Internal.Comms.ResourceSync or {}
 local Spellcasting = Addon.Client and Addon.Client.Spellcasting or {}
 local Conditions = Addon.Client and Addon.Client.Conditions or {}
@@ -23,6 +25,99 @@ end
 
 local function trimText(value)
     return ensureString(value):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function resolveCooldownChannel(detail)
+    if type(detail) ~= "table" then
+        return nil
+    end
+
+    local resolvedChannelId = detail.cooldownChannelId
+    if resolvedChannelId ~= nil and type(Ruleset.GetCooldownChannel) == "function" then
+        local channel = Ruleset.GetCooldownChannel(resolvedChannelId)
+        local channelName = trimText(channel and channel.name)
+        if channel and channel.enabled == true and channelName ~= "" then
+            return channel
+        end
+
+        return nil
+    end
+
+    local resolvedChannelName = trimText(detail.cooldownChannelName)
+    if resolvedChannelName ~= "" then
+        return {
+            name = resolvedChannelName,
+            enabled = true,
+            triggersGCD = detail.cooldownChannelTriggersGCD == true,
+            canUseOffTurn = detail.cooldownChannelCanUseOffTurn == true,
+        }
+    end
+
+    local spell = detail.spell
+    if type(spell) ~= "table" or type(Spellcasting.ResolveSpellCooldownChannel) ~= "function" then
+        return nil
+    end
+
+    local channelId, channel = Spellcasting.ResolveSpellCooldownChannel(spell)
+    local channelName = trimText(channel and channel.name)
+    if channelId ~= nil and channel and channel.enabled == true and channelName ~= "" then
+        return channel
+    end
+
+    return nil
+end
+
+local function resolveScalingStatName(statRef)
+    local normalizedRef = trimText(statRef)
+    if normalizedRef == "" then
+        return nil
+    end
+
+    if type(Profile.GetResolvedStatRow) == "function" then
+        local resolvedRow = Profile.GetResolvedStatRow(normalizedRef)
+        local resolvedName = trimText(resolvedRow and resolvedRow.name)
+        if resolvedName ~= "" then
+            return string.lower(resolvedName)
+        end
+    end
+
+    if type(Registry.ResolveStatReference) == "function" then
+        local _, stat = Registry:ResolveStatReference(normalizedRef)
+        local statName = trimText(stat and stat.name)
+        if statName ~= "" then
+            return string.lower(statName)
+        end
+    end
+
+    return nil
+end
+
+local function getSpellScalingStatNames(spell)
+    if type(spell) ~= "table" then
+        return {}
+    end
+
+    local names = {}
+    local seenRefs = {}
+    local components = type(spell.components) == "table" and spell.components or {}
+    for componentIndex = 1, #components do
+        local component = components[componentIndex]
+        local effect = type(component) == "table" and component.effect or nil
+        local statScaling = type(effect) == "table" and type(effect.statScaling) == "table" and effect.statScaling or {}
+        for scalingIndex = 1, #statScaling do
+            local scaling = statScaling[scalingIndex]
+            local statRef = trimText(scaling and scaling.statRef)
+            if statRef ~= "" and not seenRefs[statRef] then
+                local statName = resolveScalingStatName(statRef)
+                if statName then
+                    names[#names + 1] = statName
+                    seenRefs[statRef] = true
+                end
+            end
+        end
+    end
+
+    return names
 end
 
 local function buildAuraHeaderText(section)
@@ -162,6 +257,7 @@ local function buildRuntimeActivationState(detail)
             cooldownChannelId = detail.cooldownChannelId,
             cooldownChannelName = detail.cooldownChannelName,
             cooldownChannelTriggersGCD = detail.cooldownChannelTriggersGCD == true,
+            cooldownChannelCanUseOffTurn = detail.cooldownChannelCanUseOffTurn == true,
             channelCooldownRemaining = tonumber(detail.channelCooldownRemaining),
         }
     end
@@ -488,8 +584,61 @@ function SpellTooltip:Build(detail, owner)
         }
     end
 
+    local cooldownChannel = resolveCooldownChannel(detail)
+    if cooldownChannel then
+        lines[#lines + 1] = {
+            text = "",
+            wrap = false,
+        }
+
+        if type(IsShiftKeyDown) == "function" and IsShiftKeyDown() then
+            local channelText = ("This spell is considered a %s."):format(cooldownChannel.name)
+            if cooldownChannel.triggersGCD == true then
+                channelText = channelText:gsub("%.$", "")
+                    .. " and triggers the global cooldown for all other spells of this type."
+            end
+
+            lines[#lines + 1] = {
+                text = ("· %s"):format(channelText),
+                r = 0.6,
+                g = 0.6,
+                b = 0.6,
+                wrap = true,
+            }
+            if cooldownChannel.canUseOffTurn == true then
+                lines[#lines + 1] = {
+                    text = "· This spell can be used when it is not your turn.",
+                    r = 0.6,
+                    g = 0.6,
+                    b = 0.6,
+                    wrap = true,
+                }
+            end
+
+            local scalingStatNames = getSpellScalingStatNames(detail.spell)
+            for index = 1, #scalingStatNames do
+                lines[#lines + 1] = {
+                    text = ("· This spell scales with %s."):format(scalingStatNames[index]),
+                    r = 0.6,
+                    g = 0.6,
+                    b = 0.6,
+                    wrap = true,
+                }
+            end
+        else
+            lines[#lines + 1] = {
+                text = "<Hold shift to expand>",
+                r = 0.6,
+                g = 0.6,
+                b = 0.6,
+                wrap = true,
+            }
+        end
+    end
+
     return {
         type = "game",
+        rpeTooltipKind = "spell",
         title = ensureString(detail.name, "Unknown Spell"),
         titleColor = { r = 1, g = 1, b = 1 },
         lines = lines,

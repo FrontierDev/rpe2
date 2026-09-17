@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 25,
+    version = 26,
     dataset = {
         achievements = {},
         auras = {
@@ -3687,7 +3687,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_divineprotection.blp",
                 id = "0opb1tte",
-                cooldownChannel = 3,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Divine Protection",
@@ -4549,7 +4549,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_rebuke.blp",
                 id = "kskvgnmw",
-                cooldownChannel = 2,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Rebuke",

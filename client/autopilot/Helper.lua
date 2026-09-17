@@ -637,6 +637,7 @@ local function buildSpellRow(eventState, action)
         cooldownChannelId = action and action.cooldownChannelId or nil,
         cooldownChannelName = action and action.cooldownChannelName or nil,
         cooldownChannelTriggersGCD = action and action.cooldownChannelTriggersGCD == true or false,
+        cooldownChannelCanUseOffTurn = action and action.cooldownChannelCanUseOffTurn == true or false,
         spellRef = action and action.spellRef or nil,
         targetEventIds = action and action.targetEventIds or nil,
         annotations = annotations,

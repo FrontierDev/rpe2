@@ -294,6 +294,10 @@ local function buildActionEconomyInput(candidate)
     local cooldownChannelTriggersGCD = type(cooldownChannel) == "table"
         and cooldownChannel.triggersGCD == true
         or nil
+    local cooldownChannelCanUseOffTurn = type(cooldownChannel) == "table"
+        and cooldownChannel.enabled == true
+        and cooldownChannel.canUseOffTurn == true
+        or false
     local cooldownTurns = Spellcasting.NormalizeTurnCount(spell.cooldown)
     local cooldownGroup = nil
     if cooldownTurns ~= nil then
@@ -309,6 +313,7 @@ local function buildActionEconomyInput(candidate)
         cooldownChannelId = cooldownChannelId,
         cooldownChannelName = type(cooldownChannel) == "table" and cooldownChannel.name or nil,
         cooldownChannelTriggersGCD = cooldownChannelTriggersGCD,
+        cooldownChannelCanUseOffTurn = cooldownChannelCanUseOffTurn,
         cooldownChannelConfigured = cooldownChannelConfigured,
         cooldownChannelReason = cooldownChannelConfigured
             and ""

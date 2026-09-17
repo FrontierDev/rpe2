@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 14,
+    version = 15,
     dataset = {
         achievements = {},
         auras = {
@@ -737,7 +737,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_powerwordshield.blp",
                 id = "pwshld01",
-                cooldownChannel = 3,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Power Word: Shield",
@@ -1211,7 +1211,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_renew.blp",
                 id = "qqkkenuw",
-                cooldownChannel = 3,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Renew",
@@ -1543,7 +1543,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_painsupression.blp",
                 id = "mnuc5di4",
-                cooldownChannel = 3,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Pain Suppression",

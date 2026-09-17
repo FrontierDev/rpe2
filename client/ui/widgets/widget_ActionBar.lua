@@ -359,6 +359,7 @@ local function resolveRuntimeSpellDetail(detail)
     resolved.cooldownChannelId = activationState.cooldownChannelId
     resolved.cooldownChannelName = activationState.cooldownChannelName
     resolved.cooldownChannelTriggersGCD = activationState.cooldownChannelTriggersGCD == true
+    resolved.cooldownChannelCanUseOffTurn = activationState.cooldownChannelCanUseOffTurn == true
     resolved.channelCooldownRemaining = activationState.channelCooldownRemaining
     resolved.currentCharges = activationState.currentCharges
     resolved.maxCharges = activationState.maxCharges
@@ -432,6 +433,7 @@ local function resolveRuntimeSpellDetailWithActivationState(detail, activationSt
     resolved.cooldownChannelId = activationState.cooldownChannelId
     resolved.cooldownChannelName = activationState.cooldownChannelName
     resolved.cooldownChannelTriggersGCD = activationState.cooldownChannelTriggersGCD == true
+    resolved.cooldownChannelCanUseOffTurn = activationState.cooldownChannelCanUseOffTurn == true
     resolved.channelCooldownRemaining = activationState.channelCooldownRemaining
     resolved.currentCharges = activationState.currentCharges
     resolved.maxCharges = activationState.maxCharges

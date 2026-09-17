@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 17,
+    version = 18,
     dataset = {
         achievements = {},
         auras = {
@@ -2158,7 +2158,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_frost_iceshock.blp",
                 id = "300h0gls",
-                cooldownChannel = 2,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
                 mountedCombatOnly = false,
                 name = "Counterspell",

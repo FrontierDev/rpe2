@@ -1471,9 +1471,15 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
 
     local cooldownChannelId, cooldownChannel = resolveSpellCooldownChannel(activation.spell)
     local cooldownChannelName = cooldownChannel and cooldownChannel.name or nil
+    local cooldownChannelConfigured = cooldownChannelId ~= nil
+        and type(cooldownChannel) == "table"
+        and cooldownChannel.enabled == true
     local cooldownChannelTriggersGCD = cooldownChannel
         and cooldownChannel.enabled == true
         and cooldownChannel.triggersGCD == true
+        or false
+    local cooldownChannelCanUseOffTurn = cooldownChannelConfigured
+        and cooldownChannel.canUseOffTurn == true
         or false
     local channelCooldownRemaining = math.max(
         0,
@@ -1496,8 +1502,12 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
     local canAffordStartCosts = true
     local canAffordEndCosts = true
 
-    if not isBossCaster(activation.casterUnit)
+    if not cooldownChannelConfigured then
+        canCast = false
+        reason = "invalid-cooldown-channel"
+    elseif not isBossCaster(activation.casterUnit)
         and not (Spellcasting.IsCasterTurnOnTick and Spellcasting.IsCasterTurnOnTick(activation.eventState, activation.casterUnit.eventID))
+        and not cooldownChannelCanUseOffTurn
     then
         canCast = false
         reason = "not-your-turn"
@@ -1530,10 +1540,7 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
         end
     end
 
-    if canCast and (not cooldownChannelId or type(cooldownChannel) ~= "table" or cooldownChannel.enabled ~= true) then
-        canCast = false
-        reason = "invalid-cooldown-channel"
-    elseif canCast and cooldownChannelTriggersGCD and channelCooldownRemaining > 0 then
+    if canCast and cooldownChannelTriggersGCD and channelCooldownRemaining > 0 then
         canCast = false
         reason = "channel-cooldown"
     end
@@ -1627,6 +1634,7 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
         cooldownChannelId = cooldownChannelId,
         cooldownChannelName = cooldownChannelName,
         cooldownChannelTriggersGCD = cooldownChannelTriggersGCD,
+        cooldownChannelCanUseOffTurn = cooldownChannelCanUseOffTurn,
         channelCooldownRemaining = channelCooldownRemaining,
         currentCharges = currentCharges,
         maxCharges = maxCharges,
@@ -1666,6 +1674,7 @@ function Spellcasting.ResolveSpellActivationState(self, spellRef, options)
             cooldownRemaining = 0,
             cooldownChannelId = nil,
             cooldownChannelName = nil,
+            cooldownChannelCanUseOffTurn = false,
             channelCooldownRemaining = 0,
             currentCharges = nil,
             maxCharges = nil,
@@ -1694,6 +1703,7 @@ function Spellcasting.ResolveSpellActivationState(self, spellRef, options)
             cooldownRemaining = 0,
             cooldownChannelId = nil,
             cooldownChannelName = nil,
+            cooldownChannelCanUseOffTurn = false,
             channelCooldownRemaining = 0,
             currentCharges = nil,
             maxCharges = nil,
@@ -1720,6 +1730,7 @@ function Spellcasting.ResolveSpellActivationState(self, spellRef, options)
         cooldownChannelId = snapshot.cooldownChannelId,
         cooldownChannelName = snapshot.cooldownChannelName,
         cooldownChannelTriggersGCD = snapshot.cooldownChannelTriggersGCD == true,
+        cooldownChannelCanUseOffTurn = snapshot.cooldownChannelCanUseOffTurn == true,
         channelCooldownRemaining = snapshot.channelCooldownRemaining,
         currentCharges = snapshot.currentCharges,
         maxCharges = snapshot.maxCharges,
