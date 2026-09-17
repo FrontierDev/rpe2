@@ -63,6 +63,28 @@ local function getEventState(entry)
     return type(Client.GetEventState) == "function" and Client:GetEventState() or nil
 end
 
+local function copyAbsorptionRuntimeSources(auraManager, eventState, targetEventId)
+    if not auraManager or type(auraManager.GetAbsorptionSources) ~= "function" then
+        return {}
+    end
+
+    local copied = {}
+    local sources = auraManager:GetAbsorptionSources(Client, eventState, targetEventId) or {}
+    for index = 1, #sources do
+        local source = sources[index]
+        if type(source) == "table" then
+            copied[#copied + 1] = {
+                auraKey = source.auraKey,
+                effectIndex = source.effectIndex,
+                maximum = tonumber(source.maximum) or 0,
+                remaining = tonumber(source.remaining) or 0,
+                revision = tonumber(source.revision) or 0,
+            }
+        end
+    end
+    return copied
+end
+
 local function getDifficultyModifiers(unit, eventState)
     if type(unit) ~= "table" or unit.isPlayer == true then
         return {
@@ -317,6 +339,9 @@ local function applyDifficultyDamageResult(entry, result)
     result.mitigationPercent = scaledRawDamage > 0 and ((result.mitigated / scaledRawDamage) * 100) or 0
 
     local auraManager = Client.Spellcasting and Client.Spellcasting.AuraManager or nil
+    local targetEventId = entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID)
+    local runtimeSourcesBeforeCommit = copyAbsorptionRuntimeSources(auraManager, getEventState(entry), targetEventId)
+    local previewRemainingDamage = nil
     if finalDamage > 0
         and auraManager
         and type(auraManager.PreviewAbsorption) == "function"
@@ -329,11 +354,29 @@ local function applyDifficultyDamageResult(entry, result)
             effect.damageSchoolRefs or {}
         )
         if type(absorptionPreview) == "table" then
-            result.absorbedAmount = math.max(0, tonumber(absorptionPreview.absorbedAmount or absorptionPreview.absorbed) or 0)
+            local previewAbsorbedAmount = tonumber(absorptionPreview.absorbedAmount or absorptionPreview.absorbed)
+            previewRemainingDamage = tonumber(absorptionPreview.remainingDamage or absorptionPreview.healthRemainder)
+            if previewAbsorbedAmount == nil then
+                previewAbsorbedAmount = finalDamage - (previewRemainingDamage or finalDamage)
+            end
+            result.absorbedAmount = math.min(finalDamage, math.max(0, previewAbsorbedAmount))
             result.absorptionChanges = absorptionPreview.changes or absorptionPreview.plan or {}
-            result.amount = math.max(0, tonumber(absorptionPreview.remainingDamage or absorptionPreview.healthRemainder) or finalDamage)
+            -- Keep the same authoritative arithmetic as the base combat path;
+            -- never trust a cached remainder independently of absorbedAmount.
+            result.amount = math.max(0, finalDamage - result.absorbedAmount)
         end
     end
+
+    result.absorptionDiagnostics = result.absorptionDiagnostics or {}
+    result.absorptionDiagnostics.preAbsorbAmount = finalDamage
+    result.absorptionDiagnostics.previewAbsorbedAmount = math.max(0, tonumber(result.absorbedAmount) or 0)
+    result.absorptionDiagnostics.previewRemainingDamage = math.max(
+        0,
+        previewRemainingDamage ~= nil
+            and previewRemainingDamage
+            or (finalDamage - result.absorbedAmount)
+    )
+    result.absorptionDiagnostics.runtimeSourcesBeforeCommit = runtimeSourcesBeforeCommit
 
     rebuildThreatPreview(entry, result, combatRules, effect)
     return result
@@ -421,6 +464,9 @@ end
 local baseBuildDamagePreview = Combat.BuildDamagePreview
 if type(baseBuildDamagePreview) == "function" then
     function Combat:BuildDamagePreview(entry)
+        if type(entry) == "table" and type(entry.authoritativeDamageResult) == "table" then
+            return entry.authoritativeDamageResult
+        end
         local result = baseBuildDamagePreview(self, entry)
         if type(result) == "table" then
             applyDifficultyDamageResult(entry, result)
@@ -438,6 +484,12 @@ end
 local baseApplyResolvedDamage = Combat.ApplyResolvedDamage
 if type(baseApplyResolvedDamage) == "function" then
     function Combat:ApplyResolvedDamage(entry, previewOnly)
+        if previewOnly ~= true
+            and type(entry) == "table"
+            and type(entry.authoritativeDamageResult) == "table"
+        then
+            return true, entry.authoritativeDamageResult
+        end
         if type(self.BuildDamagePreview) == "function" then
             self:BuildDamagePreview(entry)
         end

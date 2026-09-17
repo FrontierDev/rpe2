@@ -1718,7 +1718,10 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
                 wasCritical = type(damageResult) == "table" and damageResult.wasCritical == true,
             })
         end
-        if type(Combat.RegisterActionDamageCombatLog) == "function" then
+        local defenderIsLocalAuthority = isLocalAuthorityForUnit(entry.eventState, entry.defenderUnit)
+        -- The defender owns the final post-absorb result for remote hits.
+        -- The attacker still completes action bookkeeping, but must not emit a preview log.
+        if defenderIsLocalAuthority and type(Combat.RegisterActionDamageCombatLog) == "function" then
             Combat:RegisterActionDamageCombatLog(entry, damageResult)
         end
         finalizeDamageCombatEvents(client, entry, true)

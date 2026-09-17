@@ -111,6 +111,82 @@ local function buildAggregateDamageDetailText(aggregate)
     return ("%s (%s)"):format(baseText, table.concat(bonusParts, ", "))
 end
 
+local function emitSingleTargetDamageCombatLog(entry, damageResult)
+    if type(entry) ~= "table" or type(damageResult) ~= "table" then
+        return false
+    end
+
+    local client = Addon.Client
+    if type(client) ~= "table" or type(client.EmitCombatLogEntry) ~= "function" then
+        return false
+    end
+
+    local context = type(entry.context) == "table" and entry.context or nil
+    local eventState = entry.eventState or (context and context.eventState)
+    local localEventUnit = type(client.ResolveLocalEventUnit) == "function"
+        and client:ResolveLocalEventUnit(eventState)
+        or nil
+    local defenderEventId = tonumber(entry.defenderEventId)
+    if type(localEventUnit) ~= "table"
+        or defenderEventId == nil
+        or tonumber(localEventUnit.eventID) ~= defenderEventId
+    then
+        return false
+    end
+
+    local amount = math.max(0, math.floor(tonumber(damageResult.amount) or 0))
+    local absorbedAmount = math.max(0, math.floor(tonumber(damageResult.absorbedAmount) or 0))
+    if amount <= 0 and absorbedAmount <= 0 then
+        return false
+    end
+
+    local effect = entry.effect
+    local schoolRef = type(damageResult.damageSchoolRef) == "string" and damageResult.damageSchoolRef or nil
+    if schoolRef == nil and type(effect) == "table" and type(effect.damageSchoolRefs) == "table" then
+        schoolRef = effect.damageSchoolRefs[1]
+    end
+
+    local schoolIcon = damageResult.damageSchoolIcon
+    local schoolLabel = damageResult.damageSchoolName
+    local accentColor = nil
+    if type(client.ResolveCombatLogDamageSchoolPresentation) == "function" then
+        schoolIcon, schoolLabel, accentColor = client:ResolveCombatLogDamageSchoolPresentation(
+            schoolRef,
+            schoolLabel,
+            schoolIcon
+        )
+    end
+
+    local spellIcon = type(client.ResolveCombatLogSpellIcon) == "function"
+        and client:ResolveCombatLogSpellIcon(context and context.spell or nil, entry.spellRef or (context and context.spellRef) or nil)
+        or nil
+    local aggregate = {
+        amountMin = amount,
+        amountMax = amount,
+        absorbedMin = absorbedAmount,
+        absorbedMax = absorbedAmount,
+        labelText = schoolLabel,
+        accentColor = accentColor,
+    }
+
+    return client:EmitCombatLogEntry({
+        eventId = tostring((eventState and eventState.id) or entry.eventId or ""),
+        entryType = "damage",
+        casterDisplayName = tostring(entry.attackerUnit and entry.attackerUnit.name or "Unknown"),
+        targetDisplayName = tostring(entry.defenderUnit and entry.defenderUnit.name or "Unknown"),
+        targetCount = 1,
+        amountMin = amount,
+        amountMax = amount,
+        absorbedAmount = absorbedAmount,
+        iconTexture = schoolIcon,
+        spellIconTexture = spellIcon,
+        spellRef = entry.spellRef or (context and context.spellRef) or nil,
+        labelText = tostring(schoolLabel or "") ~= "" and tostring(schoolLabel) or "True",
+        detailText = buildAggregateDamageDetailText(aggregate),
+        accentColor = accentColor,
+    })
+end
+
 local function normalizeHealthResourceRef(resourceRef)
     if type(resourceRef) ~= "string" or resourceRef == "" then
         return nil
@@ -1009,7 +1085,12 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
     local state = self:GetOrCreateActionCombatEventState(castEntry, spell)
     local componentKey = Normalization.NormalizeToken(type(entry) == "table" and (entry.componentKey or (context and context.componentKey)) or nil)
     local amount = math.max(0, math.floor(tonumber(type(damageResult) == "table" and damageResult.amount or 0) or 0))
-    if type(state) ~= "table" or not componentKey or amount < 0 then
+    if type(state) ~= "table" then
+        -- A remote defender cannot share the attacker's in-memory castEntry.
+        -- Emit its authoritative post-absorb result as a complete single-target entry.
+        return emitSingleTargetDamageCombatLog(entry, damageResult)
+    end
+    if not componentKey or amount < 0 then
         return false
     end
 
