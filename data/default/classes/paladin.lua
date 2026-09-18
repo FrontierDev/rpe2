@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 31,
+    version = 32,
     dataset = {
         achievements = {},
         auras = {
@@ -692,7 +692,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.0838,
+                                coefficient = 0.2514,
                                 statRef = "f82db71a:u7b49vs9"
                             }
                         },

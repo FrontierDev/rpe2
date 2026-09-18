@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 19,
+    version = 20,
     dataset = {
         achievements = {},
         auras = {
@@ -106,7 +106,7 @@ Addon.Data.DefaultDatasets:Register({
                         baseHealing = 20.8,
                         statScaling = {
                             {
-                                coefficient = 0.1248,
+                                coefficient = 0.624,
                                 statRef = "f82db71a:hj6d4kvy"
                             }
                         },
@@ -190,7 +190,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.0838,
+                                coefficient = 0.2514,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -316,7 +316,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.104,
+                                coefficient = 0.52,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -359,7 +359,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.0884,
+                                coefficient = 0.442,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -399,7 +399,7 @@ Addon.Data.DefaultDatasets:Register({
                         baseHealing = 8.84,
                         statScaling = {
                             {
-                                coefficient = 0.0442,
+                                coefficient = 0.221,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },

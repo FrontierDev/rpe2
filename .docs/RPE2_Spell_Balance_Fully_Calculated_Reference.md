@@ -1,6 +1,6 @@
 # RPE2 Spell Balance — Formula Reference
 
-This document records the balance formulas used for the default RPE2 class datasets. The spreadsheet is the source of the numeric modifiers; this reference explains how those modifiers are applied to RPE2 spells.
+This document records the balance formulas used for the default RPE2 class datasets. The spreadsheet is the source of the numeric modifiers.
 
 ## Direct effects
 
@@ -26,8 +26,6 @@ Stat Coefficient
 × Secondary-Effect Modifier
 × Role Effect Modifier
 ```
-
-Weapon-based direct effects additionally use the spreadsheet's weapon base-effect and weapon-coefficient rules.
 
 ### Core modifiers
 
@@ -72,11 +70,15 @@ Weapon-based direct effects additionally use the spreadsheet's weapon base-effec
 
 ## Periodic damage and healing
 
-Periodic effects preserve a **total spell budget** across their full duration.
+Periodic effects use the spreadsheet approximately as an **Instant Bonus Action whose cooldown-equivalent is the aura duration**.
 
-For ordinary RPE2 DoTs and HoTs, use the spreadsheet approximately as an **Instant Bonus Action whose cooldown-equivalent is the aura duration**. Calculate that total budget first, then divide both the base effect and its stat coefficient evenly across the aura ticks.
+The periodic **base amount** is a total spell budget spread across the aura's ticks.
+
+The periodic **stat coefficient is not divided by duration**. Each tick uses the full coefficient calculated from the spreadsheet modifiers.
 
 RPE2 top-level aura effects tick once per owner turn, so an aura with duration `N` has `N` ticks.
+
+### Base amount
 
 ```text
 Periodic Total Base
@@ -87,70 +89,69 @@ Periodic Total Base
 × Secondary Modifier
 × Role Effect Modifier
 
-Base / Tick = Periodic Total Base / Duration
+Base / Tick
+= Periodic Total Base / Duration
 ```
 
+### Stat scaling
+
 ```text
-Periodic Total Stat Coefficient
+Stat Coefficient / Tick
 = Instant Base Stat Coefficient
 × 0.65
 × CooldownModifier(Duration)
 × Secondary Modifier
 × Role Effect Modifier
-
-Stat Coefficient / Tick
-= Periodic Total Stat Coefficient / Duration
 ```
 
-**Do not apply the full total budget on every tick.**  
-**Do not omit the duration-equivalent cooldown modifier before dividing.**
+**Do not divide the stat coefficient by duration.**
 
 ### Worked example — Shadow Word: Pain
 
 Shadow Word: Pain is a 5-turn, single-target DPS-role DoT with no secondary-output penalty.
 
+Base damage:
+
 ```text
 Total base damage
 = 100 × 0.65 × 1.60
 = 104
+
+Base damage / turn
+= 104 / 5
+= 20.8
 ```
 
+Spell Power scaling:
+
 ```text
-Total Spell Power coefficient
+Spell Power coefficient / turn
 = 0.50 × 0.65 × 1.60
 = 0.52
-```
-
-Spread over five turns:
-
-```text
-Base damage / turn = 104 / 5 = 20.8
-Spell Power / turn = 0.52 / 5 = 0.104
 ```
 
 Therefore:
 
 ```text
 Shadow Word: Pain
-= 20.8 + (Spell Power × 0.104) damage per turn
-= 104 + (Spell Power × 0.52) total over five turns
+= 20.8 + (Spell Power × 0.52) damage each turn
 ```
 
 ### Default-class periodic values
 
-| Class | Effect | Duration | Base / turn | Scaling / turn | Full-duration budget |
-|---|---|---:|---:|---:|---:|
-| Mage | Fireball DoT | 5 | 17.68 | 0.0884 Spell Power | 88.4 + 0.442 SP |
-| Mage | Pyroblast DoT | 5 | 17.68 | 0.0884 Spell Power | 88.4 + 0.442 SP |
-| Paladin | Expurgation | 3 | 23.9417 | 0.0838 Melee AP | 71.825 + 0.2514 AP |
-| Priest | Renew | 5 | 20.8 | 0.1248 Healing Power | 104 + 0.624 HP |
-| Priest | Holy Fire DoT | 3 | 16.7592 | 0.0838 Spell Power | 50.2775 + 0.2514 SP |
-| Priest | Shadow Word: Pain | 5 | 20.8 | 0.104 Spell Power | 104 + 0.52 SP |
-| Priest | Vampiric Touch | 5 | 17.68 | 0.0884 Spell Power | 88.4 + 0.442 SP |
-| Priest | Vampiric Regeneration | 5 | 8.84 | 0.0442 Spell Power | 44.2 + 0.221 SP |
-| Rogue | Rupture | 5 | 20.8 | 0.0728 Melee AP | 104 + 0.364 AP |
-| Rogue | Garrote | 2 | 31.7688 | 0.1112 Melee AP | 63.5375 + 0.2224 AP |
-| Warrior | Rend | 5 | 20.8 | 0.0728 Melee AP | 104 + 0.364 AP |
+| Class | Effect | Duration | Base / turn | Scaling / turn |
+|---|---|---:|---:|---:|
+| Mage | Fireball DoT | 5 | 17.68 | 0.442 Spell Power |
+| Mage | Pyroblast DoT | 5 | 17.68 | 0.442 Spell Power |
+| Paladin | Expurgation | 3 | 23.9417 | 0.2514 Melee AP |
+| Priest | Renew | 5 | 20.8 | 0.624 Healing Power |
+| Priest | Holy Fire DoT | 3 | 16.7592 | 0.2514 Spell Power |
+| Priest | Shadow Word: Pain | 5 | 20.8 | 0.52 Spell Power |
+| Priest | Vampiric Touch | 5 | 17.68 | 0.442 Spell Power |
+| Priest | Vampiric Regeneration | 5 | 8.84 | 0.221 Spell Power |
+| Rogue | Rupture | 5 | 20.8 | 0.364 Melee AP |
+| Rogue | Garrote | 2 | 31.7688 | 0.2224 Melee AP |
+| Warrior | Rend | 5 | 20.8 | 0.364 Melee AP |
 
 Triggered event procs such as Deep Wounds and Paladin seal events are not treated as ordinary once-per-turn periodic auras because their proc frequency is event-driven.
 
