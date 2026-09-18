@@ -12,6 +12,24 @@ local function getCombat()
     return Addon.Client and Addon.Client.Combat or nil
 end
 
+local function resolveDamageSchoolRef(Combat, effect)
+    for index = 1, #(effect and effect.damageSchoolRefs or {}) do
+        local candidate = tostring(effect.damageSchoolRefs[index] or "")
+        if candidate ~= "" then
+            if type(Combat.ResolveDamageSchoolReference) ~= "function" then
+                return candidate
+            end
+
+            local _, damageSchool = Combat:ResolveDamageSchoolReference(candidate)
+            if type(damageSchool) == "table" then
+                return candidate
+            end
+        end
+    end
+
+    return nil
+end
+
 AuraManager:RegisterEffect({
     type = "damage",
     Execute = function(self, context, effect)
@@ -67,6 +85,7 @@ AuraManager:RegisterEffect({
             appliedDelta = appliedDelta,
             resourceEntry = resourceEntry,
             hitType = "ability",
+            damageSchoolRef = resolveDamageSchoolRef(Combat, effect),
             resourceDeltas = {},
         }
 

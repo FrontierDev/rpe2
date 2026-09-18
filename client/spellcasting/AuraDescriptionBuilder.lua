@@ -647,6 +647,22 @@ local function resolveTriggeredTargetContext(combatEventId, triggerTarget, auraT
     if targetKey == "aura_target" then
         return auraTargetContext
     end
+    if eventId == "on_damage_type" and targetKey == "event_source" then
+        return {
+            subject = "the damage dealer",
+            object = "the damage dealer",
+            possessive = "the damage dealer's",
+            reflexive = "itself",
+        }
+    end
+    if eventId == "on_damage_type" and targetKey == "event_other" then
+        return {
+            subject = "the damaged unit",
+            object = "the damaged unit",
+            possessive = "the damaged unit's",
+            reflexive = "itself",
+        }
+    end
     if targetKey == "event_source" then
         if eventId == "on_heal" or eventId == "on_heal_taken" then
             return {

@@ -1668,13 +1668,24 @@ function Client:ResolveCombatReactionAction(actionId)
     local attackerName = resolveSenderForUnit(entry.eventState, entry.attackerUnit)
     local successfullyDefended = isSuccessfulDefensiveResolution(entry, action, resultToken, resolution)
     local defenceStatRef = successfullyDefended and normalizeDefenceStatRef(resolution and resolution.defenceStatRef) or nil
-    if attackerName == "" or not sendCombatWhisper(attackerName, HIT_CHECK_RESPONSE_OPCODE, {
+    local authoritativeDamageResult = nil
+    if resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
+        local _, resolvedDamageResult = Combat:ApplyResolvedDamage(entry)
+        authoritativeDamageResult = resolvedDamageResult
+        entry.lastDamageResult = resolvedDamageResult
+    end
+
+    local responseArguments = {
         entry.checkId,
         entry.eventId,
         resultToken,
         successfullyDefended and "defended" or "",
         defenceStatRef or "",
-    }) then
+        type(authoritativeDamageResult) == "table" and normalizeToken(authoritativeDamageResult.damageSchoolRef) or "",
+        type(authoritativeDamageResult) == "table" and tostring(tonumber(authoritativeDamageResult.appliedDelta) or 0) or "",
+        type(authoritativeDamageResult) == "table" and (authoritativeDamageResult.applied == true and "1" or "0") or "",
+    }
+    if attackerName == "" or not sendCombatWhisper(attackerName, HIT_CHECK_RESPONSE_OPCODE, responseArguments) then
         return false
     end
 
@@ -1778,6 +1789,10 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
     local successfullyDefended = resultToken == RESULT_FAIL
         and tostring(arguments and arguments[4] or "") == "defended"
     local defenceStatRef = successfullyDefended and normalizeDefenceStatRef(arguments and arguments[5]) or nil
+    local authoritativeDamageSchoolRef = normalizeToken(arguments and arguments[6])
+    local authoritativeAppliedDelta = tonumber(arguments and arguments[7])
+    local hasAuthoritativeDamageOutcome = tostring(arguments and arguments[8] or "") ~= ""
+    local authoritativeDamageApplied = tostring(arguments and arguments[8] or "") == "1"
     local entry = checkId and client:GetPendingCombatHitCheck(checkId) or nil
     if not entry or not eventId or eventId ~= entry.eventId or not resultToken then
         return false
@@ -1802,6 +1817,11 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
     if completed and resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
         local _, damageResult = Combat:ApplyResolvedDamage(entry, true)
         entry.lastDamageResult = damageResult
+        if hasAuthoritativeDamageOutcome and type(damageResult) == "table" then
+            damageResult.applied = authoritativeDamageApplied
+            damageResult.appliedDelta = authoritativeAppliedDelta or 0
+            damageResult.damageSchoolRef = authoritativeDamageSchoolRef
+        end
         local context = type(entry) == "table" and entry.context or nil
         local castEntry = type(context) == "table" and context.castEntry or nil
         local spell = type(context) == "table" and context.spell or nil
@@ -1821,7 +1841,13 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
             Combat:RegisterActionDamageCombatLog(entry, damageResult)
         end
         finalizeDamageCombatEvents(client, entry, true)
-        Combat:EmitDamageTypeEvent(client, entry, damageResult)
+        if hasAuthoritativeDamageOutcome then
+            Combat:EmitDamageTypeEvent(client, entry, {
+                applied = authoritativeDamageApplied,
+                appliedDelta = authoritativeAppliedDelta or 0,
+                damageSchoolRef = authoritativeDamageSchoolRef,
+            })
+        end
 
         if type(client.MarkEventUnitInteraction) == "function" then
             client:MarkEventUnitInteraction(entry.eventState, entry.attackerUnit, entry.defenderUnit, damageResult, entry.spellRef)

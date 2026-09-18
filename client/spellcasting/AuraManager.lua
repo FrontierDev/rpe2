@@ -4770,6 +4770,32 @@ function AuraManager:HandleLocalAuraTickResult(client, context, result)
         )
     end
 
+    if tostring(result.effectType or "") == "damage"
+        and type(context) == "table"
+        and context.suppressCombatEvents ~= true
+        and result.applied == true
+        and (tonumber(result.appliedDelta) or 0) < 0
+    then
+        local combat = Addon.Client and Addon.Client.Combat or nil
+        local casterUnit = context.casterUnit
+        local targetUnit = context.targetUnit
+        if type(combat) == "table"
+            and type(combat.EmitDamageTypeEvent) == "function"
+            and type(casterUnit) == "table"
+            and type(targetUnit) == "table"
+        then
+            combat:EmitDamageTypeEvent(client, {
+                eventState = context.eventState,
+                sessionState = context.sessionState,
+                attackerUnit = casterUnit,
+                defenderUnit = targetUnit,
+                attackerEventId = casterUnit.eventID,
+                defenderEventId = targetUnit.eventID,
+                context = context,
+            }, result)
+        end
+    end
+
     local resourceDeltas = result.resourceDeltas
     if (type(resourceDeltas) ~= "table" or #resourceDeltas == 0)
         and (tonumber(result.absorbedAmount) or 0) <= 0
