@@ -47,6 +47,7 @@ core/internal/comms/Diagnostics.lua
 core/internal/tasks/TaskQueue.lua
 core/internal/comms/MessageQueue.lua
 core/internal/comms/Operations.lua
+core/internal/comms/CombatDamageResolved.lua
 core/internal/comms/EventUnitHidden.lua
 core/internal/comms/EventUnitTaunt.lua
 core/internal/comms/EventUnitTauntApplied.lua

@@ -23,6 +23,7 @@ local UI = Addon.UI or {}
 
 local HIT_CHECK_REQUEST_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_HIT_CHECK_REQUEST") or nil
 local HIT_CHECK_RESPONSE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_HIT_CHECK_RESPONSE") or nil
+local DAMAGE_RESOLVED_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_DAMAGE_RESOLVED") or nil
 
 local RESULT_PASS = "pass"
 local RESULT_FAIL = "fail"
@@ -1668,22 +1669,12 @@ function Client:ResolveCombatReactionAction(actionId)
     local attackerName = resolveSenderForUnit(entry.eventState, entry.attackerUnit)
     local successfullyDefended = isSuccessfulDefensiveResolution(entry, action, resultToken, resolution)
     local defenceStatRef = successfullyDefended and normalizeDefenceStatRef(resolution and resolution.defenceStatRef) or nil
-    local authoritativeDamageResult = nil
-    if resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
-        local _, resolvedDamageResult = Combat:ApplyResolvedDamage(entry)
-        authoritativeDamageResult = resolvedDamageResult
-        entry.lastDamageResult = resolvedDamageResult
-    end
-
     local responseArguments = {
         entry.checkId,
         entry.eventId,
         resultToken,
         successfullyDefended and "defended" or "",
         defenceStatRef or "",
-        type(authoritativeDamageResult) == "table" and normalizeToken(authoritativeDamageResult.damageSchoolRef) or "",
-        type(authoritativeDamageResult) == "table" and tostring(tonumber(authoritativeDamageResult.appliedDelta) or 0) or "",
-        type(authoritativeDamageResult) == "table" and (authoritativeDamageResult.applied == true and "1" or "0") or "",
     }
     if attackerName == "" or not sendCombatWhisper(attackerName, HIT_CHECK_RESPONSE_OPCODE, responseArguments) then
         return false
@@ -1696,6 +1687,22 @@ function Client:ResolveCombatReactionAction(actionId)
         local _, damageResult = Combat:ApplyResolvedDamage(entry)
         entry.lastDamageResult = damageResult
         Combat:FinalizeLocalDamageResult(entry, damageResult)
+
+        local damageOutcomeSent = sendCombatWhisper(attackerName, DAMAGE_RESOLVED_OPCODE, {
+            entry.checkId,
+            entry.eventId,
+            type(damageResult) == "table" and normalizeToken(damageResult.damageSchoolRef) or "",
+            type(damageResult) == "table" and tostring(tonumber(damageResult.appliedDelta) or 0) or "0",
+            type(damageResult) == "table" and (damageResult.applied == true and "1" or "0") or "0",
+        })
+        if not damageOutcomeSent and type(Debug) == "table" and type(Debug.Internal) == "function" then
+            Debug.Internal(
+                "Authoritative combat damage hand-off failed: checkId=%s eventId=%s target=%s.",
+                tostring(entry.checkId or ""),
+                tostring(entry.eventId or ""),
+                tostring(attackerName or "")
+            )
+        end
     elseif resultToken == RESULT_FAIL then
         finalizeDamageCombatEvents(Client, entry, false)
         Combat:ShowDefenceCombatText(entry, resolution)
@@ -1791,7 +1798,9 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
     local defenceStatRef = successfullyDefended and normalizeDefenceStatRef(arguments and arguments[5]) or nil
     local authoritativeDamageSchoolRef = normalizeToken(arguments and arguments[6])
     local authoritativeAppliedDelta = tonumber(arguments and arguments[7])
-    local hasAuthoritativeDamageOutcome = tostring(arguments and arguments[8] or "") ~= ""
+    local authoritativeDamageOutcomeToken = tostring(arguments and arguments[8] or "")
+    local hasAuthoritativeDamageOutcome = authoritativeDamageOutcomeToken == "0"
+        or authoritativeDamageOutcomeToken == "1"
     local authoritativeDamageApplied = tostring(arguments and arguments[8] or "") == "1"
     local entry = checkId and client:GetPendingCombatHitCheck(checkId) or nil
     if not entry or not eventId or eventId ~= entry.eventId or not resultToken then
@@ -1808,6 +1817,12 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
             defenceSystem = entry.defenceSystem,
             defenceStatRef = defenceStatRef,
         }
+    end
+
+    if resultToken == RESULT_PASS and not hasAuthoritativeDamageOutcome then
+        entry.damageResolutionPending = true
+        entry.pendingDamageResultToken = RESULT_PASS
+        return true, buildCombatResult(entry, nil, "damage_pending")
     end
 
     local completed, result = Combat:CompleteHitCheck(entry, resultToken, "player-response")
@@ -1879,6 +1894,48 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
         Combat:ShowMissCombatText(entry)
     end
 
+    return completed, result
+end
+
+function Combat:HandleCombatDamageResolved(client, arguments, sender)
+    local checkId = normalizeToken(arguments and arguments[1])
+    local eventId = normalizeToken(arguments and arguments[2])
+    local damageSchoolRef = normalizeToken(arguments and arguments[3])
+    local appliedDelta = tonumber(arguments and arguments[4])
+    local appliedToken = tostring(arguments and arguments[5] or "")
+    local entry = checkId and client:GetPendingCombatHitCheck(checkId) or nil
+    if not entry
+        or not eventId
+        or eventId ~= entry.eventId
+        or entry.damageResolutionPending ~= true
+        or appliedDelta == nil
+        or (appliedToken ~= "0" and appliedToken ~= "1")
+    then
+        return false
+    end
+
+    local expectedSender = resolveSenderForUnit(entry.eventState, entry.defenderUnit)
+    if expectedSender ~= "" and expectedSender ~= getResolvedName(sender) then
+        return false
+    end
+
+    local completed, result = self:HandleDamageHitCheckResponse(client, {
+        checkId,
+        eventId,
+        RESULT_PASS,
+        "",
+        "",
+        damageSchoolRef or "",
+        tostring(appliedDelta),
+        appliedToken,
+    }, sender)
+    if not completed then
+        entry.damageResolutionPending = true
+        entry.pendingDamageResultToken = RESULT_PASS
+    else
+        entry.damageResolutionPending = nil
+        entry.pendingDamageResultToken = nil
+    end
     return completed, result
 end
 

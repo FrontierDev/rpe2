@@ -22,4 +22,12 @@ function Client:HandleCombatHitCheckResponse(arguments, sender)
     return Combat:HandleDamageHitCheckResponse(self, arguments, sender)
 end
 
+function Client:HandleCombatDamageResolved(arguments, sender)
+    if type(Combat.HandleCombatDamageResolved) ~= "function" then
+        return false
+    end
+
+    return Combat:HandleCombatDamageResolved(self, arguments, sender)
+end
+
 return Client

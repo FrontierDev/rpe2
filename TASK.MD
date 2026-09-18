@@ -1,123 +1,122 @@
-## Verification against `dev` @ `5e72e58`
+## Rev 1 verification — `dev` @ `0b044ee`
 
-#370 is **not ready to close**.
+Rev 1 fixes two of the three previous blockers and substantially improves the third, but **#370 is still not ready to close** because the new remote-player authority hand-off introduces a combat-state regression.
 
-Most schema/editor/filtering work is present, but three functional blockers remain.
+### Fixed from previous review
 
-### Verified
+#### ✅ Periodic Aura damage now participates
 
-- `on_damage_type` is registered as a source/caster-recipient event.
-- `damageSchoolRef` is passed through `Events:Run()`.
-- Aura and Trait schemas retain it only for `on_damage_type`.
-- Aura/Trait matching requires a configured damage school and compares it with the resolved school.
-- Aura and Trait editors expose a single **Damage Type** dropdown only for this event.
-- Existing `on_defence` filtering remains separate.
-- Generated trigger text resolves the school name.
-- The event is generic; spells do not need to opt into it through `casterEvents`.
+`AuraManager:HandleLocalAuraTickResult()` now emits `on_damage_type` for ordinary damage ticks when:
 
-### Blocker 1 — remote player damage uses a preview, not the authoritative post-absorb result
+- `suppressCombatEvents ~= true`;
+- `result.applied == true`;
+- `appliedDelta < 0`.
 
-For a remote player defender, `HandleDamageHitCheckResponse()` on the attacker calls:
+The Aura damage effect now also resolves and carries a `damageSchoolRef`.
+
+This fixes the missing DoT/periodic path while preserving recursion suppression for triggered proc damage.
+
+#### ✅ Aura event-target wording now distinguishes source/other
+
+`AuraDescriptionBuilder.resolveTriggeredTargetContext()` now has explicit `on_damage_type` mappings:
+
+- `event_source` -> the damage dealer;
+- `event_other` -> the damaged unit.
+
+This fixes the prior mismatch between generated text and runtime targeting.
+
+#### ✅ Remote player path now carries the defender-resolved outcome
+
+The hit-check response now carries:
+
+- authoritative `damageSchoolRef`;
+- authoritative `appliedDelta`;
+- authoritative `applied` state.
+
+The attacker uses those values when calling `EmitDamageTypeEvent()`, rather than deciding the proc from its own preview result. This addresses the core problem identified in blocker 1.
+
+---
+
+### Remaining blocker — side-effectful authoritative resolution now happens before response send succeeds
+
+In `Client:ResolveCombatReactionAction()`, rev 1 now does:
 
 ```lua
-Combat:ApplyResolvedDamage(entry, true)
+local _, resolvedDamageResult = Combat:ApplyResolvedDamage(entry)
 ```
 
-then immediately:
+**before**:
 
 ```lua
-Combat:EmitDamageTypeEvent(client, entry, damageResult)
+sendCombatWhisper(attackerName, HIT_CHECK_RESPONSE_OPCODE, responseArguments)
 ```
 
-That is preview mode.
+This is not a pure calculation.
 
-The defender owns the authoritative post-absorb resolution, but defender-side `EmitDamageTypeEvent()` is prevented from executing the source-owned proc by:
+`ApplyResolvedDamage(entry)` can call `AuraManager:ConsumeAbsorption()`, which mutates live absorption state, increments revisions, queues aura runtime updates, and may remove depleted absorb auras. It also stores `entry.authoritativeDamageResult`.
+
+If the hit-check response send then fails, `ResolveCombatReactionAction()` returns immediately:
 
 ```lua
-isLocalAuthorityForUnit(entry.eventState, entry.attackerUnit)
+if attackerName == "" or not sendCombatWhisper(...) then
+    return false
+end
 ```
 
-So player-vs-player `on_damage_type` is currently decided from the attacker's predicted damage state, not the defender's authoritative applied damage.
+and therefore never reaches the normal post-send path that:
 
-This violates the issue requirement to use actual post-absorb health loss and can misfire around full/partial absorption or state divergence.
+- records resolved attack history;
+- calls `FinalizeLocalDamageResult()`;
+- queues the health resource delta;
+- completes the normal combat presentation/bookkeeping.
 
-The fix needs an explicit authority hand-off:
+That leaves a possible state where an absorb shield has already been consumed/removed even though the damage action was not finalized.
+
+This is a regression introduced by the rev-1 authority fix.
+
+### Required correction
+
+Do not obtain the source-side proc result by moving the side-effectful target damage application ahead of the existing response-send success boundary.
+
+Prefer a post-finalization authoritative outcome hand-off, for example:
 
 ```text
-authoritative target damage resolution
-    -> authoritative non-zero-health-loss outcome
-    -> source authority
-    -> on_damage_type dispatch
+hit-check response succeeds
+    -> defender resolves/finalizes authoritative damage
+    -> defender sends authoritative damage outcome to source authority
+    -> source authority emits on_damage_type
 ```
 
-Do not fix this by simply running source-owned Aura/Trait effects on the defender client.
+A dedicated post-damage-resolution message is cleaner than overloading the pre-finalization hit-check response.
 
-### Blocker 2 — ordinary periodic Aura damage does not emit `on_damage_type`
+If the existing protocol can be restructured safely without a second opcode, the same invariant still applies: **no live absorption/resource/threat mutation should be stranded when the response send fails.**
 
-Direct combat damage reaches `EmitDamageTypeEvent()` through `Reaction.lua`.
+### Static verification status
 
-Periodic Aura damage instead follows:
+Aside from that failure-path regression, rev 1 now satisfies the previously identified #370 implementation gaps:
 
-```text
-AuraManager:AdvanceAuraEntry()
- -> TickAura()
- -> contract.Execute(...)
- -> HandleLocalAuraTickResult()
-```
+- source-oriented event registration;
+- damage-school parameter propagation;
+- Aura/Trait schema filtering;
+- editor selectors;
+- matching/non-matching school handling;
+- zero-health-loss guard;
+- periodic Aura damage support;
+- Aura target wording;
+- recursion suppression for triggered effects;
+- duplicate guard via `damageTypeEventEmitted`.
 
-That path never emits `on_damage_type`.
+No workflow/CI run or commit status exists for `0b044ee`, so this remains static code-path verification rather than an in-game multiplayer pass.
 
-Therefore a Fire DoT tick that causes actual health loss does not currently satisfy **“When you deal Fire damage”**.
+### Re-verification after fix
 
-Ordinary periodic Aura damage should participate. Triggered proc damage can retain the existing `suppressCombatEvents = true` recursion protection unless the design explicitly changes that policy.
+At minimum exercise:
 
-### Blocker 3 — Aura description target wording is wrong for `triggerTarget = "event_other"`
-
-The trigger prefix is generated separately and can correctly say:
-
-```text
-When the target deals Fire damage...
-```
-
-But Aura event effect clauses still resolve their target through:
-
-```lua
-resolveTriggeredTargetContext(combatEventId, triggerTarget, auraTargetContext)
-```
-
-There is no `on_damage_type` branch for `event_other`, so the Aura builder falls back to `auraTargetContext`.
-
-Runtime semantics are:
-
-- `event_source` = damage dealer
-- `event_other` = damaged unit
-
-So the generated Aura text can describe the effect as applying to the Aura-bearing target/dealer while runtime applies it to the damaged unit.
-
-Add explicit `on_damage_type` target-context handling in the Aura description/template builder:
-
-- `event_source` -> damage dealer
-- `event_other` -> damaged unit
-- `aura_target` -> Aura-bearing unit
-- `aura_caster` -> Aura caster
-
-Trait wording already handles `event_other` as the other unit.
-
-### Additional review note
-
-Commit `5e72e58` is not isolated to #370. It also includes #369-related condition work, Warrior dataset changes, and `TASK.MD` changes. That is not itself a #370 functional failure, but it expands regression surface.
-
-### Re-verification required
-
-After the blockers are fixed, re-test:
-
-- player -> NPC;
-- NPC -> player;
-- player -> player;
-- no / partial / full absorption;
-- matching and non-matching schools;
+- player -> player hit with no absorb;
+- partial absorb;
+- full absorb;
+- failed addon-message send / response failure path;
 - Fire DoT tick;
-- Aura and Trait `event_source` / `event_other`;
-- duplicate suppression.
-
-No CI/workflow result exists for `5e72e58`, so this is a static code-path verification rather than an in-game runtime pass.
+- matching vs non-matching school;
+- `event_source` and `event_other` targets;
+- no duplicate proc.
