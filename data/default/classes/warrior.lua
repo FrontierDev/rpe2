@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 25,
+        version = 26,
     dataset = {
         achievements = {},
         auras = {
