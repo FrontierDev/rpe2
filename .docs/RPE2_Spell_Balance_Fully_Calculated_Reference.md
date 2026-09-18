@@ -1,12 +1,10 @@
 # RPE2 Spell Balance — Formula Reference
 
-This document is the authoritative balance reference for the default RPE2 class datasets.
+This document records the balance formulas used for the default RPE2 class datasets. The spreadsheet is the source of the numeric modifiers; this reference explains how those modifiers are applied to RPE2 spells.
 
-It is deliberately formula-first rather than an enormous Cartesian-product dump. Every combination is calculated directly from the same factors used by the balance spreadsheet. This avoids hiding the design logic inside thousands of generated rows.
+## Direct effects
 
-## 1. Core direct-effect formulas
-
-For a direct damage or healing effect:
+For a direct effect:
 
 ```text
 Base Effect / Target
@@ -19,15 +17,6 @@ Base Effect / Target
 × Role Effect Modifier
 ```
 
-For a damage effect that includes weapon damage:
-
-```text
-Base Effect / Target with weapon
-= Base Effect / Target × 0.75
-```
-
-Stat scaling:
-
 ```text
 Stat Coefficient
 = Base Stat Coefficient
@@ -38,70 +27,25 @@ Stat Coefficient
 × Role Effect Modifier
 ```
 
-Weapon scaling:
+Weapon-based direct effects additionally use the spreadsheet's weapon base-effect and weapon-coefficient rules.
 
-```text
-Weapon Damage Coefficient
-= 1.0
-× Action Modifier
-× Per-Target Modifier
-× Cooldown Modifier
-× Secondary-Effect Modifier
-× Role Effect Modifier
-```
+### Core modifiers
 
-Threat:
-
-```text
-Threat Coefficient
-= Role Threat Modifier × Action Threat Modifier
-```
-
-Power ratio used for resource-cost tiering:
-
-```text
-Power Ratio
-= Cast Modifier
-× Action Modifier
-× Total-Target Modifier
-× Cooldown Modifier
-× Secondary-Effect Modifier
-```
-
-## 2. Cast modifiers
-
-| Effect | Instant | 1-turn cast |
-|---|---:|---:|
-| Damage | 1.00 | 1.35 |
-| Healing | 1.00 | 1.45 |
-
-For generic absorption, use the healing cast convention when a cast-time distinction is required.
-
-## 3. Action modifiers
-
-| Balance action | Effect modifier | Threat modifier | Resource-cost modifier |
-|---|---:|---:|---:|
-| Action | 1.00 | 1.00 | 1.00 |
-| Bonus Action | 0.65 | 0.75 | 1.25 |
-| Spender | 2.25 | 1.00 | 0.75 |
-
-These are **balance categories**, not a literal mapping from cooldown-channel ID.
-
-## 4. Target modifiers
-
-| Targets | Per-target modifier | Total-target modifier |
-|---:|---:|---:|
-| 1 | 1.00 | 1.00 |
-| 2 | 0.75 | 1.50 |
-| 3 | 0.60 | 1.80 |
-| 4 | 0.50 | 2.00 |
-| 5 | 0.45 | 2.25 |
-
-## 5. Cooldown modifiers
-
-| Cooldown | Modifier |
+| Parameter | Value |
 |---|---:|
-| None | 1.00 |
+| Instant damage cast | 1.00 |
+| 1-turn damage cast | 1.35 |
+| 1-turn healing cast | 1.45 |
+| Action | 1.00 |
+| Bonus Action | 0.65 |
+| Spender | 2.25 |
+| Secondary effect | 0.85 |
+| 1 target | 1.00 |
+| 2 targets | 0.75 / target |
+| 3 targets | 0.60 / target |
+| 4 targets | 0.50 / target |
+| 5 targets | 0.45 / target |
+| No cooldown | 1.00 |
 | 1 turn | 1.05 |
 | 2 turns | 1.15 |
 | 3 turns | 1.30 |
@@ -109,240 +53,116 @@ These are **balance categories**, not a literal mapping from cooldown-channel ID
 | 5 turns | 1.60 |
 | 6+ turns | 1.85 |
 
-## 6. Secondary effects
+### Instant scaling coefficients
 
-A spell/effect that is intentionally reduced because the spell also provides another meaningful effect uses:
-
-```text
-Secondary-Effect Modifier = 0.85
-```
-
-This multiplies base output, stat coefficients, and weapon coefficients.
-
-| Value before secondary reduction | With secondary effect |
-|---:|---:|
-| 100 base effect | 85 |
-| 0.35 coefficient | 0.2975 |
-| 0.50 coefficient | 0.4250 |
-| 0.60 coefficient | 0.5100 |
-| 1.00 weapon coefficient | 0.8500 |
-
-## 7. Role effect and threat modifiers
-
-| Role profile | Damage effect | Healing effect | Threat |
-|---|---:|---:|---:|
-| DPS | 1.00 | 0.50 | 1.00 |
-| Healer | 0.70 | 1.00 | 0.50 |
-| Tank | 0.80 | 0.55 | 2.00 |
-
-Generic absorption is treated as full defensive output rather than applying the healing-role reduction.
-
-## 8. Base stat coefficients
-
-| Scaling stat | Instant | 1-turn cast |
-|---|---:|---:|
-| Melee Attack Power | 0.35 | 0.50 |
-| Ranged Attack Power | 0.35 | 0.50 |
-| Spell Power | 0.50 | 0.70 |
-| Healing Power | 0.60 | 0.80 |
-
-## 9. Weapon contribution
-
-| Parameter | Value |
+| Stat | Coefficient |
 |---|---:|
-| Base weapon coefficient | 1.00 |
-| Base-effect modifier when weapon damage is included | 0.75 |
+| Melee AP | 0.35 |
+| Ranged AP | 0.35 |
+| Spell Power | 0.50 |
+| Healing Power | 0.60 |
 
-The current Aura schema does not provide a generic periodic weapon-damage field. Periodic weapon-style class effects therefore use their relevant attack-power scaling unless/until the schema gains periodic weapon scaling.
+### Role effect modifiers
 
----
+| Role profile | Damage | Healing |
+|---|---:|---:|
+| DPS | 1.00 | 0.50 |
+| Healer | 0.70 | 1.00 |
+| Tank | 0.80 | 0.55 |
 
-# 10. Periodic damage and healing — authoritative rule
+## Periodic damage and healing
 
-**Do not divide periodic output by aura duration.**
+Periodic effects preserve a **total spell budget** across their full duration.
 
-RPE2 is turn-based. A 5-turn DoT or HoT is not a direct spell budget spread across five turns. Each tick is an actual turn of output.
+For ordinary RPE2 DoTs and HoTs, use the spreadsheet approximately as an **Instant Bonus Action whose cooldown-equivalent is the aura duration**. Calculate that total budget first, then divide both the base effect and its stat coefficient evenly across the aura ticks.
 
-For the default balance model, a standard periodic tick is budgeted approximately as:
-
-- **Bonus Action**
-- **5-turn cooldown**
-- **Instant stat-coefficient column**
-- the appropriate role modifier
-- the normal 0.85 secondary-effect modifier where applicable
-
-Aura duration determines **how many times the effect ticks**. It does **not** divide the calculated tick value.
-
-The common pre-role, pre-secondary periodic multiplier is therefore:
+RPE2 top-level aura effects tick once per owner turn, so an aura with duration `N` has `N` ticks.
 
 ```text
-Bonus Action × 5-turn cooldown
-= 0.65 × 1.60
-= 1.04
+Periodic Total Base
+= 100
+× 1.00                       [Instant]
+× 0.65                       [Bonus Action]
+× CooldownModifier(Duration)
+× Secondary Modifier
+× Role Effect Modifier
+
+Base / Tick = Periodic Total Base / Duration
 ```
 
-So:
-
 ```text
-Periodic Base / Tick
-= 100 × 1.04 × Secondary × Role Effect
+Periodic Total Stat Coefficient
+= Instant Base Stat Coefficient
+× 0.65
+× CooldownModifier(Duration)
+× Secondary Modifier
+× Role Effect Modifier
+
+Stat Coefficient / Tick
+= Periodic Total Stat Coefficient / Duration
 ```
 
-and:
+**Do not apply the full total budget on every tick.**  
+**Do not omit the duration-equivalent cooldown modifier before dividing.**
+
+### Worked example — Shadow Word: Pain
+
+Shadow Word: Pain is a 5-turn, single-target DPS-role DoT with no secondary-output penalty.
 
 ```text
-Periodic Stat Coefficient / Tick
-= Instant Base Stat Coefficient × 1.04 × Secondary × Role Effect
-```
-
-## 10.1 Damage per turn
-
-| Role | No secondary effect | With secondary effect |
-|---|---:|---:|
-| DPS | 104.00 | 88.40 |
-| Healer | 72.80 | 61.88 |
-| Tank | 83.20 | 70.72 |
-
-### Spell Power coefficient per damage tick
-
-| Role | No secondary effect | With secondary effect |
-|---|---:|---:|
-| DPS | 0.5200 | 0.4420 |
-| Healer | 0.3640 | 0.3094 |
-| Tank | 0.4160 | 0.3536 |
-
-### Melee/Ranged AP coefficient per damage tick
-
-| Role | No secondary effect | With secondary effect |
-|---|---:|---:|
-| DPS | 0.3640 | 0.3094 |
-| Healer | 0.2548 | 0.2166 |
-| Tank | 0.2912 | 0.2475 |
-
-## 10.2 Healing per turn
-
-| Role | No secondary effect | With secondary effect |
-|---|---:|---:|
-| DPS | 52.00 | 44.20 |
-| Healer | 104.00 | 88.40 |
-| Tank | 57.20 | 48.62 |
-
-### Healing Power coefficient per healing tick
-
-| Role | No secondary effect | With secondary effect |
-|---|---:|---:|
-| DPS | 0.3120 | 0.2652 |
-| Healer | 0.6240 | 0.5304 |
-| Tank | 0.3432 | 0.2917 |
-
-If a healing effect intentionally scales from another stat, use that stat's Instant base coefficient in the same formula. For example, a DPS-role secondary heal scaling from Spell Power uses:
-
-```text
-0.50 × 1.04 × 0.85 × 0.50 = 0.221
-```
-
-## 10.3 Standard default-class periodic values
-
-These are the values currently intended for the existing periodic class effects after applying the rule above.
-
-| Class | Aura | Per-turn base | Per-turn scaling | Notes |
-|---|---|---:|---:|---|
-| Mage | Fireball | 88.40 damage | 0.4420 Spell Power | Secondary periodic effect |
-| Mage | Pyroblast | 88.40 damage | 0.4420 Spell Power | Secondary periodic effect |
-| Paladin | Expurgation | 88.40 damage | 0.3094 Melee AP | Secondary periodic effect |
-| Priest | Renew | 104.00 healing | 0.6240 Healing Power | Primary HoT |
-| Priest | Holy Fire | 61.88 damage | 0.3094 Spell Power | Healer-role secondary damage |
-| Priest | Shadow Word: Pain | 104.00 damage | 0.5200 Spell Power | Primary DoT |
-| Priest | Vampiric Touch | 88.40 damage | 0.4420 Spell Power | Secondary/multi-effect spell |
-| Priest | Vampiric Regeneration | 44.20 healing | 0.2210 Spell Power | DPS-role secondary healing |
-| Rogue | Rupture | 104.00 damage | 0.3640 Melee AP | Primary DoT |
-| Rogue | Garrote | 88.40 damage | 0.3094 Melee AP | Secondary-effect spell |
-| Warrior | Rend | 104.00 damage | 0.3640 Melee AP | Primary DoT |
-
-Triggered proc auras such as Deep Wounds and Paladin seal event effects are not automatically forced into this periodic-spell model. They require a separate proc-frequency budget because they are event-triggered rather than one tick per owner turn.
-
-## 10.4 Worked example: Shadow Word: Pain
-
-Shadow Word: Pain is a DPS-role primary periodic spell with no secondary-output reduction.
-
-```text
-Base damage / turn
-= 100 × 0.65 × 1.60 × 1.00
+Total base damage
+= 100 × 0.65 × 1.60
 = 104
 ```
 
 ```text
-Spell Power coefficient / turn
-= 0.50 × 0.65 × 1.60 × 1.00
+Total Spell Power coefficient
+= 0.50 × 0.65 × 1.60
 = 0.52
 ```
 
-Therefore the intended tick is:
+Spread over five turns:
 
 ```text
-104 + (Spell Power × 0.52) Shadow damage each turn
+Base damage / turn = 104 / 5 = 20.8
+Spell Power / turn = 0.52 / 5 = 0.104
 ```
 
-A 5-turn duration means five such ticks. It does not mean dividing 104 or 0.52 by five.
+Therefore:
 
----
+```text
+Shadow Word: Pain
+= 20.8 + (Spell Power × 0.104) damage per turn
+= 104 + (Spell Power × 0.52) total over five turns
+```
 
-# 11. Generic absorption
+### Default-class periodic values
 
-Absorption is a shield pool, not periodic healing. Do not divide it by aura duration.
+| Class | Effect | Duration | Base / turn | Scaling / turn | Full-duration budget |
+|---|---|---:|---:|---:|---:|
+| Mage | Fireball DoT | 5 | 17.68 | 0.0884 Spell Power | 88.4 + 0.442 SP |
+| Mage | Pyroblast DoT | 5 | 17.68 | 0.0884 Spell Power | 88.4 + 0.442 SP |
+| Paladin | Expurgation | 3 | 23.9417 | 0.0838 Melee AP | 71.825 + 0.2514 AP |
+| Priest | Renew | 5 | 20.8 | 0.1248 Healing Power | 104 + 0.624 HP |
+| Priest | Holy Fire DoT | 3 | 16.7592 | 0.0838 Spell Power | 50.2775 + 0.2514 SP |
+| Priest | Shadow Word: Pain | 5 | 20.8 | 0.104 Spell Power | 104 + 0.52 SP |
+| Priest | Vampiric Touch | 5 | 17.68 | 0.0884 Spell Power | 88.4 + 0.442 SP |
+| Priest | Vampiric Regeneration | 5 | 8.84 | 0.0442 Spell Power | 44.2 + 0.221 SP |
+| Rogue | Rupture | 5 | 20.8 | 0.0728 Melee AP | 104 + 0.364 AP |
+| Rogue | Garrote | 2 | 31.7688 | 0.1112 Melee AP | 63.5375 + 0.2224 AP |
+| Warrior | Rend | 5 | 20.8 | 0.0728 Melee AP | 104 + 0.364 AP |
 
-The current generic examples validate the full defensive-output convention:
+Triggered event procs such as Deep Wounds and Paladin seal events are not treated as ordinary once-per-turn periodic auras because their proc frequency is event-driven.
 
-| Example | Base absorption | Spell Power coefficient |
-|---|---:|---:|
-| Power Word: Shield | 65 | 0.325 |
-| Fire Ward / Frost Ward | 104 | 0.520 |
+## Resource-cost policy for existing default datasets
 
-Bespoke effects such as Templar's Bulwark are not forced into this generic model.
+The calculator's resource formula is a design guide. Existing authored resource identities are preserved unless resource cost is explicitly being redesigned.
 
----
-
-# 12. Resource-cost tiers
-
-Power-ratio thresholds:
-
-| Power Ratio | Tier |
-|---|---|
-| < 1.15 | Cheap |
-| 1.15 to < 1.75 | Standard |
-| >= 1.75 | Expensive |
-
-Instant healing/defensive effects do not use the Cheap mana tier in the calculator convention.
-
-Base costs:
-
-| Tier | Base Mana | Energy | Rage |
-|---|---:|---:|---:|
-| Cheap | 4% | 25 | 12 |
-| Standard | 8% | 40 | 25 |
-| Expensive | 14.5% | 60 | 43 |
-
-Cast/resource modifiers:
-
-| Case | Modifier |
-|---|---:|
-| Instant normal spell | 1.25 |
-| 1-turn cast normal spell | 0.85 |
-| Instant healing/defensive Base Mana | 1.50 |
-
-Then multiply by the action resource-cost modifier from section 3.
-
-## 12.1 Default-dataset resource-cost policy
-
-The calculator resource-cost formula is a design guide. Rebalancing existing default datasets must preserve authored resource identities unless the cost itself is explicitly being redesigned.
-
-Current policy:
-
-- **Do not automatically replace existing Rogue Energy costs.**
-- **Do not automatically replace existing Warrior Rage costs.**
-- Pyroblast retains its intentionally high **31.8% base Mana** cost.
-- Greater Heal retains its intentionally high **31.8% base Mana** cost.
-- Standard long-duration group buffs use **10% base Mana**:
+- Rogue Energy costs remain at their authored values.
+- Warrior Rage costs remain at their authored values.
+- Pyroblast remains at 31.8% base Mana.
+- Greater Heal remains at 31.8% base Mana.
+- Long-duration caster group buffs use 10% base Mana:
   - Blessing of Might
   - Blessing of Kings
   - Blessing of Sanctuary
@@ -352,21 +172,3 @@ Current policy:
   - Divine Spirit
   - Prayer of Fortitude
   - Prayer of Shadow Protection
-
-Resource-generating secondary components, combo-point costs, and other nonstandard resource mechanics are not overwritten by this table.
-
----
-
-# 13. Rebalance checklist
-
-When applying this reference to an existing class spell:
-
-1. Identify the role profile: DPS, Healer, or Tank.
-2. Identify the balance action: Action, Bonus Action, or Spender.
-3. Apply target-count and cooldown modifiers.
-4. Apply the 0.85 modifier to effects intentionally reduced because the spell has meaningful secondary output.
-5. Use the correct scaling-stat base coefficient.
-6. Apply the weapon modifier only when the runtime effect actually uses weapon damage.
-7. For DoTs/HoTs, use the periodic per-turn rule in section 10. **Never divide by duration.**
-8. Preserve authored Energy/Rage and explicit Mana exceptions unless resource costs are specifically in scope.
-9. Keep triggered proc auras separate from turn-periodic effects unless a proc-frequency model has been defined.
