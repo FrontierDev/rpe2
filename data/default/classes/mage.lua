@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 21,
+    version = 22,
     dataset = {
         achievements = {},
         auras = {
@@ -11,13 +11,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 11.603,
+                        baseDamage = 88.4,
                         damageSchoolRefs = {
                             "f82db71a:esjguw6d"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.058,
+                                coefficient = 0.442,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -54,13 +54,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 11.05,
+                        baseDamage = 88.4,
                         damageSchoolRefs = {
                             "f82db71a:esjguw6d"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.0553,
+                                coefficient = 0.442,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -901,7 +901,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 9.2,
+                        amount = 31.8,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -2396,7 +2396,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 5,
+                        amount = 10,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,

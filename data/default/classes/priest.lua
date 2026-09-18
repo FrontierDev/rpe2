@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 17,
+    version = 18,
     dataset = {
         achievements = {},
         auras = {
@@ -103,10 +103,10 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseHealing = 13,
+                        baseHealing = 104,
                         statScaling = {
                             {
-                                coefficient = 0.078,
+                                coefficient = 0.624,
                                 statRef = "f82db71a:hj6d4kvy"
                             }
                         },
@@ -184,13 +184,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 12.892,
+                        baseDamage = 61.88,
                         damageSchoolRefs = {
                             "f82db71a:wwctys5s"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.0645,
+                                coefficient = 0.3094,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -310,13 +310,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 13,
+                        baseDamage = 104,
                         damageSchoolRefs = {
                             "f82db71a:1ggt4t3v"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.065,
+                                coefficient = 0.52,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -353,13 +353,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 22.95,
+                        baseDamage = 88.4,
                         damageSchoolRefs = {
                             "f82db71a:1ggt4t3v"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.119,
+                                coefficient = 0.442,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -396,10 +396,10 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseHealing = 5.525,
+                        baseHealing = 44.2,
                         statScaling = {
                             {
-                                coefficient = 0.0276,
+                                coefficient = 0.221,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -850,7 +850,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 9.2,
+                        amount = 31.8,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1633,7 +1633,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 5,
+                        amount = 10,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1716,7 +1716,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 5,
+                        amount = 10,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1799,7 +1799,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 5,
+                        amount = 10,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
