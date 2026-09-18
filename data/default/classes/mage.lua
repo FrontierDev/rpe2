@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 25,
+    version = 26,
     dataset = {
         achievements = {},
         auras = {
@@ -44,6 +44,49 @@ Addon.Data.DefaultDatasets:Register({
                         }
                     },
                     stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 3,
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseDamage = 5,
+                        damageSchoolRefs = {
+                            "f82db71a:esjguw6d"
+                        },
+                        statScaling = {
+                            {
+                                coefficient = 0.2,
+                                statRef = "f82db71a:7t7xgzcx"
+                            }
+                        },
+                        type = "damage"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_fire_fireball02.blp",
+                id = "ignite01",
+                maxStacks = 1,
+                name = "Ignite",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Deals {AURA_DAMAGE_1} Fire damage each turn.",
+                    bodyTokens = {
+                        {
+                            applyMode = "damage_amount",
+                            baseField = "baseDamage",
+                            effectIndex = 1,
+                            key = "AURA_DAMAGE_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "Refreshes its duration when reapplied.",
                     stackingTokens = {},
                     version = 1
                 }
@@ -684,7 +727,8 @@ Addon.Data.DefaultDatasets:Register({
                     "d7c874c4:arcinst3",
                     "d7c874c4:misbarge",
                     "d7c874c4:arcconc1",
-                    "d7c874c4:mastelms"
+                    "d7c874c4:mastelms",
+                    "d7c874c4:ignite20"
                 }
             }
         },
@@ -3700,6 +3744,36 @@ Addon.Data.DefaultDatasets:Register({
                         value = 3
                     }
                 },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Fire",
+                conditions = {},
+                description = "When you deal Fire damage, you have a 20% chance to apply Ignite for 3 turns. Ignite deals Fire damage each turn and refreshes its duration when reapplied.",
+                events = {
+                    {
+                        chance = 20,
+                        combatEventId = "on_damage_type",
+                        damageSchoolRef = "f82db71a:esjguw6d",
+                        effects = {
+                            {
+                                auraRef = "d7c874c4:ignite01",
+                                basePower = 0,
+                                duration = 3,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "event_other"
+                    }
+                },
+                icon = "interface/icons/spell_fire_fireball02.blp",
+                id = "ignite20",
+                isEnvironmental = false,
+                name = "Ignite",
+                skillBonuses = {},
+                statBonuses = {},
                 unlockLevel = 1
             },
         },
