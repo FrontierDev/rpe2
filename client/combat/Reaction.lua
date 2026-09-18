@@ -24,6 +24,7 @@ local UI = Addon.UI or {}
 local HIT_CHECK_REQUEST_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_HIT_CHECK_REQUEST") or nil
 local HIT_CHECK_RESPONSE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_HIT_CHECK_RESPONSE") or nil
 local DAMAGE_RESOLVED_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_DAMAGE_RESOLVED") or nil
+local DAMAGE_RESOLVED_ACK_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_DAMAGE_RESOLVED_ACK") or nil
 
 local RESULT_PASS = "pass"
 local RESULT_FAIL = "fail"
@@ -45,6 +46,7 @@ local REACTION_ATTACK_TYPES = { "melee", "ranged", "spell" }
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local SPELLCAST_SLOW_HELPER_MS = 25
 local SPELLCAST_SLOW_TOTAL_MS = 100
+local MAX_DAMAGE_OUTCOME_RETRIES = 3
 
 local function getNowMilliseconds()
     if type(GetTimePreciseSec) == "function" then
@@ -752,7 +754,7 @@ local function emitReactionCombatLog(entry, detailText, accentColor, role)
     })
 end
 
-local function sendCombatWhisper(targetName, opcode, arguments)
+local function sendCombatWhisper(targetName, opcode, arguments, metadataOverrides)
     local normalizedTarget = getResolvedName(targetName)
     if type(Comms.SendMessage) ~= "function" or normalizedTarget == "" or not opcode then
         return false
@@ -769,7 +771,113 @@ local function sendCombatWhisper(targetName, opcode, arguments)
         }
     end
 
+    if type(metadataOverrides) == "table" then
+        for key, value in pairs(metadataOverrides) do
+            metadata[key] = value
+        end
+    end
+
     return Comms:SendMessage("WHISPER", opcode, arguments, normalizedTarget, metadata) and true or false
+end
+
+local function getPendingDamageOutcomes(client, create)
+    if type(client) ~= "table" then
+        return nil
+    end
+    if type(client.PendingCombatDamageOutcomes) ~= "table" and create == true then
+        client.PendingCombatDamageOutcomes = {}
+    end
+    return client.PendingCombatDamageOutcomes
+end
+
+function Client:ClearPendingCombatDamageOutcome(checkId, eventId)
+    local outcomes = getPendingDamageOutcomes(self, false)
+    local normalizedCheckId = normalizeToken(checkId)
+    if type(outcomes) ~= "table" or not normalizedCheckId then
+        return false
+    end
+
+    local outcome = outcomes[normalizedCheckId]
+    if type(outcome) ~= "table"
+        or (eventId ~= nil and tostring(outcome.eventId or "") ~= tostring(eventId or ""))
+    then
+        return false
+    end
+
+    outcomes[normalizedCheckId] = nil
+    return true
+end
+
+function Combat:ClearPendingDamageOutcomes(eventId)
+    local outcomes = getPendingDamageOutcomes(Client, false)
+    if type(outcomes) ~= "table" then
+        return false
+    end
+
+    local normalizedEventId = eventId ~= nil and tostring(eventId or "") or nil
+    for checkId, outcome in pairs(outcomes) do
+        if normalizedEventId == nil
+            or tostring(type(outcome) == "table" and outcome.eventId or "") == normalizedEventId
+        then
+            outcomes[checkId] = nil
+        end
+    end
+    return true
+end
+
+local function sendPendingDamageOutcome(client, outcome)
+    if type(client) ~= "table"
+        or type(outcome) ~= "table"
+        or type(outcome.arguments) ~= "table"
+        or tostring(outcome.targetName or "") == ""
+    then
+        return false
+    end
+
+    outcome.sendAttempts = (tonumber(outcome.sendAttempts) or 0) + 1
+    local function handleFailure(_, reason)
+        local outcomes = getPendingDamageOutcomes(client, false)
+        local current = outcomes and outcomes[outcome.checkId] or nil
+        if current ~= outcome then
+            return
+        end
+
+        outcome.lastFailure = tostring(reason or "send-failed")
+        local retryCount = tonumber(outcome.retryCount) or 0
+        if retryCount < MAX_DAMAGE_OUTCOME_RETRIES then
+            outcome.retryCount = retryCount + 1
+            sendPendingDamageOutcome(client, outcome)
+            return
+        end
+
+        if type(Debug) == "table" and type(Debug.Internal) == "function" then
+            Debug.Internal(
+                "Authoritative combat damage hand-off exhausted retries: checkId=%s eventId=%s target=%s reason=%s.",
+                tostring(outcome.checkId or ""),
+                tostring(outcome.eventId or ""),
+                tostring(outcome.targetName or ""),
+                tostring(outcome.lastFailure or "send-failed")
+            )
+        end
+    end
+
+    local sent = sendCombatWhisper(
+        outcome.targetName,
+        DAMAGE_RESOLVED_OPCODE,
+        outcome.arguments,
+        { onFailed = handleFailure }
+    )
+    if not sent then
+        handleFailure(nil, "enqueue-failed")
+    end
+    return sent
+end
+
+local function sendDamageOutcomeAcknowledgement(targetName, checkId, eventId)
+    return sendCombatWhisper(targetName, DAMAGE_RESOLVED_ACK_OPCODE, {
+        checkId,
+        eventId,
+    })
 end
 
 local function finalizeDamageCombatEvents(client, entry, landed)
@@ -1688,20 +1796,25 @@ function Client:ResolveCombatReactionAction(actionId)
         entry.lastDamageResult = damageResult
         Combat:FinalizeLocalDamageResult(entry, damageResult)
 
-        local damageOutcomeSent = sendCombatWhisper(attackerName, DAMAGE_RESOLVED_OPCODE, {
-            entry.checkId,
-            entry.eventId,
-            type(damageResult) == "table" and normalizeToken(damageResult.damageSchoolRef) or "",
-            type(damageResult) == "table" and tostring(tonumber(damageResult.appliedDelta) or 0) or "0",
-            type(damageResult) == "table" and (damageResult.applied == true and "1" or "0") or "0",
-        })
+        local damageOutcome = {
+            checkId = normalizeToken(entry.checkId),
+            eventId = entry.eventId,
+            targetName = attackerName,
+            retryCount = 0,
+            sendAttempts = 0,
+            arguments = {
+                entry.checkId,
+                entry.eventId,
+                type(damageResult) == "table" and normalizeToken(damageResult.damageSchoolRef) or "",
+                type(damageResult) == "table" and tostring(tonumber(damageResult.appliedDelta) or 0) or "0",
+                type(damageResult) == "table" and (damageResult.applied == true and "1" or "0") or "0",
+            },
+        }
+        local outcomes = getPendingDamageOutcomes(self, true)
+        outcomes[damageOutcome.checkId] = damageOutcome
+        local damageOutcomeSent = sendPendingDamageOutcome(self, damageOutcome)
         if not damageOutcomeSent and type(Debug) == "table" and type(Debug.Internal) == "function" then
-            Debug.Internal(
-                "Authoritative combat damage hand-off failed: checkId=%s eventId=%s target=%s.",
-                tostring(entry.checkId or ""),
-                tostring(entry.eventId or ""),
-                tostring(attackerName or "")
-            )
+            Debug.Internal("Authoritative combat damage hand-off queued for retry: checkId=%s.", tostring(entry.checkId or ""))
         end
     elseif resultToken == RESULT_FAIL then
         finalizeDamageCombatEvents(Client, entry, false)
@@ -1904,19 +2017,33 @@ function Combat:HandleCombatDamageResolved(client, arguments, sender)
     local appliedDelta = tonumber(arguments and arguments[4])
     local appliedToken = tostring(arguments and arguments[5] or "")
     local entry = checkId and client:GetPendingCombatHitCheck(checkId) or nil
-    if not entry
+    if not checkId
         or not eventId
-        or eventId ~= entry.eventId
-        or entry.damageResolutionPending ~= true
         or appliedDelta == nil
         or (appliedToken ~= "0" and appliedToken ~= "1")
     then
         return false
     end
 
+    if not entry then
+        local eventState = client.GetEventState and client:GetEventState() or nil
+        if type(eventState) == "table" and eventState.active == true and tostring(eventState.id or "") == eventId then
+            return sendDamageOutcomeAcknowledgement(sender, checkId, eventId)
+        end
+        return false
+    end
+
+    if eventId ~= entry.eventId then
+        return false
+    end
+
     local expectedSender = resolveSenderForUnit(entry.eventState, entry.defenderUnit)
     if expectedSender ~= "" and expectedSender ~= getResolvedName(sender) then
         return false
+    end
+
+    if entry.damageResolutionPending ~= true then
+        return sendDamageOutcomeAcknowledgement(sender, checkId, eventId)
     end
 
     local completed, result = self:HandleDamageHitCheckResponse(client, {
@@ -1936,7 +2063,27 @@ function Combat:HandleCombatDamageResolved(client, arguments, sender)
         entry.damageResolutionPending = nil
         entry.pendingDamageResultToken = nil
     end
+    if completed then
+        sendDamageOutcomeAcknowledgement(sender, checkId, eventId)
+    end
     return completed, result
+end
+
+function Combat:HandleCombatDamageResolvedAck(client, arguments, sender)
+    local checkId = normalizeToken(arguments and arguments[1])
+    local eventId = normalizeToken(arguments and arguments[2])
+    local outcomes = getPendingDamageOutcomes(client, false)
+    local outcome = outcomes and checkId and outcomes[checkId] or nil
+    if type(outcome) ~= "table"
+        or not eventId
+        or tostring(outcome.eventId or "") ~= eventId
+        or tostring(outcome.targetName or "") ~= getResolvedName(sender)
+    then
+        return false
+    end
+
+    outcomes[checkId] = nil
+    return true
 end
 
 return true

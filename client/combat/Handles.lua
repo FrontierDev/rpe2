@@ -30,4 +30,12 @@ function Client:HandleCombatDamageResolved(arguments, sender)
     return Combat:HandleCombatDamageResolved(self, arguments, sender)
 end
 
+function Client:HandleCombatDamageResolvedAck(arguments, sender)
+    if type(Combat.HandleCombatDamageResolvedAck) ~= "function" then
+        return false
+    end
+
+    return Combat:HandleCombatDamageResolvedAck(self, arguments, sender)
+end
+
 return Client

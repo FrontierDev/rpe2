@@ -2492,6 +2492,9 @@ local function clearEventStateNow(client, state, reason, options)
     if type(combat) == "table" and type(combat.ClearDefensiveReactionUseLedger) == "function" then
         combat:ClearDefensiveReactionUseLedger(eventId)
     end
+    if type(combat) == "table" and type(combat.ClearPendingDamageOutcomes) == "function" then
+        combat:ClearPendingDamageOutcomes(eventId)
+    end
     if type(client.CancelPendingTurnCommit) == "function" then
         client:CancelPendingTurnCommit(options.cancelReason or "event-reset", eventId)
     end
@@ -2736,6 +2739,10 @@ local function runEventEndStep(targetClient, work, deadlineMs)
     if work.phase == "visual-queue" then
         targetClient:SetEventTransitionPhase("visual-teardown", eventState)
         local timer = startTiming("Event end phase: visual-queue", 8, work.eventId)
+        local combat = targetClient.Combat or (Addon.Client and Addon.Client.Combat) or nil
+        if type(combat) == "table" and type(combat.ClearPendingDamageOutcomes) == "function" then
+            combat:ClearPendingDamageOutcomes(work.eventId)
+        end
         eventState.active = false
         eventState.ending = false
         eventState.startupReady = false

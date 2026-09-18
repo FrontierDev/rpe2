@@ -1,122 +1,114 @@
-## Rev 1 verification — `dev` @ `0b044ee`
+## Rev 2 verification — `dev` @ `c9a5d74`
 
-Rev 1 fixes two of the three previous blockers and substantially improves the third, but **#370 is still not ready to close** because the new remote-player authority hand-off introduces a combat-state regression.
+Rev 2 fixes the rev-1 mutation-before-response problem and the normal execution path is now structurally correct, but **#370 is still not ready to close** because the new two-message protocol has no recovery if the authoritative damage-resolution message fails after damage has already been finalized.
 
-### Fixed from previous review
+### Fixed from rev 1
 
-#### ✅ Periodic Aura damage now participates
+The defender no longer calls side-effectful `ApplyResolvedDamage(entry)` before the hit-check response is accepted for sending.
 
-`AuraManager:HandleLocalAuraTickResult()` now emits `on_damage_type` for ordinary damage ticks when:
+The flow is now:
 
-- `suppressCombatEvents ~= true`;
-- `result.applied == true`;
-- `appliedDelta < 0`.
-
-The Aura damage effect now also resolves and carries a `damageSchoolRef`.
-
-This fixes the missing DoT/periodic path while preserving recursion suppression for triggered proc damage.
-
-#### ✅ Aura event-target wording now distinguishes source/other
-
-`AuraDescriptionBuilder.resolveTriggeredTargetContext()` now has explicit `on_damage_type` mappings:
-
-- `event_source` -> the damage dealer;
-- `event_other` -> the damaged unit.
-
-This fixes the prior mismatch between generated text and runtime targeting.
-
-#### ✅ Remote player path now carries the defender-resolved outcome
-
-The hit-check response now carries:
-
-- authoritative `damageSchoolRef`;
-- authoritative `appliedDelta`;
-- authoritative `applied` state.
-
-The attacker uses those values when calling `EmitDamageTypeEvent()`, rather than deciding the proc from its own preview result. This addresses the core problem identified in blocker 1.
-
----
-
-### Remaining blocker — side-effectful authoritative resolution now happens before response send succeeds
-
-In `Client:ResolveCombatReactionAction()`, rev 1 now does:
-
-```lua
-local _, resolvedDamageResult = Combat:ApplyResolvedDamage(entry)
+```text
+COMBAT_HIT_CHECK_RESPONSE queued
+    -> defender applies/finalizes authoritative damage
+    -> defender queues COMBAT_DAMAGE_RESOLVED
+    -> attacker completes pending hit
+    -> attacker emits on_damage_type from authoritative outcome
 ```
 
-**before**:
+That removes the prior possibility of consuming absorption before the initial response-send boundary.
+
+The existing rev-1 fixes also remain present:
+
+- ordinary periodic Aura damage emits `on_damage_type`;
+- Aura `event_source` / `event_other` wording is correct;
+- source-side proc dispatch uses authoritative `damageSchoolRef` and `appliedDelta`;
+- full absorption / zero health loss is rejected;
+- duplicate emission remains guarded by `damageTypeEventEmitted`.
+
+### Remaining blocker — terminal `COMBAT_DAMAGE_RESOLVED` send failure leaves the source permanently pending
+
+On the attacker, the first successful hit-check response intentionally does **not** complete the hit:
 
 ```lua
-sendCombatWhisper(attackerName, HIT_CHECK_RESPONSE_OPCODE, responseArguments)
-```
-
-This is not a pure calculation.
-
-`ApplyResolvedDamage(entry)` can call `AuraManager:ConsumeAbsorption()`, which mutates live absorption state, increments revisions, queues aura runtime updates, and may remove depleted absorb auras. It also stores `entry.authoritativeDamageResult`.
-
-If the hit-check response send then fails, `ResolveCombatReactionAction()` returns immediately:
-
-```lua
-if attackerName == "" or not sendCombatWhisper(...) then
-    return false
+if resultToken == RESULT_PASS and not hasAuthoritativeDamageOutcome then
+    entry.damageResolutionPending = true
+    entry.pendingDamageResultToken = RESULT_PASS
+    return true, buildCombatResult(entry, nil, "damage_pending")
 end
 ```
 
-and therefore never reaches the normal post-send path that:
+The pending hit is cleared only when `COMBAT_DAMAGE_RESOLVED` arrives and re-enters `HandleDamageHitCheckResponse()`.
 
-- records resolved attack history;
-- calls `FinalizeLocalDamageResult()`;
-- queues the health resource delta;
-- completes the normal combat presentation/bookkeeping.
+On the defender, however, by the time `COMBAT_DAMAGE_RESOLVED` is sent:
 
-That leaves a possible state where an absorb shield has already been consumed/removed even though the damage action was not finalized.
+```lua
+local _, damageResult = Combat:ApplyResolvedDamage(entry)
+entry.lastDamageResult = damageResult
+Combat:FinalizeLocalDamageResult(entry, damageResult)
 
-This is a regression introduced by the rev-1 authority fix.
+local damageOutcomeSent = sendCombatWhisper(attackerName, DAMAGE_RESOLVED_OPCODE, ...)
+```
+
+the damage, absorption consumption, resource-delta queueing, and local finalization have already happened.
+
+If `sendCombatWhisper(... DAMAGE_RESOLVED ...)` returns false, the implementation only logs:
+
+```lua
+Debug.Internal("Authoritative combat damage hand-off failed ...")
+```
+
+There is no retry/recovery of the logical damage outcome and no way for the attacker to leave `damageResolutionPending`.
+
+The same problem exists for an asynchronous terminal failure after enqueue. `Comms:SendMessage()` supports `metadata.onFailed`, but `sendCombatWhisper()` supplies only:
+
+```lua
+{
+    opcode = opcode,
+    scope = "client",
+}
+```
+
+so terminal queue/message failure has no application-level recovery.
+
+The comms queue retries throttling, but it can still terminate with queue-full / max-attempts / other send failure. `Comms:SendMessage()` explicitly exposes `onFailed` for this reason.
 
 ### Required correction
 
-Do not obtain the source-side proc result by moving the side-effectful target damage application ahead of the existing response-send success boundary.
+Make the authoritative damage hand-off recoverable/idempotent.
 
-Prefer a post-finalization authoritative outcome hand-off, for example:
+At minimum:
 
-```text
-hit-check response succeeds
-    -> defender resolves/finalizes authoritative damage
-    -> defender sends authoritative damage outcome to source authority
-    -> source authority emits on_damage_type
-```
+- retain the authoritative outcome by `checkId` until the source acknowledges/completes it, or provide bounded retry on failed delivery;
+- use the comms `onFailed` callback for terminal failures rather than log-only handling;
+- make repeated `COMBAT_DAMAGE_RESOLVED` delivery safe;
+- clear retained outcome state once completion is confirmed or the event ends;
+- ensure a retry cannot cause a second `on_damage_type` proc.
 
-A dedicated post-damage-resolution message is cleaner than overloading the pre-finalization hit-check response.
+A small request/ack protocol is preferable if there is already an established pattern in the repo. Do not re-run `ApplyResolvedDamage()` on retry; resend the stored authoritative outcome.
 
-If the existing protocol can be restructured safely without a second opcode, the same invariant still applies: **no live absorption/resource/threat mutation should be stranded when the response send fails.**
+### Other checks
 
-### Static verification status
+The new operation is loaded after `Operations.lua`, is registered through `Operations:Allocate()`, and is available before `Reaction.lua` requests its opcode. The attacker verifies the outcome sender against the expected defender authority.
 
-Aside from that failure-path regression, rev 1 now satisfies the previously identified #370 implementation gaps:
+Pending-hit lifecycle is otherwise correct:
 
-- source-oriented event registration;
-- damage-school parameter propagation;
-- Aura/Trait schema filtering;
-- editor selectors;
-- matching/non-matching school handling;
-- zero-health-loss guard;
-- periodic Aura damage support;
-- Aura target wording;
-- recursion suppression for triggered effects;
-- duplicate guard via `damageTypeEventEmitted`.
+- initial PASS response leaves the entry in `PendingCombatHitChecksByCheckId`;
+- authoritative outcome calls `CompleteHitCheck()`;
+- `CompleteHitCheck()` clears the pending entry;
+- duplicate outcome delivery after completion is rejected because the pending entry no longer exists.
 
-No workflow/CI run or commit status exists for `0b044ee`, so this remains static code-path verification rather than an in-game multiplayer pass.
+### Verification status
 
-### Re-verification after fix
+No CI/workflow run or commit status exists for `c9a5d74`. This is static code-path verification.
 
-At minimum exercise:
+Re-test after the delivery-recovery fix with:
 
-- player -> player hit with no absorb;
-- partial absorb;
-- full absorb;
-- failed addon-message send / response failure path;
+- normal player -> player hit;
+- partial/full absorption;
+- forced `COMBAT_DAMAGE_RESOLVED` queue failure;
+- forced terminal send failure;
+- duplicate/retried damage-resolved message;
 - Fire DoT tick;
-- matching vs non-matching school;
-- `event_source` and `event_other` targets;
+- matching/non-matching damage school;
 - no duplicate proc.
