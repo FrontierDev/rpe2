@@ -631,7 +631,7 @@ local function resolveTriggeredTargetContext(combatEventId, triggerTarget)
     return buildGenericTargetContext("the other unit", "the other unit", "the other unit's")
 end
 
-local function resolveCombatTriggerLabel(combatEventId, defenceStatRef)
+local function resolveCombatTriggerLabel(combatEventId, defenceStatRef, damageSchoolRef)
     local eventId = tostring(combatEventId or "")
     if eventId == "on_taunt" then
         return "When you taunt an enemy"
@@ -645,6 +645,13 @@ local function resolveCombatTriggerLabel(combatEventId, defenceStatRef)
             return ("When you successfully %s an attack"):format(string.lower(defenceLabel))
         end
         return "When you successfully defend against an attack"
+    end
+    if eventId == "on_damage_type" then
+        local damageSchoolLabel = resolveDamageSchoolName(damageSchoolRef)
+        if damageSchoolLabel then
+            return ("When you deal %s damage"):format(damageSchoolLabel)
+        end
+        return "When you deal damage"
     end
     if eventId == "on_auto_attack_hit" then
         return "When you hit with a basic attack"
@@ -918,7 +925,8 @@ function TraitDescriptionBuilder:BuildGeneratedDescription(detail, casterUnit)
         if #clauses > 0 then
             local prefix = resolveCombatTriggerLabel(
                 eventEntry and eventEntry.combatEventId or nil,
-                eventEntry and eventEntry.defenceStatRef or nil
+                eventEntry and eventEntry.defenceStatRef or nil,
+                eventEntry and eventEntry.damageSchoolRef or nil
             )
             local chance = normalizeChancePercent(eventEntry and eventEntry.chance)
             if chance < 100 then

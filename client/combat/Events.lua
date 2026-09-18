@@ -95,6 +95,11 @@ local EVENT_DEFINITIONS = {
         label = "On Defence",
         recipientRole = "target",
     },
+    {
+        id = "on_damage_type",
+        label = "On Damage Type",
+        recipientRole = "caster",
+    },
 }
 
 local EVENT_DEFINITIONS_BY_ID = {}
@@ -220,6 +225,7 @@ function Events:Run(client, context)
                 eventSourceUnit = sourceUnit,
                 eventOtherUnit = targetUnit,
                 defenceStatRef = context.defenceStatRef,
+                damageSchoolRef = context.damageSchoolRef,
                 casterEventId = sourceEventId,
                 targetEventId = targetEventId,
                 actionContext = context.actionContext or context,

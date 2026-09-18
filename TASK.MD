@@ -1,208 +1,348 @@
 ## Summary
 
-Add support for a **Resource Regeneration** percentage stat that acts as a final modifier to automatic resource regeneration ticks, in the same way that stats such as Damage Done, Damage Reduction, Healing Done, etc. modify their corresponding mechanics.
+Add a new parameterised combat event:
 
-For example:
+**On Damage Type**
 
-```
-Base resource regeneration: 20
-Resource Regeneration: +5
+This should allow Aura/Trait event triggers such as:
 
-Final regeneration: 21
-```
+- **When you deal Fire damage...**
+- **When the target deals Fire damage...**
+- **When you deal Frost damage...**
 
-because:
-
-```
-20 × 1.05 = 21
-```
-
-The modifier must apply to **all regenerating resources except the configured Health resource**.
-
-## Required behaviour
-
-Add a ruleset-configurable stat reference:
-
-```
-resources.resource_regeneration_stat
-```
-
-Label:
-
-```
-Resource Regeneration Stat
-```
-
-This should be a normal `statReference` dropdown, consistent with the existing modifier-stat mappings.
-
-When a resource regeneration tick is calculated:
+Internally, the event should filter on a single **damage school** reference (Fire, Frost, Physical, Holy, etc.). The repository's schema calls these **damage schools**, so use a field such as:
 
 ```lua
-finalRegen = baseRegen * (1 + resourceRegenerationStat / 100)
+damageSchoolRef = "datasetId:damageSchoolId"
 ```
 
-Examples:
+even though the editor-facing label should be **Damage Type**.
 
-```
-Base regen 20, stat +5   -> 21
-Base regen 20, stat +25  -> 25
-Base regen 20, stat -10  -> 18
-Base regen 20, stat 0    -> 20
-```
+Suggested combat event ID:
 
-Use the existing resource regeneration rounding/clamping conventions.
-
-The modifier should be applied **after the resource's normal regeneration value has been calculated**, regardless of whether that regeneration came from:
-
-- fixed regeneration (`regenPerSecond`);
-- derived regeneration (`regenSourceStatRef × regenMultiplier`).
-
-This is therefore a modifier to the resulting regeneration tick, not another source of base regeneration.
-
-## Health exclusion
-
-The resource identified by:
-
-```
-resources.health_stat
+```lua
+on_damage_type
 ```
 
-must explicitly bypass the Resource Regeneration modifier.
+## Intended semantics
 
-For example:
+`on_damage_type` fires when the event recipient **deals actual damage of the configured damage school**.
 
-```
-Health regen: 10
-Mana regen:   20
-Resource Regeneration: +25%
-```
-
-must produce:
-
-```
-Health: +10
-Mana:   +25
-```
-
-The exclusion must be based on the configured Health resource reference, not resource names or hard-coded IDs.
-
-## Do not modify other resource changes
-
-Resource Regeneration must affect **automatic regeneration ticks only**.
-
-It must not modify:
-
-- direct resource restoration from spells/effects;
-- resource costs;
-- resource refunds;
-- resource gains from other mechanics;
-- maximum resource values;
-- Health regeneration.
-
-For example, a spell which directly restores 20 Mana must still restore exactly 20 Mana regardless of this stat.
-
-## Implementation
-
-### `core/internal/ruleset/Rules.lua`
-
-Add to the `resources` rules:
+For a configured Fire event:
 
 ```lua
 {
-    key = "resource_regeneration_stat",
-    label = "Resource Regeneration Stat",
-    type = "dropdown",
-    default = "",
-    description = "Select the stat reference used for final non-health resource regeneration modifiers.",
-    optionsSource = "statReference",
+    combatEventId = "on_damage_type",
+    damageSchoolRef = "<Fire damage school ref>",
+    triggerTarget = "event_other",
+    chance = 100,
+    effects = { ... },
 }
 ```
 
-Keep this alongside the existing resource-regeneration rules.
+The event should be source/dealer-oriented:
 
-### `core/internal/comms/ResourceSync.lua`
+- **event source** = unit that dealt the damage;
+- **event other** = unit that took the damage;
+- event recipient = the damage dealer.
 
-Update:
+This is analogous to `on_defence` being a normal combat event with an additional event-specific filter field, but `on_damage_type` filters on `damageSchoolRef` instead of `defenceStatRef`.
+
+### Damage requirement
+
+The event should fire only when the resolved damage actually causes a **non-zero health loss**.
+
+Use the authoritative resolved damage result rather than the authored effect definition alone.
+
+A hit that is completely absorbed and produces no health loss should **not** count as "deals damage".
+
+A missed/failed attack should not fire it.
+
+The trigger should use the **resolved damage school** carried by the damage result, not infer school from melee/ranged/spell attack type.
+
+## Existing architecture
+
+### Combat event registry
+
+`client/combat/Events.lua` defines combat events through `EVENT_DEFINITIONS`.
+
+`on_defence` currently demonstrates the parameterised-event pattern:
 
 ```lua
-ResourceSync.BuildPlayerTurnRegenResourceDeltas(...)
+{
+    id = "on_defence",
+    label = "On Defence",
+    recipientRole = "target",
+}
 ```
 
-The existing function already calculates each Resource's regeneration value.
+The new event should be registered here with the damage dealer as recipient, i.e. equivalent to a caster/source-oriented event.
 
-After calculating the normal/base `regenValue`:
+### Parameter filtering
 
-1. determine whether the current `resourceRef` is the configured Health resource;
-2. if it is Health, leave `regenValue` unchanged;
-3. otherwise resolve the configured Resource Regeneration stat;
-4. apply it as a final percentage modifier;
-5. continue through the existing rounding, cap and delta-generation behaviour.
+Aura events already support `defenceStatRef`:
 
-Do not duplicate the fixed/derived regeneration calculations.
+- `core/classes/Aura.lua` normalizes it only for `on_defence`;
+- `client/spellcasting/AuraManager.lua` uses `matchesCombatEvent()` to match the runtime `context.defenceStatRef`.
 
-Conceptually:
+Trait events have the parallel implementation:
+
+- `core/classes/Trait.lua`;
+- `client/client_Traits.lua`.
+
+Implement `damageSchoolRef` using the same architecture rather than creating a separate proc system.
+
+### Damage resolution
+
+`client/combat/Reaction.lua::FinalizeLocalDamageResult(entry, damageResult)` receives the resolved damage result after damage calculation/absorption.
+
+The resolved damage payload already exposes the damage school used elsewhere by the combat log:
 
 ```lua
-regenValue = resolveNormalResourceRegen(...)
+damageResult.damageSchoolRef
+```
 
-if resourceRef ~= healthResourceRef then
-    regenValue = regenValue * (1 + resourceRegenModifier / 100)
+and the actual health loss is available through the resolved resource delta / `appliedDelta`.
+
+This is the appropriate level at which to emit a generic damage-school event. Do not require individual spells to manually add `on_damage_type` to their `casterEvents`.
+
+## Required changes
+
+### 1. Register the combat event
+
+Update `client/combat/Events.lua`:
+
+```lua
+{
+    id = "on_damage_type",
+    label = "On Damage Type",
+    recipientRole = "caster",
+}
+```
+
+Use the existing source/target routing:
+
+- source/caster = damage dealer;
+- target/event-other = damaged unit.
+
+Ensure the event context can carry:
+
+```lua
+damageSchoolRef = ...
+```
+
+through `Events:Run()` into Aura/Trait combat-event handlers, analogous to `defenceStatRef`.
+
+### 2. Emit it from resolved damage
+
+Add a focused helper in the combat layer, e.g.:
+
+```lua
+Combat:EmitDamageTypeEvent(client, entry, damageResult)
+```
+
+Call it from the authoritative damage-finalization path.
+
+It should return without dispatching unless all of the following are true:
+
+- attacker/source unit exists;
+- defender/target unit exists;
+- damage resolved successfully;
+- actual health loss is greater than zero;
+- `damageResult.damageSchoolRef` is a valid non-empty ref.
+
+Dispatch:
+
+```lua
+Events:Run(client, {
+    eventState = entry.eventState,
+    sessionState = ...,
+    combatEventId = "on_damage_type",
+    sourceEventId = attackerEventId,
+    targetEventIds = { defenderEventId },
+    eventSourceUnit = entry.attackerUnit,
+    eventOtherUnit = entry.defenderUnit,
+    damageSchoolRef = damageResult.damageSchoolRef,
+    actionContext = entry.context,
+})
+```
+
+Do not infer the damage school from `entry.attackType`.
+
+Do not emit once per authored `damageSchoolRefs` entry. Emit from the **resolved** damage result.
+
+Avoid double-emission across local/remote damage resolution. The authoritative finalization path must produce one logical `on_damage_type` event for one applied damage result.
+
+### 3. Pass the damage-school parameter through the event dispatcher
+
+Update `client/combat/Events.lua::Run()` so the AuraManager/Trait runtime context includes:
+
+```lua
+damageSchoolRef = context.damageSchoolRef
+```
+
+alongside the existing:
+
+```lua
+defenceStatRef = context.defenceStatRef
+```
+
+### 4. Extend Aura event schema
+
+Update `core/classes/Aura.lua`.
+
+Add a normalizer for the event's selected damage school, e.g.:
+
+```lua
+local function normalizeDamageSchoolRef(value)
+    ...
 end
 ```
 
-### `client/client_Resources.lua`
+The normalized event should contain:
 
-`Client:ApplyLocalTurnStartResourceRegeneration()` already supplies `BuildPlayerTurnRegenResourceDeltas()` with the active EventUnit resources, `healthResourceRef`, and a stat-resolution callback.
-
-Extend this path to resolve/use the ruleset's `resource_regeneration_stat`.
-
-Prefer passing the stat reference/value into the existing pure regeneration calculation rather than introducing a second regeneration path.
-
-NPC/EventUnit stats must work through the same mechanism as player stats.
-
-### `data/default/core.lua`
-
-Add a default stat:
-
-```
-Resource Regeneration
+```lua
+damageSchoolRef =
+    combatEventId == "on_damage_type"
+    and normalizeDamageSchoolRef(value.damageSchoolRef)
+    or nil
 ```
 
-Semantics:
+Like `defenceStatRef`, this field must not remain populated on unrelated combat event types.
 
+### 5. Filter Aura events by damage school
+
+Extend `client/spellcasting/AuraManager.lua::matchesCombatEvent()`.
+
+Current `on_defence` behaviour filters by `defenceStatRef`.
+
+Add equivalent handling for `on_damage_type`:
+
+- if the Aura event has no valid `damageSchoolRef`, it should not become an unfiltered "all damage" event accidentally;
+- otherwise, compare the requested event `damageSchoolRef` with the resolved runtime `context.damageSchoolRef`;
+- use the repository's existing ref-normalization / dataset-qualified-ref comparison conventions where appropriate.
+
+The selected damage type is a required parameter for this event.
+
+### 6. Extend Trait event schema/runtime
+
+Apply the same behaviour to Trait events.
+
+Update:
+
+- `core/classes/Trait.lua::normalizeEvent()`;
+- `client/client_Traits.lua::matchesTraitCombatEvent()` and its call sites.
+
+Trait/Aura semantics must be identical.
+
+Embedded item traits that use the Trait event schema should inherit this functionality automatically rather than requiring a separate implementation.
+
+### 7. Aura editor support
+
+Update the Aura event editor:
+
+- `client/ui/editor/inspectors/aura/page_InspectorAuraEvents.lua`;
+- `client/ui/editor/inspectors/page_InspectorAura.lua`;
+- shared helpers as appropriate.
+
+Add an event-specific dropdown:
+
+**Damage Type**
+
+Populate it using the existing cross-dataset damage-school list:
+
+```lua
+BuildSpellInspectorDamageSchoolsAcrossDatasets()
 ```
-1 stat = +1% resource regeneration
+
+For `on_damage_type`:
+
+- show/enable the Damage Type dropdown;
+- store exactly one `damageSchoolRef`;
+- require a selection.
+
+For all other event types:
+
+- hide/disable it;
+- normalization must clear stale `damageSchoolRef` values.
+
+Keep the existing **Defence Type** selector exclusive to `on_defence`.
+
+### 8. Trait editor support
+
+Add the same **Damage Type** selector to the Trait event editor in:
+
+`client/ui/editor/inspectors/page_InspectorTrait.lua`
+
+It should behave identically to the Aura editor.
+
+### 9. Generated descriptions/tooltips
+
+Update:
+
+- `client/spellcasting/AuraDescriptionBuilder.lua`;
+- `client/traits/DescriptionBuilder.lua`.
+
+The generated trigger text must include the selected damage-school name.
+
+Examples:
+
+```text
+When you deal Fire damage, ...
+When the target deals Fire damage, ...
 ```
 
-Configure the default ruleset to use this stat for `resource_regeneration_stat`.
+Use the existing damage-school name resolution; do not show raw refs.
 
-It must be usable by the existing stat systems, including equipment bonuses, traits, auras, class/race bonuses, and EventUnit stats.
+Preserve current `triggerTarget` language for where the triggered effect is applied. The damage dealer/recipient wording and the effect's trigger target are separate concepts.
 
-Do **not** repurpose the existing stat used as a Resource's `regenSourceStatRef`. A resource's source stat determines its **base regeneration**; Resource Regeneration modifies the resulting tick.
+### 10. Validation
 
-## Validation
+If the editor/schema has a validation mechanism for event-specific required fields, make `damageSchoolRef` required for `on_damage_type`.
 
-Add deterministic coverage around `BuildPlayerTurnRegenResourceDeltas()`.
+Do not silently interpret an empty selection as "any damage".
 
-At minimum verify:
+## Expected files
 
-1. Fixed regen: base 20, Resource Regeneration +5 -> 21.
-2. Derived regen: source stat 100, `regenMultiplier = 0.2`, Resource Regeneration +25 -> 25.
-3. Health exclusion: Health base regen 20, modifier +50 -> Health remains 20.
-4. Multiple resources: modifier applies independently to Mana/Energy while Health remains unchanged.
-5. Negative modifier: base 20, modifier -10 -> 18.
-6. Zero/unconfigured modifier preserves current behaviour.
-7. Direct resource restoration is unaffected.
-8. The modifier works for both player-controlled EventUnits and NPC EventUnits where the stat is present.
+At minimum:
+
+- `client/combat/Events.lua`
+- `client/combat/Reaction.lua` and/or the central damage-finalization helper location
+- `core/classes/Aura.lua`
+- `core/classes/Trait.lua`
+- `client/spellcasting/AuraManager.lua`
+- `client/client_Traits.lua`
+- `client/ui/editor/inspectors/aura/page_InspectorAuraEvents.lua`
+- `client/ui/editor/inspectors/page_InspectorAura.lua`
+- `client/ui/editor/inspectors/page_InspectorTrait.lua`
+- `client/spellcasting/AuraDescriptionBuilder.lua`
+- `client/traits/DescriptionBuilder.lua`
+
+Only modify additional files if tracing the current damage/event call paths proves they are required.
 
 ## Acceptance criteria
 
-- A `Resource Regeneration` stat exists in the default Core dataset.
-- The active ruleset can select which stat represents Resource Regeneration.
-- +5 Resource Regeneration increases every non-health automatic regeneration tick by 5%.
-- Fixed and derived regeneration are both affected.
-- The configured Health resource is never affected.
-- Direct resource gains/restores are not affected.
-- Resource costs and refunds are not affected.
-- Existing regeneration behaviour is unchanged when the stat is zero or unconfigured.
-- The implementation uses the existing EventUnit/stat resolution and resource-delta pipeline rather than creating a parallel regeneration system.
+- [ ] **On Damage Type** appears in Aura combat-event selection.
+- [ ] **On Damage Type** appears in Trait combat-event selection.
+- [ ] Selecting it exposes a single **Damage Type** dropdown populated from current damage schools.
+- [ ] A damage type is required; an empty selection does not mean "all damage".
+- [ ] Aura/Trait normalization preserves `damageSchoolRef` only for `on_damage_type`.
+- [ ] Switching away from `on_damage_type` removes/ignores the stale damage-school parameter.
+- [ ] Dealing non-zero Fire damage fires an event configured for Fire.
+- [ ] Fire damage does not fire an event configured for Frost.
+- [ ] Frost damage fires a Frost-configured event.
+- [ ] Physical damage can be selected and matched in the same way.
+- [ ] Melee/ranged/spell delivery type does not matter; matching is by resolved damage school.
+- [ ] A missed attack does not fire the event.
+- [ ] A completely absorbed hit that causes zero health loss does not fire the event.
+- [ ] A partially absorbed hit that still causes non-zero health loss does fire it.
+- [ ] The damage dealer is the event source/recipient.
+- [ ] The damaged unit is `event_other`.
+- [ ] `triggerTarget = "event_source"` can target the dealer.
+- [ ] `triggerTarget = "event_other"` can target the damaged unit.
+- [ ] Existing `on_defence` / `defenceStatRef` filtering remains unchanged.
+- [ ] Existing On Melee Hit / On Spell Hit / On Critical Hit hooks remain unchanged.
+- [ ] A single resolved damage application produces no duplicate `on_damage_type` proc.
+- [ ] Trait and Aura implementations have identical filtering semantics.
+- [ ] Generated descriptions resolve the damage-school name, e.g. **"When you deal Fire damage..."**, rather than exposing a raw ref.
+- [ ] No spell needs to manually opt into `on_damage_type` through its existing `casterEvents` list.

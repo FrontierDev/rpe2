@@ -694,17 +694,28 @@ local function normalizeDefenceStatRef(value)
     return reference and reference ~= "" and reference or nil
 end
 
-local function matchesCombatEvent(auraEvent, combatEventId, resolvedDefenceStatRef)
-    if combatEventId ~= "on_defence" then
-        return true
+local function normalizeDamageSchoolRef(value)
+    local reference = normalizeRef(value)
+    return reference and reference ~= "" and reference or nil
+end
+
+local function matchesCombatEvent(auraEvent, combatEventId, resolvedDefenceStatRef, resolvedDamageSchoolRef)
+    if combatEventId == "on_defence" then
+        local requestedRef = normalizeDefenceStatRef(auraEvent and auraEvent.defenceStatRef)
+        if not requestedRef then
+            return true
+        end
+
+        return requestedRef == normalizeDefenceStatRef(resolvedDefenceStatRef)
     end
 
-    local requestedRef = normalizeDefenceStatRef(auraEvent and auraEvent.defenceStatRef)
-    if not requestedRef then
-        return true
+    if combatEventId == "on_damage_type" then
+        local requestedRef = normalizeDamageSchoolRef(auraEvent and auraEvent.damageSchoolRef)
+        local resolvedRef = normalizeDamageSchoolRef(resolvedDamageSchoolRef)
+        return requestedRef ~= nil and resolvedRef ~= nil and sameAuraRef(requestedRef, resolvedRef)
     end
 
-    return requestedRef == normalizeDefenceStatRef(resolvedDefenceStatRef)
+    return true
 end
 
 local function rollSucceedsForChance(chancePercent)
@@ -5009,7 +5020,12 @@ function AuraManager:HandleCombatEvent(client, context)
                 local auraEventEntry = auraEventEntries[auraEventEntryIndex]
                 local auraEvent = auraEventEntry.auraEvent
                 local auraEventIndex = auraEventEntry.auraEventIndex
-                local targetUnit = matchesCombatEvent(auraEvent, combatEventId, context.defenceStatRef)
+                local targetUnit = matchesCombatEvent(
+                        auraEvent,
+                        combatEventId,
+                        context.defenceStatRef,
+                        context.damageSchoolRef
+                    )
                     and resolveTriggeredAuraTarget(
                         auraEvent,
                         auraCasterUnit,

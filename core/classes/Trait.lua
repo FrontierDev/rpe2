@@ -214,6 +214,10 @@ local function normalizeDefenceStatRef(value)
     return reference ~= "" and reference or nil
 end
 
+local function normalizeDamageSchoolRef(value)
+    return normalizeRef(value)
+end
+
 local function normalizeAmountMode(value)
     local mode = tostring(value or "flat")
     if mode == "base_percent" then
@@ -322,6 +326,7 @@ local function normalizeEvent(value)
     return {
         combatEventId = combatEventId,
         defenceStatRef = combatEventId == "on_defence" and normalizeDefenceStatRef(value.defenceStatRef) or nil,
+        damageSchoolRef = combatEventId == "on_damage_type" and normalizeDamageSchoolRef(value.damageSchoolRef) or nil,
         triggerTarget = normalizeTriggerTarget(value.triggerTarget),
         chance = normalizeChancePercent(value.chance),
         effects = normalizeEventEffects(value.effects),

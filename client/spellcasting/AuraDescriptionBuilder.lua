@@ -489,7 +489,7 @@ local function buildPassiveControlSentence(effect, targetContext, options)
     return table.concat(sentences, " ")
 end
 
-local function resolveCombatTriggerLabel(combatEventId, targetContext, defenceStatRef)
+local function resolveCombatTriggerLabel(combatEventId, targetContext, defenceStatRef, damageSchoolRef)
     local eventId = tostring(combatEventId or "")
     if eventId == "on_taunt" then
         if targetContext.subject == "you" then
@@ -516,6 +516,19 @@ local function resolveCombatTriggerLabel(combatEventId, targetContext, defenceSt
             return "When you successfully defend against an attack"
         end
         return ("When %s successfully defends against an attack"):format(targetContext.subject)
+    end
+    if eventId == "on_damage_type" then
+        local damageSchoolLabel = resolveDamageSchoolName(damageSchoolRef)
+        if damageSchoolLabel then
+            if targetContext.subject == "you" then
+                return ("When you deal %s damage"):format(damageSchoolLabel)
+            end
+            return ("When %s deals %s damage"):format(targetContext.subject, damageSchoolLabel)
+        end
+        if targetContext.subject == "you" then
+            return "When you deal damage"
+        end
+        return ("When %s deals damage"):format(targetContext.subject)
     end
     if eventId == "on_auto_attack_hit" then
         if targetContext.subject == "you" then
@@ -954,7 +967,8 @@ function AuraDescriptionBuilder:BuildGeneratedDescription(auraDefinition, option
             local prefix = resolveCombatTriggerLabel(
                 auraEvent and auraEvent.combatEventId or nil,
                 targetContext,
-                auraEvent and auraEvent.defenceStatRef or nil
+                auraEvent and auraEvent.defenceStatRef or nil,
+                auraEvent and auraEvent.damageSchoolRef or nil
             )
             local chance = normalizeChancePercent(auraEvent and auraEvent.chance)
             if chance < 100 then
@@ -1435,7 +1449,8 @@ function AuraDescriptionBuilder:BuildTooltipTemplatePayload(auraDefinition, opti
             local prefix = resolveCombatTriggerLabel(
                 auraEvent and auraEvent.combatEventId or nil,
                 targetContext,
-                auraEvent and auraEvent.defenceStatRef or nil
+                auraEvent and auraEvent.defenceStatRef or nil,
+                auraEvent and auraEvent.damageSchoolRef or nil
             )
             local chance = normalizeChancePercent(auraEvent and auraEvent.chance)
             if chance < 100 then

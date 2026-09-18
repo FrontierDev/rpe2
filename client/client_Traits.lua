@@ -1955,17 +1955,47 @@ local function normalizeDefenceStatRef(value)
     return reference ~= "" and reference or nil
 end
 
-local function matchesTraitCombatEvent(eventEntry, combatEventId, resolvedDefenceStatRef)
-    if combatEventId ~= "on_defence" then
+local function normalizeDamageSchoolRef(value)
+    local reference = ensureString(value)
+    return reference ~= "" and reference or nil
+end
+
+local function sameDamageSchoolRef(left, right)
+    local leftRef = normalizeDamageSchoolRef(left)
+    local rightRef = normalizeDamageSchoolRef(right)
+    if not leftRef or not rightRef then
+        return false
+    end
+    if leftRef == rightRef then
         return true
     end
 
-    local requestedRef = normalizeDefenceStatRef(eventEntry and eventEntry.defenceStatRef)
-    if not requestedRef then
-        return true
+    local leftDatasetId, leftId = string.match(leftRef, "^([^:]+):(.+)$")
+    local rightDatasetId, rightId = string.match(rightRef, "^([^:]+):(.+)$")
+    if leftDatasetId and rightDatasetId then
+        return false
     end
 
-    return requestedRef == normalizeDefenceStatRef(resolvedDefenceStatRef)
+    return (leftId or leftRef) == (rightId or rightRef)
+end
+
+local function matchesTraitCombatEvent(eventEntry, combatEventId, resolvedDefenceStatRef, resolvedDamageSchoolRef)
+    if combatEventId == "on_defence" then
+        local requestedRef = normalizeDefenceStatRef(eventEntry and eventEntry.defenceStatRef)
+        if not requestedRef then
+            return true
+        end
+
+        return requestedRef == normalizeDefenceStatRef(resolvedDefenceStatRef)
+    end
+
+    if combatEventId == "on_damage_type" then
+        local requestedRef = normalizeDamageSchoolRef(eventEntry and eventEntry.damageSchoolRef)
+        local resolvedRef = normalizeDamageSchoolRef(resolvedDamageSchoolRef)
+        return requestedRef ~= nil and resolvedRef ~= nil and sameDamageSchoolRef(requestedRef, resolvedRef)
+    end
+
+    return true
 end
 
 function Client:HandleTraitCombatEvent(context)
@@ -2061,7 +2091,12 @@ function Client:HandleTraitCombatEvent(context)
     for index = 1, #(registeredEvents or {}) do
         local registeredEntry = registeredEvents[index]
         local eventEntry = registeredEntry and registeredEntry.event or nil
-        local targetUnit = matchesTraitCombatEvent(eventEntry, combatEventId, context.defenceStatRef)
+        local targetUnit = matchesTraitCombatEvent(
+                eventEntry,
+                combatEventId,
+                context.defenceStatRef,
+                context.damageSchoolRef
+            )
             and resolveTraitTriggeredTarget(
                 ownerUnit,
                 ensureString(eventEntry and eventEntry.triggerTarget),

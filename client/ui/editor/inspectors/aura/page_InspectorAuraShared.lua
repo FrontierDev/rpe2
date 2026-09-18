@@ -148,6 +148,11 @@ local function normalizeDefenceStatRef(value)
     return reference ~= "" and reference or nil
 end
 
+local function normalizeDamageSchoolRef(value)
+    local reference = tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    return reference ~= "" and reference or nil
+end
+
 local function normalizeChancePercent(value)
     local numericValue = tonumber(value)
     if numericValue == nil then
@@ -744,6 +749,9 @@ function DataEditor:NormalizeAuraInspectorEvent(auraEvent)
     auraEvent.combatEventId = normalizeCombatEventId(auraEvent.combatEventId)
     auraEvent.defenceStatRef = auraEvent.combatEventId == "on_defence"
         and normalizeDefenceStatRef(auraEvent.defenceStatRef)
+        or nil
+    auraEvent.damageSchoolRef = auraEvent.combatEventId == "on_damage_type"
+        and normalizeDamageSchoolRef(auraEvent.damageSchoolRef)
         or nil
     auraEvent.triggerTarget = auraEvent.combatEventId and normalizeTriggerTarget(auraEvent.triggerTarget) or nil
     auraEvent.chance = normalizeChancePercent(auraEvent.chance)

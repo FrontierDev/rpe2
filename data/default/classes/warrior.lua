@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 26,
+        version = 29,
     dataset = {
         achievements = {},
         auras = {
@@ -513,6 +513,113 @@ Addon.Data.DefaultDatasets:Register({
         resources = {},
         skills = {},
         spells = {
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false,
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseDamage = 78.75,
+                            damageSchoolRefs = {
+                                "f82db71a:v1azo4j6"
+                            },
+                            damageType = "melee",
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.3675,
+                                    statRef = "f82db71a:u7b49vs9"
+                                }
+                            },
+                            targetEvents = {
+                                "on_melee_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 1,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 1.05,
+                            weaponDamageMode = "main_hand"
+                        },
+                        key = "ovrpowr1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Requires a failed attack this turn",
+                        type = "caster_failed_attack_this_turn"
+                    },
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires Main Hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                cooldown = 1,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "Instantly overpower an enemy after a failed attack, dealing Physical damage.",
+                icon = "interface/icons/ability_meleedamage.blp",
+                id = "ovrpowr1",
+                cooldownChannel = 5,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Overpower",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:e2tfklq7"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Arms",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Deal {DAMAGE_1} Physical damage to an enemy after failing an attack this turn.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
             {
                 allowDeadTargets = false,
                 canMoveWhileCasting = false,
@@ -1361,13 +1468,6 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Taunt",
                 range = 0,
                 resourceCosts = {
-                    {
-                        amount = 1,
-                        amountMode = "base_percent",
-                        castPhase = "on_cast_end",
-                        refundOnInterrupt = 0,
-                        resourceRef = "f82db71a:4c8mfm99"
-                    }
                 },
                 seedNPCSpell = false,
                 spellbookCategory = "Protection",

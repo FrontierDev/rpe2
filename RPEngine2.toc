@@ -105,6 +105,7 @@ client/conditions/AuraRequirement.lua
 client/conditions/TraitRequirement.lua
 client/conditions/CasterDead.lua
 client/conditions/CasterDefendedMeleeThisTurn.lua
+client/conditions/CasterFailedAttackThisTurn.lua
 client/conditions/CasterKilledThisTurn.lua
 client/conditions/TargetKilledThisTurn.lua
 client/conditions/CasterHealthPercent.lua

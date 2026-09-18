@@ -862,6 +862,7 @@ function Combat:FinalizeLocalDamageResult(entry, damageResult)
 
     local combatEventsStartTime = timingEnabled and getNowMilliseconds() or nil
     finalizeDamageCombatEvents(Client, entry, true)
+    Combat:EmitDamageTypeEvent(Client, entry, damageResult)
     if timingEnabled then
         timingParts[#timingParts + 1] = {
             label = "combat-events",
@@ -1498,6 +1499,49 @@ function Combat:EmitSuccessfulDefenceEvent(client, entry, action, resultToken, r
     })
 end
 
+function Combat:EmitDamageTypeEvent(client, entry, damageResult)
+    if type(client) ~= "table"
+        or type(entry) ~= "table"
+        or type(damageResult) ~= "table"
+        or entry.damageTypeEventEmitted == true
+        or damageResult.applied ~= true
+        or (tonumber(damageResult.appliedDelta) or 0) >= 0
+        or type(entry.attackerUnit) ~= "table"
+        or type(entry.defenderUnit) ~= "table"
+        or not isLocalAuthorityForUnit(entry.eventState, entry.attackerUnit)
+    then
+        return false
+    end
+
+    local damageSchoolRef = normalizeToken(damageResult.damageSchoolRef)
+    local attackerEventId = math.floor(tonumber(entry.attackerEventId or entry.attackerUnit.eventID) or 0)
+    local defenderEventId = math.floor(tonumber(entry.defenderEventId or entry.defenderUnit.eventID) or 0)
+    local events = self.Events
+    if not damageSchoolRef
+        or attackerEventId <= 0
+        or defenderEventId <= 0
+        or type(events) ~= "table"
+        or type(events.Run) ~= "function"
+    then
+        return false
+    end
+
+    entry.damageTypeEventEmitted = true
+    return events:Run(client, {
+        eventState = entry.eventState,
+        sessionState = entry.sessionState or (client.GetState and client:GetState() or nil),
+        combatEventId = "on_damage_type",
+        sourceEventId = attackerEventId,
+        targetEventIds = { defenderEventId },
+        eventSourceUnit = entry.attackerUnit,
+        eventOtherUnit = entry.defenderUnit,
+        sourceUnit = entry.attackerUnit,
+        targetUnit = entry.defenderUnit,
+        damageSchoolRef = damageSchoolRef,
+        actionContext = entry.context,
+    })
+end
+
 function Combat:RecordResolvedCombatAttackHistory(client, entry, resultToken, action, resolution, defendedOverride)
     if type(client) ~= "table" or type(client.RecordCombatAttack) ~= "function" or type(entry) ~= "table" then
         return false
@@ -1777,6 +1821,7 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
             Combat:RegisterActionDamageCombatLog(entry, damageResult)
         end
         finalizeDamageCombatEvents(client, entry, true)
+        Combat:EmitDamageTypeEvent(client, entry, damageResult)
 
         if type(client.MarkEventUnitInteraction) == "function" then
             client:MarkEventUnitInteraction(entry.eventState, entry.attackerUnit, entry.defenderUnit, damageResult, entry.spellRef)

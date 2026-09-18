@@ -279,6 +279,10 @@ local function normalizeDefenceStatRef(value)
     return reference ~= "" and reference or nil
 end
 
+local function normalizeDamageSchoolRef(value)
+    return normalizeRef(value)
+end
+
 local function normalizeEffect(value)
     if type(value) ~= "table" then
         return nil
@@ -466,6 +470,7 @@ local function normalizeEvent(value)
     return {
         combatEventId = combatEventId,
         defenceStatRef = combatEventId == "on_defence" and normalizeDefenceStatRef(value.defenceStatRef) or nil,
+        damageSchoolRef = combatEventId == "on_damage_type" and normalizeDamageSchoolRef(value.damageSchoolRef) or nil,
         triggerTarget = triggerTarget,
         chance = normalizeChancePercent(value.chance),
         effects = normalizeEventEffects(value.effects),

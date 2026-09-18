@@ -885,14 +885,19 @@ local function getCombatTurnHistory(client, eventState, createIfMissing)
 end
 
 function Spellcasting.RecordCombatAttack(client, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
-    local turnHistory, eventId, turnNumber = getCombatTurnHistory(client, eventState, true)
     local attackerEventId = tonumber(attackerUnit and attackerUnit.eventID) or 0
     local targetEventId = tonumber(targetUnit and targetUnit.eventID) or 0
     local normalizedAttackType = tostring(attackType or ""):lower()
-    if not turnHistory or attackerEventId <= 0 or targetEventId <= 0
+    if attackerEventId <= 0 or targetEventId <= 0
         or (normalizedAttackType ~= "melee" and normalizedAttackType ~= "ranged" and normalizedAttackType ~= "spell")
-        or (landed ~= true and successfullyDefended ~= true)
+        or type(landed) ~= "boolean"
+        or type(successfullyDefended) ~= "boolean"
     then
+        return false
+    end
+
+    local turnHistory, eventId, turnNumber = getCombatTurnHistory(client, eventState, true)
+    if not turnHistory then
         return false
     end
 
@@ -980,6 +985,25 @@ function Spellcasting.HasSuccessfullyDefendedMeleeThisTurn(client, eventState, t
             and record.attackType == "melee"
             and record.targetEventId == numericTargetEventId
             and record.successfullyDefended == true
+        then
+            return true
+        end
+    end
+    return false
+end
+
+function Spellcasting.HasFailedAttackThisTurn(client, eventState, attackerEventId)
+    local turnHistory = getCombatTurnHistory(client, eventState, false)
+    local numericAttackerEventId = tonumber(attackerEventId) or 0
+    if not turnHistory or numericAttackerEventId <= 0 then
+        return false
+    end
+
+    for index = #turnHistory.attacks, 1, -1 do
+        local record = turnHistory.attacks[index]
+        if record.resolved == true
+            and record.attackerEventId == numericAttackerEventId
+            and record.landed ~= true
         then
             return true
         end
@@ -1310,6 +1334,10 @@ end
 
 function Client:HasSuccessfullyDefendedMeleeThisTurn(eventState, targetEventId)
     return Spellcasting.HasSuccessfullyDefendedMeleeThisTurn(self, eventState, targetEventId)
+end
+
+function Client:HasFailedAttackThisTurn(eventState, attackerEventId)
+    return Spellcasting.HasFailedAttackThisTurn(self, eventState, attackerEventId)
 end
 
 function Client:WasUnitKilledThisTurn(eventState, unitEventId)
@@ -2618,7 +2646,9 @@ function Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, 
             or "spell"
         local resolved = result.pending ~= true
             and tostring(result.resultType or "") ~= "invalid"
-        self:RecordRecentAttacker(eventState, casterUnit, targetUnit, damageType, resolved, false)
+        if resolved then
+            self:RecordRecentAttacker(eventState, casterUnit, targetUnit, damageType, true, false)
+        end
     end
 
     if type(self.MarkEventUnitInteraction) == "function" and shouldMarkResolvedEffectInteraction(result) then

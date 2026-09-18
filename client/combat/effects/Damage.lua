@@ -1321,6 +1321,7 @@ buildResolvedDamageResult = function(self, entry)
         hitType = nil,
         appliedDelta = 0,
         resourceDeltas = {},
+        damageSchoolRef = nil,
         damageSchoolName = "",
         damageSchoolIcon = nil,
         threatGenerated = 0,
@@ -1367,6 +1368,9 @@ buildResolvedDamageResult = function(self, entry)
     local finalDamage = scaledRawDamage
     for schoolIndex = 1, #(hitContext.schoolContexts or {}) do
         local schoolContext = hitContext.schoolContexts[schoolIndex]
+        if result.damageSchoolRef == nil then
+            result.damageSchoolRef = normalizeToken(schoolContext and schoolContext.schoolRef)
+        end
         if result.damageSchoolIcon == nil and tostring(schoolContext and schoolContext.icon or "") ~= "" then
             result.damageSchoolIcon = tostring(schoolContext.icon)
         end
