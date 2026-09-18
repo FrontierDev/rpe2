@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 17,
+    version = 18,
     dataset = {
         achievements = {},
         auras = {
@@ -169,13 +169,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 38.25,
+                        baseDamage = 45,
                         damageSchoolRefs = {
                             "f82db71a:v1azo4j6"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.669,
+                                coefficient = 0.1575,
                                 statRef = "f82db71a:u7b49vs9"
                             }
                         },
@@ -197,13 +197,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 57.5,
+                        baseDamage = 42.5,
                         damageSchoolRefs = {
                             "f82db71a:v1azo4j6"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.403,
+                                coefficient = 0.1488,
                                 statRef = "f82db71a:u7b49vs9"
                             }
                         },
@@ -440,7 +440,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 75,
+                            baseDamage = 63.75,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -450,7 +450,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.35,
+                                    coefficient = 0.2975,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -461,7 +461,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0.85,
                             weaponDamageMode = "main_hand"
                         },
                         key = "0ce4d5de",
@@ -520,7 +520,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 30,
+                        amount = 31,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -572,7 +572,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 265.359,
+                            baseDamage = 143.438,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -582,7 +582,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 1.238,
+                                    coefficient = 0.6694,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -593,7 +593,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 3.538,
+                            weaponDamageCoefficient = 1.9125,
                             weaponDamageMode = "main_hand"
                         },
                         key = "0ce4d5de",
@@ -664,7 +664,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 60,
+                        amount = 56,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -770,7 +770,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 86.25,
+                            baseDamage = 63.75,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -780,7 +780,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.403,
+                                    coefficient = 0.2975,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -791,7 +791,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1.15,
+                            weaponDamageCoefficient = 0.85,
                             weaponDamageMode = "main_hand"
                         },
                         key = "0ce4d5de",
@@ -852,7 +852,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 50,
+                        amount = 31,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -903,7 +903,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 360,
+                            baseDamage = 225,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -913,7 +913,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 1.26,
+                                    coefficient = 0.7875,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -962,7 +962,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 15,
+                        amount = 56,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1014,7 +1014,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 86.25,
+                            baseDamage = 63.75,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -1024,7 +1024,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.403,
+                                    coefficient = 0.2975,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -1035,7 +1035,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1.15,
+                            weaponDamageCoefficient = 0.85,
                             weaponDamageMode = "both"
                         },
                         key = "0ce4d5de",
@@ -1096,7 +1096,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 50,
+                        amount = 31,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1403,7 +1403,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 73.313,
+                            baseDamage = 73.312,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -1413,7 +1413,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.342,
+                                    coefficient = 0.3421,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -1424,7 +1424,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 0.978,
+                            weaponDamageCoefficient = 0.9775,
                             weaponDamageMode = "main_hand"
                         },
                         key = "0ce4d5de",
@@ -1505,7 +1505,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 30,
+                        amount = 31,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1576,7 +1576,7 @@ Addon.Data.DefaultDatasets:Register({
                             applyAura = true,
                             auraRef = "23d5dce2:8phuvfx1",
                             auraStacks = 1,
-                            baseDamage = 63.75,
+                            baseDamage = 66.938,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -1586,7 +1586,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.298,
+                                    coefficient = 0.3124,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -1597,7 +1597,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 0.85,
+                            weaponDamageCoefficient = 0.8925,
                             weaponDamageMode = "main_hand"
                         },
                         key = "0ce4d5de",
@@ -1656,7 +1656,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 30,
+                        amount = 31,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1777,7 +1777,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 15,
+                        amount = 56,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1918,7 +1918,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 50,
+                        amount = 31,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
