@@ -450,6 +450,172 @@ Addon.Data.DefaultDatasets:Register({
                     stackingTokens = {},
                     version = 1
                 }
+            },
+            {
+                description = "Increases armor by 100% and Frost Resistance by 30. On melee hit taken, apply Chilled to the attacker.",
+                duration = 10,
+                effects = {
+                    {
+                        baseAmount = 100,
+                        operation = "percent",
+                        statRef = "f82db71a:v42albuv",
+                        statScaling = {},
+                        type = "stat"
+                    },
+                    {
+                        baseAmount = 30,
+                        operation = "flat",
+                        statRef = "f82db71a:jjn0my8k",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {
+                    {
+                        combatEventId = "on_melee_taken",
+                        effects = {
+                            {
+                                auraRef = "d7c874c4:m5d3gzpj",
+                                basePower = 0,
+                                duration = 2,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "event_source"
+                    }
+                },
+                icon = "interface/icons/spell_frost_frostarmor02.blp",
+                id = "icearmra",
+                maxStacks = 1,
+                name = "Ice Armor",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases armor by 100% and Frost Resistance by 30. On melee hit taken, apply Chilled to the attacker.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "Increases Spell Crit. Chance by 5%. On melee hit taken, deal 5 Fire damage to the attacker.",
+                duration = 10,
+                effects = {
+                    {
+                        baseAmount = 5,
+                        operation = "flat",
+                        statRef = "f82db71a:69hfqhne",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {
+                    {
+                        combatEventId = "on_melee_taken",
+                        effects = {
+                            {
+                                amountMode = "flat",
+                                baseDamage = 5,
+                                damageSchoolRefs = {
+                                    "f82db71a:esjguw6d"
+                                },
+                                statScaling = {},
+                                type = "damage"
+                            }
+                        },
+                        triggerTarget = "event_source"
+                    }
+                },
+                icon = "interface/icons/ability_mage_moltenarmor.blp",
+                id = "molarmra",
+                maxStacks = 1,
+                name = "Molten Armor",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Spell Crit. Chance by 5%. On melee hit taken, deal {AURA_EVENT_DAMAGE_1} Fire damage to the attacker.",
+                    bodyTokens = {
+                        {
+                            applyMode = "damage_amount",
+                            baseField = "baseDamage",
+                            effectIndex = 1,
+                            eventIndex = 1,
+                            key = "AURA_EVENT_DAMAGE_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "Increases Magic Resistance by 2% and Resource Regeneration by 30%.",
+                duration = 10,
+                effects = {
+                    {
+                        baseAmount = 2,
+                        operation = "flat",
+                        statRef = "f82db71a:zs1nbz13",
+                        statScaling = {},
+                        type = "stat"
+                    },
+                    {
+                        baseAmount = 30,
+                        operation = "flat",
+                        statRef = "f82db71a:rgnrtg01",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_magearmor.blp",
+                id = "mgarmaur",
+                maxStacks = 1,
+                name = "Mage Armor",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Magic Resistance by 2% and Resource Regeneration by 30%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "Breaks when the affected unit takes damage. Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                duration = 2,
+                effects = {
+                    {
+                        cancelOnDamage = true,
+                        forceAutoHitAgainstTarget = true,
+                        movementRangeOverride = 0,
+                        preventCasting = true,
+                        statScaling = {},
+                        type = "control"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_nature_polymorph.blp",
+                id = "polymrph",
+                maxStacks = 1,
+                name = "Polymorph",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Breaks when the affected unit takes damage. Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
             }
         },
         authorName = "Ortellus-ArgentDawn",
@@ -1171,6 +1337,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
+                    mainText = "Deal {DAMAGE_1} Fire damage to up to 5 enemies. Targets must share the same raid marker.",
                     mainText = "Deal {DAMAGE_1} Fire damage to up to 5 enemies. Targets must share the same raid marker.",
                     tokens = {
                         {
@@ -2946,7 +3113,348 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 totalTicks = 0,
                 useCooldownCharges = false
-            }
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d7c874c4:icearmra",
+                            basePower = 0,
+                            duration = 10,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "icearm01",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "magearmor",
+                cooldownScalesWithHaste = false,
+                description = "Increases armor by 100% and Frost Resistance by 30. On melee hit taken, apply Chilled to the attacker.",
+                icon = "interface/icons/spell_frost_frostarmor02.blp",
+                id = "icearm01",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Ice Armor",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Frost",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "d7c874c4:icearmra",
+                            datasetId = "d7c874c4",
+                            descriptionText = "Increases armor by 100% and Frost Resistance by 30. On melee hit taken, apply Chilled to the attacker.",
+                            duration = 10,
+                            icon = "interface/icons/spell_frost_frostarmor02.blp",
+                            nameText = "Ice Armor",
+                            powerLevel = 0,
+                            spellDatasetId = "d7c874c4",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Ice Armor to yourself for 10 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d7c874c4:molarmra",
+                            basePower = 0,
+                            duration = 10,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "molarm01",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "magearmor",
+                cooldownScalesWithHaste = false,
+                description = "Increases Spell Crit. Chance by 5%. On melee hit taken, deal 5 Fire damage to the attacker.",
+                icon = "interface/icons/ability_mage_moltenarmor.blp",
+                id = "molarm01",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Molten Armor",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Fire",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "d7c874c4:molarmra",
+                            datasetId = "d7c874c4",
+                            descriptionText = "Increases Spell Crit. Chance by 5%. On melee hit taken, deal {AURA_EVENT_DAMAGE_1} Fire damage to the attacker.",
+                            duration = 10,
+                            icon = "interface/icons/ability_mage_moltenarmor.blp",
+                            nameText = "Molten Armor",
+                            powerLevel = 0,
+                            spellDatasetId = "d7c874c4",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "damage_amount",
+                                    baseField = "baseDamage",
+                                    effectIndex = 1,
+                                    eventIndex = 1,
+                                    key = "AURA_EVENT_DAMAGE_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Molten Armor to yourself for 10 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d7c874c4:mgarmaur",
+                            basePower = 0,
+                            duration = 10,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "mgarma01",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "magearmor",
+                cooldownScalesWithHaste = false,
+                description = "Increases Magic Resistance by 2% and Resource Regeneration by 30%.",
+                icon = "interface/icons/spell_magearmor.blp",
+                id = "mgarma01",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Mage Armor",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Arcane",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "d7c874c4:mgarmaur",
+                            datasetId = "d7c874c4",
+                            descriptionText = "Increases Magic Resistance by 2% and Resource Regeneration by 30%.",
+                            duration = 10,
+                            icon = "interface/icons/spell_magearmor.blp",
+                            nameText = "Mage Armor",
+                            powerLevel = 0,
+                            spellDatasetId = "d7c874c4",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Mage Armor to yourself for 10 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 1,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d7c874c4:polymrph",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "polymr01",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 6,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_nature_polymorph.blp",
+                id = "polymr01",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Polymorph",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Arcane",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "d7c874c4:polymrph",
+                            datasetId = "d7c874c4",
+                            descriptionText = "Breaks when the affected unit takes damage. Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                            duration = 2,
+                            icon = "interface/icons/spell_nature_polymorph.blp",
+                            nameText = "Polymorph",
+                            powerLevel = 0,
+                            spellDatasetId = "d7c874c4",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Polymorph to an enemy for 2 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
         },
         stats = {},
         traits = {
@@ -3194,44 +3702,6 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 unlockLevel = 1
             },
-            {
-                automaticAuras = {},
-                category = "Frost",
-                conditions = {},
-                description = "Increases armor by 100% and Frost Resistance by 30. On melee hit taken, apply Chilled to the attacker.",
-                events = {
-                    {
-                        combatEventId = "on_melee_taken",
-                        effects = {
-                            {
-                                auraRef = "d7c874c4:m5d3gzpj",
-                                basePower = 0,
-                                duration = 2,
-                                stacks = 1,
-                                type = "apply_aura"
-                            }
-                        },
-                        triggerTarget = "event_source"
-                    }
-                },
-                icon = "interface/icons/spell_frost_frostarmor02.blp",
-                id = "icearm01",
-                isEnvironmental = false,
-                name = "Ice Armor",
-                skillBonuses = {},
-                statBonuses = {
-                    {
-                        operation = "percent",
-                        statRef = "f82db71a:v42albuv",
-                        value = 100
-                    },
-                    {
-                        statRef = "f82db71a:jjn0my8k",
-                        value = 30
-                    }
-                },
-                unlockLevel = 1
-            }
         },
         units = {},
         weaponTypes = {}

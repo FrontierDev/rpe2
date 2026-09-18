@@ -143,12 +143,12 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseAbsorption = 65,
+                        baseAbsorption = 104,
                         damageSchoolRefs = {},
                         statScaling = {
                             {
-                                coefficient = 0.325,
-                                statRef = "f82db71a:7t7xgzcx"
+                                coefficient = 0.624,
+                                statRef = "f82db71a:hj6d4kvy"
                             }
                         },
                         type = "absorb"

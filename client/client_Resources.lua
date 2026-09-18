@@ -41,6 +41,20 @@ local function isTurnResourceRegenerationEnabled()
     return Ruleset.GetRulesetRuleValue(activeRuleset, "resources", ruleDefinition) ~= false
 end
 
+local function getResourceRegenerationStatRef()
+    local activeRuleset = Ruleset and Ruleset.GetActiveRuleset and Ruleset.GetActiveRuleset() or nil
+    local ruleDefinition = Ruleset
+        and Ruleset.GetRulesetRuleDefinition
+        and Ruleset.GetRulesetRuleDefinition("resources", "resource_regeneration_stat")
+        or nil
+    local statRef = Ruleset
+        and Ruleset.GetRulesetRuleValue
+        and Ruleset.GetRulesetRuleValue(activeRuleset, "resources", ruleDefinition)
+        or nil
+
+    return type(statRef) == "string" and statRef or ""
+end
+
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
 end
@@ -1694,6 +1708,7 @@ function Client:ApplyLocalTurnStartResourceRegeneration(stateOverride, eventStat
     local resourceDeltas = ResourceSync.BuildPlayerTurnRegenResourceDeltas
         and ResourceSync.BuildPlayerTurnRegenResourceDeltas(activeEventUnit.resources, {
             healthResourceRef = eventState.healthResourceRef,
+            resourceRegenerationStatRef = getResourceRegenerationStatRef(),
             resolveStatValue = function(statRef)
                 local normalizedStatRef = type(statRef) == "string" and statRef or ""
                 if normalizedStatRef == "" then

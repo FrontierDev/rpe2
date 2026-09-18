@@ -129,10 +129,11 @@ Addon.Data.DefaultDatasets:Register({
                 duration = 10,
                 effects = {
                     {
-                        amount = 8,
-                        amountMode = "flat",
-                        resourceRef = "f82db71a:4c8mfm99",
-                        type = "resource"
+                        baseAmount = 5,
+                        operation = "flat",
+                        statRef = "f82db71a:rgnrtg01",
+                        statScaling = {},
+                        type = "stat"
                     }
                 },
                 events = {},
@@ -144,15 +145,8 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "Restores {AURA_RESOURCE_GAIN_1} each turn.",
-                    bodyTokens = {
-                        {
-                            applyMode = "resource_gain_amount",
-                            effectIndex = 1,
-                            key = "AURA_RESOURCE_GAIN_1",
-                            tokenType = "aura_amount"
-                        }
-                    },
+                    bodyText = "Increases Resource Regeneration by 5%.",
+                    bodyTokens = {},
                     stackingText = "",
                     stackingTokens = {},
                     version = 1
@@ -1841,7 +1835,7 @@ Addon.Data.DefaultDatasets:Register({
                         {
                             auraRef = "b0211ab3:tymni65r",
                             datasetId = "b0211ab3",
-                            descriptionText = "Restores {AURA_RESOURCE_GAIN_1} each turn.",
+                            descriptionText = "Increases Resource Regeneration by 5%.",
                             duration = 10,
                             icon = "interface/icons/spell_holy_greaterblessingofwisdom.blp",
                             nameText = "Blessing of Wisdom",
@@ -1854,14 +1848,7 @@ Addon.Data.DefaultDatasets:Register({
                                 reflexive = "themselves",
                                 subject = "all allies"
                             },
-                            tokens = {
-                                {
-                                    applyMode = "resource_gain_amount",
-                                    effectIndex = 1,
-                                    key = "AURA_RESOURCE_GAIN_1",
-                                    tokenType = "aura_amount"
-                                }
-                            }
+                            tokens = {}
                         }
                     },
                     mainText = "Apply Blessing of Wisdom to all allies for 10 turns.",
@@ -3358,6 +3345,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplateData = {
                     auraSections = {},
                     mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. Generates a high amount of threat. Targets must share the same raid marker.",
+                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. Generates a high amount of threat. Targets must share the same raid marker.",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -4293,6 +4281,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplateData = {
                     auraSections = {},
                     mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. Targets must share the same raid marker.",
+                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. Targets must share the same raid marker.",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -4720,7 +4709,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 15,
+                        amount = 2,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,

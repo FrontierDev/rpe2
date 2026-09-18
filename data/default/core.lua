@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 24,
+    version = 27,
     dataset = {
         achievements = {},
         auras = {},
@@ -4168,6 +4168,29 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Damage Reduction",
                 priority = 3,
                 seedNPCStat = false,
+                tags = {},
+                valueMode = "manual",
+                visibility = true
+            },
+            {
+                baseValue = 0,
+                category = "Special",
+                color = {
+                    a = 1,
+                    b = 0,
+                    g = 1,
+                    r = 0
+                },
+                defenceLabel = "",
+                derivedSources = {},
+                description = "Increases automatic regeneration for non-special, non-health resources by 1% per point.",
+                displayMode = "equip_percent",
+                icon = "interface/icons/ability_dualwieldspecialization.blp",
+                id = "rgnrtg01",
+                itemLevelWeight = 0,
+                name = "Resource Regeneration",
+                priority = 0,
+                seedNPCStat = true,
                 tags = {},
                 valueMode = "manual",
                 visibility = true

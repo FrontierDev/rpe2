@@ -1,182 +1,208 @@
-## Context
+## Summary
 
-Spell tooltips are built centrally in `client/ui/tooltips/tooltip_Spell.lua`. The tooltip builder already has access to runtime cooldown-channel state (`cooldownChannelId`, `cooldownChannelName`, `cooldownChannelTriggersGCD`) and the action bar passes resolved channel information into spell tooltip detail.
+Add support for a **Resource Regeneration** percentage stat that acts as a final modifier to automatic resource regeneration ticks, in the same way that stats such as Damage Done, Damage Reduction, Healing Done, etc. modify their corresponding mechanics.
 
-Cooldown channels are now meaningful player-facing action-economy categories (Main Action, Bonus Action, Buff Action, Free Action, Reaction, etc.). Players need a lightweight way to inspect a spell's channel without permanently adding extra text to every tooltip.
+For example:
 
-## Goal
+```
+Base resource regeneration: 20
+Resource Regeneration: +5
 
-When the player is hovering a spell tooltip and **Shift is held**, append a blank line and then the following line at the very bottom of the tooltip:
-
-> This spell is considered a [cooldown channel name].
-
-Example:
-
-> This spell is considered a Bonus Action.
-
-The appended line should be grey.
-
-When Shift is not held, the tooltip should remain unchanged.
-
-## Source-first requirements
-
-Before editing, read the current `dev` versions of at least:
-
-- `client/ui/tooltips/tooltip_Spell.lua`
-- `client/ui/widgets/widget_ActionBar.lua`
-- the shared tooltip rendering/provider code used by RPE widgets
-- `core/internal/ruleset/Ruleset.lua`
-- the cooldown-channel resolver/runtime state path in `client/spellcasting/Cooldowns.lua` / helpers
-
-Search the repository for existing modifier-key tooltip behavior (`IsShiftKeyDown`, `MODIFIER_STATE_CHANGED`, tooltip refresh/rebuild hooks) before adding a new mechanism.
-
-Do not assume the tooltip is rebuilt continuously while hovered. Trace whether the current tooltip provider is evaluated only on `OnEnter` or can be refreshed while visible.
-
-## Required behavior
-
-### 1. Append channel information only while Shift is held
-
-For a valid spell tooltip with a valid enabled cooldown channel:
-
-- normal hover: no extra channel-information line;
-- hover while Shift is already held: show the extra line;
-- press Shift while the tooltip is already visible: the tooltip should update immediately and show the line;
-- release Shift while still hovering: the tooltip should update immediately and remove the line.
-
-Do not require the user to move the mouse off and back onto the spell.
-
-### 2. Exact text
-
-Use exactly:
-
-```text
-This spell is considered a [cooldown channel name].
+Final regeneration: 21
 ```
 
-Substitute the channel's current resolved display name.
+because:
+
+```
+20 × 1.05 = 21
+```
+
+The modifier must apply to **all regenerating resources except the configured Health resource**.
+
+## Required behaviour
+
+Add a ruleset-configurable stat reference:
+
+```
+resources.resource_regeneration_stat
+```
+
+Label:
+
+```
+Resource Regeneration Stat
+```
+
+This should be a normal `statReference` dropdown, consistent with the existing modifier-stat mappings.
+
+When a resource regeneration tick is calculated:
+
+```lua
+finalRegen = baseRegen * (1 + resourceRegenerationStat / 100)
+```
 
 Examples:
 
-```text
-This spell is considered a Main Action.
-This spell is considered a Bonus Action.
-This spell is considered a Buff Action.
-This spell is considered a Free Action.
-This spell is considered a Reaction.
+```
+Base regen 20, stat +5   -> 21
+Base regen 20, stat +25  -> 25
+Base regen 20, stat -10  -> 18
+Base regen 20, stat 0    -> 20
 ```
 
-Do not expose the numeric channel ID in this line.
+Use the existing resource regeneration rounding/clamping conventions.
 
-### 3. Position and spacing
+The modifier should be applied **after the resource's normal regeneration value has been calculated**, regardless of whether that regeneration came from:
 
-The channel line must be the **last line of the spell tooltip**.
+- fixed regeneration (`regenPerSecond`);
+- derived regeneration (`regenSourceStatRef × regenMultiplier`).
 
-Insert one blank line immediately before it so it is visually separated from the normal tooltip body.
+This is therefore a modifier to the resulting regeneration tick, not another source of base regeneration.
 
-Equivalent line structure:
+## Health exclusion
+
+The resource identified by:
+
+```
+resources.health_stat
+```
+
+must explicitly bypass the Resource Regeneration modifier.
+
+For example:
+
+```
+Health regen: 10
+Mana regen:   20
+Resource Regeneration: +25%
+```
+
+must produce:
+
+```
+Health: +10
+Mana:   +25
+```
+
+The exclusion must be based on the configured Health resource reference, not resource names or hard-coded IDs.
+
+## Do not modify other resource changes
+
+Resource Regeneration must affect **automatic regeneration ticks only**.
+
+It must not modify:
+
+- direct resource restoration from spells/effects;
+- resource costs;
+- resource refunds;
+- resource gains from other mechanics;
+- maximum resource values;
+- Health regeneration.
+
+For example, a spell which directly restores 20 Mana must still restore exactly 20 Mana regardless of this stat.
+
+## Implementation
+
+### `core/internal/ruleset/Rules.lua`
+
+Add to the `resources` rules:
 
 ```lua
--- existing tooltip lines...
-{ text = "" },
 {
-    text = ("This spell is considered a %s."):format(channelName),
-    r = 0.6,
-    g = 0.6,
-    b = 0.6,
-    wrap = true,
+    key = "resource_regeneration_stat",
+    label = "Resource Regeneration Stat",
+    type = "dropdown",
+    default = "",
+    description = "Select the stat reference used for final non-health resource regeneration modifiers.",
+    optionsSource = "statReference",
 }
 ```
 
-Exact grey values may follow the existing tooltip convention, but the result must visually match other secondary/grey tooltip text.
+Keep this alongside the existing resource-regeneration rules.
 
-Do not add spacing after the channel line.
+### `core/internal/comms/ResourceSync.lua`
 
-### 4. Resolve the name canonically
+Update:
 
-The displayed name must come from the canonical resolved cooldown-channel state/ruleset definition, not from a hardcoded channel-number-to-name table.
+```lua
+ResourceSync.BuildPlayerTurnRegenResourceDeltas(...)
+```
 
-Preferred sources, in order of existing architecture:
+The existing function already calculates each Resource's regeneration value.
 
-1. already-resolved `cooldownChannelName` on tooltip/runtime activation detail;
-2. the canonical spell/channel resolver or `Ruleset.GetCooldownChannel(...)` if the tooltip has a spell definition but no runtime activation state.
+After calculating the normal/base `regenValue`:
 
-Requirements:
+1. determine whether the current `resourceRef` is the configured Health resource;
+2. if it is Health, leave `regenValue` unchanged;
+3. otherwise resolve the configured Resource Regeneration stat;
+4. apply it as a final percentage modifier;
+5. continue through the existing rounding, cap and delta-generation behaviour.
 
-- renaming a channel in the active ruleset changes the Shift-hover text;
-- Reaction is displayed using whatever Channel 5 is currently named, not the literal string `Reaction`;
-- do not duplicate action-economy defaults in `tooltip_Spell.lua`;
-- do not infer the name from legacy `triggersGCD` / `ignoreGCD` fields.
+Do not duplicate the fixed/derived regeneration calculations.
 
-### 5. Non-runtime spell tooltips
+Conceptually:
 
-Spell tooltips may appear outside an active event, where no live activation state exists.
+```lua
+regenValue = resolveNormalResourceRegen(...)
 
-The Shift-hover line must still work wherever `tooltip_Spell.lua` has a valid spell definition and can resolve its `cooldownChannel` against the active ruleset.
+if resourceRef ~= healthResourceRef then
+    regenValue = regenValue * (1 + resourceRegenModifier / 100)
+end
+```
 
-Do not limit the feature to action-bar tooltips during events.
+### `client/client_Resources.lua`
 
-If the spell has an invalid/unconfigured channel, do not invent a name or silently remap it. In that case omit the Shift-only sentence rather than displaying misleading information.
+`Client:ApplyLocalTurnStartResourceRegeneration()` already supplies `BuildPlayerTurnRegenResourceDeltas()` with the active EventUnit resources, `healthResourceRef`, and a stat-resolution callback.
 
-### 6. Modifier-state refresh
+Extend this path to resolve/use the ruleset's `resource_regeneration_stat`.
 
-If the current shared tooltip framework already has a modifier-state refresh mechanism, reuse it.
+Prefer passing the stat reference/value into the existing pure regeneration calculation rather than introducing a second regeneration path.
 
-If not, add the narrowest shared mechanism required so a currently visible RPE tooltip can be rebuilt when Shift changes state. Do not add per-frame polling to every action-bar slot.
+NPC/EventUnit stats must work through the same mechanism as player stats.
 
-Preferred behavior is event-driven via `MODIFIER_STATE_CHANGED` (or the existing equivalent):
+### `data/default/core.lua`
 
-- detect Shift state transition;
-- if an RPE spell tooltip is currently visible and still has a valid owner/provider, rebuild/re-render that tooltip;
-- do not disturb unrelated Blizzard tooltips;
-- do not create duplicate event frames/listeners for every slot.
+Add a default stat:
 
-The implementation must also handle left/right Shift consistently via `IsShiftKeyDown()` or equivalent final state checking.
+```
+Resource Regeneration
+```
 
-### 7. Tooltip cache/staleness
+Semantics:
 
-The line should reflect the current active ruleset channel name. If tooltip data/build results are cached, ensure modifier state and relevant configuration revision are accounted for at the correct layer, or bypass only the presentation fragment as appropriate.
+```
+1 stat = +1% resource regeneration
+```
 
-Do not force broad cache invalidation or regenerate authored spell descriptions solely because Shift was pressed if the existing tooltip framework can append/rebuild presentation cheaply.
+Configure the default ruleset to use this stat for `resource_regeneration_stat`.
 
-## Explicit non-goals
+It must be usable by the existing stat systems, including equipment bonuses, traits, auras, class/race bonuses, and EventUnit stats.
 
-Do not in this issue:
+Do **not** repurpose the existing stat used as a Resource's `regenSourceStatRef`. A resource's source stat determines its **base regeneration**; Resource Regeneration modifies the resulting tick.
 
-- permanently display the cooldown channel without Shift;
-- add the channel ID to the tooltip;
-- display whether the channel triggers its GCD;
-- display whether the channel can be used off-turn;
-- add explanatory text about cooldown-channel mechanics;
-- change spell channel assignments;
-- change cooldown/action-economy behavior;
-- add this line to item, trait, skill, player, or achievement tooltips;
-- alter the main generated spell description.
+## Validation
 
-## Deterministic validation
+Add deterministic coverage around `BuildPlayerTurnRegenResourceDeltas()`.
 
-Validate at minimum:
+At minimum verify:
 
-1. Main Action spell, no Shift -> no channel line.
-2. Main Action spell + Shift -> blank line then `This spell is considered a Main Action.` in grey.
-3. Bonus Action spell + Shift -> `This spell is considered a Bonus Action.`.
-4. Buff Action spell + Shift -> `This spell is considered a Buff Action.`.
-5. Free Action spell + Shift -> `This spell is considered a Free Action.`.
-6. Reaction spell + Shift -> `This spell is considered a Reaction.`.
-7. Press Shift after tooltip is already visible -> line appears without re-hovering.
-8. Release Shift while still hovering -> line disappears without re-hovering.
-9. Rename a cooldown channel in the active ruleset -> Shift-hover uses the renamed channel name through the normal configuration refresh path.
-10. Spell tooltip outside an active event still resolves and displays its configured channel when possible.
-11. Invalid/unconfigured channel -> no misleading channel sentence is appended.
-12. The appended sentence is always the final tooltip line and has exactly one blank line before it.
-13. Existing spell tooltip description, costs, cast time, cooldown text, conditions, aura sections, and runtime cooldown lines remain unchanged.
-14. No per-slot OnUpdate/polling loop is introduced.
+1. Fixed regen: base 20, Resource Regeneration +5 -> 21.
+2. Derived regen: source stat 100, `regenMultiplier = 0.2`, Resource Regeneration +25 -> 25.
+3. Health exclusion: Health base regen 20, modifier +50 -> Health remains 20.
+4. Multiple resources: modifier applies independently to Mana/Energy while Health remains unchanged.
+5. Negative modifier: base 20, modifier -10 -> 18.
+6. Zero/unconfigured modifier preserves current behaviour.
+7. Direct resource restoration is unaffected.
+8. The modifier works for both player-controlled EventUnits and NPC EventUnits where the stat is present.
 
 ## Acceptance criteria
 
-- [ ] Holding Shift on a spell tooltip appends the exact requested channel sentence.
-- [ ] The sentence is grey and separated from the normal tooltip by one blank line.
-- [ ] The displayed name comes from the canonical resolved cooldown channel.
-- [ ] Pressing/releasing Shift while remaining hovered updates the tooltip immediately.
-- [ ] The feature works for spell tooltips outside active events where the channel can be resolved.
-- [ ] Invalid/unconfigured channels are not mislabeled.
-- [ ] No cooldown-channel behavior or spell assignments change as part of this issue.
+- A `Resource Regeneration` stat exists in the default Core dataset.
+- The active ruleset can select which stat represents Resource Regeneration.
+- +5 Resource Regeneration increases every non-health automatic regeneration tick by 5%.
+- Fixed and derived regeneration are both affected.
+- The configured Health resource is never affected.
+- Direct resource gains/restores are not affected.
+- Resource costs and refunds are not affected.
+- Existing regeneration behaviour is unchanged when the stat is zero or unconfigured.
+- The implementation uses the existing EventUnit/stat resolution and resource-delta pipeline rather than creating a parallel regeneration system.

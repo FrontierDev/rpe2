@@ -663,7 +663,7 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 1,
+                            maxTargets = 2,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
@@ -1766,6 +1766,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplateData = {
                     auraSections = {},
                     mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. Targets must share the same raid marker.",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. Targets must share the same raid marker.",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -1869,6 +1870,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. Targets must share the same raid marker.",
                     mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. Targets must share the same raid marker.",
                     tokens = {
                         {
