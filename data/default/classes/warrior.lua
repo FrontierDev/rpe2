@@ -575,7 +575,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownChannel = 5,
                 learnMode = "always_learned",
                 learnLevel = 12,
-                usesRanks = false,
+                usesRanks = true,
                 rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Overpower",
@@ -2574,7 +2574,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownChannel = 3,
                 learnMode = "always_learned",
                 learnLevel = 1,
-                usesRanks = true,
+                usesRanks = false,
                 rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Battle Shout",
@@ -2660,7 +2660,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownChannel = 3,
                 learnMode = "always_learned",
                 learnLevel = 54,
-                usesRanks = true,
+                usesRanks = false,
                 rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Commanding Shout",
@@ -3218,5 +3218,5 @@ Addon.Data.DefaultDatasets:Register({
         },
         units = {},
         weaponTypes = {}
-    }},
+    },
 })
