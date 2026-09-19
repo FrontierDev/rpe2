@@ -100,6 +100,7 @@ local function installAuraSnapshot(client, eventState, records, replaceExisting)
             stacks = record.stacks,
             turns = record.turnsRemaining,
             powerLevel = record.powerLevel,
+            rankMultiplier = record.rankMultiplier,
             fullState = true,
         })
         if applied == true then

@@ -921,6 +921,19 @@ local function normalizeTurnCount(turnCount)
     return math.max(1, math.ceil(numericTurns))
 end
 
+local function normalizeAuraRankMultiplier(value)
+    local multiplier = tonumber(value)
+    if multiplier == nil
+        or multiplier ~= multiplier
+        or multiplier == math.huge
+        or multiplier == -math.huge
+        or multiplier < 0
+    then
+        return 1
+    end
+    return multiplier
+end
+
 local function buildAuraKey(auraRef, casterEventId, targetEventId)
     return table.concat({
         tostring(auraRef or ""),
@@ -929,7 +942,7 @@ local function buildAuraKey(auraRef, casterEventId, targetEventId)
     }, "\31")
 end
 
-local function buildAuraApplySignature(channelName, eventId, casterEventId, targetEventId, auraRef, stacks, turns, powerLevel)
+local function buildAuraApplySignature(channelName, eventId, casterEventId, targetEventId, auraRef, stacks, turns, powerLevel, rankMultiplier)
     return table.concat({
         tostring(channelName or ""),
         tostring(eventId or ""),
@@ -939,6 +952,7 @@ local function buildAuraApplySignature(channelName, eventId, casterEventId, targ
         tostring(tonumber(stacks) or 0),
         tostring(tonumber(turns) or 0),
         tostring(tonumber(powerLevel) or 0),
+        tostring(normalizeAuraRankMultiplier(rankMultiplier)),
     }, "\31")
 end
 
@@ -1041,6 +1055,7 @@ local function normalizeAuraApplyEntry(entry)
         stacks = math.max(1, math.floor(tonumber(entry.stacks) or 1)),
         turns = math.max(1, math.floor(tonumber(entry.turns or entry.turnsRemaining) or 1)),
         powerLevel = tonumber(entry.powerLevel) or 0,
+        rankMultiplier = normalizeAuraRankMultiplier(entry.rankMultiplier),
         fullState = entry.fullState == true or tostring(entry.fullState or "") == "1",
     }
 end
@@ -1082,6 +1097,7 @@ local function normalizeAuraApplyEntries(entriesOrPayload)
                 turns = values[5],
                 powerLevel = values[6],
                 fullState = values[7],
+                rankMultiplier = #values >= 8 and values[8] or nil,
             })
             if entry then
                 normalized[#normalized + 1] = entry
@@ -1157,6 +1173,7 @@ local function serializeAuraApplyEntries(entries)
             tostring(entry.turns or 1),
             tostring(entry.powerLevel or 0),
             entry.fullState == true and "1" or "0",
+            tostring(entry.rankMultiplier or 1),
         }, AURA_FIELD_SEPARATOR)
     end
 
@@ -1970,6 +1987,8 @@ local function cloneAuraTickerState(entry)
         casterEventId = tonumber(entry.casterEventId) or 0,
         targetEventId = tonumber(entry.targetEventId) or 0,
         stacks = math.max(0, math.floor(tonumber(entry.stacks) or 0)),
+        powerLevel = tonumber(entry.powerLevel) or 0,
+        rankMultiplier = normalizeAuraRankMultiplier(entry.rankMultiplier),
         definition = entry.definition,
     }
 end
@@ -2329,6 +2348,8 @@ function AuraManager:ResolveEffectAmount(context, effect, baseField)
             baseAmount = baseAmount + (statValue * (tonumber(scaling.coefficient) or 0))
         end
     end
+
+    baseAmount = baseAmount * normalizeAuraRankMultiplier(auraEntry and auraEntry.rankMultiplier)
 
     local stacks = math.max(1, math.floor(tonumber(auraEntry and auraEntry.stacks) or 1))
 
@@ -2971,6 +2992,7 @@ function AuraManager:GetUnitAuras(client, eventState, unitEventId)
                 stacks = math.max(0, math.floor(tonumber(entry.stacks) or 0)),
                 turnsRemaining = math.max(0, math.floor(tonumber(entry.turnsRemaining) or 0)),
                 powerLevel = tonumber(entry.powerLevel) or 0,
+                rankMultiplier = normalizeAuraRankMultiplier(entry.rankMultiplier),
                 casterEventId = tonumber(entry.casterEventId) or 0,
                 targetEventId = tonumber(entry.targetEventId) or 0,
                 absorptionSources = absorptionSourcesByAuraKey[tostring(entry.auraKey or "")] or {},
@@ -3068,6 +3090,7 @@ function AuraManager:BuildUnitAuraSignature(client, eventState, unitEventId)
             tostring(tonumber(row.stacks) or 0),
             tostring(tonumber(row.turnsRemaining) or 0),
             tostring(tonumber(row.powerLevel) or 0),
+            tostring(normalizeAuraRankMultiplier(row.rankMultiplier)),
             tostring(tonumber(row.casterEventId) or 0),
             tostring(tonumber(row.targetEventId) or 0),
         }, "\30")
@@ -3278,12 +3301,14 @@ function AuraManager:UpsertAura(client, payload)
         currentTickNumber
     )
     local powerLevel = tonumber(payload.powerLevel) or 0
+    local rankMultiplier = normalizeAuraRankMultiplier(payload.rankMultiplier)
     local replaceState = type(payload) == "table" and payload.fullState == true
     local entry = bucket.byKey[auraKey]
 
     if entry then
         removeAuraKeyFromTargetIndex(bucket, entry.targetEventId, auraKey)
         entry.powerLevel = powerLevel
+        entry.rankMultiplier = rankMultiplier
         entry.definition = auraDefinition
         entry.datasetId = dataset.id
         entry.stackBehavior = stackBehavior
@@ -3337,6 +3362,7 @@ function AuraManager:UpsertAura(client, payload)
         stacks = math.min(maxStacks, stacksToApply),
         turnsRemaining = turnsRemaining,
         powerLevel = powerLevel,
+        rankMultiplier = rankMultiplier,
         stackBehavior = stackBehavior,
         maxStacks = maxStacks,
         lastAdvancedOwnerTurnNumber = activationOwnerTurn,
@@ -3613,6 +3639,7 @@ local function flushOutboundAuraOperationBatch(manager, state)
                     stacks = operation.stacks,
                     turns = operation.turnsRemaining,
                     powerLevel = operation.powerLevel,
+                    rankMultiplier = operation.rankMultiplier,
                     fullState = operation.fullState == true,
                 }
                 operationKeys[#operationKeys + 1] = operationKey
@@ -3997,6 +4024,9 @@ function AuraManager:QueueAuraApply(client, context, entry, payload)
     local stacksToApply = math.max(1, math.floor(rawStacks))
     local turnsToApply = math.max(1, math.floor(rawTurns))
     local powerLevel = tonumber(type(payload) == "table" and payload.powerLevel or entry.powerLevel) or 0
+    local rankMultiplier = normalizeAuraRankMultiplier(
+        type(payload) == "table" and payload.rankMultiplier or entry.rankMultiplier
+    )
     local scope = normalizePendingScope(type(context) == "table" and (context.pendingScope or context.scope) or nil)
     local sourceTurnNumber = math.floor(tonumber(eventState.turnNumber) or 0)
     local sourceTickNumber = math.floor(tonumber(eventState.tickNumber) or 0)
@@ -4034,6 +4064,7 @@ function AuraManager:QueueAuraApply(client, context, entry, payload)
         end
         existing.turnsRemaining = turnsToApply
         existing.powerLevel = powerLevel
+        existing.rankMultiplier = rankMultiplier
         existing.fullState = existing.fullState == true or replaceState
         existing.scope = scope
         existing.sourceTurnNumber = sourceTurnNumber
@@ -4050,6 +4081,7 @@ function AuraManager:QueueAuraApply(client, context, entry, payload)
             stacks = stacksToApply,
             turnsRemaining = turnsToApply,
             powerLevel = powerLevel,
+            rankMultiplier = rankMultiplier,
             fullState = replaceState,
             scope = scope,
             sourceTurnNumber = sourceTurnNumber,
@@ -4229,7 +4261,8 @@ function AuraManager:SendAuraApply(client, context, entry)
         entry.auraRef,
         entry.stacks,
         entry.turnsRemaining,
-        entry.powerLevel
+        entry.powerLevel,
+        entry.rankMultiplier
     )
     client.PendingLocalAuraApplyEchoSignatures = client.PendingLocalAuraApplyEchoSignatures or {}
     incrementPendingSignature(client.PendingLocalAuraApplyEchoSignatures, signature)
@@ -4243,6 +4276,7 @@ function AuraManager:SendAuraApply(client, context, entry)
         entry.stacks,
         entry.turnsRemaining,
         entry.powerLevel,
+        entry.rankMultiplier,
     })
 
     if sent then
@@ -4409,10 +4443,14 @@ function AuraManager:SendAuraRuntimeUpdateBatch(client, context, entries)
     }) and true or false
 end
 
-function AuraManager:ApplyAuraFromContext(client, context, auraRef, stacks, turns, powerLevel)
+function AuraManager:ApplyAuraFromContext(client, context, auraRef, stacks, turns, powerLevel, rankMultiplierOverride)
     local eventState = type(context) == "table" and context.eventState or nil
     local casterUnit = type(context) == "table" and context.casterUnit or nil
     local targetUnit = type(context) == "table" and (context.targetUnit or context.target) or nil
+    local contextRankMultiplier = type(context) == "table" and context.spellRankMultiplier or nil
+    local rankMultiplier = normalizeAuraRankMultiplier(
+        rankMultiplierOverride ~= nil and rankMultiplierOverride or contextRankMultiplier
+    )
     if type(eventState) ~= "table" or eventState.active ~= true or type(casterUnit) ~= "table" or type(targetUnit) ~= "table" then
         if type(Debug.Internal) == "function" then
             Debug.Internal(
@@ -4446,6 +4484,7 @@ function AuraManager:ApplyAuraFromContext(client, context, auraRef, stacks, turn
         stacks = stacks,
         turns = turns,
         powerLevel = powerLevel,
+        rankMultiplier = rankMultiplier,
         casterEventId = tonumber(casterUnit.eventID) or 0,
         targetEventId = tonumber(targetUnit.eventID) or 0,
     })
@@ -4471,6 +4510,7 @@ function AuraManager:ApplyAuraFromContext(client, context, auraRef, stacks, turn
         stacks = stacks,
         turns = turns or entry.turnsRemaining,
         powerLevel = powerLevel,
+        rankMultiplier = rankMultiplier,
     })
     if not queued and type(Debug.Internal) == "function" then
         Debug.Internal(
@@ -4715,6 +4755,7 @@ function AuraManager:RemoveAuraStacksFromContext(client, context, auraRef, stack
         stacks = entry.stacks,
         turns = entry.turnsRemaining,
         powerLevel = entry.powerLevel,
+        rankMultiplier = entry.rankMultiplier,
         fullState = true,
     })
     if not queuedApply and type(Debug.Internal) == "function" then
@@ -6079,7 +6120,7 @@ function AuraManager:RefreshLocalPlayerDerivedState(eventState, options)
     return self:QueueLocalPlayerDerivedStateRefresh(eventState, options)
 end
 
-function AuraManager:ValidateInboundAuraPayload(client, sender, channelName, eventId, casterEventId, targetEventId, auraRef, stacks, turns, powerLevel)
+function AuraManager:ValidateInboundAuraPayload(client, sender, channelName, eventId, casterEventId, targetEventId, auraRef, stacks, turns, powerLevel, rankMultiplier)
     local sessionState, eventState = nil, nil
     if type(Spellcasting.GetActiveSpellcastContext) == "function" then
         sessionState, eventState = Spellcasting.GetActiveSpellcastContext(client)
@@ -6133,6 +6174,7 @@ function AuraManager:ValidateInboundAuraPayload(client, sender, channelName, eve
         stacks = math.max(1, math.floor(tonumber(stacks) or 1)),
         turns = math.max(1, math.floor(tonumber(turns) or 1)),
         powerLevel = tonumber(powerLevel) or 0,
+        rankMultiplier = normalizeAuraRankMultiplier(rankMultiplier),
     }
 end
 
@@ -6147,7 +6189,8 @@ function AuraManager:ValidateInboundAura(client, arguments, sender)
         arguments and arguments[5] or nil,
         arguments and arguments[6] or nil,
         arguments and arguments[7] or nil,
-        arguments and arguments[8] or nil
+        arguments and arguments[8] or nil,
+        arguments and arguments[9] or nil
     )
 end
 
@@ -6167,7 +6210,8 @@ function AuraManager:HandleAuraApply(client, arguments, sender)
             payload.auraRef,
             payload.stacks,
             payload.turns,
-            payload.powerLevel
+            payload.powerLevel,
+            payload.rankMultiplier
         )
         if consumePendingSignature(client.PendingLocalAuraApplyEchoSignatures, signature) then
             return true
@@ -6258,7 +6302,8 @@ function AuraManager:HandleAuraApplyBatch(client, arguments, sender)
             entry.auraRef,
             entry.stacks,
             entry.turns,
-            entry.powerLevel
+            entry.powerLevel,
+            entry.rankMultiplier
         )
         if payload then
             payload.fullState = entry.fullState == true

@@ -1073,6 +1073,29 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
     self.SpellInspectorResourceAmountModeGroup:AddChild(self.SpellInspectorResourceAmountModeDropdown)
     attachMouseWheel(self.SpellInspectorResourceAmountModeDropdown)
 
+    self.SpellInspectorResourceScaleWithRankCheckbox = self:CreateSpellInspectorCheckbox(
+        root:GetFrame(),
+        "RPEDataEditorSpellInspectorResourceScaleWithRankCheckbox",
+        "Scale With Rank",
+        false,
+        function(checked)
+            if self._refreshingSpellInspector then
+                return
+            end
+
+            local component = self:GetSelectedSpellInspectorComponent()
+            if component and tostring(component.effect and component.effect.type or "") == "resource" then
+                self:CommitSelectedSpell(function()
+                    component.effect.scaleWithRank = checked == true
+                end)
+                self:RefreshSpellInspectorPage()
+            end
+        end
+    )
+    self.SpellInspectorResourceScaleWithRankCheckbox._visibleHeight = 18
+    root:AddChild(self.SpellInspectorResourceScaleWithRankCheckbox)
+    attachMouseWheel(self.SpellInspectorResourceScaleWithRankCheckbox)
+
     self.SpellInspectorSummonPetUnitGroup = createGroup("RPEDataEditorSpellInspectorSummonPetUnitGroup", "Summoned Unit", 18)
     self.SpellInspectorSummonPetUnitDropdown = UI.CreateDropdown(self.SpellInspectorSummonPetUnitGroup:GetFrame(), "RPEDataEditorSpellInspectorSummonPetUnitDropdown", {
         width = self.SpellInspectorFieldWidth,

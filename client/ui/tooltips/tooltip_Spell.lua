@@ -274,6 +274,66 @@ local function buildRuntimeActivationState(detail)
     return nil
 end
 
+local function resolveSpellRankContext(detail, runtimeState)
+    local spell = type(detail) == "table" and detail.spell or nil
+    if type(spell) ~= "table" or type(Spellcasting.ResolveSpellRankContext) ~= "function" then
+        return nil, nil
+    end
+
+    local activationState = type(detail.activationState) == "table" and detail.activationState or nil
+    local profileRankContext = type(detail.rankContext) == "table"
+        and type(detail.casterUnit) ~= "table"
+        and type(detail.eventState) ~= "table"
+        and activationState == nil
+    if not profileRankContext and type(activationState) ~= "table" and type(runtimeState) == "table"
+        and (type(runtimeState.casterUnit) == "table" or type(runtimeState.eventState) == "table")
+    then
+        activationState = runtimeState
+    end
+    if not profileRankContext and type(activationState) ~= "table"
+        and type(detail.spellRef) == "string"
+        and detail.spellRef ~= ""
+        and type(Client.ResolveSpellActivationState) == "function"
+    then
+        activationState = Client:ResolveSpellActivationState(detail.spellRef, {
+            includeTargetCandidates = false,
+        })
+    end
+
+    local descriptionBuilder = Spellcasting and Spellcasting.DescriptionBuilder or nil
+    local casterUnit = profileRankContext
+        and type(descriptionBuilder) == "table" and type(descriptionBuilder.BuildPseudoCasterUnit) == "function"
+        and descriptionBuilder.BuildPseudoCasterUnit()
+        or type(detail.casterUnit) == "table" and detail.casterUnit
+        or type(activationState) == "table" and activationState.casterUnit
+        or buildTooltipCasterUnit(detail)
+    local eventState = type(detail.eventState) == "table" and detail.eventState
+        or type(activationState) == "table" and activationState.eventState
+        or nil
+    local options = {
+        casterUnit = casterUnit,
+        eventState = eventState,
+    }
+    if profileRankContext and type(Profile.GetLevel) == "function" then
+        options.casterLevel = Profile.GetLevel()
+    end
+    local rankContext = Spellcasting.ResolveSpellRankContext(spell, options)
+
+    local hasMeaningfulLevelContext = type(detail.rankContext) == "table"
+        and tonumber(detail.rankContext.casterLevel) ~= nil
+        or type(detail.casterUnit) == "table"
+        or type(activationState) == "table" and type(activationState.casterUnit) == "table"
+    if not hasMeaningfulLevelContext then
+        local profileLevel = type(Profile.GetLevel) == "function" and tonumber(Profile.GetLevel()) or nil
+        if profileLevel == nil and type(Database.GetProfileLevel) == "function" then
+            profileLevel = tonumber(Database.GetProfileLevel())
+        end
+        hasMeaningfulLevelContext = profileLevel ~= nil and profileLevel >= 1
+    end
+
+    return rankContext, hasMeaningfulLevelContext
+end
+
 local function buildConditionLines(detail)
     if type(Conditions) ~= "table" or type(Conditions.BuildTooltipLines) ~= "function" then
         return {}
@@ -447,9 +507,50 @@ function SpellTooltip:Build(detail, owner)
 
     local tooltipData = buildTooltipDescription(detail, owner)
     local runtimeState = buildRuntimeActivationState(detail)
+    local rankContext, hasMeaningfulLevelContext = resolveSpellRankContext(detail, runtimeState)
     local description = ensureString(tooltipData and tooltipData.descriptionText, "")
     local errorText = ensureString(tooltipData and tooltipData.errorText, "")
     local lines = {}
+    local requiredLevel = tonumber(detail.requiredLevel)
+    local isBelowLearnLevel = detail.isAvailable == false
+        or type(runtimeState) == "table" and runtimeState.reason == "level-required"
+        or type(rankContext) == "table" and rankContext.eligible ~= true
+    if isBelowLearnLevel then
+        requiredLevel = requiredLevel
+            or tonumber(runtimeState and runtimeState.learnLevel)
+            or tonumber(rankContext and rankContext.learnLevel)
+        if requiredLevel then
+            lines[#lines + 1] = {
+                text = ("Requires Level %d"):format(math.max(1, math.floor(requiredLevel))),
+                r = 1,
+                g = 0.55,
+                b = 0.35,
+                wrap = true,
+            }
+        end
+    elseif type(rankContext) == "table"
+        and rankContext.useSpellRanks == true
+        and rankContext.usesRanks ~= false
+        and tonumber(rankContext.rank)
+    then
+        lines[#lines + 1] = {
+            text = ("Rank %d"):format(math.max(1, math.floor(tonumber(rankContext.rank) or 1))),
+            r = 0.85,
+            g = 0.85,
+            b = 1,
+            wrap = true,
+        }
+        local nextRankLevel = tonumber(rankContext.nextRankLevel)
+        if hasMeaningfulLevelContext and nextRankLevel and nextRankLevel >= 1 then
+            lines[#lines + 1] = {
+                text = ("Next rank at level %d"):format(math.floor(nextRankLevel)),
+                r = 0.6,
+                g = 0.6,
+                b = 0.6,
+                wrap = true,
+            }
+        end
+    end
     local costLine = buildCostLine(detail)
     local chargesText = buildChargesText(detail, runtimeState)
     if (costLine and costLine ~= "") or chargesText then

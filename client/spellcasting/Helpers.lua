@@ -155,6 +155,130 @@ local function getCombat()
     return Addon.Client and Addon.Client.Combat or nil
 end
 
+local function finiteNumber(value)
+    local numeric = tonumber(value)
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        return nil
+    end
+    return numeric
+end
+
+local function normalizeCasterLevel(value)
+    local numeric = finiteNumber(value)
+    if numeric == nil then
+        return nil
+    end
+    return math.max(1, math.floor(numeric))
+end
+
+function Spellcasting.ResolveSpellRankContext(spell, options)
+    local settings = type(options) == "table" and options or {}
+    local classes = Addon.Internal
+        and Addon.Internal.Database
+        and Addon.Internal.Database.Classes
+        or nil
+    local spellClass = classes and classes.Spell or nil
+    if type(spellClass) ~= "table" or type(spellClass.ResolveRankForLevel) ~= "function" then
+        return nil
+    end
+
+    local eventState = settings.eventState
+    if eventState == nil and type(Client.GetEventState) == "function" then
+        eventState = Client:GetEventState()
+    end
+
+    local casterUnit = settings.casterUnit
+    if casterUnit == nil and type(Client.ResolveActiveSpellcasterUnit) == "function" then
+        casterUnit = Client:ResolveActiveSpellcasterUnit(eventState)
+    end
+
+    local casterLevel = normalizeCasterLevel(settings.casterLevel)
+    if casterLevel == nil then
+        local combat = getCombat()
+        if type(combat) == "table" and type(combat.GetUnitLevel) == "function"
+            and (type(casterUnit) == "table" or type(eventState) == "table" and eventState.active == true)
+        then
+            casterLevel = normalizeCasterLevel(combat:GetUnitLevel(casterUnit, eventState))
+        elseif type(casterUnit) == "table" and casterUnit.isPlayer == true and type(Profile.GetLevel) == "function" then
+            casterLevel = normalizeCasterLevel(Profile.GetLevel())
+        elseif type(eventState) == "table" and eventState.active == true then
+            casterLevel = normalizeCasterLevel(eventState.level)
+        elseif type(Profile.GetLevel) == "function" then
+            casterLevel = normalizeCasterLevel(Profile.GetLevel())
+        end
+    end
+    casterLevel = casterLevel or 1
+
+    local ruleset = settings.ruleset
+    if ruleset == nil and type(Ruleset.GetActiveRuleset) == "function" then
+        ruleset = Ruleset.GetActiveRuleset()
+    end
+    local useSpellRanks = true
+    if type(Ruleset.GetRulesetRuleDefinition) == "function"
+        and type(Ruleset.GetRulesetRuleValue) == "function"
+    then
+        local definition = Ruleset.GetRulesetRuleDefinition("character", "use_spell_ranks")
+        local configured = Ruleset.GetRulesetRuleValue(ruleset, "character", definition)
+        if configured ~= nil then
+            useSpellRanks = configured == true
+        end
+    end
+
+    local gainPercent = 10
+    if type(Ruleset.GetRulesetRuleDefinition) == "function"
+        and type(Ruleset.GetRulesetRuleValue) == "function"
+    then
+        local definition = Ruleset.GetRulesetRuleDefinition("character", "spell_rank_effect_gain_percent")
+        local configuredGain = Ruleset.GetRulesetRuleValue(ruleset, "character", definition)
+        local numericGain = finiteNumber(configuredGain)
+        if numericGain ~= nil then
+            gainPercent = math.max(0, numericGain)
+        end
+    end
+
+    local resolved = spellClass.ResolveRankForLevel(spell, casterLevel)
+    local spellUsesRanks = true
+    if type(spellClass.ResolveUsesRanks) == "function" then
+        spellUsesRanks = spellClass.ResolveUsesRanks(spell) ~= false
+    end
+    local rank = resolved and resolved.rank or nil
+    local multiplier = 1
+    if useSpellRanks and spellUsesRanks and rank ~= nil then
+        multiplier = 1 + (math.max(0, rank - 1) * (gainPercent / 100))
+        if finiteNumber(multiplier) == nil then
+            multiplier = 1
+        end
+    end
+
+    return {
+        eligible = resolved ~= nil and resolved.eligible == true,
+        useSpellRanks = useSpellRanks,
+        usesRanks = spellUsesRanks,
+        rank = rank,
+        multiplier = multiplier,
+        casterLevel = casterLevel,
+        learnLevel = resolved and resolved.learnLevel or spellClass.ResolveLearnLevel(spell),
+        rankInterval = resolved and resolved.rankInterval or spellClass.ResolveRankInterval(spell),
+        nextRankLevel = resolved and resolved.nextRankLevel or nil,
+    }
+end
+
+function Spellcasting.ApplySpellRankMultiplier(context, amount)
+    local numericAmount = finiteNumber(amount)
+    if numericAmount == nil then
+        return nil
+    end
+
+    local rankMultiplier = type(context) == "table"
+        and finiteNumber(context.spellRankMultiplier or context.multiplier)
+        or nil
+    if rankMultiplier == nil or rankMultiplier < 0 then
+        rankMultiplier = 1
+    end
+
+    return numericAmount * rankMultiplier
+end
+
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
 end
@@ -1078,6 +1202,7 @@ local function cloneSpellImpactOperation(operation)
         stacks = tonumber(operation.stacks) or 0,
         turns = tonumber(operation.turns) or 0,
         powerLevel = tonumber(operation.powerLevel) or 0,
+        rankMultiplier = tonumber(operation.rankMultiplier) or 1,
         casterEventId = tonumber(operation.casterEventId) or 0,
         targetEventId = tonumber(operation.targetEventId) or 0,
         reversible = operation.reversible ~= false,
@@ -1162,6 +1287,7 @@ function Spellcasting.RecordSpellImpact(client, eventState, casterUnit, targetUn
         stacks = tonumber(result.stacks or (auraEntry and auraEntry.stacks)) or 0,
         turns = tonumber(result.duration or (auraEntry and auraEntry.turnsRemaining)) or 0,
         powerLevel = tonumber(result.powerLevel or (auraEntry and auraEntry.powerLevel)) or 0,
+        rankMultiplier = tonumber(result.rankMultiplier or (auraEntry and auraEntry.rankMultiplier)) or 1,
         casterEventId = tonumber((auraEntry and auraEntry.casterEventId) or result.casterEventId or casterEventId) or casterEventId,
         targetEventId = tonumber((auraEntry and auraEntry.targetEventId) or result.targetEventId or targetEventId) or targetEventId,
     }
@@ -1298,7 +1424,8 @@ function Spellcasting.RevertLastSpellImpact(client, eventState, targetUnit, cont
                 operation.auraRef,
                 math.max(1, operation.stacks),
                 math.max(1, operation.turns),
-                operation.powerLevel
+                operation.powerLevel,
+                operation.rankMultiplier
             )
             if applied then
                 reverted.operationCount = reverted.operationCount + 1
@@ -3006,6 +3133,8 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
                     resolvedTargetEventIds = resolvedTargetEventIds,
                     healthResourceRef = healthResourceRef,
                     castEntry = castEntry,
+                    spellRank = type(castEntry) == "table" and castEntry.spellRank or nil,
+                    spellRankMultiplier = type(castEntry) == "table" and castEntry.spellRankMultiplier or 1,
                     combatEventState = combatEventState,
                     spellCasterEvents = type(spell) == "table" and spell.casterEvents or nil,
                 })
@@ -3047,6 +3176,8 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
                             resolvedTargetEventIds = { tonumber(targetUnit and targetUnit.eventID) or 0 },
                             healthResourceRef = healthResourceRef,
                             castEntry = castEntry,
+                            spellRank = type(castEntry) == "table" and castEntry.spellRank or nil,
+                            spellRankMultiplier = type(castEntry) == "table" and castEntry.spellRankMultiplier or 1,
                             combatEventState = combatEventState,
                             spellCasterEvents = type(spell) == "table" and spell.casterEvents or nil,
                             effectType = effectType,
@@ -3124,6 +3255,8 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
             casterUnit = casterUnit,
             attackerUnit = casterUnit,
             castEntry = castEntry,
+            spellRank = type(castEntry) == "table" and castEntry.spellRank or nil,
+            spellRankMultiplier = type(castEntry) == "table" and castEntry.spellRankMultiplier or 1,
             combatEventState = combatEventState,
             spellCasterEvents = type(spell) == "table" and spell.casterEvents or nil,
         }, castEntry, spell)

@@ -112,6 +112,28 @@ local function normalizeCheckboxValue(value, defaultValue)
     return value and true or false
 end
 
+local function normalizeSpellRankEffectGainPercent(value, fallback)
+    local numeric = tonumber(value)
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        numeric = tonumber(fallback)
+    end
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        numeric = 10
+    end
+
+    numeric = math.max(0, numeric)
+
+    return tostring(numeric)
+end
+
+local function normalizeRulesetRuleValue(ruleDefinition, value)
+    if type(ruleDefinition) == "table" and ruleDefinition.key == "spell_rank_effect_gain_percent" then
+        return normalizeSpellRankEffectGainPercent(value, ruleDefinition.default)
+    end
+
+    return value
+end
+
 local function buildDatasetEntryReferenceItems(collectionKey, options)
     local items = {}
     local settings = type(options) == "table" and options or {}
@@ -273,7 +295,7 @@ function Ruleset.GetRulesetRuleValue(ruleset, categoryKey, ruleDefinition)
         return normalizeCheckboxValue(value, ruleDefinition.default)
     end
 
-    return value
+    return normalizeRulesetRuleValue(ruleDefinition, value)
 end
 
 function Ruleset.GetRulesetRuleValueByKey(ruleset, categoryKey, ruleKey, defaultValue)
@@ -300,7 +322,7 @@ function Ruleset.GetRulesetRuleValueByKey(ruleset, categoryKey, ruleKey, default
         return normalizeCheckboxValue(value, fallbackValue)
     end
 
-    return value
+    return normalizeRulesetRuleValue(ruleDefinition, value)
 end
 
 function Ruleset.GetCooldownChannel(channelId, rulesetOverride)
@@ -381,7 +403,7 @@ function Ruleset.SetRulesetRuleValue(rulesetId, categoryKey, ruleDefinition, val
 
     ruleset.rules = type(ruleset.rules) == "table" and ruleset.rules or {}
     ruleset.rules[categoryKey] = type(ruleset.rules[categoryKey]) == "table" and ruleset.rules[categoryKey] or {}
-    ruleset.rules[categoryKey][ruleDefinition.key] = value
+    ruleset.rules[categoryKey][ruleDefinition.key] = normalizeRulesetRuleValue(ruleDefinition, value)
 
     if Database and Database.UpdateRulesetMetadata then
         local updated = Database.UpdateRulesetMetadata(ruleset.id, { rules = ruleset.rules })

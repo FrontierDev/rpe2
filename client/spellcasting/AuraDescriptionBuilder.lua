@@ -308,6 +308,7 @@ local function buildAuraEffectContext(options)
     return {
         aura = {
             powerLevel = tonumber(type(options) == "table" and options.powerLevel) or 0,
+            rankMultiplier = tonumber(type(options) == "table" and options.rankMultiplier) or 1,
             stacks = math.max(1, math.floor(tonumber(type(options) == "table" and options.stacks) or 1)),
         },
         casterUnit = type(options) == "table" and options.casterUnit or nil,
@@ -1580,6 +1581,7 @@ function AuraDescriptionBuilder:BuildTooltipSectionTemplate(auraRef, options)
         casterUnit = type(options) == "table" and options.casterUnit or nil,
         targetUnit = type(options) == "table" and options.targetUnit or nil,
         powerLevel = type(options) == "table" and options.powerLevel or nil,
+        rankMultiplier = type(options) == "table" and options.rankMultiplier or nil,
         stacks = type(options) == "table" and options.stacks or nil,
         duration = type(options) == "table" and options.duration or nil,
         targetContext = type(options) == "table" and options.targetContext or nil,
@@ -1596,6 +1598,7 @@ function AuraDescriptionBuilder:BuildTooltipSectionTemplate(auraRef, options)
             casterUnit = resolvedOptions.casterUnit,
             targetUnit = resolvedOptions.targetUnit,
             powerLevel = resolvedOptions.powerLevel,
+            rankMultiplier = resolvedOptions.rankMultiplier,
             stacks = resolvedOptions.stacks,
             duration = resolvedOptions.duration,
             targetContext = resolvedOptions.targetContext,
@@ -1611,6 +1614,7 @@ function AuraDescriptionBuilder:BuildTooltipSectionTemplate(auraRef, options)
             descriptionText = TooltipTemplate.CombineText(payload.bodyText, payload.stackingText),
             tokens = TooltipTemplate.MergeTokens(payload.bodyTokens, payload.stackingTokens),
             powerLevel = type(options) == "table" and options.powerLevel or nil,
+            rankMultiplier = type(options) == "table" and options.rankMultiplier or nil,
             stacks = type(options) == "table" and options.stacks or nil,
             duration = type(options) == "table" and options.duration or nil,
             targetContext = type(options) == "table" and options.targetContext or nil,
@@ -1637,6 +1641,7 @@ function AuraDescriptionBuilder:BuildTooltipSectionTemplate(auraRef, options)
         descriptionText = descriptionText,
         tokens = {},
         powerLevel = resolvedOptions.powerLevel,
+        rankMultiplier = resolvedOptions.rankMultiplier,
         stacks = resolvedOptions.stacks,
         duration = resolvedOptions.duration,
         targetContext = resolvedOptions.targetContext,
@@ -1666,6 +1671,9 @@ function AuraDescriptionBuilder:ResolveTooltipSectionTemplate(section, options)
             casterUnit = type(options) == "table" and options.casterUnit or nil,
             targetUnit = type(options) == "table" and options.targetUnit or nil,
             powerLevel = tonumber(section.powerLevel) or 0,
+            rankMultiplier = tonumber(type(options) == "table" and options.rankMultiplier)
+                or tonumber(section.rankMultiplier)
+                or 1,
             stacks = tonumber(section.stacks) or 1,
             duration = section.duration,
             targetContext = section.targetContext,
@@ -1690,6 +1698,7 @@ function AuraDescriptionBuilder:BuildTooltipSection(auraRef, options)
             casterUnit = type(options) == "table" and options.casterUnit or nil,
             targetUnit = type(options) == "table" and options.targetUnit or nil,
             powerLevel = type(options) == "table" and options.powerLevel or nil,
+            rankMultiplier = type(options) == "table" and options.rankMultiplier or nil,
             stacks = type(options) == "table" and options.stacks or nil,
             duration = type(options) == "table" and options.duration or nil,
             targetContext = type(options) == "table" and options.targetContext or nil,
@@ -1728,6 +1737,7 @@ function AuraDescriptionBuilder:BuildTooltipSection(auraRef, options)
         spellDatasetId = type(options) == "table" and options.spellDatasetId or nil,
         casterUnit = type(options) == "table" and options.casterUnit or nil,
         powerLevel = type(options) == "table" and options.powerLevel or nil,
+        rankMultiplier = type(options) == "table" and options.rankMultiplier or nil,
         stacks = type(options) == "table" and options.stacks or nil,
         targetContext = type(options) == "table" and options.targetContext or nil,
     })

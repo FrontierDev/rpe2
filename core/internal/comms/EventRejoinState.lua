@@ -8,7 +8,7 @@ local Comms = Addon.Internal.Comms
 local EventRejoinState = Comms.EventRejoinState
 local Operations = Comms.Operations or {}
 
-EventRejoinState.ProtocolVersion = 4
+EventRejoinState.ProtocolVersion = 5
 EventRejoinState.Opcode = 31
 
 local function normalizeNonNegativeInteger(value)
@@ -262,13 +262,14 @@ local function serializeAuraRecord(entry)
         math.max(1, math.floor(tonumber(entry and entry.stacks) or 1)),
         math.max(1, math.floor(tonumber(entry and entry.turnsRemaining) or 1)),
         tonumber(entry and entry.powerLevel) or 0,
+        normalizeNonNegativeNumber(entry and entry.rankMultiplier) or 1,
         serializeAuraRuntimeStates(entry and entry.effectState),
     })
 end
 
 local function deserializeAuraRecord(payload)
     local fields = decodeFields(payload)
-    if type(fields) ~= "table" or (#fields ~= 6 and #fields ~= 7) then
+    if type(fields) ~= "table" or (#fields ~= 6 and #fields ~= 7 and #fields ~= 8) then
         return nil
     end
     local casterEventId = math.floor(tonumber(fields[1]) or 0)
@@ -277,6 +278,7 @@ local function deserializeAuraRecord(payload)
     if casterEventId <= 0 or targetEventId <= 0 or auraRef == "" then
         return nil
     end
+    local runtimeStateField = #fields >= 8 and fields[8] or (#fields >= 7 and fields[7] or nil)
     return {
         casterEventId = casterEventId,
         targetEventId = targetEventId,
@@ -284,7 +286,8 @@ local function deserializeAuraRecord(payload)
         stacks = math.max(1, math.floor(tonumber(fields[4]) or 1)),
         turnsRemaining = math.max(1, math.floor(tonumber(fields[5]) or 1)),
         powerLevel = tonumber(fields[6]) or 0,
-        effectState = #fields >= 7 and deserializeAuraRuntimeStates(fields[7]) or {},
+        rankMultiplier = #fields >= 8 and (normalizeNonNegativeNumber(fields[7]) or 1) or 1,
+        effectState = deserializeAuraRuntimeStates(runtimeStateField) or {},
     }
 end
 
@@ -527,7 +530,12 @@ function EventRejoinState.DeserializeSnapshot(payload)
         return nil, reason or "invalid-snapshot"
     end
     local protocolVersion = tonumber(fields[1])
-    if protocolVersion ~= 1 and protocolVersion ~= 2 and protocolVersion ~= 3 and protocolVersion ~= EventRejoinState.ProtocolVersion then
+    if protocolVersion ~= 1
+        and protocolVersion ~= 2
+        and protocolVersion ~= 3
+        and protocolVersion ~= 4
+        and protocolVersion ~= EventRejoinState.ProtocolVersion
+    then
         return nil, "unsupported-version"
     end
     local expectedFieldCount = protocolVersion >= 3 and 4 or 3

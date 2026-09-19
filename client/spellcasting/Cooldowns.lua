@@ -1446,6 +1446,13 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
         return nil
     end
 
+    local spellRankContext = type(Spellcasting.ResolveSpellRankContext) == "function"
+        and Spellcasting.ResolveSpellRankContext(activation.spell, {
+            casterUnit = activation.casterUnit,
+            eventState = activation.eventState,
+        })
+        or nil
+
     local eventId = normalizeEventId(activation.eventState and activation.eventState.id)
     local casterEventId = normalizeUnitEventId(activation.casterUnit and activation.casterUnit.eventID)
     local unitState = casterEventId and Spellcasting.GetUnitCooldownState(self, eventId, casterEventId, false) or nil
@@ -1502,7 +1509,13 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
     local canAffordStartCosts = true
     local canAffordEndCosts = true
 
-    if not cooldownChannelConfigured then
+    if type(spellRankContext) ~= "table" then
+        canCast = false
+        reason = "spell-rank-context-unavailable"
+    elseif spellRankContext.eligible ~= true then
+        canCast = false
+        reason = "level-required"
+    elseif not cooldownChannelConfigured then
         canCast = false
         reason = "invalid-cooldown-channel"
     elseif not isBossCaster(activation.casterUnit)
@@ -1625,6 +1638,15 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
         dataset = activation.dataset,
         spell = activation.spell,
         spellRef = activation.spellRef,
+        spellRankContext = spellRankContext,
+        spellRank = spellRankContext and spellRankContext.rank or nil,
+        spellRankMultiplier = spellRankContext and spellRankContext.multiplier or 1,
+        casterLevel = spellRankContext and spellRankContext.casterLevel or nil,
+        learnLevel = spellRankContext and spellRankContext.learnLevel or nil,
+        rankInterval = spellRankContext and spellRankContext.rankInterval or nil,
+        nextRankLevel = spellRankContext and spellRankContext.nextRankLevel or nil,
+        useSpellRanks = spellRankContext and spellRankContext.useSpellRanks == true or false,
+        usesRanks = not spellRankContext or spellRankContext.usesRanks ~= false,
         policy = activation.policy,
         targetUnit = activation.targetUnit,
         targetGroups = activation.targetGroups or {},
@@ -1721,6 +1743,15 @@ function Spellcasting.ResolveSpellActivationState(self, spellRef, options)
         dataset = snapshot.dataset,
         spell = snapshot.spell,
         spellRef = snapshot.spellRef,
+        spellRankContext = snapshot.spellRankContext,
+        spellRank = snapshot.spellRank,
+        spellRankMultiplier = snapshot.spellRankMultiplier,
+        casterLevel = snapshot.casterLevel,
+        learnLevel = snapshot.learnLevel,
+        rankInterval = snapshot.rankInterval,
+        nextRankLevel = snapshot.nextRankLevel,
+        useSpellRanks = snapshot.useSpellRanks == true,
+        usesRanks = snapshot.usesRanks ~= false,
         policy = snapshot.policy,
         targetUnit = snapshot.targetUnit,
         targetGroups = snapshot.targetGroups or {},
@@ -1747,13 +1778,19 @@ function Spellcasting.ResolveSpellActivationState(self, spellRef, options)
 
     if options.includeText ~= false then
         state.cooldownText = buildCooldownText(state)
-        state.failureText = state.canCast and "" or buildFailureReason(
-            state.reason,
-            state.cooldownRemaining,
-            state.cooldownChannelName,
-            state.channelCooldownRemaining,
-            snapshot.conditionState and snapshot.conditionState.failureText or ""
-        )
+        if state.canCast then
+            state.failureText = ""
+        elseif state.reason == "level-required" then
+            state.failureText = ("Requires Level %d"):format(math.max(1, math.floor(tonumber(snapshot.learnLevel) or 1)))
+        else
+            state.failureText = buildFailureReason(
+                state.reason,
+                state.cooldownRemaining,
+                state.cooldownChannelName,
+                state.channelCooldownRemaining,
+                snapshot.conditionState and snapshot.conditionState.failureText or ""
+            )
+        end
     else
         state.cooldownText = nil
         state.failureText = nil

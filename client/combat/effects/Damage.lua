@@ -16,6 +16,7 @@ local Dependencies = Database.Dependecies or {}
 local Common = Addon.Utils.Common or {}
 local Dice = Addon.Utils.Dice or {}
 local Lookup = Addon.Utils.Lookup or {}
+local Spellcasting = Addon.Client.Spellcasting or {}
 local Normalization = Addon.Client.Combat.Normalization or {}
 local Debug = Addon.Debug
 local function getAuraManager()
@@ -1288,7 +1289,9 @@ function Combat:ResolveDamageAmount(context, effect)
     end
 
     local variance = Dice.RollVariance and Dice.RollVariance(context) or 1
-    return math.max(0, Common.Round((baseDamage + (weaponDamage * weaponDamageCoefficient) + statScaling) * variance))
+    local rawAmount = (baseDamage + (weaponDamage * weaponDamageCoefficient) + statScaling) * variance
+    rawAmount = Spellcasting.ApplySpellRankMultiplier(context, rawAmount) or 0
+    return math.max(0, Common.Round(rawAmount))
 end
 
 buildResolvedDamageResult = function(self, entry)

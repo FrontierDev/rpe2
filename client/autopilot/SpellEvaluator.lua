@@ -125,7 +125,12 @@ local function resolveWeaponAverageDamage(casterUnit, effect)
     return math.max(0, total)
 end
 
-function Evaluator.ResolveExpectedDamage(casterUnit, effect)
+local function applySpellRankMultiplier(rankContext, amount)
+    local spellcasting = getSpellcasting()
+    return spellcasting.ApplySpellRankMultiplier(rankContext, amount)
+end
+
+function Evaluator.ResolveExpectedDamage(casterUnit, effect, rankContext)
     if type(effect) ~= "table" or tostring(effect.type or "") ~= "damage" then
         return 0
     end
@@ -134,17 +139,18 @@ function Evaluator.ResolveExpectedDamage(casterUnit, effect)
     local weaponDamage = resolveWeaponAverageDamage(casterUnit, effect)
     local weaponCoefficient = tonumber(effect.weaponDamageCoefficient) or 1
     local statScaling = resolveStatScaling(casterUnit, effect)
-    return roundNonNegative(baseDamage + (weaponDamage * weaponCoefficient) + statScaling)
+    local amount = baseDamage + (weaponDamage * weaponCoefficient) + statScaling
+    return roundNonNegative(applySpellRankMultiplier(rankContext, amount))
 end
 
-function Evaluator.ResolveExpectedHealing(casterUnit, effect)
+function Evaluator.ResolveExpectedHealing(casterUnit, effect, rankContext)
     if type(effect) ~= "table" or tostring(effect.type or "") ~= "heal" then
         return 0
     end
 
     local baseHealing = tonumber(effect.baseHealing) or 0
     local statScaling = resolveStatScaling(casterUnit, effect)
-    return roundNonNegative(baseHealing + statScaling)
+    return roundNonNegative(applySpellRankMultiplier(rankContext, baseHealing + statScaling))
 end
 
 function Evaluator.ClassifySpell(spell)
@@ -205,6 +211,38 @@ local function resolveResourceBurden(casterUnit, spell, eventState)
     return total
 end
 
+function Evaluator.ResolveExpectedResourceEffects(casterUnit, targetUnit, spell, eventState, rankContext)
+    local combat = getCombat()
+    local resolved = {}
+    if type(combat) ~= "table" or type(combat.ResolveResourceEffectAmount) ~= "function" then
+        return resolved
+    end
+
+    local rankMultiplier = tonumber(type(rankContext) == "table"
+        and (rankContext.spellRankMultiplier or rankContext.multiplier)) or 1
+    for index = 1, #(type(spell) == "table" and spell.components or {}) do
+        local component = spell.components[index]
+        local effect = type(component) == "table" and component.effect or nil
+        if type(effect) == "table" and tostring(effect.type or "") == "resource" then
+            local targetPolicy = type(component.target) == "table" and component.target.type or nil
+            local effectTarget = targetPolicy == "caster" and casterUnit or (targetUnit or casterUnit)
+            local amount = combat:ResolveResourceEffectAmount({
+                client = Client,
+                eventState = eventState,
+                casterUnit = casterUnit,
+                targetUnit = effectTarget,
+                spellRankMultiplier = rankMultiplier,
+            }, effect)
+            resolved[#resolved + 1] = {
+                componentKey = component.key,
+                resourceRef = effect.resourceRef,
+                amount = tonumber(amount) or 0,
+            }
+        end
+    end
+    return resolved
+end
+
 local function resolveCooldownCommitment(spell)
     return normalizeNonNegative(spell and spell.cooldown)
 end
@@ -255,6 +293,26 @@ function Evaluator.BuildSpellProfile(activationSnapshot, options)
         return nil
     end
 
+    -- Activation snapshots are built by the shared Spell rank resolver. Keep
+    -- that cast snapshot when present; resolve it through the same helper for
+    -- callers that provide a spell profile without one.
+    local spellcasting = getSpellcasting()
+    local rankContext = activationSnapshot.spellRankContext
+    if type(rankContext) ~= "table"
+        and type(spellcasting) == "table"
+        and type(spellcasting.ResolveSpellRankContext) == "function"
+    then
+        rankContext = spellcasting.ResolveSpellRankContext(spell, {
+            casterUnit = casterUnit,
+            eventState = activationSnapshot.eventState,
+        })
+    end
+    rankContext = type(rankContext) == "table" and rankContext or {
+        rank = activationSnapshot.spellRank,
+        multiplier = activationSnapshot.spellRankMultiplier,
+    }
+    local spellRankMultiplier = tonumber(rankContext.spellRankMultiplier or rankContext.multiplier) or 1
+
     local classification = Evaluator.ClassifySpell(spell)
     local immediateDamage = 0
     local immediateHealing = 0
@@ -264,9 +322,9 @@ function Evaluator.BuildSpellProfile(activationSnapshot, options)
         local effect = type(component) == "table" and component.effect or nil
         local effectType = tostring(type(effect) == "table" and effect.type or "")
         if effectType == "damage" then
-            immediateDamage = immediateDamage + Evaluator.ResolveExpectedDamage(casterUnit, effect)
+            immediateDamage = immediateDamage + Evaluator.ResolveExpectedDamage(casterUnit, effect, rankContext)
         elseif effectType == "heal" then
-            immediateHealing = immediateHealing + Evaluator.ResolveExpectedHealing(casterUnit, effect)
+            immediateHealing = immediateHealing + Evaluator.ResolveExpectedHealing(casterUnit, effect, rankContext)
         end
     end
 
@@ -280,6 +338,10 @@ function Evaluator.BuildSpellProfile(activationSnapshot, options)
                 or activationSnapshot.spellDatasetId,
             spellDatasetId = activationSnapshot.spellDatasetId
                 or (activationSnapshot.dataset and activationSnapshot.dataset.id),
+            casterUnit = casterUnit,
+            eventState = activationSnapshot.eventState,
+            spellRank = rankContext.rank or activationSnapshot.spellRank,
+            spellRankMultiplier = spellRankMultiplier,
         }, options.auraDefinitionCache)
     end
 
@@ -312,6 +374,9 @@ function Evaluator.BuildSpellProfile(activationSnapshot, options)
     return {
         spellRef = tostring(activationSnapshot.spellRef or ""),
         spell = spell,
+        rankContext = rankContext,
+        spellRank = rankContext.rank or activationSnapshot.spellRank,
+        spellRankMultiplier = spellRankMultiplier,
         casterUnit = casterUnit,
         casterEventId = tonumber(casterUnit.eventID) or 0,
         eventState = activationSnapshot.eventState,
@@ -344,6 +409,13 @@ function Evaluator.BuildSpellProfile(activationSnapshot, options)
         controlStateByTargetEventId = options.controlStateByTargetEventId,
         activeCastsByEventId = options.activeCastsByEventId,
         resourceBurden = resolveResourceBurden(casterUnit, spell, activationSnapshot.eventState),
+        expectedResourceEffects = Evaluator.ResolveExpectedResourceEffects(
+            casterUnit,
+            activationSnapshot.targetUnit or casterUnit,
+            spell,
+            activationSnapshot.eventState,
+            rankContext
+        ),
         cooldownCommitment = resolveCooldownCommitment(spell),
         chargeCommitment = resolveChargeCommitment(activationSnapshot, spell),
     }
@@ -637,6 +709,14 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
         return nil
     end
 
+    local expectedResourceEffects = Evaluator.ResolveExpectedResourceEffects(
+        profile.casterUnit,
+        targetUnit,
+        profile.spell,
+        profile.eventState,
+        profile.rankContext
+    )
+
     local health = type(targetUnit) == "table"
         and Evaluator.ResolveProjectedHealth(targetUnit, profile.eventState, options.projectedHealingLedger)
         or nil
@@ -729,6 +809,7 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
         interruptRemainingTurns = interrupt.interruptRemainingTurns,
         preferredIntent = preferredIntent,
         resourceBurden = profile.resourceBurden,
+        expectedResourceEffects = expectedResourceEffects,
         cooldownCommitment = profile.cooldownCommitment,
         chargeCommitment = profile.chargeCommitment,
         targetHealth = health,

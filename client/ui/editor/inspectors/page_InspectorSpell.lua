@@ -7,6 +7,7 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
 local TooltipTemplate = Addon.Client and Addon.Client.Spellcasting and Addon.Client.Spellcasting.TooltipTemplate or nil
+local SpellClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Spell or nil
 
 local function hasStoredSpellTooltipTemplate(spell)
     if type(spell) ~= "table" then
@@ -172,6 +173,13 @@ function DataEditor:RefreshSpellInspectorPage()
         self.SpellInspectorSeedNPCSpellCheckbox:SetChecked(spell and spell.seedNPCSpell == true or false, true)
         self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorSeedNPCSpellCheckbox, hasSpell)
     end
+    local usesRanks = spell == nil
+        or (SpellClass and SpellClass.ResolveUsesRanks and SpellClass.ResolveUsesRanks(spell) ~= false)
+        or spell.usesRanks ~= false
+    if self.SpellInspectorUsesRanksCheckbox then
+        self.SpellInspectorUsesRanksCheckbox:SetChecked(usesRanks, true)
+        self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorUsesRanksCheckbox, hasSpell)
+    end
     if self.SpellInspectorLearnModeDropdown then
         self.SpellInspectorLearnModeDropdown:SetItems(self:GetSpellInspectorLearnModeItems())
         self.SpellInspectorLearnModeDropdown:SetSelectedValue(spell and spell.learnMode or "trainer", true)
@@ -180,6 +188,16 @@ function DataEditor:RefreshSpellInspectorPage()
     if self.SpellInspectorSpellbookCategoryInput then
         self.SpellInspectorSpellbookCategoryInput:SetText(spell and (spell.spellbookCategory or "") or "")
         self:SetSpellInspectorTextElementEnabled(self.SpellInspectorSpellbookCategoryInput, hasSpell)
+    end
+    if self.SpellInspectorLearnLevelInput then
+        local learnLevel = spell and SpellClass and SpellClass.ResolveLearnLevel and SpellClass.ResolveLearnLevel(spell) or 1
+        self.SpellInspectorLearnLevelInput:SetText(tostring(learnLevel))
+        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorLearnLevelInput, hasSpell)
+    end
+    if self.SpellInspectorRankIntervalInput then
+        local rankInterval = spell and SpellClass and SpellClass.ResolveRankInterval and SpellClass.ResolveRankInterval(spell) or 8
+        self.SpellInspectorRankIntervalInput:SetText(tostring(rankInterval))
+        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorRankIntervalInput, hasSpell and usesRanks)
     end
     if self.SpellInspectorTooltipTemplateStatusText then
         local hasStoredTemplate = hasStoredSpellTooltipTemplate(spell)
@@ -398,6 +416,11 @@ function DataEditor:RefreshSpellInspectorPage()
     if self.SpellInspectorResourceAmountModeDropdown then
         self.SpellInspectorResourceAmountModeDropdown:SetSelectedValue(effect.amountMode or "flat", true)
         self:SetSpellInspectorDropdownEnabled(self.SpellInspectorResourceAmountModeDropdown, isResource and component ~= nil)
+    end
+    if self.SpellInspectorResourceScaleWithRankCheckbox then
+        self.SpellInspectorResourceScaleWithRankCheckbox:SetChecked(effect.scaleWithRank == true, true)
+        self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorResourceScaleWithRankCheckbox, isResource and component ~= nil)
+        self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceScaleWithRankCheckbox, isResource)
     end
     if self.SpellInspectorSummonPetUnitDropdown then
         self.SpellInspectorSummonPetUnitDropdown:SetItems(self:BuildSpellInspectorUnitsAcrossDatasets())

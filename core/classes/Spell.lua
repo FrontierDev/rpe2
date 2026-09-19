@@ -13,6 +13,8 @@ local GUID_ALPHABET = "0123456789abcdef"
 local guidRandomSeeded = false
 local COOLDOWN_CHANNEL_MIN_ID = 1
 local COOLDOWN_CHANNEL_MAX_ID = 10
+local DEFAULT_LEARN_LEVEL = 1
+local DEFAULT_RANK_INTERVAL = 8
 
 local function ensureTable(value)
     if type(value) == "table" then
@@ -555,6 +557,7 @@ local function buildDefaultEffect(effectType)
             resourceRef = nil,
             amount = 0,
             amountMode = "flat",
+            scaleWithRank = false,
             targetEvents = {},
         }
     end
@@ -673,6 +676,9 @@ local function normalizeEffect(value)
     effect.resourceRef = normalizeRef(data.resourceRef)
     effect.amount = tonumber(data.amount) or 0
     effect.amountMode = normalizeResourceCostAmountMode(data.amountMode)
+    if effect.type == "resource" then
+        effect.scaleWithRank = normalizeBool(data.scaleWithRank, false)
+    end
     effect.targetEvents = normalizeEventList(data.targetEvents)
     return effect
 end
@@ -830,6 +836,72 @@ function Spell.GetCooldownChannelSource(spell)
     return source
 end
 
+function Spell.ResolveLearnLevel(spell)
+    local value = type(spell) == "table" and spell.learnLevel or nil
+    return normalizePositiveIntegerOrNil(value) or DEFAULT_LEARN_LEVEL
+end
+
+function Spell.ResolveUsesRanks(spell)
+    return not (type(spell) == "table" and spell.usesRanks == false)
+end
+
+function Spell.ResolveRankInterval(spell)
+    local value = type(spell) == "table" and spell.rankInterval or nil
+    return normalizePositiveIntegerOrNil(value) or DEFAULT_RANK_INTERVAL
+end
+
+function Spell.ResolveNextRankLevel(spell, rank)
+    if not Spell.ResolveUsesRanks(spell) then
+        return nil
+    end
+    local normalizedRank = normalizePositiveIntegerOrNil(rank)
+    if not normalizedRank then
+        return nil
+    end
+
+    return Spell.ResolveLearnLevel(spell) + (normalizedRank * Spell.ResolveRankInterval(spell))
+end
+
+function Spell.ResolveRankForLevel(spell, casterLevel)
+    local learnLevel = Spell.ResolveLearnLevel(spell)
+    local rankInterval = Spell.ResolveRankInterval(spell)
+    local usesRanks = Spell.ResolveUsesRanks(spell)
+    local level = tonumber(casterLevel)
+    if level == nil or level ~= level or level == math.huge or level == -math.huge then
+        level = DEFAULT_LEARN_LEVEL
+    end
+
+    if level < learnLevel then
+        return {
+            eligible = false,
+            usesRanks = usesRanks,
+            learnLevel = learnLevel,
+            rankInterval = rankInterval,
+        }
+    end
+
+    if not usesRanks then
+        return {
+            eligible = true,
+            usesRanks = false,
+            rank = 1,
+            learnLevel = learnLevel,
+            rankInterval = rankInterval,
+            nextRankLevel = nil,
+        }
+    end
+
+    local rank = 1 + math.floor((level - learnLevel) / rankInterval)
+    return {
+        eligible = true,
+        usesRanks = true,
+        rank = rank,
+        learnLevel = learnLevel,
+        rankInterval = rankInterval,
+        nextRankLevel = Spell.ResolveNextRankLevel(spell, rank),
+    }
+end
+
 function Spell:New(data)
     return setmetatable({
         id = nil,
@@ -840,6 +912,9 @@ function Spell:New(data)
         icon = "",
         seedNPCSpell = false,
         learnMode = "trainer",
+        learnLevel = DEFAULT_LEARN_LEVEL,
+        rankInterval = DEFAULT_RANK_INTERVAL,
+        usesRanks = true,
         spellbookCategory = "",
         castTime = 0,
         cooldown = 0,
@@ -892,6 +967,9 @@ function Spell:Merge(data)
     self.icon = ensureString(self.icon)
     self.seedNPCSpell = normalizeBool(self.seedNPCSpell, false)
     self.learnMode = normalizeLearnMode(self.learnMode)
+    self.learnLevel = normalizePositiveIntegerOrNil(self.learnLevel) or DEFAULT_LEARN_LEVEL
+    self.rankInterval = normalizePositiveIntegerOrNil(self.rankInterval) or DEFAULT_RANK_INTERVAL
+    self.usesRanks = normalizeBool(self.usesRanks, true)
     self.spellbookCategory = normalizeSpellbookCategory(self.spellbookCategory)
     self.castTime = tonumber(self.castTime) or 0
     self.cooldown = tonumber(self.cooldown) or 0
@@ -950,6 +1028,9 @@ function Spell:ToTable()
         icon = self.icon,
         seedNPCSpell = self.seedNPCSpell == true,
         learnMode = self.learnMode,
+        learnLevel = self.learnLevel,
+        rankInterval = self.rankInterval,
+        usesRanks = self.usesRanks == true,
         spellbookCategory = self.spellbookCategory,
         castTime = self.castTime,
         cooldown = self.cooldown,

@@ -9,6 +9,33 @@ local UI = Addon.UI or {}
 local Client = Addon.Client or {}
 local TooltipTemplate = Addon.Client and Addon.Client.Spellcasting and Addon.Client.Spellcasting.TooltipTemplate or nil
 local Debug = Addon.Debug or {}
+local SpellClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Spell or nil
+
+local function normalizePositiveInteger(value)
+    local numeric = tonumber(value)
+    if numeric and numeric > 0 and numeric < math.huge and math.floor(numeric) == numeric then
+        return numeric
+    end
+
+    return nil
+end
+
+local function commitLearningIntegerInput(editor, input, spellField, resolveValue, fallback)
+    if not editor or not input or type(resolveValue) ~= "function" then
+        return
+    end
+
+    local value = normalizePositiveInteger(input:GetText())
+    if value then
+        editor:CommitSelectedSpell(function(spell)
+            spell[spellField] = value
+        end)
+    end
+
+    local _, selectedSpell = editor:GetSelectedSpellAndDataset()
+    local normalizedValue = selectedSpell and resolveValue(selectedSpell) or fallback
+    input:SetText(tostring(normalizedValue or fallback))
+end
 
 local function hasStoredSpellTooltipTemplate(spell)
     if type(spell) ~= "table" then
@@ -458,6 +485,25 @@ function DataEditor:BuildSpellInspectorLearningPage(page)
     })
     UI.Utils.AnchorFill(root, page, 0, 0, 0, 0)
 
+    self.SpellInspectorUsesRanksCheckbox = self:CreateSpellInspectorCheckbox(
+        root:GetFrame(),
+        "RPEDataEditorSpellInspectorUsesRanksCheckbox",
+        "Uses Ranks",
+        true,
+        function(checked)
+            if self._refreshingSpellInspector then
+                return
+            end
+
+            self:CommitSelectedSpell(function(spell)
+                spell.usesRanks = checked == true
+            end)
+            self:RefreshSpellInspectorPage()
+        end
+    )
+    root:AddChild(self.SpellInspectorUsesRanksCheckbox)
+    attachMouseWheel(self.SpellInspectorUsesRanksCheckbox)
+
     root:AddChild(self:BuildSpellInspectorLabel(root:GetFrame(), "RPEDataEditorSpellInspectorLearnModeLabel", "Learn Mode"))
     self.SpellInspectorLearnModeDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorSpellInspectorLearnModeDropdown", {
         width = self.SpellInspectorFieldWidth,
@@ -494,14 +540,61 @@ function DataEditor:BuildSpellInspectorLearningPage(page)
     end)
     root:AddChild(self.SpellInspectorSpellbookCategoryInput)
 
+    root:AddChild(self:BuildSpellInspectorLabel(root:GetFrame(), "RPEDataEditorSpellInspectorLearnLevelLabel", "Learn Level"))
+    self.SpellInspectorLearnLevelInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorSpellInspectorLearnLevelInput", {
+        width = self.SpellInspectorFieldWidth,
+        height = self.SpellInspectorControlHeight,
+        text = "1",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local learnLevelEditBox = self.SpellInspectorLearnLevelInput.GetEditBox and self.SpellInspectorLearnLevelInput:GetEditBox() or nil
+    if learnLevelEditBox and learnLevelEditBox.SetNumeric then
+        learnLevelEditBox:SetNumeric(true)
+    end
+    local function commitLearnLevel()
+        commitLearningIntegerInput(self, self.SpellInspectorLearnLevelInput, "learnLevel",
+            SpellClass and SpellClass.ResolveLearnLevel or nil, 1)
+    end
+    self.SpellInspectorLearnLevelInput:SetScript("OnEnterPressed", commitLearnLevel)
+    self.SpellInspectorLearnLevelInput:SetScript("OnEditFocusLost", commitLearnLevel)
+    root:AddChild(self.SpellInspectorLearnLevelInput)
+
+    root:AddChild(self:BuildSpellInspectorLabel(root:GetFrame(), "RPEDataEditorSpellInspectorRankIntervalLabel", "Rank Interval"))
+    self.SpellInspectorRankIntervalInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorSpellInspectorRankIntervalInput", {
+        width = self.SpellInspectorFieldWidth,
+        height = self.SpellInspectorControlHeight,
+        text = "8",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local rankIntervalEditBox = self.SpellInspectorRankIntervalInput.GetEditBox and self.SpellInspectorRankIntervalInput:GetEditBox() or nil
+    if rankIntervalEditBox and rankIntervalEditBox.SetNumeric then
+        rankIntervalEditBox:SetNumeric(true)
+    end
+    local function commitRankInterval()
+        commitLearningIntegerInput(self, self.SpellInspectorRankIntervalInput, "rankInterval",
+            SpellClass and SpellClass.ResolveRankInterval or nil, 8)
+    end
+    self.SpellInspectorRankIntervalInput:SetScript("OnEnterPressed", commitRankInterval)
+    self.SpellInspectorRankIntervalInput:SetScript("OnEditFocusLost", commitRankInterval)
+    root:AddChild(self.SpellInspectorRankIntervalInput)
+
     self.SpellInspectorLearningHintText = UI.CreateText(root:GetFrame(), "RPEDataEditorSpellInspectorLearningHintText", "Always Learned spells are added to the effective spellbook automatically.", {
         width = self.SpellInspectorFieldWidth,
-        height = 28,
+        height = 38,
         justifyH = "LEFT",
         wordWrap = true,
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
     root:AddChild(self.SpellInspectorLearningHintText)
+
+    self.SpellInspectorRankProgressionHintText = UI.CreateText(root:GetFrame(), "RPEDataEditorSpellInspectorRankProgressionHintText", "Rank 1 is learned at Learn Level. A new rank is gained every Rank Interval levels.", {
+        width = self.SpellInspectorFieldWidth,
+        height = 38,
+        justifyH = "LEFT",
+        wordWrap = true,
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    root:AddChild(self.SpellInspectorRankProgressionHintText)
 end
 
 function DataEditor:GenerateSpellTooltipTemplate()

@@ -38,6 +38,7 @@ function Combat:ResolveHealingAmount(context, effect)
 
     local variance = Dice and Dice.RollVariance and Dice.RollVariance(context) or 1
     local amount = (baseHealing + statScaling) * variance
+    amount = Spellcasting.ApplySpellRankMultiplier(context, amount) or 0
     return math.max(0, Common.Round(amount))
 end
 

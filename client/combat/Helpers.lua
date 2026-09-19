@@ -12,6 +12,7 @@ local Registry = Addon.Internal.Registry or {}
 local Common = Addon.Utils.Common or {}
 local Dice = Addon.Utils.Dice or {}
 local Lookup = Addon.Utils.Lookup or {}
+local Spellcasting = Addon.Client.Spellcasting or {}
 local Normalization = Addon.Client.Combat.Normalization or {}
 local Debug = Addon.Debug
 local Database = Addon.Internal.Database or {}
@@ -951,8 +952,16 @@ end
 function Combat:ResolveResourceEffectAmount(context, effect)
     local amount = tonumber(type(effect) == "table" and effect.amount or nil) or 0
     local amountMode = tostring(type(effect) == "table" and effect.amountMode or "flat")
+    local auraEntry = type(context) == "table" and context.aura or nil
+    local rankContext = nil
+    if type(auraEntry) == "table" then
+        rankContext = { spellRankMultiplier = auraEntry.rankMultiplier }
+    elseif type(effect) == "table" and effect.scaleWithRank == true then
+        rankContext = context
+    end
+    local rankedAmount = rankContext and Spellcasting.ApplySpellRankMultiplier(rankContext, amount) or amount
     if amountMode == "flat" then
-        return amount
+        return rankedAmount
     end
 
     local targetUnit = type(context) == "table" and (context.targetUnit or context.target) or nil
@@ -985,8 +994,9 @@ function Combat:ResolveResourceEffectAmount(context, effect)
             or 0
     end
 
-    local resolvedAmount = math.ceil(resourceValue * math.abs(amount) / 100)
-    return amount < 0 and -resolvedAmount or resolvedAmount
+    -- Scale the authored percentage before preserving the existing ceiling conversion.
+    local resolvedAmount = math.ceil(resourceValue * math.abs(rankedAmount) / 100)
+    return rankedAmount < 0 and -resolvedAmount or resolvedAmount
 end
 
 function Combat:PreviewResourceDelta(unit, resourceRef, delta, options)
