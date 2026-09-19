@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 31,
+        version = 32,
     dataset = {
         achievements = {},
         auras = {
@@ -575,7 +575,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownChannel = 5,
                 learnMode = "always_learned",
                 learnLevel = 12,
-                usesRanks = true,
+                usesRanks = false,
                 rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Overpower",
@@ -3218,5 +3218,5 @@ Addon.Data.DefaultDatasets:Register({
         },
         units = {},
         weaponTypes = {}
-    },
+    }},
 })
