@@ -209,6 +209,13 @@ assertEqual(activeAura.powerLevel, 20, "flat Aura power remains additive")
 local scaledEffect = { baseAmount = 100, statScaling = { { statRef = "might", coefficient = 2 } } }
 assertEqual(AuraManager:ResolveEffectAmount({ aura = activeAura, casterUnit = caster }, scaledEffect, "baseAmount"), 156,
     "base, power, and stat scaling are multiplied by rank")
+local fixedEffect = {
+    baseAmount = 100,
+    statScaling = { { statRef = "might", coefficient = 2 } },
+    scaleWithRank = false,
+}
+assertEqual(AuraManager:ResolveEffectAmount({ aura = activeAura, casterUnit = caster }, fixedEffect, "baseAmount"), 130,
+    "Aura effects can opt out of the snapshotted rank multiplier")
 assertEqual(AuraManager:ResolveEffectAmount({ aura = { powerLevel = 20, rankMultiplier = 1, stacks = 1 }, casterUnit = caster }, scaledEffect, "baseAmount"), 130,
     "rank one preserves additive amount")
 activeAura.stacks = 2
