@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 30,
+    version = 31,
     dataset = {
         achievements = {},
         auras = {
@@ -827,7 +827,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownChannel = 1,
                 learnMode = "always_learned",
                 learnLevel = 1,
-                usesRanks = true,
+                usesRanks = false,
                 rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Fireball",
@@ -3895,5 +3895,5 @@ Addon.Data.DefaultDatasets:Register({
         },
         units = {},
         weaponTypes = {}
-    },
+    }},
 })
