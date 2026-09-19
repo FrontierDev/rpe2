@@ -306,8 +306,6 @@ client/character/profile/page_ProfileSpellbook.lua
 client/ui/tooltips/tooltip_Spell.lua
 ~~~
 
-Exact Profile UI filename should be confirmed from the current branch before editing.
-
 ### Changes
 
 #### 5.1 Effective always-learned spellbook
