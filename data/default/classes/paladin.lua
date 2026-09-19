@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 39,
+    version = 40,
     dataset = {
         achievements = {},
         auras = {
@@ -141,7 +141,7 @@ Addon.Data.DefaultDatasets:Register({
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 0.08,
+                                        coefficient = 0.1,
                                         statRef = "f82db71a:u7b49vs9"
                                     }
                                 },
@@ -447,13 +447,13 @@ Addon.Data.DefaultDatasets:Register({
                         effects = {
                             {
                                 amountMode = "flat",
-                                baseDamage = 6,
+                                baseDamage = 8,
                                 damageSchoolRefs = {
                                     "f82db71a:wwctys5s"
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 0.15,
+                                        coefficient = 0.2,
                                         statRef = "f82db71a:7t7xgzcx"
                                     }
                                 },
@@ -504,7 +504,7 @@ Addon.Data.DefaultDatasets:Register({
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 0.2,
+                                        coefficient = 0.3,
                                         statRef = "f82db71a:u7b49vs9"
                                     }
                                 },
