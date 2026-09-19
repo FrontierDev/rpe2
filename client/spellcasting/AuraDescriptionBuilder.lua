@@ -1634,7 +1634,7 @@ function AuraDescriptionBuilder:BuildTooltipSection(auraRef, options)
     end
 
     if auraDefinition.tooltipTemplate == true then
-        local resolvedDescriptionText, resolveError = self:ResolveTooltipTemplatePayload(auraDefinition, auraDefinition.tooltipTemplateData, {
+        local resolvedOptions = {
             auraRef = qualifiedAuraRef or auraRef,
             datasetId = dataset and dataset.id or (type(options) == "table" and options.datasetId or nil),
             dataset = dataset or (type(options) == "table" and options.dataset or nil),
@@ -1645,7 +1645,14 @@ function AuraDescriptionBuilder:BuildTooltipSection(auraRef, options)
             stacks = type(options) == "table" and options.stacks or nil,
             duration = type(options) == "table" and options.duration or nil,
             targetContext = type(options) == "table" and options.targetContext or nil,
-        })
+        }
+        local payload = type(TooltipTemplate.NormalizeAuraPayload) == "function"
+            and TooltipTemplate.NormalizeAuraPayload(auraDefinition.tooltipTemplateData)
+            or nil
+        if type(payload) ~= "table" then
+            payload = self:BuildTooltipTemplatePayload(auraDefinition, resolvedOptions)
+        end
+        local resolvedDescriptionText, resolveError = self:ResolveTooltipTemplatePayload(auraDefinition, payload, resolvedOptions)
         local descriptionText = trimText(resolvedDescriptionText)
         if descriptionText == "" then
             return {

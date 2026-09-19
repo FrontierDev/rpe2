@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 28,
+    version = 29,
     dataset = {
         achievements = {},
         auras = {
@@ -75,21 +75,6 @@ Addon.Data.DefaultDatasets:Register({
                 stackBehavior = "refresh_duration",
                 tags = {},
                 tooltipTemplate = true,
-                tooltipTemplateData = {
-                    bodyText = "Deals {AURA_DAMAGE_1} Fire damage each turn.",
-                    bodyTokens = {
-                        {
-                            applyMode = "damage_amount",
-                            baseField = "baseDamage",
-                            effectIndex = 1,
-                            key = "AURA_DAMAGE_1",
-                            tokenType = "aura_amount"
-                        }
-                    },
-                    stackingText = "Refreshes its duration when reapplied.",
-                    stackingTokens = {},
-                    version = 1
-                }
             },
             {
                 description = "",
@@ -112,13 +97,6 @@ Addon.Data.DefaultDatasets:Register({
                 stackBehavior = "refresh_duration",
                 tags = {},
                 tooltipTemplate = true,
-                tooltipTemplateData = {
-                    bodyText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
-                    bodyTokens = {},
-                    stackingText = "",
-                    stackingTokens = {},
-                    version = 1
-                }
             },
             {
                 description = "",
