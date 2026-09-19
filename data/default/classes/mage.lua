@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 27,
+    version = 28,
     dataset = {
         achievements = {},
         auras = {
@@ -68,7 +68,7 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 events = {},
-                icon = "interface/icons/spell_fire_fireball02.blp",
+                icon = "interface/icons/spell_fire_incinerate.blp",
                 id = "ignite01",
                 maxStacks = 1,
                 name = "Ignite",
@@ -87,6 +87,35 @@ Addon.Data.DefaultDatasets:Register({
                         }
                     },
                     stackingText = "Refreshes its duration when reapplied.",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 1,
+                effects = {
+                    {
+                        cancelOnDamage = false,
+                        forceAutoHitAgainstTarget = true,
+                        movementRangeOverride = 0,
+                        preventCasting = true,
+                        statScaling = {},
+                        type = "control"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_fire_meteorstorm.blp",
+                id = "impact01",
+                maxStacks = 1,
+                name = "Impact",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                    bodyTokens = {},
+                    stackingText = "",
                     stackingTokens = {},
                     version = 1
                 }
@@ -728,7 +757,8 @@ Addon.Data.DefaultDatasets:Register({
                     "d7c874c4:misbarge",
                     "d7c874c4:arcconc1",
                     "d7c874c4:mastelms",
-                    "d7c874c4:ignite20"
+                    "d7c874c4:ignite20",
+                    "d7c874c4:impact05"
                 }
             }
         },
@@ -3768,10 +3798,40 @@ Addon.Data.DefaultDatasets:Register({
                         triggerTarget = "event_other"
                     }
                 },
-                icon = "interface/icons/spell_fire_fireball02.blp",
+                icon = "interface/icons/spell_fire_incinerate.blp",
                 id = "ignite20",
                 isEnvironmental = false,
                 name = "Ignite",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Fire",
+                conditions = {},
+                description = "",
+                events = {
+                    {
+                        chance = 5,
+                        combatEventId = "on_damage_type",
+                        damageSchoolRef = "f82db71a:esjguw6d",
+                        effects = {
+                            {
+                                auraRef = "d7c874c4:impact01",
+                                basePower = 0,
+                                duration = 1,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "event_other"
+                    }
+                },
+                icon = "interface/icons/spell_fire_meteorstorm.blp",
+                id = "impact05",
+                isEnvironmental = false,
+                name = "Impact",
                 skillBonuses = {},
                 statBonuses = {},
                 unlockLevel = 1
