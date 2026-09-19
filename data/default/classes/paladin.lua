@@ -1,10 +1,194 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 34,
+    version = 35,
     dataset = {
         achievements = {},
         auras = {
+            {
+                description = "",
+                duration = 3,
+                effects = {
+                    {
+                        baseAmount = 10,
+                        operation = "percent",
+                        statRef = "f82db71a:u7b49vs9",
+                        statScaling = {},
+                        type = "stat"
+                    },
+                    {
+                        baseAmount = -10,
+                        operation = "flat",
+                        statRef = "f82db71a:gj9wxb0x",
+                        statScaling = {},
+                        type = "stat"
+                    },
+                    {
+                        baseAmount = 5,
+                        operation = "flat",
+                        statRef = "f82db71a:jslmczbi",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_holy_holysmite.blp",
+                id = "sotc9a2f",
+                maxStacks = 1,
+                name = "Seal of the Crusader",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Melee Attack Power by 10%. Reduces Damage Done by 10%. Increases Melee Crit. Chance by 5%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 5,
+                effects = {
+                    {
+                        baseAmount = -100,
+                        operation = "flat",
+                        statRef = "f82db71a:hlyrsstn",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_holy_holysmite.blp",
+                id = "jotc5d7e",
+                maxStacks = 1,
+                name = "Judgement of the Crusader",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Reduces Holy Resistance by {AURA_STAT_1}.",
+                    bodyTokens = {
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 1,
+                            key = "AURA_STAT_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 2,
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseAbsorption = 0,
+                        damageSchoolRefs = {},
+                        statScaling = {
+                            {
+                                coefficient = 8,
+                                statRef = "f82db71a:ygjno50i"
+                            }
+                        },
+                        type = "absorb"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_holy_sealoffury.blp",
+                id = "fbar2e8d",
+                maxStacks = 1,
+                name = "Fury Barrier",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Absorbs {AURA_ABSORB_1} damage.",
+                    bodyTokens = {
+                        {
+                            applyMode = "absorb_amount",
+                            baseField = "baseAbsorption",
+                            effectIndex = 1,
+                            key = "AURA_ABSORB_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 3,
+                effects = {},
+                events = {
+                    {
+                        chance = 100,
+                        combatEventId = "on_auto_attack_hit",
+                        effects = {
+                            {
+                                amountMode = "flat",
+                                baseDamage = 0,
+                                damageSchoolRefs = {
+                                    "f82db71a:wwctys5s"
+                                },
+                                statScaling = {
+                                    {
+                                        coefficient = 0.1,
+                                        statRef = "f82db71a:u7b49vs9"
+                                    }
+                                },
+                                type = "damage"
+                            }
+                        },
+                        triggerTarget = "event_other"
+                    },
+                    {
+                        chance = 100,
+                        combatEventId = "on_melee_hit",
+                        effects = {
+                            {
+                                auraRef = "b0211ab3:fbar2e8d",
+                                basePower = 0,
+                                duration = 2,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "aura_caster"
+                    }
+                },
+                icon = "interface/icons/spell_holy_sealoffury.blp",
+                id = "sfry7c1b",
+                maxStacks = 1,
+                name = "Seal of Fury",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_1} Holy damage. When the affected unit hits with a melee attack, apply Fury Barrier to yourself for 2 turns.",
+                    bodyTokens = {
+                        {
+                            applyMode = "damage_amount",
+                            baseField = "baseDamage",
+                            effectIndex = 1,
+                            eventIndex = 1,
+                            key = "AURA_EVENT_DAMAGE_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
             {
                 description = "",
                 duration = 3,
@@ -1538,6 +1722,721 @@ Addon.Data.DefaultDatasets:Register({
         resources = {},
         skills = {},
         spells = {
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 5,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:sotc9a2f",
+                            basePower = 0,
+                            duration = 3,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "csa1f2b3",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires main hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                cooldown = 1,
+                cooldownGroup = "seal",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_holysmite.blp",
+                id = "scsp4a6c",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Seal of the Crusader",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Retribution",
+                tags = {
+                    "seal"
+                },
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:sotc9a2f",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Increases Melee Attack Power by 10%. Reduces Damage Done by 10%. Increases Melee Crit. Chance by 5%.",
+                            duration = 3,
+                            icon = "interface/icons/spell_holy_holysmite.blp",
+                            nameText = "Seal of the Crusader",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Seal of the Crusader to yourself for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 5,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_spell_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:sotc9a2f",
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "remove_aura"
+                        },
+                        key = "jca4d5e6",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    },
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:jotc5d7e",
+                            basePower = 0,
+                            duration = 5,
+                            stacks = 1,
+                            targetEvents = {
+                                "on_spell_taken"
+                            },
+                            type = "apply_aura"
+                        },
+                        key = "jca7f8a9",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        auraRef = "b0211ab3:sotc9a2f",
+                        invert = false,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Requires Seal of the Crusader",
+                        type = "aura_requirement",
+                        unit = "caster"
+                    }
+                },
+                cooldown = 3,
+                cooldownGroup = "judgement",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_righteousfury.blp",
+                id = "jcsp8f3a",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Judgement of the Crusader",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Retribution",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:jotc5d7e",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Reduces Holy Resistance by {AURA_STAT_1}.",
+                            duration = 5,
+                            icon = "interface/icons/spell_holy_holysmite.blp",
+                            nameText = "Judgement of the Crusader",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "stat_amount",
+                                    baseField = "baseAmount",
+                                    effectIndex = 1,
+                                    key = "AURA_STAT_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Judgement of the Crusader to an enemy for 5 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 5,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:sfry7c1b",
+                            basePower = 0,
+                            duration = 3,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "sfa1b2c3",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires main hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    },
+                    {
+                        invert = false,
+                        requiresShield = true,
+                        showOnTooltip = true,
+                        slotKey = "offhand",
+                        tooltipTextOverride = "Requires Shield",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                cooldown = 1,
+                cooldownGroup = "seal",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_sealoffury.blp",
+                id = "sfsp6b2e",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Seal of Fury",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {
+                    "seal"
+                },
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:sfry7c1b",
+                            datasetId = "b0211ab3",
+                            descriptionText = "When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_1} Holy damage. When the affected unit hits with a melee attack, apply Fury Barrier to yourself for 2 turns.",
+                            duration = 3,
+                            icon = "interface/icons/spell_holy_sealoffury.blp",
+                            nameText = "Seal of Fury",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "damage_amount",
+                                    baseField = "baseDamage",
+                                    effectIndex = 1,
+                                    eventIndex = 1,
+                                    key = "AURA_EVENT_DAMAGE_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Seal of Fury to yourself for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 5,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_spell_hit",
+                    "on_critical_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false,
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseDamage = 88.4,
+                            damageSchoolRefs = {
+                                "f82db71a:wwctys5s"
+                            },
+                            damageType = "spell",
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.3094,
+                                    statRef = "f82db71a:u7b49vs9"
+                                }
+                            },
+                            targetEvents = {
+                                "on_spell_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 2,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 0,
+                            weaponDamageMode = "none"
+                        },
+                        key = "jfa4d5e6",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    },
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:sfry7c1b",
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "remove_aura"
+                        },
+                        key = "jfa7b8c9",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    },
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            duration = 1,
+                            targetEvents = {},
+                            type = "taunt"
+                        },
+                        key = "jfad1e2f",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        auraRef = "b0211ab3:sfry7c1b",
+                        invert = false,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Requires Seal of Fury",
+                        type = "aura_requirement",
+                        unit = "caster"
+                    }
+                },
+                cooldown = 3,
+                cooldownGroup = "judgement",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_righteousfury.blp",
+                id = "jfsp9d4c",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Judgement of Fury",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Deal {DAMAGE_1} Holy damage to an enemy. Taunt an enemy for 1 turn. Generates a high amount of threat.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 15,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:q2ktkztt"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_heal",
+                    "on_critical_heal"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseHealing = 65,
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.39,
+                                    statRef = "f82db71a:hj6d4kvy"
+                                }
+                            },
+                            targetEvents = {
+                                "on_heal_taken"
+                            },
+                            type = "heal",
+                            usesProjectile = false
+                        },
+                        key = "lma3b4c5",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = true,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_paladin_lightofthemartyr.blp",
+                id = "lotm7e2a",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Light of the Martyr",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 15,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:q2ktkztt"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Holy",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Heal an ally for {HEAL_1} health.",
+                    tokens = {
+                        {
+                            applyMode = "heal_range",
+                            componentIndex = 1,
+                            key = "HEAL_1",
+                            tokenType = "spell_heal_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 12,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_heal",
+                    "on_critical_heal"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseHealing = 0,
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 10,
+                                    statRef = "f82db71a:ygjno50i"
+                                }
+                            },
+                            targetEvents = {
+                                "on_heal_taken"
+                            },
+                            type = "heal",
+                            usesProjectile = false
+                        },
+                        key = "loh6d7e8",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_layonhands.blp",
+                id = "lohs3c8f",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Lay on Hands",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 12,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Holy",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Heal an ally for {HEAL_1} health.",
+                    tokens = {
+                        {
+                            applyMode = "heal_range",
+                            componentIndex = 1,
+                            key = "HEAL_1",
+                            tokenType = "spell_heal_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
             {
                 _resourceCostsByPhase = {
                     on_cast_end = {
