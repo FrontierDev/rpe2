@@ -151,12 +151,21 @@ The active Ruleset defines:
 spell_rank_effect_gain_percent = 5
 ```
 
-For resolved rank `R`:
+The user-facing Spell rank remains relative to the Spell's own `learnLevel`:
 
 ```text
-bonusRanks = max(0, R - 1)
-rankMultiplier = 1 + bonusRanks * 0.05
+displayRank = 1 + floor((level - learnLevel) / rankInterval)
 ```
+
+Effect scaling uses the derived hidden scaling offset:
+
+```text
+scalingRankOffset = floor((learnLevel - 1) / rankInterval)
+scalingRank = displayRank + scalingRankOffset
+rankMultiplier = 1 + max(0, scalingRank - 1) * 0.05
+```
+
+The hidden `scalingRank` is never shown to the player.
 
 The increase is **linear**, not compounded.
 
@@ -247,7 +256,10 @@ Rank scaling must not automatically scale:
 - projectile speed;
 - taunt behaviour;
 - interrupt behaviour;
-- arbitrary numeric fields merely because they are numeric.
+- arbitrary numeric fields merely because they are numeric;
+- fixed utility magnitudes on hybrid Spells unless that specific effect is intentionally rank-scaled.
+
+For hybrid Spells, ranking the Spell's damage must not implicitly increase unrelated fixed utility. Examples include Mortal Strike's healing-reduction Aura and Holy Shield's Block Chance bonus.
 
 ---
 
@@ -634,6 +646,48 @@ These Spells are item/on-use effects and therefore remain unranked.
 | Ultra-Flash Shadow Reflector | 1 | false | 8 |
 | Arcane Bomb | 1 | false | 8 |
 
+
+## 12.10 High-cost, special-resource and hybrid damage review
+
+The following Spells were reviewed separately because their damage budget is affected by high resource cost, special-resource expenditure, multi-targeting, repeated procs/ticks, or fixed utility carried by the same Spell.
+
+The formulas below are the current authored values before downstream mitigation/critical handling and before the Spell-rank multiplier.
+
+| Spell / effect | Cost / constraint | Current damage component | Decision |
+|---|---|---|---|
+| Bladestorm | 30 Rage; 10-turn cooldown; up to 4 marked targets | `93.656 + 0.4625 × Melee Attack Power + 0.925 × Main-Hand damage` per target | **Keep.** It is materially stronger than Whirlwind, but the 10-turn cooldown and 30-Rage cost justify that premium. |
+| Mortal Strike | 30 Rage; 4-turn cooldown; applies −50% Healing Received | `92.438 + 0.4314 × Melee Attack Power + 1.2325 × Main-Hand damage` | **Keep the damage.** The −50% Healing Received Aura is fixed utility and must not become stronger merely because the damage ranks. |
+| Seal of Fury proc | Seal costs 5% Base Mana; proc occurs on basic attacks | `0 + 0.10 × Melee Attack Power` per proc | **Keep.** This matches Seal of Command's proc damage budget. The damage proc should rank; the separate Righteous Indignation absorb must not be increased accidentally just because the proc damage ranks. |
+| Holy Shield proc | 5% Base Mana; 3-turn Aura; +30 Block Chance; proc on successful block | `96 + 0.20 × Spell Power` per successful block | **Do not change the number yet.** The balance risk is repeated proc frequency, not the one-shot coefficient. Fixed +30 Block Chance must remain fixed when the proc damage ranks. |
+| Templar's Verdict | 3 Holy Power | `168.75 + 0.7875 × Melee Attack Power + 2.25 × Main-Hand damage` | **Keep.** It is the single-target Holy-Power finisher. |
+| Divine Storm | 3 Holy Power; up to 3 marked targets | `101.25 + 0.4725 × Melee Attack Power + 1.35 × Main-Hand damage` per target | **Keep.** Each target receives exactly 60% of Templar's Verdict's authored damage coefficients, giving a clear single-target/AoE trade. |
+| Eviscerate | 15 Energy + 5 Combo Points | `225 + 0.7875 × Melee Attack Power` | **Keep.** The high immediate damage is appropriate for a full Combo Point finisher. |
+| Rupture | 15 Energy + 5 Combo Points; 5-turn DoT | `20.8 + 0.364 × Melee Attack Power` per turn for 5 turns | **Keep for now.** It provides the sustained-damage alternative to Eviscerate; periodic coefficient semantics should be reviewed globally rather than changing Rupture alone. |
+| Ambush | 60 Energy; requires Stealth and a dagger; generates 2 Combo Points | `143.438 + 0.6694 × Melee Attack Power + 1.9125 × Main-Hand damage` | **Keep.** Its damage coefficients are exactly 2.25× Sinister Strike's, with meaningful positional/resource gating. |
+| Pyroblast | 31.8% Base Mana; direct hit plus 5-turn DoT | Direct: `258.188 + 1.3388 × Spell Power`; DoT: `17.68 + 0.442 × Spell Power` per turn | **Keep the direct hit. Review the DoT convention globally.** The DoT coefficient is applied on every tick, so the full five-turn spell has much larger total Spell Power scaling than the direct component alone suggests. Do not alter Pyroblast in isolation while other DoTs use the same per-turn convention. |
+| Arcane Barrage | 4 Arcane Charges | `191.25 + 0.9563 × Spell Power` | **Keep.** It is a true special-resource spender and also enables Arcane Missiles. |
+| Arcane Surge | 100% Max Mana; 10-turn cooldown; restores 8% Max Mana per turn for 10 turns | `353.813 + 1.7691 × Spell Power` | **Keep.** The up-front cost is extreme, but up to 80% Max Mana is returned over the Aura duration. |
+| Shield Slam | 30 Rage; requires shield; threat coefficient 2 | `104 + 0.364 × Melee Attack Power` | **Keep.** A substantial part of the 30-Rage budget is the doubled threat generation rather than raw damage. |
+| Shadow Word: Death | 13.6% Base Mana; target must be at or below 20% health | `225 + 1.125 × Spell Power` | **Keep.** The execute gate justifies the higher damage relative to ordinary Priest nukes. |
+
+Other relatively expensive damage Spells do not presently require special treatment:
+
+- `Frost Nova` and `Cone of Cold`: their cost pays for control/AoE utility as well as damage.
+- `Holy Wrath`: the mana premium is tied to multi-target damage.
+- `Whirlwind`: already sits below Bladestorm in per-target damage and has the shorter cooldown.
+- ordinary builders that generate Holy Power, Combo Points or Arcane Charges are not treated as special-resource spenders simply because they create a special resource.
+
+### Hybrid-Aura implementation requirement
+
+The intended data semantics are:
+
+- rank-scaled damage/healing can increase;
+- fixed control/utility magnitudes remain fixed unless explicitly opted in.
+
+The current Aura runtime stores one `rankMultiplier` on the entire applied Aura and `AuraManager:ResolveEffectAmount()` multiplies resolved Aura effect amounts by it. That is too coarse for hybrid Auras such as Mortal Strike and Holy Shield.
+
+Do **not** solve this by making those whole Spells unranked, because their damage is intended to rank. The implementation needs effect-level control (or an equivalent explicit exclusion) before hybrid Aura ranking is fully correct.
+
 ## 12.9 Default datasets with no Spell records
 
 The following current default datasets contain no Spell records requiring progression fields:
@@ -821,8 +875,10 @@ Default/current shipped rank interval: 8 levels
 Ranked Spell progression is:
 
 ```text
-rank = 1 + floor((level - learnLevel) / rankInterval)
-multiplier = 1 + (rank - 1) * 0.05
+displayRank = 1 + floor((level - learnLevel) / rankInterval)
+scalingRankOffset = floor((learnLevel - 1) / rankInterval)
+scalingRank = displayRank + scalingRankOffset
+multiplier = 1 + (scalingRank - 1) * 0.05
 ```
 
 The default datasets must explicitly author each Spell's unlock level, rank eligibility, and interval according to this document.
