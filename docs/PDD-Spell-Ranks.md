@@ -319,8 +319,18 @@ Do not use ranks for static utility/control/action-economy behaviour such as:
 - taunts;
 - pure crowd control;
 - fixed major cooldown percentages;
+- **group-wide buffs in the Paladin, Mage, Warrior and Priest datasets**;
 - basic weapon/pet actions already scaling through weapons/stats;
 - item-use effects whose power is authored by the item Spell.
+
+The current default group buffs treated as unranked are:
+
+- Mage: `Arcane Intellect`;
+- Paladin: `Blessing of Might`, `Blessing of Kings`, `Blessing of Sanctuary`, `Blessing of Wisdom`, `Blessing of Light`, `Blessing of Salvation`;
+- Priest: `Divine Spirit`, `Prayer of Fortitude`, `Prayer of Shadow Protection`;
+- Warrior: `Battle Shout`, `Commanding Shout`.
+
+Additionally, `Judgement of Wisdom` and `Mage Armor` are unranked, while `Seal of Fury` is ranked.
 
 A Spell with both scalable damage/healing and a fixed Resource component can have `usesRanks = true` while the Resource component remains `scaleWithRank = false`.
 
@@ -370,7 +380,7 @@ File: `data/default/classes/mage.lua`
 | Arcane Surge | 60 | true | 8 |
 | Evocation | 20 | false | 8 |
 | Counterspell | 24 | false | 8 |
-| Arcane Intellect | 1 | true | 8 |
+| Arcane Intellect | 1 | false | 8 |
 | Frostbolt | 4 | true | 8 |
 | Frost Nova | 10 | true | 8 |
 | Deep Freeze | 60 | false | 8 |
@@ -379,7 +389,7 @@ File: `data/default/classes/mage.lua`
 | Glacial Spike | 58 | true | 8 |
 | Ice Armor | 30 | true | 8 |
 | Molten Armor | 50 | true | 8 |
-| Mage Armor | 34 | true | 8 |
+| Mage Armor | 34 | false | 8 |
 | Polymorph | 8 | false | 8 |
 
 Late-game RPE mappings are deliberately kept within the level-60 cap:
@@ -398,16 +408,16 @@ File: `data/default/classes/paladin.lua`
 |---|---:|:---:|---:|
 | Seal of the Crusader | 6 | true | 8 |
 | Judgement of the Crusader | 6 | true | 8 |
-| Seal of Fury | 16 | false | 8 |
+| Seal of Fury | 16 | true | 8 |
 | Judgement of Fury | 16 | true | 8 |
 | Light of the Martyr | 20 | true | 8 |
 | Lay on Hands | 10 | true | 8 |
 | Consecration | 20 | true | 8 |
-| Blessing of Might | 4 | true | 8 |
+| Blessing of Might | 4 | false | 8 |
 | Blessing of Kings | 20 | false | 8 |
 | Blessing of Sanctuary | 30 | false | 8 |
-| Blessing of Wisdom | 14 | true | 8 |
-| Blessing of Light | 40 | true | 8 |
+| Blessing of Wisdom | 14 | false | 8 |
+| Blessing of Light | 40 | false | 8 |
 | Blessing of Salvation | 26 | false | 8 |
 | Judgement of the Righteous | 4 | true | 8 |
 | Seal of Righteousness | 1 | true | 8 |
@@ -415,7 +425,7 @@ File: `data/default/classes/paladin.lua`
 | Seal of Command | 20 | true | 8 |
 | Judgement of the Light | 30 | true | 8 |
 | Seal of Light | 30 | true | 8 |
-| Judgement of Wisdom | 38 | true | 8 |
+| Judgement of Wisdom | 38 | false | 8 |
 | Seal of Wisdom | 38 | true | 8 |
 | Crusader Strike | 50 | true | 8 |
 | Templar's Verdict | 10 | true | 8 |
@@ -466,9 +476,9 @@ File: `data/default/classes/priest.lua`
 | Smite | 1 | true | 8 |
 | Holy Fire | 20 | true | 8 |
 | Pain Suppression | 50 | false | 8 |
-| Divine Spirit | 30 | true | 8 |
-| Prayer of Fortitude | 48 | true | 8 |
-| Prayer of Shadow Protection | 56 | true | 8 |
+| Divine Spirit | 30 | false | 8 |
+| Prayer of Fortitude | 48 | false | 8 |
+| Prayer of Shadow Protection | 56 | false | 8 |
 | Psychic Scream | 14 | false | 8 |
 | Psychic Horror | 50 | false | 8 |
 | Shadow Word: Pain | 4 | true | 8 |
@@ -535,8 +545,8 @@ File: `data/default/classes/warrior.lua`
 | Shield Block | 16 | false | 8 |
 | Bloodthirst | 40 | true | 8 |
 | Revenge | 14 | true | 8 |
-| Battle Shout | 1 | true | 8 |
-| Commanding Shout | 54 | true | 8 |
+| Battle Shout | 1 | false | 8 |
+| Commanding Shout | 54 | false | 8 |
 | Shield Wall | 28 | false | 8 |
 | Intervene | 56 | false | 8 |
 
