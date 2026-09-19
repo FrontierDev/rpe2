@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 22,
+    version = 23,
     dataset = {
         achievements = {},
         auras = {
@@ -668,7 +668,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownChannel = 1,
                 learnMode = "always_learned",
                 learnLevel = 16,
-                usesRanks = true,
+                usesRanks = false,
                 rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Heal",
@@ -2938,5 +2938,5 @@ Addon.Data.DefaultDatasets:Register({
         },
         units = {},
         weaponTypes = {}
-    },
+    }}},
 })
