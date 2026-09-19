@@ -134,13 +134,13 @@ Under the Character category, add:
     key = "spell_rank_effect_gain_percent",
     label = "Spell Rank Effect Gain (%)",
     type = "text",
-    default = "10",
+    default = "5",
 }
 ~~~
 
 Normalize the percentage to a finite non-negative number at the consuming resolver boundary.
 
-The 10% default is balance data and should remain configurable.
+The 5% default is balance data and should remain configurable.
 
 #### 3.4 Deterministic tests
 
@@ -868,13 +868,13 @@ learn=5 interval=8 level=13 -> Rank 2
 
 ### Multiplier
 
-At 10%:
+At 5%:
 
 ~~~text
 Rank 1 -> 1.00
-Rank 2 -> 1.10
-Rank 3 -> 1.20
-Rank 8 -> 1.70
+Rank 2 -> 1.05
+Rank 3 -> 1.10
+Rank 8 -> 1.35
 ~~~
 
 At ranks disabled:
@@ -886,11 +886,11 @@ any Rank -> effect multiplier 1.00
 ### Direct effect examples
 
 ~~~text
-100 raw damage at Rank 3 / 10% -> 120 before downstream mitigation
-100 raw heal at Rank 3 / 10%   -> 120 before crit/healing modifiers
-+50 resource at Rank 2 / 10%   -> +55
--50 resource at Rank 2 / 10%   -> -55
-10% resource effect at Rank 2  -> 11%
+100 raw damage at Rank 3 / 5% -> 110 before downstream mitigation
+100 raw heal at Rank 3 / 5%   -> 110 before crit/healing modifiers
++50 direct resource at Rank 2 with scaleWithRank=true -> +52.5
+-50 direct resource at Rank 2 with scaleWithRank=true -> -52.5
+10% direct resource effect at Rank 2 with scaleWithRank=true -> 10.5%
 ~~~
 
 ### Exclusion tests
@@ -962,7 +962,7 @@ Spell {
 ~~~lua
 character = {
     use_spell_ranks = true,
-    spell_rank_effect_gain_percent = 10,
+    spell_rank_effect_gain_percent = 5,
 }
 ~~~
 
