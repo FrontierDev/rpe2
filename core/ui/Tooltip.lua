@@ -524,14 +524,29 @@ function Tooltip:ShowGameTooltip(owner, spec, resolvedSpec)
 
     local title = spec.title or spec.header or ""
     local titleColor = spec.titleColor or {}
+    local titleRight = tostring(spec.titleRight or "")
+    local titleRightColor = spec.titleRightColor or {}
     if title ~= "" then
-        tooltip:AddLine(
-            title,
-            titleColor.r or titleColor[1] or 1,
-            titleColor.g or titleColor[2] or 1,
-            titleColor.b or titleColor[3] or 1,
-            true
-        )
+        if titleRight ~= "" and tooltip.AddDoubleLine then
+            tooltip:AddDoubleLine(
+                title,
+                titleRight,
+                titleColor.r or titleColor[1] or 1,
+                titleColor.g or titleColor[2] or 1,
+                titleColor.b or titleColor[3] or 1,
+                titleRightColor.r or titleRightColor[1] or 0.8,
+                titleRightColor.g or titleRightColor[2] or 0.8,
+                titleRightColor.b or titleRightColor[3] or 0.8
+            )
+        else
+            tooltip:AddLine(
+                title,
+                titleColor.r or titleColor[1] or 1,
+                titleColor.g or titleColor[2] or 1,
+                titleColor.b or titleColor[3] or 1,
+                true
+            )
+        end
     end
 
     if spec.lines then

@@ -502,7 +502,6 @@ function DataEditor:BuildSpellInspectorLearningPage(page)
         end
     )
     root:AddChild(self.SpellInspectorUsesRanksCheckbox)
-    attachMouseWheel(self.SpellInspectorUsesRanksCheckbox)
 
     root:AddChild(self:BuildSpellInspectorLabel(root:GetFrame(), "RPEDataEditorSpellInspectorLearnModeLabel", "Learn Mode"))
     self.SpellInspectorLearnModeDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorSpellInspectorLearnModeDropdown", {

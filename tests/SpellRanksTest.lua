@@ -88,6 +88,20 @@ assertRank(laterLearnSpell, 12, true, 1, 13)
 assertRank(laterLearnSpell, 13, true, 2, 21)
 assertEqual(Spell.ResolveNextRankLevel(laterLearnSpell, 3), 37, "resolve next rank level")
 
+local levelOneOffsetSpell = Spell:New({ learnLevel = 1, rankInterval = 8 })
+assertEqual(Spell.ResolveRankScalingOffset(levelOneOffsetSpell), 0, "level-one Spell rank scaling offset")
+assertEqual(Spell.ResolveRankScalingIntercept(levelOneOffsetSpell), 1, "level-one Spell rank scaling intercept")
+local levelThirtyOffsetSpell = Spell:New({ learnLevel = 30, rankInterval = 8 })
+assertEqual(Spell.ResolveRankScalingOffset(levelThirtyOffsetSpell), 3, "level-thirty Spell rank scaling offset")
+assertEqual(Spell.ResolveRankScalingIntercept(levelThirtyOffsetSpell), 6, "level-thirty Spell rank scaling intercept")
+local levelTwentyFiveOffsetSpell = Spell:New({ learnLevel = 25, rankInterval = 6 })
+assertEqual(Spell.ResolveRankScalingOffset(levelTwentyFiveOffsetSpell), 4, "level-twenty-five Spell rank scaling offset")
+assertEqual(Spell.ResolveRankScalingIntercept(levelTwentyFiveOffsetSpell), 1, "level-twenty-five Spell rank scaling intercept")
+assertEqual(Spell.ResolveRankScalingIntercept(Spell:New({ learnLevel = 24, rankInterval = 6 })), 6,
+    "rank scaling intercept remains within interval at upper boundary")
+assertEqual(Spell.ResolveRankScalingIntercept(Spell:New({ learnLevel = 25, rankInterval = 6 })), 1,
+    "rank scaling intercept resets at interval boundary")
+
 local highLevel = Spell.ResolveRankForLevel(rankOneSpell, 1000000000)
 assertEqual(highLevel.eligible, true, "high level eligibility")
 assertEqual(highLevel.rank, 125000000, "rank has no cap")
@@ -125,7 +139,7 @@ local rankGainRule = findRule("character", "spell_rank_effect_gain_percent")
 assertEqual(rankGainRule ~= nil, true, "Spell Rank Effect Gain rule exists")
 assertEqual(rankGainRule.label, "Spell Rank Effect Gain (%)", "Spell Rank Effect Gain label")
 assertEqual(rankGainRule.type, "text", "Spell Rank Effect Gain control type")
-assertEqual(rankGainRule.default, "10", "Spell Rank Effect Gain default")
+assertEqual(rankGainRule.default, "5", "Spell Rank Effect Gain default")
 
 local alternateResourceEffect
 local EffectAddon = {

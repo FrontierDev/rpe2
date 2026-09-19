@@ -224,17 +224,18 @@ function Spellcasting.ResolveSpellRankContext(spell, options)
         end
     end
 
-    local gainPercent = 10
+    local gainPercent = nil
     if type(Ruleset.GetRulesetRuleDefinition) == "function"
         and type(Ruleset.GetRulesetRuleValue) == "function"
     then
         local definition = Ruleset.GetRulesetRuleDefinition("character", "spell_rank_effect_gain_percent")
         local configuredGain = Ruleset.GetRulesetRuleValue(ruleset, "character", definition)
-        local numericGain = finiteNumber(configuredGain)
-        if numericGain ~= nil then
-            gainPercent = math.max(0, numericGain)
+        gainPercent = finiteNumber(configuredGain)
+        if gainPercent == nil then
+            gainPercent = finiteNumber(type(definition) == "table" and definition.default or nil)
         end
     end
+    gainPercent = math.max(0, gainPercent or 5)
 
     local resolved = spellClass.ResolveRankForLevel(spell, casterLevel)
     local spellUsesRanks = true
@@ -244,7 +245,11 @@ function Spellcasting.ResolveSpellRankContext(spell, options)
     local rank = resolved and resolved.rank or nil
     local multiplier = 1
     if useSpellRanks and spellUsesRanks and rank ~= nil then
-        multiplier = 1 + (math.max(0, rank - 1) * (gainPercent / 100))
+        local scalingOffset = type(spellClass.ResolveRankScalingOffset) == "function"
+            and spellClass.ResolveRankScalingOffset(spell)
+            or 0
+        local scalingRank = rank + scalingOffset
+        multiplier = 1 + (math.max(0, scalingRank - 1) * (gainPercent / 100))
         if finiteNumber(multiplier) == nil then
             multiplier = 1
         end

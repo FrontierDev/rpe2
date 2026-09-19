@@ -96,7 +96,7 @@ local Addon = {
                 if spell.usesRanks == false then
                     return { rank = 1, multiplier = 1, usesRanks = false }
                 end
-                return { rank = 3, multiplier = 1.2 }
+                return { rank = 3, multiplier = 1.1 }
             end,
         },
         Combat = combat,
@@ -409,16 +409,16 @@ local autopilotProfile = AutoSpell.BuildSpellProfile({
 }, {})
 assertEqual(spellRankResolverCalls, 1, "autopilot uses shared rank resolver once per profile")
 assertEqual(autopilotProfile.spellRank, 3, "autopilot profile exposes the resolved rank")
-assertEqual(autopilotProfile.spellRankMultiplier, 1.2, "autopilot profile exposes the resolved multiplier")
-assertEqual(autopilotProfile.immediateDamage, 60, "autopilot damage scales weapon and stat contributions")
-assertEqual(autopilotProfile.immediateHealing, 36, "autopilot healing scales base and stat contributions")
+assertEqual(autopilotProfile.spellRankMultiplier, 1.1, "autopilot profile exposes the resolved multiplier")
+assertEqual(autopilotProfile.immediateDamage, 55, "autopilot damage scales weapon and stat contributions")
+assertEqual(autopilotProfile.immediateHealing, 33, "autopilot healing scales base and stat contributions")
 assertEqual(#autopilotProfile.auraApplications, 3, "dedicated, damage, and healing Aura applications are collected")
 assertEqual(autopilotProfile.auraApplications[1].powerLevel, 4, "Aura power remains additive")
-assertEqual(autopilotProfile.auraApplications[1].rankMultiplier, 1.2, "Aura application carries source Spell rank")
-assertEqual(autopilotProfile.auraApplications[3].rankMultiplier, 1.2, "dedicated Aura carries source Spell rank")
+assertEqual(autopilotProfile.auraApplications[1].rankMultiplier, 1.1, "Aura application carries source Spell rank")
+assertEqual(autopilotProfile.auraApplications[3].rankMultiplier, 1.1, "dedicated Aura carries source Spell rank")
 assertEqual(autopilotProfile.expectedResourceEffects[1].amount, 1,
     "Autopilot preserves authored amount for opted-out Resource effects")
-assertEqual(autopilotProfile.expectedResourceEffects[2].amount, 12,
+assertEqual(autopilotProfile.expectedResourceEffects[2].amount, 11,
     "Autopilot uses live Resource resolver for opted-in effects")
 
 rankedSpell.usesRanks = false

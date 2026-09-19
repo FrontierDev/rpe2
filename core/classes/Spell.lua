@@ -850,6 +850,15 @@ function Spell.ResolveRankInterval(spell)
     return normalizePositiveIntegerOrNil(value) or DEFAULT_RANK_INTERVAL
 end
 
+function Spell.ResolveRankScalingOffset(spell)
+    return math.floor((Spell.ResolveLearnLevel(spell) - 1) / Spell.ResolveRankInterval(spell))
+end
+
+function Spell.ResolveRankScalingIntercept(spell)
+    return Spell.ResolveLearnLevel(spell)
+        - (Spell.ResolveRankScalingOffset(spell) * Spell.ResolveRankInterval(spell))
+end
+
 function Spell.ResolveNextRankLevel(spell, rank)
     if not Spell.ResolveUsesRanks(spell) then
         return nil

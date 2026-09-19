@@ -1,421 +1,496 @@
-## Context
+## Purpose
 
-Follow-up refinement to the Spell Ranks implementation.
+Apply the finalized Spell progression metadata to the existing Spells shipped in the default datasets.
 
-Design references:
+This issue is the **content/data migration** for the Spell Rank system and depends on #379.
 
-- [Spell Ranks PDD](https://github.com/FrontierDev/rpe2/blob/dev/docs/PDD-Spell-Ranks.md)
-- [Spell Ranks implementation plan](https://github.com/FrontierDev/rpe2/blob/dev/docs/PLAN-Spell-Ranks.md)
-- #371–#376
+Canonical design document:
 
-This issue changes two assumptions in the original design:
+`docs/PDD-Spell-Ranks.md`
 
-1. individual Spells may explicitly opt out of rank progression entirely;
-2. a direct **Spell Resource effect** does **not** scale with rank unless that individual effect explicitly opts in.
+Do not implement a separate rank-scaling formula in this issue. #379 owns the distinction between:
 
-This issue is the authoritative target for these two behaviours and supersedes any blanket direct-Resource scaling language in #373 / the original PDD.
+- displayed Spell rank;
+- hidden scaling offset/intercept;
+- runtime `spellRankMultiplier`.
 
----
-
-## 1. Add per-Spell rank opt-out
-
-### Required Spell field
-
-Add a Spell-level boolean equivalent to:
-
-```lua
-usesRanks = true
-```
-
-The exact field name may follow current conventions, but it must be explicit and serialized as part of the canonical Spell definition.
-
-Default:
-
-```text
-true
-```
-
-Existing/legacy Spells with no field therefore continue to use ranks.
-
-Example:
-
-```lua
-{
-    name = "Evocation",
-    usesRanks = false,
-    learnLevel = 20,
-    ...
-}
-```
-
-### Semantics
-
-When `usesRanks == false`:
-
-- `learnLevel` still applies normally;
-- the Spell has no progressing rank system;
-- its effect multiplier is always `1.0`;
-- `rankInterval` is ignored for runtime progression;
-- the stored `rankInterval` value may remain in the definition so toggling ranks back on does not destroy authoring data;
-- no next-rank level exists;
-- no effect from the Spell receives a higher-rank multiplier;
-- Auras applied by the Spell receive `rankMultiplier = 1`;
-- autopilot evaluates the same unscaled values as live execution.
-
-The clean runtime representation should remain compatible with the existing rank-context API. For example:
-
-```lua
-{
-    eligible = true,
-    usesRanks = false,
-    rank = 1,
-    multiplier = 1.0,
-    nextRankLevel = nil,
-}
-```
-
-An internal Rank 1 value is acceptable for compatibility, but **player-facing presentation must treat the Spell as unranked**, not as a Spell visibly stuck at "Rank 1".
-
-### Ruleset interaction
-
-There are now two independent controls:
-
-```text
-Ruleset use_spell_ranks = false
-    -> globally disables rank scaling/presentation
-
-Spell usesRanks = false
-    -> this Spell never progresses regardless of the Ruleset
-```
-
-A Spell cannot be made ranked by the Ruleset if its own definition opts out.
-
-### Authoring UI
-
-Update the Spell inspector Learning page in:
-
-`client/ui/editor/inspectors/spell/page_InspectorSpellGeneral.lua`
-
-Add a checkbox:
-
-```text
-Uses Ranks
-```
-
-Default: checked.
-
-When unchecked:
-
-- retain Learn Level;
-- hide or disable Rank Interval because it has no active effect;
-- do not clear the stored Rank Interval value.
-
-### Tooltip / Spellbook presentation
-
-For an unranked Spell:
-
-- do not show `Rank 1`;
-- do not show `Next rank at level X`;
-- still show `Requires Level X` when below `learnLevel`;
-- generated/tokenized numeric effect descriptions remain authoritative.
+This issue only authors the correct Spell metadata.
 
 ---
 
-## 2. Direct Spell Resource effects are opt-in for rank scaling
+## Required fields
 
-### Required effect field
+Every existing Spell in the affected registered default datasets must explicitly contain:
 
-Extend the **Spell component Resource effect** with:
+```lua
+learnLevel = <value>,
+usesRanks = <true|false>,
+rankInterval = 8,
+```
+
+The current shipped default interval is **8 for every existing default Spell**.
+
+Even Spells with:
+
+```lua
+usesRanks = false
+```
+
+must explicitly retain:
+
+```lua
+rankInterval = 8
+```
+
+for canonical dataset consistency. The interval is ignored at runtime for unranked Spells.
+
+---
+
+## Progression semantics
+
+### learnLevel
+
+Controls when the Spell first becomes available.
+
+A newly learned ranked Spell displays **Rank 1**, regardless of the hidden multiplier offset introduced by #379.
+
+No default class Spell may have:
+
+```text
+learnLevel > 60
+```
+
+because the RPE level cap is 60.
+
+Later-expansion abilities that historically appeared above level 60 are deliberately redistributed through levels 50–60.
+
+### usesRanks
+
+Set to `true` when the current RPE Spell has magnitude-bearing output that should improve with Spell-rank scaling:
+
+- damage;
+- healing;
+- absorption;
+- magnitude-bearing Aura output;
+- periodic damage/healing;
+- other supported scalable numeric output.
+
+Set to `false` for static behaviour such as:
+
+- interrupts;
+- taunts;
+- pure control;
+- fixed major cooldown percentages;
+- basic weapon/pet actions already scaling through other systems;
+- item-use effects whose authored item Spell defines their strength.
+
+A Spell may have `usesRanks = true` while its direct Resource component remains fixed. Direct Resource scaling remains separately controlled by:
 
 ```lua
 scaleWithRank = false
 ```
 
-Default:
+by default.
 
-```text
-false
-```
+### rankInterval
 
-This must be normalized and serialized with the Spell effect.
-
-Current Spell Resource effect shape is created in:
-
-`core/classes/Spell.lua::buildDefaultEffect("resource")`
-
-and normalized in:
-
-`core/classes/Spell.lua::normalizeEffect()`.
-
-Add the new field there rather than creating a side table.
-
-### Semantics
-
-A direct Resource effect behaves as follows:
-
-```text
-scaleWithRank = false
-    -> use authored resource amount unchanged by Spell rank
-
-scaleWithRank = true
-    -> apply the Spell's resolved spellRankMultiplier exactly once
-```
-
-Example: Sinister Strike
+All current default Spells use:
 
 ```lua
-{
-    type = "resource",
-    resourceRef = "<Combo Points>",
-    amount = 1,
-    amountMode = "flat",
-    scaleWithRank = false,
-}
+rankInterval = 8
 ```
 
-At Rank 1, Rank 5 or Rank 10 it still grants:
+Do not infer or omit the field simply because 8 is the schema default. The packaged defaults should state it explicitly.
 
-```text
-1 combo point
-```
+---
 
-Example opt-in effect:
+
+## Core
+
+File: `data/default/core.lua`
+
+| Spell | learnLevel | usesRanks | rankInterval |
+|---|---:|:---:|---:|
+| Main Hand Attack | 1 | false | 8 |
+| Mounted Attack | 1 | false | 8 |
+| Pet Attack | 1 | false | 8 |
+| Summon Pet | 1 | false | 8 |
+| Shoot | 1 | false | 8 |
+| Throw | 1 | false | 8 |
+| Wand | 1 | false | 8 |
+| Off Hand Attack | 1 | false | 8 |
+
+## Mage
+
+File: `data/default/classes/mage.lua`
+
+| Spell | learnLevel | usesRanks | rankInterval |
+|---|---:|:---:|---:|
+| Fireball | 1 | true | 8 |
+| Pyroblast | 20 | true | 8 |
+| Fire Blast | 6 | true | 8 |
+| Scorch | 22 | true | 8 |
+| Combustion | 40 | false | 8 |
+| Flamestrike | 16 | true | 8 |
+| Arcane Explosion | 14 | true | 8 |
+| Fire Ward | 20 | true | 8 |
+| Frost Ward | 22 | true | 8 |
+| Arcane Blast | 52 | true | 8 |
+| Arcane Barrage | 60 | true | 8 |
+| Arcane Missiles | 8 | true | 8 |
+| Arcane Surge | 60 | true | 8 |
+| Evocation | 20 | false | 8 |
+| Counterspell | 24 | false | 8 |
+| Arcane Intellect | 1 | true | 8 |
+| Frostbolt | 4 | true | 8 |
+| Frost Nova | 10 | true | 8 |
+| Deep Freeze | 60 | false | 8 |
+| Ice Lance | 54 | true | 8 |
+| Cone of Cold | 26 | true | 8 |
+| Glacial Spike | 58 | true | 8 |
+| Ice Armor | 30 | true | 8 |
+| Molten Armor | 50 | true | 8 |
+| Mage Armor | 34 | true | 8 |
+| Polymorph | 8 | false | 8 |
+
+## Paladin
+
+File: `data/default/classes/paladin.lua`
+
+| Spell | learnLevel | usesRanks | rankInterval |
+|---|---:|:---:|---:|
+| Seal of the Crusader | 6 | true | 8 |
+| Judgement of the Crusader | 6 | true | 8 |
+| Seal of Fury | 16 | false | 8 |
+| Judgement of Fury | 16 | true | 8 |
+| Light of the Martyr | 20 | true | 8 |
+| Lay on Hands | 10 | true | 8 |
+| Consecration | 20 | true | 8 |
+| Blessing of Might | 4 | true | 8 |
+| Blessing of Kings | 20 | false | 8 |
+| Blessing of Sanctuary | 30 | false | 8 |
+| Blessing of Wisdom | 14 | true | 8 |
+| Blessing of Light | 40 | true | 8 |
+| Blessing of Salvation | 26 | false | 8 |
+| Judgement of the Righteous | 4 | true | 8 |
+| Seal of Righteousness | 1 | true | 8 |
+| Judgement of Command | 20 | true | 8 |
+| Seal of Command | 20 | true | 8 |
+| Judgement of the Light | 30 | true | 8 |
+| Seal of Light | 30 | true | 8 |
+| Judgement of Wisdom | 38 | true | 8 |
+| Seal of Wisdom | 38 | true | 8 |
+| Crusader Strike | 50 | true | 8 |
+| Templar's Verdict | 10 | true | 8 |
+| Hammer of the Righteous | 60 | true | 8 |
+| Shield of the Righteous | 54 | true | 8 |
+| Holy Shield | 40 | true | 8 |
+| Divine Protection | 6 | false | 8 |
+| Holy Light | 1 | true | 8 |
+| Flash of Light | 20 | true | 8 |
+| Divine Favor | 30 | false | 8 |
+| Exorcism | 20 | true | 8 |
+| Holy Wrath | 50 | true | 8 |
+| Divine Storm | 60 | true | 8 |
+| Blade of Wrath | 50 | true | 8 |
+| Hand of Reckoning | 16 | false | 8 |
+| Rebuke | 54 | false | 8 |
+| Word of Glory | 9 | true | 8 |
+| Light of the Protector | 50 | true | 8 |
+| Guardian of Ancient Kings | 58 | false | 8 |
+| Hammer of Justice | 8 | false | 8 |
+| Avenging Wrath | 56 | false | 8 |
+| Templar's Bulwark | 40 | true | 8 |
+| Repentance | 40 | false | 8 |
+
+## Priest
+
+File: `data/default/classes/priest.lua`
+
+| Spell | learnLevel | usesRanks | rankInterval |
+|---|---:|:---:|---:|
+| Heal | 16 | true | 8 |
+| Power Word: Shield | 6 | true | 8 |
+| Greater Heal | 40 | true | 8 |
+| Lesser Heal | 1 | true | 8 |
+| Binding Heal | 52 | true | 8 |
+| Flash Heal | 20 | true | 8 |
+| Renew | 8 | true | 8 |
+| Smite | 1 | true | 8 |
+| Holy Fire | 20 | true | 8 |
+| Pain Suppression | 50 | false | 8 |
+| Divine Spirit | 30 | true | 8 |
+| Prayer of Fortitude | 48 | true | 8 |
+| Prayer of Shadow Protection | 56 | true | 8 |
+| Psychic Scream | 14 | false | 8 |
+| Psychic Horror | 50 | false | 8 |
+| Shadow Word: Pain | 4 | true | 8 |
+| Vampiric Touch | 50 | true | 8 |
+| Mind Blast | 10 | true | 8 |
+| Mind Spike | 44 | true | 8 |
+| Mind Flay | 20 | true | 8 |
+| Shadow Word: Death | 50 | true | 8 |
+
+## Rogue
+
+File: `data/default/classes/rogue.lua`
+
+| Spell | learnLevel | usesRanks | rankInterval |
+|---|---:|:---:|---:|
+| Sinister Strike | 1 | true | 8 |
+| Ambush | 18 | true | 8 |
+| Stealth | 1 | false | 8 |
+| Backstab | 4 | true | 8 |
+| Eviscerate | 1 | true | 8 |
+| Mutilate | 50 | true | 8 |
+| Evasion | 8 | false | 8 |
+| Adrenaline Rush | 40 | false | 8 |
+| Slice and Dice | 10 | false | 8 |
+| Ghostly Strike | 20 | true | 8 |
+| Hemmorhage | 30 | true | 8 |
+| Rupture | 20 | true | 8 |
+| Garrote | 14 | true | 8 |
+| Kick | 12 | false | 8 |
+| Gouge | 6 | false | 8 |
+| Kidney Shot | 30 | false | 8 |
+| Cold Blood | 30 | false | 8 |
+
+## Warrior
+
+File: `data/default/classes/warrior.lua`
+
+| Spell | learnLevel | usesRanks | rankInterval |
+|---|---:|:---:|---:|
+| Overpower | 12 | true | 8 |
+| Heroic Strike | 1 | true | 8 |
+| Cleave | 20 | true | 8 |
+| Mortal Strike | 40 | true | 8 |
+| Slam | 30 | true | 8 |
+| Sunder Armor | 10 | true | 8 |
+| Shield Slam | 40 | true | 8 |
+| Shield Bash | 12 | true | 8 |
+| Taunt | 10 | false | 8 |
+| Bloodrage | 10 | false | 8 |
+| Inner Rage | 56 | false | 8 |
+| Rend | 4 | true | 8 |
+| Whirlwind | 36 | true | 8 |
+| Bladestorm | 60 | true | 8 |
+| Knockdown | 20 | false | 8 |
+| Intimidating Shout | 22 | false | 8 |
+| Shield Block | 16 | false | 8 |
+| Bloodthirst | 40 | true | 8 |
+| Revenge | 14 | true | 8 |
+| Battle Shout | 1 | true | 8 |
+| Commanding Shout | 54 | true | 8 |
+| Shield Wall | 28 | false | 8 |
+| Intervene | 56 | false | 8 |
+
+
+---
+
+## Alchemy
+
+File:
+
+`data/default/professions/alchemy.lua`
+
+All **35 existing Spell records** in the Alchemy `spells` table are item-use effects.
+
+For every Alchemy Spell set:
 
 ```lua
-{
-    type = "resource",
-    amount = 10,
-    amountMode = "flat",
-    scaleWithRank = true,
-}
+learnLevel = 1,
+usesRanks = false,
+rankInterval = 8,
 ```
 
-At Rank 3 with a 10% per-rank gain:
+This applies to:
 
-```text
-10 -> 12
-```
+- Minor Healing Potion
+- Minor Mana Potion
+- Minor Rejuvenation Potion
+- Discolored Healing Potion
+- Lesser Healing Potion
+- Rage Potion
+- Healing Potion
+- Lesser Mana Potion
+- Elixir of Giant Growth
+- Minor Magic Resistance Potion
+- Greater Healing Potion
+- Mana Potion
+- Great Rage Potion
+- Greater Mana Potion
+- Superior Healing Potion
+- Wildvine Potion
+- Magic Resistance Potion
+- Lesser Stoneshield Potion
+- Mighty Rage Potion
+- Superior Mana Potion
+- Major Healing Potion
+- Greater Stoneshield Potion
+- Major Mana Potion
+- Shadow Protection Potion
+- Fire Protection Potion
+- Frost Protection Potion
+- Nature Protection Potion
+- Greater Arcane Protection Potion
+- Greater Fire Protection Potion
+- Greater Frost Protection Potion
+- Greater Nature Protection Potion
+- Greater Shadow Protection Potion
+- Limited Invulnerability Potion
+- Mageblood Potion
+- Major Rejuvenation Potion
 
-Percentage resource effects follow the same opt-in rule.
+Their owning item controls access. Character level must not independently rank potion potency.
 
-### Important distinction: this is the Spell Resource effect only
+---
 
-Do **not** reinterpret this field as an Aura Resource-effect setting.
+## Engineering
 
-Aura numeric effects that inherit a source Spell's snapshotted `rankMultiplier` remain governed by the Aura-rank propagation work in #374.
+File:
 
-The direct Spell execution path and Aura execution path both currently reach resource amount helpers, so implementation must not accidentally make a missing `scaleWithRank` field disable intended Aura rank propagation.
+`data/default/professions/engineering.lua`
 
-In particular, inspect:
+All **25 existing Spell records** in the Engineering `spells` table are item/on-use effects.
 
-- `client/combat/effects/Resource.lua`
-- `client/spellcasting/effects/Resource.lua`
-- the canonical `Combat:ResolveResourceEffectAmount()` implementation
-
-and keep direct Spell Resource opt-in logic at the correct semantic boundary.
-
-### Effect contract
-
-Update the direct Resource effect contract in:
-
-`client/combat/effects/Resource.lua`
-
-so its defaults/fields include:
+For every Engineering Spell set:
 
 ```lua
-scaleWithRank = false
+learnLevel = 1,
+usesRanks = false,
+rankInterval = 8,
 ```
 
-where appropriate.
+This applies to:
 
-### Spell inspector
+- Rough Dynamite
+- Rough Copper Bomb
+- Coarse Dynamite
+- EZ-Thro Dynamite
+- Large Copper Bomb
+- Small Bronze Bomb
+- Heavy Dynamite
+- Big Bronze Bomb
+- Flame Deflector
+- Ice Deflector
+- Solid Dynamite
+- Iron Grenade
+- Big Iron Bomb
+- EZ-Thro Dynamite II
+- Goblin Sapper Charge
+- Mithril Frag Bomb
+- Flash Bomb
+- Hi-Explosive Bomb
+- Thorium Grenade
+- Dark Iron Bomb
+- Gyrofreeze Ice Reflector
+- Hyper-Radiant Flame Reflector
+- Major Recombobulator
+- Ultra-Flash Shadow Reflector
+- Arcane Bomb
 
-Update:
-
-- `client/ui/editor/inspectors/spell/page_InspectorSpellComponents.lua`
-- `client/ui/editor/inspectors/page_InspectorSpell.lua`
-
-For a selected Resource effect, expose:
-
-```text
-Scale With Rank
-```
-
-Default: unchecked.
-
-The control must only apply to the selected **Spell Resource effect**.
-
-Do not expose it for:
-
-- Spell resource costs;
-- damage/heal effects;
-- Aura effect authoring.
+Item requirements govern availability and item-authored values govern strength.
 
 ---
 
-## 3. Runtime integration
+## Default datasets with no Spell changes
 
-The rank application helper must distinguish:
+The following current registered default datasets contain no Spell records requiring this migration:
 
-### Damage
+- `data/default/professions/blacksmithing.lua`
+- `data/default/professions/enchanting.lua`
+- `data/default/professions/fishing.lua`
+- `data/default/professions/inscription.lua`
+- `data/default/professions/jewelcrafting.lua`
+- `data/default/professions/leatherworking.lua`
+- `data/default/professions/misc.lua`
+- `data/default/professions/tailoring.lua`
 
-```text
-ranked Spell -> scales
-unranked Spell -> multiplier 1
-```
+Do not add placeholder Spell records to them.
 
-### Healing
-
-```text
-ranked Spell -> scales
-unranked Spell -> multiplier 1
-```
-
-### Direct Spell Resource effect
-
-```text
-ranked Spell + scaleWithRank=true  -> scales
-ranked Spell + scaleWithRank=false -> does not scale
-unranked Spell                     -> does not scale
-```
-
-### Aura applied by Spell
-
-```text
-ranked Spell   -> snapshots Spell rankMultiplier
-unranked Spell -> snapshots 1
-```
-
-### Resource costs
-
-Never scale.
-
-Do not mutate authored effect tables at runtime.
+`data/default/spells_to_add.lua` is not the canonical registered default dataset source and must not be edited instead of the class/default dataset files above.
 
 ---
 
-## 4. Tooltip / generated-description parity
+## Packaged dataset versions
 
-Any generated Resource amount in:
+Every modified packaged default dataset must have its version incremented from the value present when implementation begins.
 
-- `client/spellcasting/DescriptionBuilder.lua`;
-- `client/spellcasting/TooltipTemplate.lua`;
-- related Spell tooltip preview paths;
+Expected affected datasets:
 
-must use the same rule as live execution.
+- Core
+- Mage
+- Paladin
+- Priest
+- Rogue
+- Warrior
+- Alchemy
+- Engineering
 
-For `scaleWithRank = false`, a tooltip should continue to show:
+Do not hard-code an old version number from this issue if another commit has already advanced a dataset version.
 
-```text
-Generates 1 Combo Point.
+Updating a packaged default dataset must not reactivate it if the user deliberately deactivated that dataset.
+
+---
+
+## Implementation constraints
+
+Do not:
+
+- create separate Spell definitions for individual ranks;
+- alter Spell IDs;
+- alter Aura IDs or references;
+- change `learnMode`;
+- change class spell-list references;
+- author a scaling offset/intercept field—the offset is derived by #379;
+- use any interval other than 8 in the current default migration;
+- opt Resource effects into `scaleWithRank = true` unless separately required;
+- hand-write rank-specific tooltip descriptions;
+- rebalance base damage/healing merely to compensate for displayed rank.
+
+Keep the three progression fields together near the existing Spell learning metadata where practical:
+
+```lua
+learnMode = "...",
+learnLevel = ...,
+usesRanks = ...,
+rankInterval = 8,
+spellbookCategory = "...",
 ```
 
-at every rank.
+---
 
-For `scaleWithRank = true`, the preview should show the rank-adjusted value.
+## Validation
 
-Do not hand-write alternative Resource descriptions.
+Static validation must confirm:
+
+- [ ] Every Spell in Core, Mage, Paladin, Priest, Rogue, Warrior, Alchemy, and Engineering has an explicit positive-integer `learnLevel`.
+- [ ] Every Spell in those datasets has an explicit boolean `usesRanks`.
+- [ ] Every Spell in those datasets has explicit `rankInterval = 8`.
+- [ ] No default class Spell has `learnLevel > 60`.
+- [ ] Every Core Spell is unranked.
+- [ ] Every Alchemy and Engineering item-use Spell has `learnLevel = 1`, `usesRanks = false`, `rankInterval = 8`.
+- [ ] Spell IDs are unchanged.
+- [ ] Aura IDs/references are unchanged.
+- [ ] `learnMode` values are unchanged.
+- [ ] Direct Resource effects are not accidentally opted into rank scaling.
+- [ ] All affected packaged dataset versions are incremented.
+
+Runtime smoke checks after #379 is present:
+
+1. A level-1 / interval-8 ranked Spell displays Rank 5 at level 40 and uses x1.20.
+2. A level-30 / interval-8 ranked Spell displays Rank 2 at level 40 and also uses x1.20.
+3. A newly unlocked later-level Spell displays Rank 1 at its `learnLevel`.
+4. An unranked Spell such as Counterspell/Taunt/Hammer of Justice remains x1.00.
+5. A potion or engineering item-use Spell remains x1.00 regardless of character level.
+6. Level gating correctly adds/removes always-learned class Spells from effective availability.
+7. No default class Spell becomes inaccessible because its `learnLevel` exceeds the level cap.
 
 ---
 
-## 5. Autopilot parity
+## Relationship to #378
 
-Audit:
+This issue supersedes the default-dataset migration scope in #378.
 
-- `client/autopilot/SpellEvaluator.lua`;
-- `client/autopilot/AuraEvaluator.lua`;
-- any direct Resource-value scoring path.
-
-Autopilot must evaluate:
-
-- unranked Spells at multiplier 1;
-- direct Resource effects with `scaleWithRank=false` at authored magnitude;
-- direct Resource effects with `scaleWithRank=true` at the same scaled magnitude as live execution.
-
-Do not duplicate rank arithmetic.
-
----
-
-## Primary files
-
-At minimum inspect:
-
-- `core/classes/Spell.lua`
-- `client/spellcasting/Lifecycle.lua`
-- `client/spellcasting/Helpers.lua`
-- `client/combat/effects/Resource.lua`
-- `client/spellcasting/effects/Resource.lua`
-- canonical `Combat:ResolveResourceEffectAmount()` implementation
-- `client/ui/editor/inspectors/spell/page_InspectorSpellGeneral.lua`
-- `client/ui/editor/inspectors/spell/page_InspectorSpellComponents.lua`
-- `client/ui/editor/inspectors/page_InspectorSpell.lua`
-- `client/ui/tooltips/tooltip_Spell.lua`
-- `client/spellcasting/DescriptionBuilder.lua`
-- `client/autopilot/SpellEvaluator.lua`
-- `client/autopilot/AuraEvaluator.lua`
-- `tests/SpellRanksTest.lua`
-
-Only modify additional files where tracing current `dev` call paths proves necessary.
-
----
-
-## Acceptance criteria
-
-### Per-Spell rank opt-out
-
-- [ ] Spell schema contains an explicit rank-progression enable/disable field defaulting to enabled.
-- [ ] Legacy Spells with no field remain ranked.
-- [ ] `usesRanks=false` preserves `learnLevel`.
-- [ ] `usesRanks=false` produces multiplier 1 at every caster level.
-- [ ] `usesRanks=false` has no next-rank level.
-- [ ] Rank Interval is ignored but not destructively cleared.
-- [ ] Unranked Spell tooltips/spellbook entries do not display Rank 1 / Next Rank.
-- [ ] Below-level unranked Spells still display/enforce their Learn Level.
-- [ ] Auras applied by an unranked Spell snapshot `rankMultiplier=1`.
-- [ ] Autopilot treats the same Spell as unranked.
-
-### Resource effect opt-in
-
-- [ ] Spell Resource effect contains `scaleWithRank=false` by default.
-- [ ] Legacy/missing field normalizes to false.
-- [ ] Resource effect inspector exposes **Scale With Rank** only for Resource effects.
-- [ ] Rank 5 Sinister Strike-style `amount=1, scaleWithRank=false` still grants exactly 1.
-- [ ] `scaleWithRank=true` scales flat Resource amounts exactly once.
-- [ ] `scaleWithRank=true` scales percentage Resource effects exactly once.
-- [ ] Resource costs never scale.
-- [ ] Aura Resource effects are not accidentally disabled by the direct-Spell flag.
-- [ ] Tooltip/generated values match live execution.
-- [ ] Autopilot values match live execution.
-
-### Regression
-
-- [ ] Ranked damage/healing behaviour remains unchanged.
-- [ ] Ranked Aura propagation remains unchanged.
-- [ ] Ruleset-wide `use_spell_ranks=false` still forces multiplier 1 globally.
-- [ ] No rank or scale state is persisted to Profiles.
-- [ ] No shared Spell/effect definition is mutated during execution.
-
----
-
-## Deterministic test cases
-
-At minimum:
-
-```text
-Spell usesRanks=false, level 1   -> multiplier 1.0
-Spell usesRanks=false, level 60  -> multiplier 1.0
-Spell usesRanks=false            -> nextRankLevel nil
-Spell usesRanks=true             -> existing rank formula unchanged
-
-Resource amount 1, scaleWithRank=false, Rank 5 -> 1
-Resource amount 10, scaleWithRank=true, Rank 3 @ 10% -> 12
-Resource amount -10, scaleWithRank=true, Rank 3 @ 10% -> -12
-Resource 10% max, scaleWithRank=true, Rank 2 @ 10% -> 11%
-Resource 10% max, scaleWithRank=false, Rank 8 -> 10%
-
-unranked Spell + Resource scaleWithRank=true -> unchanged because Spell multiplier is 1
-```
-
-Also verify that an Aura Resource effect applied from a ranked Spell still follows the Aura rank-propagation contract from #374 rather than this direct-Spell flag.
-
-Before closing, trace all current Resource amount consumers and verify there is no unconditional direct Resource rank scaling left.
+Use this issue plus #379 as the implementation authority because they reflect the finalized separation between displayed rank and scaling multiplier and explicitly require `rankInterval` on every existing default Spell.

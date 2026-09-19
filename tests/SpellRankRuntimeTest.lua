@@ -135,7 +135,37 @@ local player = Spellcasting.ResolveSpellRankContext(spell, {
 })
 assertEqual(player.casterLevel, 17, "player event caster level")
 assertEqual(player.rank, 3, "player event caster rank")
-assertEqual(player.multiplier, 1.2, "player event caster multiplier")
+assertEqual(player.multiplier, 1.1, "player event caster multiplier uses the 5 percent default")
+
+local function resolveAtLevel(testSpell, level)
+    return Spellcasting.ResolveSpellRankContext(testSpell, {
+        casterUnit = { isPlayer = false, level = level },
+        eventState = eventState,
+    })
+end
+
+local levelOneSpell = Spell:New({ learnLevel = 1, rankInterval = 8 })
+local levelOneAtForty = resolveAtLevel(levelOneSpell, 40)
+assertEqual(levelOneAtForty.rank, 5, "level-one Spell keeps its displayed Rank 5")
+assertEqual(levelOneAtForty.multiplier, 1.2, "level-one Spell scaling Rank 5 multiplier")
+
+local levelThirtySpell = Spell:New({ learnLevel = 30, rankInterval = 8 })
+local levelThirtyAtThirty = resolveAtLevel(levelThirtySpell, 30)
+assertEqual(levelThirtyAtThirty.rank, 1, "newly learned Spell displays Rank 1")
+assertEqual(levelThirtyAtThirty.multiplier, 1.15, "newly learned level-thirty Spell starts at scaling Rank 4")
+local levelThirtyAtForty = resolveAtLevel(levelThirtySpell, 40)
+assertEqual(levelThirtyAtForty.rank, 2, "level-thirty Spell displays Rank 2 at level 40")
+assertEqual(levelThirtyAtForty.nextRankLevel, 46, "next rank still follows displayed-rank progression")
+assertEqual(levelThirtyAtForty.multiplier, 1.2, "level-thirty Spell matches level-one multiplier at level 40")
+
+local levelTwentyFiveSpell = Spell:New({ learnLevel = 25, rankInterval = 6 })
+local levelTwentyFiveAtTwentyFive = resolveAtLevel(levelTwentyFiveSpell, 25)
+assertEqual(levelTwentyFiveAtTwentyFive.rank, 1, "level-twenty-five Spell displays Rank 1 on learn level")
+assertEqual(levelTwentyFiveAtTwentyFive.multiplier, 1.2, "interval-aligned intercept gives scaling Rank 5")
+local levelTwentyFiveAtThirtyOne = resolveAtLevel(levelTwentyFiveSpell, 31)
+assertEqual(levelTwentyFiveAtThirtyOne.rank, 2, "interval boundary advances displayed rank")
+assertEqual(levelTwentyFiveAtThirtyOne.nextRankLevel, 37, "interval boundary next rank remains display-based")
+assertEqual(levelTwentyFiveAtThirtyOne.multiplier, 1.25, "interval boundary advances scaling rank once")
 
 local unrankedSpell = Spell:New({ learnLevel = 1, rankInterval = 4, usesRanks = false })
 local unrankedAtLevelOne = Spellcasting.ResolveSpellRankContext(unrankedSpell, {
@@ -152,6 +182,16 @@ assertEqual(unrankedAtLevelOne.multiplier, 1, "unranked Spell multiplier at leve
 assertEqual(unrankedAtLevelSixty.rank, 1, "unranked Spell stays at Rank 1 at level 60")
 assertEqual(unrankedAtLevelSixty.multiplier, 1, "unranked Spell multiplier at level 60")
 assertEqual(unrankedAtLevelSixty.nextRankLevel, nil, "unranked Spell has no next rank")
+local unrankedWithOffset = Spellcasting.ResolveSpellRankContext(Spell:New({
+    learnLevel = 25,
+    rankInterval = 6,
+    usesRanks = false,
+}), {
+    casterUnit = { isPlayer = false, level = 60 },
+    eventState = eventState,
+})
+assertEqual(unrankedWithOffset.rank, 1, "unranked Spell keeps the compatibility display rank")
+assertEqual(unrankedWithOffset.multiplier, 1, "unranked Spell does not apply its derived scaling offset")
 local unrankedBelowLearnLevel = Spellcasting.ResolveSpellRankContext(Spell:New({
     learnLevel = 10,
     usesRanks = false,
@@ -170,11 +210,8 @@ assertEqual(npc.casterLevel, 25, "NPC event caster level")
 assertEqual(npc.rank, 4, "NPC event caster rank")
 
 activeRuleset.rules.character.use_spell_ranks = false
-local disabled = Spellcasting.ResolveSpellRankContext(spell, {
-    casterUnit = { isPlayer = false, level = 25 },
-    eventState = eventState,
-})
-assertEqual(disabled.rank, 4, "disabled ranks retain derived rank")
+local disabled = resolveAtLevel(levelThirtySpell, 40)
+assertEqual(disabled.rank, 2, "disabled ranks retain displayed rank")
 assertEqual(disabled.multiplier, 1, "disabled rank multiplier")
 assertEqual(disabled.useSpellRanks, false, "disabled rank setting")
 
@@ -191,7 +228,7 @@ local invalidGain = Spellcasting.ResolveSpellRankContext(spell, {
     casterUnit = { isPlayer = false, level = 17 },
     eventState = eventState,
 })
-assertEqual(invalidGain.multiplier, 1.2, "invalid percentage uses the configured default")
+assertEqual(invalidGain.multiplier, 1.1, "invalid percentage uses the configured default")
 
 activeRuleset.rules.character.spell_rank_effect_gain_percent = "-25"
 local negativeGain = Spellcasting.ResolveSpellRankContext(spell, {
@@ -289,7 +326,7 @@ Addon.Internal.ConfigurationRevision = 3
 local activeCastSnapshot = Spellcasting.BuildSpellActivationSnapshot(Addon.Client, "ranktest:always")
 assertEqual(activeCastSnapshot.canCast, true, "live activation accepts eligible cast")
 assertEqual(activeCastSnapshot.spellRank, 2, "activation snapshot contains rank")
-assertEqual(activeCastSnapshot.spellRankMultiplier, 1.25, "activation snapshot contains configured multiplier")
+assertEqual(activeCastSnapshot.spellRankMultiplier, 1.5, "activation snapshot contains offset-adjusted multiplier")
 
 local unrankedAlwaysLearned = Spell:New({
     id = "unranked",
@@ -311,6 +348,6 @@ runtimeCasterUnit.level = 26
 activeRuleset.rules.character.spell_rank_effect_gain_percent = "90"
 Addon.Internal.ConfigurationRevision = 5
 assertEqual(activeCastSnapshot.spellRank, 2, "cast rank snapshot remains stable after state change")
-assertEqual(activeCastSnapshot.spellRankMultiplier, 1.25, "cast multiplier snapshot remains stable after state change")
+assertEqual(activeCastSnapshot.spellRankMultiplier, 1.5, "cast multiplier snapshot remains stable after state change")
 
 print("Spell rank runtime tests passed")

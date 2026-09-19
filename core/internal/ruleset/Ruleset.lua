@@ -118,7 +118,7 @@ local function normalizeSpellRankEffectGainPercent(value, fallback)
         numeric = tonumber(fallback)
     end
     if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
-        numeric = 10
+        numeric = 5
     end
 
     numeric = math.max(0, numeric)
