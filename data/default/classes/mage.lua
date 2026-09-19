@@ -827,7 +827,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownChannel = 1,
                 learnMode = "always_learned",
                 learnLevel = 1,
-                usesRanks = false,
+                usesRanks = true,
                 rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Fireball",
@@ -2489,7 +2489,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownChannel = 3,
                 learnMode = "always_learned",
                 learnLevel = 1,
-                usesRanks = true,
+                usesRanks = false,
                 rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Arcane Intellect",
@@ -3453,7 +3453,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownChannel = 3,
                 learnMode = "always_learned",
                 learnLevel = 34,
-                usesRanks = true,
+                usesRanks = false,
                 rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Mage Armor",
@@ -3895,5 +3895,5 @@ Addon.Data.DefaultDatasets:Register({
         },
         units = {},
         weaponTypes = {}
-    }},
+    },
 })
