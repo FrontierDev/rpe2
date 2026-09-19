@@ -435,19 +435,28 @@ Do not multiply healing-done or healing-received modifiers separately.
 
 #### 6.3 Resource effects
 
-Locate the canonical Combat:ResolveResourceEffectAmount implementation used by client/combat/effects/Resource.lua.
+Locate the canonical Combat:ResolveResourceEffectAmount implementation used by both direct Resource-effect execution paths.
 
-Apply rank multiplier to the resolved effect magnitude.
+Direct Resource effects are **opt-in** for rank scaling:
+
+~~~lua
+scaleWithRank = false
+~~~
 
 Requirements:
 
 ~~~text
-+10 at 1.20 -> +12
--10 at 1.20 -> -12
-10% at 1.20 -> 12%
+scaleWithRank=false, +10 at 1.20 -> +10
+scaleWithRank=true,  +10 at 1.20 -> +12
+scaleWithRank=true,  -10 at 1.20 -> -12
+scaleWithRank=true,  10% at 1.20 -> 12%
 ~~~
 
+Apply the rank multiplier exactly once only when `scaleWithRank == true`.
+
 Do not apply rank multiplier to resourceCosts.
+
+Aura Resource effects are not governed by this direct-effect flag; they inherit the applied Aura's snapshotted rankMultiplier.
 
 #### 6.4 Do not mutate effect tables
 
@@ -467,7 +476,9 @@ The authored Spell definition is shared and must remain immutable at runtime.
 
 At Rank 1 every tested direct effect matches pre-feature output.
 
-At higher ranks damage/healing/resource output changes exactly once.
+At higher ranks damage/healing output changes exactly once.
+
+Direct Resource output changes exactly once only when `scaleWithRank = true`; otherwise it remains unchanged.
 
 Resource costs, cooldowns and other non-effect values remain unchanged.
 
