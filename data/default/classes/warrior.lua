@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 29,
+        version = 30,
     dataset = {
         achievements = {},
         auras = {
@@ -211,13 +211,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 5,
+                        baseDamage = 28.1667,
                         damageSchoolRefs = {
                             "f82db71a:v1azo4j6"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.2,
+                                coefficient = 0.29575,
                                 statRef = "f82db71a:u7b49vs9"
                             }
                         },
@@ -231,22 +231,7 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Deep Wounds",
                 stackBehavior = "refresh_duration",
                 tags = {},
-                tooltipTemplate = true,
-                tooltipTemplateData = {
-                    bodyText = "Deals {AURA_DAMAGE_1} Physical damage each turn.",
-                    bodyTokens = {
-                        {
-                            applyMode = "damage_amount",
-                            baseField = "baseDamage",
-                            effectIndex = 1,
-                            key = "AURA_DAMAGE_1",
-                            tokenType = "aura_amount"
-                        }
-                    },
-                    stackingText = "",
-                    stackingTokens = {},
-                    version = 1
-                }
+                tooltipTemplate = true
             },
             {
                 description = "",
@@ -487,7 +472,8 @@ Addon.Data.DefaultDatasets:Register({
                     "7bbb4cb9:sxq460qa",
                     "7bbb4cb9:cruelty3",
                     "7bbb4cb9:antcwar1",
-                    "7bbb4cb9:shldspc1"
+                    "7bbb4cb9:shldspc1",
+                    "7bbb4cb9:0yud4l94"
                 }
             }
         },
@@ -3024,6 +3010,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 events = {
                     {
+                        chance = 100,
                         combatEventId = "on_critical_hit",
                         effects = {
                             {
@@ -3034,7 +3021,7 @@ Addon.Data.DefaultDatasets:Register({
                                 type = "apply_aura"
                             }
                         },
-                        triggerTarget = "aura_caster"
+                        triggerTarget = "event_other"
                     }
                 },
                 icon = "interface/icons/ability_backstab.blp",
