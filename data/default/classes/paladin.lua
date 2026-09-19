@@ -1,10 +1,54 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 33,
+    version = 34,
     dataset = {
         achievements = {},
         auras = {
+            {
+                description = "",
+                duration = 3,
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseDamage = 11.2667,
+                        damageSchoolRefs = {
+                            "f82db71a:wwctys5s"
+                        },
+                        statScaling = {
+                            {
+                                coefficient = 0.169,
+                                statRef = "f82db71a:7t7xgzcx"
+                            }
+                        },
+                        threatCoefficient = 0.49,
+                        type = "damage"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_holy_innerfire.blp",
+                id = "q7m4v2ka",
+                maxStacks = 1,
+                name = "Consecration",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Deals {AURA_DAMAGE_1} Holy damage each turn. Generates a low amount of threat.",
+                    bodyTokens = {
+                        {
+                            applyMode = "damage_amount",
+                            baseField = "baseDamage",
+                            effectIndex = 1,
+                            key = "AURA_DAMAGE_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
             {
                 description = "",
                 duration = 10,
@@ -1494,6 +1538,109 @@ Addon.Data.DefaultDatasets:Register({
         resources = {},
         skills = {},
         spells = {
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 12.5,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:q7m4v2ka",
+                            basePower = 0,
+                            duration = 3,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "s9p6x4qc",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = true,
+                            maxTargets = 4,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "multi"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_innerfire.blp",
+                id = "r8n5w3pb",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                mountedCombatOnly = false,
+                name = "Consecration",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 12.5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:q7m4v2ka",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Deals {AURA_DAMAGE_1} Holy damage each turn. Generates a low amount of threat.",
+                            duration = 3,
+                            icon = "interface/icons/spell_holy_innerfire.blp",
+                            nameText = "Consecration",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "damage_amount",
+                                    baseField = "baseDamage",
+                                    effectIndex = 1,
+                                    key = "AURA_DAMAGE_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Consecration to up to 4 enemies for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
             {
                 _resourceCostsByPhase = {
                     on_cast_end = {

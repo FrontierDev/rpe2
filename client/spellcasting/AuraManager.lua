@@ -4820,6 +4820,7 @@ function AuraManager:HandleLocalAuraTickResult(client, context, result)
             {
                 immediate = immediate,
                 scope = immediate and (context.pendingScope or context.scope or "reaction") or "turn",
+                threatUpdates = type(result.threatUpdate) == "table" and { result.threatUpdate } or nil,
             }
         )
     end

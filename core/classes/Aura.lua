@@ -361,6 +361,7 @@ local function normalizeEffect(value)
         amountMode = normalizeAmountMode(value.amountMode),
         statScaling = normalizeStatScaling(value.statScaling),
         damageSchoolRefs = normalizeDamageSchoolRefs(value.damageSchoolRefs),
+        threatCoefficient = value.threatCoefficient ~= nil and tonumber(value.threatCoefficient) or nil,
     }
 end
 

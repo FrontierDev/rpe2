@@ -329,6 +329,52 @@ local function resolveAmount(options, effect, baseField)
     return math.floor((tonumber(amount) or 0) + 0.5)
 end
 
+local function resolveAuraThreatDescription(auraDefinition)
+    local hasHighThreat = false
+    local hasModerateThreat = false
+    local hasLowThreat = false
+
+    for index = 1, #((type(auraDefinition) == "table" and auraDefinition.effects) or {}) do
+        local effect = auraDefinition.effects[index]
+        if type(effect) == "table" and tostring(effect.type or "") == "damage" and effect.threatCoefficient ~= nil then
+            local threatCoefficient = tonumber(effect.threatCoefficient)
+            if threatCoefficient and threatCoefficient > 1.8 then
+                hasHighThreat = true
+            elseif threatCoefficient and threatCoefficient > 1.2 then
+                hasModerateThreat = true
+            elseif threatCoefficient and threatCoefficient < 0.5 then
+                hasLowThreat = true
+            end
+        end
+    end
+
+    if hasHighThreat then
+        return "Generates a high amount of threat."
+    end
+    if hasModerateThreat then
+        return "Generates a moderate amount of threat."
+    end
+    if hasLowThreat then
+        return "Generates a low amount of threat."
+    end
+    return ""
+end
+
+local function appendAuraThreatDescription(auraDefinition, descriptionText)
+    local description = trimText(descriptionText)
+    local threatDescription = resolveAuraThreatDescription(auraDefinition)
+    if threatDescription == "" then
+        return description
+    end
+    if description == "" then
+        return threatDescription
+    end
+    if description:sub(-#threatDescription) == threatDescription then
+        return description
+    end
+    return description .. " " .. threatDescription
+end
+
 local function buildPassiveDamageSentence(effect, targetContext, options)
     local amount = math.max(0, resolveAmount(options, effect, "baseDamage"))
     local amountMode = tostring(effect and effect.amountMode or "flat")
@@ -994,7 +1040,7 @@ function AuraDescriptionBuilder:BuildGeneratedDescription(auraDefinition, option
         end
     end
 
-    return table.concat(sentences, " ")
+    return appendAuraThreatDescription(auraDefinition, table.concat(sentences, " "))
 end
 
 local function buildStackingTemplate(auraDefinition)
@@ -1477,8 +1523,10 @@ function AuraDescriptionBuilder:BuildTooltipTemplatePayload(auraDefinition, opti
     end
 
     local stackingText, stackingTokens = buildStackingTemplate(auraDefinition)
+    local bodyText = #bodySentences > 0 and table.concat(bodySentences, " ") or authoredDescriptionText
+    bodyText = appendAuraThreatDescription(auraDefinition, bodyText)
     return TooltipTemplate.NormalizeAuraPayload({
-        bodyText = #bodySentences > 0 and table.concat(bodySentences, " ") or authoredDescriptionText,
+        bodyText = bodyText,
         bodyTokens = bodyState.tokens,
         stackingText = stackingText,
         stackingTokens = stackingTokens,
