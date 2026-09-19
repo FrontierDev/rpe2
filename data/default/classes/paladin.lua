@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 35,
+    version = 36,
     dataset = {
         achievements = {},
         auras = {
@@ -104,7 +104,7 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/spell_holy_sealoffury.blp",
                 id = "fbar2e8d",
                 maxStacks = 1,
-                name = "Fury Barrier",
+                name = "Righteous Indignation",
                 stackBehavior = "refresh_duration",
                 tags = {},
                 tooltipTemplate = true,
@@ -173,7 +173,7 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_1} Holy damage. When the affected unit hits with a melee attack, apply Fury Barrier to yourself for 2 turns.",
+                    bodyText = "When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_1} Holy damage. When the affected unit hits with a melee attack, apply Righteous Indignation to yourself for 2 turns.",
                     bodyTokens = {
                         {
                             applyMode = "damage_amount",
@@ -2056,7 +2056,7 @@ Addon.Data.DefaultDatasets:Register({
                         {
                             auraRef = "b0211ab3:sfry7c1b",
                             datasetId = "b0211ab3",
-                            descriptionText = "When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_1} Holy damage. When the affected unit hits with a melee attack, apply Fury Barrier to yourself for 2 turns.",
+                            descriptionText = "When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_1} Holy damage. When the affected unit hits with a melee attack, apply Righteous Indignation to yourself for 2 turns.",
                             duration = 3,
                             icon = "interface/icons/spell_holy_sealoffury.blp",
                             nameText = "Seal of Fury",
@@ -2344,7 +2344,7 @@ Addon.Data.DefaultDatasets:Register({
                 _resourceCostsByPhase = {
                     on_cast_end = {
                         {
-                            amount = 12,
+                            amount = 50,
                             amountMode = "base_percent",
                             castPhase = "on_cast_end",
                             refundOnInterrupt = 0,
@@ -2410,7 +2410,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 12,
+                        amount = 50,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -2501,7 +2501,7 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 seedNPCSpell = false,
-                spellbookCategory = "Protection",
+                spellbookCategory = "Holy",
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
