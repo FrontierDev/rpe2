@@ -295,6 +295,7 @@ local function normalizeEffect(value)
             baseHealing = tonumber(value.baseHealing) or 0,
             amountMode = normalizeAmountMode(value.amountMode),
             statScaling = normalizeStatScaling(value.statScaling),
+            scaleWithRank = value.scaleWithRank ~= false,
         }
     end
 
@@ -305,6 +306,7 @@ local function normalizeEffect(value)
             operation = normalizeStatOperation(value.operation),
             baseAmount = tonumber(value.baseAmount) or 0,
             statScaling = normalizeStatScaling(value.statScaling),
+            scaleWithRank = value.scaleWithRank ~= false,
         }
     end
 
@@ -342,6 +344,7 @@ local function normalizeEffect(value)
             resourceRef = normalizeRef(value.resourceRef),
             amount = tonumber(value.amount) or tonumber(value.baseAmount) or 0,
             amountMode = normalizeAmountMode(value.amountMode),
+            scaleWithRank = value.scaleWithRank ~= false,
         }
     end
 
@@ -352,6 +355,7 @@ local function normalizeEffect(value)
             amountMode = normalizeAmountMode(value.amountMode),
             statScaling = normalizeStatScaling(value.statScaling),
             damageSchoolRefs = normalizeDamageSchoolRefs(value.damageSchoolRefs),
+            scaleWithRank = value.scaleWithRank ~= false,
         }
     end
 
@@ -362,6 +366,7 @@ local function normalizeEffect(value)
         statScaling = normalizeStatScaling(value.statScaling),
         damageSchoolRefs = normalizeDamageSchoolRefs(value.damageSchoolRefs),
         threatCoefficient = value.threatCoefficient ~= nil and tonumber(value.threatCoefficient) or nil,
+        scaleWithRank = value.scaleWithRank ~= false,
     }
 end
 
@@ -391,6 +396,7 @@ local function normalizeEventEffect(value)
             baseHealing = tonumber(value.baseHealing) or 0,
             amountMode = normalizeAmountMode(value.amountMode),
             statScaling = normalizeStatScaling(value.statScaling),
+            scaleWithRank = value.scaleWithRank ~= false,
         }
     end
 
@@ -418,6 +424,7 @@ local function normalizeEventEffect(value)
             resourceRef = normalizeRef(value.resourceRef),
             amount = tonumber(value.amount) or tonumber(value.baseAmount) or 0,
             amountMode = normalizeAmountMode(value.amountMode),
+            scaleWithRank = value.scaleWithRank ~= false,
         }
     end
 
@@ -440,6 +447,7 @@ local function normalizeEventEffect(value)
             amountMode = normalizeAmountMode(value.amountMode),
             statScaling = normalizeStatScaling(value.statScaling),
             damageSchoolRefs = normalizeDamageSchoolRefs(value.damageSchoolRefs),
+            scaleWithRank = value.scaleWithRank ~= false,
         }
     end
 
