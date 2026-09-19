@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 26,
+    version = 27,
     dataset = {
         achievements = {},
         auras = {
@@ -54,13 +54,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 5,
+                        baseDamage = 28.1667,
                         damageSchoolRefs = {
                             "f82db71a:esjguw6d"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.2,
+                                coefficient = 0.4225,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -3750,7 +3750,7 @@ Addon.Data.DefaultDatasets:Register({
                 automaticAuras = {},
                 category = "Fire",
                 conditions = {},
-                description = "When you deal Fire damage, you have a 20% chance to apply Ignite for 3 turns. Ignite deals Fire damage each turn and refreshes its duration when reapplied.",
+                description = "",
                 events = {
                     {
                         chance = 20,
