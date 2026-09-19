@@ -2349,7 +2349,9 @@ function AuraManager:ResolveEffectAmount(context, effect, baseField)
         end
     end
 
-    baseAmount = baseAmount * normalizeAuraRankMultiplier(auraEntry and auraEntry.rankMultiplier)
+    if type(effect) ~= "table" or effect.scaleWithRank ~= false then
+        baseAmount = baseAmount * normalizeAuraRankMultiplier(auraEntry and auraEntry.rankMultiplier)
+    end
 
     local stacks = math.max(1, math.floor(tonumber(auraEntry and auraEntry.stacks) or 1))
 
