@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 40,
+    version = 41,
     dataset = {
         achievements = {},
         auras = {
@@ -135,13 +135,13 @@ Addon.Data.DefaultDatasets:Register({
                         effects = {
                             {
                                 amountMode = "flat",
-                                baseDamage = 0,
+                                baseDamage = 28.1667,
                                 damageSchoolRefs = {
                                     "f82db71a:wwctys5s"
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 0.1,
+                                        coefficient = 0.29575,
                                         statRef = "f82db71a:u7b49vs9"
                                     }
                                 },
@@ -447,13 +447,13 @@ Addon.Data.DefaultDatasets:Register({
                         effects = {
                             {
                                 amountMode = "flat",
-                                baseDamage = 8,
+                                baseDamage = 28.1667,
                                 damageSchoolRefs = {
                                     "f82db71a:wwctys5s"
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 0.2,
+                                        coefficient = 0.4225,
                                         statRef = "f82db71a:7t7xgzcx"
                                     }
                                 },
@@ -498,13 +498,13 @@ Addon.Data.DefaultDatasets:Register({
                         effects = {
                             {
                                 amountMode = "flat",
-                                baseDamage = 0,
+                                baseDamage = 55.25,
                                 damageSchoolRefs = {
                                     "f82db71a:wwctys5s"
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 0.3,
+                                        coefficient = 0.4225,
                                         statRef = "f82db71a:u7b49vs9"
                                     }
                                 },
