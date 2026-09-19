@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 38,
+    version = 39,
     dataset = {
         achievements = {},
         auras = {
@@ -141,7 +141,7 @@ Addon.Data.DefaultDatasets:Register({
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 0.1,
+                                        coefficient = 0.08,
                                         statRef = "f82db71a:u7b49vs9"
                                     }
                                 },
@@ -453,7 +453,7 @@ Addon.Data.DefaultDatasets:Register({
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 1,
+                                        coefficient = 0.15,
                                         statRef = "f82db71a:7t7xgzcx"
                                     }
                                 },
@@ -493,7 +493,7 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {},
                 events = {
                     {
-                        chance = 100,
+                        chance = 70,
                         combatEventId = "on_auto_attack_hit",
                         effects = {
                             {
@@ -504,7 +504,7 @@ Addon.Data.DefaultDatasets:Register({
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 0.1,
+                                        coefficient = 0.2,
                                         statRef = "f82db71a:u7b49vs9"
                                     }
                                 },
@@ -522,7 +522,7 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_1} Holy damage.",
+                    bodyText = "Basic attacks have a 70% chance to deal {AURA_EVENT_DAMAGE_1} Holy damage to the target.",
                     bodyTokens = {
                         {
                             applyMode = "damage_amount",
