@@ -650,7 +650,7 @@ function SpellbookPage:RefreshSpellEntries(rows)
                     and resolved.usesRanks ~= false
                     and tonumber(resolved.rank)
                 then
-                    displayName = ("%s — Rank %d"):format(
+                    displayName = ("%s\n|cff999999Rank %d|r"):format(
                         displayName,
                         math.max(1, math.floor(tonumber(resolved.rank) or 1))
                     )
