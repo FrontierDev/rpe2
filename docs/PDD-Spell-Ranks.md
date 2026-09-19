@@ -317,7 +317,24 @@ Aura apply, sync, batch, deduplication/signature, and persistence paths that car
 
 Legacy or non-Spell Aura sources default to 1.0.
 
+Individual numeric Aura effects may opt out of the Aura's snapshotted Spell-rank multiplier:
+
+```lua
+scaleWithRank = false
+```
+
+The default is `true`, preserving existing ranked-Aura behaviour.
+
+This is required for hybrid Auras where one magnitude should rank while another remains fixed. Examples:
+
+- Ice Armor: Armor percentage ranks; Frost Resistance remains fixed.
+- Molten Armor: retaliation damage ranks; Spell Crit. Chance remains fixed.
+- Mortal Strike: damage can rank while its healing-reduction magnitude remains fixed.
+- Holy Shield: retaliation damage can rank while Block Chance remains fixed.
+
 ---
+
+
 
 # 11. Rank eligibility policy for default Spells
 
@@ -660,6 +677,8 @@ The formulas below are the current authored values before downstream mitigation/
 | Seal of Righteousness proc | Seal costs 5% Base Mana; guaranteed on basic attacks | `28.1667 + 0.4225 × Spell Power` per proc | **Aligned to the existing damage scale.** Uses the same per-proc magnitude as one Ignite tick, but as guaranteed basic-attack bonus damage. |
 | Seal of Fury proc | Seal costs 5% Base Mana; guaranteed on basic attacks; also applies Righteous Indignation on melee hits | `28.1667 + 0.29575 × Melee Attack Power` per proc | **Aligned to the existing damage scale.** Uses the same per-proc magnitude as one Deep Wounds tick. Fury remains the defensive seal because it also applies Righteous Indignation. |
 | Seal of Command proc | Seal costs 5% Base Mana; 70% chance on basic-attack hit | `55.25 + 0.4225 × Melee Attack Power` per successful proc | **Aligned to the existing damage scale.** Deliberately burstier than Righteousness/Fury. At 70% proc chance its expected AP contribution is `0.29575 × AP` per basic hit, matching the Deep Wounds/Fury AP coefficient while retaining a higher expected base-damage contribution. |
+| Molten Armor retaliation | 5% Base Mana; 10-turn self Aura; triggers when hit by melee; also grants fixed +5 Spell Crit. Chance | `28.1667 + 0.4225 × Spell Power` per trigger | **Rebalanced to the existing damage scale.** Uses the same per-trigger damage as one Ignite tick. The damage is rank-scaled; the +5 Spell Crit. Chance is explicitly fixed. |
+| Ice Armor | 5% Base Mana; 10-turn self Aura; retaliatory Chilled application; fixed +30 Frost Resistance | `30% Armor` authored base, multiplied by the Spell-rank multiplier | **Ranked defensive scaling.** Only the Armor percentage scales with rank; Frost Resistance remains +30. |
 | Holy Shield proc | 5% Base Mana; 3-turn Aura; +30 Block Chance; proc on successful block | `96 + 0.20 × Spell Power` per successful block | **Do not change the number yet.** The balance risk is repeated proc frequency, not the one-shot coefficient. Fixed +30 Block Chance must remain fixed when the proc damage ranks. |
 | Templar's Verdict | 3 Holy Power | `168.75 + 0.7875 × Melee Attack Power + 2.25 × Main-Hand damage` | **Keep.** It is the single-target Holy-Power finisher. |
 | Divine Storm | 3 Holy Power; up to 3 marked targets | `101.25 + 0.4725 × Melee Attack Power + 1.35 × Main-Hand damage` per target | **Keep.** Each target receives exactly 60% of Templar's Verdict's authored damage coefficients, giving a clear single-target/AoE trade. |
@@ -834,7 +853,9 @@ Static validation must prove:
 7. direct Resource effects remain `scaleWithRank = false` unless separately authored;
 8. Spell/Aura IDs and references remain unchanged;
 9. modified packaged dataset versions are incremented;
-10. the Ruleset default gain is 5%.
+10. the Ruleset default gain is 5%;
+11. Aura numeric effects default to `scaleWithRank = true`, while explicit `false` effects remain at authored magnitude;
+12. Ice Armor scales only its Armor percentage and Molten Armor scales only its retaliation damage.
 
 Runtime checks must cover:
 
