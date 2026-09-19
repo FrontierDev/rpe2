@@ -30,7 +30,7 @@ Rules.Definitions = {
             { key = "use_level_system", label = "Use Level System", type = "checkbox", default = false, description = "Enable character level progression logic." },
             { key = "starting_level", label = "Starting Level", type = "text", default = "1", description = "Default starting level for new characters." },
             { key = "use_spell_ranks", label = "Use Spell Ranks", type = "checkbox", default = true, description = "Enable level-derived Spell ranks and their effect scaling." },
-            { key = "spell_rank_effect_gain_percent", label = "Spell Rank Effect Gain (%)", type = "text", default = "10", description = "Percentage increase to scalable Spell effects for each rank above Rank 1." },
+            { key = "spell_rank_effect_gain_percent", label = "Spell Rank Effect Gain (%)", type = "text", default = "5", description = "Percentage increase to scalable Spell effects for each rank above Rank 1." },
             { key = "use_races", label = "Use Races", type = "checkbox", default = false, description = "Enable race-based stat and resource base progression." },
             { key = "use_classes", label = "Use Classes", type = "checkbox", default = false, description = "Enable class-based stat and resource base progression." },
         },
