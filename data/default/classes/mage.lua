@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 31,
+    version = 32,
     dataset = {
         achievements = {},
         auras = {
@@ -502,12 +502,13 @@ Addon.Data.DefaultDatasets:Register({
                 }
             },
             {
-                description = "Increases armor by 100% and Frost Resistance by 30. On melee hit taken, apply Chilled to the attacker.",
+                description = "Increases Armor and Frost Resistance. On melee hit taken, apply Chilled to the attacker.",
                 duration = 10,
                 effects = {
                     {
-                        baseAmount = 100,
+                        baseAmount = 30,
                         operation = "percent",
+                        scaleWithRank = true,
                         statRef = "f82db71a:v42albuv",
                         statScaling = {},
                         type = "stat"
@@ -515,6 +516,7 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         baseAmount = 30,
                         operation = "flat",
+                        scaleWithRank = false,
                         statRef = "f82db71a:jjn0my8k",
                         statScaling = {},
                         type = "stat"
@@ -543,20 +545,36 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "Increases armor by 100% and Frost Resistance by 30. On melee hit taken, apply Chilled to the attacker.",
-                    bodyTokens = {},
+                    bodyText = "Increases Armor by {AURA_STAT_1}% and Frost Resistance by {AURA_STAT_2}. On melee hit taken, apply Chilled to the attacker.",
+                    bodyTokens = {
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 1,
+                            key = "AURA_STAT_1",
+                            tokenType = "aura_amount"
+                        },
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 2,
+                            key = "AURA_STAT_2",
+                            tokenType = "aura_amount"
+                        }
+                    },
                     stackingText = "",
                     stackingTokens = {},
                     version = 1
                 }
             },
             {
-                description = "Increases Spell Crit. Chance by 5%. On melee hit taken, deal 5 Fire damage to the attacker.",
+                description = "Increases Spell Crit. Chance by 5%. On melee hit taken, deal Fire damage to the attacker.",
                 duration = 10,
                 effects = {
                     {
                         baseAmount = 5,
                         operation = "flat",
+                        scaleWithRank = false,
                         statRef = "f82db71a:69hfqhne",
                         statScaling = {},
                         type = "stat"
@@ -568,11 +586,17 @@ Addon.Data.DefaultDatasets:Register({
                         effects = {
                             {
                                 amountMode = "flat",
-                                baseDamage = 5,
+                                baseDamage = 28.1667,
                                 damageSchoolRefs = {
                                     "f82db71a:esjguw6d"
                                 },
-                                statScaling = {},
+                                scaleWithRank = true,
+                                statScaling = {
+                                    {
+                                        coefficient = 0.4225,
+                                        statRef = "f82db71a:7t7xgzcx"
+                                    }
+                                },
                                 type = "damage"
                             }
                         },
@@ -3266,7 +3290,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldown = 10,
                 cooldownGroup = "magearmor",
                 cooldownScalesWithHaste = false,
-                description = "Increases armor by 100% and Frost Resistance by 30. On melee hit taken, apply Chilled to the attacker.",
+                description = "Increases Armor and Frost Resistance. On melee hit taken, apply Chilled to the attacker.",
                 icon = "interface/icons/spell_frost_frostarmor02.blp",
                 id = "icearm01",
                 cooldownChannel = 3,
@@ -3295,7 +3319,7 @@ Addon.Data.DefaultDatasets:Register({
                         {
                             auraRef = "d7c874c4:icearmra",
                             datasetId = "d7c874c4",
-                            descriptionText = "Increases armor by 100% and Frost Resistance by 30. On melee hit taken, apply Chilled to the attacker.",
+                            descriptionText = "Increases Armor by {AURA_STAT_1}% and Frost Resistance by {AURA_STAT_2}. On melee hit taken, apply Chilled to the attacker.",
                             duration = 10,
                             icon = "interface/icons/spell_frost_frostarmor02.blp",
                             nameText = "Ice Armor",
@@ -3308,7 +3332,22 @@ Addon.Data.DefaultDatasets:Register({
                                 reflexive = "yourself",
                                 subject = "you"
                             },
-                            tokens = {}
+                            tokens = {
+                                {
+                                    applyMode = "stat_amount",
+                                    baseField = "baseAmount",
+                                    effectIndex = 1,
+                                    key = "AURA_STAT_1",
+                                    tokenType = "aura_amount"
+                                },
+                                {
+                                    applyMode = "stat_amount",
+                                    baseField = "baseAmount",
+                                    effectIndex = 2,
+                                    key = "AURA_STAT_2",
+                                    tokenType = "aura_amount"
+                                }
+                            }
                         }
                     },
                     mainText = "Apply Ice Armor to yourself for 10 turns.",
@@ -3352,7 +3391,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldown = 10,
                 cooldownGroup = "magearmor",
                 cooldownScalesWithHaste = false,
-                description = "Increases Spell Crit. Chance by 5%. On melee hit taken, deal 5 Fire damage to the attacker.",
+                description = "Increases Spell Crit. Chance by 5%. On melee hit taken, deal Fire damage to the attacker.",
                 icon = "interface/icons/ability_mage_moltenarmor.blp",
                 id = "molarm01",
                 cooldownChannel = 3,
