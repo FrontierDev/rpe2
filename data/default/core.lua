@@ -4669,500 +4669,139 @@ Addon.Data.DefaultDatasets:Register({
                 unlockLevel = 1
             }
         },
-        units = {
+units = {
             {
-                __rpeResourceEntryCache = {
-                    byRef = {
-                        ["f82db71a:4c8mfm99"] = {
-                            resourceRef = "f82db71a:4c8mfm99",
-                            value = 2250
-                        },
-                        ["f82db71a:q2ktkztt"] = {
-                            resourceRef = "f82db71a:q2ktkztt",
-                            value = 2250
-                        }
-                    },
-                    entries = {
-                        {
-                            resourceRef = "f82db71a:q2ktkztt",
-                            value = 2250
-                        },
-                        {
-                            resourceRef = "f82db71a:4c8mfm99",
-                            value = 2250
-                        }
-                    },
-                    indexByRef = {
-                        ["f82db71a:4c8mfm99"] = 2,
-                        ["f82db71a:q2ktkztt"] = 1
-                    }
-                },
-                __rpeStatEntryCache = {
-                    byRef = {
-                        ["f82db71a:0w7c7p09"] = {
-                            statRef = "f82db71a:0w7c7p09",
-                            value = 0
-                        },
-                        ["f82db71a:69hfqhne"] = {
-                            statRef = "f82db71a:69hfqhne",
-                            value = 5
-                        },
-                        ["f82db71a:7t7xgzcx"] = {
-                            statRef = "f82db71a:7t7xgzcx",
-                            value = 300
-                        },
-                        ["f82db71a:954yunb9"] = {
-                            statRef = "f82db71a:954yunb9",
-                            value = 0
-                        },
-                        ["f82db71a:dd88li4c"] = {
-                            statRef = "f82db71a:dd88li4c",
-                            value = 0
-                        },
-                        ["f82db71a:fercjhm5"] = {
-                            statRef = "f82db71a:fercjhm5",
-                            value = 5
-                        },
-                        ["f82db71a:gj9wxb0x"] = {
-                            statRef = "f82db71a:gj9wxb0x",
-                            value = 0
-                        },
-                        ["f82db71a:hj6d4kvy"] = {
-                            statRef = "f82db71a:hj6d4kvy",
-                            value = 0
-                        },
-                        ["f82db71a:jjn0my8k"] = {
-                            statRef = "f82db71a:jjn0my8k",
-                            value = 0
-                        },
-                        ["f82db71a:jslmczbi"] = {
-                            statRef = "f82db71a:jslmczbi",
-                            value = 5
-                        },
-                        ["f82db71a:o6113cir"] = {
-                            statRef = "f82db71a:o6113cir",
-                            value = 0
-                        },
-                        ["f82db71a:p8syz5ba"] = {
-                            statRef = "f82db71a:p8syz5ba",
-                            value = 0
-                        },
-                        ["f82db71a:pg0ytacb"] = {
-                            statRef = "f82db71a:pg0ytacb",
-                            value = 0
-                        },
-                        ["f82db71a:s1mt6jh9"] = {
-                            statRef = "f82db71a:s1mt6jh9",
-                            value = 30
-                        },
-                        ["f82db71a:tcn0s8kx"] = {
-                            statRef = "f82db71a:tcn0s8kx",
-                            value = 0
-                        },
-                        ["f82db71a:u7b49vs9"] = {
-                            statRef = "f82db71a:u7b49vs9",
-                            value = 300
-                        },
-                        ["f82db71a:v2g0tw0o"] = {
-                            statRef = "f82db71a:v2g0tw0o",
-                            value = 0
-                        },
-                        ["f82db71a:v2rs9cpy"] = {
-                            statRef = "f82db71a:v2rs9cpy",
-                            value = 300
-                        },
-                        ["f82db71a:v42albuv"] = {
-                            statRef = "f82db71a:v42albuv",
-                            value = 0
-                        },
-                        ["f82db71a:wbj4zuf3"] = {
-                            statRef = "f82db71a:wbj4zuf3",
-                            value = 0
-                        },
-                        ["f82db71a:zs1nbz13"] = {
-                            statRef = "f82db71a:zs1nbz13",
-                            value = 0
-                        }
-                    },
-                    entries = {
-                        {
-                            statRef = "f82db71a:v42albuv",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:wbj4zuf3",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:dd88li4c",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:v2g0tw0o",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:tcn0s8kx",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:o6113cir",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:p8syz5ba",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:zs1nbz13",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:u7b49vs9",
-                            value = 300
-                        },
-                        {
-                            statRef = "f82db71a:v2rs9cpy",
-                            value = 300
-                        },
-                        {
-                            statRef = "f82db71a:7t7xgzcx",
-                            value = 300
-                        },
-                        {
-                            statRef = "f82db71a:jslmczbi",
-                            value = 5
-                        },
-                        {
-                            statRef = "f82db71a:fercjhm5",
-                            value = 5
-                        },
-                        {
-                            statRef = "f82db71a:69hfqhne",
-                            value = 5
-                        },
-                        {
-                            statRef = "f82db71a:0w7c7p09",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:hj6d4kvy",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:jjn0my8k",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:pg0ytacb",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:954yunb9",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:gj9wxb0x",
-                            value = 0
-                        },
-                        {
-                            statRef = "f82db71a:s1mt6jh9",
-                            value = 30
-                        }
-                    },
-                    indexByRef = {
-                        ["f82db71a:0w7c7p09"] = 15,
-                        ["f82db71a:69hfqhne"] = 14,
-                        ["f82db71a:7t7xgzcx"] = 11,
-                        ["f82db71a:954yunb9"] = 19,
-                        ["f82db71a:dd88li4c"] = 3,
-                        ["f82db71a:fercjhm5"] = 13,
-                        ["f82db71a:gj9wxb0x"] = 20,
-                        ["f82db71a:hj6d4kvy"] = 16,
-                        ["f82db71a:jjn0my8k"] = 17,
-                        ["f82db71a:jslmczbi"] = 12,
-                        ["f82db71a:o6113cir"] = 6,
-                        ["f82db71a:p8syz5ba"] = 7,
-                        ["f82db71a:pg0ytacb"] = 18,
-                        ["f82db71a:s1mt6jh9"] = 21,
-                        ["f82db71a:tcn0s8kx"] = 5,
-                        ["f82db71a:u7b49vs9"] = 9,
-                        ["f82db71a:v2g0tw0o"] = 4,
-                        ["f82db71a:v2rs9cpy"] = 10,
-                        ["f82db71a:v42albuv"] = 1,
-                        ["f82db71a:wbj4zuf3"] = 2,
-                        ["f82db71a:zs1nbz13"] = 8
-                    }
-                },
                 appearances = {},
                 attributes = {},
                 challengeLevel = "normal",
                 creatureSize = "medium",
                 creatureType = "humanoid",
-                id = "dtb3fwk2",
-                mainHandWeapon = "61fdf3df:8fp9w74u",
-                name = "Darkblade",
-                presets = {
-                    {
-                        appearances = {
-                            {
-                                cam = 0.4,
-                                displayId = 4765,
-                                fileDataId = 120294,
-                                rot = 0,
-                                z = -0.35
-                            },
-                            {
-                                cam = 0.4,
-                                displayId = 4762,
-                                fileDataId = 120294,
-                                rot = 0,
-                                z = -0.35
-                            }
-                        },
-                        equipment = {
-                            mainHandWeapon = "61fdf3df:8wv368lv"
-                        },
-                        name = "Marauder",
-                        resourceModifiers = {
-                            {
-                                flatBonus = 0,
-                                percentBonus = 10,
-                                resourceRef = "f82db71a:q2ktkztt"
-                            }
-                        },
-                        spells = {
-                            "f82db71a:z36xzk0w",
-                            "f82db71a:zd3t6feq",
-                            "7bbb4cb9:0jiq0uoc"
-                        },
-                        statModifiers = {
-                            {
-                                flatBonus = 5,
-                                percentBonus = 0,
-                                statRef = "f82db71a:tcn0s8kx"
-                            },
-                            {
-                                flatBonus = 0,
-                                percentBonus = 10,
-                                statRef = "f82db71a:u7b49vs9"
-                            },
-                            {
-                                flatBonus = 0,
-                                percentBonus = -5,
-                                statRef = "f82db71a:zs1nbz13"
-                            }
-                        }
-                    },
-                    {
-                        appearances = {
-                            {
-                                cam = 0.45,
-                                displayId = 4980,
-                                fileDataId = 120263,
-                                rot = 0,
-                                z = -0.35
-                            },
-                            {
-                                cam = 0.35,
-                                displayId = 4973,
-                                fileDataId = 120263,
-                                rot = 0,
-                                z = -0.35
-                            }
-                        },
-                        name = "Sorceress",
-                        resourceModifiers = {
-                            {
-                                flatBonus = 0,
-                                percentBonus = -20,
-                                resourceRef = "f82db71a:q2ktkztt"
-                            }
-                        },
-                        spells = {
-                            "f82db71a:z36xzk0w",
-                            "f82db71a:zd3t6feq",
-                            "d7c874c4:n6jbep9e",
-                            "d7c874c4:300h0gls"
-                        },
-                        statModifiers = {
-                            {
-                                flatBonus = 0,
-                                percentBonus = 10,
-                                statRef = "f82db71a:7t7xgzcx"
-                            },
-                            {
-                                flatBonus = 0,
-                                percentBonus = 5,
-                                statRef = "f82db71a:69hfqhne"
-                            },
-                            {
-                                flatBonus = 0,
-                                percentBonus = 5,
-                                statRef = "f82db71a:zs1nbz13"
-                            }
-                        }
-                    },
-                    {
-                        appearances = {
-                            {
-                                cam = 0.45,
-                                displayId = 4980,
-                                fileDataId = 120263,
-                                rot = 0,
-                                z = -0.35
-                            },
-                            {
-                                cam = 0.35,
-                                displayId = 4973,
-                                fileDataId = 120263,
-                                rot = 0,
-                                z = -0.35
-                            }
-                        },
-                        name = "Priestess",
-                        resourceModifiers = {
-                            {
-                                flatBonus = 0,
-                                percentBonus = -20,
-                                resourceRef = "f82db71a:q2ktkztt"
-                            },
-                            {
-                                flatBonus = 0,
-                                percentBonus = 10,
-                                resourceRef = "f82db71a:4c8mfm99"
-                            }
-                        },
-                        spells = {
-                            "f82db71a:z36xzk0w",
-                            "f82db71a:zd3t6feq",
-                            "1c1038a7:eet5xd4t",
-                            "1c1038a7:rm9rekvj",
-                            "1c1038a7:drza38ax"
-                        },
-                        statModifiers = {
-                            {
-                                flatBonus = 0,
-                                percentBonus = 10,
-                                statRef = "f82db71a:hj6d4kvy"
-                            },
-                            {
-                                flatBonus = 0,
-                                percentBonus = 5,
-                                statRef = "f82db71a:69hfqhne"
-                            },
-                            {
-                                flatBonus = 0,
-                                percentBonus = 5,
-                                statRef = "f82db71a:zs1nbz13"
-                            },
-                            {
-                                flatBonus = 0,
-                                percentBonus = 20,
-                                statRef = "f82db71a:7t7xgzcx"
-                            }
-                        }
-                    }
-                },
+                id = "7i40epa5",
+                mainHandWeapon = "f82db71a:stwswd01",
+                name = "Human",
+                presets = {},
                 resistances = {},
                 resources = {
                     {
-                        resourceRef = "f82db71a:q2ktkztt",
-                        value = 2250
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        resourceRef = "f82db71a:q2ktkztt"
                     },
                     {
-                        resourceRef = "f82db71a:4c8mfm99",
-                        value = 2250
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
                     }
                 },
                 spells = {
                     "f82db71a:z36xzk0w",
-                    "f82db71a:zd3t6feq"
+                    "f82db71a:shoota01"
                 },
                 stats = {
                     {
-                        statRef = "f82db71a:v42albuv",
-                        value = 0
+                        initialValue = 25,
+                        perLevelValue = 25,
+                        statRef = "f82db71a:v42albuv"
                     },
                     {
-                        statRef = "f82db71a:wbj4zuf3",
-                        value = 0
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:wbj4zuf3"
                     },
                     {
-                        statRef = "f82db71a:dd88li4c",
-                        value = 0
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:dd88li4c"
                     },
                     {
-                        statRef = "f82db71a:v2g0tw0o",
-                        value = 0
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:v2g0tw0o"
                     },
                     {
-                        statRef = "f82db71a:tcn0s8kx",
-                        value = 0
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:tcn0s8kx"
                     },
                     {
-                        statRef = "f82db71a:o6113cir",
-                        value = 0
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:o6113cir"
                     },
                     {
-                        statRef = "f82db71a:p8syz5ba",
-                        value = 0
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:p8syz5ba"
                     },
                     {
-                        statRef = "f82db71a:zs1nbz13",
-                        value = 0
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:zs1nbz13"
                     },
                     {
-                        statRef = "f82db71a:u7b49vs9",
-                        value = 300
+                        initialValue = 65,
+                        perLevelValue = 4,
+                        statRef = "f82db71a:u7b49vs9"
                     },
                     {
-                        statRef = "f82db71a:v2rs9cpy",
-                        value = 300
+                        initialValue = 65,
+                        perLevelValue = 4,
+                        statRef = "f82db71a:v2rs9cpy"
                     },
                     {
-                        statRef = "f82db71a:7t7xgzcx",
-                        value = 300
+                        initialValue = 65,
+                        perLevelValue = 4,
+                        statRef = "f82db71a:7t7xgzcx"
                     },
                     {
-                        statRef = "f82db71a:jslmczbi",
-                        value = 5
+                        initialValue = 5,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:jslmczbi"
                     },
                     {
-                        statRef = "f82db71a:fercjhm5",
-                        value = 5
+                        initialValue = 5,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:fercjhm5"
                     },
                     {
-                        statRef = "f82db71a:69hfqhne",
-                        value = 5
+                        initialValue = 5,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:69hfqhne"
                     },
                     {
-                        statRef = "f82db71a:0w7c7p09",
-                        value = 0
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:0w7c7p09"
                     },
                     {
-                        statRef = "f82db71a:hj6d4kvy",
-                        value = 0
+                        initialValue = 0,
+                        perLevelValue = 5,
+                        statRef = "f82db71a:hj6d4kvy"
                     },
                     {
-                        statRef = "f82db71a:jjn0my8k",
-                        value = 0
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:jjn0my8k"
                     },
                     {
-                        statRef = "f82db71a:pg0ytacb",
-                        value = 0
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:pg0ytacb"
                     },
                     {
-                        statRef = "f82db71a:954yunb9",
-                        value = 0
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:954yunb9"
                     },
                     {
-                        statRef = "f82db71a:gj9wxb0x",
-                        value = 0
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:gj9wxb0x"
                     },
                     {
-                        statRef = "f82db71a:s1mt6jh9",
-                        value = 30
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:rgnrtg01"
                     }
                 },
                 tags = {}
