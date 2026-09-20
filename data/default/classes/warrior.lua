@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 33,
+        version = 34,
     dataset = {
         achievements = {},
         auras = {
@@ -3591,7 +3591,7 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 conditions = {},
-                cooldown = 3,
+                cooldown = 5,
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
