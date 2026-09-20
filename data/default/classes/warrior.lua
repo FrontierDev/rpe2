@@ -398,8 +398,7 @@ Addon.Data.DefaultDatasets:Register({
                     stackingTokens = {},
                     version = 1
                 }
-            }
-,
+            },
             {
                 description = "",
                 duration = 1,
@@ -3010,8 +3009,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 totalTicks = 0,
                 useCooldownCharges = false
-            }
-,
+            },
             {
                 allowDeadTargets = false,
                 canMoveWhileCasting = false,
