@@ -35,7 +35,7 @@ local function isPresetNpc(unit)
 end
 
 local baseGetResolvedValue = EventUnit.GetResolvedValue
-function EventUnit:GetResolvedValue(key, fallback)
+function EventUnit:GetResolvedValue(key, fallback, options)
     if isPresetNpc(self) then
         if key == "spells" then
             -- Preset spells are host-materialized runtime state. Empty is a
@@ -49,7 +49,7 @@ function EventUnit:GetResolvedValue(key, fallback)
         end
     end
 
-    return type(baseGetResolvedValue) == "function" and baseGetResolvedValue(self, key, fallback) or fallback
+    return type(baseGetResolvedValue) == "function" and baseGetResolvedValue(self, key, fallback, options) or fallback
 end
 
 local baseBuildResolvedSpellRefs = EventUnit.BuildResolvedSpellRefs

@@ -6,6 +6,7 @@ Addon.Internal.Database.Classes = Addon.Internal.Database.Classes or {}
 
 local EventUnit = {}
 EventUnit.__index = EventUnit
+local UnitClass = Addon.Internal.Database.Classes.Unit
 local RESOURCE_RECORD_SEPARATOR = string.char(27)
 local RESOURCE_FIELD_SEPARATOR = string.char(26)
 local SPELL_RECORD_SEPARATOR = string.char(21)
@@ -117,6 +118,11 @@ local function resolveUnitDefinition(registryId)
     return nil, nil
 end
 
+local function getUnitClass()
+    return Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes
+        and Addon.Internal.Database.Classes.Unit or UnitClass
+end
+
 local function resolvePetDefinition(petRef)
     local normalizedPetRef = type(petRef) == "string" and petRef or ""
     if normalizedPetRef == "" then
@@ -159,6 +165,12 @@ local function normalizeResourceEntry(entry)
 
     local resourceRef = normalizeString(entry.resourceRef or entry.resourceID or entry.id, "")
     if resourceRef == "" then
+        return nil
+    end
+
+    local hasRuntimeValue = entry.currentValue ~= nil or entry.maxValue ~= nil
+        or entry.current ~= nil or entry.max ~= nil or entry.maximum ~= nil or entry.value ~= nil
+    if not hasRuntimeValue and (entry.initialValue ~= nil or entry.perLevelValue ~= nil) then
         return nil
     end
 
@@ -208,6 +220,9 @@ local function normalizeStatEntry(entry)
     local value = tonumber(entry.value)
     local currentValue = tonumber(entry.currentValue ~= nil and entry.currentValue or entry.current)
     if value == nil and currentValue == nil then
+        if entry.initialValue ~= nil or entry.perLevelValue ~= nil then
+            return nil
+        end
         value = 0
         currentValue = 0
     elseif value == nil then
@@ -328,7 +343,8 @@ end
 
 local resolveSpellValue
 
-local function buildResolvedResources(eventUnit, playerCount)
+local function buildResolvedResources(eventUnit, playerCount, options)
+    local unitClass = getUnitClass()
     local localResources = type(eventUnit) == "table" and eventUnit.resources or nil
     if type(localResources) == "table" and #localResources > 0 then
         return cloneResources(localResources)
@@ -336,26 +352,26 @@ local function buildResolvedResources(eventUnit, playerCount)
 
     local resolvedUnit = type(eventUnit) == "table" and eventUnit.GetResolvedUnit and eventUnit:GetResolvedUnit() or nil
     local resolvedResources = {}
-    for index = 1, #((resolvedUnit and resolvedUnit.resources) or {}) do
-        local entry = resolvedUnit.resources[index]
-        local resourceRef = normalizeString(entry and (entry.resourceRef or entry.resourceID or entry.id), "")
+    local baseValues = type(unitClass) == "table" and type(unitClass.ResolveResourceValues) == "function"
+        and unitClass.ResolveResourceValues(resolvedUnit, type(options) == "table" and options.level or nil)
+        or {}
+    local preset = type(unitClass) == "table" and type(unitClass.ResolvePreset) == "function"
+        and unitClass.ResolvePreset(resolvedUnit, eventUnit and eventUnit.presetIndex)
+        or nil
+    if type(unitClass) == "table" and type(unitClass.ApplyResourceModifiers) == "function" then
+        baseValues = unitClass.ApplyResourceModifiers(baseValues, preset)
+    end
+
+    for index = 1, #baseValues do
+        local entry = baseValues[index]
+        local resourceRef = normalizeString(entry and entry.resourceRef, "")
         if resourceRef ~= "" then
-            local currentValue = entry and entry.currentValue or nil
-            local maxValue = entry and entry.maxValue or nil
-            if currentValue ~= nil or maxValue ~= nil then
-                resolvedResources[#resolvedResources + 1] = {
-                    resourceRef = resourceRef,
-                    currentValue = tonumber(currentValue ~= nil and currentValue or maxValue) or 0,
-                    maxValue = tonumber(maxValue ~= nil and maxValue or currentValue) or 0,
-                }
-            else
-                local baseValue = tonumber(entry and entry.value) or 0
-                resolvedResources[#resolvedResources + 1] = {
-                    resourceRef = resourceRef,
-                    currentValue = baseValue,
-                    maxValue = baseValue,
-                }
-            end
+            local value = tonumber(entry.value) or 0
+            resolvedResources[#resolvedResources + 1] = {
+                resourceRef = resourceRef,
+                currentValue = value,
+                maxValue = value,
+            }
         end
     end
 
@@ -367,9 +383,32 @@ local function buildResolvedSpellRefs(eventUnit, fallback)
     return cloneSpellRefs(resolveSpellValue(eventUnit, resolvedUnit, fallback) or {})
 end
 
-local function buildResolvedStats(eventUnit, fallback)
+local function buildUnitDerivedStats(baseUnit, presetIndex, level)
+    local unitClass = getUnitClass()
+    if type(baseUnit) ~= "table" or type(unitClass) ~= "table"
+        or type(unitClass.ResolveStatValues) ~= "function"
+    then
+        return {}
+    end
+
+    local stats = unitClass.ResolveStatValues(baseUnit, level)
+    local preset = type(unitClass.ResolvePreset) == "function"
+        and unitClass.ResolvePreset(baseUnit, presetIndex)
+        or nil
+    if type(unitClass.ApplyStatModifiers) == "function" then
+        stats = unitClass.ApplyStatModifiers(stats, preset)
+    end
+    return stats
+end
+
+local function buildResolvedStats(eventUnit, fallback, options)
     local resolvedUnit = type(eventUnit) == "table" and eventUnit.GetResolvedUnit and eventUnit:GetResolvedUnit() or nil
-    local baseStats = cloneStats((resolvedUnit and resolvedUnit.stats) or fallback or {})
+    local baseStats
+    if type(resolvedUnit) == "table" then
+        baseStats = buildUnitDerivedStats(resolvedUnit, eventUnit and eventUnit.presetIndex, type(options) == "table" and options.level or nil)
+    else
+        baseStats = cloneStats(fallback or {})
+    end
     local localStats = type(eventUnit) == "table" and eventUnit.stats or nil
     if type(localStats) ~= "table" or #localStats == 0 then
         return baseStats
@@ -718,15 +757,18 @@ resolveSpellValue = function(eventUnit, resolvedUnit, fallback)
     return fallback
 end
 
-function EventUnit:GetResolvedValue(key, fallback)
+function EventUnit:GetResolvedValue(key, fallback, options)
     if key == "spells" then
         return buildResolvedSpellRefs(self, fallback)
     end
     if key == "stats" then
-        return buildResolvedStats(self, fallback)
+        return buildResolvedStats(self, fallback, options)
     end
     if key == "resources" then
-        return buildResolvedResources(self)
+        local resolver = EventUnit.BuildResolvedResources
+        return type(resolver) == "function"
+            and resolver(self, type(options) == "table" and options.playerCount or nil, options)
+            or buildResolvedResources(self, type(options) == "table" and options.playerCount or nil, options)
     end
 
     local resolvedUnit = self:GetResolvedUnit()
@@ -791,8 +833,8 @@ end
 
 EventUnit.CoerceBoolean = coerceBoolean
 
-function EventUnit.BuildResolvedResources(eventUnit, playerCount)
-    return buildResolvedResources(eventUnit, playerCount)
+function EventUnit.BuildResolvedResources(eventUnit, playerCount, options)
+    return buildResolvedResources(eventUnit, playerCount, options)
 end
 
 function EventUnit.BuildResourceDeltas(baseResources, resolvedResources)
@@ -807,8 +849,12 @@ function EventUnit.BuildResolvedSpellRefs(eventUnit, fallback)
     return buildResolvedSpellRefs(eventUnit, fallback)
 end
 
-function EventUnit.BuildResolvedStats(eventUnit, fallback)
-    return buildResolvedStats(eventUnit, fallback)
+function EventUnit.BuildResolvedStats(eventUnit, fallback, options)
+    return buildResolvedStats(eventUnit, fallback, options)
+end
+
+function EventUnit.BuildUnitDerivedStats(baseUnit, presetIndex, level)
+    return buildUnitDerivedStats(baseUnit, presetIndex, level)
 end
 
 function EventUnit.HydrateNetworkUnit(unit, options)
@@ -824,24 +870,57 @@ function EventUnit.HydrateNetworkUnit(unit, options)
     end
 
     local hydrated = EventUnit.FromTable and EventUnit.FromTable(unit) or unit
-    local playerCount = math.max(0, tonumber(type(options) == "table" and options.playerCount or 0) or 0)
+    local resolvedOptions = type(options) == "table" and options or {}
+    local playerCount = math.max(0, math.floor(tonumber(resolvedOptions.playerCount) or 0))
+
+    if not hydrated.isPlayer and (resourceMode == "inherit" or resourceMode == "delta"
+        or spellMode == "inherit" or statMode == "inherit" or statMode == "merge" or statMode == "bonus")
+    then
+        local eventLevel = tonumber(resolvedOptions.level)
+        local suppliedPlayerCount = tonumber(resolvedOptions.playerCount)
+        if eventLevel == nil or eventLevel < 1 or suppliedPlayerCount == nil or suppliedPlayerCount < 0
+            or type(resolvedOptions.difficulty) ~= "string" or resolvedOptions.difficulty == ""
+        then
+            error(("Cannot hydrate network NPC %s: Event level, player count, and difficulty context are required.")
+                :format(tostring(hydrated.registryID or "<missing registryID>")), 2)
+        end
+
+        local resolvedUnit = type(hydrated.GetResolvedUnit) == "function" and hydrated:GetResolvedUnit() or nil
+        if type(resolvedUnit) ~= "table" then
+            error(("Cannot hydrate network NPC %s: activated Unit definition is unavailable for inherited mechanics.")
+                :format(tostring(hydrated.registryID or "<missing registryID>")), 2)
+        end
+
+        local requestedPreset = math.max(0, math.floor(tonumber(hydrated.presetIndex) or 0))
+        local unitClass = getUnitClass()
+        if requestedPreset > 0 and type(unitClass) == "table" and type(unitClass.ResolvePreset) == "function" then
+            local _, resolvedPresetIndex = unitClass.ResolvePreset(resolvedUnit, requestedPreset)
+            if tonumber(resolvedPresetIndex) ~= requestedPreset then
+                error(("Cannot hydrate network NPC %s: preset %d is unavailable in the activated Unit definition.")
+                    :format(tostring(hydrated.registryID or "<missing registryID>"), requestedPreset), 2)
+            end
+        end
+    end
 
     if resourceMode == "inherit" then
-        hydrated.resources = buildResolvedResources(hydrated, playerCount)
+        local resolver = EventUnit.BuildResolvedResources
+        hydrated.resources = type(resolver) == "function"
+            and resolver(hydrated, playerCount, resolvedOptions)
+            or buildResolvedResources(hydrated, playerCount, resolvedOptions)
     elseif resourceMode == "delta" then
         local resourceDeltas = cloneResources(hydrated.resources)
         hydrated.resources = {}
         local resolver = EventUnit.BuildResolvedResources
         local baseResources = type(resolver) == "function"
-                and resolver(hydrated, playerCount, options)
-            or buildResolvedResources(hydrated, playerCount)
+                and resolver(hydrated, playerCount, resolvedOptions)
+            or buildResolvedResources(hydrated, playerCount, resolvedOptions)
         hydrated.resources = applyResourceDeltas(baseResources, resourceDeltas)
     end
     if spellMode == "inherit" then
         hydrated.spells = buildResolvedSpellRefs(hydrated)
     end
     if statMode == "inherit" or statMode == "merge" or statMode == "bonus" then
-        hydrated.stats = buildResolvedStats(hydrated)
+        hydrated.stats = EventUnit.BuildResolvedStats(hydrated, nil, resolvedOptions)
     end
 
     hydrated._networkResourceMode = nil

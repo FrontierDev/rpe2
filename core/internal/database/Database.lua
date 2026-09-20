@@ -1634,7 +1634,8 @@ local function buildSeededUnitFields(dataset)
         if stat and stat.id and stat.seedNPCStat == true then
             seededStats[#seededStats + 1] = {
                 statRef = ("%s:%s"):format(datasetId, stat.id),
-                value = tonumber(stat.baseValue) or 0,
+                initialValue = tonumber(stat.baseValue) or 0,
+                perLevelValue = 0,
             }
         end
     end

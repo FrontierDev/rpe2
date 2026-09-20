@@ -11,6 +11,7 @@ local Dependencies = Database.Dependecies or {}
 local Profile = Addon.Internal.Profile or {}
 local Registry = Addon.Internal.Registry or {}
 local Ruleset = Addon.Internal.Ruleset or {}
+local EventUnit = (Database.Classes or {}).EventUnit
 local Dice = Addon.Utils.Dice or {}
 local Common = Addon.Utils.Common or {}
 
@@ -188,7 +189,7 @@ local function isLocalPlayerSkillProgressionSource(eventState, eventUnit)
     return isLocalPlayerEventUnit(eventState, eventUnit)
 end
 
-local function resolveRuntimeStatValue(eventUnit, statRef)
+local function resolveRuntimeStatValue(eventUnit, statRef, eventState)
     local normalizedStatRef = normalizeRef(statRef)
     if type(eventUnit) ~= "table" or not normalizedStatRef then
         return nil
@@ -209,9 +210,11 @@ local function resolveRuntimeStatValue(eventUnit, statRef)
     end
 
     local value = findInRows(eventUnit.stats)
-    if value == nil and type(eventUnit.GetResolvedUnit) == "function" then
-        local resolvedUnit = eventUnit:GetResolvedUnit()
-        value = findInRows(resolvedUnit and resolvedUnit.stats)
+    if value == nil and type(EventUnit) == "table" and type(EventUnit.BuildResolvedStats) == "function" then
+        local stats = EventUnit.BuildResolvedStats(eventUnit, nil, {
+            level = eventState and eventState.level,
+        })
+        value = findInRows(stats)
     end
     if value == nil then
         return nil
@@ -258,7 +261,7 @@ local function resolveSkillModifier(skillRef, skill, eventState, eventUnit)
         return 0
     end
 
-    local statValue = resolveRuntimeStatValue(eventUnit, derivedStatRef)
+    local statValue = resolveRuntimeStatValue(eventUnit, derivedStatRef, eventState)
     if statValue == nil then
         return 0
     end

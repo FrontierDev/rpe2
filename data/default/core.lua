@@ -4004,7 +4004,7 @@ Addon.Data.DefaultDatasets:Register({
                 itemLevelWeight = 0,
                 name = "Movement Speed",
                 priority = 85,
-                seedNPCStat = false,
+                seedNPCStat = true,
                 tags = {},
                 valueMode = "manual",
                 visibility = true
@@ -4116,7 +4116,7 @@ Addon.Data.DefaultDatasets:Register({
                 itemLevelWeight = 0,
                 name = "Shadow Resistance",
                 priority = 72,
-                seedNPCStat = false,
+                seedNPCStat = true,
                 tags = {},
                 valueMode = "manual",
                 visibility = true
@@ -4139,7 +4139,7 @@ Addon.Data.DefaultDatasets:Register({
                 itemLevelWeight = 0,
                 name = "Holy Resistance",
                 priority = 71,
-                seedNPCStat = false,
+                seedNPCStat = true,
                 tags = {},
                 valueMode = "manual",
                 visibility = true
@@ -4162,7 +4162,7 @@ Addon.Data.DefaultDatasets:Register({
                 itemLevelWeight = 0,
                 name = "Damage Done",
                 priority = 4,
-                seedNPCStat = true,
+                seedNPCStat = false,
                 tags = {},
                 valueMode = "manual",
                 visibility = false

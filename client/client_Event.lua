@@ -1705,6 +1705,8 @@ local function hydrateInboundEventUnit(unit, eventState)
 
     return EventUnit.HydrateNetworkUnit(unit, {
         playerCount = countPlayerUnits(eventState and eventState.units or nil),
+        level = eventState and eventState.level,
+        difficulty = eventState and eventState.difficulty,
     })
 end
 
@@ -2866,7 +2868,11 @@ local function hydrateLocalHostAuthoritativeRoster(eventState)
         return false
     end
 
-    local units = Event.DeserializeUnitsFromNetwork(serverEventState:SerializeUnitsForNetwork())
+    local units = Event.DeserializeUnitsFromNetwork(serverEventState:SerializeUnitsForNetwork(), {
+        level = eventState.level,
+        difficulty = eventState.difficulty,
+        playerCount = countPlayerUnits(serverEventState.units),
+    })
     if type(units) ~= "table" or #units == 0 then
         return false
     end
@@ -3132,7 +3138,12 @@ function Client:HandleEventUnits(arguments)
     local wasLocalTurn = self.IsLocalTurnActive and self:IsLocalTurnActive(eventState) or false
     local startupRuntime = getEventStartupRuntime(self, eventState.id, true)
     local deserializeStartTime = timingParts and getTimingNowMilliseconds() or nil
-    local units = Event.DeserializeUnitsFromNetwork(arguments and arguments[3] or "")
+    local serializedUnits = arguments and arguments[3] or ""
+    local units = Event.DeserializeUnitsFromNetwork(serializedUnits, {
+        level = eventState.level,
+        difficulty = eventState.difficulty,
+        playerCount = Event.CountPlayerUnitsInNetwork(serializedUnits),
+    })
     appendTimingPart(timingParts, "deserialize-units", deserializeStartTime, 15)
 
     local resourcesStartTime = timingParts and getTimingNowMilliseconds() or nil
@@ -3215,7 +3226,14 @@ function Client:HandleEventUnitDeltaBatch(arguments)
         return false
     end
 
-    local entries = Event and Event.DeserializeUnitDeltaBatchFromNetwork and Event.DeserializeUnitDeltaBatchFromNetwork(arguments and arguments[3] or "") or {}
+    local hydrationOptions = {
+        level = eventState.level,
+        difficulty = eventState.difficulty,
+        playerCount = countPlayerUnits(eventState.units or {}),
+    }
+    local entries = Event and Event.DeserializeUnitDeltaBatchFromNetwork
+        and Event.DeserializeUnitDeltaBatchFromNetwork(arguments and arguments[3] or "", hydrationOptions)
+        or {}
     if #entries == 0 then
         return false
     end

@@ -130,9 +130,14 @@ local function normalizeUnitStats(values)
         local entry = values[index]
         local statRef = type(entry) == "table" and normalizeRef(entry.statRef) or nil
         if statRef then
+            local initialValue = entry.initialValue
+            if initialValue == nil then
+                initialValue = entry.value
+            end
             normalized[#normalized + 1] = {
                 statRef = statRef,
-                value = tonumber(entry.value) or 0,
+                initialValue = normalizeNumber(initialValue, 0),
+                perLevelValue = normalizeNumber(entry.perLevelValue, 0),
             }
         end
     end
@@ -147,9 +152,14 @@ local function normalizeUnitResources(values)
         local entry = values[index]
         local resourceRef = type(entry) == "table" and normalizeRef(entry.resourceRef) or nil
         if resourceRef then
+            local initialValue = entry.initialValue
+            if initialValue == nil then
+                initialValue = entry.value
+            end
             normalized[#normalized + 1] = {
                 resourceRef = resourceRef,
-                value = tonumber(entry.value) or 0,
+                initialValue = normalizeNumber(initialValue, 0),
+                perLevelValue = normalizeNumber(entry.perLevelValue, 0),
             }
         end
     end
@@ -293,6 +303,51 @@ local function applyNumericModifier(baseValue, modifier)
     local percentBonus = normalizeNumber(modifier and modifier.percentBonus, 0)
     local flatBonus = normalizeNumber(modifier and modifier.flatBonus, 0)
     return base * (1 + percentBonus / 100) + flatBonus
+end
+
+local function normalizeProgressionLevel(level)
+    local numeric = normalizeOptionalNumber(level)
+    if numeric == nil then
+        return 1
+    end
+
+    return math.max(1, math.floor(numeric))
+end
+
+function Unit.ResolveProgressionValue(initialValue, perLevelValue, level)
+    local normalizedInitial = normalizeNumber(initialValue, 0)
+    local normalizedPerLevel = normalizeNumber(perLevelValue, 0)
+    return normalizedInitial + ((normalizeProgressionLevel(level) - 1) * normalizedPerLevel)
+end
+
+function Unit.ResolveStatValues(unit, level)
+    local resolved = {}
+    local stats = normalizeUnitStats(type(unit) == "table" and unit.stats or nil)
+
+    for index = 1, #stats do
+        local entry = stats[index]
+        resolved[#resolved + 1] = {
+            statRef = entry.statRef,
+            value = Unit.ResolveProgressionValue(entry.initialValue, entry.perLevelValue, level),
+        }
+    end
+
+    return resolved
+end
+
+function Unit.ResolveResourceValues(unit, level)
+    local resolved = {}
+    local resources = normalizeUnitResources(type(unit) == "table" and unit.resources or nil)
+
+    for index = 1, #resources do
+        local entry = resources[index]
+        resolved[#resolved + 1] = {
+            resourceRef = entry.resourceRef,
+            value = Unit.ResolveProgressionValue(entry.initialValue, entry.perLevelValue, level),
+        }
+    end
+
+    return resolved
 end
 
 function Unit.GetChallengeLevelDefinitions()

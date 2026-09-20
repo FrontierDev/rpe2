@@ -12,6 +12,7 @@ local Comms = Addon.Internal.Comms or {}
 local Operations = Comms.Operations or {}
 local Registry = Addon.Internal.Registry or {}
 local Database = Addon.Internal.Database or {}
+local EventUnit = (Database.Classes or {}).EventUnit
 local Dependencies = Database.Dependecies or {}
 local Common = Addon.Utils.Common or {}
 local Dice = Addon.Utils.Dice or {}
@@ -734,8 +735,28 @@ local function buildHealthResourceContext(self, entry)
         return context
     end
 
-    local resolvedUnit = entry.defenderUnit.GetResolvedUnit and entry.defenderUnit:GetResolvedUnit() or nil
-    local resolvedResources = type(resolvedUnit) == "table" and resolvedUnit.resources or nil
+    local resolvedResources = nil
+    if type(entry.defenderUnit.GetResolvedUnit) == "function"
+        and type(EventUnit) == "table"
+        and type(EventUnit.BuildUnitDerivedResources) == "function"
+    then
+        local baseUnit = entry.defenderUnit:GetResolvedUnit()
+        local playerCount = 0
+        for index = 1, #(entry.eventState and entry.eventState.units or {}) do
+            if entry.eventState.units[index] and entry.eventState.units[index].isPlayer == true then
+                playerCount = playerCount + 1
+            end
+        end
+        resolvedResources = EventUnit.BuildUnitDerivedResources(
+            baseUnit,
+            entry.defenderUnit.presetIndex,
+            playerCount,
+            {
+                level = entry.eventState and entry.eventState.level,
+                difficulty = entry.eventState and entry.eventState.difficulty,
+            }
+        )
+    end
     for index = 1, #(resolvedResources or {}) do
         local candidate = resolvedResources[index]
         if normalizeToken(candidate and candidate.resourceRef) == healthResourceRef then

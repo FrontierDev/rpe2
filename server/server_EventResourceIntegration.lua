@@ -271,13 +271,18 @@ end
 
 local function getCurrentEventContext(server)
     local live = type(server.EventState) == "table" and server.EventState.active == true and server.EventState or nil
-    local state = live or server.EventDraftState
+    local state = live
+    if not state and type(server.GetEditableEventState) == "function" then
+        state = server:GetEditableEventState()
+    end
+    state = state or server.EventDraftState
     return state, countPlayerUnits(state and state.units or {})
 end
 
 local function buildResourceOptions(options, difficulty)
     local source = type(options) == "table" and options or {}
     return {
+        level = source.level,
         difficulty = source.difficulty ~= nil and source.difficulty or difficulty,
         playerScalingChallengeLevels = source.playerScalingChallengeLevels,
         applyPerPlayerScaling = source.applyPerPlayerScaling,
@@ -301,11 +306,15 @@ if Server._unitResourceVariantIntegrationInstalled ~= true then
             return variant
         end
 
-        local contextState = type(self.EventState) == "table" and self.EventState.active == true and self.EventState
-            or self.EventDraftState
+        local contextState = getCurrentEventContext(self)
         local difficulty = type(options) == "table" and options.difficulty or nil
         if difficulty == nil then
             difficulty = contextState and contextState.difficulty or "normal"
+        end
+
+        local level = type(options) == "table" and options.level or nil
+        if level == nil then
+            level = contextState and contextState.level or variant.level
         end
 
         local playerCount = type(options) == "table" and options.playerCount or nil
@@ -313,22 +322,25 @@ if Server._unitResourceVariantIntegrationInstalled ~= true then
             playerCount = variant.playerCount
         end
 
+        local resourceOptions = buildResourceOptions(options, difficulty)
+        resourceOptions.level = level
         local resources, policy = EventUnit.BuildUnitDerivedResources(
             variant.baseUnit,
             variant.presetIndex,
             playerCount,
-            buildResourceOptions(options, difficulty)
+            resourceOptions
         )
         variant.resources = deepCopy(resources)
         variant.resourcePolicy = deepCopy(policy)
         variant.playerCount = policy and policy.playerCount or variant.playerCount
+        variant.level = policy and policy.level or level
         return variant
     end
 
     Server._unitResourceVariantIntegrationInstalled = true
 end
 
-local function materializeMissingRuntimeResources(server, unit, playerCount, difficulty)
+local function materializeMissingRuntimeResources(server, unit, playerCount, difficulty, level)
     if type(unit) ~= "table" or unit.isPlayer == true or tostring(unit.registryID or "") == "" then
         return false
     end
@@ -340,6 +352,7 @@ local function materializeMissingRuntimeResources(server, unit, playerCount, dif
         presetIndex = unit.presetIndex,
         playerCount = playerCount,
         difficulty = difficulty,
+        level = level,
         selectRandomAppearance = false,
     })
     if type(variant) ~= "table" then
@@ -365,6 +378,7 @@ if Server._unitResourceDirectAddIntegrationInstalled ~= true then
                     presetIndex = prepared.presetIndex,
                     playerCount = playerCount,
                     difficulty = state and state.difficulty or "normal",
+                    level = state and state.level or nil,
                     selectRandomAppearance = false,
                 })
                 if variant then
@@ -388,8 +402,9 @@ if Server._unitResourceDraftIntegrationInstalled ~= true then
         if type(existing) == "table" and type(existing.units) == "table" then
             local playerCount = countPlayerUnits(existing.units)
             local difficulty = existing.difficulty or "normal"
+            local level = existing.level
             for index = 1, #existing.units do
-                materializeMissingRuntimeResources(self, existing.units[index], playerCount, difficulty)
+                materializeMissingRuntimeResources(self, existing.units[index], playerCount, difficulty, level)
             end
         end
 

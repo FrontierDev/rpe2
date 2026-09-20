@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 38,
+        version = 39,
     dataset = {
         achievements = {},
         auras = {
@@ -3757,7 +3757,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
-                icon = "interface/icons/ability_warrior_shieldwall.blp",
+                icon = "interface/icons/spell_holy_ashestoashes.blp",
                 id = "laststnd",
                 cooldownChannel = 5,
                 learnMode = "always_learned",

@@ -173,8 +173,11 @@ function DataEditor:RefreshUnitInspectorPage()
         self.UnitInspectorPendingStatDropdown:SetItems(self:BuildUnitInspectorReferencesAcrossDatasets("stats"))
         self:SetUnitInspectorDropdownEnabled(self.UnitInspectorPendingStatDropdown, hasUnit)
     end
-    if self.UnitInspectorPendingStatValueInput then
-        self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingStatValueInput, hasUnit)
+    if self.UnitInspectorPendingStatInitialInput then
+        self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingStatInitialInput, hasUnit)
+    end
+    if self.UnitInspectorPendingStatPerLevelInput then
+        self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingStatPerLevelInput, hasUnit)
     end
     if self.UnitInspectorAddStatButton then
         self.UnitInspectorAddStatButton:SetEnabled(hasUnit)
@@ -194,8 +197,11 @@ function DataEditor:RefreshUnitInspectorPage()
         self.UnitInspectorPendingResourceDropdown:SetItems(self:BuildUnitInspectorReferencesAcrossDatasets("resources"))
         self:SetUnitInspectorDropdownEnabled(self.UnitInspectorPendingResourceDropdown, hasUnit)
     end
-    if self.UnitInspectorPendingResourceValueInput then
-        self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingResourceValueInput, hasUnit)
+    if self.UnitInspectorPendingResourceInitialInput then
+        self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingResourceInitialInput, hasUnit)
+    end
+    if self.UnitInspectorPendingResourcePerLevelInput then
+        self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingResourcePerLevelInput, hasUnit)
     end
     if self.UnitInspectorPendingResourcePerPlayerInput then
         self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingResourcePerPlayerInput, hasUnit)
