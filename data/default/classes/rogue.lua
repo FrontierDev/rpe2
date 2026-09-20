@@ -325,7 +325,7 @@ Addon.Data.DefaultDatasets:Register({
                 stackBehavior = "refresh_duration",
                 tags = {},
                 tooltipTemplate = false
-            }
+            },
             {
                 description = "",
                 duration = 5,
@@ -2617,7 +2617,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = false,
                 totalTicks = 0,
                 useCooldownCharges = false
-            }
+            },
             {
                 allowDeadTargets = false,
                 canMoveWhileCasting = false,
