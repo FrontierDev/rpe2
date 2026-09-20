@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 35,
+        version = 36,
     dataset = {
         achievements = {},
         auras = {
@@ -3479,16 +3479,22 @@ Addon.Data.DefaultDatasets:Register({
                         invert = false,
                         showOnTooltip = true,
                         slotKey = "mainhand",
-                        tooltipTextOverride = "Requires Main Hand",
-                        type = "item_equipped",
-                        weaponTypeRefs = {}
+                        tooltipTextOverride = "Requires Main Hand Weapon",
+                        type = "weapon_type",
+                        weaponTypeRefs = {
+                            "f82db71a:z6nh3znw",
+                            "f82db71a:i4pivdig",
+                            "f82db71a:9ni3vfas",
+                            "f82db71a:y0dnlo8g",
+                            "f82db71a:gjz2331m"
+                        }
                     },
                     {
                         invert = false,
                         showOnTooltip = true,
                         slotKey = "offhand",
                         tooltipTextOverride = "Requires Off Hand Weapon",
-                        type = "item_equipped",
+                        type = "weapon_type",
                         weaponTypeRefs = {
                             "f82db71a:z6nh3znw",
                             "f82db71a:i4pivdig",
