@@ -108,6 +108,7 @@ local TYPE_DEFAULTS = {
     aura_requirement = {
         unit = "caster",
         auraRef = nil,
+        minimumValue = 1,
     },
     trait_requirement = {
         unit = "caster",
@@ -240,6 +241,7 @@ function Condition.Normalize(value)
     if conditionType == "aura_requirement" then
         normalized.unit = normalizeUnitSelector(data.unit)
         normalized.auraRef = normalizeRef(data.auraRef)
+        normalized.minimumValue = math.max(1, math.floor(tonumber(data.minimumValue) or 1))
         return normalized.auraRef and normalized or nil
     end
 

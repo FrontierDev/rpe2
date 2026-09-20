@@ -321,6 +321,7 @@ function DataEditor:CreateAuthoringConditionDefaults(conditionType)
     elseif normalizedType == "aura_requirement" then
         condition.unit = ensureString(condition.unit) ~= "" and condition.unit or "caster"
         condition.auraRef = ensureString(condition.auraRef) ~= "" and condition.auraRef or getFirstSelectableValue(buildAcrossDatasets(self, "auras", true))
+        condition.minimumValue = condition.minimumValue ~= nil and condition.minimumValue or 1
     elseif normalizedType == "trait_requirement" then
         condition.unit = ensureString(condition.unit) ~= "" and condition.unit or "caster"
         condition.traitRef = ensureString(condition.traitRef) ~= "" and condition.traitRef or getFirstSelectableValue(buildAcrossDatasets(self, "traits", true))
@@ -1127,7 +1128,7 @@ function DataEditor:RefreshInspectorConditionsPage(ownerKey)
 
     setGroupVisible(ui.TypeGroup, condition ~= nil)
     setGroupVisible(ui.TooltipOverrideGroup, condition ~= nil)
-    setGroupVisible(ui.MinimumGroup, conditionType == "level" or conditionType == "caster_health_percent" or conditionType == "target_health_percent" or conditionType == "skill_requirement")
+    setGroupVisible(ui.MinimumGroup, conditionType == "level" or conditionType == "caster_health_percent" or conditionType == "target_health_percent" or conditionType == "skill_requirement" or conditionType == "aura_requirement")
     setGroupVisible(ui.MaximumGroup, conditionType == "level" or conditionType == "caster_health_percent" or conditionType == "target_health_percent" or conditionType == "skill_requirement")
     setGroupVisible(ui.ClassGroup, conditionType == "class")
     setGroupVisible(ui.RaceGroup, conditionType == "race")

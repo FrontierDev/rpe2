@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 23,
+    version = 24,
     dataset = {
         achievements = {},
         auras = {
@@ -310,6 +310,272 @@ Addon.Data.DefaultDatasets:Register({
                 duration = 2,
                 effects = {
                     {
+                description = "",
+                duration = 5,
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseDamage = 5.63334,
+                        damageSchoolRefs = {
+                            "f82db71a:qtr10qyj"
+                        },
+                        statScaling = {
+                            {
+                                coefficient = 0.0845,
+                                statRef = "f82db71a:u7b49vs9"
+                            }
+                        },
+                        type = "damage"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/ability_poisonarrow.blp",
+                id = "dlypsn01",
+                maxStacks = 5,
+                name = "Deadly Poison",
+                stackBehavior = "refresh_duration",
+                tags = {
+                    "poison"
+                },
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Deals {AURA_DAMAGE_1} Nature damage each turn.",
+                    bodyTokens = {
+                        {
+                            applyMode = "damage_amount",
+                            baseField = "baseDamage",
+                            effectIndex = 1,
+                            key = "AURA_DAMAGE_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "Applies {AURA_APPLIED_STACKS_1} stack. Stacks up to {AURA_MAX_STACKS_1} times.",
+                    stackingTokens = {
+                        {
+                            applyMode = "applied_stacks",
+                            key = "AURA_APPLIED_STACKS_1",
+                            tokenType = "aura_stacks"
+                        },
+                        {
+                            applyMode = "max_stacks",
+                            key = "AURA_MAX_STACKS_1",
+                            tokenType = "aura_stacks"
+                        }
+                    },
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 3,
+                effects = {
+                    {
+                        cancelOnDamage = true,
+                        forceAutoHitAgainstTarget = true,
+                        movementRangeOverride = 0,
+                        preventCasting = true,
+                        statScaling = {},
+                        type = "control"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/ability_sap.blp",
+                id = "sapaura1",
+                maxStacks = 1,
+                name = "Sap",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Breaks when the affected unit takes damage. Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 1,
+                effects = {
+                    {
+                        cancelOnDamage = true,
+                        forceAutoHitAgainstTarget = true,
+                        movementRangeOverride = 0,
+                        preventCasting = true,
+                        statScaling = {},
+                        type = "control"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_shadow_mindsteal.blp",
+                id = "blndaura1",
+                maxStacks = 1,
+                name = "Blind",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Breaks when the affected unit takes damage. Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 2,
+                effects = {
+                    {
+                        cancelOnDamage = false,
+                        forceAutoHitAgainstTarget = true,
+                        movementRangeOverride = 0,
+                        preventCasting = true,
+                        statScaling = {},
+                        type = "control"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/ability_cheapshot.blp",
+                id = "chpshtau",
+                maxStacks = 1,
+                name = "Cheap Shot",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 3,
+                effects = {
+                    {
+                        baseAmount = 6,
+                        operation = "flat",
+                        statRef = "f82db71a:pu05li08",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {
+                    {
+                        chance = 100,
+                        combatEventId = "on_auto_attack_taken",
+                        effects = {
+                            {
+                                auraRef = "23d5dce2:cmbtrdau",
+                                stacks = 1,
+                                type = "remove_aura"
+                            }
+                        },
+                        triggerTarget = "aura_target"
+                    }
+                },
+                icon = "interface/icons/ability_rogue_combatreadiness.blp",
+                id = "cmbtrdau",
+                maxStacks = 5,
+                name = "Combat Readiness",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Damage Reduction by 6%. Loses 1 stack when hit by an auto attack.",
+                    bodyTokens = {},
+                    stackingText = "Applies {AURA_APPLIED_STACKS_1} stacks. Stacks up to {AURA_MAX_STACKS_1} times.",
+                    stackingTokens = {
+                        {
+                            applyMode = "applied_stacks",
+                            key = "AURA_APPLIED_STACKS_1",
+                            tokenType = "aura_stacks"
+                        },
+                        {
+                            applyMode = "max_stacks",
+                            key = "AURA_MAX_STACKS_1",
+                            tokenType = "aura_stacks"
+                        }
+                    },
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 2,
+                effects = {
+                    {
+                        baseAmount = 5,
+                        operation = "flat",
+                        statRef = "f82db71a:wbj4zuf3",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {
+                    {
+                        chance = 100,
+                        combatEventId = "on_melee_hit",
+                        effects = {
+                            {
+                                amountMode = "flat",
+                                baseDamage = 27.625,
+                                damageSchoolRefs = {
+                                    "f82db71a:1ggt4t3v"
+                                },
+                                statScaling = {
+                                    {
+                                        coefficient = 0.0965,
+                                        statRef = "f82db71a:u7b49vs9"
+                                    }
+                                },
+                                type = "damage"
+                            }
+                        },
+                        triggerTarget = "event_other"
+                    },
+                    {
+                        chance = 100,
+                        combatEventId = "on_auto_attack_hit",
+                        effects = {
+                            {
+                                amountMode = "flat",
+                                baseDamage = 27.625,
+                                damageSchoolRefs = {
+                                    "f82db71a:1ggt4t3v"
+                                },
+                                statScaling = {
+                                    {
+                                        coefficient = 0.0965,
+                                        statRef = "f82db71a:u7b49vs9"
+                                    }
+                                },
+                                type = "damage"
+                            }
+                        },
+                        triggerTarget = "event_other"
+                    }
+                },
+                icon = "interface/icons/ability_rogue_shadowblades.blp",
+                id = "shdblada",
+                maxStacks = 1,
+                name = "Shadow Blades",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Melee Hit Chance by 5%. Melee hits and auto attack hits deal additional Shadow damage.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
                         baseAmount = -20,
                         operation = "flat",
                         statRef = "f82db71a:ok80ohz3",
@@ -389,6 +655,7 @@ Addon.Data.DefaultDatasets:Register({
                 talentTraitRefs = {
                     "23d5dce2:z9yfqvhy",
                     "23d5dce2:58pob6kr",
+                    "23d5dce2:dlypsntr",
                     "23d5dce2:malice05",
                     "23d5dce2:sealfate",
                     "23d5dce2:lghtref5",
@@ -2333,10 +2600,840 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = false,
                 totalTicks = 0,
                 useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "23d5dce2:sapaura1",
+                            basePower = 0,
+                            duration = 3,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "sapcmp01",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Requires Stealth",
+                        type = "hidden",
+                        unit = "caster"
+                    }
+                },
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_sap.blp",
+                id = "sapspell",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Sap",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 50,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:c3gaf7dd"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Subtlety",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "23d5dce2:sapaura1",
+                            datasetId = "23d5dce2",
+                            descriptionText = "Breaks when the affected unit takes damage. Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                            duration = 3,
+                            icon = "interface/icons/ability_sap.blp",
+                            nameText = "Sap",
+                            powerLevel = 0,
+                            spellDatasetId = "23d5dce2",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Sap to an enemy for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "23d5dce2:blndaura1",
+                            basePower = 0,
+                            duration = 1,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "blindcmp",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_shadow_mindsteal.blp",
+                id = "blind001",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Blind",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 10,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:c3gaf7dd"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Subtlety",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "23d5dce2:blndaura1",
+                            datasetId = "23d5dce2",
+                            descriptionText = "Breaks when the affected unit takes damage. Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                            duration = 1,
+                            icon = "interface/icons/spell_shadow_mindsteal.blp",
+                            nameText = "Blind",
+                            powerLevel = 0,
+                            spellDatasetId = "23d5dce2",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Blind to an enemy for 1 turn.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "23d5dce2:chpshtau",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "cheapcmp",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    },
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amount = 2,
+                            amountMode = "flat",
+                            resourceRef = "f82db71a:1h7yfxff",
+                            targetEvents = {},
+                            type = "resource"
+                        },
+                        key = "cheapcp2",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Requires Stealth",
+                        type = "hidden",
+                        unit = "caster"
+                    }
+                },
+                cooldown = 1,
+                cooldownGroup = "stun",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_cheapshot.blp",
+                id = "chpsht01",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Cheap Shot",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 40,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:c3gaf7dd"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Subtlety",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "23d5dce2:chpshtau",
+                            datasetId = "23d5dce2",
+                            descriptionText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                            duration = 2,
+                            icon = "interface/icons/ability_cheapshot.blp",
+                            nameText = "Cheap Shot",
+                            powerLevel = 0,
+                            spellDatasetId = "23d5dce2",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Cheap Shot to an enemy for 2 turns. Restore {RESOURCE_AMOUNT_1} to yourself.",
+                    tokens = {
+                        {
+                            applyMode = "resource_gain_amount",
+                            componentIndex = 2,
+                            key = "RESOURCE_AMOUNT_1",
+                            tokenType = "spell_resource_amount"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amount = 2,
+                            amountMode = "flat",
+                            resourceRef = "f82db71a:1h7yfxff",
+                            targetEvents = {},
+                            type = "resource"
+                        },
+                        key = "premedcp",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Requires Stealth",
+                        type = "hidden",
+                        unit = "caster"
+                    }
+                },
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                doesNotRevealCaster = true,
+                icon = "interface/icons/spell_shadow_possession.blp",
+                id = "premed01",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Premeditation",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:c3gaf7dd"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Subtlety",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Restore {RESOURCE_AMOUNT_1} to yourself.",
+                    tokens = {
+                        {
+                            applyMode = "resource_gain_amount",
+                            componentIndex = 1,
+                            key = "RESOURCE_AMOUNT_1",
+                            tokenType = "spell_resource_amount"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_ranged_hit",
+                    "on_critical_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false,
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseDamage = 0,
+                            damageSchoolRefs = {
+                                "f82db71a:v1azo4j6"
+                            },
+                            damageType = "ranged",
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {},
+                            targetEvents = {
+                                "on_ranged_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 1,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 0.5,
+                            weaponDamageMode = "both"
+                        },
+                        key = "fankndmg",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 5,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "multi"
+                        }
+                    },
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amount = 1,
+                            amountMode = "flat",
+                            resourceRef = "f82db71a:1h7yfxff",
+                            targetEvents = {},
+                            type = "resource"
+                        },
+                        key = "fankncp1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires Main Hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_rogue_fanofknives.blp",
+                id = "fankniv1",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Fan of Knives",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 40,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:c3gaf7dd"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Combat",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Deal {DAMAGE_1} Physical ranged damage to up to 5 enemies. Restore {RESOURCE_AMOUNT_1} to yourself.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        },
+                        {
+                            applyMode = "resource_gain_amount",
+                            componentIndex = 2,
+                            key = "RESOURCE_AMOUNT_1",
+                            tokenType = "spell_resource_amount"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "23d5dce2:cmbtrdau",
+                            basePower = 0,
+                            duration = 3,
+                            stacks = 5,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "cmbtrcmp",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_rogue_combatreadiness.blp",
+                id = "cmbtrd01",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Combat Readiness",
+                range = 0,
+                resourceCosts = {},
+                seedNPCSpell = false,
+                spellbookCategory = "Combat",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "23d5dce2:cmbtrdau",
+                            datasetId = "23d5dce2",
+                            descriptionText = "Increases Damage Reduction by 6%. Loses 1 stack when hit by an auto attack.",
+                            duration = 3,
+                            icon = "interface/icons/ability_rogue_combatreadiness.blp",
+                            nameText = "Combat Readiness",
+                            powerLevel = 0,
+                            spellDatasetId = "23d5dce2",
+                            stacks = 5,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply 5 stacks of Combat Readiness to yourself for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_melee_hit",
+                    "on_critical_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false,
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseDamage = 247.5,
+                            damageSchoolRefs = {
+                                "f82db71a:qtr10qyj"
+                            },
+                            damageType = "melee",
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.86625,
+                                    statRef = "f82db71a:u7b49vs9"
+                                }
+                            },
+                            targetEvents = {
+                                "on_melee_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 1,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 0,
+                            weaponDamageMode = "none"
+                        },
+                        key = "envndmg1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires Main Hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    },
+                    {
+                        auraRef = "23d5dce2:dlypsn01",
+                        invert = false,
+                        minimumValue = 5,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "aura_requirement",
+                        unit = "target"
+                    }
+                },
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_rogue_disembowel.blp",
+                id = "envenom1",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Envenom",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 15,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:c3gaf7dd"
+                    },
+                    {
+                        amount = 5,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:1h7yfxff"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Assassination",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Deal {DAMAGE_1} Nature damage to an enemy.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "23d5dce2:shdblada",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "shdblcmp",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_rogue_shadowblades.blp",
+                id = "shdblad1",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Shadow Blades",
+                range = 0,
+                resourceCosts = {},
+                seedNPCSpell = false,
+                spellbookCategory = "Assassination",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "23d5dce2:shdblada",
+                            datasetId = "23d5dce2",
+                            descriptionText = "Increases Melee Hit Chance by 5%. Melee hits and auto attack hits deal additional Shadow damage.",
+                            duration = 2,
+                            icon = "interface/icons/ability_rogue_shadowblades.blp",
+                            nameText = "Shadow Blades",
+                            powerLevel = 0,
+                            spellDatasetId = "23d5dce2",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Shadow Blades to yourself for 2 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
             }
         },
         stats = {},
         traits = {
+            {
+                automaticAuras = {},
+                category = "",
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires Main Hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                description = "",
+                events = {
+                    {
+                        chance = 100,
+                        combatEventId = "on_auto_attack_hit",
+                        effects = {
+                            {
+                                auraRef = "23d5dce2:dlypsn01",
+                                basePower = 0,
+                                duration = 5,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "event_other"
+                    }
+                },
+                icon = "interface/icons/ability_poisonarrow.blp",
+                id = "dlypsntr",
+                isEnvironmental = false,
+                name = "Deadly Poison",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
             {
                 automaticAuras = {},
                 category = "",
