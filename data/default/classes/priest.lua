@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 24,
+    version = 25,
     dataset = {
         achievements = {},
         auras = {
@@ -527,7 +527,33 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Shadow Weaving",
                 stackBehavior = "refresh_duration",
                 tags = {},
-                tooltipTemplate = true
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Reduces Shadow Resistance by {AURA_STAT_1}.",
+                    bodyTokens = {
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 1,
+                            key = "AURA_STAT_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "Applies {AURA_APPLIED_STACKS_1} stacks. Stacks up to {AURA_MAX_STACKS_1} times.",
+                    stackingTokens = {
+                        {
+                            applyMode = "applied_stacks",
+                            key = "AURA_APPLIED_STACKS_1",
+                            tokenType = "aura_stacks"
+                        },
+                        {
+                            applyMode = "max_stacks",
+                            key = "AURA_MAX_STACKS_1",
+                            tokenType = "aura_stacks"
+                        }
+                    },
+                    version = 1
+                }
             },
             {
                 description = "",
@@ -549,7 +575,14 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Blackout",
                 stackBehavior = "refresh_duration",
                 tags = {},
-                tooltipTemplate = true
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
             },
             {
                 description = "",
@@ -577,7 +610,14 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Dispersion",
                 stackBehavior = "refresh_duration",
                 tags = {},
-                tooltipTemplate = true
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Prevents the affected unit from casting spells. Increases Damage Reduction by 90%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
             },
             {
                 description = "",
@@ -609,7 +649,25 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Prayer of Mending",
                 stackBehavior = "refresh_duration",
                 tags = {},
-                tooltipTemplate = true
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "When the affected unit is victim of a basic attack, heal the affected unit for 2% of Max health and remove 1 stack.",
+                    bodyTokens = {},
+                    stackingText = "Applies {AURA_APPLIED_STACKS_1} stacks. Stacks up to {AURA_MAX_STACKS_1} times.",
+                    stackingTokens = {
+                        {
+                            applyMode = "applied_stacks",
+                            key = "AURA_APPLIED_STACKS_1",
+                            tokenType = "aura_stacks"
+                        },
+                        {
+                            applyMode = "max_stacks",
+                            key = "AURA_MAX_STACKS_1",
+                            tokenType = "aura_stacks"
+                        }
+                    },
+                    version = 1
+                }
             },
         },
         authorName = "Ortellus-ArgentDawn",
@@ -2922,6 +2980,38 @@ Addon.Data.DefaultDatasets:Register({
                 spellbookCategory = "Shadow",
                 tags = {},
                 tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "1c1038a7:dispersa",
+                            datasetId = "1c1038a7",
+                            descriptionText = "Prevents the affected unit from casting spells. Increases Damage Reduction by 90%.",
+                            duration = 1,
+                            icon = "interface/icons/spell_shadow_dispersion.blp",
+                            nameText = "Dispersion",
+                            powerLevel = 0,
+                            spellDatasetId = "1c1038a7",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Dispersion to yourself for 1 turn. Restore {RESOURCE_AMOUNT_1} to yourself.",
+                    tokens = {
+                        {
+                            applyMode = "resource_gain_amount",
+                            componentIndex = 2,
+                            key = "RESOURCE_AMOUNT_1",
+                            tokenType = "spell_resource_amount"
+                        }
+                    },
+                    version = 1
+                },
                 totalTicks = 0,
                 useCooldownCharges = false
             },
@@ -2999,6 +3089,19 @@ Addon.Data.DefaultDatasets:Register({
                 spellbookCategory = "Holy",
                 tags = {},
                 tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Heal up to 5 allies for {HEAL_1} health.",
+                    tokens = {
+                        {
+                            applyMode = "heal_range",
+                            componentIndex = 1,
+                            key = "HEAL_1",
+                            tokenType = "spell_heal_range"
+                        }
+                    },
+                    version = 1
+                },
                 totalTicks = 0,
                 useCooldownCharges = false
             },
@@ -3076,6 +3179,19 @@ Addon.Data.DefaultDatasets:Register({
                 spellbookCategory = "Holy",
                 tags = {},
                 tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Heal up to 5 allies for {HEAL_1} health.",
+                    tokens = {
+                        {
+                            applyMode = "heal_range",
+                            componentIndex = 1,
+                            key = "HEAL_1",
+                            tokenType = "spell_heal_range"
+                        }
+                    },
+                    version = 1
+                },
                 totalTicks = 0,
                 useCooldownCharges = false
             },
@@ -3153,6 +3269,19 @@ Addon.Data.DefaultDatasets:Register({
                 spellbookCategory = "Holy",
                 tags = {},
                 tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Heal all allies for {HEAL_1} health.",
+                    tokens = {
+                        {
+                            applyMode = "heal_range",
+                            componentIndex = 1,
+                            key = "HEAL_1",
+                            tokenType = "spell_heal_range"
+                        }
+                    },
+                    version = 1
+                },
                 totalTicks = 0,
                 useCooldownCharges = false
             },
@@ -3205,6 +3334,19 @@ Addon.Data.DefaultDatasets:Register({
                 spellbookCategory = "Holy",
                 tags = {},
                 tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Restore {RESOURCE_AMOUNT_1} to all allies.",
+                    tokens = {
+                        {
+                            applyMode = "resource_gain_amount",
+                            componentIndex = 1,
+                            key = "RESOURCE_AMOUNT_1",
+                            tokenType = "spell_resource_amount"
+                        }
+                    },
+                    version = 1
+                },
                 totalTicks = 0,
                 useCooldownCharges = false
             },
@@ -3266,6 +3408,42 @@ Addon.Data.DefaultDatasets:Register({
                 spellbookCategory = "Holy",
                 tags = {},
                 tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "1c1038a7:prmndau1",
+                            datasetId = "1c1038a7",
+                            descriptionText = "When the affected unit is victim of a basic attack, heal the affected unit for 2% of Max health and remove 1 stack. Applies {AURA_APPLIED_STACKS_1} stacks. Stacks up to {AURA_MAX_STACKS_1} times.",
+                            duration = 5,
+                            icon = "interface/icons/spell_holy_prayerofmendingtga.blp",
+                            nameText = "Prayer of Mending",
+                            powerLevel = 0,
+                            spellDatasetId = "1c1038a7",
+                            stacks = 3,
+                            targetContext = {
+                                object = "the affected ally",
+                                possessive = "the affected ally's",
+                                reflexive = "itself",
+                                subject = "the affected ally"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "applied_stacks",
+                                    key = "AURA_APPLIED_STACKS_1",
+                                    tokenType = "aura_stacks"
+                                },
+                                {
+                                    applyMode = "max_stacks",
+                                    key = "AURA_MAX_STACKS_1",
+                                    tokenType = "aura_stacks"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Prayer of Mending to up to 3 allies with 3 stacks for 5 turns.",
+                    tokens = {},
+                    version = 1
+                },
                 totalTicks = 0,
                 useCooldownCharges = false
             },
