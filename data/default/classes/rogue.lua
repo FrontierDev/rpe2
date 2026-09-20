@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 26,
+    version = 27,
     dataset = {
         achievements = {},
         auras = {
@@ -808,7 +808,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 30,
+                        amount = 40,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -3160,7 +3160,7 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 conditions = {},
-                cooldown = 0,
+                cooldown = 10,
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
@@ -3468,7 +3468,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
-                icon = "interface/icons/spell_nature_reincarnation.blp",
+                icon = "interface/icons/achievement_halloween_smiley_01.blp",
                 id = "tease001",
                 cooldownChannel = 2,
                 learnMode = "always_learned",
@@ -3483,6 +3483,12 @@ Addon.Data.DefaultDatasets:Register({
                 spellbookCategory = "Combat",
                 tags = {},
                 tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Taunt an enemy for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
                 totalTicks = 0,
                 useCooldownCharges = false
             },
