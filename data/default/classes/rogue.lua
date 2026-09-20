@@ -310,18 +310,35 @@ Addon.Data.DefaultDatasets:Register({
                 duration = 2,
                 effects = {
                     {
+                        baseAmount = -20,
+                        operation = "flat",
+                        statRef = "f82db71a:ok80ohz3",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/inv_misc_herb_16.blp",
+                id = "hjsfi9pe",
+                maxStacks = 1,
+                name = "Wound Poison",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = false
+            }
+            {
                 description = "",
                 duration = 5,
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 5.63334,
+                        baseDamage = 4.16,
                         damageSchoolRefs = {
                             "f82db71a:qtr10qyj"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.0845,
+                                coefficient = 0.0728,
                                 statRef = "f82db71a:u7b49vs9"
                             }
                         },
@@ -349,7 +366,7 @@ Addon.Data.DefaultDatasets:Register({
                             tokenType = "aura_amount"
                         }
                     },
-                    stackingText = "Applies {AURA_APPLIED_STACKS_1} stack. Stacks up to {AURA_MAX_STACKS_1} times.",
+                    stackingText = "Applies {AURA_APPLIED_STACKS_1} stacks. Stacks up to {AURA_MAX_STACKS_1} times.",
                     stackingTokens = {
                         {
                             applyMode = "applied_stacks",
@@ -486,7 +503,7 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "Increases Damage Reduction by 6%. Loses 1 stack when hit by an auto attack.",
+                    bodyText = "Increases Damage Reduction by 6%. When the affected unit is victim of a basic attack, remove 1 stack.",
                     bodyTokens = {},
                     stackingText = "Applies {AURA_APPLIED_STACKS_1} stacks. Stacks up to {AURA_MAX_STACKS_1} times.",
                     stackingTokens = {
@@ -523,13 +540,13 @@ Addon.Data.DefaultDatasets:Register({
                         effects = {
                             {
                                 amountMode = "flat",
-                                baseDamage = 27.625,
+                                baseDamage = 28.1667,
                                 damageSchoolRefs = {
                                     "f82db71a:1ggt4t3v"
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 0.0965,
+                                        coefficient = 0.29575,
                                         statRef = "f82db71a:u7b49vs9"
                                     }
                                 },
@@ -544,13 +561,13 @@ Addon.Data.DefaultDatasets:Register({
                         effects = {
                             {
                                 amountMode = "flat",
-                                baseDamage = 27.625,
+                                baseDamage = 28.1667,
                                 damageSchoolRefs = {
                                     "f82db71a:1ggt4t3v"
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 0.0965,
+                                        coefficient = 0.29575,
                                         statRef = "f82db71a:u7b49vs9"
                                     }
                                 },
@@ -568,30 +585,30 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "Increases Melee Hit Chance by 5%. Melee hits and auto attack hits deal additional Shadow damage.",
-                    bodyTokens = {},
+                    bodyText = "Increases Melee Hit Chance by 5%. When the affected unit hits with a melee attack, the target takes {AURA_EVENT_DAMAGE_1} Shadow damage. When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_2} Shadow damage.",
+                    bodyTokens = {
+                        {
+                            applyMode = "damage_amount",
+                            baseField = "baseDamage",
+                            effectIndex = 1,
+                            eventIndex = 1,
+                            key = "AURA_EVENT_DAMAGE_1",
+                            tokenType = "aura_amount"
+                        },
+                        {
+                            applyMode = "damage_amount",
+                            baseField = "baseDamage",
+                            effectIndex = 1,
+                            eventIndex = 2,
+                            key = "AURA_EVENT_DAMAGE_2",
+                            tokenType = "aura_amount"
+                        }
+                    },
                     stackingText = "",
                     stackingTokens = {},
                     version = 1
                 }
             },
-            {
-                        baseAmount = -20,
-                        operation = "flat",
-                        statRef = "f82db71a:ok80ohz3",
-                        statScaling = {},
-                        type = "stat"
-                    }
-                },
-                events = {},
-                icon = "interface/icons/inv_misc_herb_16.blp",
-                id = "hjsfi9pe",
-                maxStacks = 1,
-                name = "Wound Poison",
-                stackBehavior = "refresh_duration",
-                tags = {},
-                tooltipTemplate = false
-            }
         },
         authorName = "Ortellus-ArgentDawn",
         classes = {
@@ -2600,7 +2617,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = false,
                 totalTicks = 0,
                 useCooldownCharges = false
-            },
+            }
             {
                 allowDeadTargets = false,
                 canMoveWhileCasting = false,
@@ -2995,7 +3012,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 0,
+                            baseDamage = 28.6875,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -3003,7 +3020,12 @@ Addon.Data.DefaultDatasets:Register({
                             hitType = "ability",
                             projectilePath = "",
                             projectileSpeed = 0,
-                            statScaling = {},
+                            statScaling = {
+                                {
+                                    coefficient = 0.133875,
+                                    statRef = "f82db71a:v2rs9cpy"
+                                }
+                            },
                             targetEvents = {
                                 "on_ranged_taken",
                                 "on_critical_hit_taken"
@@ -3011,8 +3033,8 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 0.5,
-                            weaponDamageMode = "both"
+                            weaponDamageCoefficient = 0.3825,
+                            weaponDamageMode = "main_hand"
                         },
                         key = "fankndmg",
                         target = {
@@ -3051,8 +3073,8 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         invert = false,
                         showOnTooltip = true,
-                        slotKey = "mainhand",
-                        tooltipTextOverride = "Requires Main Hand",
+                        slotKey = "ranged",
+                        tooltipTextOverride = "Requires Ranged Weapon",
                         type = "item_equipped",
                         weaponTypeRefs = {}
                     }
@@ -3086,7 +3108,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical ranged damage to up to 5 enemies. Restore {RESOURCE_AMOUNT_1} to yourself.",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 5 enemies. Restore {RESOURCE_AMOUNT_1} to yourself.",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -3161,7 +3183,7 @@ Addon.Data.DefaultDatasets:Register({
                         {
                             auraRef = "23d5dce2:cmbtrdau",
                             datasetId = "23d5dce2",
-                            descriptionText = "Increases Damage Reduction by 6%. Loses 1 stack when hit by an auto attack.",
+                            descriptionText = "Increases Damage Reduction by 6%. When the affected unit is victim of a basic attack, remove 1 stack. Applies {AURA_APPLIED_STACKS_1} stacks. Stacks up to {AURA_MAX_STACKS_1} times.",
                             duration = 3,
                             icon = "interface/icons/ability_rogue_combatreadiness.blp",
                             nameText = "Combat Readiness",
@@ -3174,10 +3196,21 @@ Addon.Data.DefaultDatasets:Register({
                                 reflexive = "yourself",
                                 subject = "you"
                             },
-                            tokens = {}
+                            tokens = {
+                                {
+                                    applyMode = "applied_stacks",
+                                    key = "AURA_APPLIED_STACKS_1",
+                                    tokenType = "aura_stacks"
+                                },
+                                {
+                                    applyMode = "max_stacks",
+                                    key = "AURA_MAX_STACKS_1",
+                                    tokenType = "aura_stacks"
+                                }
+                            }
                         }
                     },
-                    mainText = "Apply 5 stacks of Combat Readiness to yourself for 3 turns.",
+                    mainText = "Apply Combat Readiness to yourself with 5 stacks for 3 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -3202,7 +3235,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 247.5,
+                            baseDamage = 236.25,
                             damageSchoolRefs = {
                                 "f82db71a:qtr10qyj"
                             },
@@ -3212,7 +3245,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.86625,
+                                    coefficient = 0.826875,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -3362,7 +3395,7 @@ Addon.Data.DefaultDatasets:Register({
                         {
                             auraRef = "23d5dce2:shdblada",
                             datasetId = "23d5dce2",
-                            descriptionText = "Increases Melee Hit Chance by 5%. Melee hits and auto attack hits deal additional Shadow damage.",
+                            descriptionText = "Increases Melee Hit Chance by 5%. When the affected unit hits with a melee attack, the target takes {AURA_EVENT_DAMAGE_1} Shadow damage. When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_2} Shadow damage.",
                             duration = 2,
                             icon = "interface/icons/ability_rogue_shadowblades.blp",
                             nameText = "Shadow Blades",
@@ -3375,7 +3408,24 @@ Addon.Data.DefaultDatasets:Register({
                                 reflexive = "yourself",
                                 subject = "you"
                             },
-                            tokens = {}
+                            tokens = {
+                                {
+                                    applyMode = "damage_amount",
+                                    baseField = "baseDamage",
+                                    effectIndex = 1,
+                                    eventIndex = 1,
+                                    key = "AURA_EVENT_DAMAGE_1",
+                                    tokenType = "aura_amount"
+                                },
+                                {
+                                    applyMode = "damage_amount",
+                                    baseField = "baseDamage",
+                                    effectIndex = 1,
+                                    eventIndex = 2,
+                                    key = "AURA_EVENT_DAMAGE_2",
+                                    tokenType = "aura_amount"
+                                }
+                            }
                         }
                     },
                     mainText = "Apply Shadow Blades to yourself for 2 turns.",
@@ -3384,7 +3434,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 totalTicks = 0,
                 useCooldownCharges = false
-            }
+            },
         },
         stats = {},
         traits = {
