@@ -2832,15 +2832,7 @@ Addon.Data.DefaultDatasets:Register({
                         }
                     }
                 },
-                conditions = {
-                    {
-                        invert = false,
-                        showOnTooltip = true,
-                        tooltipTextOverride = "Requires Stealth",
-                        type = "hidden",
-                        unit = "caster"
-                    }
-                },
+                conditions = {},
                 cooldown = 1,
                 cooldownGroup = "stun",
                 cooldownScalesWithHaste = false,
