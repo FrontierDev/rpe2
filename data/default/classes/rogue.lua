@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 25,
+    version = 26,
     dataset = {
         achievements = {},
         auras = {
@@ -577,7 +577,7 @@ Addon.Data.DefaultDatasets:Register({
                         triggerTarget = "event_other"
                     }
                 },
-                icon = "interface/icons/ability_rogue_shadowblades.blp",
+                icon = "interface/icons/inv_knife_1h_grimbatolraid_d_03.blp",
                 id = "shdblada",
                 maxStacks = 1,
                 name = "Shadow Blades",
@@ -3376,7 +3376,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
-                icon = "interface/icons/ability_rogue_shadowblades.blp",
+                icon = "interface/icons/inv_knife_1h_grimbatolraid_d_03.blp",
                 id = "shdblad1",
                 cooldownChannel = 3,
                 learnMode = "always_learned",

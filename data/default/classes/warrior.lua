@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 36,
+        version = 37,
     dataset = {
         achievements = {},
         auras = {
@@ -412,7 +412,7 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 events = {},
-                icon = "interface/icons/ability_warrior_savageblow.blp",
+                icon = "interface/icons/ability_warrior_colossussmash.blp",
                 id = "clsmshau",
                 maxStacks = 1,
                 name = "Colossus Smash",
@@ -482,7 +482,7 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 events = {},
-                icon = "interface/icons/ability_warrior_shieldwall.blp",
+                icon = "interface/icons/spell_holy_ashestoashes.blp",
                 id = "lstndaur",
                 maxStacks = 1,
                 name = "Last Stand",
@@ -3080,7 +3080,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
-                icon = "interface/icons/ability_warrior_sunder.blp",
+                icon = "interface/icons/inv_sword_11.blp",
                 id = "devast01",
                 cooldownChannel = 1,
                 learnMode = "always_learned",
@@ -3219,7 +3219,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
-                icon = "interface/icons/ability_warrior_savageblow.blp",
+                icon = "interface/icons/ability_warrior_colossussmash.blp",
                 id = "colsmash",
                 cooldownChannel = 1,
                 learnMode = "always_learned",
@@ -4042,7 +4042,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
-                icon = "interface/icons/inv_throwingknife_02.blp",
+                icon = "interface/icons/inv_axe_66.blp",
                 id = "herthrow",
                 cooldownChannel = 2,
                 learnMode = "always_learned",
