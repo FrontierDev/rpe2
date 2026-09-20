@@ -4683,14 +4683,9 @@ units = {
                 resistances = {},
                 resources = {
                     {
-                        initialValue = 0,
-                        perLevelValue = 0,
+                        initialValue = 208,
+                        perLevelValue = 29.63,
                         resourceRef = "f82db71a:q2ktkztt"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        resourceRef = "f82db71a:4c8mfm99"
                     }
                 },
                 spells = {
@@ -4749,8 +4744,8 @@ units = {
                         statRef = "f82db71a:v2rs9cpy"
                     },
                     {
-                        initialValue = 65,
-                        perLevelValue = 4,
+                        initialValue = 0,
+                        perLevelValue = 5.08,
                         statRef = "f82db71a:7t7xgzcx"
                     },
                     {

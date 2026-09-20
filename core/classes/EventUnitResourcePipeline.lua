@@ -15,7 +15,7 @@ if type(EventUnit) ~= "table" or type(UnitClass) ~= "table" then
 end
 
 local DEFAULT_SCALING_LEVELS = { "minor", "normal", "elite" }
-local DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT = 20
+local DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT = 10
 local DEFAULT_HEALTH_PERCENT = {
     normal = 0,
     heroic = 10,

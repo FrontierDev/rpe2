@@ -21,7 +21,7 @@ end
 local PLAYER_SCALING_RULE_KEY = "player_scaling_challenge_levels"
 local HEALTH_BONUS_PER_PLAYER_RULE_KEY = "npc_health_bonus_per_player_percent"
 local DEFAULT_PLAYER_SCALING_CHALLENGE_LEVELS = { "minor", "normal", "elite" }
-local DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT = 20
+local DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT = 10
 
 local function deepCopy(value)
     if type(value) ~= "table" then
