@@ -507,7 +507,7 @@ Addon.Data.DefaultDatasets:Register({
                     stackingTokens = {},
                     version = 1
                 }
-            }
+            },
             {
                 description = "",
                 duration = 5,
@@ -2850,7 +2850,7 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 totalTicks = 0,
                 useCooldownCharges = false
-            }
+            },
             {
                 allowDeadTargets = false,
                 canMoveWhileCasting = false,
@@ -3458,7 +3458,7 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 unlockLevel = 1
-            }
+            },
             {
                 automaticAuras = {},
                 category = "Shadow",
