@@ -6,6 +6,11 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
+local UnitClass = Addon.Internal
+    and Addon.Internal.Database
+    and Addon.Internal.Database.Classes
+    and Addon.Internal.Database.Classes.Unit
+local Registry = Addon.Internal and Addon.Internal.Registry or {}
 
 local PRESET_PAGE_KEY = "presets"
 
@@ -72,6 +77,20 @@ function DataEditor:UnitInspectorPresetNameExists(unit, name, ignoreIndex)
         local preset = unit.presets[index]
         if index ~= ignoreIndex and trimString(preset and preset.name or "") == normalizedName then
             return true
+        end
+    end
+
+    local parentRef = tostring(unit and unit.extendsUnitRef or "")
+    if parentRef ~= "" and type(Registry.ResolveUnitDefinition) == "function" then
+        local ok, _, parent = pcall(function()
+            return Registry:ResolveUnitDefinition(parentRef, { includeInactive = true })
+        end)
+        if ok and parent then
+            for index = 1, #(parent.presets or {}) do
+                if trimString(parent.presets[index] and parent.presets[index].name or "") == normalizedName then
+                    return true
+                end
+            end
         end
     end
 
@@ -154,16 +173,67 @@ end
 
 function DataEditor:BuildUnitInspectorPresetSelectorItems(unit)
     local items = {}
+    local ownItems = {}
+    if unit and type(unit.extendsUnitRef) == "string" and unit.extendsUnitRef ~= ""
+        and type(Registry.ResolveUnitDefinition) == "function"
+    then
+        local ok, _, parent = pcall(function()
+            return Registry:ResolveUnitDefinition(unit.extendsUnitRef, { includeInactive = true })
+        end)
+        local inheritedItems = {}
+        if ok and parent then
+            for index = 1, #(parent.presets or {}) do
+                local preset = parent.presets[index]
+                local name = trimString(preset and preset.name or "")
+                if name == "" then name = "Preset " .. tostring(index) end
+                inheritedItems[#inheritedItems + 1] = {
+                    label = name .. " (inherited, read-only)",
+                    value = "inherited:" .. tostring(index),
+                    enabled = true,
+                    notCheckable = true,
+                }
+            end
+        end
+        if #inheritedItems > 0 then
+            items[#items + 1] = {
+                label = "Inherited presets (read-only)",
+                value = "inherited-presets",
+                enabled = true,
+                notCheckable = true,
+                keepShownOnClick = true,
+                children = inheritedItems,
+            }
+        elseif not ok then
+            items[#items + 1] = {
+                label = "Inherited presets unavailable (invalid parent)",
+                value = "inherited-presets-invalid",
+                enabled = false,
+            }
+        end
+    end
+
     for index = 1, #(unit and unit.presets or {}) do
         local preset = unit.presets[index]
         local name = trimString(preset and preset.name or "")
         if name == "" then
             name = "Preset " .. tostring(index)
         end
-        items[#items + 1] = {
+        ownItems[#ownItems + 1] = {
             label = name,
             value = tostring(index),
         }
+    end
+    if #items > 0 and #ownItems > 0 then
+        items[#items + 1] = {
+            label = "Child presets (editable)",
+            value = "child-presets",
+            enabled = true,
+            notCheckable = true,
+            keepShownOnClick = true,
+            children = ownItems,
+        }
+    elseif #items == 0 then
+        items = ownItems
     end
     return items
 end
@@ -287,6 +357,50 @@ function DataEditor:CommitUnitInspectorPresetName()
         end
     end)
     self:RefreshUnitInspectorPresetsPage()
+end
+
+function DataEditor:CommitUnitInspectorPresetChallengeLevel(value)
+    if self._refreshingUnitInspector or self._refreshingUnitInspectorPresets then
+        return
+    end
+
+    local _, presetIndex = self:GetSelectedUnitInspectorPreset()
+    if not presetIndex then
+        return
+    end
+
+    local challengeLevel = trimString(value):lower()
+    if challengeLevel == "" then
+        challengeLevel = nil
+    elseif not UnitClass or type(UnitClass.IsValidChallengeLevel) ~= "function"
+        or not UnitClass.IsValidChallengeLevel(challengeLevel)
+    then
+        self:RefreshUnitInspectorPresetsPage()
+        return
+    end
+
+    self:CommitSelectedUnit(function(unit)
+        local preset = unit.presets and unit.presets[presetIndex] or nil
+        if preset then
+            preset.challengeLevel = challengeLevel
+        end
+    end)
+    self:RefreshUnitInspectorPresetsPage()
+end
+
+function DataEditor:BuildUnitInspectorPresetChallengeLevelItems()
+    local items = { { label = "Inherit", value = "" } }
+    if UnitClass and type(UnitClass.GetChallengeLevelDefinitions) == "function" then
+        local definitions = UnitClass.GetChallengeLevelDefinitions()
+        for index = 1, #definitions do
+            local definition = definitions[index]
+            items[#items + 1] = {
+                label = definition.label,
+                value = definition.value,
+            }
+        end
+    end
+    return items
 end
 
 function DataEditor:SetSelectedUnitInspectorPresetStatModifierIndex(index)
@@ -660,7 +774,10 @@ function DataEditor:RefreshUnitInspectorPresetsPage()
     if self.UnitInspectorPresetDropdown then
         self.UnitInspectorPresetDropdown:SetItems(self:BuildUnitInspectorPresetSelectorItems(unit))
         self.UnitInspectorPresetDropdown:SetSelectedValue(presetIndex and tostring(presetIndex) or "", true)
-        self:SetUnitInspectorDropdownEnabled(self.UnitInspectorPresetDropdown, hasUnit and #(unit and unit.presets or {}) > 0)
+        self:SetUnitInspectorDropdownEnabled(
+            self.UnitInspectorPresetDropdown,
+            hasUnit and (#(unit and unit.presets or {}) > 0 or tostring(unit.extendsUnitRef or "") ~= "")
+        )
     end
 
     setButtonEnabled(self.UnitInspectorPresetAddButton, hasUnit)
@@ -673,6 +790,12 @@ function DataEditor:RefreshUnitInspectorPresetsPage()
         self.UnitInspectorPresetNameEditingIndex = presetIndex
         self.UnitInspectorPresetNameInput:SetText(preset and preset.name or "")
         self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPresetNameInput, hasPreset)
+    end
+
+    if self.UnitInspectorPresetChallengeLevelDropdown then
+        self.UnitInspectorPresetChallengeLevelDropdown:SetItems(self:BuildUnitInspectorPresetChallengeLevelItems())
+        self.UnitInspectorPresetChallengeLevelDropdown:SetSelectedValue(preset and preset.challengeLevel or "", true)
+        self:SetUnitInspectorDropdownEnabled(self.UnitInspectorPresetChallengeLevelDropdown, hasPreset)
     end
 
     if self.UnitInspectorPresetStatDropdown then
@@ -757,6 +880,20 @@ function DataEditor:BuildUnitInspectorPresetsPage(page)
         self:CommitUnitInspectorPresetName()
     end)
     root:AddChild(self.UnitInspectorPresetNameInput)
+
+    root:AddChild(self:BuildUnitInspectorLabel(root:GetFrame(), "RPEDataEditorUnitInspectorPresetChallengeLevelLabel", "Challenge Level"))
+    self.UnitInspectorPresetChallengeLevelDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorUnitInspectorPresetChallengeLevelDropdown", {
+        width = self.UnitInspectorFieldWidth,
+        height = 18,
+        items = { { label = "Inherit", value = "" } },
+        onValueChanged = function(value)
+            if self._refreshingUnitInspector or self._refreshingUnitInspectorPresets then
+                return
+            end
+            self:CommitUnitInspectorPresetChallengeLevel(value)
+        end,
+    })
+    root:AddChild(self.UnitInspectorPresetChallengeLevelDropdown)
 
     root:AddChild(self:BuildUnitInspectorLabel(root:GetFrame(), "RPEDataEditorUnitInspectorPresetStatLabel", "Stat Modifiers"))
     root:AddChild(buildModifierHeader(root:GetFrame(), "RPEDataEditorUnitInspectorPresetStatHeader", "Stat"))

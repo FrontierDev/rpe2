@@ -255,7 +255,7 @@ end
 function EventUnit.ResolveNpcResourcePolicy(baseUnit, playerCount, options)
     local resolvedOptions = type(options) == "table" and options or {}
     local normalizedPlayerCount = normalizePlayerCount(playerCount)
-    local challengeLevel = UnitClass.NormalizeChallengeLevel(baseUnit and baseUnit.challengeLevel)
+    local challengeLevel = UnitClass.ResolveEffectiveChallengeLevel(baseUnit, resolvedOptions.presetIndex)
     local scalingLookup = buildScalingChallengeLookup(resolvedOptions)
     local applyPerPlayerScaling
 
@@ -288,7 +288,9 @@ function EventUnit.BuildUnitDerivedResources(baseUnit, presetIndex, playerCount,
     end
 
     local preset, normalizedPresetIndex = resolvePreset(baseUnit, presetIndex)
-    local policy = EventUnit.ResolveNpcResourcePolicy(baseUnit, playerCount, options)
+    local policyOptions = deepCopy(type(options) == "table" and options or {})
+    policyOptions.presetIndex = normalizedPresetIndex
+    local policy = EventUnit.ResolveNpcResourcePolicy(baseUnit, playerCount, policyOptions)
     local seedValues, ratioByRef = buildSeedValues(baseUnit, preset, policy)
     local modifiedValues = applyPresetResourceModifiers(seedValues, preset)
     local resources = {}

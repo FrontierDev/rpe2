@@ -426,6 +426,10 @@ local function getUnitSourceRefs(unit)
         return refs
     end
 
+    if type(unit.extendsUnitRef) == "string" and unit.extendsUnitRef ~= "" then
+        refs[#refs + 1] = unit.extendsUnitRef:gsub("^%s+", ""):gsub("%s+$", "")
+    end
+
     for index = 1, #(unit.spells or {}) do
         local spellRef = unit.spells[index]
         if type(spellRef) == "string" and spellRef ~= "" then

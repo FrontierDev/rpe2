@@ -64,36 +64,11 @@ local function deepCopy(value)
 end
 
 local function findActivatedUnitDefinition(registryId)
-    local normalizedRegistryId = type(registryId) == "string" and registryId or ""
-    if normalizedRegistryId == "" then
+    local registry = Addon.Internal and Addon.Internal.Registry or nil
+    if type(registry) ~= "table" or type(registry.ResolveUnitDefinition) ~= "function" then
         return nil, nil
     end
-
-    local separatorIndex = string.find(normalizedRegistryId, ":", 1, true)
-    if not separatorIndex then
-        return nil, nil
-    end
-
-    local datasetId = string.sub(normalizedRegistryId, 1, separatorIndex - 1)
-    local unitId = string.sub(normalizedRegistryId, separatorIndex + 1)
-    if datasetId == "" or unitId == "" then
-        return nil, nil
-    end
-
-    local datasets = Addon.Internal and Addon.Internal.Registry and Addon.Internal.Registry.GetActivatedDatasets and Addon.Internal.Registry:GetActivatedDatasets() or {}
-    for datasetIndex = 1, #datasets do
-        local dataset = datasets[datasetIndex]
-        if dataset and dataset.id == datasetId then
-            for unitIndex = 1, #(dataset.units or {}) do
-                local unit = dataset.units[unitIndex]
-                if unit and unit.id == unitId then
-                    return dataset, unit
-                end
-            end
-        end
-    end
-
-    return nil, nil
+    return registry:ResolveUnitDefinition(registryId)
 end
 
 local function buildSendMetadata(opcode)

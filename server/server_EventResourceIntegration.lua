@@ -238,7 +238,7 @@ then
         local policy = baseResolveNpcResourcePolicy(baseUnit, playerCount, options) or {}
         local resolvedOptions = type(options) == "table" and options or {}
 
-        policy.challengeLevel = normalizeChallengeLevel(baseUnit and baseUnit.challengeLevel)
+        policy.challengeLevel = UnitClass.ResolveEffectiveChallengeLevel(baseUnit, resolvedOptions.presetIndex)
         if resolvedOptions.applyPerPlayerScaling == nil then
             local selectedLevels = resolvedOptions.playerScalingChallengeLevels
             if selectedLevels == nil then

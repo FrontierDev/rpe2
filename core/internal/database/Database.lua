@@ -1748,7 +1748,10 @@ local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId
         normalized.id = normalized.id
     end
 
-    if normalized.name == nil or normalized.name == "" then
+    local hasUnitParent = collectionKey == "units"
+        and type(sourceData.extendsUnitRef) == "string"
+        and sourceData.extendsUnitRef:gsub("^%s+", ""):gsub("%s+$", "") ~= ""
+    if (normalized.name == nil or normalized.name == "") and not hasUnitParent then
         normalized.name = ("New %s"):format(definition.singular or "Entry")
     end
 

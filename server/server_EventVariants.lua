@@ -36,36 +36,10 @@ local function normalizeVariantIndex(value)
 end
 
 local function resolveActivatedUnitDefinition(registryId)
-    local normalizedRegistryId = type(registryId) == "string" and registryId or ""
-    if normalizedRegistryId == "" then
+    if type(Registry.ResolveUnitDefinition) ~= "function" then
         return nil, nil
     end
-
-    local separatorIndex = string.find(normalizedRegistryId, ":", 1, true)
-    if not separatorIndex then
-        return nil, nil
-    end
-
-    local datasetId = string.sub(normalizedRegistryId, 1, separatorIndex - 1)
-    local unitId = string.sub(normalizedRegistryId, separatorIndex + 1)
-    if datasetId == "" or unitId == "" then
-        return nil, nil
-    end
-
-    local datasets = Registry.GetActivatedDatasets and Registry:GetActivatedDatasets() or {}
-    for datasetIndex = 1, #datasets do
-        local dataset = datasets[datasetIndex]
-        if dataset and dataset.id == datasetId then
-            for unitIndex = 1, #(dataset.units or {}) do
-                local unit = dataset.units[unitIndex]
-                if unit and unit.id == unitId then
-                    return dataset, unit
-                end
-            end
-        end
-    end
-
-    return nil, nil
+    return Registry:ResolveUnitDefinition(registryId)
 end
 
 local function countPlayerUnits(units)
@@ -218,7 +192,7 @@ function Server:BuildResolvedNpcVariant(registryId, options)
         effectiveAppearances = deepCopy(effectiveAppearances or {}),
         appearanceIndex = appearanceIndex,
         appearance = appearanceIndex > 0 and UnitClass.ResolveAppearance(baseUnit, presetIndex, appearanceIndex) or nil,
-        challengeLevel = UnitClass.NormalizeChallengeLevel(baseUnit.challengeLevel),
+        challengeLevel = UnitClass.ResolveEffectiveChallengeLevel(baseUnit, presetIndex),
         playerCount = playerCount,
         level = level,
     }

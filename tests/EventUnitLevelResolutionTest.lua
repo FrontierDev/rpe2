@@ -50,6 +50,7 @@ local baseUnit = Unit:New({
     presets = {
         {
             name = "Empowered",
+            challengeLevel = "elite",
             statModifiers = {
                 { statRef = "test:power", percentBonus = 50, flatBonus = 5 },
                 { statRef = "test:missing-stat", percentBonus = 25, flatBonus = 7 },
@@ -94,6 +95,8 @@ local variantEventUnit = EventUnit:New({ registryID = "test:npc", presetIndex = 
 local resolvedStats = EventUnit.BuildResolvedStats(variantEventUnit, nil, { level = 10 })
 assertEqual(findRow(resolvedStats, "statRef", "test:power").value, 290, "stat preset applies to level-resolved base")
 assertEqual(findRow(resolvedStats, "statRef", "test:missing-stat").value, 7, "missing stat modifier uses base zero")
+assertEqual(Unit.ResolveEffectiveChallengeLevel(baseUnit, 0), "normal", "No preset resolves the base challenge level")
+assertEqual(Unit.ResolveEffectiveChallengeLevel(baseUnit, 1), "elite", "Preset override resolves through Unit")
 
 local resourceOptions = {
     level = 10,
@@ -109,6 +112,30 @@ assertClose(findRow(resolvedResources, "resourceRef", "test:health").currentValu
 assertEqual(findRow(resolvedResources, "resourceRef", "test:mana").maxValue, 43, "non-health resource receives preset flat modifier only")
 assertEqual(findRow(resolvedResources, "resourceRef", "test:missing-resource").maxValue, 7, "missing resource modifier retains base-zero behavior")
 assertEqual(policy.level, 10, "resource policy records the explicit Event level")
+
+local effectiveChallengeScalingResources, effectiveChallengePolicy = EventUnit.BuildUnitDerivedResources(baseUnit, 1, 2, {
+    level = 10,
+    difficulty = "normal",
+    healthResourceRef = "test:health",
+    playerScalingChallengeLevels = { "elite" },
+    healthBonusPerPlayerPercent = 10,
+    healthPercent = 0,
+})
+assertEqual(effectiveChallengePolicy.challengeLevel, "elite", "Resource policy uses the preset challenge level")
+assertEqual(effectiveChallengePolicy.applyPerPlayerScaling, true, "Player scaling eligibility uses the preset challenge level")
+assertEqual(findRow(effectiveChallengeScalingResources, "resourceRef", "test:health").maxValue, 342, "Health player scaling applies for an elite preset")
+
+local inheritedChallengeResources, inheritedChallengePolicy = EventUnit.BuildUnitDerivedResources(baseUnit, 0, 2, {
+    level = 10,
+    difficulty = "normal",
+    healthResourceRef = "test:health",
+    playerScalingChallengeLevels = { "elite" },
+    healthBonusPerPlayerPercent = 10,
+    healthPercent = 0,
+})
+assertEqual(inheritedChallengePolicy.challengeLevel, "normal", "No preset resource policy retains base challenge level")
+assertEqual(inheritedChallengePolicy.applyPerPlayerScaling, false, "No preset keeps base-level scaling eligibility")
+assertEqual(findRow(inheritedChallengeResources, "resourceRef", "test:health").maxValue, 190, "Base-level health remains unscaled when only elite is selected")
 
 local beforeResolve = Unit:New(baseUnit):ToTable()
 for _ = 1, 3 do
@@ -134,6 +161,13 @@ Addon.Server.EventState = {
     teams = {},
 }
 loadAddonFile("server/server_EventVariants.lua")
+
+local resolvedNpcVariant = Addon.Server:BuildResolvedNpcVariant("test:npc", {
+    presetIndex = 1,
+    level = 10,
+    playerCount = 0,
+})
+assertEqual(resolvedNpcVariant.challengeLevel, "elite", "Resolved NPC variant reports the effective preset challenge level")
 
 local summonedUnitData = Addon.Server:BuildEventNpcUnitDataFromDefinition("test:npc", {
     presetIndex = 1,

@@ -33,27 +33,11 @@ local function deepCopy(value)
 end
 
 local function resolveActivatedUnitDefinition(registryId)
-    local text = type(registryId) == "string" and registryId or ""
-    local separator = string.find(text, ":", 1, true)
-    if not separator then
+    if type(Registry.ResolveUnitDefinition) ~= "function" then
         return nil
     end
-
-    local datasetId = string.sub(text, 1, separator - 1)
-    local unitId = string.sub(text, separator + 1)
-    local datasets = type(Registry.GetActivatedDatasets) == "function" and Registry:GetActivatedDatasets() or {}
-    for datasetIndex = 1, #datasets do
-        local dataset = datasets[datasetIndex]
-        if dataset and tostring(dataset.id or "") == datasetId then
-            for unitIndex = 1, #(dataset.units or {}) do
-                local unit = dataset.units[unitIndex]
-                if unit and tostring(unit.id or "") == unitId then
-                    return unit
-                end
-            end
-        end
-    end
-    return nil
+    local _, unit = Registry:ResolveUnitDefinition(registryId)
+    return unit
 end
 
 local function applyEquipment(target, equipment)

@@ -101,6 +101,11 @@ local function normalizeRef(value)
     return ref
 end
 
+local function normalizeExtendsUnitRef(value)
+    local ref = trimString(value)
+    return ref ~= "" and ref or nil
+end
+
 local function normalizeModifierRef(value)
     local ref = trimString(value)
     if ref == "" then
@@ -258,10 +263,24 @@ local function normalizeModifierList(values, refKey)
     return normalized
 end
 
+local function normalizePresetChallengeLevel(value)
+    if value == nil then
+        return nil
+    end
+
+    local candidate = trimString(value):lower()
+    if not VALID_CHALLENGE_LEVELS[candidate] then
+        error(("Invalid Unit preset challenge level '%s'."):format(tostring(value)), 3)
+    end
+
+    return candidate
+end
+
 local function normalizePreset(value)
     local source = type(value) == "table" and value or {}
     return {
         name = trimString(source.name),
+        challengeLevel = normalizePresetChallengeLevel(source.challengeLevel),
         statModifiers = normalizeModifierList(source.statModifiers, "statRef"),
         resourceModifiers = normalizeModifierList(source.resourceModifiers, "resourceRef"),
         appearances = normalizeUnitAppearances(source.appearances),
@@ -371,6 +390,11 @@ function Unit.NormalizeChallengeLevel(value)
     return "normal"
 end
 
+function Unit.IsValidChallengeLevel(value)
+    local candidate = trimString(value):lower()
+    return VALID_CHALLENGE_LEVELS[candidate] == true
+end
+
 function Unit.NormalizeAppearance(value)
     return normalizeAppearance(value)
 end
@@ -414,6 +438,15 @@ function Unit.ResolvePreset(unit, presetIndex)
     end
 
     return normalizePreset(unit.presets[normalizedIndex]), normalizedIndex
+end
+
+function Unit.ResolveEffectiveChallengeLevel(unit, presetIndex)
+    local preset = Unit.ResolvePreset(unit, presetIndex)
+    if preset and preset.challengeLevel ~= nil then
+        return preset.challengeLevel
+    end
+
+    return Unit.NormalizeChallengeLevel(type(unit) == "table" and unit.challengeLevel or nil)
 end
 
 function Unit.ResolveVariantName(unit, presetIndex)
@@ -529,7 +562,9 @@ end
 function Unit:New(data)
     local instance = setmetatable({
         id = nil,
+        extendsUnitRef = nil,
         name = "",
+        description = nil,
         creatureType = "humanoid",
         creatureSize = "medium",
         challengeLevel = "normal",
@@ -552,6 +587,7 @@ function Unit:New(data)
         resistances = {},
         attributes = {},
         tags = {},
+        _authoredFields = {},
     }, Unit)
 
     return instance:Merge(data)
@@ -560,6 +596,11 @@ end
 function Unit:Merge(data)
     if type(data) ~= "table" then
         return self
+    end
+
+    self._authoredFields = type(self._authoredFields) == "table" and self._authoredFields or {}
+    for key in pairs(data) do
+        self._authoredFields[key] = true
     end
 
     local hasCanonicalAppearances = data.appearances ~= nil
@@ -573,7 +614,9 @@ function Unit:Merge(data)
     end
 
     self.id = self.id ~= nil and tostring(self.id) or nil
+    self.extendsUnitRef = normalizeExtendsUnitRef(self.extendsUnitRef)
     self.name = ensureString(self.name)
+    self.description = self.description ~= nil and ensureString(self.description) or nil
     self.creatureType = ensureString(self.creatureType ~= "" and self.creatureType or "humanoid")
     self.creatureSize = ensureString(self.creatureSize ~= "" and self.creatureSize or "medium")
     self.challengeLevel = Unit.NormalizeChallengeLevel(self.challengeLevel)
@@ -611,25 +654,173 @@ function Unit:Merge(data)
 end
 
 function Unit:ToTable()
-    return {
+    local data = {
         id = self.id,
-        name = self.name,
-        creatureType = self.creatureType,
-        creatureSize = self.creatureSize,
-        challengeLevel = Unit.NormalizeChallengeLevel(self.challengeLevel),
-        appearances = normalizeUnitAppearances(self.appearances),
-        presets = normalizeUnitPresets(self.presets),
-        mainHandWeapon = self.mainHandWeapon,
-        offHandWeapon = self.offHandWeapon,
-        rangedWeapon = self.rangedWeapon,
-        shield = self.shield,
-        spells = normalizeList(self.spells),
-        stats = normalizeUnitStats(self.stats),
-        resources = normalizeUnitResources(self.resources),
-        resistances = normalizeUnitResistances(self.resistances),
-        attributes = normalizeList(self.attributes),
-        tags = normalizeList(self.tags),
+        extendsUnitRef = self.extendsUnitRef,
     }
+
+    local extending = self.extendsUnitRef ~= nil
+    local authored = type(self._authoredFields) == "table" and self._authoredFields or {}
+    local constructorDefaults = {
+        name = "",
+        creatureType = "humanoid",
+        creatureSize = "medium",
+        challengeLevel = "normal",
+    }
+    local function includeScalar(key, value)
+        if not extending or authored[key] or value ~= constructorDefaults[key] then
+            data[key] = value
+        end
+    end
+
+    includeScalar("name", self.name)
+    includeScalar("description", self.description)
+    includeScalar("creatureType", self.creatureType)
+    includeScalar("creatureSize", self.creatureSize)
+    includeScalar("challengeLevel", Unit.NormalizeChallengeLevel(self.challengeLevel))
+    includeScalar("mainHandWeapon", self.mainHandWeapon)
+    includeScalar("offHandWeapon", self.offHandWeapon)
+    includeScalar("rangedWeapon", self.rangedWeapon)
+    includeScalar("shield", self.shield)
+
+    local function includeOverlay(key, value, legacyPresence)
+        if not extending or authored[key] or legacyPresence or #value > 0 then
+            data[key] = value
+        end
+    end
+
+    includeOverlay("appearances", normalizeUnitAppearances(self.appearances),
+        authored.displayId or authored.fileDataId)
+    includeOverlay("presets", normalizeUnitPresets(self.presets))
+    includeOverlay("spells", normalizeList(self.spells))
+    includeOverlay("stats", normalizeUnitStats(self.stats))
+    includeOverlay("resources", normalizeUnitResources(self.resources))
+    includeOverlay("resistances", normalizeUnitResistances(self.resistances))
+    includeOverlay("attributes", normalizeList(self.attributes))
+    includeOverlay("tags", normalizeList(self.tags))
+
+    return data
+end
+
+local function appendOrderedUnique(target, seen, values, normalize)
+    for index = 1, #(values or {}) do
+        local value = normalize(values[index])
+        if value ~= nil and value ~= "" and not seen[value] then
+            target[#target + 1] = value
+            seen[value] = true
+        end
+    end
+end
+
+local function mergeOrderedRefs(parentValues, childValues)
+    local values = {}
+    local seen = {}
+    local function add(value)
+        local ref = normalizeRef(value)
+        if ref and not seen[ref] then
+            values[#values + 1] = ref
+            seen[ref] = true
+        end
+    end
+    for index = 1, #(parentValues or {}) do add(parentValues[index]) end
+    for index = 1, #(childValues or {}) do add(childValues[index]) end
+    return values
+end
+
+local function mergeByReference(parentValues, childValues, refKey, normalize)
+    local values = {}
+    local indexByRef = {}
+    local function add(entry)
+        local normalized = normalize(entry)
+        local ref = normalized and normalized[refKey] or nil
+        if ref then
+            local index = indexByRef[ref]
+            if index then
+                values[index] = normalized
+            else
+                values[#values + 1] = normalized
+                indexByRef[ref] = #values
+            end
+        end
+    end
+    for index = 1, #(parentValues or {}) do add(parentValues[index]) end
+    for index = 1, #(childValues or {}) do add(childValues[index]) end
+    return values
+end
+
+function Unit.MergeDefinitions(parent, child)
+    local parentDefinition = type(parent) == "table" and parent or {}
+    local childDefinition = type(child) == "table" and child or {}
+    local merged = deepCopy(parentDefinition)
+
+    -- The child's entry identity always wins; an ancestor's ID is never copied.
+    merged.id = childDefinition.id
+    merged.extendsUnitRef = normalizeExtendsUnitRef(childDefinition.extendsUnitRef)
+    local scalarFields = {
+        "name", "description", "creatureType", "creatureSize", "challengeLevel",
+        "mainHandWeapon", "offHandWeapon", "rangedWeapon", "shield",
+    }
+    for index = 1, #scalarFields do
+        local key = scalarFields[index]
+        if childDefinition[key] ~= nil then
+            if key == "mainHandWeapon" or key == "offHandWeapon" or key == "rangedWeapon" or key == "shield" then
+                merged[key] = normalizeRef(childDefinition[key])
+            else
+                merged[key] = deepCopy(childDefinition[key])
+            end
+        end
+    end
+
+    local childAppearances
+    if childDefinition.appearances ~= nil then
+        childAppearances = normalizeUnitAppearances(childDefinition.appearances)
+    else
+        local legacyAppearance = normalizeAppearance(childDefinition)
+        childAppearances = legacyAppearance and { legacyAppearance } or {}
+    end
+    merged.appearances = normalizeUnitAppearances(parentDefinition.appearances)
+    for index = 1, #childAppearances do
+        merged.appearances[#merged.appearances + 1] = deepCopy(childAppearances[index])
+    end
+
+    local parentPresets = type(Unit.NormalizePresets) == "function"
+        and Unit.NormalizePresets(parentDefinition.presets) or normalizeUnitPresets(parentDefinition.presets)
+    local childPresets = type(Unit.NormalizePresets) == "function"
+        and Unit.NormalizePresets(childDefinition.presets) or normalizeUnitPresets(childDefinition.presets)
+    merged.presets = parentPresets
+    for index = 1, #childPresets do
+        merged.presets[#merged.presets + 1] = deepCopy(childPresets[index])
+    end
+
+    merged.spells = mergeOrderedRefs(parentDefinition.spells, childDefinition.spells)
+    merged.stats = mergeByReference(parentDefinition.stats, childDefinition.stats, "statRef", function(entry)
+        return normalizeUnitStats({ entry })[1]
+    end)
+    merged.resources = mergeByReference(parentDefinition.resources, childDefinition.resources, "resourceRef", function(entry)
+        return normalizeUnitResources({ entry })[1]
+    end)
+    merged.resistances = mergeByReference(parentDefinition.resistances, childDefinition.resistances, "damageSchoolRef", function(entry)
+        return normalizeUnitResistances({ entry })[1]
+    end)
+
+    merged.attributes = {}
+    local attributeSeen = {}
+    appendOrderedUnique(merged.attributes, attributeSeen, parentDefinition.attributes, function(value)
+        return ensureString(value)
+    end)
+    appendOrderedUnique(merged.attributes, attributeSeen, childDefinition.attributes, function(value)
+        return ensureString(value)
+    end)
+    merged.tags = {}
+    local tagSeen = {}
+    appendOrderedUnique(merged.tags, tagSeen, parentDefinition.tags, function(value)
+        return ensureString(value)
+    end)
+    appendOrderedUnique(merged.tags, tagSeen, childDefinition.tags, function(value)
+        return ensureString(value)
+    end)
+
+    return Unit:New(merged):ToTable()
 end
 
 function Unit.FromTable(data)

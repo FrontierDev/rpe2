@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 31,
+    version = 32,
     dataset = {
         achievements = {},
         auras = {},
@@ -4679,7 +4679,182 @@ units = {
                 id = "7i40epa5",
                 mainHandWeapon = "f82db71a:stwswd01",
                 name = "Human",
-                presets = {},
+                presets = {
+                    {
+                        name = "Footman",
+                        resourceModifiers = {
+                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = 15, flatBonus = 0 },
+                        },
+                        statModifiers = {
+                            { statRef = "f82db71a:v42albuv", percentBonus = 35, flatBonus = 0 },
+                            { statRef = "f82db71a:p8syz5ba", percentBonus = 0, flatBonus = 10 },
+                            { statRef = "f82db71a:tcn0s8kx", percentBonus = 0, flatBonus = 3 },
+                            { statRef = "f82db71a:u7b49vs9", percentBonus = 5, flatBonus = 0 },
+                        },
+                        spells = {
+                            "f82db71a:z36xzk0w",
+                            "7bbb4cb9:ti2j4umn",
+                            "7bbb4cb9:tntwar01",
+                        },
+                        equipment = {
+                            mainHandWeapon = "f82db71a:stwswd01",
+                            shield = "f82db71a:stshld01",
+                        },
+                    },
+                    {
+                        name = "Berserker",
+                        resourceModifiers = {
+                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = 10, flatBonus = 0 },
+                        },
+                        statModifiers = {
+                            { statRef = "f82db71a:v42albuv", percentBonus = -25, flatBonus = 0 },
+                            { statRef = "f82db71a:u7b49vs9", percentBonus = 20, flatBonus = 0 },
+                            { statRef = "f82db71a:jslmczbi", percentBonus = 0, flatBonus = 5 },
+                            { statRef = "f82db71a:gj9wxb0x", percentBonus = 0, flatBonus = 10 },
+                        },
+                        spells = {
+                            "f82db71a:z36xzk0w",
+                            "7bbb4cb9:c1s93sif",
+                            "7bbb4cb9:e0mooybr",
+                            "7bbb4cb9:berrage1",
+                        },
+                        equipment = {
+                            mainHandWeapon = "f82db71a:stw2sw01",
+                        },
+                    },
+                    {
+                        name = "Archer",
+                        resourceModifiers = {
+                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = -15, flatBonus = 0 },
+                        },
+                        statModifiers = {
+                            { statRef = "f82db71a:v42albuv", percentBonus = -25, flatBonus = 0 },
+                            { statRef = "f82db71a:v2rs9cpy", percentBonus = 20, flatBonus = 0 },
+                            { statRef = "f82db71a:dd88li4c", percentBonus = 0, flatBonus = 5 },
+                            { statRef = "f82db71a:fercjhm5", percentBonus = 0, flatBonus = 5 },
+                        },
+                        equipment = {
+                            rangedWeapon = "f82db71a:stwbow01",
+                        },
+                    },
+                    {
+                        name = "Assassin",
+                        resourceModifiers = {
+                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = -20, flatBonus = 0 },
+                        },
+                        statModifiers = {
+                            { statRef = "f82db71a:v42albuv", percentBonus = -35, flatBonus = 0 },
+                            { statRef = "f82db71a:u7b49vs9", percentBonus = 15, flatBonus = 0 },
+                            { statRef = "f82db71a:wbj4zuf3", percentBonus = 0, flatBonus = 5 },
+                            { statRef = "f82db71a:jslmczbi", percentBonus = 0, flatBonus = 10 },
+                            { statRef = "f82db71a:o6113cir", percentBonus = 0, flatBonus = 10 },
+                        },
+                        spells = {
+                            "f82db71a:z36xzk0w",
+                            "23d5dce2:3yvu5lwf",
+                            "23d5dce2:pfskjkhi",
+                            "23d5dce2:kbifnqpj",
+                        },
+                        equipment = {
+                            mainHandWeapon = "f82db71a:stwdgr01",
+                        },
+                    },
+                    {
+                        name = "Mage",
+                        resourceModifiers = {
+                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = -25, flatBonus = 0 },
+                        },
+                        statModifiers = {
+                            { statRef = "f82db71a:v42albuv", percentBonus = -60, flatBonus = 0 },
+                            { statRef = "f82db71a:7t7xgzcx", percentBonus = 25, flatBonus = 0 },
+                            { statRef = "f82db71a:v2g0tw0o", percentBonus = 0, flatBonus = 5 },
+                            { statRef = "f82db71a:69hfqhne", percentBonus = 0, flatBonus = 5 },
+                            { statRef = "f82db71a:zs1nbz13", percentBonus = 0, flatBonus = 5 },
+                        },
+                        spells = {
+                            "d7c874c4:68dy7na1",
+                            "d7c874c4:lywroiqu",
+                            "d7c874c4:7ha8pdoy",
+                            "d7c874c4:polymr01",
+                            "d7c874c4:fireward",
+                            "d7c874c4:mgarma01",
+                        },
+                        equipment = {
+                            mainHandWeapon = "f82db71a:stwstf01",
+                        },
+                    },
+                    {
+                        name = "Priest",
+                        resourceModifiers = {
+                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = -20, flatBonus = 0 },
+                        },
+                        statModifiers = {
+                            { statRef = "f82db71a:v42albuv", percentBonus = -45, flatBonus = 0 },
+                            { statRef = "f82db71a:hj6d4kvy", percentBonus = 30, flatBonus = 0 },
+                            { statRef = "f82db71a:7t7xgzcx", percentBonus = 10, flatBonus = 0 },
+                            { statRef = "f82db71a:v2g0tw0o", percentBonus = 0, flatBonus = 5 },
+                            { statRef = "f82db71a:69hfqhne", percentBonus = 0, flatBonus = 5 },
+                            { statRef = "f82db71a:zs1nbz13", percentBonus = 0, flatBonus = 5 },
+                        },
+                        spells = {
+                            "1c1038a7:eet5xd4t",
+                            "1c1038a7:pwshld01",
+                            "1c1038a7:qqkkenuw",
+                            "1c1038a7:rm9rekvj",
+                        },
+                        equipment = {
+                            mainHandWeapon = "f82db71a:stwmac01",
+                        },
+                    },
+                    {
+                        name = "Battlemage",
+                        resourceModifiers = {
+                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = 5, flatBonus = 0 },
+                        },
+                        statModifiers = {
+                            { statRef = "f82db71a:v42albuv", percentBonus = 25, flatBonus = 0 },
+                            { statRef = "f82db71a:7t7xgzcx", percentBonus = 15, flatBonus = 0 },
+                            { statRef = "f82db71a:v2g0tw0o", percentBonus = 0, flatBonus = 3 },
+                            { statRef = "f82db71a:69hfqhne", percentBonus = 0, flatBonus = 3 },
+                            { statRef = "f82db71a:zs1nbz13", percentBonus = 0, flatBonus = 10 },
+                            { statRef = "f82db71a:u7b49vs9", percentBonus = 10, flatBonus = 0 },
+                        },
+                        spells = {
+                            "f82db71a:z36xzk0w",
+                            "d7c874c4:68dy7na1",
+                            "d7c874c4:fireward",
+                            "d7c874c4:mgarma01",
+                        },
+                        equipment = {
+                            mainHandWeapon = "f82db71a:stwmac01",
+                            shield = "f82db71a:stshld01",
+                        },
+                    },
+                    {
+                        name = "Commander",
+                        resourceModifiers = {
+                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = 30, flatBonus = 0 },
+                        },
+                        statModifiers = {
+                            { statRef = "f82db71a:v42albuv", percentBonus = 20, flatBonus = 0 },
+                            { statRef = "f82db71a:u7b49vs9", percentBonus = 10, flatBonus = 0 },
+                            { statRef = "f82db71a:wbj4zuf3", percentBonus = 0, flatBonus = 3 },
+                            { statRef = "f82db71a:tcn0s8kx", percentBonus = 0, flatBonus = 5 },
+                            { statRef = "f82db71a:j8n012e6", percentBonus = 0, flatBonus = 25 },
+                            { statRef = "f82db71a:gj9wxb0x", percentBonus = 0, flatBonus = 5 },
+                        },
+                        spells = {
+                            "f82db71a:z36xzk0w",
+                            "7bbb4cb9:c1s93sif",
+                            "7bbb4cb9:tntwar01",
+                            "7bbb4cb9:9gh28pe5",
+                            "7bbb4cb9:demoshot",
+                        },
+                        equipment = {
+                            mainHandWeapon = "f82db71a:stwswd01",
+                        },
+                    },
+                },
                 resistances = {},
                 resources = {
                     {
@@ -4787,11 +4962,6 @@ units = {
                         initialValue = 0,
                         perLevelValue = 0,
                         statRef = "f82db71a:954yunb9"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:gj9wxb0x"
                     },
                     {
                         initialValue = 0,

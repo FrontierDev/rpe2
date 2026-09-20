@@ -162,7 +162,12 @@ end
 
 function Unit:ToTable()
     local data = type(baseToTable) == "function" and baseToTable(self) or {}
-    data.presets = normalizePresets(self.presets)
+    local authored = type(self._authoredFields) == "table" and self._authoredFields or {}
+    if self.extendsUnitRef ~= nil and not authored.presets and #(self.presets or {}) == 0 then
+        data.presets = nil
+    else
+        data.presets = normalizePresets(self.presets)
+    end
     return data
 end
 
