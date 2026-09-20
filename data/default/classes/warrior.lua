@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 34,
+        version = 35,
     dataset = {
         achievements = {},
         auras = {
@@ -3359,7 +3359,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
-                icon = "interface/icons/spell_nature_bloodlust.blp",
+                icon = "interface/icons/warrior_wild_strike.blp",
                 id = "ragblow1",
                 cooldownChannel = 1,
                 learnMode = "always_learned",
@@ -3502,7 +3502,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
-                icon = "interface/icons/spell_nature_bloodlust.blp",
+                icon = "interface/icons/ability_warrior_rampage.blp",
                 id = "rampage1",
                 cooldownChannel = 1,
                 learnMode = "always_learned",
