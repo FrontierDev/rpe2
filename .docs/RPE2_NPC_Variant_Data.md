@@ -12,6 +12,43 @@ All values below are authored values before event difficulty and player-count sc
 
 ---
 
+
+## Unit Variant Schema Notes
+
+### Preset challenge-level override
+
+A Unit preset may optionally define its own `challengeLevel`.
+
+- Omitted: inherit the base Unit challenge level.
+- Explicit values: `swarm`, `minor`, `normal`, `elite`, or `boss`.
+- Runtime challenge-specific behaviour must use the effective preset challenge level.
+
+The Human role presets below do not implicitly change challenge level unless one is explicitly authored.
+
+### Unit extension across datasets
+
+A Unit entry may extend another Unit through `extendsUnitRef`.
+
+Example:
+
+```lua
+{
+    id = "campaignHuman",
+    extendsUnitRef = "f82db71a:7i40epa5",
+    presets = {
+        -- campaign-specific Human presets
+    },
+}
+```
+
+The extending Unit keeps its own registry ref. The parent is not mutated.
+
+Inherited presets are resolved first and child presets append afterwards. This allows another dataset to reuse the Core Human baseline and contribute additional presets without copying the full Unit definition.
+
+See GitHub issues #386 and #387 for the implementation requirements.
+
+---
+
 ## 1. Base Human — Normal
 
 | Field | Initial | Per Level | Level 60 |
