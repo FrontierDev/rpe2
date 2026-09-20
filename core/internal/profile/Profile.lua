@@ -1685,6 +1685,24 @@ function Profile.ValidateTraitAssignment(traitRef, options)
     local isSelectedClassTalent = membership.selectedClassTalent
     local isManual = not membership.anyClassTalent and not membership.anyClassPassive and not membership.anyRace
 
+    for index = 1, #(trait.mutuallyExclusiveTraitRefs or {}) do
+        local conflictingRef = ensureString(trait.mutuallyExclusiveTraitRefs[index])
+        if conflictingRef ~= "" and conflictingRef ~= normalizedRef and selectedTalentLookup[conflictingRef] == true then
+            local conflictingTrait = nil
+            if type(registry.ResolveTraitReference) == "function" then
+                _, conflictingTrait = registry:ResolveTraitReference(conflictingRef)
+            end
+            local conflictingName = ensureString(conflictingTrait and conflictingTrait.name)
+            if conflictingName == "" then
+                conflictingName = conflictingRef
+            end
+            return traitAssignmentFailure("mutually_exclusive_trait", ("Mutually exclusive with %s."):format(conflictingName), {
+                typeCategory = isClassTalent and "talent" or "talent",
+                conflictingTraitRef = conflictingRef,
+            })
+        end
+    end
+
     if membership.anyRace or membership.anyClassPassive then
         return traitAssignmentFailure("passive_not_assignable", "This passive trait is granted automatically.", { typeCategory = membership.selectedRace and "race" or "class" })
     end

@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 24,
+    version = 25,
     dataset = {
         achievements = {},
         auras = {
@@ -346,7 +346,7 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 events = {},
-                icon = "interface/icons/ability_poisonarrow.blp",
+                icon = "interface/icons/ability_rogue_dualweild.blp",
                 id = "dlypsn01",
                 maxStacks = 5,
                 name = "Deadly Poison",
@@ -678,6 +678,7 @@ Addon.Data.DefaultDatasets:Register({
                     "23d5dce2:lghtref5",
                     "23d5dce2:deflect5",
                     "23d5dce2:weapexp6",
+                    "23d5dce2:unfair01",
                     "23d5dce2:mstdecpt",
                     "23d5dce2:deadly10",
                     "23d5dce2:hghtsens"
@@ -3435,6 +3436,56 @@ Addon.Data.DefaultDatasets:Register({
                 totalTicks = 0,
                 useCooldownCharges = false
             },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            duration = 3,
+                            targetEvents = {},
+                            type = "taunt"
+                        },
+                        key = "teasecmp",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 3,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_nature_reincarnation.blp",
+                id = "tease001",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Tease",
+                range = 0,
+                resourceCosts = {},
+                seedNPCSpell = false,
+                spellbookCategory = "Combat",
+                tags = {},
+                tooltipTemplate = true,
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
         },
         stats = {},
         traits = {
@@ -3468,9 +3519,12 @@ Addon.Data.DefaultDatasets:Register({
                         triggerTarget = "event_other"
                     }
                 },
-                icon = "interface/icons/ability_poisonarrow.blp",
+                icon = "interface/icons/ability_rogue_dualweild.blp",
                 id = "dlypsntr",
                 isEnvironmental = false,
+                mutuallyExclusiveTraitRefs = {
+                    "23d5dce2:z9yfqvhy"
+                },
                 name = "Deadly Poison",
                 skillBonuses = {},
                 statBonuses = {},
@@ -3535,6 +3589,9 @@ Addon.Data.DefaultDatasets:Register({
                 icon = "interface/icons/ability_poisonarrow.blp",
                 id = "z9yfqvhy",
                 isEnvironmental = false,
+                mutuallyExclusiveTraitRefs = {
+                    "23d5dce2:dlypsntr"
+                },
                 name = "Instant Poison",
                 skillBonuses = {},
                 statBonuses = {},
@@ -3692,6 +3749,43 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 automaticAuras = {},
+                category = "Combat",
+                conditions = {},
+                description = "",
+                events = {
+                    {
+                        chance = 100,
+                        combatEventId = "on_defence",
+                        defenceStatRef = "f82db71a:o6113cir",
+                        effects = {
+                            {
+                                amountMode = "flat",
+                                baseDamage = 96,
+                                damageSchoolRefs = {
+                                    "f82db71a:v1azo4j6"
+                                },
+                                statScaling = {
+                                    {
+                                        coefficient = 0.14,
+                                        statRef = "f82db71a:u7b49vs9"
+                                    }
+                                },
+                                type = "damage"
+                            }
+                        },
+                        triggerTarget = "event_source"
+                    }
+                },
+                icon = "interface/icons/ability_rogue_unfairadvantage.blp",
+                id = "unfair01",
+                isEnvironmental = false,
+                name = "Unfair Advantage",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
                 category = "Subtlety",
                 conditions = {},
                 description = "",
@@ -3703,6 +3797,14 @@ Addon.Data.DefaultDatasets:Register({
                 skillBonuses = {
                     {
                         skillRef = "f82db71a:muuwon1r",
+                        value = 5
+                    },
+                    {
+                        skillRef = "f82db71a:gwgzj5kg",
+                        value = 5
+                    },
+                    {
+                        skillRef = "f82db71a:8188fykv",
                         value = 5
                     }
                 },
