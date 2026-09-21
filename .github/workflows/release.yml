@@ -1,0 +1,117 @@
+name: Validate and publish RPEngine release
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    tags:
+      - "v[0-9]*"
+      - "[0-9]*"
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  release-package:
+    name: Validate release package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require release tag commit on main
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::Release tags must point to a commit contained in main."
+            exit 1
+          fi
+
+      - name: Resolve package version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          toc_version="$(sed -nE 's/^##[[:space:]]*Version:[[:space:]]*(.+)[[:space:]]*$/\1/p' RPEngine2.toc | head -n 1)"
+          if [[ -z "$toc_version" ]]; then
+            echo "::error::RPEngine2.toc does not contain a usable Version field."
+            exit 1
+          fi
+
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="$GITHUB_REF_NAME"
+            version="${tag#v}"
+            if [[ "$version" != "$toc_version" ]]; then
+              echo "::error::Tag version '$version' does not match RPEngine2.toc version '$toc_version'."
+              exit 1
+            fi
+          else
+            version="$toc_version"
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build and validate release archive
+        run: |
+          python3 .github/scripts/package_release.py \
+            --version "${{ steps.version.outputs.version }}" \
+            --output-dir dist
+
+      - name: Verify checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum --check "RPEngine2-${{ steps.version.outputs.version }}.zip.sha256"
+
+      - name: Inspect archive root
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import PurePosixPath
+          import zipfile
+
+          version = "${{ steps.version.outputs.version }}"
+          archive_path = f"dist/RPEngine2-{version}.zip"
+
+          with zipfile.ZipFile(archive_path) as archive:
+              names = archive.namelist()
+
+          roots = {PurePosixPath(name).parts[0] for name in names}
+          if roots != {"RPEngine2"}:
+              raise SystemExit(f"unexpected archive roots: {sorted(roots)}")
+          if "RPEngine2/RPEngine2.toc" not in names:
+              raise SystemExit("archive is missing RPEngine2/RPEngine2.toc")
+          print(f"validated {len(names)} archive entries under RPEngine2/")
+          PY
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          zip="dist/RPEngine2-${VERSION}.zip"
+          checksum="${zip}.sha256"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$zip" "$checksum" --clobber
+          else
+            gh release create "$TAG" "$zip" "$checksum" \
+              --title "RPEngine ${VERSION}" \
+              --generate-notes
+          fi
