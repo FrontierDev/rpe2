@@ -1,70 +1,125 @@
 ## Purpose
 
-Implement `remove_dataset` execution for the Phase 2 external-management protocol.
+Make RPE2 root handling conform to the protocol-v1 fail-closed rules.
 
-Depends on FrontierDev/rpe-manager#10 and the RPE external-management runtime issue created for Phase 2.
-
-## Current canonical path
-
-The current addon already exposes:
-
-```lua
-Database.DeleteDataset(datasetId)
-```
-
-in:
+Protocol contract:
 
 ```text
-core/internal/database/Database.lua
+FrontierDev/rpe-manager/docs/protocol.md
 ```
 
-The external Manager must request deletion through this API rather than deleting tables from `RPEngineDatasetDB`.
+The current `ensureRoot()` function repairs/replaces malformed protocol state. That contradicts the v1 contract and can destroy evidence/state written by a newer Manager version.
 
-## Scope
+## Required behaviour
 
-For a valid protocol-v1 `remove_dataset` request:
+### Root absent
 
-1. Validate the operation envelope and package/dataset identity.
-2. Resolve the installed package manifest entry for `catalogueId`.
-3. Ensure the request cannot delete an unrelated dataset by presenting a mismatched catalogue ID/dataset ID pair.
-4. Call `Database.DeleteDataset(datasetId)` for the canonical removal.
-5. On successful removal:
-   - remove the corresponding `installedPackages[catalogueId]` manifest entry;
-   - write a terminal success result.
-6. On failure:
-   - preserve the manifest unless the protocol explicitly defines reconciliation for an already-absent dataset;
-   - write an explicit terminal failure result.
+If `RPEngineManagerDB` is completely absent:
 
-## Already-absent datasets
+initialize exactly:
 
-Define and implement deterministic behaviour consistent with protocol v1 for:
+```lua
+RPEngineManagerDB = {
+    protocolVersion = 1,
+    pendingOperations = {},
+    installedPackages = {},
+    operationResults = {},
+}
+```
 
-- package manifest exists but dataset has already been removed manually;
-- no package manifest exists;
-- request references the wrong dataset ID for a catalogue entry.
+This is the only automatic initialization case.
 
-Do not silently report success for identity mismatches.
+### Root present but malformed
 
-If an already-absent but correctly identified dataset is treated as an idempotent success, that behaviour must be explicit in the result code/contract.
+If `RPEngineManagerDB` exists but any of the following are invalid:
 
-## Idempotency
+- root is not a table;
+- missing required root field;
+- unknown root field;
+- wrong root field type;
+- malformed pending queue;
+- malformed installed manifest map;
+- malformed operation result map;
 
-A completed removal request ID must never invoke `Database.DeleteDataset` again after `/reload`.
+then:
 
-## Regression requirements
+- do not rewrite/repair the root;
+- do not consume pending operations;
+- do not mutate datasets;
+- emit an explicit diagnostic.
 
-Canonical deletion must retain the existing `Database.DeleteDataset` behaviour, including dependency cleanup and configuration-change notification owned by the database layer.
+### Unsupported version
 
-Do not duplicate those side effects in the Manager integration module.
+If:
+
+```lua
+protocolVersion ~= 1
+```
+
+then:
+
+- leave the complete root unchanged;
+- do not append request-level failures;
+- do not consume operations;
+- do not initialize/normalize child tables;
+- emit an unsupported-version diagnostic.
+
+The addon cannot safely write a v1 result into an unknown future contract.
+
+## Closed root schema
+
+Protocol v1 permits exactly:
+
+```text
+protocolVersion
+pendingOperations
+installedPackages
+operationResults
+```
+
+Unknown root fields are malformed.
+
+Do not silently discard or preserve-and-ignore them while processing.
+
+## Validation helpers
+
+Create explicit read-only validation helpers rather than using normalization as validation.
+
+Separate responsibilities clearly:
+
+```text
+initialize absent root
+validate existing root
+process valid root
+```
+
+Avoid one `ensureRoot()` function that both repairs and returns state.
+
+## Startup behaviour
+
+`ExternalManager.Initialize()` must:
+
+1. detect absent vs present root;
+2. initialize only if absent;
+3. validate present root;
+4. return without mutation on validation/version failure;
+5. process pending operations only after successful validation.
+
+## Diagnostics
+
+Use the existing addon debug/diagnostic surface.
+
+Do not create a fake `operationResults` entry for root-level incompatibility.
 
 ## Validation
 
-Verify:
+The issue is complete when:
 
-- Manager-installed dataset -> removal succeeds through `Database.DeleteDataset`;
-- package manifest entry is removed only after successful canonical deletion/reconciliation;
-- dependent/internal database cleanup remains identical to manual deletion;
-- mismatched catalogue/dataset identity is rejected;
-- unrelated datasets cannot be removed by forged/malformed manifest metadata;
-- duplicate completed request ID does not re-run deletion;
-- manual Data Editor deletion remains unchanged.
+- absent root initializes to exact v1 shape;
+- `protocolVersion = 2` survives startup byte-equivalent in semantic content;
+- malformed child tables are not replaced with `{}`;
+- unknown root fields stop processing;
+- no queued operation is consumed under malformed/unsupported state;
+- no dataset mutation occurs under malformed/unsupported state;
+- a valid v1 root still processes normally;
+- Manager subsequently reports unsupported/malformed state rather than seeing a silently repaired v1 root.

@@ -8,86 +8,359 @@ local Database = Addon.Internal.Database or {}
 
 ExternalManager.ProtocolVersion = 1
 ExternalManager.ErrorCodes = {
-    InvalidOperation = "invalid_operation",
+    InvalidField = "invalid_field",
     UnsupportedOperation = "unsupported_operation",
-    UnsupportedProtocolVersion = "unsupported_protocol_version",
-    InvalidPackageMetadata = "invalid_package_metadata",
-    InvalidPayload = "invalid_payload",
+    InvalidPayloadFormat = "invalid_payload_format",
     DatasetIdMismatch = "dataset_id_mismatch",
-    DatasetImportFailed = "dataset_import_failed",
+    CatalogueDatasetIdConflict = "catalogue_dataset_id_conflict",
+    StaleRevision = "stale_revision",
+    RevisionHashConflict = "revision_hash_conflict",
     PackageNotInstalled = "package_not_installed",
-    InvalidManifestEntry = "invalid_manifest_entry",
-    DatasetNotFound = "dataset_not_found",
-    DatasetDeleteFailed = "dataset_delete_failed",
-    ProcessingFailed = "operation_processing_failed",
+    InstalledPackageMismatch = "installed_package_mismatch",
+    ImportRejected = "import_rejected",
+    RemoveRejected = "remove_rejected",
+    InternalError = "internal_error",
 }
+
+local ALLOWED_ERROR_CODES = {}
+for _, errorCode in pairs(ExternalManager.ErrorCodes) do
+    ALLOWED_ERROR_CODES[errorCode] = true
+end
 
 local TERMINAL_STATUSES = {
     succeeded = true,
     failed = true,
 }
 
-local function isValidRequestId(requestId)
-    return type(requestId) == "string" and requestId:match("%S") ~= nil
+local function isValidRequestId(value)
+    if type(value) ~= "string" or #value < 1 or #value > 128 then
+        return false
+    end
+
+    for index = 1, #value do
+        local byte = string.byte(value, index)
+        local isAlphaNumeric = (byte >= 48 and byte <= 57)
+            or (byte >= 65 and byte <= 90)
+            or (byte >= 97 and byte <= 122)
+        if index == 1 then
+            if not isAlphaNumeric then
+                return false
+            end
+        elseif not isAlphaNumeric
+            and byte ~= 46
+            and byte ~= 95
+            and byte ~= 58
+            and byte ~= 45
+        then
+            return false
+        end
+    end
+
+    return true
 end
 
-local function ensureRoot()
-    local globalEnvironment = _G or getfenv(0)
+local function isValidCatalogueId(value)
+    if type(value) ~= "string" or #value < 1 or #value > 128 then
+        return false
+    end
+
+    for index = 1, #value do
+        local byte = string.byte(value, index)
+        local isLowerAlphaNumeric = (byte >= 48 and byte <= 57) or (byte >= 97 and byte <= 122)
+        if index == 1 then
+            if not isLowerAlphaNumeric then
+                return false
+            end
+        elseif not isLowerAlphaNumeric and byte ~= 46 and byte ~= 95 and byte ~= 45 then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function isWhitespaceCodePoint(codePoint)
+    return (codePoint >= 0x0009 and codePoint <= 0x000D)
+        or codePoint == 0x0020
+        or codePoint == 0x00A0
+        or codePoint == 0x1680
+        or (codePoint >= 0x2000 and codePoint <= 0x200A)
+        or codePoint == 0x2028
+        or codePoint == 0x2029
+        or codePoint == 0x202F
+        or codePoint == 0x205F
+        or codePoint == 0x3000
+        or codePoint == 0xFEFF
+end
+
+local function decodeUtf8CodePoint(value, index)
+    local first = string.byte(value, index)
+    if not first then
+        return nil
+    end
+
+    if first <= 0x7F then
+        return first, index + 1
+    end
+
+    local second = string.byte(value, index + 1)
+    if first >= 0xC2 and first <= 0xDF then
+        if not second or second < 0x80 or second > 0xBF then
+            return nil
+        end
+        return (first - 0xC0) * 0x40 + (second - 0x80), index + 2
+    end
+
+    local third = string.byte(value, index + 2)
+    if first >= 0xE0 and first <= 0xEF then
+        local validSecond = second and second >= 0x80 and second <= 0xBF
+        if first == 0xE0 then
+            validSecond = second and second >= 0xA0 and second <= 0xBF
+        elseif first == 0xED then
+            validSecond = second and second >= 0x80 and second <= 0x9F
+        end
+        if not validSecond or not third or third < 0x80 or third > 0xBF then
+            return nil
+        end
+        local codePoint = (first - 0xE0) * 0x1000
+            + (second - 0x80) * 0x40
+            + (third - 0x80)
+        return codePoint, index + 3
+    end
+
+    local fourth = string.byte(value, index + 3)
+    if first >= 0xF0 and first <= 0xF4 then
+        local validSecond = second and second >= 0x80 and second <= 0xBF
+        if first == 0xF0 then
+            validSecond = second and second >= 0x90 and second <= 0xBF
+        elseif first == 0xF4 then
+            validSecond = second and second >= 0x80 and second <= 0x8F
+        end
+        if not validSecond
+            or not third or third < 0x80 or third > 0xBF
+            or not fourth or fourth < 0x80 or fourth > 0xBF
+        then
+            return nil
+        end
+        local codePoint = (first - 0xF0) * 0x40000
+            + (second - 0x80) * 0x1000
+            + (third - 0x80) * 0x40
+            + (fourth - 0x80)
+        return codePoint, index + 4
+    end
+
+    return nil
+end
+
+local function isValidDatasetId(value)
+    if type(value) ~= "string" or #value < 1 or #value > 128 then
+        return false
+    end
+
+    local index = 1
+    local firstCodePoint, lastCodePoint
+    while index <= #value do
+        local codePoint, nextIndex = decodeUtf8CodePoint(value, index)
+        if not codePoint
+            or codePoint <= 0x001F
+            or (codePoint >= 0x007F and codePoint <= 0x009F)
+        then
+            return false
+        end
+
+        firstCodePoint = firstCodePoint or codePoint
+        lastCodePoint = codePoint
+        index = nextIndex
+    end
+
+    return not isWhitespaceCodePoint(firstCodePoint) and not isWhitespaceCodePoint(lastCodePoint)
+end
+
+local function isValidRevision(value)
+    return type(value) == "number"
+        and value == value
+        and value ~= math.huge
+        and value ~= -math.huge
+        and value >= 1
+        and value <= 2147483647
+        and value == math.floor(value)
+end
+
+local function isValidHash(value)
+    if type(value) ~= "string" or #value ~= 64 then
+        return false
+    end
+
+    for index = 1, #value do
+        local byte = string.byte(value, index)
+        if not ((byte >= 48 and byte <= 57) or (byte >= 97 and byte <= 102)) then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function getGlobalEnvironment()
+    return _G or getfenv(0)
+end
+
+local function initializeAbsentRoot()
+    local globalEnvironment = getGlobalEnvironment()
     local root = rawget(globalEnvironment, "RPEngineManagerDB")
 
-    if type(root) ~= "table" then
-        root = {}
+    if root ~= nil then
+        return root, false
     end
 
-    if root.protocolVersion == nil then
-        root.protocolVersion = ExternalManager.ProtocolVersion
-    end
-
-    if type(root.pendingOperations) ~= "table" then
-        root.pendingOperations = {}
-    end
-    if type(root.installedPackages) ~= "table" then
-        root.installedPackages = {}
-    end
-    if type(root.operationResults) ~= "table" then
-        root.operationResults = {}
-    end
-
+    root = {
+        protocolVersion = 1,
+        pendingOperations = {},
+        installedPackages = {},
+        operationResults = {},
+    }
     rawset(globalEnvironment, "RPEngineManagerDB", root)
-    return root
+    return root, true
 end
 
-ExternalManager.EnsureRoot = ensureRoot
+local validateExistingRoot
+local reportDiagnostic
+
+local function reportRootValidationFailure(reason, detail)
+    if reason == "unsupported_version" then
+        reportDiagnostic(("Unsupported Manager protocol version %s; protocol-v1 state was left unchanged."):format(
+            tostring(detail)
+        ))
+        return
+    end
+
+    reportDiagnostic("Malformed Manager protocol-v1 root; state was left unchanged. " .. tostring(detail))
+end
 
 function ExternalManager.HasCompletedRequest(requestId)
     if not isValidRequestId(requestId) then
         return false
     end
 
-    local root = ensureRoot()
+    local root = rawget(getGlobalEnvironment(), "RPEngineManagerDB")
+    if type(root) ~= "table" or not validateExistingRoot then
+        return false
+    end
+    local validRoot = validateExistingRoot(root)
+    if not validRoot then
+        return false
+    end
+
     local result = root.operationResults[requestId]
     return type(result) == "table" and TERMINAL_STATUSES[result.status] == true
 end
 
-function ExternalManager.WriteOperationResult(requestId, status, errorCode, detail)
-    if not isValidRequestId(requestId) or not TERMINAL_STATUSES[status] then
+local function getOperationName(operation)
+    if type(operation) == "table"
+        and (operation.operation == "install_dataset" or operation.operation == "remove_dataset")
+    then
+        return operation.operation
+    end
+
+    return "unknown"
+end
+
+local function getOperationIdentity(operation)
+    local identity = {}
+    if type(operation) ~= "table" then
+        return identity
+    end
+
+    if isValidCatalogueId(operation.catalogueId) then
+        identity.catalogueId = operation.catalogueId
+    end
+    if isValidDatasetId(operation.datasetId) then
+        identity.datasetId = operation.datasetId
+    end
+    if isValidRevision(operation.revision) then
+        identity.revision = operation.revision
+    end
+    if isValidHash(operation.hash) then
+        identity.hash = operation.hash
+    end
+
+    return identity
+end
+
+local function copyValidOperationIdentity(identity)
+    local copied = {}
+    if type(identity) ~= "table" then
+        return copied
+    end
+
+    if isValidCatalogueId(identity.catalogueId) then
+        copied.catalogueId = identity.catalogueId
+    end
+    if isValidDatasetId(identity.datasetId) then
+        copied.datasetId = identity.datasetId
+    end
+    if isValidRevision(identity.revision) then
+        copied.revision = identity.revision
+    end
+    if isValidHash(identity.hash) then
+        copied.hash = identity.hash
+    end
+
+    return copied
+end
+
+function ExternalManager.WriteOperationResult(requestId, operationName, status, identity, errorCode, detail)
+    if not isValidRequestId(requestId) then
         return false
     end
 
-    local root = ensureRoot()
+    local root = rawget(getGlobalEnvironment(), "RPEngineManagerDB")
+    if type(root) ~= "table" or not validateExistingRoot then
+        return false
+    end
+    local validRoot, validationReason, validationDetail = validateExistingRoot(root)
+    if not validRoot then
+        reportRootValidationFailure(validationReason, validationDetail)
+        return false
+    end
+
     local existingResult = root.operationResults[requestId]
     if type(existingResult) == "table" and TERMINAL_STATUSES[existingResult.status] == true then
         return existingResult
     end
 
+    if (operationName ~= "install_dataset"
+            and operationName ~= "remove_dataset"
+            and operationName ~= "unknown")
+        or not TERMINAL_STATUSES[status]
+    then
+        return false
+    end
+
+    local resultIdentity = copyValidOperationIdentity(identity)
+    if status == "succeeded"
+        and (operationName == "unknown"
+            or not resultIdentity.catalogueId
+            or not resultIdentity.datasetId
+            or not resultIdentity.revision
+            or not resultIdentity.hash)
+    then
+        return false
+    end
+
     local result = {
         requestId = requestId,
+        operation = operationName,
         status = status,
     }
 
+    for fieldName, value in pairs(resultIdentity) do
+        result[fieldName] = value
+    end
+
     if status == "failed" then
         result.error = {
-            code = type(errorCode) == "string" and errorCode or "operation_failed",
+            code = ALLOWED_ERROR_CODES[errorCode] and errorCode or ExternalManager.ErrorCodes.InternalError,
             detail = type(detail) == "string" and detail or "The operation failed.",
         }
     end
@@ -96,83 +369,91 @@ function ExternalManager.WriteOperationResult(requestId, status, errorCode, deta
     return result
 end
 
-local function compareKeys(left, right)
-    local leftType = type(left)
-    local rightType = type(right)
+local function failOperation(requestId, operationName, identity, errorCode, detail)
+    ExternalManager.WriteOperationResult(requestId, operationName, "failed", identity, errorCode, detail)
+end
 
-    if leftType ~= rightType then
-        return leftType < rightType
+reportDiagnostic = function(message)
+    local debug = Addon.Debug
+    local logger = debug and (debug.Error or debug.Internal) or nil
+    if type(logger) == "function" then
+        pcall(logger, "External Manager: %s", tostring(message))
+    end
+end
+
+local function getDenseQueueLength(queue)
+    local count = 0
+    local maximumIndex = 0
+
+    for key in pairs(queue) do
+        if type(key) ~= "number"
+            or key ~= key
+            or key == math.huge
+            or key == -math.huge
+            or key < 1
+            or key ~= math.floor(key)
+        then
+            return nil
+        end
+
+        count = count + 1
+        if key > maximumIndex then
+            maximumIndex = key
+        end
     end
 
-    if leftType == "number" then
-        return left < right
+    if count ~= maximumIndex then
+        return nil
     end
 
-    return tostring(left) < tostring(right)
+    return count
 end
 
-local function keyOrderValue(key)
-    return type(key) .. ":" .. tostring(key)
-end
-
-local function resultKeyForMalformedOperation(key)
-    return "__rpe_invalid_operation__:" .. keyOrderValue(key)
-end
-
-local function collectPendingOperations(pendingOperations)
-    local entries = {}
-    for key, operation in pairs(pendingOperations) do
-        local requestId = type(operation) == "table" and operation.requestId or nil
-        local resultKey = isValidRequestId(requestId) and requestId or resultKeyForMalformedOperation(key)
-
-        entries[#entries + 1] = {
-            key = key,
-            operation = operation,
-            requestId = requestId,
-            resultKey = resultKey,
-            sortKey = key,
-        }
+local function validateClosedSchema(operation, expectedFields)
+    local allowedFields = {}
+    for index = 1, #expectedFields do
+        allowedFields[expectedFields[index]] = true
     end
 
-    table.sort(entries, function(left, right)
-        return compareKeys(left.sortKey, right.sortKey)
-    end)
-
-    return entries
-end
-
-local function failOperation(requestId, errorCode, detail)
-    ExternalManager.WriteOperationResult(requestId, "failed", errorCode, detail)
-end
-
-local function isNonEmptyString(value)
-    return type(value) == "string" and value:match("%S") ~= nil
-end
-
-local function isValidRevision(value)
-    if isNonEmptyString(value) then
-        return true
+    for key in pairs(operation) do
+        if type(key) ~= "string" or not allowedFields[key] then
+            return false, "Operation contains a field that is not defined for protocol v1."
+        end
     end
 
-    return type(value) == "number"
-        and value == value
-        and value ~= math.huge
-        and value ~= -math.huge
-        and value >= 0
-        and value == math.floor(value)
+    for index = 1, #expectedFields do
+        local fieldName = expectedFields[index]
+        if rawget(operation, fieldName) == nil then
+            return false, "Operation is missing required field " .. fieldName .. "."
+        end
+    end
+
+    return true
 end
 
 local function getInstallationTimestamp()
     if type(GetServerTime) == "function" then
-        local timestamp = tonumber(GetServerTime())
-        if timestamp and timestamp == timestamp and timestamp ~= math.huge and timestamp ~= -math.huge then
+        local callOk, timestamp = pcall(GetServerTime)
+        if callOk
+            and type(timestamp) == "number"
+            and timestamp == timestamp
+            and timestamp ~= math.huge
+            and timestamp ~= -math.huge
+            and timestamp == math.floor(timestamp)
+        then
             return timestamp
         end
     end
 
     if type(time) == "function" then
-        local timestamp = tonumber(time())
-        if timestamp and timestamp == timestamp and timestamp ~= math.huge and timestamp ~= -math.huge then
+        local callOk, timestamp = pcall(time)
+        if callOk
+            and type(timestamp) == "number"
+            and timestamp == timestamp
+            and timestamp ~= math.huge
+            and timestamp ~= -math.huge
+            and timestamp == math.floor(timestamp)
+        then
             return timestamp
         end
     end
@@ -180,276 +461,599 @@ local function getInstallationTimestamp()
     return nil
 end
 
-local function processInstallDataset(root, operation, requestId)
+local INSTALL_FIELDS = {
+    "requestId",
+    "operation",
+    "catalogueId",
+    "datasetId",
+    "revision",
+    "hash",
+    "payload",
+}
+
+local REMOVE_FIELDS = {
+    "requestId",
+    "operation",
+    "catalogueId",
+    "datasetId",
+    "revision",
+    "hash",
+}
+
+local MANIFEST_FIELDS = {
+    packageType = true,
+    datasetId = true,
+    revision = true,
+    hash = true,
+    installedAt = true,
+}
+
+local function isValidUnixTimestamp(value)
+    return type(value) == "number"
+        and value == value
+        and value ~= math.huge
+        and value ~= -math.huge
+        and value == math.floor(value)
+end
+
+local function validateManifestEntry(entry)
+    if type(entry) ~= "table" then
+        return false
+    end
+
+    for key in pairs(entry) do
+        if type(key) ~= "string" or not MANIFEST_FIELDS[key] then
+            return false
+        end
+    end
+
+    return rawget(entry, "packageType") == "dataset"
+        and isValidDatasetId(rawget(entry, "datasetId"))
+        and isValidRevision(rawget(entry, "revision"))
+        and isValidHash(rawget(entry, "hash"))
+        and isValidUnixTimestamp(rawget(entry, "installedAt"))
+end
+
+local ROOT_FIELDS = {
+    protocolVersion = true,
+    pendingOperations = true,
+    installedPackages = true,
+    operationResults = true,
+}
+
+local ROOT_FIELD_NAMES = {
+    "protocolVersion",
+    "pendingOperations",
+    "installedPackages",
+    "operationResults",
+}
+
+local SUCCESS_RESULT_FIELDS = {
+    requestId = true,
+    operation = true,
+    status = true,
+    catalogueId = true,
+    datasetId = true,
+    revision = true,
+    hash = true,
+}
+
+local FAILURE_RESULT_FIELDS = {
+    requestId = true,
+    operation = true,
+    status = true,
+    catalogueId = true,
+    datasetId = true,
+    revision = true,
+    hash = true,
+    error = true,
+}
+
+local OPERATION_IDENTITY_FIELDS = {
+    "catalogueId",
+    "datasetId",
+    "revision",
+    "hash",
+}
+
+local function hasOnlyFields(record, allowedFields)
+    for key in pairs(record) do
+        if type(key) ~= "string" or not allowedFields[key] then
+            return false
+        end
+    end
+    return true
+end
+
+local function validateOperationResultRecord(requestId, result)
+    if type(result) ~= "table"
+        or rawget(result, "requestId") ~= requestId
+        or not isValidRequestId(requestId)
+    then
+        return false
+    end
+
+    local status = rawget(result, "status")
+    local operationName = rawget(result, "operation")
+    if status == "succeeded" then
+        return operationName ~= "unknown"
+            and (operationName == "install_dataset" or operationName == "remove_dataset")
+            and hasOnlyFields(result, SUCCESS_RESULT_FIELDS)
+            and isValidCatalogueId(rawget(result, "catalogueId"))
+            and isValidDatasetId(rawget(result, "datasetId"))
+            and isValidRevision(rawget(result, "revision"))
+            and isValidHash(rawget(result, "hash"))
+    end
+
+    if status ~= "failed"
+        or (operationName ~= "install_dataset"
+            and operationName ~= "remove_dataset"
+            and operationName ~= "unknown")
+        or not hasOnlyFields(result, FAILURE_RESULT_FIELDS)
+    then
+        return false
+    end
+
+    for index = 1, #OPERATION_IDENTITY_FIELDS do
+        local fieldName = OPERATION_IDENTITY_FIELDS[index]
+        local value = rawget(result, fieldName)
+        if value ~= nil then
+            if fieldName == "catalogueId" and not isValidCatalogueId(value) then
+                return false
+            elseif fieldName == "datasetId" and not isValidDatasetId(value) then
+                return false
+            elseif fieldName == "revision" and not isValidRevision(value) then
+                return false
+            elseif fieldName == "hash" and not isValidHash(value) then
+                return false
+            end
+        end
+    end
+
+    local errorRecord = rawget(result, "error")
+    return type(errorRecord) == "table"
+        and hasOnlyFields(errorRecord, { code = true, detail = true })
+        and ALLOWED_ERROR_CODES[rawget(errorRecord, "code")] == true
+        and type(rawget(errorRecord, "detail")) == "string"
+end
+
+validateExistingRoot = function(root)
+    if type(root) ~= "table" then
+        return false, "malformed_root", "RPEngineManagerDB must be a table."
+    end
+
+    local protocolVersion = rawget(root, "protocolVersion")
+    if type(protocolVersion) == "number" and protocolVersion ~= ExternalManager.ProtocolVersion then
+        return false, "unsupported_version", protocolVersion
+    end
+    if protocolVersion ~= ExternalManager.ProtocolVersion then
+        return false, "malformed_root", "protocolVersion is missing or has the wrong type."
+    end
+
+    if not hasOnlyFields(root, ROOT_FIELDS) then
+        return false, "malformed_root", "RPEngineManagerDB contains an unknown field."
+    end
+    for index = 1, #ROOT_FIELD_NAMES do
+        local fieldName = ROOT_FIELD_NAMES[index]
+        if rawget(root, fieldName) == nil then
+            return false, "malformed_root", "RPEngineManagerDB is missing " .. fieldName .. "."
+        end
+    end
+
+    local pendingOperations = rawget(root, "pendingOperations")
+    if type(pendingOperations) ~= "table" then
+        return false, "malformed_root", "pendingOperations must be a table."
+    end
+    local queueLength = getDenseQueueLength(pendingOperations)
+    if queueLength == nil then
+        return false, "malformed_root", "pendingOperations must be a dense 1-based FIFO array."
+    end
+    for index = 1, queueLength do
+        local operation = rawget(pendingOperations, index)
+        if type(operation) ~= "table" or not isValidRequestId(rawget(operation, "requestId")) then
+            return false, "malformed_root", "pendingOperations contains an entry without a valid requestId."
+        end
+    end
+
+    local installedPackages = rawget(root, "installedPackages")
+    if type(installedPackages) ~= "table" then
+        return false, "malformed_root", "installedPackages must be a table."
+    end
+    for catalogueId, entry in pairs(installedPackages) do
+        if not isValidCatalogueId(catalogueId) or not validateManifestEntry(entry) then
+            return false, "malformed_root", "installedPackages contains a malformed package entry."
+        end
+    end
+
+    local operationResults = rawget(root, "operationResults")
+    if type(operationResults) ~= "table" then
+        return false, "malformed_root", "operationResults must be a table."
+    end
+    for requestId, result in pairs(operationResults) do
+        if not isValidRequestId(requestId) or not validateOperationResultRecord(requestId, result) then
+            return false, "malformed_root", "operationResults contains a malformed result entry."
+        end
+    end
+
+    return true
+end
+
+ExternalManager.ValidateRoot = validateExistingRoot
+
+local function processInstallDataset(root, operation, requestId, operationName, identity)
+    local function fail(errorCode, detail)
+        failOperation(requestId, operationName, identity, errorCode, detail)
+    end
+
+    local validSchema, schemaError = validateClosedSchema(operation, INSTALL_FIELDS)
+    if not validSchema then
+        fail(ExternalManager.ErrorCodes.InvalidField, schemaError)
+        return
+    end
+
     local catalogueId = operation.catalogueId
     local datasetId = operation.datasetId
     local revision = operation.revision
     local packageHash = operation.hash
     local payload = operation.payload
 
-    if not isNonEmptyString(catalogueId)
-        or not isNonEmptyString(datasetId)
+    if not isValidCatalogueId(catalogueId)
+        or not isValidDatasetId(datasetId)
         or not isValidRevision(revision)
-        or not isNonEmptyString(packageHash)
+        or not isValidHash(packageHash)
     then
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.InvalidPackageMetadata,
-            "install_dataset requires non-empty catalogueId, datasetId, and hash values plus a valid revision."
+        fail(
+            ExternalManager.ErrorCodes.InvalidField,
+            "install_dataset contains a catalogueId, datasetId, revision, or hash outside the protocol-v1 constraints."
         )
         return
     end
 
     if type(payload) ~= "string" then
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.InvalidPayload,
-            "install_dataset requires a string RPE_DATASET_V1 payload."
+        fail(
+            ExternalManager.ErrorCodes.InvalidPayloadFormat,
+            "install_dataset payload must be a string using the RPE_DATASET_V1 format."
         )
         return
     end
 
     if type(Database.GetDatasetImportPayloadIdentity) ~= "function" then
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.ProcessingFailed,
+        fail(
+            ExternalManager.ErrorCodes.InternalError,
             "Dataset payload identity validation is unavailable."
         )
         return
     end
 
-    local payloadDatasetId, identityError = Database.GetDatasetImportPayloadIdentity(payload)
+    local identityCallOk, payloadDatasetId, identityError = pcall(
+        Database.GetDatasetImportPayloadIdentity,
+        payload
+    )
+    if not identityCallOk then
+        fail(
+            ExternalManager.ErrorCodes.InternalError,
+            tostring(payloadDatasetId)
+        )
+        return
+    end
     if not payloadDatasetId then
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.InvalidPayload,
+        fail(
+            ExternalManager.ErrorCodes.InvalidPayloadFormat,
             identityError or "Payload is not a valid RPE_DATASET_V1 dataset export."
         )
         return
     end
 
     if payloadDatasetId ~= datasetId then
-        failOperation(
-            requestId,
+        fail(
             ExternalManager.ErrorCodes.DatasetIdMismatch,
             "Declared datasetId does not match the dataset ID in the payload."
         )
         return
     end
 
+    local existingEntry = root.installedPackages[catalogueId]
+    if existingEntry ~= nil then
+        if not validateManifestEntry(existingEntry) then
+            fail(
+                ExternalManager.ErrorCodes.InstalledPackageMismatch,
+                "Existing package manifest entry is malformed."
+            )
+            return
+        end
+
+        if existingEntry.datasetId ~= datasetId then
+            fail(
+                ExternalManager.ErrorCodes.CatalogueDatasetIdConflict,
+                "catalogueId is already associated with a different datasetId."
+            )
+            return
+        end
+
+        if revision < existingEntry.revision then
+            fail(
+                ExternalManager.ErrorCodes.StaleRevision,
+                "Requested package revision is older than the installed revision."
+            )
+            return
+        end
+
+        if revision == existingEntry.revision and packageHash ~= existingEntry.hash then
+            fail(
+                ExternalManager.ErrorCodes.RevisionHashConflict,
+                "The same package revision is already installed with a different hash."
+            )
+            return
+        end
+
+        if revision == existingEntry.revision then
+            local result = ExternalManager.WriteOperationResult(requestId, operationName, "succeeded", identity)
+            if not result then
+                error("Could not persist a complete install_dataset result.")
+            end
+            return
+        end
+    end
+
     if type(Database.ImportDataset) ~= "function" then
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.DatasetImportFailed,
+        fail(
+            ExternalManager.ErrorCodes.InternalError,
             "The canonical dataset importer is unavailable."
         )
         return
     end
 
+    local installedAt = getInstallationTimestamp()
+    if not installedAt then
+        fail(
+            ExternalManager.ErrorCodes.InternalError,
+            "A valid Unix installation timestamp is unavailable."
+        )
+        return
+    end
+
     local importOk, importedDataset, importError = pcall(Database.ImportDataset, payload)
-    if not importOk or type(importedDataset) ~= "table" then
-        local detail = importOk and importError or importedDataset
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.DatasetImportFailed,
-            tostring(detail or "Dataset import failed.")
+    if not importOk then
+        fail(ExternalManager.ErrorCodes.InternalError, tostring(importedDataset))
+        return
+    end
+    if type(importedDataset) ~= "table" then
+        fail(
+            ExternalManager.ErrorCodes.ImportRejected,
+            tostring(importError or "The canonical dataset importer rejected the payload.")
         )
         return
     end
 
     local manifestEntry = {
         packageType = "dataset",
-        catalogueId = catalogueId,
         datasetId = datasetId,
         revision = revision,
         hash = packageHash,
+        installedAt = installedAt,
     }
-    local installedAt = getInstallationTimestamp()
-    if installedAt then
-        manifestEntry.installedAt = installedAt
-    end
 
-    -- Write manifest metadata only after the canonical import has succeeded.
-    -- It remains separate from the authored dataset and its exported payload.
     root.installedPackages[catalogueId] = manifestEntry
-    ExternalManager.WriteOperationResult(requestId, "succeeded")
+    local result = ExternalManager.WriteOperationResult(requestId, operationName, "succeeded", identity)
+    if not result then
+        error("Could not persist a complete install_dataset result.")
+    end
 end
 
-local function processRemoveDataset(root, operation, requestId)
+local function processRemoveDataset(root, operation, requestId, operationName, identity)
+    local function fail(errorCode, detail)
+        failOperation(requestId, operationName, identity, errorCode, detail)
+    end
+
+    local validSchema, schemaError = validateClosedSchema(operation, REMOVE_FIELDS)
+    if not validSchema then
+        fail(ExternalManager.ErrorCodes.InvalidField, schemaError)
+        return
+    end
+
     local catalogueId = operation.catalogueId
     local datasetId = operation.datasetId
+    local revision = operation.revision
+    local packageHash = operation.hash
 
-    if not isNonEmptyString(catalogueId) or not isNonEmptyString(datasetId) then
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.InvalidPackageMetadata,
-            "remove_dataset requires non-empty catalogueId and datasetId values."
+    if not isValidCatalogueId(catalogueId)
+        or not isValidDatasetId(datasetId)
+        or not isValidRevision(revision)
+        or not isValidHash(packageHash)
+    then
+        fail(
+            ExternalManager.ErrorCodes.InvalidField,
+            "remove_dataset contains a catalogueId, datasetId, revision, or hash outside the protocol-v1 constraints."
         )
         return
     end
 
     local manifestEntry = root.installedPackages[catalogueId]
     if manifestEntry == nil then
-        failOperation(
-            requestId,
+        fail(
             ExternalManager.ErrorCodes.PackageNotInstalled,
             "No installed package manifest entry exists for catalogueId " .. catalogueId .. "."
         )
         return
     end
 
-    if type(manifestEntry) ~= "table"
-        or manifestEntry.packageType ~= "dataset"
-        or (manifestEntry.catalogueId ~= nil and manifestEntry.catalogueId ~= catalogueId)
-        or not isNonEmptyString(manifestEntry.datasetId)
-        or not isValidRevision(manifestEntry.revision)
-        or not isNonEmptyString(manifestEntry.hash)
+    if not validateManifestEntry(manifestEntry)
+        or manifestEntry.datasetId ~= datasetId
+        or manifestEntry.revision ~= revision
+        or manifestEntry.hash ~= packageHash
     then
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.InvalidManifestEntry,
-            "Installed package manifest entry is malformed or does not identify a dataset package."
+        fail(
+            ExternalManager.ErrorCodes.InstalledPackageMismatch,
+            "Request package identity does not match the installed manifest entry."
         )
         return
     end
 
-    if manifestEntry.datasetId ~= datasetId then
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.DatasetIdMismatch,
-            "Declared datasetId does not match the dataset ID recorded for this catalogue package."
+    if type(Database.GetDatasetByID) ~= "function" then
+        fail(
+            ExternalManager.ErrorCodes.InternalError,
+            "The canonical dataset lookup API is unavailable."
         )
         return
     end
 
-    if type(Database.GetDatasetByID) ~= "function" or type(Database.DeleteDataset) ~= "function" then
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.DatasetDeleteFailed,
+    local lookupOk, dataset = pcall(Database.GetDatasetByID, datasetId)
+    if not lookupOk then
+        fail(ExternalManager.ErrorCodes.InternalError, tostring(dataset))
+        return
+    end
+    if not dataset then
+        fail(
+            ExternalManager.ErrorCodes.RemoveRejected,
+            "The installed dataset is already absent, so canonical removal cannot succeed."
+        )
+        return
+    end
+
+    if type(Database.DeleteDataset) ~= "function" then
+        fail(
+            ExternalManager.ErrorCodes.InternalError,
             "The canonical dataset deletion API is unavailable."
         )
         return
     end
 
-    if not Database.GetDatasetByID(datasetId) then
-        -- Keep the manifest so a missing local dataset is reported explicitly
-        -- and can be reconciled by the Manager or the user.
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.DatasetNotFound,
-            "The installed package manifest identifies this dataset, but the dataset is already absent."
+    local deleteOk, deleted = pcall(Database.DeleteDataset, datasetId)
+    if not deleteOk then
+        fail(
+            ExternalManager.ErrorCodes.RemoveRejected,
+            "The canonical dataset deletion failed: " .. tostring(deleted)
         )
         return
     end
-
-    local deleteOk, deleted = pcall(Database.DeleteDataset, datasetId)
-    if not deleteOk or deleted ~= true then
-        local detail = deleteOk and "The canonical dataset deletion did not succeed." or tostring(deleted)
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.DatasetDeleteFailed,
-            detail
+    if deleted ~= true then
+        fail(
+            ExternalManager.ErrorCodes.RemoveRejected,
+            "The canonical dataset deletion did not succeed."
         )
         return
     end
 
     root.installedPackages[catalogueId] = nil
-    ExternalManager.WriteOperationResult(requestId, "succeeded")
+    local result = ExternalManager.WriteOperationResult(requestId, operationName, "succeeded", identity)
+    if not result then
+        error("Could not persist a complete remove_dataset result.")
+    end
 end
 
-local function processOperation(root, entry)
-    local operation = entry.operation
-    local requestId = entry.requestId
-
-    if not isValidRequestId(requestId) then
-        failOperation(
-            entry.resultKey,
-            ExternalManager.ErrorCodes.InvalidOperation,
-            "Pending operation must be a table with a non-empty string requestId."
-        )
-        return
-    end
-
-    if ExternalManager.HasCompletedRequest(requestId) then
-        return
+local function processOperation(root, operation, requestId, operationName, identity)
+    local function fail(errorCode, detail)
+        failOperation(requestId, operationName, identity, errorCode, detail)
     end
 
     if root.protocolVersion ~= ExternalManager.ProtocolVersion then
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.UnsupportedProtocolVersion,
+        fail(
+            ExternalManager.ErrorCodes.InvalidField,
             "RPEngine supports Manager protocol version 1; received " .. tostring(root.protocolVersion) .. "."
         )
         return
     end
 
-    if type(operation) ~= "table" then
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.InvalidOperation,
-            "Pending operation must be a table."
+    if type(operation.operation) ~= "string" or operation.operation == "" then
+        fail(
+            ExternalManager.ErrorCodes.InvalidField,
+            "Operation must contain a non-empty protocol-v1 operation field."
         )
         return
     end
 
-    if not isNonEmptyString(operation.type) then
-        failOperation(
-            requestId,
-            ExternalManager.ErrorCodes.InvalidOperation,
-            "Pending operation must declare a non-empty type."
-        )
+    if operationName == "install_dataset" then
+        processInstallDataset(root, operation, requestId, operationName, identity)
         return
     end
 
-    if operation.type == "install_dataset" then
-        processInstallDataset(root, operation, requestId)
+    if operationName == "remove_dataset" then
+        processRemoveDataset(root, operation, requestId, operationName, identity)
         return
     end
 
-    if operation.type == "remove_dataset" then
-        processRemoveDataset(root, operation, requestId)
-        return
+    fail(ExternalManager.ErrorCodes.UnsupportedOperation,
+        "RPEngine does not support Manager operation " .. tostring(operation.operation) .. ".")
+end
+
+local function processValidRoot(root)
+    local queue = root.pendingOperations
+    local queueLength = getDenseQueueLength(queue)
+    if queueLength == nil then
+        reportDiagnostic("Malformed pendingOperations queue; processing stopped without consuming operations.")
+        return 0
     end
 
-    failOperation(
-        requestId,
-        ExternalManager.ErrorCodes.UnsupportedOperation,
-        "RPEngine does not support Manager operation type " .. tostring(operation.type) .. "."
-    )
+    local consumed = 0
+    while consumed < queueLength do
+        local operation = queue[1]
+        if type(operation) ~= "table" then
+            reportDiagnostic(("pendingOperations entry %d is not a table; queue processing stopped."):format(consumed + 1))
+            break
+        end
+
+        local requestId = operation.requestId
+        if not isValidRequestId(requestId) then
+            reportDiagnostic(("pendingOperations entry %d has a missing or invalid requestId; queue processing stopped."):format(consumed + 1))
+            break
+        end
+
+        local existingResult = root.operationResults[requestId]
+        if not (type(existingResult) == "table" and TERMINAL_STATUSES[existingResult.status] == true) then
+            local operationName = getOperationName(operation)
+            local identity = getOperationIdentity(operation)
+            local ok, err = pcall(processOperation, root, operation, requestId, operationName, identity)
+            if not ok then
+                failOperation(
+                    requestId,
+                    operationName,
+                    identity,
+                    ExternalManager.ErrorCodes.InternalError,
+                    tostring(err)
+                )
+            end
+        end
+
+        local terminalResult = root.operationResults[requestId]
+        if not (type(terminalResult) == "table" and TERMINAL_STATUSES[terminalResult.status] == true) then
+            reportDiagnostic(("pendingOperations entry %d did not produce a terminal result; queue processing stopped."):format(consumed + 1))
+            break
+        end
+
+        table.remove(queue, 1)
+        consumed = consumed + 1
+    end
+
+    return consumed
 end
 
 function ExternalManager.ProcessPendingOperations()
-    local root = ensureRoot()
-    local pendingOperations = root.pendingOperations
-    local entries = collectPendingOperations(pendingOperations)
-    local processed = 0
-
-    for index = 1, #entries do
-        local entry = entries[index]
-        local ok, err = pcall(processOperation, root, entry)
-
-        if not ok then
-            failOperation(
-                entry.resultKey,
-                ExternalManager.ErrorCodes.ProcessingFailed,
-                "RPEngine could not process the pending operation: " .. tostring(err)
-            )
-        end
-
-        -- A terminal result is stored before the pending entry is removed. This
-        -- makes completed request IDs durable across reloads and restarts.
-        if ExternalManager.HasCompletedRequest(entry.requestId)
-            or (not isValidRequestId(entry.requestId) and ExternalManager.HasCompletedRequest(entry.resultKey))
-        then
-            pendingOperations[entry.key] = nil
-            processed = processed + 1
-        end
+    local root = rawget(getGlobalEnvironment(), "RPEngineManagerDB")
+    if root == nil then
+        reportDiagnostic("RPEngineManagerDB is absent; call Initialize before processing operations.")
+        return 0
     end
 
-    return processed
+    local validRoot, validationReason, validationDetail = validateExistingRoot(root)
+    if not validRoot then
+        reportRootValidationFailure(validationReason, validationDetail)
+        return 0
+    end
+
+    return processValidRoot(root)
 end
 
 function ExternalManager.Initialize()
-    ensureRoot()
-    return ExternalManager.ProcessPendingOperations()
+    local root = rawget(getGlobalEnvironment(), "RPEngineManagerDB")
+    if root == nil then
+        root = initializeAbsentRoot()
+    end
+
+    local validRoot, validationReason, validationDetail = validateExistingRoot(root)
+    if not validRoot then
+        reportRootValidationFailure(validationReason, validationDetail)
+        return 0
+    end
+
+    return processValidRoot(root)
 end
