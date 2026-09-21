@@ -1,26 +1,33 @@
-name: Publish RPEngine release
+name: Validate and publish RPEngine release
 
 on:
   push:
+    branches:
+      - dev
+      - main
     tags:
       - "v[0-9]*"
       - "[0-9]*"
+  pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
-    name: Build and publish addon package
+  release-package:
+    name: Validate release package
     runs-on: ubuntu-latest
+    permissions:
+      contents: ${{ startsWith(github.ref, 'refs/tags/') && 'write' || 'read' }}
 
     steps:
-      - name: Check out tagged commit
+      - name: Check out source commit
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Require release commit on main
+      - name: Require release tag commit on main
+        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
           set -euo pipefail
@@ -30,18 +37,11 @@ jobs:
             exit 1
           fi
 
-      - name: Resolve and validate release version
+      - name: Resolve package version
         id: version
         shell: bash
         run: |
           set -euo pipefail
-          tag="$GITHUB_REF_NAME"
-          version="${tag#v}"
-
-          if [[ -z "$version" ]]; then
-            echo "::error::Release tag does not contain a version."
-            exit 1
-          fi
 
           toc_version="$(sed -nE 's/^##[[:space:]]*Version:[[:space:]]*(.+)[[:space:]]*$/\1/p' RPEngine2.toc | head -n 1)"
           if [[ -z "$toc_version" ]]; then
@@ -49,9 +49,15 @@ jobs:
             exit 1
           fi
 
-          if [[ "$version" != "$toc_version" ]]; then
-            echo "::error::Tag version '$version' does not match RPEngine2.toc version '$toc_version'."
-            exit 1
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            tag="$GITHUB_REF_NAME"
+            version="${tag#v}"
+            if [[ "$version" != "$toc_version" ]]; then
+              echo "::error::Tag version '$version' does not match RPEngine2.toc version '$toc_version'."
+              exit 1
+            fi
+          else
+            version="$toc_version"
           fi
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -62,14 +68,37 @@ jobs:
             --version "${{ steps.version.outputs.version }}" \
             --output-dir dist
 
-      - name: Verify published checksum input
+      - name: Verify checksum
         shell: bash
         run: |
           set -euo pipefail
           cd dist
           sha256sum --check "RPEngine2-${{ steps.version.outputs.version }}.zip.sha256"
 
+      - name: Inspect archive root
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import PurePosixPath
+          import zipfile
+
+          version = "${{ steps.version.outputs.version }}"
+          archive_path = f"dist/RPEngine2-{version}.zip"
+
+          with zipfile.ZipFile(archive_path) as archive:
+              names = archive.namelist()
+
+          roots = {PurePosixPath(name).parts[0] for name in names}
+          if roots != {"RPEngine2"}:
+              raise SystemExit(f"unexpected archive roots: {sorted(roots)}")
+          if "RPEngine2/RPEngine2.toc" not in names:
+              raise SystemExit("archive is missing RPEngine2/RPEngine2.toc")
+          print(f"validated {len(names)} archive entries under RPEngine2/")
+          PY
+
       - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
