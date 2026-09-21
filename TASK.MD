@@ -1,22 +1,84 @@
-## Purpose
+## Problem
 
-Make RPE2 root handling conform to the protocol-v1 fail-closed rules.
+The Phase 2 external-management runtime is not initializing at addon startup, so:
 
-Protocol contract:
-
-```text
-FrontierDev/rpe-manager/docs/protocol.md
+```lua
+RPEngineManagerDB == nil
 ```
 
-The current `ensureRoot()` function repairs/replaces malformed protocol state. That contradicts the v1 contract and can destroy evidence/state written by a newer Manager version.
+after logging in and exiting WoW.
 
-## Required behaviour
+This blocks the Phase 2 end-to-end Manager integration test.
 
-### Root absent
+## Root cause
 
-If `RPEngineManagerDB` is completely absent:
+In `RPEngine2.toc`, the files are currently loaded in this order:
 
-initialize exactly:
+```text
+core/internal/Runtime.lua
+...
+core/internal/manager/ExternalManager.lua
+```
+
+But `core/internal/Runtime.lua` captures the Manager module at file load time:
+
+```lua
+local ExternalManager = Addon.Internal.ExternalManager or {}
+```
+
+At that point `ExternalManager.lua` has not yet been loaded, so this local refers to an empty placeholder table.
+
+Later, `ExternalManager.lua` creates/assigns the real:
+
+```lua
+Addon.Internal.ExternalManager
+```
+
+but the local captured in `Runtime.lua` still points at the earlier empty table.
+
+As a result, on `ADDON_LOADED`:
+
+```lua
+if ExternalManager and ExternalManager.Initialize then
+    safeCall(ExternalManager.Initialize, ExternalManager)
+end
+```
+
+does not call the real initializer.
+
+Therefore the absent protocol root is never initialized and `RPEngineManagerDB` remains nil.
+
+## Required fix
+
+Ensure `Runtime.lua` invokes the actual loaded `Addon.Internal.ExternalManager` module.
+
+Preferred approaches:
+
+1. Load `core/internal/manager/ExternalManager.lua` before `core/internal/Runtime.lua` in `RPEngine2.toc`, **if its dependencies permit that order**; or
+2. Resolve `Addon.Internal.ExternalManager` dynamically inside the `ADDON_LOADED` handler rather than capturing it before the module is loaded.
+
+Do not add a fallback duplicate initialization path elsewhere.
+
+The final architecture should have one canonical initialization path.
+
+## Dependency check
+
+Before changing TOC order, verify `ExternalManager.lua` dependencies.
+
+It currently relies on dataset/database APIs such as:
+
+```lua
+Database.GetDatasetImportPayloadIdentity
+Database.ImportDataset
+Database.GetDatasetByID
+Database.DeleteDataset
+```
+
+If those APIs require `Database.lua` to have loaded first, prefer resolving `Addon.Internal.ExternalManager` at event dispatch time instead of moving the Manager module ahead of its dependencies.
+
+## Expected behaviour
+
+On first startup with no existing Manager SavedVariable:
 
 ```lua
 RPEngineManagerDB = {
@@ -27,99 +89,36 @@ RPEngineManagerDB = {
 }
 ```
 
-This is the only automatic initialization case.
+must be created by the addon.
 
-### Root present but malformed
-
-If `RPEngineManagerDB` exists but any of the following are invalid:
-
-- root is not a table;
-- missing required root field;
-- unknown root field;
-- wrong root field type;
-- malformed pending queue;
-- malformed installed manifest map;
-- malformed operation result map;
-
-then:
-
-- do not rewrite/repair the root;
-- do not consume pending operations;
-- do not mutate datasets;
-- emit an explicit diagnostic.
-
-### Unsupported version
-
-If:
-
-```lua
-protocolVersion ~= 1
-```
-
-then:
-
-- leave the complete root unchanged;
-- do not append request-level failures;
-- do not consume operations;
-- do not initialize/normalize child tables;
-- emit an unsupported-version diagnostic.
-
-The addon cannot safely write a v1 result into an unknown future contract.
-
-## Closed root schema
-
-Protocol v1 permits exactly:
+After normal WoW logout/exit, that exact root must be persisted into:
 
 ```text
-protocolVersion
-pendingOperations
-installedPackages
-operationResults
+WTF/Account/<account>/SavedVariables/RPEngine2.lua
 ```
 
-Unknown root fields are malformed.
+## Regression requirements
 
-Do not silently discard or preserve-and-ignore them while processing.
+Verify that:
 
-## Validation helpers
-
-Create explicit read-only validation helpers rather than using normalization as validation.
-
-Separate responsibilities clearly:
-
-```text
-initialize absent root
-validate existing root
-process valid root
-```
-
-Avoid one `ensureRoot()` function that both repairs and returns state.
-
-## Startup behaviour
-
-`ExternalManager.Initialize()` must:
-
-1. detect absent vs present root;
-2. initialize only if absent;
-3. validate present root;
-4. return without mutation on validation/version failure;
-5. process pending operations only after successful validation.
-
-## Diagnostics
-
-Use the existing addon debug/diagnostic surface.
-
-Do not create a fake `operationResults` entry for root-level incompatibility.
+- `ExternalManager.Initialize()` runs exactly once during normal addon startup;
+- absent root initializes to protocol v1;
+- valid existing root is processed normally;
+- malformed/unsupported root still follows the protocol-v1 fail-closed behaviour;
+- pending operations are processed at startup;
+- no duplicate Manager initialization occurs;
+- existing Runtime initialization for Tasks, Comms, Achievements, etc. is unchanged.
 
 ## Validation
 
 The issue is complete when:
 
-- absent root initializes to exact v1 shape;
-- `protocolVersion = 2` survives startup byte-equivalent in semantic content;
-- malformed child tables are not replaced with `{}`;
-- unknown root fields stop processing;
-- no queued operation is consumed under malformed/unsupported state;
-- no dataset mutation occurs under malformed/unsupported state;
-- a valid v1 root still processes normally;
-- Manager subsequently reports unsupported/malformed state rather than seeing a silently repaired v1 root.
+1. Delete/rename the test account's existing `RPEngineManagerDB` state while WoW is closed.
+2. Start WoW with the current addon.
+3. Confirm in-memory:
+   ```lua
+   RPEngineManagerDB ~= nil
+   ```
+4. Exit WoW normally.
+5. Confirm `RPEngine2.lua` contains the protocol-v1 root.
+6. Queue a Phase 2 Manager request and verify it is consumed on the next addon startup.
