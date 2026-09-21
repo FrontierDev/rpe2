@@ -10,6 +10,7 @@ local UI = Addon.UI or {}
 local Client = Addon.Client or {}
 local Combat = Client.Combat or {}
 local SpellClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Spell or nil
+local Ruleset = Addon.Internal and Addon.Internal.Ruleset or {}
 
 DataEditor.SpellInspectorSidePadding = DataEditor.SpellInspectorSidePadding or 8
 DataEditor.SpellInspectorControlHeight = DataEditor.SpellInspectorControlHeight or 20
@@ -29,6 +30,7 @@ local EFFECT_TYPE_ITEMS = {
     { label = "Remove Aura by Tag", value = "remove_aura_by_tag" },
     { label = "Resource", value = "resource" },
     { label = "Interrupt", value = "interrupt" },
+    { label = "Taunt", value = "taunt" },
     { label = "Revert", value = "revert" },
     { label = "Summon Pet", value = "summon_pet" },
 }
@@ -236,6 +238,46 @@ function DataEditor:NormalizeSpellDefinition(spell)
     return spell or {}
 end
 
+function DataEditor:BuildSpellInspectorCooldownChannelItems(spell)
+    local items = {}
+    local channels = type(Ruleset.GetCooldownChannels) == "function" and Ruleset.GetCooldownChannels() or {}
+    local effectiveChannelId = nil
+    if type(SpellClass) == "table" and type(SpellClass.ResolveCooldownChannel) == "function" then
+        effectiveChannelId = select(1, SpellClass.ResolveCooldownChannel(spell))
+    end
+
+    local hasSelectedItem = false
+    for index = 1, #channels do
+        local channel = channels[index]
+        local channelId = tonumber(channel and channel.id)
+        local channelName = tostring(channel and channel.name or "")
+        if channelId and channelName ~= "" and channel and channel.enabled == true then
+            items[#items + 1] = {
+                label = ("Channel %d: %s"):format(channelId, channelName),
+                value = channelId,
+            }
+            if channelId == effectiveChannelId then
+                hasSelectedItem = true
+            end
+        elseif channelId == effectiveChannelId then
+            items[#items + 1] = {
+                label = ("Channel %d (Unconfigured)"):format(channelId),
+                value = channelId,
+            }
+            hasSelectedItem = true
+        end
+    end
+
+    if effectiveChannelId and not hasSelectedItem then
+        items[#items + 1] = {
+            label = ("Channel %d (Unconfigured)"):format(effectiveChannelId),
+            value = effectiveChannelId,
+        }
+    end
+
+    return items, effectiveChannelId
+end
+
 function DataEditor:CommitSelectedSpell(mutate)
     local dataset, spell = self:GetSelectedSpellAndDataset()
     if not dataset or not spell or type(mutate) ~= "function" then
@@ -351,6 +393,29 @@ end
 
 function DataEditor:BuildSpellInspectorStatsAcrossDatasets()
     return self:BuildReferenceItemsAcrossDatasets("stats", { includeNone = true, noneLabel = "None" })
+end
+
+function DataEditor:BuildSpellInspectorDefenceStatsAcrossDatasets()
+    local items = {
+        { label = "Any Defence", value = "" },
+    }
+    local datasets = self:GetDatasets()
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        for statIndex = 1, #((dataset and dataset.stats) or {}) do
+            local stat = dataset.stats[statIndex]
+            local defenceLabel = tostring(stat and stat.defenceLabel or ""):gsub("^%s+", ""):gsub("%s+$", "")
+            local category = tostring(stat and stat.category or ""):gsub("^%s+", ""):gsub("%s+$", ""):lower()
+            if stat and stat.id and (category == "defense" or category == "defence" or defenceLabel ~= "") then
+                local statName = self:GetEntryDisplayName("stats", stat)
+                items[#items + 1] = {
+                    label = ("%s / %s"):format(self:GetDatasetDisplayName(dataset), defenceLabel ~= "" and defenceLabel or statName),
+                    value = ("%s:%s"):format(dataset.id, stat.id),
+                }
+            end
+        end
+    end
+    return items
 end
 
 function DataEditor:BuildSpellInspectorResourcesAcrossDatasets()

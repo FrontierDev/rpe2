@@ -201,9 +201,10 @@ local function isUnitActive(unit)
     return type(unit) == "table" and (unit.isPlayer == true or unit.active ~= false)
 end
 
-local function createCloneState(source)
+local function createCloneState(source, plannerState)
     return {
         source = source,
+        plannerState = plannerState,
         result = {},
         stage = "scalars",
         scalarCursor = nil,
@@ -294,6 +295,13 @@ local function stepCloneState(clone, deadlineMs)
     end
 
     if clone.stage == "finalize" then
+        local plannerState = clone.plannerState
+        result.tauntState = type(Planner.GetHostLocalTauntState) == "function"
+            and Planner.GetHostLocalTauntState(
+                plannerState and plannerState.sourceEventState,
+                source.eventID
+            )
+            or nil
         result._networkStatMode = source._networkStatMode
         local mt = getmetatable(source)
         if mt ~= nil then setmetatable(result, mt) end
@@ -324,7 +332,7 @@ local function stepSnapshotUnits(state, deadlineMs)
     if perf.stage == "units" then
         while perf.sourceIndex <= #sourceUnits do
             if type(perf.clone) ~= "table" then
-                perf.clone = createCloneState(sourceUnits[perf.sourceIndex])
+                perf.clone = createCloneState(sourceUnits[perf.sourceIndex], state)
             end
             if stepCloneState(perf.clone, deadlineMs) ~= true then
                 return false
@@ -369,6 +377,7 @@ local function stepSnapshotUnits(state, deadlineMs)
         perf.stage = "complete"
     end
 
+    state.snapshot.unitsFrozen = true
     state.performanceUnitSnapshot = nil
     state.phase = "snapshot-positions"
     -- PlannerIntegration.phaseSnapshotPositions consumes cursors.unit. Reset

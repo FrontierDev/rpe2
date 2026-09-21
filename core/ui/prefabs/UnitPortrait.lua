@@ -21,6 +21,7 @@ setmetatable(UnitPortrait, { __index = BaseElement })
 local DEFAULT_TEXTURE = "Interface\\Icons\\INV_Misc_QuestionMark"
 local DEFAULT_HIDDEN_OVERLAY_TEXTURE = "Interface\\AddOns\\RPEngine2\\data\\textures\\ui\\hidden_portrait_overlay.png"
 local DEFAULT_HEALTH_ICON = "Interface\\Icons\\Spell_Holy_SealOfSacrifice"
+local DEFAULT_ABSORPTION_ICON = "Interface\\Icons\\Spell_Holy_PowerWordShield"
 local DEFAULT_PET_ICON = 132161
 local DEFAULT_TARGET_ICON = 132177
 local DEFAULT_PROGRESS_BAR_HEIGHT = 10
@@ -29,6 +30,10 @@ local DEFAULT_CAST_ICON_SIZE = 14
 local DEFAULT_RAID_MARKER_ICON_SIZE = 14
 local DEFAULT_CORNER_BADGE_ICON_SIZE = 21
 local DEFAULT_TURN_COMPLETE_ICON = "Interface\\RaidFrame\\ReadyCheck-Ready"
+local DEFAULT_ABSORPTION_TEXTURE = "Interface\\Buttons\\WHITE8X8"
+local DEFAULT_ABSORPTION_EDGE_TEXTURE = "Interface\\Buttons\\WHITE8X8"
+local DEFAULT_ABSORPTION_COLOR = { r = 1, g = 1, b = 1, a = 1 }
+local DEFAULT_ABSORPTION_EDGE_COLOR = { r = 1, g = 1, b = 1, a = 0.95 }
 
 local function getMaxFrameLevel(...)
     local maxLevel = 0
@@ -153,6 +158,31 @@ local function buildHealthTooltipLine(portraitUnit)
     }
 end
 
+local function buildAbsorptionTooltipLine(portraitUnit)
+    local eventState = type(Client.GetEventState) == "function" and Client:GetEventState() or Client.EventState
+    local auraManager = Client.Spellcasting and Client.Spellcasting.AuraManager or nil
+    local unitEventId = tonumber(portraitUnit and portraitUnit.eventID) or 0
+    if not auraManager
+        or type(auraManager.GetTotalAbsorption) ~= "function"
+        or type(eventState) ~= "table"
+        or eventState.active ~= true
+        or unitEventId <= 0
+    then
+        return nil
+    end
+
+    local absorption = math.max(0, tonumber(auraManager:GetTotalAbsorption(Client, eventState, unitEventId)) or 0)
+    if absorption <= 0 then
+        return nil
+    end
+
+    return {
+        icon = DEFAULT_ABSORPTION_ICON,
+        text = ("%.0f absorption"):format(absorption),
+        colorToken = "text.primary",
+    }
+end
+
 local function buildPortraitTooltip(portraitUnit)
     if type(portraitUnit) ~= "table" then
         return nil
@@ -167,6 +197,11 @@ local function buildPortraitTooltip(portraitUnit)
     local healthLine = buildHealthTooltipLine(portraitUnit)
     if healthLine then
         lines[#lines + 1] = healthLine
+    end
+
+    local absorptionLine = buildAbsorptionTooltipLine(portraitUnit)
+    if absorptionLine then
+        lines[#lines + 1] = absorptionLine
     end
 
     local eventState = type(Client.GetEventState) == "function" and Client:GetEventState() or Client.EventState
@@ -341,6 +376,8 @@ function UnitPortrait:New(options)
     instance.hiddenOverlayFrame = nil
     instance.hiddenOverlayTexture = nil
     instance.progressBar = nil
+    instance.absorptionOvershieldIndicator = nil
+    instance.absorptionOvershieldTexture = nil
     instance.secondaryProgressBar = nil
     instance.castIcon = nil
     instance.raidMarker = nil
@@ -538,6 +575,14 @@ function UnitPortrait:SetHiddenPresentation(hidden, hideDetails)
         progressFrame:Hide()
     end
 
+    local overshieldFrame = self.absorptionOvershieldIndicator
+        and self.absorptionOvershieldIndicator.GetFrame
+        and self.absorptionOvershieldIndicator:GetFrame()
+        or nil
+    if overshieldFrame and shouldHideDetails then
+        overshieldFrame:Hide()
+    end
+
     local secondaryProgressFrame = self.secondaryProgressBar and self.secondaryProgressBar.GetFrame and self.secondaryProgressBar:GetFrame() or nil
     if secondaryProgressFrame and shouldHideDetails then
         secondaryProgressFrame:Hide()
@@ -555,8 +600,59 @@ end
 
 function UnitPortrait:SetProgressState(state)
     applyProgressBarState(self.progressBar, state)
+    self:SetAbsorptionState(state)
     self:RefreshStatusLayout()
     return state
+end
+
+function UnitPortrait:SetAbsorptionState(state)
+    local edgeFrame = self.absorptionOvershieldIndicator
+        and self.absorptionOvershieldIndicator.GetFrame
+        and self.absorptionOvershieldIndicator:GetFrame()
+        or nil
+    local progressBar = self.progressBar
+    if not progressBar then
+        return false
+    end
+
+    local maximum = math.max(0, tonumber(state and state.maxValue) or 0)
+    local current = math.max(0, tonumber(state and state.currentValue) or 0)
+    if maximum > 0 then
+        current = math.min(maximum, current)
+    end
+    local totalAbsorption = math.max(0, tonumber(state and state.absorption) or tonumber(state and state.total) or 0)
+    local absorptionColor = self.options.absorptionColor or DEFAULT_ABSORPTION_COLOR
+    progressBar:SetOption("secondaryColor", absorptionColor)
+    if progressBar.ApplyColors then
+        progressBar:ApplyColors()
+    end
+
+    if maximum > 0 and totalAbsorption > 0 then
+        progressBar:SetSecondaryValue(math.min(maximum, current + totalAbsorption))
+    else
+        progressBar:SetSecondaryValue(nil)
+    end
+
+    local missingHealth = math.max(0, maximum - current)
+    local overshield = maximum > 0 and totalAbsorption > missingHealth
+    local healthBarFrame = progressBar.barFrame
+    if edgeFrame then
+        if healthBarFrame then
+            edgeFrame:ClearAllPoints()
+            edgeFrame:SetPoint("TOPLEFT", healthBarFrame, "TOPRIGHT", 0, 0)
+            edgeFrame:SetPoint("BOTTOMLEFT", healthBarFrame, "BOTTOMRIGHT", 0, 0)
+            edgeFrame:SetWidth(2)
+            if overshield then
+                edgeFrame:Show()
+            else
+                edgeFrame:Hide()
+            end
+        else
+            edgeFrame:Hide()
+        end
+    end
+
+    return totalAbsorption > 0
 end
 
 function UnitPortrait:SetSecondaryProgressState(state)
@@ -680,6 +776,7 @@ function UnitPortrait:RefreshOverlayFrameLevels()
         self.petIndicator and self.petIndicator.GetFrame and self.petIndicator:GetFrame() or nil,
         self.targetIndicator and self.targetIndicator.GetFrame and self.targetIndicator:GetFrame() or nil,
         self.turnCompleteIndicator and self.turnCompleteIndicator.GetFrame and self.turnCompleteIndicator:GetFrame() or nil,
+        self.absorptionOvershieldIndicator and self.absorptionOvershieldIndicator.GetFrame and self.absorptionOvershieldIndicator:GetFrame() or nil,
     }
 
     for index = 1, #overlayFrames do
@@ -937,12 +1034,33 @@ function UnitPortrait:Create()
         borderColor = self.options.progressBorderColor or defaults.ProgressBorderColor,
         primaryColor = self.options.progressPrimaryColor or defaults.ProgressPrimaryColor,
         secondaryColor = self.options.progressSecondaryColor or defaults.ProgressSecondaryColor,
+        secondaryTexture = self.options.absorptionTexture or DEFAULT_ABSORPTION_TEXTURE,
+        secondaryOverlayTexture = self.options.absorptionOverlayTexture,
         textColor = self.options.progressTextColor or defaults.ProgressTextColor,
         border = false,
     })
     self.progressBar:SetParent(frame)
     self.progressBar:Create()
     self.progressBar:SetPoint("TOPLEFT", self.portraitFrame, "BOTTOMLEFT", 0, -spacing)
+
+    self.absorptionOvershieldIndicator = Image:New({
+        name = (self.name or "UnitPortrait") .. "AbsorptionOvershield",
+        width = 2,
+        height = progressHeight,
+        texture = self.options.absorptionEdgeTexture or DEFAULT_ABSORPTION_EDGE_TEXTURE,
+        border = false,
+        layer = "OVERLAY",
+        frameStrata = self.options.frameStrata,
+        textureInsetLeft = 0,
+        textureInsetTop = 0,
+        textureInsetRight = 0,
+        textureInsetBottom = 0,
+        vertexColor = self.options.absorptionEdgeColor or DEFAULT_ABSORPTION_EDGE_COLOR,
+    })
+    self.absorptionOvershieldIndicator:SetParent(frame)
+    self.absorptionOvershieldIndicator:Create()
+    self.absorptionOvershieldTexture = self.absorptionOvershieldIndicator.textureRegion
+    self.absorptionOvershieldIndicator:GetFrame():Hide()
 
     if secondaryProgressHeight > 0 then
         self.secondaryProgressBar = ProgressBar:New({

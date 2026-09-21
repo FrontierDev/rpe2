@@ -7,6 +7,7 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
 local TooltipTemplate = Addon.Client and Addon.Client.Spellcasting and Addon.Client.Spellcasting.TooltipTemplate or nil
+local SpellClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Spell or nil
 
 local function hasStoredSpellTooltipTemplate(spell)
     if type(spell) ~= "table" then
@@ -172,6 +173,13 @@ function DataEditor:RefreshSpellInspectorPage()
         self.SpellInspectorSeedNPCSpellCheckbox:SetChecked(spell and spell.seedNPCSpell == true or false, true)
         self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorSeedNPCSpellCheckbox, hasSpell)
     end
+    local usesRanks = spell == nil
+        or (SpellClass and SpellClass.ResolveUsesRanks and SpellClass.ResolveUsesRanks(spell) ~= false)
+        or spell.usesRanks ~= false
+    if self.SpellInspectorUsesRanksCheckbox then
+        self.SpellInspectorUsesRanksCheckbox:SetChecked(usesRanks, true)
+        self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorUsesRanksCheckbox, hasSpell)
+    end
     if self.SpellInspectorLearnModeDropdown then
         self.SpellInspectorLearnModeDropdown:SetItems(self:GetSpellInspectorLearnModeItems())
         self.SpellInspectorLearnModeDropdown:SetSelectedValue(spell and spell.learnMode or "trainer", true)
@@ -180,6 +188,16 @@ function DataEditor:RefreshSpellInspectorPage()
     if self.SpellInspectorSpellbookCategoryInput then
         self.SpellInspectorSpellbookCategoryInput:SetText(spell and (spell.spellbookCategory or "") or "")
         self:SetSpellInspectorTextElementEnabled(self.SpellInspectorSpellbookCategoryInput, hasSpell)
+    end
+    if self.SpellInspectorLearnLevelInput then
+        local learnLevel = spell and SpellClass and SpellClass.ResolveLearnLevel and SpellClass.ResolveLearnLevel(spell) or 1
+        self.SpellInspectorLearnLevelInput:SetText(tostring(learnLevel))
+        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorLearnLevelInput, hasSpell)
+    end
+    if self.SpellInspectorRankIntervalInput then
+        local rankInterval = spell and SpellClass and SpellClass.ResolveRankInterval and SpellClass.ResolveRankInterval(spell) or 8
+        self.SpellInspectorRankIntervalInput:SetText(tostring(rankInterval))
+        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorRankIntervalInput, hasSpell and usesRanks)
     end
     if self.SpellInspectorTooltipTemplateStatusText then
         local hasStoredTemplate = hasStoredSpellTooltipTemplate(spell)
@@ -199,14 +217,6 @@ function DataEditor:RefreshSpellInspectorPage()
         self.SpellInspectorCastTimeSlider:SetValue(spell and spell.castTime or 0, true)
         self:SetSpellInspectorSliderEnabled(self.SpellInspectorCastTimeSlider, hasSpell)
     end
-    if self.SpellInspectorTriggersGCDCheckbox then
-        self.SpellInspectorTriggersGCDCheckbox:SetChecked(spell and spell.ignoreGCD ~= true and spell.triggersGCD == true or false, true)
-        self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorTriggersGCDCheckbox, hasSpell and spell and spell.ignoreGCD ~= true)
-    end
-    if self.SpellInspectorIgnoreGCDCheckbox then
-        self.SpellInspectorIgnoreGCDCheckbox:SetChecked(spell and spell.ignoreGCD == true or false, true)
-        self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorIgnoreGCDCheckbox, hasSpell)
-    end
     if self.SpellInspectorCooldownSlider then
         self.SpellInspectorCooldownSlider:SetValue(spell and spell.cooldown or 1, true)
         self:SetSpellInspectorSliderEnabled(self.SpellInspectorCooldownSlider, hasSpell)
@@ -222,6 +232,12 @@ function DataEditor:RefreshSpellInspectorPage()
     if self.SpellInspectorCooldownGroupInput then
         self.SpellInspectorCooldownGroupInput:SetText(spell and (spell.cooldownGroup or "") or "")
         self:SetSpellInspectorTextElementEnabled(self.SpellInspectorCooldownGroupInput, hasSpell)
+    end
+    if self.SpellInspectorCooldownChannelDropdown then
+        local channelItems, effectiveChannelId = self:BuildSpellInspectorCooldownChannelItems(spell)
+        self.SpellInspectorCooldownChannelDropdown:SetItems(channelItems)
+        self.SpellInspectorCooldownChannelDropdown:SetSelectedValue(effectiveChannelId, true)
+        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorCooldownChannelDropdown, hasSpell and effectiveChannelId ~= nil)
     end
     if self.SpellInspectorMountedCombatOnlyCheckbox then
         self.SpellInspectorMountedCombatOnlyCheckbox:SetChecked(spell and spell.mountedCombatOnly == true or false, true)
@@ -277,6 +293,7 @@ function DataEditor:RefreshSpellInspectorPage()
     local isRemoveAuraTag = isRemoveAuraByTag or (isRemoveAura and tostring(effect.match or "aura") == "tag")
     local isRemoveAuraExact = isRemoveAura and not isRemoveAuraTag
     local isResource = effectType == "resource"
+    local isTaunt = effectType == "taunt"
     local isSummonPet = effectType == "summon_pet"
     local targetType = tostring(target.type or "single")
     local isPetTarget = targetType == "pet"
@@ -400,6 +417,11 @@ function DataEditor:RefreshSpellInspectorPage()
         self.SpellInspectorResourceAmountModeDropdown:SetSelectedValue(effect.amountMode or "flat", true)
         self:SetSpellInspectorDropdownEnabled(self.SpellInspectorResourceAmountModeDropdown, isResource and component ~= nil)
     end
+    if self.SpellInspectorResourceScaleWithRankCheckbox then
+        self.SpellInspectorResourceScaleWithRankCheckbox:SetChecked(effect.scaleWithRank == true, true)
+        self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorResourceScaleWithRankCheckbox, isResource and component ~= nil)
+        self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceScaleWithRankCheckbox, isResource)
+    end
     if self.SpellInspectorSummonPetUnitDropdown then
         self.SpellInspectorSummonPetUnitDropdown:SetItems(self:BuildSpellInspectorUnitsAcrossDatasets())
         self.SpellInspectorSummonPetUnitDropdown:SetSelectedValue(effect.unitRef or "", true)
@@ -441,6 +463,10 @@ function DataEditor:RefreshSpellInspectorPage()
         self.SpellInspectorApplyAuraDurationInput:SetText(tostring(effect.duration or 12))
         self:SetSpellInspectorTextElementEnabled(self.SpellInspectorApplyAuraDurationInput, isApplyAura and component ~= nil)
     end
+    if self.SpellInspectorTauntDurationInput then
+        self.SpellInspectorTauntDurationInput:SetText(tostring(effect.duration or 2))
+        self:SetSpellInspectorTextElementEnabled(self.SpellInspectorTauntDurationInput, isTaunt and component ~= nil)
+    end
     if self.SpellInspectorResourceAmountInput then
         self.SpellInspectorResourceAmountInput:SetText(tostring(effect.amount or 0))
         self:SetSpellInspectorTextElementEnabled(self.SpellInspectorResourceAmountInput, isResource and component ~= nil)
@@ -470,6 +496,7 @@ function DataEditor:RefreshSpellInspectorPage()
     self:SetSpellInspectorGroupVisible(self.SpellInspectorDamageTypeGroup, isDamage)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorAuraStacksGroup, showsAuraApplicationControls)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorApplyAuraDurationGroup, isApplyAura)
+    self:SetSpellInspectorGroupVisible(self.SpellInspectorTauntDurationGroup, isTaunt)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceAmountGroup, isResource)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceAmountModeGroup, isResource)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorTargetEventsGroup, not isSummonPet)

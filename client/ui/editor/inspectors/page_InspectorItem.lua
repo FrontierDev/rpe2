@@ -573,6 +573,7 @@ function DataEditor:RefreshItemInspectorPage()
     local isConsumableEventApplyAura = selectedConsumableEffectType == "apply_aura"
     local isConsumableEventRemoveAura = selectedConsumableEffectType == "remove_aura"
     local isConsumableEventResource = selectedConsumableEffectType == "resource"
+    local isConsumableDefenceEvent = selectedConsumableEvent and selectedConsumableEvent.combatEventId == "on_defence"
     local consumableEventUsesAmountMode = isConsumableEventDamage or isConsumableEventHeal or isConsumableEventResource
     local consumableEffectNeedsReference = isConsumableEventApplyAura or isConsumableEventRemoveAura or isConsumableEventResource
     if self.ItemInspectorConsumablePendingEffectAmountLabel and self.ItemInspectorConsumablePendingEffectAmountLabel.SetText then
@@ -631,6 +632,11 @@ function DataEditor:RefreshItemInspectorPage()
         self.ItemInspectorConsumablePendingEffectAmountInput:SetText(tostring(amountValue))
         setTextElementEnabled(self.ItemInspectorConsumablePendingEffectAmountInput, hasEmbeddedTrait)
     end
+    if self.ItemInspectorConsumablePendingDefenceStatDropdown then
+        self.ItemInspectorConsumablePendingDefenceStatDropdown:SetItems(self:BuildSpellInspectorDefenceStatsAcrossDatasets())
+        self.ItemInspectorConsumablePendingDefenceStatDropdown:SetSelectedValue(selectedConsumableEvent and selectedConsumableEvent.defenceStatRef or "", true)
+        setDropdownEnabled(self.ItemInspectorConsumablePendingDefenceStatDropdown, hasEmbeddedTrait and isConsumableDefenceEvent)
+    end
     if self.ItemInspectorConsumablePendingEffectAmountModeDropdown then
         self.ItemInspectorConsumablePendingEffectAmountModeDropdown:SetItems(self:GetAuraInspectorAmountModeItems())
         self.ItemInspectorConsumablePendingEffectAmountModeDropdown:SetSelectedValue(selectedConsumableEffect and selectedConsumableEffect.amountMode or "flat", true)
@@ -669,6 +675,7 @@ function DataEditor:RefreshItemInspectorPage()
         setTextElementEnabled(self.ItemInspectorConsumablePendingEffectExtraInput, hasEmbeddedTrait and isConsumableEventApplyAura)
     end
     setElementGroupVisible(self.ItemInspectorConsumablePendingEventSchoolGroup, hasEmbeddedTrait and isConsumableEventDamage)
+    setElementGroupVisible(self.ItemInspectorConsumablePendingDefenceStatGroup, hasEmbeddedTrait and isConsumableDefenceEvent)
     setElementGroupVisible(self.ItemInspectorConsumablePendingEventDetailHeaderRow, hasEmbeddedTrait and consumableEffectNeedsReference)
     setElementGroupVisible(self.ItemInspectorConsumablePendingEventDetailRow, hasEmbeddedTrait and consumableEffectNeedsReference)
     setElementGroupVisible(self.ItemInspectorConsumablePendingEventExtraHeaderRow, hasEmbeddedTrait and isConsumableEventApplyAura)

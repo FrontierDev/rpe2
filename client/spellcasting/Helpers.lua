@@ -155,6 +155,135 @@ local function getCombat()
     return Addon.Client and Addon.Client.Combat or nil
 end
 
+local function finiteNumber(value)
+    local numeric = tonumber(value)
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        return nil
+    end
+    return numeric
+end
+
+local function normalizeCasterLevel(value)
+    local numeric = finiteNumber(value)
+    if numeric == nil then
+        return nil
+    end
+    return math.max(1, math.floor(numeric))
+end
+
+function Spellcasting.ResolveSpellRankContext(spell, options)
+    local settings = type(options) == "table" and options or {}
+    local classes = Addon.Internal
+        and Addon.Internal.Database
+        and Addon.Internal.Database.Classes
+        or nil
+    local spellClass = classes and classes.Spell or nil
+    if type(spellClass) ~= "table" or type(spellClass.ResolveRankForLevel) ~= "function" then
+        return nil
+    end
+
+    local eventState = settings.eventState
+    if eventState == nil and type(Client.GetEventState) == "function" then
+        eventState = Client:GetEventState()
+    end
+
+    local casterUnit = settings.casterUnit
+    if casterUnit == nil and type(Client.ResolveActiveSpellcasterUnit) == "function" then
+        casterUnit = Client:ResolveActiveSpellcasterUnit(eventState)
+    end
+
+    local casterLevel = normalizeCasterLevel(settings.casterLevel)
+    if casterLevel == nil then
+        local combat = getCombat()
+        if type(combat) == "table" and type(combat.GetUnitLevel) == "function"
+            and (type(casterUnit) == "table" or type(eventState) == "table" and eventState.active == true)
+        then
+            casterLevel = normalizeCasterLevel(combat:GetUnitLevel(casterUnit, eventState))
+        elseif type(casterUnit) == "table" and casterUnit.isPlayer == true and type(Profile.GetLevel) == "function" then
+            casterLevel = normalizeCasterLevel(Profile.GetLevel())
+        elseif type(eventState) == "table" and eventState.active == true then
+            casterLevel = normalizeCasterLevel(eventState.level)
+        elseif type(Profile.GetLevel) == "function" then
+            casterLevel = normalizeCasterLevel(Profile.GetLevel())
+        end
+    end
+    casterLevel = casterLevel or 1
+
+    local ruleset = settings.ruleset
+    if ruleset == nil and type(Ruleset.GetActiveRuleset) == "function" then
+        ruleset = Ruleset.GetActiveRuleset()
+    end
+    local useSpellRanks = true
+    if type(Ruleset.GetRulesetRuleDefinition) == "function"
+        and type(Ruleset.GetRulesetRuleValue) == "function"
+    then
+        local definition = Ruleset.GetRulesetRuleDefinition("character", "use_spell_ranks")
+        local configured = Ruleset.GetRulesetRuleValue(ruleset, "character", definition)
+        if configured ~= nil then
+            useSpellRanks = configured == true
+        end
+    end
+
+    local gainPercent = nil
+    if type(Ruleset.GetRulesetRuleDefinition) == "function"
+        and type(Ruleset.GetRulesetRuleValue) == "function"
+    then
+        local definition = Ruleset.GetRulesetRuleDefinition("character", "spell_rank_effect_gain_percent")
+        local configuredGain = Ruleset.GetRulesetRuleValue(ruleset, "character", definition)
+        gainPercent = finiteNumber(configuredGain)
+        if gainPercent == nil then
+            gainPercent = finiteNumber(type(definition) == "table" and definition.default or nil)
+        end
+    end
+    gainPercent = math.max(0, gainPercent or 5)
+
+    local resolved = spellClass.ResolveRankForLevel(spell, casterLevel)
+    local spellUsesRanks = true
+    if type(spellClass.ResolveUsesRanks) == "function" then
+        spellUsesRanks = spellClass.ResolveUsesRanks(spell) ~= false
+    end
+    local rank = resolved and resolved.rank or nil
+    local multiplier = 1
+    if useSpellRanks and spellUsesRanks and rank ~= nil then
+        local scalingOffset = type(spellClass.ResolveRankScalingOffset) == "function"
+            and spellClass.ResolveRankScalingOffset(spell)
+            or 0
+        local scalingRank = rank + scalingOffset
+        multiplier = 1 + (math.max(0, scalingRank - 1) * (gainPercent / 100))
+        if finiteNumber(multiplier) == nil then
+            multiplier = 1
+        end
+    end
+
+    return {
+        eligible = resolved ~= nil and resolved.eligible == true,
+        useSpellRanks = useSpellRanks,
+        usesRanks = spellUsesRanks,
+        rank = rank,
+        multiplier = multiplier,
+        casterLevel = casterLevel,
+        learnLevel = resolved and resolved.learnLevel or spellClass.ResolveLearnLevel(spell),
+        rankInterval = resolved and resolved.rankInterval or spellClass.ResolveRankInterval(spell),
+        nextRankLevel = resolved and resolved.nextRankLevel or nil,
+    }
+end
+
+function Spellcasting.ApplySpellRankMultiplier(context, amount)
+    local numericAmount = finiteNumber(amount)
+    if numericAmount == nil then
+        return nil
+    end
+
+    local rankMultiplier = type(context) == "table"
+        and finiteNumber(context.spellRankMultiplier or context.multiplier)
+        or nil
+    if rankMultiplier == nil or rankMultiplier < 0 then
+        rankMultiplier = 1
+    end
+
+    return numericAmount * rankMultiplier
+end
+
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
 end
@@ -191,6 +320,7 @@ local function emitResolvedHealCombatLog(client, eventState, casterUnit, targetR
     end
 
     local targetCount = 0
+    local exactTotal = 0
     local amountMin = nil
     local amountMax = nil
     local singleTargetName = nil
@@ -202,6 +332,7 @@ local function emitResolvedHealCombatLog(client, eventState, casterUnit, targetR
         local resultType = tostring(type(result) == "table" and result.resultType or "")
         if type(targetUnit) == "table" and amount > 0 and resultType ~= "invalid" then
             targetCount = targetCount + 1
+            exactTotal = exactTotal + amount
             if targetCount == 1 then
                 singleTargetName = tostring(targetUnit.name or "Unknown")
             end
@@ -222,6 +353,8 @@ local function emitResolvedHealCombatLog(client, eventState, casterUnit, targetR
     return client:EmitCombatLogEntry({
         eventId = eventState.id,
         entryType = "heal",
+        casterEventId = tonumber(casterUnit.eventID) or nil,
+        meterAmount = exactTotal,
         casterDisplayName = tostring(casterUnit.name or "Unknown"),
         targetDisplayName = targetCount > 1 and ("%d targets"):format(targetCount) or singleTargetName,
         targetCount = targetCount,
@@ -273,6 +406,44 @@ local function emitInterruptCombatLog(client, eventState, casterUnit, targetUnit
             or nil,
         detailText = ("Interrupted %s."):format(interruptedSpellName),
         accentColor = "ffcf6d2a",
+    })
+end
+
+local function emitTauntCombatLog(client, eventState, casterUnit, targetUnit, result, spell, spellRef)
+    if type(client) ~= "table"
+        or type(client.EmitCombatLogEntry) ~= "function"
+        or type(eventState) ~= "table"
+        or eventState.active ~= true
+        or type(casterUnit) ~= "table"
+        or type(targetUnit) ~= "table"
+        or targetUnit.isPlayer == true
+        or type(result) ~= "table"
+        or tostring(result.effectType or "") ~= "taunt"
+        or result.applied ~= true
+    then
+        return false
+    end
+
+    local duration = math.max(1, math.floor(tonumber(result.duration) or 1))
+    local durationLabel = duration == 1 and "1 turn" or ("%d turns"):format(duration)
+    return client:EmitCombatLogEntry({
+        eventId = eventState.id,
+        entryType = "status",
+        logKind = "taunt",
+        casterDisplayName = tostring(casterUnit.name or "Unknown"),
+        targetDisplayName = tostring(targetUnit.name or "Unknown"),
+        targetCount = 1,
+        amountMin = 1,
+        amountMax = 1,
+        iconTexture = nil,
+        spellIconTexture = type(client.ResolveCombatLogSpellIcon) == "function"
+            and client:ResolveCombatLogSpellIcon(spell, spellRef)
+            or nil,
+        labelText = "Taunt",
+        detailText = ("Taunt (%s)"):format(durationLabel),
+        duration = duration,
+        accentColor = "ffcf6d2a",
+        spellRef = spellRef,
     })
 end
 
@@ -843,14 +1014,19 @@ local function getCombatTurnHistory(client, eventState, createIfMissing)
 end
 
 function Spellcasting.RecordCombatAttack(client, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
-    local turnHistory, eventId, turnNumber = getCombatTurnHistory(client, eventState, true)
     local attackerEventId = tonumber(attackerUnit and attackerUnit.eventID) or 0
     local targetEventId = tonumber(targetUnit and targetUnit.eventID) or 0
     local normalizedAttackType = tostring(attackType or ""):lower()
-    if not turnHistory or attackerEventId <= 0 or targetEventId <= 0
+    if attackerEventId <= 0 or targetEventId <= 0
         or (normalizedAttackType ~= "melee" and normalizedAttackType ~= "ranged" and normalizedAttackType ~= "spell")
-        or (landed ~= true and successfullyDefended ~= true)
+        or type(landed) ~= "boolean"
+        or type(successfullyDefended) ~= "boolean"
     then
+        return false
+    end
+
+    local turnHistory, eventId, turnNumber = getCombatTurnHistory(client, eventState, true)
+    if not turnHistory then
         return false
     end
 
@@ -945,6 +1121,25 @@ function Spellcasting.HasSuccessfullyDefendedMeleeThisTurn(client, eventState, t
     return false
 end
 
+function Spellcasting.HasFailedAttackThisTurn(client, eventState, attackerEventId)
+    local turnHistory = getCombatTurnHistory(client, eventState, false)
+    local numericAttackerEventId = tonumber(attackerEventId) or 0
+    if not turnHistory or numericAttackerEventId <= 0 then
+        return false
+    end
+
+    for index = #turnHistory.attacks, 1, -1 do
+        local record = turnHistory.attacks[index]
+        if record.resolved == true
+            and record.attackerEventId == numericAttackerEventId
+            and record.landed ~= true
+        then
+            return true
+        end
+    end
+    return false
+end
+
 function Spellcasting.WasUnitKilledThisTurn(client, eventState, unitEventId)
     local turnHistory = getCombatTurnHistory(client, eventState, false)
     local numericUnitEventId = tonumber(unitEventId) or 0
@@ -1012,6 +1207,7 @@ local function cloneSpellImpactOperation(operation)
         stacks = tonumber(operation.stacks) or 0,
         turns = tonumber(operation.turns) or 0,
         powerLevel = tonumber(operation.powerLevel) or 0,
+        rankMultiplier = tonumber(operation.rankMultiplier) or 1,
         casterEventId = tonumber(operation.casterEventId) or 0,
         targetEventId = tonumber(operation.targetEventId) or 0,
         reversible = operation.reversible ~= false,
@@ -1096,6 +1292,7 @@ function Spellcasting.RecordSpellImpact(client, eventState, casterUnit, targetUn
         stacks = tonumber(result.stacks or (auraEntry and auraEntry.stacks)) or 0,
         turns = tonumber(result.duration or (auraEntry and auraEntry.turnsRemaining)) or 0,
         powerLevel = tonumber(result.powerLevel or (auraEntry and auraEntry.powerLevel)) or 0,
+        rankMultiplier = tonumber(result.rankMultiplier or (auraEntry and auraEntry.rankMultiplier)) or 1,
         casterEventId = tonumber((auraEntry and auraEntry.casterEventId) or result.casterEventId or casterEventId) or casterEventId,
         targetEventId = tonumber((auraEntry and auraEntry.targetEventId) or result.targetEventId or targetEventId) or targetEventId,
     }
@@ -1232,7 +1429,8 @@ function Spellcasting.RevertLastSpellImpact(client, eventState, targetUnit, cont
                 operation.auraRef,
                 math.max(1, operation.stacks),
                 math.max(1, operation.turns),
-                operation.powerLevel
+                operation.powerLevel,
+                operation.rankMultiplier
             )
             if applied then
                 reverted.operationCount = reverted.operationCount + 1
@@ -1268,6 +1466,10 @@ end
 
 function Client:HasSuccessfullyDefendedMeleeThisTurn(eventState, targetEventId)
     return Spellcasting.HasSuccessfullyDefendedMeleeThisTurn(self, eventState, targetEventId)
+end
+
+function Client:HasFailedAttackThisTurn(eventState, attackerEventId)
+    return Spellcasting.HasFailedAttackThisTurn(self, eventState, attackerEventId)
 end
 
 function Client:WasUnitKilledThisTurn(eventState, unitEventId)
@@ -1497,14 +1699,27 @@ end
 
 -- Canonical pure spell classification helpers. Keep planner projections and
 -- live cooldown/lifecycle rules on the same definitions.
-function Spellcasting.SpellIgnoresGlobalCooldown(spell)
-    return type(spell) == "table" and spell.ignoreGCD == true
-end
+function Spellcasting.ResolveSpellCooldownChannel(spell, rulesetOverride)
+    local classes = Addon.Internal
+        and Addon.Internal.Database
+        and Addon.Internal.Database.Classes
+        or nil
+    local spellClass = classes and classes.Spell or nil
+    if type(spellClass) ~= "table" or type(spellClass.ResolveCooldownChannel) ~= "function" then
+        return nil, nil, "unavailable", "spell-channel-resolver-unavailable"
+    end
 
-function Spellcasting.SpellUsesGlobalCooldown(spell)
-    return Spellcasting.SpellIgnoresGlobalCooldown(spell) ~= true
-        and type(spell) == "table"
-        and spell.triggersGCD == true
+    local channelId, source, reason = spellClass.ResolveCooldownChannel(spell)
+    if channelId == nil then
+        return nil, nil, source, reason
+    end
+
+    local channel = nil
+    if type(Ruleset.GetCooldownChannel) == "function" then
+        channel = Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    end
+
+    return channelId, channel, source, reason
 end
 
 function Spellcasting.ResolvePersistentCastTurns(spell, turnCountOverride)
@@ -2408,6 +2623,34 @@ local function showTrackedTargetDelta(client, eventState, targetUnit, delta, siz
     })
 end
 
+local function showTrackedAbsorptionText(client, eventState, targetUnit, casterUnit, amount, size)
+    local numericAmount = math.max(0, math.floor(tonumber(amount) or 0))
+    if numericAmount <= 0 then
+        return false
+    end
+
+    local text = ("Absorbed %d"):format(numericAmount)
+    local color = UI.ResolveColor(nil, "text.secondary")
+    if Spellcasting.IsCombatTextTrackedUnit(client, eventState, targetUnit) then
+        return enqueueCombatText({
+            text = text,
+            color = color,
+            size = size,
+            direction = "DOWN",
+        })
+    end
+    if Spellcasting.IsCombatTextTrackedUnit(client, eventState, casterUnit) then
+        return enqueueCombatText({
+            text = text,
+            color = color,
+            size = size,
+            direction = "UP",
+        })
+    end
+
+    return false
+end
+
 local function formatOutgoingDeltaText(delta, labelPrefix)
     local numericDelta = tonumber(delta) or 0
     if numericDelta > 0 then
@@ -2419,9 +2662,11 @@ end
 
 function Spellcasting.ShowLocalResourceDeltaCombatText(client, eventState, casterUnit, targetUnit, resourceDeltas, hitType, result)
     local healthResourceRef = type(eventState) == "table" and eventState.healthResourceRef or Spellcasting.GetHealthResourceRef()
-    if healthResourceRef == nil or type(resourceDeltas) ~= "table" then
+    local absorbedAmount = math.max(0, math.floor(tonumber(type(result) == "table" and result.absorbedAmount or 0) or 0))
+    if healthResourceRef == nil and absorbedAmount <= 0 then
         return false
     end
+    resourceDeltas = type(resourceDeltas) == "table" and resourceDeltas or {}
 
     local size = isCriticalResult(result) and "critical" or "normal"
     local showed = false
@@ -2430,6 +2675,7 @@ function Spellcasting.ShowLocalResourceDeltaCombatText(client, eventState, caste
     local healDisplayAmount = isHealResult and math.max(0, tonumber(result.amount) or 0) or 0
     local resultLabelPrefix = type(result) == "table" and tostring(result.resultType or "") == "crushing" and "Crushing " or ""
     local resultSuffix = (not isHealResult and isCriticalStrikeResult(result)) and "!" or ""
+    local absorptionSuffix = absorbedAmount > 0 and (" (absorbed %d)"):format(absorbedAmount) or ""
 
     for index = 1, #resourceDeltas do
         local deltaEntry = resourceDeltas[index]
@@ -2438,11 +2684,12 @@ function Spellcasting.ShowLocalResourceDeltaCombatText(client, eventState, caste
             local numericDelta = tonumber(deltaEntry.delta) or 0
             local displayDelta = isHealResult and healDisplayAmount > 0 and healDisplayAmount or numericDelta
             if displayDelta ~= 0 then
-                if showTrackedTargetDelta(client, eventState, targetUnit, displayDelta, size, resultLabelPrefix, resultSuffix) then
+                if showTrackedTargetDelta(client, eventState, targetUnit, displayDelta, size, resultLabelPrefix, absorptionSuffix .. resultSuffix) then
                     showed = true
                 elseif Spellcasting.IsCombatTextTrackedUnit(client, eventState, casterUnit) then
                     local isHealing = displayDelta > 0
                     local text = formatOutgoingDeltaText(displayDelta, resultLabelPrefix)
+                    text = text .. absorptionSuffix
                     if not isHealing and resultSuffix ~= "" then
                         text = text .. "!"
                     end
@@ -2455,6 +2702,10 @@ function Spellcasting.ShowLocalResourceDeltaCombatText(client, eventState, caste
                 end
             end
         end
+    end
+
+    if not showed and absorbedAmount > 0 then
+        showed = showTrackedAbsorptionText(client, eventState, targetUnit, casterUnit, absorbedAmount, size) or showed
     end
 
     if not showed
@@ -2508,7 +2759,7 @@ local function shouldMarkResolvedEffectInteraction(result)
     return resultType ~= "invalid"
 end
 
-function Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, targetUnit, component, result, spellRef)
+function Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, targetUnit, component, result, spellRef, spell)
     if type(result) ~= "table" then
         return false
     end
@@ -2527,7 +2778,9 @@ function Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, 
             or "spell"
         local resolved = result.pending ~= true
             and tostring(result.resultType or "") ~= "invalid"
-        self:RecordRecentAttacker(eventState, casterUnit, targetUnit, damageType, resolved, false)
+        if resolved then
+            self:RecordRecentAttacker(eventState, casterUnit, targetUnit, damageType, true, false)
+        end
     end
 
     if type(self.MarkEventUnitInteraction) == "function" and shouldMarkResolvedEffectInteraction(result) then
@@ -2537,22 +2790,31 @@ function Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, 
     if effectType == "interrupt" then
         emitInterruptCombatLog(self, eventState, casterUnit, targetUnit, result, spellRef)
     end
+    if effectType == "taunt" then
+        emitTauntCombatLog(self, eventState, casterUnit, targetUnit, result, spell, spellRef)
+    end
 
     local resourceDeltas = Spellcasting.BuildResourceDeltaPayload(result.resourceDeltas)
     local hasResourceDeltas = type(resourceDeltas) == "table" and #resourceDeltas > 0
+    local hasAbsorptionPresentation = effectType == "damage"
+        and (tonumber(result.absorbedAmount) or 0) > 0
     local isPureDisplayedHeal = tostring(result.effectType or "") == "heal" and (tonumber(result.amount) or 0) > 0
     if not hasResourceDeltas then
-        if not isPureDisplayedHeal then
+        if not isPureDisplayedHeal and not hasAbsorptionPresentation then
             return false
         end
-        resourceDeltas = {
-            {
-                resourceRef = type(eventState) == "table" and eventState.healthResourceRef or Spellcasting.GetHealthResourceRef(),
-                delta = 0,
-                maxValue = 0,
-                currentValue = 0,
-            },
-        }
+        if isPureDisplayedHeal then
+            resourceDeltas = {
+                {
+                    resourceRef = type(eventState) == "table" and eventState.healthResourceRef or Spellcasting.GetHealthResourceRef(),
+                    delta = 0,
+                    maxValue = 0,
+                    currentValue = 0,
+                },
+            }
+        else
+            resourceDeltas = {}
+        end
     end
 
     local sessionState = self.GetState and self:GetState() or nil
@@ -2876,6 +3138,8 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
                     resolvedTargetEventIds = resolvedTargetEventIds,
                     healthResourceRef = healthResourceRef,
                     castEntry = castEntry,
+                    spellRank = type(castEntry) == "table" and castEntry.spellRank or nil,
+                    spellRankMultiplier = type(castEntry) == "table" and castEntry.spellRankMultiplier or 1,
                     combatEventState = combatEventState,
                     spellCasterEvents = type(spell) == "table" and spell.casterEvents or nil,
                 })
@@ -2917,6 +3181,8 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
                             resolvedTargetEventIds = { tonumber(targetUnit and targetUnit.eventID) or 0 },
                             healthResourceRef = healthResourceRef,
                             castEntry = castEntry,
+                            spellRank = type(castEntry) == "table" and castEntry.spellRank or nil,
+                            spellRankMultiplier = type(castEntry) == "table" and castEntry.spellRankMultiplier or 1,
                             combatEventState = combatEventState,
                             spellCasterEvents = type(spell) == "table" and spell.casterEvents or nil,
                             effectType = effectType,
@@ -2942,7 +3208,7 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
                     result = result,
                 }
                 local processStartTime = timingEnabled and getNowMilliseconds() or nil
-                Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, targetUnit, normalizedComponent, result, spellRef)
+                Spellcasting.ProcessResolvedEffectResult(self, eventState, casterUnit, targetUnit, normalizedComponent, result, spellRef, spell)
                 if timingEnabled then
                     processElapsed = processElapsed + (getNowMilliseconds() - processStartTime)
                 end
@@ -2994,6 +3260,8 @@ function Spellcasting.ExecuteSpellComponentsForPhase(self, eventState, casterUni
             casterUnit = casterUnit,
             attackerUnit = casterUnit,
             castEntry = castEntry,
+            spellRank = type(castEntry) == "table" and castEntry.spellRank or nil,
+            spellRankMultiplier = type(castEntry) == "table" and castEntry.spellRankMultiplier or 1,
             combatEventState = combatEventState,
             spellCasterEvents = type(spell) == "table" and spell.casterEvents or nil,
         }, castEntry, spell)

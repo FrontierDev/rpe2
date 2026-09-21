@@ -15,6 +15,7 @@ local Ruleset = Addon.Internal.Ruleset or {}
 local Database = Addon.Internal.Database or {}
 local Event = Addon.Internal.Database.Classes.Event
 local EventUnit = Addon.Internal.Database.Classes.EventUnit
+local UnitClass = (Database.Classes or {}).Unit
 local DEFAULT_TEAM_COLORS = Event and Event.GetDefaultTeamColors and Event.GetDefaultTeamColors()
 local DEFAULT_MAX_EVENT_UNITS = 5
 local MAX_EVENT_INITIATIVE = 20
@@ -63,36 +64,11 @@ local function deepCopy(value)
 end
 
 local function findActivatedUnitDefinition(registryId)
-    local normalizedRegistryId = type(registryId) == "string" and registryId or ""
-    if normalizedRegistryId == "" then
+    local registry = Addon.Internal and Addon.Internal.Registry or nil
+    if type(registry) ~= "table" or type(registry.ResolveUnitDefinition) ~= "function" then
         return nil, nil
     end
-
-    local separatorIndex = string.find(normalizedRegistryId, ":", 1, true)
-    if not separatorIndex then
-        return nil, nil
-    end
-
-    local datasetId = string.sub(normalizedRegistryId, 1, separatorIndex - 1)
-    local unitId = string.sub(normalizedRegistryId, separatorIndex + 1)
-    if datasetId == "" or unitId == "" then
-        return nil, nil
-    end
-
-    local datasets = Addon.Internal and Addon.Internal.Registry and Addon.Internal.Registry.GetActivatedDatasets and Addon.Internal.Registry:GetActivatedDatasets() or {}
-    for datasetIndex = 1, #datasets do
-        local dataset = datasets[datasetIndex]
-        if dataset and dataset.id == datasetId then
-            for unitIndex = 1, #(dataset.units or {}) do
-                local unit = dataset.units[unitIndex]
-                if unit and unit.id == unitId then
-                    return dataset, unit
-                end
-            end
-        end
-    end
-
-    return nil, nil
+    return registry:ResolveUnitDefinition(registryId)
 end
 
 local function buildSendMetadata(opcode)
@@ -458,7 +434,7 @@ local function buildStatBonusRows(baseStats, runtimeStats)
     return bonuses
 end
 
-local function buildCompactSummonedUnitDelta(unit)
+local function buildCompactSummonedUnitDelta(unit, level)
     if not unit or tostring(unit.registryID or "") == "" or tostring(unit.petRef or "") == "" then
         return unit
     end
@@ -468,10 +444,14 @@ local function buildCompactSummonedUnitDelta(unit)
         return unit
     end
 
-    local resolvedUnit = compactUnit.GetResolvedUnit and compactUnit:GetResolvedUnit() or nil
     compactUnit.resources = {}
     compactUnit.spells = {}
-    compactUnit.stats = buildStatBonusRows(resolvedUnit and resolvedUnit.stats or nil, compactUnit.stats)
+    local baselineProbe = cloneUnit(compactUnit)
+    if baselineProbe then
+        baselineProbe.stats = {}
+        local baselineStats = EventUnit.BuildResolvedStats(baselineProbe, nil, { level = level })
+        compactUnit.stats = buildStatBonusRows(baselineStats, compactUnit.stats)
+    end
     compactUnit._networkResourceMode = "inherit"
     compactUnit._networkSpellMode = "inherit"
     compactUnit._networkStatMode = "bonus"
@@ -562,9 +542,9 @@ end
 
 local buildNpcResources
 
-local function buildNpcUnit(unitData, ownerName, nextEventUnitId, playerCount)
+local function buildNpcUnit(unitData, ownerName, nextEventUnitId, playerCount, level, difficulty)
     local values = type(unitData) == "table" and unitData or {}
-    return EventUnit:New({
+    local unit = EventUnit:New({
         name = values.name or "",
         description = values.description or "",
         eventID = nextEventUnitId,
@@ -576,7 +556,7 @@ local function buildNpcUnit(unitData, ownerName, nextEventUnitId, playerCount)
         team = math.max(1, math.floor(tonumber(values.team) or 1)),
         ownerID = values.ownerID or ownerName,
         controllerID = values.controllerID,
-        resources = buildNpcResources(values, playerCount),
+        resources = buildNpcResources(values, playerCount, level, difficulty),
         spells = values.spells,
         stats = values.stats,
         active = coerceEventUnitBoolean(values.active, true),
@@ -590,6 +570,13 @@ local function buildNpcUnit(unitData, ownerName, nextEventUnitId, playerCount)
         rangedWeapon = values.rangedWeapon,
         shield = values.shield,
     })
+
+    if #unit.stats == 0 and tostring(unit.registryID or "") ~= ""
+        and type(EventUnit.BuildResolvedStats) == "function"
+    then
+        unit.stats = EventUnit.BuildResolvedStats(unit, nil, { level = level })
+    end
+    return unit
 end
 
 local function countPlayerUnits(units)
@@ -613,6 +600,14 @@ local function resolveControllingPlayerEventId(casterUnit)
     end
 
     return tonumber(casterUnit.controllerID) or nil
+end
+
+local function isEventUnitActive(unit)
+    if EventUnit and type(EventUnit.IsActive) == "function" then
+        return EventUnit.IsActive(unit)
+    end
+
+    return type(unit) == "table" and (unit.isPlayer == true or unit.active ~= false)
 end
 
 local function resolveControllerEventID(controllerValue, playerEventIds, fallbackEventId)
@@ -659,12 +654,50 @@ local function normalizeNpcResourceEntry(entry, playerCount)
     }
 end
 
-buildNpcResources = function(unitData, playerCount)
+buildNpcResources = function(unitData, playerCount, level, difficulty)
     local resources = {}
-    local sourceEntries = type(unitData) == "table" and unitData.resources or nil
+    local values = type(unitData) == "table" and unitData or {}
+    local _, resolvedUnit = findActivatedUnitDefinition(values.registryID)
+    if resolvedUnit and type(EventUnit.BuildUnitDerivedResources) == "function" then
+        local derived = EventUnit.BuildUnitDerivedResources(
+            resolvedUnit,
+            values.presetIndex,
+            playerCount,
+            {
+                level = level,
+                difficulty = difficulty,
+            }
+        )
+        local ratioByRef = {}
+        for index = 1, #(values.resources or {}) do
+            local entry = values.resources[index]
+            local resourceRef = type(entry) == "table" and tostring(entry.resourceRef or "") or ""
+            local currentValue = tonumber(type(entry) == "table" and (entry.currentValue or entry.current) or nil)
+            local maxValue = tonumber(type(entry) == "table" and (entry.maxValue or entry.max or entry.maximum) or nil)
+            if resourceRef ~= "" and (currentValue ~= nil or maxValue ~= nil) then
+                local maximum = maxValue ~= nil and maxValue or currentValue or 0
+                ratioByRef[resourceRef] = maximum > 0 and math.max(0, math.min(1, (currentValue ~= nil and currentValue or maximum) / maximum)) or 1
+            end
+        end
+        for index = 1, #(derived or {}) do
+            local entry = derived[index]
+            local resourceRef = tostring(entry and entry.resourceRef or "")
+            if resourceRef ~= "" then
+                local maxValue = tonumber(entry.maxValue) or 0
+                local currentValue = maxValue * (ratioByRef[resourceRef] or 1)
+                resources[#resources + 1] = {
+                    resourceRef = resourceRef,
+                    currentValue = currentValue,
+                    maxValue = maxValue,
+                }
+            end
+        end
+        return resources
+    end
+
+    local sourceEntries = values.resources
 
     if type(sourceEntries) ~= "table" or #sourceEntries == 0 then
-        local _, resolvedUnit = findActivatedUnitDefinition(type(unitData) == "table" and unitData.registryID or nil)
         sourceEntries = resolvedUnit and resolvedUnit.resources or nil
     end
 
@@ -678,7 +711,7 @@ buildNpcResources = function(unitData, playerCount)
     return resources
 end
 
-local function buildEventUnits(sessionState, sourceUnits, hostName)
+local function buildEventUnits(sessionState, sourceUnits, hostName, level, difficulty)
     local units = {}
     local nextEventUnitId = 1
     local seenPlayers = {}
@@ -768,12 +801,17 @@ local function buildEventUnits(sessionState, sourceUnits, hostName)
     for index = 1, #sourceNpcUnits do
         local unitData = sourceNpcUnits[index]
         if type(unitData) == "table" then
-            local unit = cloneUnit(unitData) or buildNpcUnit(unitData, hostName, nextEventUnitId, playerCount)
+            local unit = cloneUnit(unitData) or buildNpcUnit(unitData, hostName, nextEventUnitId, playerCount, level, difficulty)
+            if #((unit and unit.stats) or {}) == 0 and tostring(unit and unit.registryID or "") ~= ""
+                and type(EventUnit.BuildResolvedStats) == "function"
+            then
+                unit.stats = EventUnit.BuildResolvedStats(unit, nil, { level = level })
+            end
             unit.eventID = nextEventUnitId
             unit.isPlayer = false
             unit.ownerID = unit.ownerID or hostName
             unit.controllerID = resolveControllerEventID(unit.controllerID, playerEventIds, playerEventIds[hostName] or nextEventUnitId)
-            unit.resources = buildNpcResources(unitData, playerCount)
+            unit.resources = buildNpcResources(unitData, playerCount, level, difficulty)
             units[#units + 1] = unit
             nextEventUnitId = nextEventUnitId + 1
         end
@@ -1139,10 +1177,15 @@ local function recordInitialEventSnapshotDelivery(eventState, mode, recipients, 
 end
 
 local function buildEventUnitDeltaBatchArguments(eventState, entries)
+    local options = {
+        level = eventState and eventState.level,
+        difficulty = eventState and eventState.difficulty,
+        playerCount = countPlayerUnits(eventState and eventState.units or nil),
+    }
     return {
         eventState and eventState.channelName or "",
         eventState and eventState.id or nil,
-        Event and Event.SerializeUnitDeltaBatchForNetwork and Event.SerializeUnitDeltaBatchForNetwork(entries) or "",
+        Event and Event.SerializeUnitDeltaBatchForNetwork and Event.SerializeUnitDeltaBatchForNetwork(entries, options) or "",
     }
 end
 
@@ -1387,6 +1430,161 @@ Server.EventDraftState = Server.EventDraftState or nil
 Server.PendingEventAdvanceCommit = Server.PendingEventAdvanceCommit or nil
 Server.EventAdvanceRequestGeneration = math.max(0, math.floor(tonumber(Server.EventAdvanceRequestGeneration) or 0))
 Server.LastEventAdvanceCommit = Server.LastEventAdvanceCommit or nil
+Server.EventTauntRuntimeByEventId = Server.EventTauntRuntimeByEventId or {}
+
+local function resolveTauntOwnerPageIndex(eventState, targetEventId)
+    if type(eventState) ~= "table" then
+        return nil
+    end
+
+    local normalizedTargetEventId = math.floor(tonumber(targetEventId) or 0)
+    if normalizedTargetEventId <= 0 then
+        return nil
+    end
+
+    local turnMode = Event and type(Event.NormalizeTurnMode) == "function"
+        and Event.NormalizeTurnMode(eventState.turnMode)
+        or tostring(eventState.turnMode or "manual")
+    if turnMode == "autopilot" and Event and type(Event.GetUnitTurnStepIndex) == "function" then
+        return Event.GetUnitTurnStepIndex(eventState, normalizedTargetEventId, getMaxEventUnits())
+    end
+
+    if Event and type(Event.GetUnitPageIndex) == "function" then
+        return Event.GetUnitPageIndex(eventState.units, normalizedTargetEventId, getMaxEventUnits())
+    end
+
+    return nil
+end
+
+local function resolveTauntActivationTurn(eventState, targetEventId, turnNumber, tickNumber)
+    local currentTurn = math.max(1, math.floor(tonumber(turnNumber) or 1))
+    local currentTick = math.max(1, math.floor(tonumber(tickNumber) or 1))
+    local ownerPage = resolveTauntOwnerPageIndex(eventState, targetEventId)
+    if ownerPage ~= nil and currentTick < ownerPage then
+        return currentTurn
+    end
+
+    return currentTurn + 1
+end
+
+-- Taunt is consumed after the target's planning page completes. This keeps a
+-- newly active one-turn Taunt available for that page, while the next page in
+-- a later turn cannot observe an already-expired state.
+local function getEventTauntRuntimeState(server, eventState)
+    if type(server) ~= "table" or type(eventState) ~= "table" then
+        return nil
+    end
+
+    local eventId = tostring(eventState.id or "")
+    if eventId == "" then
+        return nil
+    end
+
+    server.EventTauntRuntimeByEventId = server.EventTauntRuntimeByEventId or {}
+    local state = server.EventTauntRuntimeByEventId[eventId]
+    if type(state) ~= "table" then
+        state = {
+            targets = {},
+            lastAdvancedStepKey = nil,
+            nextApplicationId = 0,
+        }
+        server.EventTauntRuntimeByEventId[eventId] = state
+    end
+
+    state.targets = state.targets or {}
+    return state
+end
+
+local function resetTauntRuntimeRecord(server, eventState, targetEventId, sourceEventId, remainingTurns)
+    local runtimeState = getEventTauntRuntimeState(server, eventState)
+    if not runtimeState then
+        return nil
+    end
+
+    local normalizedTargetEventId = math.floor(tonumber(targetEventId) or 0)
+    local normalizedSourceEventId = math.floor(tonumber(sourceEventId) or 0)
+    if normalizedTargetEventId <= 0 or normalizedSourceEventId <= 0 then
+        return nil
+    end
+
+    local record = {
+        sourceEventId = normalizedSourceEventId,
+        remainingTurns = math.max(1, math.floor(tonumber(remainingTurns) or 0)),
+        activationTurnNumber = resolveTauntActivationTurn(
+            eventState,
+            normalizedTargetEventId,
+            eventState.turnNumber,
+            eventState.tickNumber
+        ),
+    }
+    runtimeState.nextApplicationId = math.max(0, math.floor(tonumber(runtimeState.nextApplicationId) or 0)) + 1
+    record.applicationId = runtimeState.nextApplicationId
+    runtimeState.targets[normalizedTargetEventId] = record
+    runtimeState.lastAdvancedStepKey = nil
+    return record
+end
+
+local function advanceEventTaunts(server, eventState, sourceTurnNumber, sourceTickNumber)
+    if type(server) ~= "table"
+        or type(eventState) ~= "table"
+        or eventState.active ~= true
+    then
+        return {}
+    end
+
+    local runtimeState = getEventTauntRuntimeState(server, eventState)
+    if not runtimeState then
+        return false
+    end
+
+    local normalizedTurnNumber = math.max(1, math.floor(tonumber(sourceTurnNumber) or 1))
+    local normalizedTickNumber = math.max(1, math.floor(tonumber(sourceTickNumber) or 1))
+    local stepKey = ("%d:%d"):format(normalizedTurnNumber, normalizedTickNumber)
+    if runtimeState.lastAdvancedStepKey == stepKey then
+        return false
+    end
+    runtimeState.lastAdvancedStepKey = stepKey
+
+    local targetEventIds = {}
+    for targetEventId in pairs(runtimeState.targets or {}) do
+        targetEventIds[#targetEventIds + 1] = tonumber(targetEventId) or 0
+    end
+    table.sort(targetEventIds)
+
+    for index = 1, #targetEventIds do
+        local targetEventId = targetEventIds[index]
+        local targetUnit = findEventUnitById(eventState.units, targetEventId)
+        local record = runtimeState.targets[targetEventId]
+        if targetEventId > 0
+            and type(targetUnit) == "table"
+            and targetUnit.isPlayer ~= true
+            and isEventUnitActive(targetUnit)
+            and type(record) == "table"
+        then
+            local sourceEventId = math.floor(tonumber(record.sourceEventId) or 0)
+            local remainingTurns = math.floor(tonumber(record.remainingTurns) or 0)
+            if sourceEventId <= 0 or remainingTurns <= 0 then
+                runtimeState.targets[targetEventId] = nil
+            else
+                local ownerPage = resolveTauntOwnerPageIndex(eventState, targetEventId)
+                if ownerPage ~= nil
+                    and normalizedTickNumber == math.floor(tonumber(ownerPage) or 0)
+                    and normalizedTurnNumber >= math.floor(tonumber(record.activationTurnNumber) or normalizedTurnNumber + 1)
+                then
+                    if remainingTurns <= 1 then
+                        runtimeState.targets[targetEventId] = nil
+                    else
+                        record.remainingTurns = remainingTurns - 1
+                    end
+                end
+            end
+        else
+            runtimeState.targets[targetEventId] = nil
+        end
+    end
+
+    return true
+end
 
 function Server:GetEventState()
     return self.EventState
@@ -1411,7 +1609,8 @@ function Server:GetEventDraftState()
     local hostName = Common.NormalizeName(Common.GetPlayerName())
     local draftState = self.EventDraftState
     local sourceUnits = draftState and draftState.units or nil
-    local units = buildEventUnits(sessionState, sourceUnits, hostName)
+    local eventLevel = draftState and normalizeEventLevel(draftState.level) or getDefaultDraftEventLevel()
+    local units = buildEventUnits(sessionState, sourceUnits, hostName, eventLevel, draftState and draftState.difficulty or "normal")
 
     if draftState then
         draftState.hostName = hostName
@@ -1528,7 +1727,7 @@ function Server:AddEventNpcUnit(data)
     local previousTotalTicks = tonumber(eventState.totalTicks) or 0
 
     local nextEventUnitId = getNextEventUnitId(eventState.units)
-    local unit = buildNpcUnit(data, hostName, nextEventUnitId, countPlayerUnits(eventState.units))
+    local unit = buildNpcUnit(data, hostName, nextEventUnitId, countPlayerUnits(eventState.units), eventState.level, eventState.difficulty)
     unit.controllerID = unit.controllerID or hostName
     normalizeEventUnitInitiative(unit)
     if eventState.active == true then
@@ -1616,7 +1815,7 @@ function Server:SummonEventPetUnit(casterUnit, registryId, options)
 
     local hostName = Common.NormalizeName(eventState.hostName ~= "" and eventState.hostName or Common.GetPlayerName())
     local nextEventUnitId = getNextEventUnitId(eventState.units)
-    local unit = buildNpcUnit(summonData, hostName, nextEventUnitId, countPlayerUnits(eventState.units))
+    local unit = buildNpcUnit(summonData, hostName, nextEventUnitId, countPlayerUnits(eventState.units), eventState.level, eventState.difficulty)
     normalizeEventUnitInitiative(unit)
     upsertAppendedEventUnit(eventState.units, unit)
     normalizeEventStepState(eventState)
@@ -1630,7 +1829,7 @@ function Server:SummonEventPetUnit(casterUnit, registryId, options)
         entries[#entries + 1] = {
             operation = "upsert",
             eventID = unit.eventID,
-            unit = buildCompactSummonedUnitDelta(unit),
+            unit = buildCompactSummonedUnitDelta(unit, eventState.level),
         }
         broadcastEventDeltaBatch(self, eventState, entries, previousTurnNumber ~= (tonumber(eventState.turnNumber) or 0)
             or previousTickNumber ~= (tonumber(eventState.tickNumber) or 0)
@@ -1651,10 +1850,25 @@ function Server:BuildEventNpcUnitDataFromDefinition(registryId, options)
         team = options,
     }
     local eventState = self.GetEditableEventState and self:GetEditableEventState() or nil
+    local presetIndex = type(UnitClass) == "table" and type(UnitClass.NormalizePresetIndex) == "function"
+        and UnitClass.NormalizePresetIndex(unit, resolvedOptions.presetIndex)
+        or 0
+    local level = resolvedOptions.level ~= nil and resolvedOptions.level or eventState and eventState.level or 1
+    local playerCount = countPlayerUnits(eventState and eventState.units or {})
+    local stats = type(EventUnit.BuildUnitDerivedStats) == "function"
+        and EventUnit.BuildUnitDerivedStats(unit, presetIndex, level)
+        or {}
+    local resources = type(EventUnit.BuildUnitDerivedResources) == "function"
+        and EventUnit.BuildUnitDerivedResources(unit, presetIndex, playerCount, {
+            level = level,
+            difficulty = eventState and eventState.difficulty or "normal",
+        })
+        or {}
     return {
         name = unit.name or "Unnamed Unit",
         description = unit.description or "",
         registryID = ("%s:%s"):format(dataset.id, unit.id),
+        presetIndex = presetIndex,
         team = clampEventTeamIndex(eventState, resolvedOptions.team),
         raidMarker = math.max(0, math.floor(tonumber(resolvedOptions.raidMarker) or 0)),
         active = coerceEventUnitBoolean(resolvedOptions.active, true),
@@ -1662,6 +1876,8 @@ function Server:BuildEventNpcUnitDataFromDefinition(registryId, options)
         boss = coerceEventUnitBoolean(resolvedOptions.boss, false),
         showInNpcMode = coerceEventUnitBoolean(resolvedOptions.showInNpcMode, false),
         spells = deepCopy(unit.spells or {}),
+        stats = stats,
+        resources = resources,
     }
 end
 
@@ -1743,6 +1959,65 @@ function Server:SetEventUnitHidden(eventId, isHidden)
 
     refreshEventManagePage()
     return true
+end
+
+function Server:SetEventTauntRuntimeState(eventId, sourceEventId, remainingTurns)
+    local eventState = self:GetEventState()
+    if not eventState or eventState.active ~= true then
+        return false
+    end
+
+    local normalizedTargetEventId = math.floor(tonumber(eventId) or 0)
+    local normalizedSourceId = math.floor(tonumber(sourceEventId) or 0)
+    local targetUnit = findEventUnitById(eventState.units, normalizedTargetEventId)
+    local sourceUnit = findEventUnitById(eventState.units, normalizedSourceId)
+    local normalizedSourceEventId = math.floor(tonumber(sourceUnit and sourceUnit.eventID) or 0)
+    local normalizedRemainingTurns = math.floor(tonumber(remainingTurns) or 0)
+    if type(targetUnit) ~= "table"
+        or targetUnit.isPlayer == true
+        or not isEventUnitActive(targetUnit)
+        or type(sourceUnit) ~= "table"
+        or not isEventUnitActive(sourceUnit)
+        or normalizedTargetEventId <= 0
+        or normalizedSourceId <= 0
+        or normalizedSourceEventId <= 0
+        or normalizedRemainingTurns <= 0
+    then
+        return false
+    end
+
+    local runtimeState = getEventTauntRuntimeState(self, eventState)
+    if not runtimeState then
+        return false
+    end
+
+    local currentState = runtimeState.targets[normalizedTargetEventId]
+    if type(currentState) == "table"
+        and tonumber(currentState.sourceEventId) == normalizedSourceEventId
+        and tonumber(currentState.remainingTurns) == normalizedRemainingTurns
+    then
+        return true, false, currentState
+    elseif type(currentState) == "table" then
+        -- Re-applying an already active taunt updates its runtime duration/source
+        -- but is not a new taunt application for combat-event purposes.
+        local record = resetTauntRuntimeRecord(
+            self,
+            eventState,
+            targetUnit.eventID,
+            normalizedSourceEventId,
+            normalizedRemainingTurns
+        )
+        return record ~= nil, false, record
+    end
+
+    local record = resetTauntRuntimeRecord(
+        self,
+        eventState,
+        targetUnit.eventID,
+        normalizedSourceEventId,
+        normalizedRemainingTurns
+    )
+    return record ~= nil, record ~= nil, record
 end
 
 function Server:SetEventUnitShowInNpcMode(eventId, shown)
@@ -1927,6 +2202,7 @@ function Server:StartEvent(data)
         return nil
     end
 
+    local eventData = type(data) == "table" and data or {}
     local totalTimer = startTiming("Server:StartEvent", {
         context = "event-start",
         thresholdMs = 50,
@@ -1938,16 +2214,22 @@ function Server:StartEvent(data)
     end
 
     if self.HasClientHashMismatch and self:HasClientHashMismatch(sessionState) then
-        if Addon.Debug and Addon.Debug.Warn then
-            Addon.Debug.Warn("StartEvent blocked: one or more connected clients have dataset or ruleset hash mismatches.")
+        if eventData.forceHashMismatchStart ~= true then
+            if Addon.Debug and Addon.Debug.Warn then
+                Addon.Debug.Warn("StartEvent blocked: one or more connected clients have dataset or ruleset hash mismatches.")
+            end
+            stopTiming(totalTimer)
+            return nil, "client-hash-mismatch"
         end
-        stopTiming(totalTimer)
-        return nil
+        if Addon.Debug and Addon.Debug.Warn then
+            Addon.Debug.Warn("StartEvent proceeding despite client dataset or ruleset hash mismatches (dashboard Shift override).")
+        end
     end
 
     if self:IsEventActive() then
         self:EndEvent("replaced")
     end
+    self.EventTauntRuntimeByEventId = {}
 
     if self.ResetSpellcastingState then
         self:ResetSpellcastingState()
@@ -1958,7 +2240,6 @@ function Server:StartEvent(data)
     end
 
     local hostName = Common.NormalizeName(Common.GetPlayerName())
-    local eventData = type(data) == "table" and data or {}
     local draftState = self:GetEventDraftState()
     local eventName = eventData.name or (draftState and draftState.name) or ""
     local eventSubtext = eventData.subtext or (draftState and draftState.subtext) or ""
@@ -1979,11 +2260,12 @@ function Server:StartEvent(data)
     elseif draftState then
         sourceUnits = draftState.units
     end
+    local eventLevel = normalizeEventLevel(eventData.level or (draftState and draftState.level) or 1)
     local buildUnitsTimer = startTiming("buildEventUnits", {
         context = "event-start",
         thresholdMs = 15,
     })
-    local eventUnits = buildEventUnits(sessionState, sourceUnits, hostName)
+    local eventUnits = buildEventUnits(sessionState, sourceUnits, hostName, eventLevel, eventDifficulty)
     stopTiming(buildUnitsTimer)
 
     local buildStateTimer = startTiming("buildEventState", {
@@ -2007,7 +2289,7 @@ function Server:StartEvent(data)
         eventAuras = eventAuras,
         lootRefs = eventLootRefs,
         teamColors = eventTeamColors,
-        level = normalizeEventLevel(eventData.level or (draftState and draftState.level) or 1),
+        level = eventLevel,
         turnNumber = tonumber(eventData.turnNumber) or 1,
         tickNumber = tonumber(eventData.tickNumber) or 1,
         unitsReady = false,
@@ -2017,6 +2299,9 @@ function Server:StartEvent(data)
     stopTiming(buildStateTimer)
 
     self.EventState = eventState
+    if type(Client.EventMeters) == "table" and type(Client.EventMeters.ResetEvent) == "function" then
+        Client.EventMeters:ResetEvent(eventState.id)
+    end
     local buildDraftTimer = startTiming("buildEventDraftState", {
         context = "event-start",
         thresholdMs = 10,
@@ -2107,6 +2392,15 @@ function Server:EndEvent(reason)
     if self.ResetSpellcastingState then
         self:ResetSpellcastingState(eventState.id)
     end
+    if type(self.EventTauntRuntimeByEventId) == "table" then
+        self.EventTauntRuntimeByEventId[tostring(eventState.id or "")] = nil
+    end
+    if type(Client) == "table"
+        and type(Client.EventMeters) == "table"
+        and type(Client.EventMeters.ResetEvent) == "function"
+    then
+        Client.EventMeters:ResetEvent(eventState.id)
+    end
     self.EventState = nil
     refreshEventManagePage()
     return true
@@ -2174,6 +2468,13 @@ function Server:_AdvanceEventStepAfterCommit(commit, completed)
     end
 
     normalizeEventStepState(eventState)
+
+    advanceEventTaunts(
+        self,
+        eventState,
+        commit.sourceTurnNumber,
+        commit.sourceTickNumber
+    )
 
     if self.EventDraftState then
         self.EventDraftState.turnNumber = eventState.turnNumber

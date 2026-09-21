@@ -229,6 +229,54 @@ local function refreshEventManageDashboard()
     return eventManage:RefreshDashboard() == true
 end
 
+local function hideVisibleMeters(client)
+    local ui = type(client) == "table" and client.UI or nil
+    if type(ui) ~= "table" then
+        return false
+    end
+
+    local candidates = {
+        { namespace = ui.EventMeters, genericHide = true },
+        { namespace = ui.EventMeter, genericHide = true },
+        { namespace = ui.EventWidget, genericHide = false },
+    }
+    for index = 1, #candidates do
+        local candidate = candidates[index]
+        local namespace = candidate.namespace
+        local target = namespace
+        if type(namespace) == "table" and type(namespace.Get) == "function" then
+            target = namespace:Get()
+        end
+        if type(target) == "table" then
+            local visible = true
+            if type(target.IsShown) == "function" then
+                visible = target:IsShown() == true
+            elseif type(target.IsVisible) == "function" then
+                visible = target:IsVisible() == true
+            end
+            if visible then
+                local methods = {
+                    "HideMeters",
+                    "HideMeterPanel",
+                    "HideEventMeters",
+                }
+                if candidate.genericHide then
+                    methods[#methods + 1] = "Hide"
+                end
+                for methodIndex = 1, #methods do
+                    local method = methods[methodIndex]
+                    if type(target[method]) == "function" then
+                        target[method](target)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+
+    return false
+end
+
 local EVENT_STARTUP_STEP_COUNT = 9
 
 local function getTransitionGeneration(client)
@@ -1657,6 +1705,8 @@ local function hydrateInboundEventUnit(unit, eventState)
 
     return EventUnit.HydrateNetworkUnit(unit, {
         playerCount = countPlayerUnits(eventState and eventState.units or nil),
+        level = eventState and eventState.level,
+        difficulty = eventState and eventState.difficulty,
     })
 end
 
@@ -2436,9 +2486,16 @@ local function clearEventStateNow(client, state, reason, options)
     local transition = client.EventTransition
     local eventState = type(state) == "table" and state or (transition and transition.eventState)
     local eventId = eventState and eventState.id or nil
+    local eventMeters = client.EventMeters
+    if type(eventMeters) == "table" and type(eventMeters.ResetEvent) == "function" and eventId ~= nil then
+        eventMeters:ResetEvent(eventId)
+    end
     local combat = client.Combat or (Addon.Client and Addon.Client.Combat) or nil
     if type(combat) == "table" and type(combat.ClearDefensiveReactionUseLedger) == "function" then
         combat:ClearDefensiveReactionUseLedger(eventId)
+    end
+    if type(combat) == "table" and type(combat.ClearPendingDamageOutcomes) == "function" then
+        combat:ClearPendingDamageOutcomes(eventId)
     end
     if type(client.CancelPendingTurnCommit) == "function" then
         client:CancelPendingTurnCommit(options.cancelReason or "event-reset", eventId)
@@ -2485,6 +2542,7 @@ local function clearEventStateNow(client, state, reason, options)
     if client.ClearEventWidgetCombatLog then
         client:ClearEventWidgetCombatLog(reason or "ended")
     end
+    hideVisibleMeters(client)
     if combatLogTimer then
         stopEventTiming(combatLogTimer, eventState, { teardownPhase = "combat-log" })
     end
@@ -2683,6 +2741,10 @@ local function runEventEndStep(targetClient, work, deadlineMs)
     if work.phase == "visual-queue" then
         targetClient:SetEventTransitionPhase("visual-teardown", eventState)
         local timer = startTiming("Event end phase: visual-queue", 8, work.eventId)
+        local combat = targetClient.Combat or (Addon.Client and Addon.Client.Combat) or nil
+        if type(combat) == "table" and type(combat.ClearPendingDamageOutcomes) == "function" then
+            combat:ClearPendingDamageOutcomes(work.eventId)
+        end
         eventState.active = false
         eventState.ending = false
         eventState.startupReady = false
@@ -2806,7 +2868,11 @@ local function hydrateLocalHostAuthoritativeRoster(eventState)
         return false
     end
 
-    local units = Event.DeserializeUnitsFromNetwork(serverEventState:SerializeUnitsForNetwork())
+    local units = Event.DeserializeUnitsFromNetwork(serverEventState:SerializeUnitsForNetwork(), {
+        level = eventState.level,
+        difficulty = eventState.difficulty,
+        playerCount = countPlayerUnits(serverEventState.units),
+    })
     if type(units) ~= "table" or #units == 0 then
         return false
     end
@@ -2861,6 +2927,10 @@ function Client:HandleEventStart(arguments, sender)
             })
         end
         return true
+    end
+    local eventMeters = self.EventMeters
+    if type(eventMeters) == "table" and type(eventMeters.ResetEvent) == "function" then
+        eventMeters:ResetEvent(nextState.id)
     end
     nextState.rosterReady = false
     nextState.unitsReady = false
@@ -3068,7 +3138,12 @@ function Client:HandleEventUnits(arguments)
     local wasLocalTurn = self.IsLocalTurnActive and self:IsLocalTurnActive(eventState) or false
     local startupRuntime = getEventStartupRuntime(self, eventState.id, true)
     local deserializeStartTime = timingParts and getTimingNowMilliseconds() or nil
-    local units = Event.DeserializeUnitsFromNetwork(arguments and arguments[3] or "")
+    local serializedUnits = arguments and arguments[3] or ""
+    local units = Event.DeserializeUnitsFromNetwork(serializedUnits, {
+        level = eventState.level,
+        difficulty = eventState.difficulty,
+        playerCount = Event.CountPlayerUnitsInNetwork(serializedUnits),
+    })
     appendTimingPart(timingParts, "deserialize-units", deserializeStartTime, 15)
 
     local resourcesStartTime = timingParts and getTimingNowMilliseconds() or nil
@@ -3151,7 +3226,14 @@ function Client:HandleEventUnitDeltaBatch(arguments)
         return false
     end
 
-    local entries = Event and Event.DeserializeUnitDeltaBatchFromNetwork and Event.DeserializeUnitDeltaBatchFromNetwork(arguments and arguments[3] or "") or {}
+    local hydrationOptions = {
+        level = eventState.level,
+        difficulty = eventState.difficulty,
+        playerCount = countPlayerUnits(eventState.units or {}),
+    }
+    local entries = Event and Event.DeserializeUnitDeltaBatchFromNetwork
+        and Event.DeserializeUnitDeltaBatchFromNetwork(arguments and arguments[3] or "", hydrationOptions)
+        or {}
     if #entries == 0 then
         return false
     end

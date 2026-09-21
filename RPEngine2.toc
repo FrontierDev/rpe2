@@ -1,9 +1,9 @@
 ## Interface: 120100
-## Title: RPEngine 2.0
+## Title: RPEngine 2.0.alpha6
 ## Notes: Fully-integrated roll system and associated RP tools.
-## Version: 2.0.alpha4
+## Version: 2.0.alpha6
 ## Author: Ortellus @ Argent Dawn (Discord: ortellus)
-## SavedVariables: RPEngineProfilesDB, RPEngineRulesetDB, RPEngineDatasetDB, RPEngineGlobalSettingsDB, RPEngineInventoryDB
+## SavedVariables: RPEngineProfilesDB, RPEngineRulesetDB, RPEngineDatasetDB, RPEngineGlobalSettingsDB, RPEngineInventoryDB, RPEngineManagerDB
 
 ## Initialisation and Common Files
 Init.lua
@@ -47,7 +47,10 @@ core/internal/comms/Diagnostics.lua
 core/internal/tasks/TaskQueue.lua
 core/internal/comms/MessageQueue.lua
 core/internal/comms/Operations.lua
+core/internal/comms/CombatDamageResolved.lua
 core/internal/comms/EventUnitHidden.lua
+core/internal/comms/EventUnitTaunt.lua
+core/internal/comms/EventUnitTauntApplied.lua
 core/internal/comms/EventTurnComplete.lua
 core/internal/comms/Serialization.lua
 core/internal/comms/EventRejoinState.lua
@@ -103,6 +106,7 @@ client/conditions/AuraRequirement.lua
 client/conditions/TraitRequirement.lua
 client/conditions/CasterDead.lua
 client/conditions/CasterDefendedMeleeThisTurn.lua
+client/conditions/CasterFailedAttackThisTurn.lua
 client/conditions/CasterKilledThisTurn.lua
 client/conditions/TargetKilledThisTurn.lua
 client/conditions/CasterHealthPercent.lua
@@ -140,6 +144,7 @@ core/classes/DamageSchool.lua
 core/classes/Loot.lua
 core/internal/database/DatasetSchema23.lua
 core/internal/database/DatasetSchema24.lua
+core/internal/manager/ExternalManager.lua
 core/classes/Recipe.lua
 core/classes/Aura.lua
 core/classes/HiddenStatus.lua
@@ -156,6 +161,7 @@ core/classes/EventVariantSpellEquipmentNetwork.lua
 core/classes/EventEndLoot.lua
 client/client_Event.lua
 client/client_EventUnitHidden.lua
+client/client_EventUnitTaunt.lua
 client/client_EventTurnComplete.lua
 client/conditions/Hidden.lua
 client/client_Loot.lua
@@ -169,6 +175,7 @@ client/client_SkillProgression.lua
 server/server_Event.lua
 server/server_EventNpcMode.lua
 server/server_EventUnitHidden.lua
+server/server_EventUnitTaunt.lua
 server/server_EventTurnComplete.lua
 server/server_EventEndLoot.lua
 server/server_Loot.lua
@@ -224,6 +231,8 @@ client/combat/effects/Interrupt.lua
 client/combat/effects/Revert.lua
 client/combat/effects/SummonPet.lua
 client/combat/effects/Hide.lua
+client/combat/effects/Taunt.lua
+client/client_EventMeters.lua
 client/combat/ReactionPerformance.lua
 client/spellcasting/TooltipTemplate.lua
 client/spellcasting/AuraDescriptionBuilder.lua
@@ -312,6 +321,7 @@ client/ui/widgets/widget_Event.lua
 client/ui/widgets/widget_EventPrimaryResource.lua
 client/ui/widgets/widget_EventAutopilotSchedule.lua
 client/ui/widgets/widget_Event_CombatLogHistory.lua
+client/ui/widgets/widget_Event_Meters.lua
 client/ui/widgets/widget_Event_DMHelper.lua
 client/autopilot/Helper.lua
 client/autopilot/EmoteCues.lua

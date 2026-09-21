@@ -108,6 +108,7 @@ local TYPE_DEFAULTS = {
     aura_requirement = {
         unit = "caster",
         auraRef = nil,
+        minimumValue = 1,
     },
     trait_requirement = {
         unit = "caster",
@@ -115,6 +116,7 @@ local TYPE_DEFAULTS = {
     },
     caster_dead = {},
     caster_defended_melee_this_turn = {},
+    caster_failed_attack_this_turn = {},
     caster_killed_this_turn = {},
     target_killed_this_turn = {},
     caster_health_percent = {
@@ -239,6 +241,7 @@ function Condition.Normalize(value)
     if conditionType == "aura_requirement" then
         normalized.unit = normalizeUnitSelector(data.unit)
         normalized.auraRef = normalizeRef(data.auraRef)
+        normalized.minimumValue = math.max(1, math.floor(tonumber(data.minimumValue) or 1))
         return normalized.auraRef and normalized or nil
     end
 
@@ -250,6 +253,7 @@ function Condition.Normalize(value)
 
     if conditionType == "caster_dead"
         or conditionType == "caster_defended_melee_this_turn"
+        or conditionType == "caster_failed_attack_this_turn"
         or conditionType == "caster_killed_this_turn"
         or conditionType == "target_killed_this_turn"
     then

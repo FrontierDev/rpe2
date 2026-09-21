@@ -114,15 +114,34 @@ local function buildCooldownBucketSignature(unitState)
         return ""
     end
 
+    local channelIds = {}
+    for channelId, remaining in pairs(unitState.channelCooldowns or {}) do
+        local numericChannelId = type(channelId) == "number" and tonumber(channelId) or nil
+        if numericChannelId
+            and numericChannelId % 1 == 0
+            and numericChannelId >= 1
+            and numericChannelId <= 10
+            and math.max(0, math.floor(tonumber(remaining) or 0)) > 0
+        then
+            channelIds[#channelIds + 1] = numericChannelId
+        end
+    end
+    table.sort(channelIds)
+
     local spellRefs = {}
     for spellRef in pairs(unitState.spells or {}) do
         spellRefs[#spellRefs + 1] = spellRef
     end
     table.sort(spellRefs)
 
-    local parts = {
-        buildSignature(tonumber(unitState.globalCooldownRemaining) or 0),
-    }
+    local parts = {}
+    for index = 1, #channelIds do
+        local channelId = channelIds[index]
+        parts[#parts + 1] = buildSignature(
+            channelId,
+            math.max(0, math.floor(tonumber(unitState.channelCooldowns[channelId]) or 0))
+        )
+    end
     for index = 1, #spellRefs do
         local spellRef = spellRefs[index]
         parts[#parts + 1] = buildSignature(spellRef, buildSpellStateSignature(unitState.spells[spellRef]))
@@ -337,7 +356,11 @@ local function resolveRuntimeSpellDetail(detail)
     resolved.cooldownRemaining = activationState.cooldownRemaining
     resolved.rechargeRemaining = activationState.rechargeRemaining
     resolved.lockoutRemaining = activationState.lockoutRemaining
-    resolved.globalCooldownRemaining = activationState.globalCooldownRemaining
+    resolved.cooldownChannelId = activationState.cooldownChannelId
+    resolved.cooldownChannelName = activationState.cooldownChannelName
+    resolved.cooldownChannelTriggersGCD = activationState.cooldownChannelTriggersGCD == true
+    resolved.cooldownChannelCanUseOffTurn = activationState.cooldownChannelCanUseOffTurn == true
+    resolved.channelCooldownRemaining = activationState.channelCooldownRemaining
     resolved.currentCharges = activationState.currentCharges
     resolved.maxCharges = activationState.maxCharges
     resolved.cooldownText = activationState.cooldownText or resolved.cooldownText or "No Cooldown"
@@ -354,7 +377,9 @@ local function resolveRuntimeSpellDetail(detail)
             local reason = tostring(activationState.reason or "")
             if waitingForEventStartup then
                 failureText = eventState and eventState.ending == true and "Event ending" or "Event starting"
-            elseif reason == "cooldown" or reason == "global-cooldown" or reason == "no-charges" then
+            elseif reason == "invalid-cooldown-channel" then
+                failureText = "Invalid Cooldown Channel"
+            elseif reason == "cooldown" or reason == "channel-cooldown" or reason == "no-charges" then
                 failureText = "Unavailable"
             elseif reason == "insufficient-resources" then
                 failureText = "Insufficient Resources"
@@ -405,7 +430,11 @@ local function resolveRuntimeSpellDetailWithActivationState(detail, activationSt
     resolved.cooldownRemaining = activationState.cooldownRemaining
     resolved.rechargeRemaining = activationState.rechargeRemaining
     resolved.lockoutRemaining = activationState.lockoutRemaining
-    resolved.globalCooldownRemaining = activationState.globalCooldownRemaining
+    resolved.cooldownChannelId = activationState.cooldownChannelId
+    resolved.cooldownChannelName = activationState.cooldownChannelName
+    resolved.cooldownChannelTriggersGCD = activationState.cooldownChannelTriggersGCD == true
+    resolved.cooldownChannelCanUseOffTurn = activationState.cooldownChannelCanUseOffTurn == true
+    resolved.channelCooldownRemaining = activationState.channelCooldownRemaining
     resolved.currentCharges = activationState.currentCharges
     resolved.maxCharges = activationState.maxCharges
     resolved.cooldownText = activationState.cooldownText or resolved.cooldownText or "No Cooldown"
@@ -423,7 +452,9 @@ local function resolveRuntimeSpellDetailWithActivationState(detail, activationSt
             local reason = tostring(activationState.reason or "")
             if waitingForEventStartup then
                 failureText = eventState and eventState.ending == true and "Event ending" or "Event starting"
-            elseif reason == "cooldown" or reason == "global-cooldown" or reason == "no-charges" then
+            elseif reason == "invalid-cooldown-channel" then
+                failureText = "Invalid Cooldown Channel"
+            elseif reason == "cooldown" or reason == "channel-cooldown" or reason == "no-charges" then
                 failureText = "Unavailable"
             elseif reason == "insufficient-resources" then
                 failureText = "Insufficient Resources"

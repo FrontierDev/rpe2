@@ -5,6 +5,7 @@ Addon.Internal = Addon.Internal or {}
 Addon.Utils = Addon.Utils or {}
 
 local Client = Addon.Client
+local Server = Addon.Server or {}
 local Planner = Client.AutopilotPlanner or {}
 local SpellEvaluator = Client.AutopilotSpellEvaluator or {}
 local AuraEvaluator = Client.AutopilotAuraEvaluator or {}
@@ -107,6 +108,51 @@ local function copyThreatTable(values)
     return copied
 end
 
+local function copyTauntState(value)
+    if type(value) ~= "table" then
+        return nil
+    end
+
+    local sourceEventId = math.floor(tonumber(value.sourceEventId or value.sourceId) or 0)
+    local remainingTurns = math.floor(tonumber(value.remainingTurns or value.duration) or 0)
+    if sourceEventId <= 0 or remainingTurns <= 0 then
+        return nil
+    end
+
+    return {
+        sourceEventId = sourceEventId,
+        remainingTurns = remainingTurns,
+    }
+end
+
+local function buildTauntSignature(value)
+    local tauntState = copyTauntState(value)
+    if type(tauntState) ~= "table" then
+        return "0:0"
+    end
+    return tostring(tauntState.sourceEventId) .. ":" .. tostring(tauntState.remainingTurns)
+end
+
+local function getHostLocalTauntState(eventState, targetEventId)
+    if type(eventState) ~= "table" then
+        return nil
+    end
+
+    local eventId = tostring(eventState.id or "")
+    local normalizedTargetEventId = normalizeEventId(targetEventId)
+    local runtimeByEventId = type(Server.EventTauntRuntimeByEventId) == "table"
+        and Server.EventTauntRuntimeByEventId
+        or nil
+    local eventRuntime = eventId ~= "" and runtimeByEventId and runtimeByEventId[eventId] or nil
+    local targetRuntime = type(eventRuntime) == "table"
+        and type(eventRuntime.targets) == "table"
+        and eventRuntime.targets[normalizedTargetEventId]
+        or nil
+    return copyTauntState(targetRuntime)
+end
+
+Planner.GetHostLocalTauntState = getHostLocalTauntState
+
 local function buildEntryListSignature(entries, fields)
     local records = {}
     for index = 1, #(entries or {}) do
@@ -149,6 +195,7 @@ local function buildUnitFrozenSignature(unit)
         buildEntryListSignature(unit and unit.resources, { "resourceRef", "currentValue", "maxValue" }),
         buildEntryListSignature(unit and unit.stats, { "statRef", "value", "currentValue" }),
         buildThreatSignature(unit and unit.threatTable),
+        buildTauntSignature(unit and unit.tauntState),
     }, "\31")
 end
 
@@ -552,7 +599,7 @@ local function appendNoAction(state, actorKey, unit, reason)
     }
 end
 
-local function buildSpellAction(state, actorKey, unit, candidate, movementActionId, sequenceIndex, sequenceCount, actionClass, previousActionId)
+local function buildSpellAction(state, actorKey, unit, candidate, movementActionId, sequenceIndex, sequenceCount, actionClass, previousActionId, actionEconomyEntry)
     local eventId = normalizeEventId(unit and unit.eventID)
     if eventId <= 0 or type(candidate) ~= "table" then
         return nil
@@ -582,6 +629,14 @@ local function buildSpellAction(state, actorKey, unit, candidate, movementAction
         casterSequenceIndex = resolvedSequenceIndex,
         casterSequenceCount = resolvedSequenceCount,
         actionEconomyClass = tostring(actionClass or ""),
+        cooldownChannelId = actionEconomyEntry and actionEconomyEntry.cooldownChannelId or nil,
+        cooldownChannelName = actionEconomyEntry and actionEconomyEntry.cooldownChannelName or nil,
+        cooldownChannelTriggersGCD = actionEconomyEntry
+            and actionEconomyEntry.cooldownChannelTriggersGCD == true
+            or false,
+        cooldownChannelCanUseOffTurn = actionEconomyEntry
+            and actionEconomyEntry.cooldownChannelCanUseOffTurn == true
+            or false,
         previousCasterActionId = previousActionId,
         targetSelections = selections,
         targetSelectionOrder = selectionOrder,
@@ -679,7 +734,8 @@ local function emitSequenceActions(state, actor, unit, sequence, movementActionI
                 sequenceIndex,
                 sequenceCount,
                 entry.actionClass,
-                previousActionId
+                previousActionId,
+                entry
             )
             if action then
                 state.output.actions[#state.output.actions + 1] = action
@@ -704,6 +760,7 @@ local function snapshotUnitSummary(unit, spellRefs, movementSnapshot)
         raidMarker = normalizeRaidMarker(unit and unit.raidMarker),
         resources = copyResourceEntries(unit and unit.resources),
         threatTable = copyThreatTable(unit and unit.threatTable),
+        tauntState = copyTauntState(unit and unit.tauntState),
         spellRefs = copyArray(spellRefs),
         movement = type(movementSnapshot) == "table" and copyMap(movementSnapshot) or nil,
     }
@@ -915,6 +972,10 @@ local function phaseSnapshotUnits(state, deadlineMs)
     while state.cursors.unit <= #sourceUnits do
         local frozenUnit = cloneEventUnit(sourceUnits[state.cursors.unit])
         if frozenUnit then
+            frozenUnit.tauntState = getHostLocalTauntState(
+                state.sourceEventState,
+                frozenUnit.eventID
+            )
             frozenUnit.__autopilotFrozenSignature = buildUnitFrozenSignature(frozenUnit)
             state.snapshot.eventState.units[#state.snapshot.eventState.units + 1] = frozenUnit
             local eventId = normalizeEventId(frozenUnit.eventID)
@@ -943,6 +1004,7 @@ local function phaseSnapshotUnits(state, deadlineMs)
         end
     end
 
+    state.snapshot.unitsFrozen = true
     state.phase = "snapshot-positions"
     state.cursors.unit = 1
     return true
@@ -2146,6 +2208,56 @@ function Planner.ReleaseScratch(state)
 end
 
 function Planner.IsFrozenSnapshotStale(state)
+    if type(state) ~= "table"
+        or type(state.snapshot) ~= "table"
+        or type(state.snapshot.eventState) ~= "table"
+    then
+        return true
+    end
+    if state.snapshot.unitsFrozen ~= true then
+        return false
+    end
+
+    local liveEventState = type(Server.EventState) == "table"
+        and Server.EventState
+        or state.sourceEventState
+    if type(liveEventState) ~= "table" then
+        return true
+    end
+
+    local frozenByEventId = {}
+    for index = 1, #(state.snapshot.eventState.units or {}) do
+        local frozenUnit = state.snapshot.eventState.units[index]
+        local eventId = normalizeEventId(frozenUnit and frozenUnit.eventID)
+        if eventId > 0 then
+            frozenByEventId[eventId] = frozenUnit
+        end
+    end
+
+    local liveByEventId = {}
+    for index = 1, #(liveEventState.units or {}) do
+        local liveUnit = liveEventState.units[index]
+        local eventId = normalizeEventId(liveUnit and liveUnit.eventID)
+        if eventId > 0 then
+            liveByEventId[eventId] = liveUnit
+        end
+    end
+
+    for eventId, frozenUnit in pairs(frozenByEventId) do
+        local liveUnit = liveByEventId[eventId]
+        local liveTauntState = getHostLocalTauntState(liveEventState, eventId)
+        if type(liveUnit) ~= "table"
+            or buildTauntSignature(frozenUnit and frozenUnit.tauntState)
+                ~= buildTauntSignature(liveTauntState)
+        then
+            return true
+        end
+    end
+    for eventId in pairs(liveByEventId) do
+        if frozenByEventId[eventId] == nil then
+            return true
+        end
+    end
     return false
 end
 

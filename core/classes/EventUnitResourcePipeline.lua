@@ -15,7 +15,7 @@ if type(EventUnit) ~= "table" or type(UnitClass) ~= "table" then
 end
 
 local DEFAULT_SCALING_LEVELS = { "minor", "normal", "elite" }
-local DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT = 20
+local DEFAULT_HEALTH_BONUS_PER_PLAYER_PERCENT = 10
 local DEFAULT_HEALTH_PERCENT = {
     normal = 0,
     heroic = 10,
@@ -56,6 +56,10 @@ local function normalizeFiniteNumber(value, fallback)
         return tonumber(fallback) or 0
     end
     return numeric
+end
+
+local function normalizeLevel(value)
+    return math.max(1, math.floor(normalizeFiniteNumber(value, 1)))
 end
 
 local function normalizeDifficulty(value)
@@ -178,6 +182,17 @@ local function buildSeedValues(baseUnit, preset, policy)
     local values = {}
     local ratioByRef = {}
     local seen = {}
+    local progressionValues = {}
+    if type(UnitClass.ResolveResourceValues) == "function" then
+        local resolvedValues = UnitClass.ResolveResourceValues(baseUnit, policy.level)
+        for index = 1, #resolvedValues do
+            local entry = resolvedValues[index]
+            local resourceRef = normalizeRef(entry and entry.resourceRef)
+            if resourceRef and progressionValues[resourceRef] == nil then
+                progressionValues[resourceRef] = normalizeFiniteNumber(entry.value, 0)
+            end
+        end
+    end
 
     for index = 1, #((baseUnit and baseUnit.resources) or {}) do
         local entry = baseUnit.resources[index]
@@ -196,7 +211,10 @@ local function buildSeedValues(baseUnit, preset, policy)
                 end
                 baseValue = baseMax
             else
-                baseValue = tonumber(entry.value) or 0
+                baseValue = progressionValues[resourceRef]
+                if baseValue == nil then
+                    baseValue = normalizeFiniteNumber(entry.value, 0)
+                end
             end
 
             local scaledValue = baseValue
@@ -237,7 +255,7 @@ end
 function EventUnit.ResolveNpcResourcePolicy(baseUnit, playerCount, options)
     local resolvedOptions = type(options) == "table" and options or {}
     local normalizedPlayerCount = normalizePlayerCount(playerCount)
-    local challengeLevel = UnitClass.NormalizeChallengeLevel(baseUnit and baseUnit.challengeLevel)
+    local challengeLevel = UnitClass.ResolveEffectiveChallengeLevel(baseUnit, resolvedOptions.presetIndex)
     local scalingLookup = buildScalingChallengeLookup(resolvedOptions)
     local applyPerPlayerScaling
 
@@ -253,6 +271,7 @@ function EventUnit.ResolveNpcResourcePolicy(baseUnit, playerCount, options)
     local healthPercent = resolveDifficultyHealthPercent(difficulty, resolvedOptions)
 
     return {
+        level = normalizeLevel(resolvedOptions.level),
         playerCount = normalizedPlayerCount,
         challengeLevel = challengeLevel,
         applyPerPlayerScaling = applyPerPlayerScaling,
@@ -269,7 +288,9 @@ function EventUnit.BuildUnitDerivedResources(baseUnit, presetIndex, playerCount,
     end
 
     local preset, normalizedPresetIndex = resolvePreset(baseUnit, presetIndex)
-    local policy = EventUnit.ResolveNpcResourcePolicy(baseUnit, playerCount, options)
+    local policyOptions = deepCopy(type(options) == "table" and options or {})
+    policyOptions.presetIndex = normalizedPresetIndex
+    local policy = EventUnit.ResolveNpcResourcePolicy(baseUnit, playerCount, policyOptions)
     local seedValues, ratioByRef = buildSeedValues(baseUnit, preset, policy)
     local modifiedValues = applyPresetResourceModifiers(seedValues, preset)
     local resources = {}
@@ -324,20 +345,20 @@ if EventUnit._unitDerivedResourceFallbackInstalled ~= true then
     function EventUnit.BuildResolvedResources(eventUnit, playerCount, options)
         if type(eventUnit) ~= "table" or eventUnit.isPlayer == true then
             return type(baseBuildResolvedResources) == "function"
-                and baseBuildResolvedResources(eventUnit, playerCount)
+                and baseBuildResolvedResources(eventUnit, playerCount, options)
                 or {}
         end
 
         if EventUnit.HasExplicitRuntimeResources(eventUnit) then
             return type(baseBuildResolvedResources) == "function"
-                and baseBuildResolvedResources(eventUnit, playerCount)
+                and baseBuildResolvedResources(eventUnit, playerCount, options)
                 or deepCopy(eventUnit.resources or {})
         end
 
         local baseUnit = type(eventUnit.GetResolvedUnit) == "function" and eventUnit:GetResolvedUnit() or nil
         if type(baseUnit) ~= "table" then
             return type(baseBuildResolvedResources) == "function"
-                and baseBuildResolvedResources(eventUnit, playerCount)
+                and baseBuildResolvedResources(eventUnit, playerCount, options)
                 or {}
         end
 

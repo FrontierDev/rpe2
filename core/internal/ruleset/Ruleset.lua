@@ -19,9 +19,50 @@ local function refreshVisibleProfileWindow()
 
     return false
 end
+
+local function refreshVisibleDataEditor()
+    local dataEditor = Addon.Client and Addon.Client.UI and Addon.Client.UI.Editor or nil
+    if not (dataEditor and dataEditor.IsWindowVisible and dataEditor:IsWindowVisible()) then
+        return false
+    end
+
+    if dataEditor.RefreshSpellInspectorPage then
+        dataEditor:RefreshSpellInspectorPage()
+        return true
+    end
+
+    return false
+end
 local Rules = Addon.Internal.Ruleset.Rules or {}
 local Database = Addon.Internal.Database or {}
 local RULESET_CATEGORY_DEFINITIONS = Rules.Definitions or {}
+local COOLDOWN_CHANNEL_MIN_ID = 1
+local COOLDOWN_CHANNEL_MAX_ID = 10
+
+local function normalizeCooldownChannelId(channelId)
+    if type(channelId) ~= "number"
+        or channelId % 1 ~= 0
+        or channelId < COOLDOWN_CHANNEL_MIN_ID
+        or channelId > COOLDOWN_CHANNEL_MAX_ID
+    then
+        return nil
+    end
+
+    return channelId
+end
+
+local function trimText(value)
+    if type(value) ~= "string" then
+        return ""
+    end
+
+    local trimmed = value:gsub("^%s+", ""):gsub("%s+$", "")
+    return trimmed
+end
+
+local function getCooldownChannelRuleKey(channelId, suffix)
+    return ("cooldown_channel_%d_%s"):format(channelId, suffix)
+end
 
 local function findCategoryDefinition(categoryKey)
     for index = 1, #RULESET_CATEGORY_DEFINITIONS do
@@ -69,6 +110,28 @@ local function normalizeCheckboxValue(value, defaultValue)
     end
 
     return value and true or false
+end
+
+local function normalizeSpellRankEffectGainPercent(value, fallback)
+    local numeric = tonumber(value)
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        numeric = tonumber(fallback)
+    end
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        numeric = 5
+    end
+
+    numeric = math.max(0, numeric)
+
+    return tostring(numeric)
+end
+
+local function normalizeRulesetRuleValue(ruleDefinition, value)
+    if type(ruleDefinition) == "table" and ruleDefinition.key == "spell_rank_effect_gain_percent" then
+        return normalizeSpellRankEffectGainPercent(value, ruleDefinition.default)
+    end
+
+    return value
 end
 
 local function buildDatasetEntryReferenceItems(collectionKey, options)
@@ -148,6 +211,7 @@ function Ruleset.SetActiveRulesetId(rulesetId)
 
     local activeId = Database.SetActiveRulesetId(rulesetId)
     refreshVisibleProfileWindow()
+    refreshVisibleDataEditor()
     return activeId
 end
 
@@ -231,7 +295,7 @@ function Ruleset.GetRulesetRuleValue(ruleset, categoryKey, ruleDefinition)
         return normalizeCheckboxValue(value, ruleDefinition.default)
     end
 
-    return value
+    return normalizeRulesetRuleValue(ruleDefinition, value)
 end
 
 function Ruleset.GetRulesetRuleValueByKey(ruleset, categoryKey, ruleKey, defaultValue)
@@ -258,7 +322,77 @@ function Ruleset.GetRulesetRuleValueByKey(ruleset, categoryKey, ruleKey, default
         return normalizeCheckboxValue(value, fallbackValue)
     end
 
-    return value
+    return normalizeRulesetRuleValue(ruleDefinition, value)
+end
+
+function Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    local normalizedChannelId = normalizeCooldownChannelId(channelId)
+    if not normalizedChannelId then
+        return nil
+    end
+
+    local ruleset = rulesetOverride
+    if ruleset == nil then
+        ruleset = Ruleset.GetActiveRuleset()
+    end
+
+    local name = Ruleset.GetRulesetRuleValueByKey(
+        ruleset,
+        "action_economy",
+        getCooldownChannelRuleKey(normalizedChannelId, "name"),
+        ""
+    )
+    local triggersGCD = Ruleset.GetRulesetRuleValueByKey(
+        ruleset,
+        "action_economy",
+        getCooldownChannelRuleKey(normalizedChannelId, "triggers_gcd"),
+        false
+    ) == true
+    local canUseOffTurn = Ruleset.GetRulesetRuleValueByKey(
+        ruleset,
+        "action_economy",
+        getCooldownChannelRuleKey(normalizedChannelId, "can_use_off_turn"),
+        false
+    ) == true
+    local normalizedName = trimText(name)
+    local enabled = normalizedName ~= ""
+
+    return {
+        id = normalizedChannelId,
+        name = normalizedName,
+        triggersGCD = triggersGCD,
+        canUseOffTurn = enabled and canUseOffTurn or false,
+        enabled = enabled,
+    }
+end
+
+function Ruleset.GetCooldownChannels(rulesetOverride)
+    local channels = {}
+    for channelId = COOLDOWN_CHANNEL_MIN_ID, COOLDOWN_CHANNEL_MAX_ID do
+        channels[#channels + 1] = Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    end
+
+    return channels
+end
+
+function Ruleset.IsCooldownChannelEnabled(channelId, rulesetOverride)
+    local channel = Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    return channel ~= nil and channel.enabled == true
+end
+
+function Ruleset.DoesCooldownChannelTriggerGCD(channelId, rulesetOverride)
+    local channel = Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    return channel ~= nil and channel.triggersGCD == true
+end
+
+function Ruleset.CanCooldownChannelBeUsedOffTurn(channelId, rulesetOverride)
+    local channel = Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    return channel ~= nil and channel.enabled == true and channel.canUseOffTurn == true
+end
+
+function Ruleset.GetCooldownChannelName(channelId, rulesetOverride)
+    local channel = Ruleset.GetCooldownChannel(channelId, rulesetOverride)
+    return channel and channel.name or nil
 end
 
 function Ruleset.SetRulesetRuleValue(rulesetId, categoryKey, ruleDefinition, value)
@@ -269,15 +403,17 @@ function Ruleset.SetRulesetRuleValue(rulesetId, categoryKey, ruleDefinition, val
 
     ruleset.rules = type(ruleset.rules) == "table" and ruleset.rules or {}
     ruleset.rules[categoryKey] = type(ruleset.rules[categoryKey]) == "table" and ruleset.rules[categoryKey] or {}
-    ruleset.rules[categoryKey][ruleDefinition.key] = value
+    ruleset.rules[categoryKey][ruleDefinition.key] = normalizeRulesetRuleValue(ruleDefinition, value)
 
     if Database and Database.UpdateRulesetMetadata then
         local updated = Database.UpdateRulesetMetadata(ruleset.id, { rules = ruleset.rules })
         refreshVisibleProfileWindow()
+        refreshVisibleDataEditor()
         return updated
     end
 
     refreshVisibleProfileWindow()
+    refreshVisibleDataEditor()
     return ruleset
 end
 

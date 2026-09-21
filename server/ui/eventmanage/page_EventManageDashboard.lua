@@ -61,7 +61,9 @@ function EventManage:BuildDashboardPage(page)
 
     self.StartEventButton = UI.CreateButton(toolbar:GetFrame(), "RPEServerEventManageStartEventButton", "Start Event", toolbarButtonWidth, function()
         if Server.StartEvent then
-            Server:StartEvent({})
+            Server:StartEvent({
+                forceHashMismatchStart = type(IsShiftKeyDown) == "function" and IsShiftKeyDown() == true,
+            })
             EventManage:RefreshDashboard()
         end
     end)

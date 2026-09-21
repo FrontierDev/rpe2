@@ -1750,6 +1750,42 @@ local function buildTraitInspectorEventsPage(self, page)
     self.TraitInspectorCombatEventGroup:AddChild(self.TraitInspectorCombatEventDropdown)
     attachMouseWheel(self.TraitInspectorCombatEventDropdown)
 
+    self.TraitInspectorDefenceStatGroup = createGroup("RPEDataEditorTraitInspectorDefenceStatGroup", "Defence Type", 18)
+    self.TraitInspectorDefenceStatDropdown = UI.CreateDropdown(self.TraitInspectorDefenceStatGroup:GetFrame(), "RPEDataEditorTraitInspectorDefenceStatDropdown", {
+        width = FIELD_WIDTH,
+        height = 18,
+        items = self:BuildSpellInspectorDefenceStatsAcrossDatasets(),
+        onValueChanged = function(value)
+            if self._refreshingTraitInspector then
+                return
+            end
+            self:CommitSelectedTraitInspectorEvent(function(traitEvent)
+                traitEvent.defenceStatRef = value ~= "" and value or nil
+                self:NormalizeAuraInspectorEvent(traitEvent)
+            end)
+        end,
+    })
+    self.TraitInspectorDefenceStatGroup:AddChild(self.TraitInspectorDefenceStatDropdown)
+    attachMouseWheel(self.TraitInspectorDefenceStatDropdown)
+
+    self.TraitInspectorDamageSchoolGroup = createGroup("RPEDataEditorTraitInspectorDamageSchoolGroup", "Damage Type", 18)
+    self.TraitInspectorDamageSchoolDropdown = UI.CreateDropdown(self.TraitInspectorDamageSchoolGroup:GetFrame(), "RPEDataEditorTraitInspectorDamageSchoolDropdown", {
+        width = FIELD_WIDTH,
+        height = 18,
+        items = self:BuildSpellInspectorDamageSchoolsAcrossDatasets(),
+        onValueChanged = function(value)
+            if self._refreshingTraitInspector then
+                return
+            end
+            self:CommitSelectedTraitInspectorEvent(function(traitEvent)
+                traitEvent.damageSchoolRef = value ~= "" and value or nil
+                self:NormalizeAuraInspectorEvent(traitEvent)
+            end)
+        end,
+    })
+    self.TraitInspectorDamageSchoolGroup:AddChild(self.TraitInspectorDamageSchoolDropdown)
+    attachMouseWheel(self.TraitInspectorDamageSchoolDropdown)
+
     self.TraitInspectorTriggerTargetGroup = createGroup("RPEDataEditorTraitInspectorTriggerTargetGroup", "Trigger Target", 18)
     self.TraitInspectorTriggerTargetDropdown = UI.CreateDropdown(self.TraitInspectorTriggerTargetGroup:GetFrame(), "RPEDataEditorTraitInspectorTriggerTargetDropdown", {
         width = FIELD_WIDTH,
@@ -2405,6 +2441,8 @@ function DataEditor:RefreshTraitInspectorPage()
     end
     local traitEvent = self:GetSelectedTraitInspectorEvent()
     local hasTraitEventTrigger = traitEvent ~= nil and type(traitEvent.combatEventId) == "string" and traitEvent.combatEventId ~= ""
+    local isDefenceEvent = hasTraitEventTrigger and traitEvent.combatEventId == "on_defence"
+    local isDamageTypeEvent = hasTraitEventTrigger and traitEvent.combatEventId == "on_damage_type"
     if self.TraitInspectorCombatEventDropdown then
         self.TraitInspectorCombatEventDropdown:SetItems(self:GetAuraInspectorCombatEventItems())
         self.TraitInspectorCombatEventDropdown:SetSelectedValue(traitEvent and traitEvent.combatEventId or "", true)
@@ -2414,6 +2452,16 @@ function DataEditor:RefreshTraitInspectorPage()
         self.TraitInspectorTriggerTargetDropdown:SetItems(self:GetAuraInspectorTriggerTargetItems())
         self.TraitInspectorTriggerTargetDropdown:SetSelectedValue(traitEvent and traitEvent.triggerTarget or "event_other", true)
         setDropdownEnabled(self.TraitInspectorTriggerTargetDropdown, traitEvent ~= nil and hasTraitEventTrigger)
+    end
+    if self.TraitInspectorDefenceStatDropdown then
+        self.TraitInspectorDefenceStatDropdown:SetItems(self:BuildSpellInspectorDefenceStatsAcrossDatasets())
+        self.TraitInspectorDefenceStatDropdown:SetSelectedValue(traitEvent and traitEvent.defenceStatRef or "", true)
+        setDropdownEnabled(self.TraitInspectorDefenceStatDropdown, isDefenceEvent)
+    end
+    if self.TraitInspectorDamageSchoolDropdown then
+        self.TraitInspectorDamageSchoolDropdown:SetItems(self:BuildSpellInspectorDamageSchoolsAcrossDatasets())
+        self.TraitInspectorDamageSchoolDropdown:SetSelectedValue(traitEvent and traitEvent.damageSchoolRef or "", true)
+        setDropdownEnabled(self.TraitInspectorDamageSchoolDropdown, isDamageTypeEvent)
     end
     if self.TraitInspectorEventChanceInput then
         self.TraitInspectorEventChanceInput:SetText(tostring(traitEvent and traitEvent.chance or 100))
@@ -2522,6 +2570,8 @@ function DataEditor:RefreshTraitInspectorPage()
 
     setGroupVisible(self.TraitInspectorCombatEventGroup, traitEvent ~= nil)
     setGroupVisible(self.TraitInspectorTriggerTargetGroup, traitEvent ~= nil and hasTraitEventTrigger)
+    setGroupVisible(self.TraitInspectorDefenceStatGroup, isDefenceEvent)
+    setGroupVisible(self.TraitInspectorDamageSchoolGroup, isDamageTypeEvent)
     setGroupVisible(self.TraitInspectorEventChanceGroup, traitEvent ~= nil)
     setGroupVisible(self.TraitInspectorEventEffectTypeGroup, eventEffect ~= nil)
     setGroupVisible(self.TraitInspectorEventBaseAmountGroup, eventEffect ~= nil and (isEventDamage or isEventHeal))

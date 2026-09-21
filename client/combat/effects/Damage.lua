@@ -12,10 +12,12 @@ local Comms = Addon.Internal.Comms or {}
 local Operations = Comms.Operations or {}
 local Registry = Addon.Internal.Registry or {}
 local Database = Addon.Internal.Database or {}
+local EventUnit = (Database.Classes or {}).EventUnit
 local Dependencies = Database.Dependecies or {}
 local Common = Addon.Utils.Common or {}
 local Dice = Addon.Utils.Dice or {}
 local Lookup = Addon.Utils.Lookup or {}
+local Spellcasting = Addon.Client.Spellcasting or {}
 local Normalization = Addon.Client.Combat.Normalization or {}
 local Debug = Addon.Debug
 local function getAuraManager()
@@ -333,6 +335,7 @@ local function showCombatReactionDeferred(targetClient, entry)
 end
 
 local buildResolvedDamageResult
+local refreshResolvedDamageThreat
 
 local function getPercentModifierStatValue(unit, statRef)
     local normalizedStatRef = normalizeToken(statRef)
@@ -350,16 +353,16 @@ local function applyPercentModifier(amount, percentValue, invert)
     return numericAmount * factor
 end
 
-local function buildThreatUpdatePayload(targetUnit, sourceUnit, amount)
+local function buildThreatUpdatePayload(targetUnit, sourceEventId, amount)
     local targetEventId = math.floor(tonumber(targetUnit and targetUnit.eventID) or 0)
-    local sourceEventId = math.floor(tonumber(sourceUnit and sourceUnit.eventID) or 0)
-    if targetEventId <= 0 or sourceEventId <= 0 then
+    local numericSourceEventId = math.floor(tonumber(sourceEventId) or 0)
+    if targetEventId <= 0 or numericSourceEventId <= 0 then
         return nil
     end
 
     return {
         targetEventId = targetEventId,
-        sourceEventId = sourceEventId,
+        sourceEventId = numericSourceEventId,
         amount = math.max(0, Common.Round(amount or 0)),
     }
 end
@@ -387,7 +390,56 @@ local function getThreatForUnit(targetUnit, sourceEventId)
     return math.max(0, tonumber(threatTable and threatTable[numericSourceEventId]) or 0)
 end
 
-local function commitResolvedDamageThreat(entry, result)
+local function findEventUnitById(units, eventId)
+    local numericEventId = math.floor(tonumber(eventId) or 0)
+    if type(units) ~= "table" or numericEventId <= 0 then
+        return nil
+    end
+
+    for index = 1, #units do
+        local unit = units[index]
+        if type(unit) == "table" and math.floor(tonumber(unit.eventID) or 0) == numericEventId then
+            return unit
+        end
+    end
+
+    return nil
+end
+
+local function resolveThreatSourceEventId(entry)
+    if type(entry) ~= "table" then
+        return 0
+    end
+
+    local entrySourceEventId = math.floor(tonumber(entry.attackerEventId) or 0)
+    local unitSourceEventId = math.floor(tonumber(entry.attackerUnit and entry.attackerUnit.eventID) or 0)
+    local eventState = entry.eventState
+    if type(eventState) == "table" and type(eventState.units) == "table" then
+        if entrySourceEventId > 0 and findEventUnitById(eventState.units, entrySourceEventId) then
+            return entrySourceEventId
+        end
+        if unitSourceEventId > 0 and findEventUnitById(eventState.units, unitSourceEventId) then
+            return unitSourceEventId
+        end
+        return 0
+    end
+
+    return entrySourceEventId > 0 and entrySourceEventId or unitSourceEventId
+end
+
+local function isValidThreatSourceEventId(entry, sourceEventId)
+    local numericSourceEventId = math.floor(tonumber(sourceEventId) or 0)
+    if numericSourceEventId <= 0 or type(entry) ~= "table" then
+        return false
+    end
+
+    local eventState = entry.eventState
+    return type(eventState) ~= "table"
+        or type(eventState.units) ~= "table"
+        or findEventUnitById(eventState.units, numericSourceEventId) ~= nil
+end
+
+local function commitResolvedDamageThreat(self, entry, result)
     if type(entry) ~= "table" or type(entry.defenderUnit) ~= "table" or type(result) ~= "table" then
         return false
     end
@@ -398,7 +450,10 @@ local function commitResolvedDamageThreat(entry, result)
     result.threatCommitted = true
     result.threatApplied = false
     result.threatUpdate = nil
-    if entry.defenderUnit.isPlayer == true or (tonumber(result.amount) or 0) <= 0 then
+
+    local appliedHealthDamage = math.max(0, -(tonumber(result.appliedDelta) or 0))
+    refreshResolvedDamageThreat(self, entry, result, appliedHealthDamage)
+    if entry.defenderUnit.isPlayer == true or appliedHealthDamage <= 0 then
         return false
     end
 
@@ -411,9 +466,138 @@ local function commitResolvedDamageThreat(entry, result)
     result.threatApplied = threatApplied
     result.threatTotal = totalThreat
     if threatApplied then
-        result.threatUpdate = buildThreatUpdatePayload(entry.defenderUnit, entry.attackerUnit, generatedThreat)
+        result.threatUpdate = buildThreatUpdatePayload(entry.defenderUnit, result.threatSourceEventId, generatedThreat)
     end
     return threatApplied
+end
+
+local function copyAbsorptionRuntimeSources(sources)
+    local copied = {}
+    for index = 1, #(sources or {}) do
+        local source = sources[index]
+        if type(source) == "table" then
+            copied[#copied + 1] = {
+                auraKey = source.auraKey,
+                effectIndex = source.effectIndex,
+                maximum = tonumber(source.maximum) or 0,
+                remaining = tonumber(source.remaining) or 0,
+                revision = tonumber(source.revision) or 0,
+            }
+        end
+    end
+    return copied
+end
+
+local function getAbsorptionRuntimeSources(auraManager, eventState, targetEventId)
+    if not auraManager or type(auraManager.GetAbsorptionSources) ~= "function" then
+        return {}
+    end
+
+    return copyAbsorptionRuntimeSources(auraManager:GetAbsorptionSources(
+        Client,
+        eventState,
+        targetEventId
+    ))
+end
+
+local function setDamageAbsorptionResult(result, absorbedAmount)
+    local preAbsorbAmount = math.max(0, tonumber(result and result.preAbsorbAmount) or 0)
+    local normalizedAbsorbed = math.min(
+        preAbsorbAmount,
+        math.max(0, tonumber(absorbedAmount) or 0)
+    )
+    if type(result) == "table" then
+        result.absorbedAmount = normalizedAbsorbed
+        result.amount = math.max(0, preAbsorbAmount - normalizedAbsorbed)
+    end
+    return normalizedAbsorbed
+end
+
+local function logAbsorptionResolution(entry, result)
+    if not Debug or type(Debug.Internal) ~= "function" then
+        return
+    end
+
+    Debug.Internal(
+        "Absorption resolve: target=%s preAbsorb=%s absorbed=%s remainder=%s healthRef=%s healthDelta=%s",
+        tostring(entry and entry.defenderEventId or 0),
+        tostring(tonumber(result and result.preAbsorbAmount) or 0),
+        tostring(tonumber(result and result.absorbedAmount) or 0),
+        tostring(tonumber(result and result.amount) or 0),
+        tostring(result and result.healthResourceRef or "nil"),
+        tostring(tonumber(result and result.appliedDelta) or 0)
+    )
+end
+
+local function logMissingDamageHealthResource(entry, result)
+    local message = "Absorption resolve failed: target=%s has post-absorb damage=%s but no health resource ref."
+    local targetEventId = tostring(entry and entry.defenderEventId or 0)
+    local damageAmount = tostring(tonumber(result and result.amount) or 0)
+    if Debug and type(Debug.Error) == "function" then
+        Debug.Error(message, targetEventId, damageAmount)
+    elseif Debug and type(Debug.Internal) == "function" then
+        Debug.Internal(message, targetEventId, damageAmount)
+    end
+end
+
+local function updateAbsorptionPreviewDiagnostics(result, absorptionPreview, runtimeSourcesBeforeConsume)
+    if type(result) ~= "table" then
+        return 0
+    end
+
+    local preAbsorbAmount = math.max(0, tonumber(result.preAbsorbAmount) or 0)
+    local previewRemainingDamage = type(absorptionPreview) == "table"
+        and tonumber(absorptionPreview.remainingDamage or absorptionPreview.healthRemainder)
+        or nil
+    local previewAbsorbedAmount = type(absorptionPreview) == "table"
+        and tonumber(absorptionPreview.absorbedAmount or absorptionPreview.absorbed)
+        or nil
+    if previewAbsorbedAmount == nil and previewRemainingDamage ~= nil then
+        previewAbsorbedAmount = preAbsorbAmount - previewRemainingDamage
+    end
+    previewAbsorbedAmount = setDamageAbsorptionResult(result, previewAbsorbedAmount or 0)
+    result.absorptionDiagnostics = result.absorptionDiagnostics or {}
+    result.absorptionDiagnostics.preAbsorbAmount = preAbsorbAmount
+    result.absorptionDiagnostics.previewAbsorbedAmount = previewAbsorbedAmount
+    result.absorptionDiagnostics.previewRemainingDamage = math.max(
+        0,
+        previewRemainingDamage ~= nil
+            and previewRemainingDamage
+            or (preAbsorbAmount - previewAbsorbedAmount)
+    )
+    result.absorptionDiagnostics.runtimeSourcesBeforeConsume = runtimeSourcesBeforeConsume or {}
+    return previewAbsorbedAmount
+end
+
+local function buildCurrentAbsorptionPreview(result, entry, auraManager)
+    if type(result) ~= "table" or type(entry) ~= "table" or not auraManager
+        or type(auraManager.PreviewAbsorption) ~= "function"
+    then
+        setDamageAbsorptionResult(result, 0)
+        return nil
+    end
+
+    local hitContext = type(entry.hitResolutionContext) == "table" and entry.hitResolutionContext or nil
+    local effect = type(hitContext) == "table" and hitContext.effect or entry.effect
+    local targetEventId = entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID)
+    local runtimeSourcesBeforeConsume = getAbsorptionRuntimeSources(auraManager, entry.eventState, targetEventId)
+    local absorptionPreview = auraManager:PreviewAbsorption(
+        Client,
+        entry.eventState,
+        targetEventId,
+        math.max(0, tonumber(result.preAbsorbAmount) or 0),
+        type(effect) == "table" and effect.damageSchoolRefs or {}
+    )
+    if type(absorptionPreview) ~= "table" then
+        setDamageAbsorptionResult(result, 0)
+        result.absorptionChanges = {}
+        updateAbsorptionPreviewDiagnostics(result, nil, runtimeSourcesBeforeConsume)
+        return nil
+    end
+
+    result.absorptionChanges = absorptionPreview.changes or absorptionPreview.plan or {}
+    updateAbsorptionPreviewDiagnostics(result, absorptionPreview, runtimeSourcesBeforeConsume)
+    return absorptionPreview
 end
 
 local function buildCombatResult(entry, resultToken, resultType)
@@ -423,6 +607,9 @@ local function buildCombatResult(entry, resultToken, resultType)
         hitCheckResult = resultToken,
         landed = resultToken == RESULT_PASS,
         pending = resultToken == nil,
+        preAbsorbAmount = 0,
+        absorbedAmount = 0,
+        absorptionChanges = {},
         amount = 0,
         checkId = entry and entry.checkId or nil,
         eventId = entry and entry.eventId or nil,
@@ -548,8 +735,28 @@ local function buildHealthResourceContext(self, entry)
         return context
     end
 
-    local resolvedUnit = entry.defenderUnit.GetResolvedUnit and entry.defenderUnit:GetResolvedUnit() or nil
-    local resolvedResources = type(resolvedUnit) == "table" and resolvedUnit.resources or nil
+    local resolvedResources = nil
+    if type(entry.defenderUnit.GetResolvedUnit) == "function"
+        and type(EventUnit) == "table"
+        and type(EventUnit.BuildUnitDerivedResources) == "function"
+    then
+        local baseUnit = entry.defenderUnit:GetResolvedUnit()
+        local playerCount = 0
+        for index = 1, #(entry.eventState and entry.eventState.units or {}) do
+            if entry.eventState.units[index] and entry.eventState.units[index].isPlayer == true then
+                playerCount = playerCount + 1
+            end
+        end
+        resolvedResources = EventUnit.BuildUnitDerivedResources(
+            baseUnit,
+            entry.defenderUnit.presetIndex,
+            playerCount,
+            {
+                level = entry.eventState and entry.eventState.level,
+                difficulty = entry.eventState and entry.eventState.difficulty,
+            }
+        )
+    end
     for index = 1, #(resolvedResources or {}) do
         local candidate = resolvedResources[index]
         if normalizeToken(candidate and candidate.resourceRef) == healthResourceRef then
@@ -650,6 +857,104 @@ local function getCachedStatValue(hitContext, unit, statRef)
     local value = tonumber(Combat.GetCachedCombatStatValue and Combat:GetCachedCombatStatValue(hitContext, unit, normalizedStatRef, 0) or 0) or 0
     unitCache[normalizedStatRef] = value
     return value
+end
+
+local function calculateDamageThreat(self, entry, result, appliedHealthDamage)
+    local numericAppliedDamage = math.max(0, tonumber(appliedHealthDamage) or 0)
+    if numericAppliedDamage <= 0 then
+        return 0
+    end
+
+    local hitContext = type(entry) == "table" and entry.hitResolutionContext or nil
+    local effect = type(hitContext) == "table" and hitContext.effect or entry.effect
+    local combatRules = type(hitContext) == "table" and hitContext.combatRules or nil
+    local threatGeneratedStat = combatRules and combatRules.threatGeneratedStat
+        or normalizeToken(self:GetCombatRule("threat_generated_stat", ""))
+    local threatCoefficient = tonumber(effect and effect.threatCoefficient) or 1
+    local threatAmount = math.max(0, Common.Round(numericAppliedDamage * threatCoefficient))
+    return math.max(0, Common.Round(applyPercentModifier(
+        threatAmount,
+        getCachedStatValue(hitContext, entry.attackerUnit, threatGeneratedStat),
+        false
+    )))
+end
+
+local function getPreviewAppliedHealthDamage(self, entry, result)
+    local amount = math.max(0, tonumber(result and result.amount) or 0)
+    if amount <= 0 or type(entry) ~= "table" or type(entry.defenderUnit) ~= "table" then
+        return 0
+    end
+
+    local hitContext = type(entry.hitResolutionContext) == "table" and entry.hitResolutionContext or nil
+    local healthResourceRef = type(hitContext) == "table"
+        and type(hitContext.healthResourceContext) == "table"
+        and normalizeToken(hitContext.healthResourceContext.healthResourceRef)
+        or nil
+    if not healthResourceRef then
+        return 0
+    end
+
+    local resourceUnit = self:CloneValue(entry.defenderUnit)
+    local previewHitContext = {
+        healthResourceContext = self:CloneValue(hitContext.healthResourceContext),
+    }
+    ensureHealthResourceEntry({
+        context = entry.context,
+        defenderUnit = resourceUnit,
+        eventState = entry.eventState,
+    }, previewHitContext)
+
+    local applied, _, appliedDelta = self:PreviewResourceDelta(
+        resourceUnit,
+        healthResourceRef,
+        -amount
+    )
+    return applied and math.max(0, -(tonumber(appliedDelta) or 0)) or 0
+end
+
+refreshResolvedDamageThreat = function(self, entry, result, appliedHealthDamage)
+    if type(entry) ~= "table" or type(result) ~= "table" then
+        return 0
+    end
+
+    local canonicalSourceEventId = math.floor(tonumber(result.threatSourceEventId) or 0)
+    result.threatGenerated = 0
+    result.threatSourceEventId = canonicalSourceEventId
+    result.threatTargetEventId = 0
+    result.threatTotal = 0
+    result.threatUpdate = nil
+
+    if type(entry.defenderUnit) ~= "table" or entry.defenderUnit.isPlayer == true then
+        return 0
+    end
+
+    local numericAppliedHealthDamage = math.max(0, tonumber(appliedHealthDamage) or 0)
+    if numericAppliedHealthDamage <= 0 then
+        return 0
+    end
+
+    if canonicalSourceEventId <= 0 then
+        canonicalSourceEventId = resolveThreatSourceEventId(entry)
+    end
+    if not isValidThreatSourceEventId(entry, canonicalSourceEventId) then
+        result.threatSourceEventId = 0
+        return 0
+    end
+
+    result.threatSourceEventId = canonicalSourceEventId
+    result.threatTargetEventId = math.floor(tonumber(entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID)) or 0)
+
+    local threatAmount = calculateDamageThreat(self, entry, result, numericAppliedHealthDamage)
+    result.threatGenerated = threatAmount
+    result.threatTotal = getThreatForUnit(entry.defenderUnit, result.threatSourceEventId) + threatAmount
+    if threatAmount > 0 then
+        result.threatUpdate = buildThreatUpdatePayload(entry.defenderUnit, result.threatSourceEventId, threatAmount)
+    end
+    return threatAmount
+end
+
+function Combat:RefreshDamageThreatPreview(entry, result)
+    return refreshResolvedDamageThreat(self, entry, result, getPreviewAppliedHealthDamage(self, entry, result))
 end
 
 local function buildDamageSchoolContexts(self, entry, effect, hitContext)
@@ -1005,7 +1310,9 @@ function Combat:ResolveDamageAmount(context, effect)
     end
 
     local variance = Dice.RollVariance and Dice.RollVariance(context) or 1
-    return math.max(0, Common.Round((baseDamage + (weaponDamage * weaponDamageCoefficient) + statScaling) * variance))
+    local rawAmount = (baseDamage + (weaponDamage * weaponDamageCoefficient) + statScaling) * variance
+    rawAmount = Spellcasting.ApplySpellRankMultiplier(context, rawAmount) or 0
+    return math.max(0, Common.Round(rawAmount))
 end
 
 buildResolvedDamageResult = function(self, entry)
@@ -1027,6 +1334,9 @@ buildResolvedDamageResult = function(self, entry)
         resultType = resultType,
         wasCritical = resultType == "critical" or resultType == "crushing",
         rawDamage = rawDamage,
+        preAbsorbAmount = 0,
+        absorbedAmount = 0,
+        absorptionChanges = {},
         amount = 0,
         mitigated = 0,
         applied = false,
@@ -1035,6 +1345,7 @@ buildResolvedDamageResult = function(self, entry)
         hitType = nil,
         appliedDelta = 0,
         resourceDeltas = {},
+        damageSchoolRef = nil,
         damageSchoolName = "",
         damageSchoolIcon = nil,
         threatGenerated = 0,
@@ -1048,6 +1359,16 @@ buildResolvedDamageResult = function(self, entry)
         critMitigationStatValue = 0,
         critMitigation = nil,
         critMitigated = 0,
+        absorptionDiagnostics = {
+            preAbsorbAmount = 0,
+            previewAbsorbedAmount = 0,
+            previewRemainingDamage = 0,
+            runtimeSourcesBeforeConsume = {},
+            consumedAbsorbedAmount = 0,
+            runtimeSourcesAfterConsume = {},
+            finalResultAmount = 0,
+            finalHealthResourceDelta = 0,
+        },
     }
     if rawDamage <= 0 then
         return false, result
@@ -1071,6 +1392,9 @@ buildResolvedDamageResult = function(self, entry)
     local finalDamage = scaledRawDamage
     for schoolIndex = 1, #(hitContext.schoolContexts or {}) do
         local schoolContext = hitContext.schoolContexts[schoolIndex]
+        if result.damageSchoolRef == nil then
+            result.damageSchoolRef = normalizeToken(schoolContext and schoolContext.schoolRef)
+        end
         if result.damageSchoolIcon == nil and tostring(schoolContext and schoolContext.icon or "") ~= "" then
             result.damageSchoolIcon = tostring(schoolContext.icon)
         end
@@ -1127,6 +1451,7 @@ buildResolvedDamageResult = function(self, entry)
 
     finalDamage = math.max(0, Common.Round(finalDamage))
     scaledRawDamage = math.max(0, Common.Round(scaledRawDamage))
+    result.preAbsorbAmount = finalDamage
     result.amount = finalDamage
     result.mitigated = math.max(0, scaledRawDamage - finalDamage)
     result.mitigationPercent = scaledRawDamage > 0 and ((result.mitigated / scaledRawDamage) * 100) or 0
@@ -1135,22 +1460,20 @@ buildResolvedDamageResult = function(self, entry)
         result.damageSchoolName = "True"
     end
 
-    if entry.defenderUnit.isPlayer ~= true and tonumber(result.amount) > 0 then
-        local attackerEventId = math.floor(tonumber(entry.attackerEventId or (entry.attackerUnit and entry.attackerUnit.eventID)) or 0)
-        local defenderEventId = math.floor(tonumber(entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID)) or 0)
-        local threatCoefficient = tonumber(effect.threatCoefficient) or 1
-        local threatAmount = math.max(0, Common.Round(tonumber(result.amount) * threatCoefficient))
-        threatAmount = math.max(0, Common.Round(applyPercentModifier(
-            threatAmount,
-            getCachedStatValue(hitContext, entry.attackerUnit, combatRules.threatGeneratedStat),
-            false
-        )))
-        result.threatGenerated = threatAmount
-        result.threatSourceEventId = attackerEventId
-        result.threatTargetEventId = defenderEventId
-        result.threatTotal = getThreatForUnit(entry.defenderUnit, attackerEventId) + threatAmount
-        result.threatUpdate = buildThreatUpdatePayload(entry.defenderUnit, entry.attackerUnit, threatAmount)
+    -- Absorption is previewed after all mitigation and final rounding. The
+    -- preview is deliberately pure; authoritative state is committed only by
+    -- ApplyResolvedDamage once the hit can be finalized.
+    local auraManager = getAuraManager()
+    if finalDamage > 0
+        and auraManager
+        and type(auraManager.PreviewAbsorption) == "function"
+    then
+        buildCurrentAbsorptionPreview(result, entry, auraManager)
+    else
+        updateAbsorptionPreviewDiagnostics(result, nil, {})
     end
+
+    self:RefreshDamageThreatPreview(entry, result)
 
     hitContext.resolvedResult = result
     return true, result
@@ -1177,58 +1500,152 @@ function Combat:BuildDamagePreview(entry)
 end
 
 function Combat:ApplyResolvedDamage(entry, previewOnly)
+    if previewOnly ~= true and type(entry) == "table" and type(entry.authoritativeDamageResult) == "table" then
+        return true, entry.authoritativeDamageResult
+    end
+
     local computed, result = buildResolvedDamageResult(self, entry)
     if not computed or type(result) ~= "table" then
         return false, result
     end
-    local finalDamage = tonumber(result.amount) or 0
     local hitContext = ensureHitResolutionContext(self, entry)
     local healthResourceRef = type(hitContext) == "table"
         and type(hitContext.healthResourceContext) == "table"
         and normalizeToken(hitContext.healthResourceContext.healthResourceRef)
         or nil
     result.healthResourceRef = healthResourceRef
-    if not healthResourceRef or finalDamage <= 0 then
-        return false, result
-    end
+    local preAbsorbAmount = math.max(0, tonumber(result.preAbsorbAmount) or 0)
+    local auraManager = getAuraManager()
+    local targetEventId = entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID)
+    local absorbedAmount = math.max(0, tonumber(result.absorbedAmount) or 0)
 
-    local resourceUnit = entry.defenderUnit
-    if previewOnly == true then
-        resourceUnit = self:CloneValue(entry.defenderUnit)
-        local previewHitContext = {
-            healthResourceContext = self:CloneValue(hitContext.healthResourceContext),
+    if previewOnly ~= true then
+        local context = type(entry.context) == "table" and entry.context or {}
+        local sessionState = context.sessionState
+            or entry.sessionState
+            or (Client.GetState and Client:GetState() or nil)
+        local absorption = {
+            absorbedAmount = 0,
+            remainingDamage = preAbsorbAmount,
+            changes = {},
         }
-        ensureHealthResourceEntry({
-            context = entry.context,
-            defenderUnit = resourceUnit,
-            eventState = entry.eventState,
-        }, previewHitContext)
+        local hitEffect = type(hitContext) == "table" and hitContext.effect or entry.effect
+        if preAbsorbAmount > 0
+            and auraManager
+            and type(auraManager.ConsumeAbsorption) == "function"
+        then
+            absorption = auraManager:ConsumeAbsorption(
+                Client,
+                entry.eventState,
+                targetEventId,
+                preAbsorbAmount,
+                type(hitEffect) == "table" and hitEffect.damageSchoolRefs or {},
+                {
+                    sessionState = sessionState,
+                    eventState = entry.eventState,
+                    pendingScope = context.pendingScope,
+                    scope = context.scope,
+                    immediate = context.immediate == true,
+                }
+            ) or absorption
+        end
+
+        local authoritativeRemainder = tonumber(absorption.remainingDamage)
+        if authoritativeRemainder == nil then
+            authoritativeRemainder = preAbsorbAmount
+        end
+        result.absorptionChanges = type(absorption.changes) == "table"
+            and absorption.changes
+            or {}
+        result.absorbedAmount = math.max(
+            0,
+            math.min(preAbsorbAmount, tonumber(absorption.absorbedAmount) or 0)
+        )
+        result.amount = math.max(0, math.min(preAbsorbAmount, authoritativeRemainder))
+        absorbedAmount = result.absorbedAmount
+        result.absorptionDiagnostics = result.absorptionDiagnostics or {}
+        result.absorptionDiagnostics.consumedAbsorbedAmount = absorbedAmount
+        result.absorptionDiagnostics.runtimeSourcesAfterConsume = getAbsorptionRuntimeSources(
+            auraManager,
+            entry.eventState,
+            targetEventId
+        )
     else
-        ensureHealthResourceEntry(entry, hitContext)
+        absorbedAmount = setDamageAbsorptionResult(result, absorbedAmount)
     end
 
-    -- Damage results are always previewed locally and become authoritative only once
-    -- the corresponding RESOURCE_DELTA message is handled back through the client.
-    local applied, resourceEntry, appliedDelta = self:PreviewResourceDelta(resourceUnit, healthResourceRef, -finalDamage)
-    result.applied = applied
-    result.resourceEntry = resourceEntry
-    result.appliedDelta = appliedDelta
-    if applied and resourceEntry then
-        result.resourceDeltas = {
-            {
-                resourceRef = healthResourceRef,
-                delta = appliedDelta,
-                maxValue = tonumber(resourceEntry.maxValue) or 0,
-                currentValue = tonumber(resourceEntry.currentValue) or 0,
-            },
-        }
+    local finalDamage = math.max(0, tonumber(result.amount) or 0)
+    result.resourceDeltas = {}
+    result.resourceEntry = nil
+    result.applied = false
+    result.appliedDelta = 0
+    if finalDamage > 0 then
+        if not healthResourceRef then
+            logMissingDamageHealthResource(entry, result)
+            result.applied = false
+            result.appliedDelta = 0
+            result.absorptionDiagnostics = result.absorptionDiagnostics or {}
+            result.absorptionDiagnostics.finalResultAmount = finalDamage
+            result.absorptionDiagnostics.finalHealthResourceDelta = 0
+            refreshResolvedDamageThreat(self, entry, result, 0)
+            return false, result
+        end
+
+        local resourceUnit = entry.defenderUnit
+        if previewOnly == true then
+            resourceUnit = self:CloneValue(entry.defenderUnit)
+            local previewHitContext = {
+                healthResourceContext = self:CloneValue(hitContext.healthResourceContext),
+            }
+            ensureHealthResourceEntry({
+                context = entry.context,
+                defenderUnit = resourceUnit,
+                eventState = entry.eventState,
+            }, previewHitContext)
+        else
+            ensureHealthResourceEntry(entry, hitContext)
+        end
+
+        -- Damage results are always previewed locally and become authoritative only once
+        -- the corresponding RESOURCE_DELTA message is handled back through the client.
+        local applied, resourceEntry, appliedDelta = self:PreviewResourceDelta(resourceUnit, healthResourceRef, -finalDamage)
+        result.applied = applied
+        result.resourceEntry = resourceEntry
+        result.appliedDelta = appliedDelta
+        if applied and resourceEntry then
+            result.resourceDeltas = {
+                {
+                    resourceRef = healthResourceRef,
+                    delta = appliedDelta,
+                    maxValue = tonumber(resourceEntry.maxValue) or 0,
+                    currentValue = tonumber(resourceEntry.currentValue) or 0,
+                },
+            }
+        end
+        if not applied then
+            logAbsorptionResolution(entry, result)
+            refreshResolvedDamageThreat(self, entry, result, 0)
+            return false, result
+        end
+    else
+        -- A fully absorbed hit is still a landed hit, but it must not invent a
+        -- zero-valued health RESOURCE_DELTA.
+        result.applied = true
+        result.appliedDelta = 0
     end
-    if not applied then
-        return false, result
+
+    result.absorptionDiagnostics = result.absorptionDiagnostics or {}
+    result.absorptionDiagnostics.finalResultAmount = finalDamage
+    result.absorptionDiagnostics.finalHealthResourceDelta = tonumber(result.appliedDelta) or 0
+    if previewOnly ~= true then
+        logAbsorptionResolution(entry, result)
     end
 
     if previewOnly ~= true then
-        commitResolvedDamageThreat(entry, result)
+        commitResolvedDamageThreat(self, entry, result)
+        entry.authoritativeDamageResult = result
+    else
+        refreshResolvedDamageThreat(self, entry, result, math.max(0, -(tonumber(result.appliedDelta) or 0)))
     end
 
     return true, result
@@ -1475,6 +1892,9 @@ function Combat:BeginHitCheck(context, effect, component)
                 end
             end
         elseif completed and resultToken == RESULT_FAIL then
+            if type(Combat.EmitSuccessfulDefenceEvent) == "function" then
+                Combat:EmitSuccessfulDefenceEvent(Client, entry, action, resultToken, resolution)
+            end
             if type(Combat.CompleteActionDamageResolution) == "function" then
                 Combat:CompleteActionDamageResolution(Client, entry, false)
             end

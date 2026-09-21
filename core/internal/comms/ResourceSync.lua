@@ -127,6 +127,34 @@ local function resolveHealthResourceRef(options)
     return getHealthResourceRef()
 end
 
+local function getResourceRegenerationStatRef()
+    local activeRuleset = Ruleset and Ruleset.GetActiveRuleset and Ruleset.GetActiveRuleset() or nil
+    local ruleDefinition = Ruleset
+        and Ruleset.GetRulesetRuleDefinition
+        and Ruleset.GetRulesetRuleDefinition("resources", "resource_regeneration_stat")
+        or nil
+    local statRef = Ruleset
+        and Ruleset.GetRulesetRuleValue
+        and Ruleset.GetRulesetRuleValue(activeRuleset, "resources", ruleDefinition)
+        or nil
+
+    if type(statRef) ~= "string" or statRef == "" then
+        return ""
+    end
+
+    return statRef
+end
+
+local function resolveResourceRegenerationStatRef(options)
+    if type(options) == "table" and options.resourceRegenerationStatRef ~= nil then
+        return type(options.resourceRegenerationStatRef) == "string"
+            and options.resourceRegenerationStatRef
+            or ""
+    end
+
+    return getResourceRegenerationStatRef()
+end
+
 local function buildTrackedProfileResourceRefLookup()
     local lookup = {}
 
@@ -609,6 +637,8 @@ function ResourceSync.BuildPlayerTurnRegenResourceDeltas(resources, options)
     end
 
     local statResolver = type(options) == "table" and options.resolveStatValue or nil
+    local healthResourceRef = resolveHealthResourceRef(options)
+    local resourceRegenerationStatRef = resolveResourceRegenerationStatRef(options)
 
     for index = 1, #normalizedResources do
         local liveEntry = normalizedResources[index]
@@ -628,6 +658,19 @@ function ResourceSync.BuildPlayerTurnRegenResourceDeltas(resources, options)
                 regenValue = (tonumber(statValue) or 0) * (tonumber(resourceDefinition.regenMultiplier) or 0)
             else
                 regenValue = tonumber(resourceDefinition.regenPerSecond) or 0
+            end
+
+            if resourceRef ~= healthResourceRef
+                and resourceDefinition.special ~= true
+                and resourceRegenerationStatRef ~= ""
+            then
+                local resourceRegenerationStat = 0
+                if type(statResolver) == "function" then
+                    resourceRegenerationStat = statResolver(resourceRegenerationStatRef, resourceRef)
+                elseif type(Profile.GetResolvedStatValue) == "function" then
+                    resourceRegenerationStat = Profile.GetResolvedStatValue(resourceRegenerationStatRef, 0)
+                end
+                regenValue = regenValue * (1 + (tonumber(resourceRegenerationStat) or 0) / 100)
             end
 
             if regenValue > 0 then

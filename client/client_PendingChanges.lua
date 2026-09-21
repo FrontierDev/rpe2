@@ -170,7 +170,9 @@ local function buildAuraSummary(client, sessionState, eventState)
             local auraRef = normalizeRef(operation.auraRef)
             if auraRef then
                 rows[#rows + 1] = {
-                    action = operation.kind == "dispel" and "dispel" or "apply",
+                    action = operation.kind == "dispel" and "dispel"
+                        or operation.kind == "runtime" and "runtime"
+                        or "apply",
                     auraRef = auraRef,
                     auraName = getAuraName(auraRef),
                     casterEventId = tonumber(operation.casterEventId) or 0,
@@ -180,6 +182,10 @@ local function buildAuraSummary(client, sessionState, eventState)
                     stacks = tonumber(operation.stacks) or 0,
                     turns = tonumber(operation.turnsRemaining) or 0,
                     fullState = operation.fullState == true,
+                    effectIndex = tonumber(operation.effectIndex),
+                    remaining = tonumber(operation.remaining),
+                    maximum = tonumber(operation.maximum),
+                    revision = tonumber(operation.revision),
                 }
             end
         end
@@ -280,6 +286,12 @@ function Client:BuildPendingTurnChangesTooltip(eventStateOverride)
                 local entry = summary.auras[index]
                 local detail = entry.action == "dispel"
                     and "remove"
+                    or entry.action == "runtime"
+                        and ("shield %s/%s (rev %s)"):format(
+                            tostring(entry.remaining or 0),
+                            tostring(entry.maximum or 0),
+                            tostring(entry.revision or 0)
+                        )
                     or ("%s stack(s), %s turn(s)%s"):format(
                         tostring(entry.stacks or 0),
                         tostring(entry.turns or 0),
@@ -291,7 +303,9 @@ function Client:BuildPendingTurnChangesTooltip(eventStateOverride)
                         tostring(entry.targetName or "Unknown"),
                         tostring(entry.auraName or entry.auraRef or "Aura")
                     ),
-                    right = entry.action == "dispel" and detail or ("apply " .. detail),
+                    right = entry.action == "dispel" and detail
+                        or entry.action == "runtime" and detail
+                        or ("apply " .. detail),
                     colorToken = "text.secondary",
                 }
             end

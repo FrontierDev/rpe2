@@ -426,12 +426,29 @@ function Dropdown:ToggleContextMenu()
         contextMenu:HideMenus()
         Dropdown.SharedContextMenuOwner = nil
     else
+        if menuFrame then
+            -- Dropdowns can be opened from movable dialog windows.  Reassert the
+            -- floating menu's strata/level each time because the shared menu may
+            -- have been reused or reparented by another dropdown.
+            if menuFrame.SetFrameStrata then
+                menuFrame:SetFrameStrata("TOOLTIP")
+            end
+            if menuFrame.SetFrameLevel then
+                menuFrame:SetFrameLevel(200)
+            end
+            if menuFrame.SetToplevel then
+                menuFrame:SetToplevel(true)
+            end
+        end
         if UI.ContextMenu and UI.ContextMenu.HideAll then
             UI.ContextMenu.HideAll(contextMenu)
         end
         Dropdown.SharedContextMenuOwner = self
         contextMenu.anchorOwner = self
         contextMenu:ShowAt(self.frame or self.dropdownFrame)
+        if menuFrame and menuFrame.Raise then
+            menuFrame:Raise()
+        end
     end
 end
 

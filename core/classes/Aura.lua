@@ -199,6 +199,7 @@ end
 local function normalizeEffectType(value)
     local effectType = string.lower(ensureString(value))
     if effectType == "heal"
+        or effectType == "absorb"
         or effectType == "stat"
         or effectType == "skill"
         or effectType == "control"
@@ -232,6 +233,17 @@ local function normalizeAmountMode(value)
     return "flat"
 end
 
+local function normalizeNonNegativeNumber(value)
+    local numericValue = tonumber(value)
+    if numericValue == nil or numericValue ~= numericValue
+        or numericValue == math.huge or numericValue == -math.huge
+    then
+        return 0
+    end
+
+    return math.max(0, numericValue)
+end
+
 local function normalizeCombatEventId(value)
     local combatEventId = string.lower(ensureString(value))
     if combatEventId == "" then
@@ -262,6 +274,15 @@ local function normalizeChancePercent(value)
     return math.max(0, math.min(100, numericValue))
 end
 
+local function normalizeDefenceStatRef(value)
+    local reference = ensureString(value)
+    return reference ~= "" and reference or nil
+end
+
+local function normalizeDamageSchoolRef(value)
+    return normalizeRef(value)
+end
+
 local function normalizeEffect(value)
     if type(value) ~= "table" then
         return nil
@@ -274,6 +295,7 @@ local function normalizeEffect(value)
             baseHealing = tonumber(value.baseHealing) or 0,
             amountMode = normalizeAmountMode(value.amountMode),
             statScaling = normalizeStatScaling(value.statScaling),
+            scaleWithRank = value.scaleWithRank ~= false,
         }
     end
 
@@ -284,6 +306,7 @@ local function normalizeEffect(value)
             operation = normalizeStatOperation(value.operation),
             baseAmount = tonumber(value.baseAmount) or 0,
             statScaling = normalizeStatScaling(value.statScaling),
+            scaleWithRank = value.scaleWithRank ~= false,
         }
     end
 
@@ -321,6 +344,18 @@ local function normalizeEffect(value)
             resourceRef = normalizeRef(value.resourceRef),
             amount = tonumber(value.amount) or tonumber(value.baseAmount) or 0,
             amountMode = normalizeAmountMode(value.amountMode),
+            scaleWithRank = value.scaleWithRank ~= false,
+        }
+    end
+
+    if effectType == "absorb" then
+        return {
+            type = "absorb",
+            baseAbsorption = normalizeNonNegativeNumber(value.baseAbsorption),
+            amountMode = normalizeAmountMode(value.amountMode),
+            statScaling = normalizeStatScaling(value.statScaling),
+            damageSchoolRefs = normalizeDamageSchoolRefs(value.damageSchoolRefs),
+            scaleWithRank = value.scaleWithRank ~= false,
         }
     end
 
@@ -330,6 +365,8 @@ local function normalizeEffect(value)
         amountMode = normalizeAmountMode(value.amountMode),
         statScaling = normalizeStatScaling(value.statScaling),
         damageSchoolRefs = normalizeDamageSchoolRefs(value.damageSchoolRefs),
+        threatCoefficient = value.threatCoefficient ~= nil and tonumber(value.threatCoefficient) or nil,
+        scaleWithRank = value.scaleWithRank ~= false,
     }
 end
 
@@ -359,6 +396,7 @@ local function normalizeEventEffect(value)
             baseHealing = tonumber(value.baseHealing) or 0,
             amountMode = normalizeAmountMode(value.amountMode),
             statScaling = normalizeStatScaling(value.statScaling),
+            scaleWithRank = value.scaleWithRank ~= false,
         }
     end
 
@@ -386,6 +424,7 @@ local function normalizeEventEffect(value)
             resourceRef = normalizeRef(value.resourceRef),
             amount = tonumber(value.amount) or tonumber(value.baseAmount) or 0,
             amountMode = normalizeAmountMode(value.amountMode),
+            scaleWithRank = value.scaleWithRank ~= false,
         }
     end
 
@@ -408,6 +447,7 @@ local function normalizeEventEffect(value)
             amountMode = normalizeAmountMode(value.amountMode),
             statScaling = normalizeStatScaling(value.statScaling),
             damageSchoolRefs = normalizeDamageSchoolRefs(value.damageSchoolRefs),
+            scaleWithRank = value.scaleWithRank ~= false,
         }
     end
 
@@ -438,6 +478,8 @@ local function normalizeEvent(value)
 
     return {
         combatEventId = combatEventId,
+        defenceStatRef = combatEventId == "on_defence" and normalizeDefenceStatRef(value.defenceStatRef) or nil,
+        damageSchoolRef = combatEventId == "on_damage_type" and normalizeDamageSchoolRef(value.damageSchoolRef) or nil,
         triggerTarget = triggerTarget,
         chance = normalizeChancePercent(value.chance),
         effects = normalizeEventEffects(value.effects),
@@ -520,6 +562,35 @@ end
 
 function Aura.FromTable(data)
     return Aura:New(data)
+end
+
+function Aura:HasAbsorbEffect()
+    for index = 1, #(self.effects or {}) do
+        local effect = self.effects[index]
+        if type(effect) == "table" and effect.type == "absorb" then
+            return true
+        end
+    end
+
+    return false
+end
+
+function Aura:Validate()
+    local errors = {}
+    if self:HasAbsorbEffect() then
+        if (tonumber(self.maxStacks) or 1) > 1 then
+            errors[#errors + 1] = "Absorb effects require Max Stacks to be 1 in V1."
+        end
+        if self.stackBehavior == "independent_duration" then
+            errors[#errors + 1] = "Absorb effects do not support Independent Duration stacking in V1."
+        end
+    end
+
+    return {
+        valid = #errors == 0,
+        errors = errors,
+        reason = errors[1] or "",
+    }
 end
 
 Addon.Internal.Database.Classes.Aura = Aura

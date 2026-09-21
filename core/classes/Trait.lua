@@ -51,6 +51,21 @@ local function normalizeRef(value)
     return ref
 end
 
+local function normalizeRefList(values)
+    local normalized = {}
+    local seen = {}
+
+    for index = 1, #(values or {}) do
+        local ref = normalizeRef(values[index])
+        if ref and not seen[ref] then
+            seen[ref] = true
+            normalized[#normalized + 1] = ref
+        end
+    end
+
+    return normalized
+end
+
 local function sortedNumericKeys(values)
     local keys = {}
     for key in pairs(values or {}) do
@@ -209,6 +224,15 @@ local function normalizeChancePercent(value)
     return math.max(0, math.min(100, numericValue))
 end
 
+local function normalizeDefenceStatRef(value)
+    local reference = ensureString(value)
+    return reference ~= "" and reference or nil
+end
+
+local function normalizeDamageSchoolRef(value)
+    return normalizeRef(value)
+end
+
 local function normalizeAmountMode(value)
     local mode = tostring(value or "flat")
     if mode == "base_percent" then
@@ -316,6 +340,8 @@ local function normalizeEvent(value)
 
     return {
         combatEventId = combatEventId,
+        defenceStatRef = combatEventId == "on_defence" and normalizeDefenceStatRef(value.defenceStatRef) or nil,
+        damageSchoolRef = combatEventId == "on_damage_type" and normalizeDamageSchoolRef(value.damageSchoolRef) or nil,
         triggerTarget = normalizeTriggerTarget(value.triggerTarget),
         chance = normalizeChancePercent(value.chance),
         effects = normalizeEventEffects(value.effects),
@@ -360,6 +386,7 @@ function Trait.NormalizeRuntimePayload(value)
         icon = ensureString(payload.icon),
         category = normalizeCategory(payload.category),
         unlockLevel = normalizeUnlockLevel(payload.unlockLevel),
+        mutuallyExclusiveTraitRefs = normalizeRefList(payload.mutuallyExclusiveTraitRefs),
         conditions = Condition.NormalizeList and Condition.NormalizeList(payload.conditions) or {},
         statBonuses = normalizeStatBonuses(payload.statBonuses),
         skillBonuses = normalizeSkillBonuses(payload.skillBonuses),
@@ -377,6 +404,7 @@ function Trait:New(data)
         category = "",
         unlockLevel = 1,
         isEnvironmental = false,
+        mutuallyExclusiveTraitRefs = {},
         conditions = {},
         statBonuses = {},
         skillBonuses = {},
@@ -391,7 +419,7 @@ function Trait:Merge(data)
     end
 
     for key, value in pairs(data) do
-        if key ~= "conditions" and key ~= "statBonuses" and key ~= "skillBonuses" and key ~= "automaticAuras" and key ~= "events" then
+        if key ~= "conditions" and key ~= "mutuallyExclusiveTraitRefs" and key ~= "statBonuses" and key ~= "skillBonuses" and key ~= "automaticAuras" and key ~= "events" then
             self[key] = value
         end
     end
@@ -402,6 +430,7 @@ function Trait:Merge(data)
     self.category = normalizeCategory(self.category)
     self.unlockLevel = normalizeUnlockLevel(self.unlockLevel)
     self.isEnvironmental = normalizeBoolean(self.isEnvironmental)
+    self.mutuallyExclusiveTraitRefs = normalizeRefList(data.mutuallyExclusiveTraitRefs or self.mutuallyExclusiveTraitRefs)
     self.conditions = Condition.NormalizeList and Condition.NormalizeList(data.conditions or self.conditions) or {}
     self.statBonuses = normalizeStatBonuses(data.statBonuses or self.statBonuses)
     self.skillBonuses = normalizeSkillBonuses(data.skillBonuses or self.skillBonuses)
@@ -420,6 +449,7 @@ function Trait:ToTable()
         category = self.category,
         unlockLevel = self.unlockLevel,
         isEnvironmental = self.isEnvironmental == true,
+        mutuallyExclusiveTraitRefs = normalizeRefList(self.mutuallyExclusiveTraitRefs),
         conditions = Condition.NormalizeList and Condition.NormalizeList(self.conditions) or {},
         statBonuses = normalizeStatBonuses(self.statBonuses),
         skillBonuses = normalizeSkillBonuses(self.skillBonuses),

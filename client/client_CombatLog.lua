@@ -38,6 +38,7 @@ local COMBAT_LOG_KINDS = {
     aura_gain = true,
     aura_loss = true,
     interrupt = true,
+    taunt = true,
 }
 
 local function normalizeLogKind(value)
@@ -469,6 +470,8 @@ function Client:NormalizeCombatLogEntry(entry)
         accentColor = normalizeColorHex(entry.accentColor),
         casterColor = normalizeColorHex(entry.casterColor),
         targetColor = normalizeColorHex(entry.targetColor),
+        casterEventId = normalizePositiveInteger(entry.casterEventId),
+        meterAmount = normalizePositiveInteger(entry.meterAmount),
     }
 end
 
@@ -500,6 +503,8 @@ function Client:BuildCombatLogArguments(entry)
         "",
         normalized.logKind or "",
         normalized.spellRef or "",
+        normalized.casterEventId or "",
+        normalized.meterAmount or "",
     }
 end
 
@@ -551,10 +556,25 @@ function Client:QueueCombatLogEntry(entry)
         return false
     end
 
+    local eventState = self.GetEventState and self:GetEventState() or self.EventState
+    local eventMeters = self.EventMeters
+    local meterRecorded = false
+    if type(eventMeters) == "table" and type(eventMeters.RecordCombatLogEntry) == "function" then
+        meterRecorded = eventMeters:RecordCombatLogEntry(normalized, eventState) == true
+    end
+
     local widgetNamespace = self.UI and self.UI.EventWidget or nil
     local widget = widgetNamespace and widgetNamespace.Get and widgetNamespace:Get() or nil
     if type(widget) ~= "table" or type(widget.QueueCombatLogEntry) ~= "function" then
         return false
+    end
+
+    if meterRecorded
+        and type(widget.IsMetersPanelShown) == "function"
+        and widget:IsMetersPanelShown() == true
+        and type(widget.RefreshMetersPanel) == "function"
+    then
+        widget:RefreshMetersPanel()
     end
 
     return widget:QueueCombatLogEntry(normalized)
@@ -627,6 +647,8 @@ function Client:HandleCombatLog(arguments, sender, distribution, target, message
         detailText = arguments and arguments[14],
         logKind = normalizeLogKind(arguments and arguments[16]),
         spellRef = arguments and (normalizeLogKind(arguments and arguments[16]) and arguments[17] or ""),
+        casterEventId = arguments and arguments[18],
+        meterAmount = arguments and arguments[19],
         -- Argument 15 is the turn number for turn-tagged payloads. Payloads
         -- without a semantic kind may still contain the legacy turn there.
         turnNumber = arguments and (

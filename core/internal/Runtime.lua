@@ -56,6 +56,11 @@ function Addon.Internal.DispatchEvent(event, ...)
             safeCall(Comms.RegisterPrefix, Comms)
         end
 
+        local ExternalManager = Addon.Internal.ExternalManager
+        if ExternalManager and ExternalManager.Initialize then
+            safeCall(ExternalManager.Initialize, ExternalManager)
+        end
+
         local Client = Addon.Client or nil
         local Achievements = Client and Client.Achievements or nil
         if Achievements and Achievements.Initialize then

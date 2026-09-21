@@ -29,7 +29,7 @@ local appendThreatDescription
 
 local MIN_VARIANCE = 0.9
 local MAX_VARIANCE = 1.1
-local RAID_MARKER_TOOLTIP_NOTE = "|cff999999Targets must share the same raid marker.|r"
+local RAID_MARKER_TOOLTIP_NOTE = "Targets must share the same raid marker."
 
 local function getTasks()
     return Addon.Internal and Addon.Internal.Tasks or nil
@@ -108,11 +108,12 @@ local function buildDeterministicRandom(mode)
     end
 end
 
-local function buildValueContext(casterUnit, variance, randomMode)
+local function buildValueContext(casterUnit, variance, randomMode, rankMultiplier)
     return {
         casterUnit = casterUnit,
         attackerUnit = casterUnit,
         caster = casterUnit,
+        spellRankMultiplier = tonumber(rankMultiplier) or 1,
         variance = variance,
         random = buildDeterministicRandom(randomMode),
     }
@@ -215,6 +216,13 @@ local function resolveCasterUnit(detail)
         return detail.casterUnit
     end
 
+    if type(detail.rankContext) == "table"
+        and type(detail.eventState) ~= "table"
+        and type(detail.activationState) ~= "table"
+    then
+        return buildPseudoCasterUnit()
+    end
+
     if type(detail.spellRef) == "string" and type(Client.ResolveSpellActivationState) == "function" then
         local activationState = Client:ResolveSpellActivationState(detail.spellRef)
         if type(activationState) == "table" and type(activationState.casterUnit) == "table" then
@@ -223,6 +231,30 @@ local function resolveCasterUnit(detail)
     end
 
     return buildPseudoCasterUnit()
+end
+
+local function resolveSpellRankContext(detail, casterUnit)
+    local spell = type(detail) == "table" and detail.spell or nil
+    if type(spell) ~= "table" or type(Spellcasting.ResolveSpellRankContext) ~= "function" then
+        return nil
+    end
+
+    local activationState = type(detail.activationState) == "table" and detail.activationState or nil
+    local profileRankContext = type(detail.rankContext) == "table"
+        and type(detail.casterUnit) ~= "table"
+        and type(detail.eventState) ~= "table"
+        and activationState == nil
+    local options = {
+        casterUnit = profileRankContext and buildPseudoCasterUnit() or casterUnit or resolveCasterUnit(detail),
+        eventState = type(detail.eventState) == "table" and detail.eventState
+            or activationState and activationState.eventState
+            or nil,
+    }
+    if profileRankContext and type(Profile.GetLevel) == "function" then
+        options.casterLevel = Profile.GetLevel()
+    end
+
+    return Spellcasting.ResolveSpellRankContext(spell, options)
 end
 
 local function normalizeEventId(value)
@@ -326,6 +358,7 @@ local function buildGeneratedDescriptionCacheKey(detail, casterUnit)
     local configurationRevision = math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
     local datasetHash = type(Registry.GenerateActivatedDatasetsHash) == "function" and tostring(Registry:GenerateActivatedDatasetsHash() or "") or ""
     local rulesetHash = type(Registry.GenerateActiveRulesetHash) == "function" and tostring(Registry:GenerateActiveRulesetHash() or "") or ""
+    local rankContext = resolveSpellRankContext(detail, casterUnit)
 
     return table.concat({
         tostring(contextType or "profile"),
@@ -339,6 +372,15 @@ local function buildGeneratedDescriptionCacheKey(detail, casterUnit)
         tostring(type(detail) == "table" and detail.traitRef or ""),
         tostring(type(detail) == "table" and type(detail.item) == "table" and detail.item.id or ""),
         tostring(type(detail) == "table" and detail.detailName or ""),
+        tostring(type(rankContext) == "table" and rankContext.casterLevel or ""),
+        tostring(type(rankContext) == "table" and rankContext.eligible or ""),
+        tostring(type(rankContext) == "table" and rankContext.useSpellRanks or ""),
+        tostring(type(rankContext) == "table" and rankContext.usesRanks or ""),
+        tostring(type(rankContext) == "table" and rankContext.rank or ""),
+        tostring(type(rankContext) == "table" and rankContext.multiplier or ""),
+        tostring(type(rankContext) == "table" and rankContext.learnLevel or ""),
+        tostring(type(rankContext) == "table" and rankContext.rankInterval or ""),
+        tostring(type(rankContext) == "table" and rankContext.nextRankLevel or ""),
     }, "\31")
 end
 
@@ -892,14 +934,14 @@ local function buildAuraClause(detail, effect, standalone)
     return clause
 end
 
-local function buildDamageSentence(detail, casterUnit, component)
+local function buildDamageSentence(detail, casterUnit, component, rankMultiplier)
     local effect = component and component.effect or nil
     if type(effect) ~= "table" or type(Combat.ResolveDamageAmount) ~= "function" then
         return nil
     end
 
-    local minimum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min"), effect)
-    local maximum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max"), effect)
+    local minimum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min", rankMultiplier), effect)
+    local maximum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max", rankMultiplier), effect)
     local schoolLabel = resolveDamageSchoolLabel(detail, effect)
     local targetPhrase = resolveTargetPhrase(component.target)
     local sentence = ("Deal %s %s damage to %s"):format(formatValueRange(minimum, maximum), schoolLabel, targetPhrase)
@@ -911,14 +953,14 @@ local function buildDamageSentence(detail, casterUnit, component)
     return sentence .. "."
 end
 
-local function buildHealSentence(detail, casterUnit, component)
+local function buildHealSentence(detail, casterUnit, component, rankMultiplier)
     local effect = component and component.effect or nil
     if type(effect) ~= "table" or type(Combat.ResolveHealingAmount) ~= "function" then
         return nil
     end
 
-    local minimum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min"), effect)
-    local maximum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max"), effect)
+    local minimum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min", rankMultiplier), effect)
+    local maximum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max", rankMultiplier), effect)
     local targetPhrase = resolveTargetPhrase(component.target)
     local sentence = ("Heal %s for %s health"):format(targetPhrase, formatValueRange(minimum, maximum))
     local auraClause = effect.applyAura == true and buildAuraClause(detail, effect, false) or nil
@@ -929,13 +971,25 @@ local function buildHealSentence(detail, casterUnit, component)
     return sentence .. "."
 end
 
-local function buildResourceSentence(detail, component)
+local function resolveResourceEffectAmount(effect, rankMultiplier)
+    local amount = tonumber(type(effect) == "table" and effect.amount or nil) or 0
+    if type(effect) == "table" and effect.scaleWithRank == true then
+        return Spellcasting.ApplySpellRankMultiplier({ spellRankMultiplier = rankMultiplier }, amount) or amount
+    end
+    return amount
+end
+
+local function formatResourceMagnitude(value)
+    return ("%g"):format(tonumber(value) or 0)
+end
+
+local function buildResourceSentence(detail, component, rankMultiplier)
     local effect = component and component.effect or nil
     if type(effect) ~= "table" then
         return nil
     end
 
-    local amount = tonumber(effect.amount) or 0
+    local amount = resolveResourceEffectAmount(effect, rankMultiplier)
     if amount == 0 then
         return nil
     end
@@ -952,8 +1006,8 @@ local function buildResourceSentence(detail, component)
         amountText = ("%g%% of Max %s"):format(amount, resourceName)
         reduceAmountText = ("%g%% of Max"):format(amount)
     else
-        amountText = ("%d %s"):format(math.floor(amount), resourceName)
-        reduceAmountText = tostring(math.floor(math.abs(amount)))
+        amountText = ("%s %s"):format(formatResourceMagnitude(amount), resourceName)
+        reduceAmountText = formatResourceMagnitude(math.abs(amount))
     end
     
     local targetPhrase = resolveTargetPhrase(component.target)
@@ -1009,6 +1063,17 @@ local function buildInterruptSentence(component)
     end
 
     return ("Interrupt the spellcasting of %s."):format(targetPhrase)
+end
+
+local function buildTauntSentence(component)
+    local effect = component and component.effect or nil
+    if type(effect) ~= "table" then
+        return nil
+    end
+
+    local targetPhrase = resolveTargetPhrase(component.target)
+    local duration = math.max(1, math.floor(tonumber(effect.duration) or 2))
+    return ("Taunt %s for %s."):format(targetPhrase, formatTurnLabel(duration))
 end
 
 local function buildRevertSentence(component)
@@ -1133,19 +1198,19 @@ local function appendRaidMarkerTooltipNote(description, components)
         return RAID_MARKER_TOOLTIP_NOTE
     end
 
-    return text .. "\n" .. RAID_MARKER_TOOLTIP_NOTE
+    return text .. " " .. RAID_MARKER_TOOLTIP_NOTE
 end
 
-local function buildSentence(detail, casterUnit, component)
+local function buildSentence(detail, casterUnit, component, rankMultiplier)
     local effectType = tostring(component and component.effect and component.effect.type or "")
     if effectType == "damage" then
-        return buildDamageSentence(detail, casterUnit, component)
+        return buildDamageSentence(detail, casterUnit, component, rankMultiplier)
     end
     if effectType == "heal" then
-        return buildHealSentence(detail, casterUnit, component)
+        return buildHealSentence(detail, casterUnit, component, rankMultiplier)
     end
     if effectType == "resource" then
-        return buildResourceSentence(detail, component)
+        return buildResourceSentence(detail, component, rankMultiplier)
     end
     if effectType == "apply_aura" then
         return buildApplyAuraSentence(detail, component)
@@ -1158,6 +1223,9 @@ local function buildSentence(detail, casterUnit, component)
     end
     if effectType == "interrupt" then
         return buildInterruptSentence(component)
+    end
+    if effectType == "taunt" then
+        return buildTauntSentence(component)
     end
     if effectType == "revert" then
         return buildRevertSentence(component)
@@ -1286,12 +1354,6 @@ local function buildResourceSentenceTemplate(detail, componentIndex, component, 
     local targetPhrase = resolveTargetPhrase(component.target)
     local amountMode = tostring(effect.amountMode or "flat")
     if amount > 0 then
-        if amountMode == "base_percent" then
-            return ("Restore %g%% of Base %s to %s."):format(amount, resourceName, targetPhrase)
-        end
-        if amountMode == "max_percent" then
-            return ("Restore %g%% of Max %s to %s."):format(amount, resourceName, targetPhrase)
-        end
         local amountToken = buildSpellTemplateToken(state, "RESOURCE_AMOUNT", "spell_resource_amount", {
             componentIndex = componentIndex,
             applyMode = "resource_gain_amount",
@@ -1300,18 +1362,6 @@ local function buildResourceSentenceTemplate(detail, componentIndex, component, 
     end
 
     local possessive = resolveTargetPossessivePhrase(targetPhrase)
-    if amountMode == "base_percent" then
-        if possessive then
-            return ("Reduce %s %s by %g%% of Base."):format(possessive, resourceName, math.abs(amount))
-        end
-        return ("Reduce %s for %s by %g%% of Base."):format(resourceName, targetPhrase, math.abs(amount))
-    end
-    if amountMode == "max_percent" then
-        if possessive then
-            return ("Reduce %s %s by %g%% of Max."):format(possessive, resourceName, math.abs(amount))
-        end
-        return ("Reduce %s for %s by %g%% of Max."):format(resourceName, targetPhrase, math.abs(amount))
-    end
     local amountToken = buildSpellTemplateToken(state, "RESOURCE_LOSS", "spell_resource_amount", {
         componentIndex = componentIndex,
         applyMode = "resource_loss_amount",
@@ -1346,6 +1396,9 @@ local function buildTemplateSentence(detail, componentIndex, component, state)
     if effectType == "interrupt" then
         return buildInterruptSentence(component)
     end
+    if effectType == "taunt" then
+        return buildTauntSentence(component)
+    end
     if effectType == "revert" then
         return buildRevertSentence(component)
     end
@@ -1370,14 +1423,14 @@ local function resolveSpellTemplateComponent(detail, token)
     return type(Combat.NormalizeComponent) == "function" and Combat:NormalizeComponent(rawComponent) or rawComponent
 end
 
-local function resolveSpellResourceTemplateToken(detail, token)
+local function resolveSpellResourceTemplateToken(detail, token, rankMultiplier)
     local component = resolveSpellTemplateComponent(detail, token)
     local effect = type(component) == "table" and component.effect or nil
     if type(effect) ~= "table" then
         return nil
     end
 
-    local amount = tonumber(effect.amount) or 0
+    local amount = resolveResourceEffectAmount(effect, rankMultiplier)
     local amountMode = tostring(effect.amountMode or "flat")
     local resourceName = resolveResourceName(effect.resourceRef)
     local applyMode = tostring(token and token.applyMode or "")
@@ -1388,7 +1441,7 @@ local function resolveSpellResourceTemplateToken(detail, token)
         if amountMode == "max_percent" then
             return ("%g%% of Max %s"):format(amount, resourceName)
         end
-        return ("%d %s"):format(math.floor(amount), resourceName)
+        return ("%s %s"):format(formatResourceMagnitude(amount), resourceName)
     end
 
     local lossAmount = math.abs(amount)
@@ -1398,10 +1451,10 @@ local function resolveSpellResourceTemplateToken(detail, token)
     if amountMode == "max_percent" then
         return ("%g%% of Max"):format(lossAmount)
     end
-    return tostring(math.floor(lossAmount))
+    return formatResourceMagnitude(lossAmount)
 end
 
-local function resolveSpellTemplateToken(detail, casterUnit, token)
+local function resolveSpellTemplateToken(detail, casterUnit, token, rankMultiplier)
     local applyMode = tostring(token and token.applyMode or "")
     if applyMode == "damage_range" then
         local component = resolveSpellTemplateComponent(detail, token)
@@ -1409,8 +1462,8 @@ local function resolveSpellTemplateToken(detail, casterUnit, token)
         if type(effect) ~= "table" or type(Combat.ResolveDamageAmount) ~= "function" then
             return nil
         end
-        local minimum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min"), effect)
-        local maximum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max"), effect)
+        local minimum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min", rankMultiplier), effect)
+        local maximum = Combat:ResolveDamageAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max", rankMultiplier), effect)
         return formatValueRange(minimum, maximum)
     end
     if applyMode == "heal_range" then
@@ -1419,12 +1472,12 @@ local function resolveSpellTemplateToken(detail, casterUnit, token)
         if type(effect) ~= "table" or type(Combat.ResolveHealingAmount) ~= "function" then
             return nil
         end
-        local minimum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min"), effect)
-        local maximum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max"), effect)
+        local minimum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MIN_VARIANCE, "min", rankMultiplier), effect)
+        local maximum = Combat:ResolveHealingAmount(buildValueContext(casterUnit, MAX_VARIANCE, "max", rankMultiplier), effect)
         return formatValueRange(minimum, maximum)
     end
     if applyMode == "resource_gain_amount" or applyMode == "resource_loss_amount" then
-        return resolveSpellResourceTemplateToken(detail, token)
+        return resolveSpellResourceTemplateToken(detail, token, rankMultiplier)
     end
 
     return nil
@@ -1552,8 +1605,10 @@ function DescriptionBuilder:ResolveTooltipTemplatePayload(detail, payload, caste
     end
 
     casterUnit = casterUnit or resolveCasterUnit(detail)
+    local rankContext = resolveSpellRankContext(detail, casterUnit)
+    local rankMultiplier = type(rankContext) == "table" and rankContext.multiplier or 1
     local resolvedMainText, resolveError = TooltipTemplate.ResolveText(normalizedPayload.mainText, normalizedPayload.tokens, function(token)
-        return resolveSpellTemplateToken(detail, casterUnit, token)
+        return resolveSpellTemplateToken(detail, casterUnit, token, rankMultiplier)
     end)
     if resolvedMainText == nil then
         return nil, buildSpellTemplateError(detail, resolveError)
@@ -1573,6 +1628,7 @@ function DescriptionBuilder:ResolveTooltipTemplatePayload(detail, payload, caste
                 spellDatasetId = resolveDatasetId(detail),
                 casterUnit = casterUnit,
                 targetUnit = targetUnit,
+                rankMultiplier = rankMultiplier,
             })
         end
         resolvedDescriptionText = trimText(resolvedDescriptionText)
@@ -1695,6 +1751,8 @@ function DescriptionBuilder:BuildGeneratedDescription(detail, casterUnit)
     end
 
     casterUnit = casterUnit or resolveCasterUnit(detail)
+    local rankContext = resolveSpellRankContext(detail, casterUnit)
+    local rankMultiplier = type(rankContext) == "table" and rankContext.multiplier or 1
     local normalizedComponents = {}
     local hasNonDefaultPhase = false
 
@@ -1712,7 +1770,7 @@ function DescriptionBuilder:BuildGeneratedDescription(detail, casterUnit)
     local sentences = {}
     for index = 1, #normalizedComponents do
         local component = normalizedComponents[index]
-        local sentence = buildSentence(detail, casterUnit, component)
+        local sentence = buildSentence(detail, casterUnit, component, rankMultiplier)
         if sentence and sentence ~= "" then
             if hasNonDefaultPhase then
                 sentence = buildPhasePrefix(component.castPhase) .. sentence
@@ -1732,6 +1790,8 @@ function DescriptionBuilder:BuildGeneratedAuraSections(detail, casterUnit)
     end
 
     casterUnit = casterUnit or resolveCasterUnit(detail)
+    local rankContext = resolveSpellRankContext(detail, casterUnit)
+    local rankMultiplier = type(rankContext) == "table" and rankContext.multiplier or 1
     local sections = {}
     local seen = {}
     for index = 1, #(spell.components or {}) do
@@ -1772,6 +1832,7 @@ function DescriptionBuilder:BuildGeneratedAuraSections(detail, casterUnit)
                         spellDatasetId = resolveDatasetId(detail),
                         casterUnit = casterUnit,
                         powerLevel = powerLevel,
+                        rankMultiplier = rankMultiplier,
                         stacks = stacks,
                         duration = duration,
                         targetContext = targetContext,

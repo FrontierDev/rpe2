@@ -189,6 +189,55 @@ local function statRowsEqual(left, right)
     return true
 end
 
+local function buildStatDeltas(baseStats, resolvedStats)
+    local baseByRef = {}
+    for index = 1, #(baseStats or {}) do
+        local entry = baseStats[index]
+        local statRef = tostring(entry and entry.statRef or "")
+        if statRef ~= "" then
+            baseByRef[statRef] = entry
+        end
+    end
+
+    local deltas = {}
+    local resolvedByRef = {}
+    for index = 1, #(resolvedStats or {}) do
+        local entry = resolvedStats[index]
+        local statRef = tostring(entry and entry.statRef or "")
+        if statRef ~= "" and resolvedByRef[statRef] == nil then
+            local baseEntry = baseByRef[statRef]
+            local value = tonumber(entry.value) or 0
+            local currentValue = tonumber(entry.currentValue ~= nil and entry.currentValue or entry.value) or 0
+            local baseValue = tonumber(baseEntry and baseEntry.value) or 0
+            local baseCurrentValue = tonumber(baseEntry and (baseEntry.currentValue ~= nil and baseEntry.currentValue or baseEntry.value)) or 0
+            if value ~= baseValue or currentValue ~= baseCurrentValue then
+                deltas[#deltas + 1] = {
+                    statRef = statRef,
+                    value = value - baseValue,
+                    currentValue = currentValue - baseCurrentValue,
+                }
+            end
+            resolvedByRef[statRef] = true
+        end
+    end
+
+    for index = 1, #(baseStats or {}) do
+        local entry = baseStats[index]
+        local statRef = tostring(entry and entry.statRef or "")
+        if statRef ~= "" and not resolvedByRef[statRef] then
+            local value = tonumber(entry.value) or 0
+            local currentValue = tonumber(entry.currentValue ~= nil and entry.currentValue or entry.value) or 0
+            deltas[#deltas + 1] = {
+                statRef = statRef,
+                value = -value,
+                currentValue = -currentValue,
+            }
+        end
+    end
+
+    return deltas
+end
+
 local function spellRefsEqual(left, right)
     local normalizedLeft = normalizeSpellRefs(left)
     local normalizedRight = normalizeSpellRefs(right)
@@ -204,7 +253,7 @@ local function spellRefsEqual(left, right)
     return true
 end
 
-local function resolveReceiverBaseResources(unit, playerCount)
+local function resolveReceiverBaseResources(unit, playerCount, options)
     if type(EventUnit.BuildResolvedResources) ~= "function" then
         return nil
     end
@@ -214,11 +263,11 @@ local function resolveReceiverBaseResources(unit, playerCount)
     end
     probe.resources = {}
     probe._networkResourceMode = nil
-    local ok, resources = pcall(EventUnit.BuildResolvedResources, probe, playerCount)
+    local ok, resources = pcall(EventUnit.BuildResolvedResources, probe, playerCount, options)
     return ok and type(resources) == "table" and resources or nil
 end
 
-local function resolveReceiverBaseStats(unit)
+local function resolveReceiverBaseStats(unit, options)
     if type(EventUnit.BuildResolvedStats) ~= "function" then
         return nil
     end
@@ -228,7 +277,7 @@ local function resolveReceiverBaseStats(unit)
     end
     probe.stats = {}
     probe._networkStatMode = nil
-    local ok, stats = pcall(EventUnit.BuildResolvedStats, probe)
+    local ok, stats = pcall(EventUnit.BuildResolvedStats, probe, nil, options)
     return ok and type(stats) == "table" and stats or nil
 end
 
@@ -246,47 +295,81 @@ local function resolveReceiverBaseSpells(unit)
     return ok and type(spells) == "table" and spells or nil
 end
 
-local function compactSnapshotUnit(unit, playerCount)
+local function compactSnapshotUnit(unit, playerCount, options)
     if type(unit) ~= "table" or unit.isPlayer == true or tostring(unit.registryID or "") == "" then
         return unit
     end
-    local resolvedUnit = type(unit.GetResolvedUnit) == "function" and unit:GetResolvedUnit() or nil
-    if type(resolvedUnit) ~= "table" then
-        return unit
+    local eventLevel = type(options) == "table" and tonumber(options.level) or nil
+    local optionPlayerCount = type(options) == "table" and tonumber(options.playerCount) or nil
+    local difficulty = type(options) == "table" and options.difficulty or nil
+    if eventLevel == nil or eventLevel < 1 or optionPlayerCount == nil or optionPlayerCount < 0
+        or type(difficulty) ~= "string" or difficulty == ""
+    then
+        error(("Cannot compact network NPC %s: Event level, player count, and difficulty context are required.")
+            :format(tostring(unit.registryID)), 2)
     end
-
     local compact = cloneNetworkUnit(unit)
     if not compact then
         return unit
     end
 
-    compact._networkResourceMode = nil
-    if type(EventUnit.BuildResourceDeltas) == "function" and type(EventUnit.ApplyResourceDeltas) == "function" then
-        local baseResources = resolveReceiverBaseResources(compact, playerCount)
-        if type(baseResources) == "table" then
-            local resourceDeltas = EventUnit.BuildResourceDeltas(baseResources, unit.resources or {})
-            local reconstructed = EventUnit.ApplyResourceDeltas(baseResources, resourceDeltas)
-            if resourceRowsEqual(reconstructed, unit.resources or {}) then
-                compact.resources = resourceDeltas
-                compact._networkResourceMode = "delta"
-            end
-        end
+    local presetIndex, appearanceIndex = resolveIdentity(unit)
+    compact.presetIndex = presetIndex
+    compact.appearanceIndex = appearanceIndex
+    local resolvedUnit = type(compact.GetResolvedUnit) == "function" and compact:GetResolvedUnit() or nil
+    if type(resolvedUnit) ~= "table" then
+        error(("Cannot compact network NPC %s: activated Unit definition is unavailable.")
+            :format(tostring(unit.registryID or "<missing registryID>")), 2)
     end
 
-    local presetIndex = normalizeVariantIndex(unit.presetIndex)
+    compact._networkResourceMode = nil
+    if type(EventUnit.BuildResourceDeltas) ~= "function" or type(EventUnit.ApplyResourceDeltas) ~= "function" then
+        error("Cannot compact network NPC resources: shared resource delta helpers are unavailable.", 2)
+    end
+    local baseResources = resolveReceiverBaseResources(compact, playerCount, options)
+    if type(baseResources) ~= "table" then
+        error(("Cannot compact network NPC %s: receiver resource baseline could not be resolved.")
+            :format(tostring(unit.registryID or "<missing registryID>")), 2)
+    end
+    local resourceDeltas = EventUnit.BuildResourceDeltas(baseResources, unit.resources or {})
+    local reconstructedResources = EventUnit.ApplyResourceDeltas(baseResources, resourceDeltas)
+    if resourceRowsEqual(reconstructedResources, unit.resources or {}) then
+        compact.resources = resourceDeltas
+        compact._networkResourceMode = "delta"
+    else
+        -- A runtime resource removal cannot be represented by replacement rows.
+        -- Keep the authoritative complete state for that explicit override.
+        compact.resources = cloneNetworkUnit(unit).resources
+    end
+
     compact._networkSpellMode = nil
     compact._networkStatMode = nil
-    if presetIndex == 0 then
-        local baseSpells = resolveReceiverBaseSpells(compact)
-        if type(baseSpells) == "table" and spellRefsEqual(baseSpells, unit.spells or {}) then
-            compact.spells = {}
-            compact._networkSpellMode = "inherit"
-        end
+    local baseSpells = resolveReceiverBaseSpells(compact)
+    if type(baseSpells) == "table" and spellRefsEqual(baseSpells, unit.spells or {}) then
+        compact.spells = {}
+        compact._networkSpellMode = "inherit"
+    end
 
-        local baseStats = resolveReceiverBaseStats(compact)
-        if type(baseStats) == "table" and statRowsEqual(baseStats, unit.stats or {}) then
+    local baseStats = resolveReceiverBaseStats(compact, options)
+    if type(baseStats) ~= "table" then
+        error(("Cannot compact network NPC %s: receiver stat baseline could not be resolved.")
+            :format(tostring(unit.registryID or "<missing registryID>")), 2)
+    else
+        if statRowsEqual(baseStats, unit.stats or {}) then
             compact.stats = {}
             compact._networkStatMode = "inherit"
+        else
+            local deltas = buildStatDeltas(baseStats, unit.stats or {})
+            local probe = cloneNetworkUnit(compact)
+            if probe then
+                probe.stats = deltas
+                probe._networkStatMode = "bonus"
+                local reconstructed = EventUnit.BuildResolvedStats(probe, nil, options)
+                if statRowsEqual(reconstructed, unit.stats or {}) then
+                    compact.stats = deltas
+                    compact._networkStatMode = "bonus"
+                end
+            end
         end
     end
 
@@ -305,8 +388,13 @@ local function buildSnapshotSerializationEvent(eventState)
 
     local compactUnits = {}
     local playerCount = countPlayerUnits(eventState.units)
+    local options = {
+        level = eventState.level,
+        difficulty = eventState.difficulty,
+        playerCount = playerCount,
+    }
     for index = 1, #((eventState.units) or {}) do
-        compactUnits[index] = compactSnapshotUnit(eventState.units[index], playerCount)
+        compactUnits[index] = compactSnapshotUnit(eventState.units[index], playerCount, options)
     end
 
     return {
@@ -335,18 +423,19 @@ local function makePresetMechanicsExplicit(fields, sourceUnit, presetIndex)
     end
 
     if presetIndex > 0 then
-        if type(EventUnit.SerializeStatsForNetwork) == "function" then
+        local statMode = tostring(sourceUnit._networkStatMode or "")
+        if statMode ~= "inherit" and statMode ~= "merge" and statMode ~= "bonus"
+            and type(EventUnit.SerializeStatsForNetwork) == "function"
+        then
             fields[15] = EventUnit.SerializeStatsForNetwork(runtimeUnit.stats or {})
+            fields[20] = ""
+            fields[21] = ""
         end
-
-        -- Preset stats are host-materialized. Do not let compact bonus mode
-        -- reconstruct Base-only mechanics on the receiver.
-        fields[20] = ""
-        fields[21] = ""
 
         -- Preserve the existing compact spell-inheritance contract unless the
         -- summon/runtime unit carries an explicit non-empty spell override.
-        if type(runtimeUnit.spells) == "table" and #runtimeUnit.spells > 0
+        if tostring(sourceUnit._networkSpellMode or "") ~= "inherit"
+            and type(runtimeUnit.spells) == "table" and #runtimeUnit.spells > 0
             and type(EventUnit.SerializeSpellRefsForNetwork) == "function"
         then
             fields[14] = EventUnit.SerializeSpellRefsForNetwork(runtimeUnit.spells)
@@ -424,8 +513,8 @@ function Event:SerializeUnitsForNetwork()
 end
 
 local baseDeserializeUnitsFromNetwork = Event.DeserializeUnitsFromNetwork
-function Event.DeserializeUnitsFromNetwork(unitsText)
-    local units = baseDeserializeUnitsFromNetwork and baseDeserializeUnitsFromNetwork(unitsText) or {}
+function Event.DeserializeUnitsFromNetwork(unitsText, options)
+    local units = baseDeserializeUnitsFromNetwork and baseDeserializeUnitsFromNetwork(unitsText, options) or {}
     if type(unitsText) ~= "string" or unitsText == "" then
         return units
     end
@@ -440,19 +529,33 @@ function Event.DeserializeUnitsFromNetwork(unitsText)
     end
 
     if type(EventUnit.HydrateNetworkUnit) == "function" then
-        local playerCount = countPlayerUnits(units)
         for index = 1, #units do
-            units[index] = EventUnit.HydrateNetworkUnit(units[index], {
-                playerCount = playerCount,
-            })
+            units[index] = EventUnit.HydrateNetworkUnit(units[index], options)
         end
     end
     return units
 end
 
 local baseSerializeUnitDeltaBatchForNetwork = Event.SerializeUnitDeltaBatchForNetwork
-function Event.SerializeUnitDeltaBatchForNetwork(entries)
-    local serialized = baseSerializeUnitDeltaBatchForNetwork and baseSerializeUnitDeltaBatchForNetwork(entries) or ""
+function Event.SerializeUnitDeltaBatchForNetwork(entries, options)
+    local resolvedOptions = type(options) == "table" and options or {}
+    local compactEntries = {}
+    for index = 1, #(entries or {}) do
+        local entry = entries[index]
+        if type(entry) == "table" and tostring(entry.operation or "") == "upsert" then
+            local copy = {}
+            for key, value in pairs(entry) do
+                copy[key] = value
+            end
+            local sourceUnit = entry.unit or entry
+            copy.unit = compactSnapshotUnit(sourceUnit, resolvedOptions.playerCount or 0, resolvedOptions)
+            compactEntries[index] = copy
+        else
+            compactEntries[index] = entry
+        end
+    end
+
+    local serialized = baseSerializeUnitDeltaBatchForNetwork and baseSerializeUnitDeltaBatchForNetwork(compactEntries, options) or ""
     if serialized == "" then
         return serialized
     end
@@ -461,7 +564,7 @@ function Event.SerializeUnitDeltaBatchForNetwork(entries)
     for index = 1, #records do
         local fields = splitPreservingEmpty(records[index], UNIT_DELTA_FIELD_SEPARATOR)
         if tostring(fields[1] or "") == "upsert" and tostring(fields[3] or "") ~= "" then
-            local entry = type(entries) == "table" and entries[index] or nil
+            local entry = type(compactEntries) == "table" and compactEntries[index] or nil
             local sourceUnit = type(entry) == "table" and (entry.unit or entry) or nil
             fields[3] = appendVariantIdentity(fields[3], sourceUnit)
             records[index] = table.concat(fields, UNIT_DELTA_FIELD_SEPARATOR)
@@ -471,8 +574,8 @@ function Event.SerializeUnitDeltaBatchForNetwork(entries)
 end
 
 local baseDeserializeUnitDeltaBatchFromNetwork = Event.DeserializeUnitDeltaBatchFromNetwork
-function Event.DeserializeUnitDeltaBatchFromNetwork(batchText)
-    local entries = baseDeserializeUnitDeltaBatchFromNetwork and baseDeserializeUnitDeltaBatchFromNetwork(batchText) or {}
+function Event.DeserializeUnitDeltaBatchFromNetwork(batchText, options)
+    local entries = baseDeserializeUnitDeltaBatchFromNetwork and baseDeserializeUnitDeltaBatchFromNetwork(batchText, options) or {}
     if type(batchText) ~= "string" or batchText == "" then
         return entries
     end

@@ -36,36 +36,10 @@ local function normalizeVariantIndex(value)
 end
 
 local function resolveActivatedUnitDefinition(registryId)
-    local normalizedRegistryId = type(registryId) == "string" and registryId or ""
-    if normalizedRegistryId == "" then
+    if type(Registry.ResolveUnitDefinition) ~= "function" then
         return nil, nil
     end
-
-    local separatorIndex = string.find(normalizedRegistryId, ":", 1, true)
-    if not separatorIndex then
-        return nil, nil
-    end
-
-    local datasetId = string.sub(normalizedRegistryId, 1, separatorIndex - 1)
-    local unitId = string.sub(normalizedRegistryId, separatorIndex + 1)
-    if datasetId == "" or unitId == "" then
-        return nil, nil
-    end
-
-    local datasets = Registry.GetActivatedDatasets and Registry:GetActivatedDatasets() or {}
-    for datasetIndex = 1, #datasets do
-        local dataset = datasets[datasetIndex]
-        if dataset and dataset.id == datasetId then
-            for unitIndex = 1, #(dataset.units or {}) do
-                local unit = dataset.units[unitIndex]
-                if unit and unit.id == unitId then
-                    return dataset, unit
-                end
-            end
-        end
-    end
-
-    return nil, nil
+    return Registry:ResolveUnitDefinition(registryId)
 end
 
 local function countPlayerUnits(units)
@@ -114,12 +88,30 @@ local function resolveCurrentPlayerCount(server, options)
     return countPlayerUnits(eventState and eventState.units or {})
 end
 
-local function buildPlayerScaledResourceValues(baseUnit, playerCount, presetIndex)
+local function normalizeEventLevel(value)
+    local level = tonumber(value)
+    if level == nil or level ~= level or level == math.huge or level == -math.huge then
+        return 1
+    end
+    return math.max(1, math.floor(level))
+end
+
+local function resolveCurrentEventLevel(server, options)
+    if type(options) == "table" and options.level ~= nil then
+        return normalizeEventLevel(options.level)
+    end
+
+    local eventState = server and server.GetEditableEventState and server:GetEditableEventState() or nil
+    return normalizeEventLevel(eventState and eventState.level)
+end
+
+local function buildPlayerScaledResourceValues(baseUnit, playerCount, presetIndex, level)
     if not EventUnit or type(EventUnit.BuildUnitDerivedResources) ~= "function" then
         return {}
     end
 
     local resources = EventUnit.BuildUnitDerivedResources(baseUnit, presetIndex, playerCount, {
+        level = level,
         difficulty = "normal",
         healthPercent = 0,
     })
@@ -169,8 +161,9 @@ function Server:BuildResolvedNpcVariant(registryId, options)
     local presetIndex = UnitClass.NormalizePresetIndex(baseUnit, resolvedOptions.presetIndex)
     local preset = UnitClass.ResolvePreset(baseUnit, presetIndex)
     local playerCount = resolveCurrentPlayerCount(self, resolvedOptions)
-    local stats = UnitClass.ApplyStatModifiers(baseUnit.stats or {}, preset)
-    local resources = buildPlayerScaledResourceValues(baseUnit, playerCount, presetIndex)
+    local level = resolveCurrentEventLevel(self, resolvedOptions)
+    local stats = EventUnit.BuildUnitDerivedStats(baseUnit, presetIndex, level)
+    local resources = buildPlayerScaledResourceValues(baseUnit, playerCount, presetIndex, level)
     local effectiveAppearances = UnitClass.ResolveEffectiveAppearances(baseUnit, presetIndex)
 
     local appearanceIndex = 0
@@ -199,8 +192,9 @@ function Server:BuildResolvedNpcVariant(registryId, options)
         effectiveAppearances = deepCopy(effectiveAppearances or {}),
         appearanceIndex = appearanceIndex,
         appearance = appearanceIndex > 0 and UnitClass.ResolveAppearance(baseUnit, presetIndex, appearanceIndex) or nil,
-        challengeLevel = UnitClass.NormalizeChallengeLevel(baseUnit.challengeLevel),
+        challengeLevel = UnitClass.ResolveEffectiveChallengeLevel(baseUnit, presetIndex),
         playerCount = playerCount,
+        level = level,
     }
 end
 
@@ -217,6 +211,7 @@ function Server:BuildEventNpcUnitDataFromDefinition(registryId, options)
 
     local variant = self:BuildResolvedNpcVariant(registryId, {
         presetIndex = requestedPresetIndex,
+        level = resolvedOptions.level ~= nil and resolvedOptions.level or eventState and eventState.level,
         playerCount = countPlayerUnits(eventState and eventState.units or {}),
         selectRandomAppearance = resolvedOptions.selectRandomAppearance == true or isSummonMaterialization,
     })

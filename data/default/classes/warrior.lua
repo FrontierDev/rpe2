@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 15,
+        version = 39,
     dataset = {
         achievements = {},
         auras = {
@@ -168,13 +168,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 5,
+                        baseDamage = 20.8,
                         damageSchoolRefs = {
                             "f82db71a:v1azo4j6"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.1,
+                                coefficient = 0.364,
                                 statRef = "f82db71a:u7b49vs9"
                             }
                         },
@@ -211,13 +211,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 5,
+                        baseDamage = 28.1667,
                         damageSchoolRefs = {
                             "f82db71a:v1azo4j6"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.2,
+                                coefficient = 0.29575,
                                 statRef = "f82db71a:u7b49vs9"
                             }
                         },
@@ -231,22 +231,7 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Deep Wounds",
                 stackBehavior = "refresh_duration",
                 tags = {},
-                tooltipTemplate = true,
-                tooltipTemplateData = {
-                    bodyText = "Deals {AURA_DAMAGE_1} Physical damage each turn.",
-                    bodyTokens = {
-                        {
-                            applyMode = "damage_amount",
-                            baseField = "baseDamage",
-                            effectIndex = 1,
-                            key = "AURA_DAMAGE_1",
-                            tokenType = "aura_amount"
-                        }
-                    },
-                    stackingText = "",
-                    stackingTokens = {},
-                    version = 1
-                }
+                tooltipTemplate = true
             },
             {
                 description = "",
@@ -413,6 +398,160 @@ Addon.Data.DefaultDatasets:Register({
                     stackingTokens = {},
                     version = 1
                 }
+            },
+            {
+                description = "",
+                duration = 1,
+                effects = {
+                    {
+                        baseAmount = -18,
+                        operation = "flat",
+                        statRef = "f82db71a:pu05li08",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/ability_warrior_colossussmash.blp",
+                id = "clsmshau",
+                maxStacks = 1,
+                name = "Colossus Smash",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Reduces Damage Reduction by 18%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 2,
+                effects = {
+                    {
+                        baseAmount = 20,
+                        operation = "flat",
+                        statRef = "f82db71a:gj9wxb0x",
+                        statScaling = {},
+                        type = "stat"
+                    },
+                    {
+                        baseAmount = -20,
+                        operation = "flat",
+                        statRef = "f82db71a:pu05li08",
+                        statScaling = {},
+                        type = "stat"
+                    },
+                    {
+                        baseAmount = -20,
+                        operation = "flat",
+                        statRef = "f82db71a:zs1nbz13",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_shadow_deathpact.blp",
+                id = "dthwshau",
+                maxStacks = 1,
+                name = "Death Wish",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Damage Done by 20%. Reduces Damage Reduction by 20%. Reduces Magic Resistance by 20%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 2,
+                effects = {
+                    {
+                        baseAmount = 30,
+                        operation = "percent",
+                        statRef = "f82db71a:ygjno50i",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_holy_ashestoashes.blp",
+                id = "lstndaur",
+                maxStacks = 1,
+                name = "Last Stand",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Stamina by 30%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 1,
+                effects = {
+                    {
+                        baseAmount = 15,
+                        operation = "percent",
+                        statRef = "f82db71a:ygjno50i",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/ability_warrior_rallyingcry.blp",
+                id = "rallyaur",
+                maxStacks = 1,
+                name = "Rallying Cry",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Stamina by 15%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 2,
+                effects = {
+                    {
+                        baseAmount = -10,
+                        operation = "percent",
+                        statRef = "f82db71a:u7b49vs9",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/ability_warrior_battleshout.blp",
+                id = "demshaur",
+                maxStacks = 1,
+                name = "Demoralizing Shout",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Reduces Melee Attack Power by 10%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
             }
         },
         authorName = "Ortellus-ArgentDawn",
@@ -487,7 +626,8 @@ Addon.Data.DefaultDatasets:Register({
                     "7bbb4cb9:sxq460qa",
                     "7bbb4cb9:cruelty3",
                     "7bbb4cb9:antcwar1",
-                    "7bbb4cb9:shldspc1"
+                    "7bbb4cb9:shldspc1",
+                    "7bbb4cb9:0yud4l94"
                 }
             }
         },
@@ -513,6 +653,223 @@ Addon.Data.DefaultDatasets:Register({
         resources = {},
         skills = {},
         spells = {
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false,
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseDamage = 78.75,
+                            damageSchoolRefs = {
+                                "f82db71a:v1azo4j6"
+                            },
+                            damageType = "melee",
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.3675,
+                                    statRef = "f82db71a:u7b49vs9"
+                                }
+                            },
+                            targetEvents = {
+                                "on_melee_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 1,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 1.05,
+                            weaponDamageMode = "main_hand"
+                        },
+                        key = "ovrpowr1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Requires a failed attack this turn",
+                        type = "caster_failed_attack_this_turn"
+                    },
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires Main Hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                cooldown = 1,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "Instantly overpower an enemy after a failed attack, dealing Physical damage.",
+                icon = "interface/icons/ability_meleedamage.blp",
+                id = "ovrpowr1",
+                cooldownChannel = 5,
+                learnMode = "always_learned",
+                learnLevel = 12,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Overpower",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:e2tfklq7"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Arms",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Deal {DAMAGE_1} Physical damage to an enemy after failing an attack this turn.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_melee_hit",
+                    "on_critical_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false,
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseDamage = 39,
+                            damageSchoolRefs = {
+                                "f82db71a:v1azo4j6"
+                            },
+                            damageType = "melee",
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.182,
+                                    statRef = "f82db71a:u7b49vs9"
+                                }
+                            },
+                            targetEvents = {
+                                "on_melee_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 1.5,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 0.52,
+                            weaponDamageMode = "main_hand"
+                        },
+                        key = "9e1eae8d",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires Main Hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_rogue_ambush.blp",
+                id = "c1s93sif",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Heroic Strike",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 15,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:e2tfklq7"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Arms",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generates a moderate amount of threat.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
             {
                 allowDeadTargets = false,
                 canMoveWhileCasting = false,
@@ -549,7 +906,7 @@ Addon.Data.DefaultDatasets:Register({
                                 "on_melee_taken",
                                 "on_critical_hit_taken"
                             },
-                            threatCoefficient = 1.5,
+                            threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
                             weaponDamageCoefficient = 1,
@@ -559,112 +916,7 @@ Addon.Data.DefaultDatasets:Register({
                         target = {
                             allowDeadTargets = false,
                             disableSelfCast = false,
-                            maxTargets = 1,
-                            minTargets = 1,
-                            requiresTarget = true,
-                            targetDisposition = "enemy",
-                            type = "single"
-                        }
-                    }
-                },
-                conditions = {
-                    {
-                        invert = false,
-                        showOnTooltip = true,
-                        slotKey = "mainhand",
-                        tooltipTextOverride = "Requires Main Hand",
-                        type = "item_equipped",
-                        weaponTypeRefs = {}
-                    }
-                },
-                cooldown = 0,
-                cooldownGroup = "",
-                cooldownScalesWithHaste = false,
-                description = "",
-                icon = "interface/icons/ability_rogue_ambush.blp",
-                id = "c1s93sif",
-                ignoreGCD = true,
-                learnMode = "always_learned",
-                mountedCombatOnly = false,
-                name = "Heroic Strike",
-                range = 0,
-                resourceCosts = {
-                    {
-                        amount = 15,
-                        amountMode = "flat",
-                        castPhase = "on_cast_end",
-                        refundOnInterrupt = 0,
-                        resourceRef = "f82db71a:e2tfklq7"
-                    }
-                },
-                seedNPCSpell = false,
-                spellbookCategory = "Arms",
-                tags = {},
-                tooltipTemplate = true,
-                tooltipTemplateData = {
-                    auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generates a moderate amount of threat.",
-                    tokens = {
-                        {
-                            applyMode = "damage_range",
-                            componentIndex = 1,
-                            key = "DAMAGE_1",
-                            tokenType = "spell_damage_range"
-                        }
-                    },
-                    version = 1
-                },
-                totalTicks = 0,
-                triggersGCD = false,
-                useCooldownCharges = false
-            },
-            {
-                allowDeadTargets = false,
-                canMoveWhileCasting = false,
-                castTime = 0,
-                casterEvents = {
-                    "on_melee_hit",
-                    "on_critical_hit"
-                },
-                charges = 0,
-                components = {
-                    {
-                        castPhase = "on_cast_end",
-                        castingGroup = "default",
-                        effect = {
-                            alwaysHits = false,
-                            amountMode = "flat",
-                            applyAura = false,
-                            auraStacks = 1,
-                            baseDamage = 56.25,
-                            damageSchoolRefs = {
-                                "f82db71a:v1azo4j6"
-                            },
-                            damageType = "melee",
-                            hitType = "ability",
-                            projectilePath = "",
-                            projectileSpeed = 0,
-                            statScaling = {
-                                {
-                                    coefficient = 0.263,
-                                    statRef = "f82db71a:u7b49vs9"
-                                }
-                            },
-                            targetEvents = {
-                                "on_melee_taken",
-                                "on_critical_hit_taken"
-                            },
-                            threatCoefficient = 1,
-                            type = "damage",
-                            usesProjectile = false,
-                            weaponDamageCoefficient = 0.75,
-                            weaponDamageMode = "main_hand"
-                        },
-                        key = "9e1eae8d",
-                        target = {
-                            allowDeadTargets = false,
-                            disableSelfCast = false,
-                            maxTargets = 1,
+                            maxTargets = 2,
                             minTargets = 1,
                             requiresTarget = true,
                             targetDisposition = "enemy",
@@ -688,8 +940,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_cleave.blp",
                 id = "e0mooybr",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Cleave",
                 range = 0,
@@ -708,7 +963,7 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to up to 1 enemy.\n|cff999999Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 1 enemy. Targets must share the same raid marker.",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -720,7 +975,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -754,7 +1008,7 @@ Addon.Data.DefaultDatasets:Register({
                             applyAura = true,
                             auraRef = "7bbb4cb9:sb4b9ef3",
                             auraStacks = 1,
-                            baseDamage = 108.75,
+                            baseDamage = 92.438,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -764,7 +1018,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.508,
+                                    coefficient = 0.4314,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -775,7 +1029,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1.45,
+                            weaponDamageCoefficient = 1.2325,
                             weaponDamageMode = "main_hand"
                         },
                         key = "fac025f0",
@@ -806,8 +1060,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_savageblow.blp",
                 id = "0jiq0uoc",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 40,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Mortal Strike",
                 range = 0,
@@ -856,7 +1113,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -878,7 +1134,7 @@ Addon.Data.DefaultDatasets:Register({
                             applyAura = false,
                             auraRef = "7bbb4cb9:sb4b9ef3",
                             auraStacks = 1,
-                            baseDamage = 101.25,
+                            baseDamage = 106.313,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -888,7 +1144,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.5,
+                                    coefficient = 0.525,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -899,7 +1155,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 1.05,
                             weaponDamageMode = "main_hand"
                         },
                         key = "fac025f0",
@@ -930,8 +1186,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_decisivestrike.blp",
                 id = "68qm26aq",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 30,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Slam",
                 range = 0,
@@ -962,7 +1221,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -984,7 +1242,7 @@ Addon.Data.DefaultDatasets:Register({
                             applyAura = true,
                             auraRef = "7bbb4cb9:3zcf855l",
                             auraStacks = 1,
-                            baseDamage = 55.25,
+                            baseDamage = 46.41,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -994,7 +1252,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.193,
+                                    coefficient = 0.1624,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -1005,7 +1263,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1.5,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1.45,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "fac025f0",
@@ -1036,8 +1294,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_sunder.blp",
                 id = "etsuhe6x",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 10,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Sunder Armor",
                 range = 0,
@@ -1097,7 +1358,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1118,7 +1378,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 130,
+                            baseDamage = 104,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -1128,7 +1388,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.455,
+                                    coefficient = 0.364,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -1139,7 +1399,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 2,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "9e1eae8d",
@@ -1170,8 +1430,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/inv_shield_05.blp",
                 id = "kejakdxo",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 40,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Shield Slam",
                 range = 0,
@@ -1202,7 +1465,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1223,7 +1485,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 55.25,
+                            baseDamage = 70.72,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -1233,7 +1495,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.193,
+                                    coefficient = 0.2475,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -1244,7 +1506,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1.5,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "9e1eae8d",
@@ -1293,8 +1555,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_shieldbash.blp",
                 id = "ti2j4umn",
-                ignoreGCD = true,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
+                learnLevel = 12,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Shield Bash",
                 range = 0,
@@ -1325,7 +1590,63 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            duration = 3,
+                            targetEvents = {},
+                            type = "taunt"
+                        },
+                        key = "tntcmp01",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 3,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_nature_reincarnation.blp",
+                id = "tntwar01",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 10,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Taunt",
+                range = 0,
+                resourceCosts = {
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Taunt an enemy for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
                 useCooldownCharges = false
             },
             {
@@ -1386,8 +1707,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_racial_bloodrage.blp",
                 id = "yn5l4xkq",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 10,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Bloodrage",
                 range = 0,
@@ -1444,7 +1768,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1484,8 +1807,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/warrior_talent_icon_innerrage.blp",
                 id = "lzan8taw",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 56,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Inner Rage",
                 range = 0,
@@ -1520,7 +1846,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1569,8 +1894,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_gouge.blp",
                 id = "xniv44uu",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 4,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Rend",
                 range = 0,
@@ -1621,7 +1949,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1652,7 +1979,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.254,
+                                    coefficient = 0.2538,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -1694,8 +2021,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_whirlwind.blp",
                 id = "k7ndyn09",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 36,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Whirlwind",
                 range = 0,
@@ -1714,7 +2044,8 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies.\n|cff999999Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. Targets must share the same raid marker.",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. Targets must share the same raid marker.",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -1726,7 +2057,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1757,7 +2087,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.463,
+                                    coefficient = 0.4625,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -1799,8 +2129,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_bladestorm.blp",
                 id = "bblnsvg2",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 60,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Bladestorm",
                 range = 0,
@@ -1819,7 +2152,8 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies.\n|cff999999Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. Targets must share the same raid marker.",
+                    mainText = "Deal {DAMAGE_1} Physical damage to up to 4 enemies. Targets must share the same raid marker.",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -1831,7 +2165,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1871,8 +2204,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/inv_mace_62.blp",
                 id = "9870xnra",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Knockdown",
                 range = 0,
@@ -1915,7 +2251,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1955,8 +2290,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_golemthunderclap.blp",
                 id = "s4nfrf2l",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 22,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Intimidating Shout",
                 range = 0,
@@ -1999,7 +2337,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2048,8 +2385,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_defend.blp",
                 id = "g36ujwt9",
-                ignoreGCD = true,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
+                learnLevel = 16,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Shield Block",
                 range = 0,
@@ -2092,7 +2432,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = true
             },
             {
@@ -2123,7 +2462,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.387,
+                                    coefficient = 0.3868,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -2160,7 +2499,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.1,
+                                    coefficient = 0.1257,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -2199,8 +2538,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_nature_bloodlust.blp",
                 id = "05yeh7qb",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 40,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Bloodthirst",
                 range = 0,
@@ -2237,7 +2579,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2258,7 +2599,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 48.75,
+                            baseDamage = 39,
                             damageSchoolRefs = {
                                 "f82db71a:v1azo4j6"
                             },
@@ -2268,7 +2609,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.228,
+                                    coefficient = 0.182,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -2279,7 +2620,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1.5,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 0.65,
+                            weaponDamageCoefficient = 0.52,
                             weaponDamageMode = "main_hand"
                         },
                         key = "9e1eae8d",
@@ -2310,8 +2651,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_revenge.blp",
                 id = "mn1ltzeo",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 14,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Revenge",
                 range = 0,
@@ -2342,7 +2686,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2382,8 +2725,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_battleshout.blp",
                 id = "9gh28pe5",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Battle Shout",
                 range = 0,
@@ -2426,7 +2772,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2466,8 +2811,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_rallyingcry.blp",
                 id = "c6j8zcqx",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 54,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Commanding Shout",
                 range = 0,
@@ -2510,7 +2858,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2559,8 +2906,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_shieldwall.blp",
                 id = "tkb4huco",
-                ignoreGCD = true,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
+                learnLevel = 28,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Shield Wall",
                 range = 0,
@@ -2595,7 +2945,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2631,8 +2980,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_victoryrush.blp",
                 id = "0ttffa47",
-                ignoreGCD = true,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
+                learnLevel = 56,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Intervene",
                 range = 0,
@@ -2656,7 +3008,1077 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_melee_hit",
+                    "on_critical_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false,
+                            amountMode = "flat",
+                            applyAura = true,
+                            auraRef = "7bbb4cb9:3zcf855l",
+                            auraStacks = 3,
+                            baseDamage = 66.3,
+                            damageSchoolRefs = {
+                                "f82db71a:v1azo4j6"
+                            },
+                            damageType = "melee",
+                            duration = 5,
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.3094,
+                                    statRef = "f82db71a:u7b49vs9"
+                                }
+                            },
+                            targetEvents = {
+                                "on_melee_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 2,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 0.884,
+                            weaponDamageMode = "main_hand"
+                        },
+                        key = "devdmg01",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires Main Hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                cooldown = 3,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/inv_sword_11.blp",
+                id = "devast01",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Devastate",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 15,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:e2tfklq7"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "7bbb4cb9:3zcf855l",
+                            datasetId = "7bbb4cb9",
+                            descriptionText = "Reduces Armor by 5%. Applies {AURA_APPLIED_STACKS_1} stacks. Stacks up to {AURA_MAX_STACKS_1} times.",
+                            duration = 5,
+                            icon = "interface/icons/ability_warrior_sunder.blp",
+                            nameText = "Sunder Armor",
+                            powerLevel = 0,
+                            spellDatasetId = "7bbb4cb9",
+                            stacks = 3,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "applied_stacks",
+                                    key = "AURA_APPLIED_STACKS_1",
+                                    tokenType = "aura_stacks"
+                                },
+                                {
+                                    applyMode = "max_stacks",
+                                    key = "AURA_MAX_STACKS_1",
+                                    tokenType = "aura_stacks"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Deal {DAMAGE_1} Physical damage to an enemy and apply Sunder Armor with 3 stacks for 5 turns. Generates a high amount of threat.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_melee_hit",
+                    "on_critical_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false,
+                            amountMode = "flat",
+                            applyAura = true,
+                            auraRef = "7bbb4cb9:clsmshau",
+                            auraStacks = 1,
+                            baseDamage = 117.9375,
+                            damageSchoolRefs = {
+                                "f82db71a:v1azo4j6"
+                            },
+                            damageType = "melee",
+                            duration = 1,
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.550375,
+                                    statRef = "f82db71a:u7b49vs9"
+                                }
+                            },
+                            targetEvents = {
+                                "on_melee_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 1,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 1.5725,
+                            weaponDamageMode = "main_hand"
+                        },
+                        key = "colsdmg1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires Main Hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                cooldown = 6,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_warrior_colossussmash.blp",
+                id = "colsmash",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Colossus Smash",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 10,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:e2tfklq7"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Arms",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "7bbb4cb9:clsmshau",
+                            datasetId = "7bbb4cb9",
+                            descriptionText = "Reduces Damage Reduction by 18%.",
+                            duration = 1,
+                            icon = "interface/icons/ability_warrior_savageblow.blp",
+                            nameText = "Colossus Smash",
+                            powerLevel = 0,
+                            spellDatasetId = "7bbb4cb9",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Deal {DAMAGE_1} Physical damage to an enemy and apply Colossus Smash for 1 turn.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_melee_hit",
+                    "on_critical_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false,
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseDamage = 75,
+                            damageSchoolRefs = {
+                                "f82db71a:v1azo4j6"
+                            },
+                            damageType = "melee",
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.35,
+                                    statRef = "f82db71a:u7b49vs9"
+                                }
+                            },
+                            targetEvents = {
+                                "on_melee_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 1,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 1,
+                            weaponDamageMode = "off_hand"
+                        },
+                        key = "ragbdmg1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        auraRef = "7bbb4cb9:12yk1r4y",
+                        invert = false,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Requires Enrage",
+                        type = "aura_requirement",
+                        unit = "caster"
+                    },
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "offhand",
+                        tooltipTextOverride = "Requires Off Hand Weapon",
+                        type = "item_equipped",
+                        weaponTypeRefs = {
+                            "f82db71a:z6nh3znw",
+                            "f82db71a:i4pivdig",
+                            "f82db71a:9ni3vfas",
+                            "f82db71a:y0dnlo8g",
+                            "f82db71a:gjz2331m"
+                        }
+                    }
+                },
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/warrior_wild_strike.blp",
+                id = "ragblow1",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Raging Blow",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 15,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:e2tfklq7"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Fury",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Deal {DAMAGE_1} Physical damage to an enemy.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_melee_hit",
+                    "on_critical_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false,
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseDamage = 143.4375,
+                            damageSchoolRefs = {
+                                "f82db71a:v1azo4j6"
+                            },
+                            damageType = "melee",
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.669375,
+                                    statRef = "f82db71a:u7b49vs9"
+                                }
+                            },
+                            targetEvents = {
+                                "on_melee_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 1,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 1.9125,
+                            weaponDamageMode = "both"
+                        },
+                        key = "rampdmg1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    },
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "7bbb4cb9:12yk1r4y",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "rampenrg",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires Main Hand Weapon",
+                        type = "weapon_type",
+                        weaponTypeRefs = {
+                            "f82db71a:z6nh3znw",
+                            "f82db71a:i4pivdig",
+                            "f82db71a:9ni3vfas",
+                            "f82db71a:y0dnlo8g",
+                            "f82db71a:gjz2331m"
+                        }
+                    },
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "offhand",
+                        tooltipTextOverride = "Requires Off Hand Weapon",
+                        type = "weapon_type",
+                        weaponTypeRefs = {
+                            "f82db71a:z6nh3znw",
+                            "f82db71a:i4pivdig",
+                            "f82db71a:9ni3vfas",
+                            "f82db71a:y0dnlo8g",
+                            "f82db71a:gjz2331m"
+                        }
+                    }
+                },
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_warrior_rampage.blp",
+                id = "rampage1",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Rampage",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 80,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:e2tfklq7"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Fury",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "7bbb4cb9:12yk1r4y",
+                            datasetId = "7bbb4cb9",
+                            descriptionText = "Increases Damage Done by 10%.",
+                            duration = 2,
+                            icon = "interface/icons/spell_shadow_unholyfrenzy.blp",
+                            nameText = "Enrage",
+                            powerLevel = 0,
+                            spellDatasetId = "7bbb4cb9",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Apply Enrage to yourself for 2 turns.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "7bbb4cb9:12yk1r4y",
+                            basePower = 0,
+                            duration = 1,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "berenrg1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 5,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_nature_ancestralguardian.blp",
+                id = "berrage1",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Berserker Rage",
+                range = 0,
+                resourceCosts = {},
+                seedNPCSpell = false,
+                spellbookCategory = "Fury",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "7bbb4cb9:12yk1r4y",
+                            datasetId = "7bbb4cb9",
+                            descriptionText = "Increases Damage Done by 10%.",
+                            duration = 1,
+                            icon = "interface/icons/spell_shadow_unholyfrenzy.blp",
+                            nameText = "Enrage",
+                            powerLevel = 0,
+                            spellDatasetId = "7bbb4cb9",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Enrage to yourself for 1 turn.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "7bbb4cb9:dthwshau",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "dthwsh01",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_shadow_deathpact.blp",
+                id = "deathwsh",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Death Wish",
+                range = 0,
+                resourceCosts = {},
+                seedNPCSpell = false,
+                spellbookCategory = "Fury",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "7bbb4cb9:dthwshau",
+                            datasetId = "7bbb4cb9",
+                            descriptionText = "Increases Damage Done by 20%. Reduces Damage Reduction by 20%. Reduces Magic Resistance by 20%.",
+                            duration = 2,
+                            icon = "interface/icons/spell_shadow_deathpact.blp",
+                            nameText = "Death Wish",
+                            powerLevel = 0,
+                            spellDatasetId = "7bbb4cb9",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Death Wish to yourself for 2 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "7bbb4cb9:lstndaur",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "lstndcmp",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_ashestoashes.blp",
+                id = "laststnd",
+                cooldownChannel = 5,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Last Stand",
+                range = 0,
+                resourceCosts = {},
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "7bbb4cb9:lstndaur",
+                            datasetId = "7bbb4cb9",
+                            descriptionText = "Increases Stamina by 30%.",
+                            duration = 2,
+                            icon = "interface/icons/ability_warrior_shieldwall.blp",
+                            nameText = "Last Stand",
+                            powerLevel = 0,
+                            spellDatasetId = "7bbb4cb9",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Last Stand to yourself for 2 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "7bbb4cb9:rallyaur",
+                            basePower = 0,
+                            duration = 1,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "rallycmp",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "all_allies"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_warrior_rallyingcry.blp",
+                id = "rallycry",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Rallying Cry",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 10,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:e2tfklq7"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "7bbb4cb9:rallyaur",
+                            datasetId = "7bbb4cb9",
+                            descriptionText = "Increases Stamina by 15%.",
+                            duration = 1,
+                            icon = "interface/icons/ability_warrior_rallyingcry.blp",
+                            nameText = "Rallying Cry",
+                            powerLevel = 0,
+                            spellDatasetId = "7bbb4cb9",
+                            stacks = 1,
+                            targetContext = {
+                                object = "all allies",
+                                possessive = "all allies'",
+                                reflexive = "themselves",
+                                subject = "all allies"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Rallying Cry to all allies for 1 turn.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "7bbb4cb9:demshaur",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "demoscmp",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = true,
+                            maxTargets = 5,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "multi"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 2,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_warrior_battleshout.blp",
+                id = "demoshot",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Demoralizing Shout",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 10,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:e2tfklq7"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "7bbb4cb9:demshaur",
+                            datasetId = "7bbb4cb9",
+                            descriptionText = "Reduces Melee Attack Power by 10%.",
+                            duration = 2,
+                            icon = "interface/icons/ability_warrior_battleshout.blp",
+                            nameText = "Demoralizing Shout",
+                            powerLevel = 0,
+                            spellDatasetId = "7bbb4cb9",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Demoralizing Shout to up to 5 enemies for 2 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_ranged_hit",
+                    "on_critical_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false,
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseDamage = 39,
+                            damageSchoolRefs = {
+                                "f82db71a:v1azo4j6"
+                            },
+                            damageType = "ranged",
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.182,
+                                    statRef = "f82db71a:v2rs9cpy"
+                                }
+                            },
+                            targetEvents = {
+                                "on_ranged_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 2,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 0.52,
+                            weaponDamageMode = "main_hand"
+                        },
+                        key = "herthdmg",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "ranged",
+                        tooltipTextOverride = "Requires a thrown weapon",
+                        type = "item_equipped",
+                        weaponTypeRefs = {
+                            "f82db71a:we5ul4ne"
+                        }
+                    }
+                },
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/inv_axe_66.blp",
+                id = "herthrow",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Heroic Throw",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 19,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:e2tfklq7"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generates a high amount of threat.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
                 useCooldownCharges = false
             }
         },
@@ -2882,6 +4304,7 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 events = {
                     {
+                        chance = 100,
                         combatEventId = "on_critical_hit",
                         effects = {
                             {
@@ -2892,7 +4315,7 @@ Addon.Data.DefaultDatasets:Register({
                                 type = "apply_aura"
                             }
                         },
-                        triggerTarget = "aura_caster"
+                        triggerTarget = "event_other"
                     }
                 },
                 icon = "interface/icons/ability_backstab.blp",

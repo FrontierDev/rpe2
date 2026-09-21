@@ -48,5 +48,5 @@ if type(dataset) == "table" then
         dataset.loot[#dataset.loot + 1] = definition
     end
 
-    inscription.version = math.max(2, math.floor(tonumber(inscription.version) or 1))
+    inscription.version = math.max(4, math.floor(tonumber(inscription.version) or 1))
 end

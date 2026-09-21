@@ -21,6 +21,7 @@ local STACK_BEHAVIOR_ITEMS = {
 local EFFECT_TYPE_ITEMS = {
     { label = "Damage", value = "damage" },
     { label = "Heal", value = "heal" },
+    { label = "Absorb", value = "absorb" },
     { label = "Stat", value = "stat" },
     { label = "Skill", value = "skill" },
     { label = "Control", value = "control" },
@@ -99,6 +100,28 @@ local function normalizeScalingEntries(values)
     return normalized
 end
 
+local function normalizeDamageSchoolRefs(values)
+    local normalized = {}
+    for index = 1, #(values or {}) do
+        local value = tostring(values[index] or "")
+        if value ~= "" then
+            normalized[#normalized + 1] = value
+        end
+    end
+    return normalized
+end
+
+local function normalizeNonNegativeNumber(value)
+    local numericValue = tonumber(value)
+    if numericValue == nil or numericValue ~= numericValue
+        or numericValue == math.huge or numericValue == -math.huge
+    then
+        return 0
+    end
+
+    return math.max(0, numericValue)
+end
+
 local function normalizeCombatEventId(value)
     local combatEventId = string.lower(tostring(value or ""))
     if combatEventId == "" then
@@ -118,6 +141,16 @@ local function normalizeTriggerTarget(value)
     end
 
     return "event_other"
+end
+
+local function normalizeDefenceStatRef(value)
+    local reference = tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    return reference ~= "" and reference or nil
+end
+
+local function normalizeDamageSchoolRef(value)
+    local reference = tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    return reference ~= "" and reference or nil
 end
 
 local function normalizeChancePercent(value)
@@ -411,6 +444,35 @@ function DataEditor:NormalizeAuraInspectorEffect(effect)
             effect.amountMode = "flat"
         end
         effect.baseDamage = nil
+        effect.baseAbsorption = nil
+        effect.statRef = nil
+        effect.operation = nil
+        effect.baseAmount = nil
+        effect.skillRef = nil
+        effect.cancelOnDamage = nil
+        effect.preventCasting = nil
+        effect.movementRangeOverride = nil
+        effect.forceAutoHitAgainstTarget = nil
+        effect.auraRef = nil
+        effect.stacks = nil
+        effect.duration = nil
+        effect.basePower = nil
+        effect.resourceRef = nil
+        effect.amount = nil
+        return
+    end
+
+    if effectType == "absorb" then
+        effect.type = "absorb"
+        effect.baseAbsorption = normalizeNonNegativeNumber(effect.baseAbsorption)
+        effect.amountMode = tostring(effect.amountMode or "flat")
+        if effect.amountMode ~= "base_percent" and effect.amountMode ~= "max_percent" then
+            effect.amountMode = "flat"
+        end
+        effect.statScaling = normalizeScalingEntries(effect.statScaling)
+        effect.damageSchoolRefs = normalizeDamageSchoolRefs(effect.damageSchoolRefs)
+        effect.baseDamage = nil
+        effect.baseHealing = nil
         effect.statRef = nil
         effect.operation = nil
         effect.baseAmount = nil
@@ -434,6 +496,7 @@ function DataEditor:NormalizeAuraInspectorEffect(effect)
         effect.operation = tostring(effect.operation or "flat") == "percent" and "percent" or "flat"
         effect.baseAmount = tonumber(effect.baseAmount) or 0
         effect.baseDamage = nil
+        effect.baseAbsorption = nil
         effect.baseHealing = nil
         effect.skillRef = nil
         effect.cancelOnDamage = nil
@@ -458,6 +521,7 @@ function DataEditor:NormalizeAuraInspectorEffect(effect)
         effect.statRef = nil
         effect.operation = nil
         effect.baseDamage = nil
+        effect.baseAbsorption = nil
         effect.baseHealing = nil
         effect.cancelOnDamage = nil
         effect.preventCasting = nil
@@ -485,6 +549,7 @@ function DataEditor:NormalizeAuraInspectorEffect(effect)
         effect.skillRef = nil
         effect.baseAmount = nil
         effect.baseDamage = nil
+        effect.baseAbsorption = nil
         effect.baseHealing = nil
         effect.auraRef = nil
         effect.stacks = nil
@@ -502,6 +567,7 @@ function DataEditor:NormalizeAuraInspectorEffect(effect)
         effect.duration = math.max(1, math.floor(tonumber(effect.duration) or tonumber(effect.turns) or 12))
         effect.basePower = tonumber(effect.basePower) or tonumber(effect.powerLevel) or 0
         effect.baseDamage = nil
+        effect.baseAbsorption = nil
         effect.baseHealing = nil
         effect.statScaling = nil
         effect.damageSchoolRefs = nil
@@ -527,6 +593,7 @@ function DataEditor:NormalizeAuraInspectorEffect(effect)
             effect.amountMode = "flat"
         end
         effect.baseDamage = nil
+        effect.baseAbsorption = nil
         effect.baseHealing = nil
         effect.statScaling = nil
         effect.damageSchoolRefs = nil
@@ -553,6 +620,7 @@ function DataEditor:NormalizeAuraInspectorEffect(effect)
     end
     effect.damageSchoolRefs = effect.damageSchoolRefs or {}
     effect.baseHealing = nil
+    effect.baseAbsorption = nil
     effect.statRef = nil
     effect.operation = nil
     effect.baseAmount = nil
@@ -567,6 +635,21 @@ function DataEditor:NormalizeAuraInspectorEffect(effect)
     effect.basePower = nil
     effect.resourceRef = nil
     effect.amount = nil
+end
+
+function DataEditor:ValidateAuraAbsorption(aura)
+    if type(aura) ~= "table" then
+        return { valid = true, errors = {}, reason = "" }
+    end
+
+    if AuraClass and type(AuraClass.New) == "function" then
+        local normalizedAura = AuraClass:New(aura)
+        if type(normalizedAura.Validate) == "function" then
+            return normalizedAura:Validate()
+        end
+    end
+
+    return { valid = true, errors = {}, reason = "" }
 end
 
 function DataEditor:NormalizeAuraInspectorEventEffect(effect)
@@ -664,6 +747,12 @@ function DataEditor:NormalizeAuraInspectorEvent(auraEvent)
     end
 
     auraEvent.combatEventId = normalizeCombatEventId(auraEvent.combatEventId)
+    auraEvent.defenceStatRef = auraEvent.combatEventId == "on_defence"
+        and normalizeDefenceStatRef(auraEvent.defenceStatRef)
+        or nil
+    auraEvent.damageSchoolRef = auraEvent.combatEventId == "on_damage_type"
+        and normalizeDamageSchoolRef(auraEvent.damageSchoolRef)
+        or nil
     auraEvent.triggerTarget = auraEvent.combatEventId and normalizeTriggerTarget(auraEvent.triggerTarget) or nil
     auraEvent.chance = normalizeChancePercent(auraEvent.chance)
     auraEvent.effects = auraEvent.effects or {}
@@ -754,6 +843,9 @@ function DataEditor:BuildAuraInspectorEffectRows(aura)
 
         if effectType == "heal" then
             statusText = tostring(tonumber(effect and effect.baseHealing) or 0)
+        elseif effectType == "absorb" then
+            statusText = tostring(tonumber(effect and effect.baseAbsorption) or 0)
+            detailText = UI.Utils.JoinCommaSeparatedList(effect and effect.damageSchoolRefs or nil)
         elseif effectType == "stat" then
             statusText = tostring(tonumber(effect and effect.baseAmount) or 0)
             detailText = self:ResolveSpellInspectorReferenceLabel("stats", effect and effect.statRef or "")

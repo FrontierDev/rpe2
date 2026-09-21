@@ -640,7 +640,22 @@ function SpellbookPage:RefreshSpellEntries(rows)
                 end
 
                 entry:SetIcon(icon)
-                entry:SetSpellName(resolved.name or "Unknown Spell")
+                local displayName = resolved.name or "Unknown Spell"
+                if resolved.isAvailable == false and tonumber(resolved.requiredLevel) then
+                    displayName = ("%s (Requires Level %d)"):format(
+                        displayName,
+                        math.max(1, math.floor(tonumber(resolved.requiredLevel) or 1))
+                    )
+                elseif resolved.useSpellRanks == true
+                    and resolved.usesRanks ~= false
+                    and tonumber(resolved.rank)
+                then
+                    displayName = ("%s\n|cff999999Rank %d|r"):format(
+                        displayName,
+                        math.max(1, math.floor(tonumber(resolved.rank) or 1))
+                    )
+                end
+                entry:SetSpellName(displayName)
                 entry:SetEnabled(true)
                 entry:SetTooltip(function(owner)
                     local currentResolved = entry.resolvedSpell
@@ -652,6 +667,8 @@ function SpellbookPage:RefreshSpellEntries(rows)
                 end)
                 if resolved.isMissing == true then
                     entry:SetBorderColor(0.8, 0.22, 0.22, 1)
+                elseif resolved.isAvailable == false then
+                    entry:SetBorderColor(0.65, 0.34, 0.28, 1)
                 elseif boundSlot then
                     entry:SetBorderColor(0.94, 0.74, 0.22, 1)
                 else

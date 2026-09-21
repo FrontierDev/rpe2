@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 9,
+    version = 32,
     dataset = {
         achievements = {},
         auras = {
@@ -11,13 +11,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 20.8,
+                        baseDamage = 17.68,
                         damageSchoolRefs = {
                             "f82db71a:esjguw6d"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.52,
+                                coefficient = 0.442,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -50,17 +50,67 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 description = "",
-                duration = 5,
+                duration = 3,
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 72,
+                        baseDamage = 28.1667,
                         damageSchoolRefs = {
                             "f82db71a:esjguw6d"
                         },
                         statScaling = {
                             {
-                                coefficient = 1.8,
+                                coefficient = 0.4225,
+                                statRef = "f82db71a:7t7xgzcx"
+                            }
+                        },
+                        type = "damage"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_fire_incinerate.blp",
+                id = "ignite01",
+                maxStacks = 1,
+                name = "Ignite",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+            },
+            {
+                description = "",
+                duration = 1,
+                effects = {
+                    {
+                        cancelOnDamage = false,
+                        forceAutoHitAgainstTarget = true,
+                        movementRangeOverride = 0,
+                        preventCasting = true,
+                        statScaling = {},
+                        type = "control"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_fire_meteorstorm.blp",
+                id = "impact01",
+                maxStacks = 1,
+                name = "Impact",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+            },
+            {
+                description = "",
+                duration = 5,
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseDamage = 17.68,
+                        damageSchoolRefs = {
+                            "f82db71a:esjguw6d"
+                        },
+                        statScaling = {
+                            {
+                                coefficient = 0.442,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -153,6 +203,92 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplateData = {
                     bodyText = "Increases Spell Crit. Chance by 100%.",
                     bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 2,
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseAbsorption = 104,
+                        damageSchoolRefs = {
+                            "f82db71a:esjguw6d"
+                        },
+                        statScaling = {
+                            {
+                                coefficient = 0.52,
+                                statRef = "f82db71a:7t7xgzcx"
+                            }
+                        },
+                        type = "absorb"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_fire_firearmor.blp",
+                id = "frwdau01",
+                maxStacks = 1,
+                name = "Fire Ward",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Absorbs {AURA_ABSORB_1} Fire damage.",
+                    bodyTokens = {
+                        {
+                            applyMode = "absorb_amount",
+                            baseField = "baseAbsorption",
+                            effectIndex = 1,
+                            key = "AURA_ABSORB_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 2,
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseAbsorption = 104,
+                        damageSchoolRefs = {
+                            "f82db71a:hx7pnwv4"
+                        },
+                        statScaling = {
+                            {
+                                coefficient = 0.52,
+                                statRef = "f82db71a:7t7xgzcx"
+                            }
+                        },
+                        type = "absorb"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_frost_frostward.blp",
+                id = "fowdau01",
+                maxStacks = 1,
+                name = "Frost Ward",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Absorbs {AURA_ABSORB_1} Frost damage.",
+                    bodyTokens = {
+                        {
+                            applyMode = "absorb_amount",
+                            baseField = "baseAbsorption",
+                            effectIndex = 1,
+                            key = "AURA_ABSORB_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
                     stackingText = "",
                     stackingTokens = {},
                     version = 1
@@ -364,6 +500,196 @@ Addon.Data.DefaultDatasets:Register({
                     stackingTokens = {},
                     version = 1
                 }
+            },
+            {
+                description = "Increases Armor and Frost Resistance. On melee hit taken, apply Chilled to the attacker.",
+                duration = 10,
+                effects = {
+                    {
+                        baseAmount = 30,
+                        operation = "percent",
+                        scaleWithRank = true,
+                        statRef = "f82db71a:v42albuv",
+                        statScaling = {},
+                        type = "stat"
+                    },
+                    {
+                        baseAmount = 30,
+                        operation = "flat",
+                        scaleWithRank = false,
+                        statRef = "f82db71a:jjn0my8k",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {
+                    {
+                        combatEventId = "on_melee_taken",
+                        effects = {
+                            {
+                                auraRef = "d7c874c4:m5d3gzpj",
+                                basePower = 0,
+                                duration = 2,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "event_source"
+                    }
+                },
+                icon = "interface/icons/spell_frost_frostarmor02.blp",
+                id = "icearmra",
+                maxStacks = 1,
+                name = "Ice Armor",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Armor by {AURA_STAT_1}% and Frost Resistance by {AURA_STAT_2}. On melee hit taken, apply Chilled to the attacker.",
+                    bodyTokens = {
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 1,
+                            key = "AURA_STAT_1",
+                            tokenType = "aura_amount"
+                        },
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 2,
+                            key = "AURA_STAT_2",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "Increases Spell Crit. Chance by 5%. On melee hit taken, deal Fire damage to the attacker.",
+                duration = 10,
+                effects = {
+                    {
+                        baseAmount = 5,
+                        operation = "flat",
+                        scaleWithRank = false,
+                        statRef = "f82db71a:69hfqhne",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {
+                    {
+                        combatEventId = "on_melee_taken",
+                        effects = {
+                            {
+                                amountMode = "flat",
+                                baseDamage = 28.1667,
+                                damageSchoolRefs = {
+                                    "f82db71a:esjguw6d"
+                                },
+                                scaleWithRank = true,
+                                statScaling = {
+                                    {
+                                        coefficient = 0.4225,
+                                        statRef = "f82db71a:7t7xgzcx"
+                                    }
+                                },
+                                type = "damage"
+                            }
+                        },
+                        triggerTarget = "event_source"
+                    }
+                },
+                icon = "interface/icons/ability_mage_moltenarmor.blp",
+                id = "molarmra",
+                maxStacks = 1,
+                name = "Molten Armor",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Spell Crit. Chance by 5%. On melee hit taken, deal {AURA_EVENT_DAMAGE_1} Fire damage to the attacker.",
+                    bodyTokens = {
+                        {
+                            applyMode = "damage_amount",
+                            baseField = "baseDamage",
+                            effectIndex = 1,
+                            eventIndex = 1,
+                            key = "AURA_EVENT_DAMAGE_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "Increases Magic Resistance by 2% and Resource Regeneration by 30%.",
+                duration = 10,
+                effects = {
+                    {
+                        baseAmount = 2,
+                        operation = "flat",
+                        statRef = "f82db71a:zs1nbz13",
+                        statScaling = {},
+                        type = "stat"
+                    },
+                    {
+                        baseAmount = 30,
+                        operation = "flat",
+                        statRef = "f82db71a:rgnrtg01",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_magearmor.blp",
+                id = "mgarmaur",
+                maxStacks = 1,
+                name = "Mage Armor",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Magic Resistance by 2% and Resource Regeneration by 30%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "Breaks when the affected unit takes damage. Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                duration = 2,
+                effects = {
+                    {
+                        cancelOnDamage = true,
+                        forceAutoHitAgainstTarget = true,
+                        movementRangeOverride = 0,
+                        preventCasting = true,
+                        statScaling = {},
+                        type = "control"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_nature_polymorph.blp",
+                id = "polymrph",
+                maxStacks = 1,
+                name = "Polymorph",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Breaks when the affected unit takes damage. Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
             }
         },
         authorName = "Ortellus-ArgentDawn",
@@ -429,7 +755,12 @@ Addon.Data.DefaultDatasets:Register({
                     "d7c874c4:arcfocus",
                     "d7c874c4:magabsrb",
                     "d7c874c4:arcmind1",
-                    "d7c874c4:arcinst3"
+                    "d7c874c4:arcinst3",
+                    "d7c874c4:misbarge",
+                    "d7c874c4:arcconc1",
+                    "d7c874c4:mastelms",
+                    "d7c874c4:ignite20",
+                    "d7c874c4:impact05"
                 }
             }
         },
@@ -474,7 +805,7 @@ Addon.Data.DefaultDatasets:Register({
                             applyAura = true,
                             auraRef = "d7c874c4:vtrjl3l2",
                             auraStacks = 1,
-                            baseDamage = 114.75,
+                            baseDamage = 120.488,
                             damageSchoolRefs = {
                                 "f82db71a:esjguw6d"
                             },
@@ -484,7 +815,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.595,
+                                    coefficient = 0.6248,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -495,7 +826,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "cc50e341",
@@ -517,8 +848,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_fire_firebolt02.blp",
                 id = "68dy7na1",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Fireball",
                 range = 0,
@@ -575,7 +909,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -607,7 +940,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 1.339,
+                                    coefficient = 1.3388,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -618,7 +951,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "cc50e341",
@@ -640,8 +973,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_fire_fireball02.blp",
                 id = "kwn6xary",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Pyroblast",
                 range = 0,
@@ -698,7 +1034,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -720,7 +1055,7 @@ Addon.Data.DefaultDatasets:Register({
                             applyAura = false,
                             auraRef = "d7c874c4:vtrjl3l2",
                             auraStacks = 1,
-                            baseDamage = 65,
+                            baseDamage = 104,
                             damageSchoolRefs = {
                                 "f82db71a:esjguw6d"
                             },
@@ -730,7 +1065,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.325,
+                                    coefficient = 0.52,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -741,7 +1076,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 0.75,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "cc50e341",
@@ -763,14 +1098,17 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_fire_fireball.blp",
                 id = "96ygwvhq",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 6,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Fire Blast",
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 6.8,
+                        amount = 6.3,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -795,7 +1133,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = true
             },
             {
@@ -817,7 +1154,7 @@ Addon.Data.DefaultDatasets:Register({
                             applyAura = true,
                             auraRef = "d7c874c4:yxha70sc",
                             auraStacks = 1,
-                            baseDamage = 85,
+                            baseDamage = 89.25,
                             damageSchoolRefs = {
                                 "f82db71a:esjguw6d"
                             },
@@ -827,7 +1164,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.425,
+                                    coefficient = 0.4463,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -838,7 +1175,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "cc50e341",
@@ -860,8 +1197,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_fire_soulburn.blp",
                 id = "hsr88j7d",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 22,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Scorch",
                 range = 0,
@@ -921,7 +1261,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -961,8 +1300,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_fire_sealoffire.blp",
                 id = "m3u708kt",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 40,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Combustion",
                 range = 0,
@@ -1005,7 +1347,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1045,7 +1386,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "acb2579e",
@@ -1067,8 +1408,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_fire_selfdestruct.blp",
                 id = "zilla37l",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 16,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Flamestrike",
                 range = 0,
@@ -1087,7 +1431,8 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Fire damage to up to 5 enemies.\n|cff999999Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Fire damage to up to 5 enemies. Targets must share the same raid marker.",
+                    mainText = "Deal {DAMAGE_1} Fire damage to up to 5 enemies. Targets must share the same raid marker.",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -1099,7 +1444,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1119,7 +1463,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 45,
+                            baseDamage = 40.163,
                             damageSchoolRefs = {
                                 "f82db71a:dtxhglqg"
                             },
@@ -1129,7 +1473,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.225,
+                                    coefficient = 0.2008,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -1139,7 +1483,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "acb2579e",
@@ -1182,8 +1526,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_nature_wispsplode.blp",
                 id = "1s5lq169",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 14,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Arcane Explosion",
                 range = 0,
@@ -1220,7 +1567,196 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d7c874c4:frwdau01",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            threatCoefficient = 0.375,
+                            type = "apply_aura"
+                        },
+                        key = "fward001",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 5,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_fire_firearmor.blp",
+                id = "fireward",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Fire Ward",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 15,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Fire",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "d7c874c4:frwdau01",
+                            datasetId = "d7c874c4",
+                            descriptionText = "Absorbs {AURA_ABSORB_1} Fire damage.",
+                            duration = 2,
+                            icon = "interface/icons/spell_fire_firearmor.blp",
+                            nameText = "Fire Ward",
+                            powerLevel = 0,
+                            spellDatasetId = "d7c874c4",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "absorb_amount",
+                                    baseField = "baseAbsorption",
+                                    effectIndex = 1,
+                                    key = "AURA_ABSORB_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Fire Ward to yourself for 2 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d7c874c4:fowdau01",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            threatCoefficient = 0.375,
+                            type = "apply_aura"
+                        },
+                        key = "fward002",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 5,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_frost_frostward.blp",
+                id = "frostwrd",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 22,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Frost Ward",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 15,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Frost",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "d7c874c4:fowdau01",
+                            datasetId = "d7c874c4",
+                            descriptionText = "Absorbs {AURA_ABSORB_1} Frost damage.",
+                            duration = 2,
+                            icon = "interface/icons/spell_frost_frostward.blp",
+                            nameText = "Frost Ward",
+                            powerLevel = 0,
+                            spellDatasetId = "d7c874c4",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "absorb_amount",
+                                    baseField = "baseAbsorption",
+                                    effectIndex = 1,
+                                    key = "AURA_ABSORB_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Frost Ward to yourself for 2 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
                 useCooldownCharges = false
             },
             {
@@ -1254,7 +1790,7 @@ Addon.Data.DefaultDatasets:Register({
                             applyAura = false,
                             auraRef = "d7c874c4:vtrjl3l2",
                             auraStacks = 1,
-                            baseDamage = 135,
+                            baseDamage = 120.488,
                             damageSchoolRefs = {
                                 "f82db71a:dtxhglqg"
                             },
@@ -1264,7 +1800,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.7,
+                                    coefficient = 0.6248,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -1275,7 +1811,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "cc50e341",
@@ -1318,8 +1854,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_arcane_blast.blp",
                 id = "n6jbep9e",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 52,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Arcane Blast",
                 range = 0,
@@ -1356,7 +1895,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1377,7 +1915,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 326.25,
+                            baseDamage = 191.25,
                             damageSchoolRefs = {
                                 "f82db71a:dtxhglqg"
                             },
@@ -1387,7 +1925,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 1.631,
+                                    coefficient = 0.9563,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -1398,7 +1936,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "acb2579e",
@@ -1442,8 +1980,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_mage_arcanebarrage.blp",
                 id = "r760qxbn",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 60,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Arcane Barrage",
                 range = 0,
@@ -1504,7 +2045,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1525,7 +2065,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 100,
+                            baseDamage = 55.25,
                             damageSchoolRefs = {
                                 "f82db71a:dtxhglqg"
                             },
@@ -1535,7 +2075,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.5,
+                                    coefficient = 0.2763,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -1543,10 +2083,10 @@ Addon.Data.DefaultDatasets:Register({
                                 "on_spell_taken",
                                 "on_critical_hit_taken"
                             },
-                            threatCoefficient = 0.49,
+                            threatCoefficient = 0.75,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "0b4f975a",
@@ -1618,14 +2158,17 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_arcane_arcane04.blp",
                 id = "1e8l0iyi",
-                ignoreGCD = true,
+                cooldownChannel = 4,
                 learnMode = "always_learned",
+                learnLevel = 8,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Arcane Missiles",
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 5,
+                        amount = 6.3,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1656,7 +2199,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1677,7 +2219,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 416.5,
+                            baseDamage = 353.813,
                             damageSchoolRefs = {
                                 "f82db71a:dtxhglqg"
                             },
@@ -1687,7 +2229,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 2.081,
+                                    coefficient = 1.7691,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -1698,7 +2240,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "c7a73068",
@@ -1742,8 +2284,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_arcane_arcanetorrent.blp",
                 id = "7r260xa0",
-                ignoreGCD = false,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 60,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Arcane Surge",
                 range = 0,
@@ -1793,7 +2338,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1832,8 +2376,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_nature_purge.blp",
                 id = "s9nxh61d",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Evocation",
                 range = 0,
@@ -1849,7 +2396,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1897,8 +2443,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_frost_iceshock.blp",
                 id = "300h0gls",
-                ignoreGCD = true,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
+                learnLevel = 24,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Counterspell",
                 range = 0,
@@ -1922,7 +2471,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1962,14 +2510,17 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_magicalsentry.blp",
                 id = "7ldwq2a9",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Arcane Intellect",
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 5,
+                        amount = 10,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -2006,7 +2557,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2049,7 +2599,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "1d9655af",
@@ -2093,14 +2643,17 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_frost_frostbolt02.blp",
                 id = "lywroiqu",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 4,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Frostbolt",
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 6.8,
+                        amount = 3.4,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -2161,7 +2714,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2182,7 +2734,7 @@ Addon.Data.DefaultDatasets:Register({
                             applyAura = true,
                             auraRef = "d7c874c4:hlax2ypw",
                             auraStacks = 1,
-                            baseDamage = 32.321,
+                            baseDamage = 45.996,
                             damageSchoolRefs = {
                                 "f82db71a:hx7pnwv4"
                             },
@@ -2192,7 +2744,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.162,
+                                    coefficient = 0.23,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -2202,7 +2754,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 0.75,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "acb2579e",
@@ -2224,14 +2776,17 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_frost_freezingbreath.blp",
                 id = "7ha8pdoy",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 10,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Frost Nova",
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 12.3,
+                        amount = 22.7,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -2274,7 +2829,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2323,8 +2877,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_mage_deepfreeze.blp",
                 id = "5p4lvyfy",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 60,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Deep Freeze",
                 range = 0,
@@ -2367,7 +2924,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2388,7 +2944,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 104,
+                            baseDamage = 68.25,
                             damageSchoolRefs = {
                                 "f82db71a:hx7pnwv4"
                             },
@@ -2398,7 +2954,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.52,
+                                    coefficient = 0.3413,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -2406,10 +2962,10 @@ Addon.Data.DefaultDatasets:Register({
                                 "on_spell_taken",
                                 "on_critical_hit_taken"
                             },
-                            threatCoefficient = 1,
+                            threatCoefficient = 0.75,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "20f41d9c",
@@ -2440,8 +2996,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_frost_chillingblast.blp",
                 id = "4yxpy77f",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 54,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Ice Lance",
                 range = 0,
@@ -2472,7 +3031,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2513,7 +3071,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "acb2579e",
@@ -2535,8 +3093,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_frost_glacier.blp",
                 id = "apgdbmji",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 26,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Cone of Cold",
                 range = 0,
@@ -2585,7 +3146,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2607,7 +3167,7 @@ Addon.Data.DefaultDatasets:Register({
                             applyAura = false,
                             auraRef = "d7c874c4:ddtdgrqi",
                             auraStacks = 1,
-                            baseDamage = 486,
+                            baseDamage = 271.097,
                             damageSchoolRefs = {
                                 "f82db71a:hx7pnwv4"
                             },
@@ -2617,7 +3177,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 2.52,
+                                    coefficient = 1.4057,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -2628,7 +3188,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "1d9655af",
@@ -2659,14 +3219,17 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_mage_glacialspike.blp",
                 id = "jg39ti4j",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 58,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Glacial Spike",
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 31.8,
+                        amount = 9.2,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -2691,9 +3254,376 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
-            }
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d7c874c4:icearmra",
+                            basePower = 0,
+                            duration = 10,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "icearm01",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "magearmor",
+                cooldownScalesWithHaste = false,
+                description = "Increases Armor and Frost Resistance. On melee hit taken, apply Chilled to the attacker.",
+                icon = "interface/icons/spell_frost_frostarmor02.blp",
+                id = "icearm01",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 30,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Ice Armor",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Frost",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "d7c874c4:icearmra",
+                            datasetId = "d7c874c4",
+                            descriptionText = "Increases Armor by {AURA_STAT_1}% and Frost Resistance by {AURA_STAT_2}. On melee hit taken, apply Chilled to the attacker.",
+                            duration = 10,
+                            icon = "interface/icons/spell_frost_frostarmor02.blp",
+                            nameText = "Ice Armor",
+                            powerLevel = 0,
+                            spellDatasetId = "d7c874c4",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "stat_amount",
+                                    baseField = "baseAmount",
+                                    effectIndex = 1,
+                                    key = "AURA_STAT_1",
+                                    tokenType = "aura_amount"
+                                },
+                                {
+                                    applyMode = "stat_amount",
+                                    baseField = "baseAmount",
+                                    effectIndex = 2,
+                                    key = "AURA_STAT_2",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Ice Armor to yourself for 10 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d7c874c4:molarmra",
+                            basePower = 0,
+                            duration = 10,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "molarm01",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "magearmor",
+                cooldownScalesWithHaste = false,
+                description = "Increases Spell Crit. Chance by 5%. On melee hit taken, deal Fire damage to the attacker.",
+                icon = "interface/icons/ability_mage_moltenarmor.blp",
+                id = "molarm01",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 50,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Molten Armor",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Fire",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "d7c874c4:molarmra",
+                            datasetId = "d7c874c4",
+                            descriptionText = "Increases Spell Crit. Chance by 5%. On melee hit taken, deal {AURA_EVENT_DAMAGE_1} Fire damage to the attacker.",
+                            duration = 10,
+                            icon = "interface/icons/ability_mage_moltenarmor.blp",
+                            nameText = "Molten Armor",
+                            powerLevel = 0,
+                            spellDatasetId = "d7c874c4",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "damage_amount",
+                                    baseField = "baseDamage",
+                                    effectIndex = 1,
+                                    eventIndex = 1,
+                                    key = "AURA_EVENT_DAMAGE_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Molten Armor to yourself for 10 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d7c874c4:mgarmaur",
+                            basePower = 0,
+                            duration = 10,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "mgarma01",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "magearmor",
+                cooldownScalesWithHaste = false,
+                description = "Increases Magic Resistance by 2% and Resource Regeneration by 30%.",
+                icon = "interface/icons/spell_magearmor.blp",
+                id = "mgarma01",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 34,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Mage Armor",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Arcane",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "d7c874c4:mgarmaur",
+                            datasetId = "d7c874c4",
+                            descriptionText = "Increases Magic Resistance by 2% and Resource Regeneration by 30%.",
+                            duration = 10,
+                            icon = "interface/icons/spell_magearmor.blp",
+                            nameText = "Mage Armor",
+                            powerLevel = 0,
+                            spellDatasetId = "d7c874c4",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Mage Armor to yourself for 10 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 1,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "d7c874c4:polymrph",
+                            basePower = 0,
+                            duration = 2,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "polymr01",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 6,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_nature_polymorph.blp",
+                id = "polymr01",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 8,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Polymorph",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Arcane",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "d7c874c4:polymrph",
+                            datasetId = "d7c874c4",
+                            descriptionText = "Breaks when the affected unit takes damage. Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                            duration = 2,
+                            icon = "interface/icons/spell_nature_polymorph.blp",
+                            nameText = "Polymorph",
+                            powerLevel = 0,
+                            spellDatasetId = "d7c874c4",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Polymorph to an enemy for 2 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
         },
         stats = {},
         traits = {
@@ -2761,6 +3691,108 @@ Addon.Data.DefaultDatasets:Register({
                         value = 3
                     }
                 },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Arcane",
+                conditions = {},
+                description = "",
+                events = {
+                    {
+                        combatEventId = "on_critical_hit",
+                        effects = {
+                            {
+                                amount = 10,
+                                amountMode = "base_percent",
+                                resourceRef = "f82db71a:4c8mfm99",
+                                type = "resource"
+                            }
+                        },
+                        triggerTarget = "event_source"
+                    }
+                },
+                icon = "interface/icons/spell_fire_masterofelements.blp",
+                id = "mastelms",
+                isEnvironmental = false,
+                name = "Master of Elements",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Arcane",
+                conditions = {
+                    {
+                        invert = true,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Does not have Arcane Concentration",
+                        traitRef = "d7c874c4:arcconc1",
+                        type = "trait_requirement",
+                        unit = "caster"
+                    }
+                },
+                description = "When you hit with a spell, you have a 25% chance to gain Arcane Missiles for 5 turns.",
+                events = {
+                    {
+                        chance = 25,
+                        combatEventId = "on_spell_hit",
+                        effects = {
+                            {
+                                auraRef = "d7c874c4:xq18639s",
+                                basePower = 0,
+                                duration = 5,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "aura_caster"
+                    }
+                },
+                icon = "interface/icons/ability_mage_missilebarrage.blp",
+                id = "misbarge",
+                isEnvironmental = false,
+                name = "Missile Barrage",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Arcane",
+                conditions = {
+                    {
+                        invert = true,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Does not have Missile Barrage",
+                        traitRef = "d7c874c4:misbarge",
+                        type = "trait_requirement",
+                        unit = "caster"
+                    }
+                },
+                description = "When you hit with a spell, you have a 20% chance to gain 1 Arcane Charge.",
+                events = {
+                    {
+                        chance = 20,
+                        combatEventId = "on_spell_hit",
+                        effects = {
+                            {
+                                amount = 1,
+                                amountMode = "flat",
+                                resourceRef = "f82db71a:v7uxqb9z",
+                                type = "resource"
+                            }
+                        },
+                        triggerTarget = "aura_caster"
+                    }
+                },
+                icon = "interface/icons/spell_shadow_manaburn.blp",
+                id = "arcconc1",
+                isEnvironmental = false,
+                name = "Arcane Concentration",
+                skillBonuses = {},
+                statBonuses = {},
                 unlockLevel = 1
             },
             {
@@ -2838,7 +3870,67 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 unlockLevel = 1
-            }
+            },
+            {
+                automaticAuras = {},
+                category = "Fire",
+                conditions = {},
+                description = "",
+                events = {
+                    {
+                        chance = 20,
+                        combatEventId = "on_damage_type",
+                        damageSchoolRef = "f82db71a:esjguw6d",
+                        effects = {
+                            {
+                                auraRef = "d7c874c4:ignite01",
+                                basePower = 0,
+                                duration = 3,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "event_other"
+                    }
+                },
+                icon = "interface/icons/spell_fire_incinerate.blp",
+                id = "ignite20",
+                isEnvironmental = false,
+                name = "Ignite",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Fire",
+                conditions = {},
+                description = "",
+                events = {
+                    {
+                        chance = 5,
+                        combatEventId = "on_damage_type",
+                        damageSchoolRef = "f82db71a:esjguw6d",
+                        effects = {
+                            {
+                                auraRef = "d7c874c4:impact01",
+                                basePower = 0,
+                                duration = 1,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "event_other"
+                    }
+                },
+                icon = "interface/icons/spell_fire_meteorstorm.blp",
+                id = "impact05",
+                isEnvironmental = false,
+                name = "Impact",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
         },
         units = {},
         weaponTypes = {}

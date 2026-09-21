@@ -764,6 +764,14 @@ local function buildConsumablePage(self, page)
     })
     self.ItemInspectorConsumablePendingCombatEventGroup:AddChild(self.ItemInspectorConsumablePendingCombatEventDropdown)
 
+    self.ItemInspectorConsumablePendingDefenceStatGroup = createEquipmentFieldGroup(eventsLayout, "RPEDataEditorItemInspectorConsumablePendingDefenceStatGroup", "Defence Type", 18)
+    self.ItemInspectorConsumablePendingDefenceStatDropdown = UI.CreateDropdown(self.ItemInspectorConsumablePendingDefenceStatGroup:GetFrame(), "RPEDataEditorItemInspectorConsumablePendingDefenceStatDropdown", {
+        width = FIELD_WIDTH,
+        height = 18,
+        items = self:BuildSpellInspectorDefenceStatsAcrossDatasets(),
+    })
+    self.ItemInspectorConsumablePendingDefenceStatGroup:AddChild(self.ItemInspectorConsumablePendingDefenceStatDropdown)
+
     self.ItemInspectorConsumablePendingEventHeaderRow = createHorizontalFieldLabels(eventsLayout, "RPEDataEditorItemInspectorConsumablePendingEventHeaderRow", {
         { text = "Trigger Target", width = 72, expandWidth = true },
         { text = "Effect Type", width = 72, expandWidth = true },
@@ -951,6 +959,10 @@ local function buildConsumablePage(self, page)
         end
 
         local triggerTarget = self.ItemInspectorConsumablePendingTriggerTargetDropdown:GetSelectedValue() or "event_other"
+        local defenceStatRef = self.ItemInspectorConsumablePendingDefenceStatDropdown
+            and self.ItemInspectorConsumablePendingDefenceStatDropdown.GetSelectedValue
+            and self.ItemInspectorConsumablePendingDefenceStatDropdown:GetSelectedValue()
+            or ""
         local effectType = self.ItemInspectorConsumablePendingEffectDropdown:GetSelectedValue() or "damage"
         local amount = tonumber(self.ItemInspectorConsumablePendingEffectAmountInput:GetText()) or 0
         local amountMode = self.ItemInspectorConsumablePendingEffectAmountModeDropdown and self.ItemInspectorConsumablePendingEffectAmountModeDropdown.GetSelectedValue and self.ItemInspectorConsumablePendingEffectAmountModeDropdown:GetSelectedValue() or "flat"
@@ -1007,6 +1019,7 @@ local function buildConsumablePage(self, page)
             local events = normalizeConsumableTraitEvents(trait.events)
             local entry = {
                 combatEventId = combatEventId,
+                defenceStatRef = combatEventId == "on_defence" and defenceStatRef ~= "" and defenceStatRef or nil,
                 triggerTarget = triggerTarget,
                 chance = chance,
                 effects = {

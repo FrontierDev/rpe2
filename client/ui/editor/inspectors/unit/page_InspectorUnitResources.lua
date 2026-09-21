@@ -41,8 +41,16 @@ function DataEditor:RefreshUnitInspectorResourceEditor()
         end
     end
 
-    if self.UnitInspectorPendingResourceValueInput then
-        self.UnitInspectorPendingResourceValueInput:SetText(tostring(resource and resource.value or 0))
+    if self.UnitInspectorPendingResourceInitialInput then
+        local initialValue = resource and resource.initialValue
+        if initialValue == nil then
+            initialValue = resource and resource.value
+        end
+        self.UnitInspectorPendingResourceInitialInput:SetText(tostring(initialValue or 0))
+    end
+
+    if self.UnitInspectorPendingResourcePerLevelInput then
+        self.UnitInspectorPendingResourcePerLevelInput:SetText(tostring(resource and resource.perLevelValue or 0))
     end
 
     if self.UnitInspectorAddResourceButton and self.UnitInspectorAddResourceButton.SetText then
@@ -121,7 +129,8 @@ function DataEditor:BuildUnitInspectorResourceRows(unit)
         rows[#rows + 1] = {
             rowIndex = index,
             resourceText = self:ResolveUnitInspectorReferenceLabel("resources", entry and entry.resourceRef or ""),
-            valueText = tostring(entry and entry.value or 0),
+            initialValueText = tostring(entry and (entry.initialValue ~= nil and entry.initialValue or entry.value) or 0),
+            perLevelValueText = tostring(entry and entry.perLevelValue or 0),
         }
     end
 
@@ -169,8 +178,9 @@ function DataEditor:BuildUnitInspectorResourcesPage(page)
     self.UnitInspectorResourcesScroll:SetRowRenderer(function(row, item, itemIndex)
         if row.SetColumns then
             row:SetColumns({
-                { key = "resourceText", width = 184, justifyH = "LEFT" },
-                { key = "valueText", width = 32, justifyH = "RIGHT" },
+                { key = "resourceText", width = 140, justifyH = "LEFT" },
+                { key = "initialValueText", width = 40, justifyH = "RIGHT" },
+                { key = "perLevelValueText", width = 48, justifyH = "RIGHT" },
             })
         end
         if row.SetRowData then
@@ -201,21 +211,13 @@ function DataEditor:BuildUnitInspectorResourcesPage(page)
     root:AddChild(self.UnitInspectorPendingResourceRow)
 
     self.UnitInspectorPendingResourceDropdown = UI.CreateDropdown(self.UnitInspectorPendingResourceRow:GetFrame(), "RPEDataEditorUnitInspectorPendingResourceDropdown", {
-        width = 164,
+        width = 194,
         height = 18,
         items = {
             { label = "None", value = "" },
         },
     })
     self.UnitInspectorPendingResourceRow:AddChild(self.UnitInspectorPendingResourceDropdown)
-
-    self.UnitInspectorPendingResourceValueInput = UI.CreateTextInput(self.UnitInspectorPendingResourceRow:GetFrame(), "RPEDataEditorUnitInspectorPendingResourceValueInput", {
-        width = 32,
-        height = 18,
-        text = "0",
-        borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    self.UnitInspectorPendingResourceRow:AddChild(self.UnitInspectorPendingResourceValueInput)
 
     self.UnitInspectorAddResourceButton = UI.CreateButton(self.UnitInspectorPendingResourceRow:GetFrame(), "RPEDataEditorUnitInspectorAddResourceButton", "Add", 36, function()
         if self._refreshingUnitInspector then
@@ -232,16 +234,20 @@ function DataEditor:BuildUnitInspectorResourcesPage(page)
             return
         end
 
-        local value = tonumber(self.UnitInspectorPendingResourceValueInput and self.UnitInspectorPendingResourceValueInput:GetText()) or 0
+        local initialValue = tonumber(self.UnitInspectorPendingResourceInitialInput and self.UnitInspectorPendingResourceInitialInput:GetText()) or 0
+        local perLevelValue = tonumber(self.UnitInspectorPendingResourcePerLevelInput and self.UnitInspectorPendingResourcePerLevelInput:GetText()) or 0
         self:CommitSelectedUnit(function(unit)
             unit.resources = unit.resources or {}
             if selectedIndex and unit.resources[selectedIndex] then
                 unit.resources[selectedIndex].resourceRef = resourceRef
-                unit.resources[selectedIndex].value = value
+                unit.resources[selectedIndex].initialValue = initialValue
+                unit.resources[selectedIndex].perLevelValue = perLevelValue
+                unit.resources[selectedIndex].value = nil
             else
                 unit.resources[#unit.resources + 1] = {
                     resourceRef = resourceRef,
-                    value = value,
+                    initialValue = initialValue,
+                    perLevelValue = perLevelValue,
                 }
             end
         end)
@@ -252,6 +258,33 @@ function DataEditor:BuildUnitInspectorResourcesPage(page)
         fontSize = 7,
     })
     self.UnitInspectorPendingResourceRow:AddChild(self.UnitInspectorAddResourceButton)
+
+    self.UnitInspectorPendingResourceValuesRow = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorUnitInspectorPendingResourceValuesRow", {
+        width = self.UnitInspectorFieldWidth,
+        height = 18,
+        spacing = 2,
+        fitChildrenWidth = false,
+        fitChildrenHeight = false,
+    })
+    root:AddChild(self.UnitInspectorPendingResourceValuesRow)
+
+    self.UnitInspectorPendingResourceValuesRow:AddChild(self:BuildUnitInspectorLabel(self.UnitInspectorPendingResourceValuesRow:GetFrame(), "RPEDataEditorUnitInspectorPendingResourceInitialLabel", "Initial", 44))
+    self.UnitInspectorPendingResourceInitialInput = UI.CreateTextInput(self.UnitInspectorPendingResourceValuesRow:GetFrame(), "RPEDataEditorUnitInspectorPendingResourceInitialInput", {
+        width = 54,
+        height = 18,
+        text = "0",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.UnitInspectorPendingResourceValuesRow:AddChild(self.UnitInspectorPendingResourceInitialInput)
+
+    self.UnitInspectorPendingResourceValuesRow:AddChild(self:BuildUnitInspectorLabel(self.UnitInspectorPendingResourceValuesRow:GetFrame(), "RPEDataEditorUnitInspectorPendingResourcePerLevelLabel", "Per Level", 58))
+    self.UnitInspectorPendingResourcePerLevelInput = UI.CreateTextInput(self.UnitInspectorPendingResourceValuesRow:GetFrame(), "RPEDataEditorUnitInspectorPendingResourcePerLevelInput", {
+        width = 68,
+        height = 18,
+        text = "0",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.UnitInspectorPendingResourceValuesRow:AddChild(self.UnitInspectorPendingResourcePerLevelInput)
 
     self:RefreshUnitInspectorResourceEditor()
 end

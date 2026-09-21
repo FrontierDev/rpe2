@@ -180,6 +180,7 @@ function DataEditor:RefreshAuraInspectorPage()
     local effectType = tostring(effect and effect.type or "damage")
     local isDamage = effectType == "damage"
     local isHeal = effectType == "heal"
+    local isAbsorb = effectType == "absorb"
     local isStat = effectType == "stat"
     local isSkill = effectType == "skill"
     local isControl = effectType == "control"
@@ -187,6 +188,8 @@ function DataEditor:RefreshAuraInspectorPage()
     local isResource = effectType == "resource"
     local auraEvent = self:GetSelectedAuraInspectorEvent()
     local hasAuraEventTrigger = auraEvent ~= nil and type(auraEvent.combatEventId) == "string" and auraEvent.combatEventId ~= ""
+    local isDefenceEvent = hasAuraEventTrigger and auraEvent.combatEventId == "on_defence"
+    local isDamageTypeEvent = hasAuraEventTrigger and auraEvent.combatEventId == "on_damage_type"
     local eventEffect = self:GetSelectedAuraInspectorEventEffect()
     local eventEffectType = tostring(eventEffect and eventEffect.type or "damage")
     local isEventDamage = eventEffectType == "damage"
@@ -220,6 +223,11 @@ function DataEditor:RefreshAuraInspectorPage()
     if self.AuraInspectorMaxStacksInput then
         self.AuraInspectorMaxStacksInput:SetText(tostring(aura and aura.maxStacks or 1))
         self:SetAuraInspectorTextElementEnabled(self.AuraInspectorMaxStacksInput, hasAura)
+    end
+    if self.AuraInspectorAbsorbValidationText then
+        local validation = self:ValidateAuraAbsorption(aura)
+        local message = validation and validation.valid ~= true and validation.reason or ""
+        self.AuraInspectorAbsorbValidationText:SetText(message ~= "" and ("Warning: " .. message) or "")
     end
     if self.AuraInspectorTooltipTemplateStatusText then
         local hasStoredTemplate = hasStoredAuraTooltipTemplate(aura)
@@ -263,6 +271,8 @@ function DataEditor:RefreshAuraInspectorPage()
     if self.AuraInspectorBaseAmountLabel then
         if isHeal then
             self.AuraInspectorBaseAmountLabel:SetText("Base Healing")
+        elseif isAbsorb then
+            self.AuraInspectorBaseAmountLabel:SetText("Base Absorption")
         elseif isStat or isSkill then
             self.AuraInspectorBaseAmountLabel:SetText("Base Amount")
         else
@@ -271,6 +281,7 @@ function DataEditor:RefreshAuraInspectorPage()
     end
     if self.AuraInspectorBaseAmountInput then
         local amount = isHeal and (effect and effect.baseHealing or 0)
+            or isAbsorb and (effect and effect.baseAbsorption or 0)
             or (isStat or isSkill) and (effect and effect.baseAmount or 0)
             or (effect and effect.baseDamage or 0)
         self.AuraInspectorBaseAmountInput:SetText(tostring(amount or 0))
@@ -278,12 +289,12 @@ function DataEditor:RefreshAuraInspectorPage()
     end
     if self.AuraInspectorAmountModeDropdown then
         self.AuraInspectorAmountModeDropdown:SetSelectedValue(effect and effect.amountMode or "flat", true)
-        self:SetAuraInspectorDropdownEnabled(self.AuraInspectorAmountModeDropdown, effect ~= nil and (isDamage or isHeal))
+        self:SetAuraInspectorDropdownEnabled(self.AuraInspectorAmountModeDropdown, effect ~= nil and (isDamage or isHeal or isAbsorb))
     end
     if self.AuraInspectorDamageSchoolsDropdown then
         self.AuraInspectorDamageSchoolsDropdown:SetItems(self:BuildSpellInspectorDamageSchoolsAcrossDatasets())
         self.AuraInspectorDamageSchoolsDropdown:SetSelectedValues(effect and effect.damageSchoolRefs or {}, true)
-        self:SetAuraInspectorDropdownEnabled(self.AuraInspectorDamageSchoolsDropdown, effect ~= nil and isDamage)
+        self:SetAuraInspectorDropdownEnabled(self.AuraInspectorDamageSchoolsDropdown, effect ~= nil and (isDamage or isAbsorb))
     end
     if self.AuraInspectorStatRefDropdown then
         self.AuraInspectorStatRefDropdown:SetItems(self:BuildSpellInspectorStatsAcrossDatasets())
@@ -361,8 +372,8 @@ function DataEditor:RefreshAuraInspectorPage()
 
     self:SetAuraInspectorGroupVisible(self.AuraInspectorEffectTypeGroup, effect ~= nil)
     self:SetAuraInspectorGroupVisible(self.AuraInspectorBaseAmountGroup, effect ~= nil and not isControl and not isApplyAura and not isResource)
-    self:SetAuraInspectorGroupVisible(self.AuraInspectorAmountModeGroup, effect ~= nil and (isDamage or isHeal))
-    self:SetAuraInspectorGroupVisible(self.AuraInspectorDamageSchoolsGroup, effect ~= nil and isDamage)
+    self:SetAuraInspectorGroupVisible(self.AuraInspectorAmountModeGroup, effect ~= nil and (isDamage or isHeal or isAbsorb))
+    self:SetAuraInspectorGroupVisible(self.AuraInspectorDamageSchoolsGroup, effect ~= nil and (isDamage or isAbsorb))
     self:SetAuraInspectorGroupVisible(self.AuraInspectorStatRefGroup, effect ~= nil and isStat)
     self:SetAuraInspectorGroupVisible(self.AuraInspectorSkillRefGroup, effect ~= nil and isSkill)
     self:SetAuraInspectorGroupVisible(self.AuraInspectorOperationGroup, effect ~= nil and isStat)
@@ -400,6 +411,16 @@ function DataEditor:RefreshAuraInspectorPage()
         self.AuraInspectorTriggerTargetDropdown:SetItems(self:GetAuraInspectorTriggerTargetItems())
         self.AuraInspectorTriggerTargetDropdown:SetSelectedValue(auraEvent and auraEvent.triggerTarget or "event_other", true)
         self:SetAuraInspectorDropdownEnabled(self.AuraInspectorTriggerTargetDropdown, auraEvent ~= nil and hasAuraEventTrigger)
+    end
+    if self.AuraInspectorDefenceStatDropdown then
+        self.AuraInspectorDefenceStatDropdown:SetItems(self:BuildSpellInspectorDefenceStatsAcrossDatasets())
+        self.AuraInspectorDefenceStatDropdown:SetSelectedValue(auraEvent and auraEvent.defenceStatRef or "", true)
+        self:SetAuraInspectorDropdownEnabled(self.AuraInspectorDefenceStatDropdown, isDefenceEvent)
+    end
+    if self.AuraInspectorDamageSchoolDropdown then
+        self.AuraInspectorDamageSchoolDropdown:SetItems(self:BuildSpellInspectorDamageSchoolsAcrossDatasets())
+        self.AuraInspectorDamageSchoolDropdown:SetSelectedValue(auraEvent and auraEvent.damageSchoolRef or "", true)
+        self:SetAuraInspectorDropdownEnabled(self.AuraInspectorDamageSchoolDropdown, isDamageTypeEvent)
     end
     if self.AuraInspectorEventChanceInput then
         self.AuraInspectorEventChanceInput:SetText(tostring(auraEvent and auraEvent.chance or 100))
@@ -481,6 +502,8 @@ function DataEditor:RefreshAuraInspectorPage()
 
     self:SetAuraInspectorGroupVisible(self.AuraInspectorCombatEventGroup, auraEvent ~= nil)
     self:SetAuraInspectorGroupVisible(self.AuraInspectorTriggerTargetGroup, auraEvent ~= nil and hasAuraEventTrigger)
+    self:SetAuraInspectorGroupVisible(self.AuraInspectorDefenceStatGroup, isDefenceEvent)
+    self:SetAuraInspectorGroupVisible(self.AuraInspectorDamageSchoolGroup, isDamageTypeEvent)
     self:SetAuraInspectorGroupVisible(self.AuraInspectorEventChanceGroup, auraEvent ~= nil)
     self:SetAuraInspectorGroupVisible(self.AuraInspectorEventEffectTypeGroup, eventEffect ~= nil)
     self:SetAuraInspectorGroupVisible(self.AuraInspectorEventBaseAmountGroup, eventEffect ~= nil and (isEventDamage or isEventHeal))

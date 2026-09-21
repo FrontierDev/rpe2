@@ -1,10 +1,238 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 17,
+    version = 41,
     dataset = {
         achievements = {},
         auras = {
+            {
+                description = "",
+                duration = 3,
+                effects = {
+                    {
+                        baseAmount = 10,
+                        operation = "percent",
+                        statRef = "f82db71a:u7b49vs9",
+                        statScaling = {},
+                        type = "stat"
+                    },
+                    {
+                        baseAmount = -10,
+                        operation = "flat",
+                        statRef = "f82db71a:gj9wxb0x",
+                        statScaling = {},
+                        type = "stat"
+                    },
+                    {
+                        baseAmount = 5,
+                        operation = "flat",
+                        statRef = "f82db71a:jslmczbi",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_holy_holysmite.blp",
+                id = "sotc9a2f",
+                maxStacks = 1,
+                name = "Seal of the Crusader",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Melee Attack Power by 10%. Reduces Damage Done by 10%. Increases Melee Crit. Chance by 5%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 5,
+                effects = {
+                    {
+                        baseAmount = -100,
+                        operation = "flat",
+                        statRef = "f82db71a:hlyrsstn",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_holy_holysmite.blp",
+                id = "jotc5d7e",
+                maxStacks = 1,
+                name = "Judgement of the Crusader",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Reduces Holy Resistance by {AURA_STAT_1}.",
+                    bodyTokens = {
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 1,
+                            key = "AURA_STAT_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 2,
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseAbsorption = 0,
+                        damageSchoolRefs = {},
+                        statScaling = {
+                            {
+                                coefficient = 8,
+                                statRef = "f82db71a:ygjno50i"
+                            }
+                        },
+                        type = "absorb"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_holy_sealoffury.blp",
+                id = "fbar2e8d",
+                maxStacks = 1,
+                name = "Righteous Indignation",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Absorbs {AURA_ABSORB_1} damage.",
+                    bodyTokens = {
+                        {
+                            applyMode = "absorb_amount",
+                            baseField = "baseAbsorption",
+                            effectIndex = 1,
+                            key = "AURA_ABSORB_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 3,
+                effects = {},
+                events = {
+                    {
+                        chance = 100,
+                        combatEventId = "on_auto_attack_hit",
+                        effects = {
+                            {
+                                amountMode = "flat",
+                                baseDamage = 28.1667,
+                                damageSchoolRefs = {
+                                    "f82db71a:wwctys5s"
+                                },
+                                statScaling = {
+                                    {
+                                        coefficient = 0.29575,
+                                        statRef = "f82db71a:u7b49vs9"
+                                    }
+                                },
+                                type = "damage"
+                            }
+                        },
+                        triggerTarget = "event_other"
+                    },
+                    {
+                        chance = 100,
+                        combatEventId = "on_melee_hit",
+                        effects = {
+                            {
+                                auraRef = "b0211ab3:fbar2e8d",
+                                basePower = 0,
+                                duration = 2,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "aura_caster"
+                    }
+                },
+                icon = "interface/icons/spell_holy_sealoffury.blp",
+                id = "sfry7c1b",
+                maxStacks = 1,
+                name = "Seal of Fury",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_1} Holy damage. When the affected unit hits with a melee attack, apply Righteous Indignation to yourself for 2 turns.",
+                    bodyTokens = {
+                        {
+                            applyMode = "damage_amount",
+                            baseField = "baseDamage",
+                            effectIndex = 1,
+                            eventIndex = 1,
+                            key = "AURA_EVENT_DAMAGE_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 3,
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseDamage = 11.2667,
+                        damageSchoolRefs = {
+                            "f82db71a:wwctys5s"
+                        },
+                        statScaling = {
+                            {
+                                coefficient = 0.169,
+                                statRef = "f82db71a:7t7xgzcx"
+                            }
+                        },
+                        threatCoefficient = 0.49,
+                        type = "damage"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_holy_innerfire.blp",
+                id = "q7m4v2ka",
+                maxStacks = 1,
+                name = "Consecration",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Deals {AURA_DAMAGE_1} Holy damage each turn. Generates a low amount of threat.",
+                    bodyTokens = {
+                        {
+                            applyMode = "damage_amount",
+                            baseField = "baseDamage",
+                            effectIndex = 1,
+                            key = "AURA_DAMAGE_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
             {
                 description = "",
                 duration = 10,
@@ -129,10 +357,11 @@ Addon.Data.DefaultDatasets:Register({
                 duration = 10,
                 effects = {
                     {
-                        amount = 8,
-                        amountMode = "flat",
-                        resourceRef = "f82db71a:4c8mfm99",
-                        type = "resource"
+                        baseAmount = 5,
+                        operation = "flat",
+                        statRef = "f82db71a:rgnrtg01",
+                        statScaling = {},
+                        type = "stat"
                     }
                 },
                 events = {},
@@ -144,15 +373,8 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "Restores {AURA_RESOURCE_GAIN_1} each turn.",
-                    bodyTokens = {
-                        {
-                            applyMode = "resource_gain_amount",
-                            effectIndex = 1,
-                            key = "AURA_RESOURCE_GAIN_1",
-                            tokenType = "aura_amount"
-                        }
-                    },
+                    bodyText = "Increases Resource Regeneration by 5%.",
+                    bodyTokens = {},
                     stackingText = "",
                     stackingTokens = {},
                     version = 1
@@ -164,7 +386,7 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         baseAmount = 5,
-                        operation = "percent",
+                        operation = "flat",
                         statRef = "f82db71a:ok80ohz3",
                         statScaling = {},
                         type = "stat"
@@ -225,13 +447,13 @@ Addon.Data.DefaultDatasets:Register({
                         effects = {
                             {
                                 amountMode = "flat",
-                                baseDamage = 6,
+                                baseDamage = 28.1667,
                                 damageSchoolRefs = {
                                     "f82db71a:wwctys5s"
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 1,
+                                        coefficient = 0.4225,
                                         statRef = "f82db71a:7t7xgzcx"
                                     }
                                 },
@@ -271,18 +493,18 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {},
                 events = {
                     {
-                        chance = 100,
+                        chance = 70,
                         combatEventId = "on_auto_attack_hit",
                         effects = {
                             {
                                 amountMode = "flat",
-                                baseDamage = 0,
+                                baseDamage = 55.25,
                                 damageSchoolRefs = {
                                     "f82db71a:wwctys5s"
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 0.1,
+                                        coefficient = 0.4225,
                                         statRef = "f82db71a:u7b49vs9"
                                     }
                                 },
@@ -300,7 +522,7 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_1} Holy damage.",
+                    bodyText = "Basic attacks have a 70% chance to deal {AURA_EVENT_DAMAGE_1} Holy damage to the target.",
                     bodyTokens = {
                         {
                             applyMode = "damage_amount",
@@ -503,6 +725,34 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         baseAmount = 30,
                         operation = "flat",
+                        statRef = "f82db71a:p8syz5ba",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/ability_defend.blp",
+                id = "rdbtaura",
+                maxStacks = 1,
+                name = "Redoubt",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Block Chance by 30%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 1,
+                effects = {
+                    {
+                        baseAmount = 30,
+                        operation = "flat",
                         statRef = "f82db71a:pu05li08",
                         statScaling = {},
                         type = "stat"
@@ -519,6 +769,73 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplateData = {
                     bodyText = "Increases Damage Reduction by 30%.",
                     bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 3,
+                effects = {
+                    {
+                        baseAmount = 30,
+                        operation = "flat",
+                        statRef = "f82db71a:p8syz5ba",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {
+                    {
+                        chance = 100,
+                        combatEventId = "on_defence",
+                        defenceStatRef = "f82db71a:p8syz5ba",
+                        effects = {
+                            {
+                                amountMode = "flat",
+                                baseDamage = 96,
+                                damageSchoolRefs = {
+                                    "f82db71a:wwctys5s"
+                                },
+                                statScaling = {
+                                    {
+                                        coefficient = 0.2,
+                                        statRef = "f82db71a:7t7xgzcx"
+                                    }
+                                },
+                                type = "damage"
+                            }
+                        },
+                        triggerTarget = "event_source"
+                    }
+                },
+                icon = "interface/icons/spell_holy_blessingofprotection.blp",
+                id = "hlyshlda",
+                maxStacks = 1,
+                name = "Holy Shield",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Block Chance by {AURA_STAT_1}. When you successfully block an attack, deal {AURA_EVENT_DAMAGE_1} Holy damage to the attacker.",
+                    bodyTokens = {
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 1,
+                            key = "AURA_STAT_1",
+                            tokenType = "aura_amount"
+                        },
+                        {
+                            applyMode = "damage_amount",
+                            baseField = "baseDamage",
+                            effectIndex = 1,
+                            eventIndex = 1,
+                            key = "AURA_EVENT_DAMAGE_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
                     stackingText = "",
                     stackingTokens = {},
                     version = 1
@@ -597,13 +914,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 5,
+                        baseDamage = 23.9417,
                         damageSchoolRefs = {
                             "f82db71a:wwctys5s"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.2,
+                                coefficient = 0.2514,
                                 statRef = "f82db71a:u7b49vs9"
                             }
                         },
@@ -762,6 +1079,47 @@ Addon.Data.DefaultDatasets:Register({
                     stackingTokens = {},
                     version = 1
                 }
+            },
+            {
+                description = "",
+                duration = 1,
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseAbsorption = 0,
+                        damageSchoolRefs = {},
+                        statScaling = {
+                            {
+                                coefficient = 8,
+                                statRef = "f82db71a:ygjno50i"
+                            }
+                        },
+                        type = "absorb"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/ability_paladin_shieldofthetemplar.blp",
+                id = "tplblw01",
+                maxStacks = 1,
+                name = "Templar's Bulwark",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Absorbs {AURA_ABSORB_1} damage.",
+                    bodyTokens = {
+                        {
+                            applyMode = "absorb_amount",
+                            baseField = "baseAbsorption",
+                            effectIndex = 1,
+                            key = "AURA_ABSORB_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
             }
         },
         authorName = "Ortellus-ArgentDawn",
@@ -835,7 +1193,8 @@ Addon.Data.DefaultDatasets:Register({
                     "b0211ab3:dvinstrg",
                     "b0211ab3:prcpldn1",
                     "b0211ab3:dflctpal",
-                    "b0211ab3:antcpal1"
+                    "b0211ab3:antcpal1",
+                    "b0211ab3:rdbttrait"
                 }
             }
         },
@@ -1367,6 +1726,845 @@ Addon.Data.DefaultDatasets:Register({
                 _resourceCostsByPhase = {
                     on_cast_end = {
                         {
+                            amount = 5,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:sotc9a2f",
+                            basePower = 0,
+                            duration = 3,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "csa1f2b3",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires main hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                cooldown = 1,
+                cooldownGroup = "seal",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_holysmite.blp",
+                id = "scsp4a6c",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 6,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Seal of the Crusader",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Retribution",
+                tags = {
+                    "seal"
+                },
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:sotc9a2f",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Increases Melee Attack Power by 10%. Reduces Damage Done by 10%. Increases Melee Crit. Chance by 5%.",
+                            duration = 3,
+                            icon = "interface/icons/spell_holy_holysmite.blp",
+                            nameText = "Seal of the Crusader",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Seal of the Crusader to yourself for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 5,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_spell_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:sotc9a2f",
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "remove_aura"
+                        },
+                        key = "jca4d5e6",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    },
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:jotc5d7e",
+                            basePower = 0,
+                            duration = 5,
+                            stacks = 1,
+                            targetEvents = {
+                                "on_spell_taken"
+                            },
+                            type = "apply_aura"
+                        },
+                        key = "jca7f8a9",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        auraRef = "b0211ab3:sotc9a2f",
+                        invert = false,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Requires Seal of the Crusader",
+                        type = "aura_requirement",
+                        unit = "caster"
+                    }
+                },
+                cooldown = 3,
+                cooldownGroup = "judgement",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_righteousfury.blp",
+                id = "jcsp8f3a",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 6,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Judgement of the Crusader",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Retribution",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:jotc5d7e",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Reduces Holy Resistance by {AURA_STAT_1}.",
+                            duration = 5,
+                            icon = "interface/icons/spell_holy_holysmite.blp",
+                            nameText = "Judgement of the Crusader",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "stat_amount",
+                                    baseField = "baseAmount",
+                                    effectIndex = 1,
+                                    key = "AURA_STAT_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Judgement of the Crusader to an enemy for 5 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 5,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:sfry7c1b",
+                            basePower = 0,
+                            duration = 3,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "sfa1b2c3",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires main hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    },
+                    {
+                        invert = false,
+                        requiresShield = true,
+                        showOnTooltip = true,
+                        slotKey = "offhand",
+                        tooltipTextOverride = "Requires Shield",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                cooldown = 1,
+                cooldownGroup = "seal",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_sealoffury.blp",
+                id = "sfsp6b2e",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 16,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Seal of Fury",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {
+                    "seal"
+                },
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:sfry7c1b",
+                            datasetId = "b0211ab3",
+                            descriptionText = "When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_1} Holy damage. When the affected unit hits with a melee attack, apply Righteous Indignation to yourself for 2 turns.",
+                            duration = 3,
+                            icon = "interface/icons/spell_holy_sealoffury.blp",
+                            nameText = "Seal of Fury",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "damage_amount",
+                                    baseField = "baseDamage",
+                                    effectIndex = 1,
+                                    eventIndex = 1,
+                                    key = "AURA_EVENT_DAMAGE_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Seal of Fury to yourself for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 5,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_spell_hit",
+                    "on_critical_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = false,
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseDamage = 88.4,
+                            damageSchoolRefs = {
+                                "f82db71a:wwctys5s"
+                            },
+                            damageType = "spell",
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.3094,
+                                    statRef = "f82db71a:u7b49vs9"
+                                }
+                            },
+                            targetEvents = {
+                                "on_spell_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 2,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 0,
+                            weaponDamageMode = "none"
+                        },
+                        key = "jfa4d5e6",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    },
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:sfry7c1b",
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "remove_aura"
+                        },
+                        key = "jfa7b8c9",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    },
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            duration = 1,
+                            targetEvents = {},
+                            type = "taunt"
+                        },
+                        key = "jfad1e2f",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        auraRef = "b0211ab3:sfry7c1b",
+                        invert = false,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Requires Seal of Fury",
+                        type = "aura_requirement",
+                        unit = "caster"
+                    }
+                },
+                cooldown = 3,
+                cooldownGroup = "judgement",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_righteousfury.blp",
+                id = "jfsp9d4c",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 16,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Judgement of Fury",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Deal {DAMAGE_1} Holy damage to an enemy. Taunt an enemy for 1 turn. Generates a high amount of threat.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 15,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:q2ktkztt"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_heal",
+                    "on_critical_heal"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseHealing = 65,
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.39,
+                                    statRef = "f82db71a:hj6d4kvy"
+                                }
+                            },
+                            targetEvents = {
+                                "on_heal_taken"
+                            },
+                            type = "heal",
+                            usesProjectile = false
+                        },
+                        key = "lma3b4c5",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = true,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_paladin_lightofthemartyr.blp",
+                id = "lotm7e2a",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Light of the Martyr",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 15,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:q2ktkztt"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Holy",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Heal an ally for {HEAL_1} health.",
+                    tokens = {
+                        {
+                            applyMode = "heal_range",
+                            componentIndex = 1,
+                            key = "HEAL_1",
+                            tokenType = "spell_heal_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 50,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_heal",
+                    "on_critical_heal"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseHealing = 0,
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 10,
+                                    statRef = "f82db71a:ygjno50i"
+                                }
+                            },
+                            targetEvents = {
+                                "on_heal_taken"
+                            },
+                            type = "heal",
+                            usesProjectile = false
+                        },
+                        key = "loh6d7e8",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_layonhands.blp",
+                id = "lohs3c8f",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 10,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Lay on Hands",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 50,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Holy",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Heal an ally for {HEAL_1} health.",
+                    tokens = {
+                        {
+                            applyMode = "heal_range",
+                            componentIndex = 1,
+                            key = "HEAL_1",
+                            tokenType = "spell_heal_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 12.5,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:q7m4v2ka",
+                            basePower = 0,
+                            duration = 3,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "s9p6x4qc",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = true,
+                            maxTargets = 4,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "multi"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_innerfire.blp",
+                id = "r8n5w3pb",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Consecration",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 12.5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Holy",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:q7m4v2ka",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Deals {AURA_DAMAGE_1} Holy damage each turn. Generates a low amount of threat.",
+                            duration = 3,
+                            icon = "interface/icons/spell_holy_innerfire.blp",
+                            nameText = "Consecration",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "damage_amount",
+                                    baseField = "baseDamage",
+                                    effectIndex = 1,
+                                    key = "AURA_DAMAGE_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Consecration to up to 4 enemies for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
                             amount = 10,
                             amountMode = "base_percent",
                             castPhase = "on_cast_end",
@@ -1412,8 +2610,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_greaterblessingofkings.blp",
                 id = "h981ofan",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 4,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Blessing of Might",
                 range = 0,
@@ -1458,7 +2659,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1510,8 +2710,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_magic_greaterblessingofkings.blp",
                 id = "wfq254qz",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Blessing of Kings",
                 range = 0,
@@ -1556,7 +2759,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1596,8 +2798,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_greaterblessingofsanctuary.blp",
                 id = "zg4n0a1f",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 30,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Blessing of Sanctuary",
                 range = 0,
@@ -1642,7 +2847,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1682,8 +2886,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_greaterblessingofwisdom.blp",
                 id = "xdt25qxt",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 14,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Blessing of Wisdom",
                 range = 0,
@@ -1707,7 +2914,7 @@ Addon.Data.DefaultDatasets:Register({
                         {
                             auraRef = "b0211ab3:tymni65r",
                             datasetId = "b0211ab3",
-                            descriptionText = "Restores {AURA_RESOURCE_GAIN_1} each turn.",
+                            descriptionText = "Increases Resource Regeneration by 5%.",
                             duration = 10,
                             icon = "interface/icons/spell_holy_greaterblessingofwisdom.blp",
                             nameText = "Blessing of Wisdom",
@@ -1720,14 +2927,7 @@ Addon.Data.DefaultDatasets:Register({
                                 reflexive = "themselves",
                                 subject = "all allies"
                             },
-                            tokens = {
-                                {
-                                    applyMode = "resource_gain_amount",
-                                    effectIndex = 1,
-                                    key = "AURA_RESOURCE_GAIN_1",
-                                    tokenType = "aura_amount"
-                                }
-                            }
+                            tokens = {}
                         }
                     },
                     mainText = "Apply Blessing of Wisdom to all allies for 10 turns.",
@@ -1735,7 +2935,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1775,8 +2974,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_greaterblessingoflight.blp",
                 id = "ms0v0du4",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 40,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Blessing of Light",
                 range = 0,
@@ -1821,7 +3023,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1861,8 +3062,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_greaterblessingofsalvation.blp",
                 id = "25j5h8f2",
-                ignoreGCD = false,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 26,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Blessing of Salvation",
                 range = 0,
@@ -1907,7 +3111,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1950,7 +3153,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.553,
+                                    coefficient = 0.5525,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -1961,7 +3164,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "8088c3d6",
@@ -2012,8 +3215,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_righteousfury.blp",
                 id = "wmp0b1zn",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 4,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Judgement of the Righteous",
                 range = 0,
@@ -2044,7 +3250,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2105,8 +3310,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/inv_hammer_01.blp",
                 id = "xvfmhwn2",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Seal of Righteousness",
                 range = 0,
@@ -2160,7 +3368,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2181,7 +3388,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 71.55,
+                            baseDamage = 82.875,
                             damageSchoolRefs = {
                                 "f82db71a:wwctys5s"
                             },
@@ -2191,7 +3398,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.387,
+                                    coefficient = 0.3868,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -2253,8 +3460,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_righteousfury.blp",
                 id = "kyzga5f2",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Judgement of Command",
                 range = 0,
@@ -2285,7 +3495,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2334,8 +3543,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_warrior_innerrage.blp",
                 id = "uesn7obf",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Seal of Command",
                 range = 0,
@@ -2389,7 +3601,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2408,12 +3619,12 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseHealing = 71.5,
+                            baseHealing = 60.775,
                             projectilePath = "",
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.78,
+                                    coefficient = 0.3647,
                                     statRef = "f82db71a:hj6d4kvy"
                                 }
                             },
@@ -2495,8 +3706,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_righteousfury.blp",
                 id = "pb305qze",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 30,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Judgement of the Light",
                 range = 0,
@@ -2546,7 +3760,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2595,8 +3808,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_healingaura.blp",
                 id = "25h4rwgt",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 30,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Seal of Light",
                 range = 0,
@@ -2641,7 +3857,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2739,8 +3954,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_righteousfury.blp",
                 id = "j1my2871",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 38,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Judgement of Wisdom",
                 range = 0,
@@ -2775,7 +3993,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2836,8 +4053,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_righteousnessaura.blp",
                 id = "vuotim0h",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 38,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Seal of Wisdom",
                 range = 0,
@@ -2882,7 +4102,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2915,7 +4134,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 75,
+                            baseDamage = 82.875,
                             damageSchoolRefs = {
                                 "f82db71a:wwctys5s"
                             },
@@ -2925,7 +4144,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.35,
+                                    coefficient = 0.3868,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -2936,7 +4155,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 1.105,
                             weaponDamageMode = "main_hand"
                         },
                         key = "f83d713d",
@@ -2988,8 +4207,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_crusaderstrike.blp",
                 id = "27baiuv3",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 50,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Crusader Strike",
                 range = 0,
@@ -3026,7 +4248,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = true
             },
             {
@@ -3069,7 +4290,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.788,
+                                    coefficient = 0.7875,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -3111,8 +4332,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_paladin_templarsverdict.blp",
                 id = "eg4gydsa",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 10,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Templar's Verdict",
                 range = 0,
@@ -3143,7 +4367,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -3164,7 +4387,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 45,
+                            baseDamage = 46.8,
                             damageSchoolRefs = {
                                 "f82db71a:wwctys5s"
                             },
@@ -3174,7 +4397,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.21,
+                                    coefficient = 0.2184,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -3185,7 +4408,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 2,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 0.6,
+                            weaponDamageCoefficient = 0.624,
                             weaponDamageMode = "main_hand"
                         },
                         key = "74e6d957",
@@ -3216,8 +4439,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_paladin_hammeroftherighteous.blp",
                 id = "d1pmq58z",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 60,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Hammer of the Righteous",
                 range = 0,
@@ -3236,7 +4462,8 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. Generates a high amount of threat.\n|cff999999Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. Generates a high amount of threat. Targets must share the same raid marker.",
+                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. Generates a high amount of threat. Targets must share the same raid marker.",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -3248,7 +4475,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = true
             },
             {
@@ -3269,7 +4495,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 55.25,
+                            baseDamage = 57.46,
                             damageSchoolRefs = {
                                 "f82db71a:wwctys5s"
                             },
@@ -3279,7 +4505,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.193,
+                                    coefficient = 0.2011,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -3290,7 +4516,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1.5,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "2cb313ab",
@@ -3343,14 +4569,17 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_paladin_shieldofvengeance.blp",
                 id = "pz4cufo7",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 54,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Shield of the Righteous",
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 5,
+                        amount = 6.3,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -3405,8 +4634,121 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = true
+            },
+            {
+                _resourceCostsByPhase = {
+                    on_cast_end = {
+                        {
+                            amount = 5,
+                            amountMode = "base_percent",
+                            castPhase = "on_cast_end",
+                            refundOnInterrupt = 0,
+                            resourceRef = "f82db71a:4c8mfm99"
+                        }
+                    },
+                    on_cast_start = {}
+                },
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:hlyshlda",
+                            basePower = 0,
+                            duration = 3,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "hshld001",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 3,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_blessingofprotection.blp",
+                id = "hlyshlds",
+                cooldownChannel = 3,
+                learnMode = "always_learned",
+                learnLevel = 40,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Holy Shield",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:hlyshlda",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Increases Block Chance by {AURA_STAT_1}. When you successfully block an attack, deal {AURA_EVENT_DAMAGE_1} Holy damage to the attacker.",
+                            duration = 3,
+                            icon = "interface/icons/spell_holy_blessingofprotection.blp",
+                            nameText = "Holy Shield",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "stat_amount",
+                                    baseField = "baseAmount",
+                                    effectIndex = 1,
+                                    key = "AURA_STAT_1",
+                                    tokenType = "aura_amount"
+                                },
+                                {
+                                    applyMode = "damage_amount",
+                                    baseField = "baseDamage",
+                                    effectIndex = 1,
+                                    eventIndex = 1,
+                                    key = "AURA_EVENT_DAMAGE_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Holy Shield to yourself for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
             },
             {
                 _resourceCostsByPhase = {
@@ -3457,8 +4799,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_divineprotection.blp",
                 id = "0opb1tte",
-                ignoreGCD = true,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
+                learnLevel = 6,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Divine Protection",
                 range = 0,
@@ -3501,7 +4846,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -3567,8 +4911,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_holybolt.blp",
                 id = "9nwvhorx",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Holy Light",
                 range = 0,
@@ -3599,7 +4946,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -3653,8 +4999,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_flashheal.blp",
                 id = "znfbmec8",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Flash of Light",
                 range = 0,
@@ -3685,7 +5034,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -3725,8 +5073,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_heal.blp",
                 id = "bk0uyunm",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 30,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Divine Favor",
                 range = 0,
@@ -3761,7 +5112,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -3803,7 +5153,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "710f6be5",
@@ -3836,8 +5186,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_excorcism_02.blp",
                 id = "4wt3pl5q",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Exorcism",
                 range = 0,
@@ -3868,7 +5221,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -3910,7 +5262,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "710f6be5",
@@ -3943,8 +5295,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_excorcism.blp",
                 id = "x8ljrb7w",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 50,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Holy Wrath",
                 range = 0,
@@ -3975,7 +5330,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4006,7 +5360,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.473,
+                                    coefficient = 0.4725,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -4048,8 +5402,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_paladin_divinestorm.blp",
                 id = "tu5g28q8",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 60,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Divine Storm",
                 range = 0,
@@ -4068,7 +5425,8 @@ Addon.Data.DefaultDatasets:Register({
                 tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies.\n|cff999999Targets must share the same raid marker.|r",
+                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. Targets must share the same raid marker.",
+                    mainText = "Deal {DAMAGE_1} Holy damage to up to 3 enemies. Targets must share the same raid marker.",
                     tokens = {
                         {
                             applyMode = "damage_range",
@@ -4080,7 +5438,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4102,7 +5459,7 @@ Addon.Data.DefaultDatasets:Register({
                             applyAura = true,
                             auraRef = "b0211ab3:bgmk5vpf",
                             auraStacks = 1,
-                            baseDamage = 130,
+                            baseDamage = 123.25,
                             damageSchoolRefs = {
                                 "f82db71a:wwctys5s"
                             },
@@ -4112,7 +5469,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.455,
+                                    coefficient = 0.4314,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -4123,7 +5480,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "63e1467f",
@@ -4166,8 +5523,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_paladin_bladeofjustice.blp",
                 id = "pznrmr50",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 50,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Blade of Wrath",
                 range = 0,
@@ -4230,7 +5590,70 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            duration = 3,
+                            targetEvents = {},
+                            type = "taunt"
+                        },
+                        key = "1a2b3c4d",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 3,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_unyieldingfaith.blp",
+                id = "hork7m2p",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 16,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Hand of Reckoning",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 1,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Taunt an enemy for 3 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
                 useCooldownCharges = false
             },
             {
@@ -4266,8 +5689,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_rebuke.blp",
                 id = "kskvgnmw",
-                ignoreGCD = true,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
+                learnLevel = 54,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Rebuke",
                 range = 0,
@@ -4291,7 +5717,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -4316,7 +5741,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 1.35,
+                                    coefficient = 0.675,
                                     statRef = "f82db71a:hj6d4kvy"
                                 }
                             },
@@ -4346,8 +5771,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/inv_helmet_96.blp",
                 id = "5ouonxor",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 9,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Word of Glory",
                 range = 0,
@@ -4378,7 +5806,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4400,12 +5827,12 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseHealing = 35.75,
+                            baseHealing = 37.538,
                             projectilePath = "",
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.39,
+                                    coefficient = 0.2252,
                                     statRef = "f82db71a:hj6d4kvy"
                                 }
                             },
@@ -4432,14 +5859,17 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/ability_paladin_lightoftheprotector.blp",
                 id = "x2qgj4wy",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 50,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Light of the Protector",
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 15,
+                        amount = 2,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -4464,7 +5894,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -4504,8 +5933,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_heroism.blp",
                 id = "gak8p3v1",
-                ignoreGCD = true,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
+                learnLevel = 58,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Guardian of Ancient Kings",
                 range = 0,
@@ -4556,7 +5988,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4596,8 +6027,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_sealofmight.blp",
                 id = "hoj2q6x4",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 8,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Hammer of Justice",
                 range = 0,
@@ -4640,7 +6074,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -4680,8 +6113,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_avenginewrath.blp",
                 id = "awr9m5d2",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 56,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Avenging Wrath",
                 range = 0,
@@ -4724,7 +6160,92 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "b0211ab3:tplblw01",
+                            basePower = 0,
+                            duration = 1,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "tplblwc1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_paladin_shieldofthetemplar.blp",
+                id = "tplblwsp",
+                cooldownChannel = 5,
+                learnMode = "always_learned",
+                learnLevel = 40,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Templar's Bulwark",
+                range = 0,
+                resourceCosts = {},
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "b0211ab3:tplblw01",
+                            datasetId = "b0211ab3",
+                            descriptionText = "Absorbs {AURA_ABSORB_1} damage.",
+                            duration = 1,
+                            icon = "interface/icons/ability_paladin_shieldofthetemplar.blp",
+                            nameText = "Templar's Bulwark",
+                            powerLevel = 0,
+                            spellDatasetId = "b0211ab3",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "absorb_amount",
+                                    baseField = "baseAbsorption",
+                                    effectIndex = 1,
+                                    key = "AURA_ABSORB_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Templar's Bulwark to yourself for 1 turn.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
                 useCooldownCharges = false
             },
             {
@@ -4764,8 +6285,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_prayerofhealing.blp",
                 id = "rep7n4c8",
-                ignoreGCD = true,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 40,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Repentance",
                 range = 0,
@@ -4808,7 +6332,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             }
         },
@@ -4831,6 +6354,35 @@ Addon.Data.DefaultDatasets:Register({
                         value = 5
                     }
                 },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Protection",
+                conditions = {},
+                description = "When you take melee damage, you have a 50% chance to gain 30% Block Chance for 1 turn.",
+                events = {
+                    {
+                        chance = 50,
+                        combatEventId = "on_melee_taken",
+                        effects = {
+                            {
+                                auraRef = "b0211ab3:rdbtaura",
+                                basePower = 0,
+                                duration = 1,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "aura_caster"
+                    }
+                },
+                icon = "interface/icons/ability_defend.blp",
+                id = "rdbttrait",
+                isEnvironmental = false,
+                name = "Redoubt",
+                skillBonuses = {},
+                statBonuses = {},
                 unlockLevel = 1
             },
             {

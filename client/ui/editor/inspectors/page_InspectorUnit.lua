@@ -6,6 +6,7 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
+local Registry = Addon.Internal and Addon.Internal.Registry or {}
 
 local function buildUnitInspectorPageSelectorItems(editor)
     local items = editor:BuildUnitInspectorPageSelectorItems()
@@ -111,16 +112,45 @@ end
 
 function DataEditor:RefreshUnitInspectorPage()
     local _, unit = self:GetSelectedUnitAndDataset()
+    local effectiveUnit = self.GetUnitInspectorEffectiveDefinition and self:GetUnitInspectorEffectiveDefinition(unit) or unit
     local hasUnit = unit ~= nil
 
     self._refreshingUnitInspector = true
 
     if self.UnitInspectorNameInput then
-        self.UnitInspectorNameInput:SetText(unit and (unit.name or "") or "")
+        self.UnitInspectorNameInput:SetText(effectiveUnit and (effectiveUnit.name or "") or "")
         self:SetUnitInspectorTextElementEnabled(self.UnitInspectorNameInput, hasUnit)
     end
     if self.UnitInspectorIdText then
         self.UnitInspectorIdText:SetText(("ID: %s"):format(unit and unit.id ~= nil and tostring(unit.id) or "-"))
+    end
+    if self.UnitInspectorExtendsDropdown then
+        self.UnitInspectorExtendsDropdown:SetItems(self:BuildUnitInspectorExtendsItems(unit))
+        self.UnitInspectorExtendsDropdown:SetSelectedValue(unit and unit.extendsUnitRef or "", true)
+        self:SetUnitInspectorDropdownEnabled(self.UnitInspectorExtendsDropdown, hasUnit)
+    end
+    if self.UnitInspectorExtendsStatus then
+        local parentRef = tostring(unit and unit.extendsUnitRef or "")
+        local status = "No parent Unit."
+        if parentRef ~= "" then
+            local ok, dataset, effective = pcall(function()
+                if type(Registry.ResolveUnitDefinition) ~= "function" then
+                    error("Unit resolver is unavailable.")
+                end
+                return Registry:ResolveUnitDefinition(parentRef, { includeInactive = true })
+            end)
+            if not ok then
+                status = "Invalid parent: " .. tostring(dataset)
+            elseif not dataset or not effective then
+                status = "Missing parent Unit: " .. parentRef
+            else
+                status = ("Inherits from %s (%s)."):format(
+                    tostring(effective.name ~= "" and effective.name or effective.id or "Unit"),
+                    parentRef
+                )
+            end
+        end
+        self.UnitInspectorExtendsStatus:SetText(status)
     end
     if self.UnitInspectorTagsInput then
         self.UnitInspectorTagsInput:SetText(UI.Utils.JoinCommaSeparatedList(unit and unit.tags or nil))
@@ -128,17 +158,17 @@ function DataEditor:RefreshUnitInspectorPage()
     end
     if self.UnitInspectorCreatureTypeDropdown then
         self.UnitInspectorCreatureTypeDropdown:SetItems(self:GetUnitInspectorCreatureTypeItems())
-        self.UnitInspectorCreatureTypeDropdown:SetSelectedValue(unit and unit.creatureType or "humanoid", true)
+        self.UnitInspectorCreatureTypeDropdown:SetSelectedValue(effectiveUnit and effectiveUnit.creatureType or "humanoid", true)
         self:SetUnitInspectorDropdownEnabled(self.UnitInspectorCreatureTypeDropdown, hasUnit)
     end
     if self.UnitInspectorCreatureSizeDropdown then
         self.UnitInspectorCreatureSizeDropdown:SetItems(self:GetUnitInspectorCreatureSizeItems())
-        self.UnitInspectorCreatureSizeDropdown:SetSelectedValue(unit and unit.creatureSize or "medium", true)
+        self.UnitInspectorCreatureSizeDropdown:SetSelectedValue(effectiveUnit and effectiveUnit.creatureSize or "medium", true)
         self:SetUnitInspectorDropdownEnabled(self.UnitInspectorCreatureSizeDropdown, hasUnit)
     end
     if self.UnitInspectorChallengeLevelDropdown then
         self.UnitInspectorChallengeLevelDropdown:SetItems(self:GetUnitInspectorChallengeLevelItems())
-        self.UnitInspectorChallengeLevelDropdown:SetSelectedValue(self:NormalizeUnitInspectorChallengeLevel(unit and unit.challengeLevel or nil), true)
+        self.UnitInspectorChallengeLevelDropdown:SetSelectedValue(self:NormalizeUnitInspectorChallengeLevel(effectiveUnit and effectiveUnit.challengeLevel or nil), true)
         self:SetUnitInspectorDropdownEnabled(self.UnitInspectorChallengeLevelDropdown, hasUnit)
     end
     if self.UnitInspectorAttributesDropdown then
@@ -152,7 +182,7 @@ function DataEditor:RefreshUnitInspectorPage()
         if dropdown then
             local slotRef = self:GetUnitInspectorActiveSlotReference(definition.ruleKey)
             dropdown:SetItems(self:BuildUnitInspectorItemItemsForSlot(slotRef, definition.fieldKey))
-            dropdown:SetSelectedValue(unit and unit[definition.fieldKey] or "", true)
+            dropdown:SetSelectedValue(effectiveUnit and effectiveUnit[definition.fieldKey] or "", true)
             self:SetUnitInspectorDropdownEnabled(dropdown, hasUnit and slotRef ~= "")
         end
     end
@@ -173,8 +203,11 @@ function DataEditor:RefreshUnitInspectorPage()
         self.UnitInspectorPendingStatDropdown:SetItems(self:BuildUnitInspectorReferencesAcrossDatasets("stats"))
         self:SetUnitInspectorDropdownEnabled(self.UnitInspectorPendingStatDropdown, hasUnit)
     end
-    if self.UnitInspectorPendingStatValueInput then
-        self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingStatValueInput, hasUnit)
+    if self.UnitInspectorPendingStatInitialInput then
+        self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingStatInitialInput, hasUnit)
+    end
+    if self.UnitInspectorPendingStatPerLevelInput then
+        self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingStatPerLevelInput, hasUnit)
     end
     if self.UnitInspectorAddStatButton then
         self.UnitInspectorAddStatButton:SetEnabled(hasUnit)
@@ -194,8 +227,11 @@ function DataEditor:RefreshUnitInspectorPage()
         self.UnitInspectorPendingResourceDropdown:SetItems(self:BuildUnitInspectorReferencesAcrossDatasets("resources"))
         self:SetUnitInspectorDropdownEnabled(self.UnitInspectorPendingResourceDropdown, hasUnit)
     end
-    if self.UnitInspectorPendingResourceValueInput then
-        self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingResourceValueInput, hasUnit)
+    if self.UnitInspectorPendingResourceInitialInput then
+        self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingResourceInitialInput, hasUnit)
+    end
+    if self.UnitInspectorPendingResourcePerLevelInput then
+        self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingResourcePerLevelInput, hasUnit)
     end
     if self.UnitInspectorPendingResourcePerPlayerInput then
         self:SetUnitInspectorTextElementEnabled(self.UnitInspectorPendingResourcePerPlayerInput, hasUnit)

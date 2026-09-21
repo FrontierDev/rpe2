@@ -12,6 +12,7 @@ local Registry = Addon.Internal.Registry or {}
 local Common = Addon.Utils.Common or {}
 local Dice = Addon.Utils.Dice or {}
 local Lookup = Addon.Utils.Lookup or {}
+local Spellcasting = Addon.Client.Spellcasting or {}
 local Normalization = Addon.Client.Combat.Normalization or {}
 local Debug = Addon.Debug
 local Database = Addon.Internal.Database or {}
@@ -69,7 +70,15 @@ local function buildDamageAmountText(amountMin, amountMax)
 end
 
 local function buildAggregateDamageDetailText(aggregate)
-    if type(aggregate) ~= "table" or type(aggregate.bonusDamageEntries) ~= "table" or #aggregate.bonusDamageEntries == 0 then
+    if type(aggregate) ~= "table" then
+        return nil
+    end
+
+    local absorbedMin = tonumber(aggregate.absorbedMin)
+    local absorbedMax = tonumber(aggregate.absorbedMax)
+    local hasAbsorption = absorbedMin ~= nil and absorbedMax ~= nil and absorbedMax > 0
+    local hasBonusDamage = type(aggregate.bonusDamageEntries) == "table" and #aggregate.bonusDamageEntries > 0
+    if not hasAbsorption and not hasBonusDamage then
         return nil
     end
 
@@ -77,22 +86,108 @@ local function buildAggregateDamageDetailText(aggregate)
         buildDamageAmountText(aggregate.amountMin, aggregate.amountMax),
         tostring(aggregate.labelText or "") ~= "" and tostring(aggregate.labelText) or "True"
     )
+    if hasAbsorption then
+        baseText = ("%s (absorbed %s)"):format(baseText, buildDamageAmountText(absorbedMin, absorbedMax))
+    end
     baseText = wrapTextWithColor(baseText, aggregate.accentColor)
 
     local bonusParts = {}
     for index = 1, #aggregate.bonusDamageEntries do
         local bonusEntry = aggregate.bonusDamageEntries[index]
         local amount = math.max(0, math.floor(tonumber(bonusEntry and bonusEntry.amount) or 0))
-        if amount > 0 then
-            bonusParts[#bonusParts + 1] = wrapTextWithColor(("+" .. tostring(amount)), bonusEntry and bonusEntry.colorHex or nil)
+        local absorbedAmount = math.max(0, math.floor(tonumber(bonusEntry and bonusEntry.absorbedAmount) or 0))
+        if amount > 0 or absorbedAmount > 0 then
+            local bonusText = "+" .. tostring(amount)
+            if absorbedAmount > 0 then
+                bonusText = ("%s (absorbed %d)"):format(bonusText, absorbedAmount)
+            end
+            bonusParts[#bonusParts + 1] = wrapTextWithColor(bonusText, bonusEntry and bonusEntry.colorHex or nil)
         end
     end
 
     if #bonusParts == 0 then
-        return nil
+        return baseText
     end
 
     return ("%s (%s)"):format(baseText, table.concat(bonusParts, ", "))
+end
+
+local function emitSingleTargetDamageCombatLog(entry, damageResult)
+    if type(entry) ~= "table" or type(damageResult) ~= "table" then
+        return false
+    end
+
+    local client = Addon.Client
+    if type(client) ~= "table" or type(client.EmitCombatLogEntry) ~= "function" then
+        return false
+    end
+
+    local context = type(entry.context) == "table" and entry.context or nil
+    local eventState = entry.eventState or (context and context.eventState)
+    local localEventUnit = type(client.ResolveLocalEventUnit) == "function"
+        and client:ResolveLocalEventUnit(eventState)
+        or nil
+    local defenderEventId = tonumber(entry.defenderEventId)
+    if type(localEventUnit) ~= "table"
+        or defenderEventId == nil
+        or tonumber(localEventUnit.eventID) ~= defenderEventId
+    then
+        return false
+    end
+
+    local amount = math.max(0, math.floor(tonumber(damageResult.amount) or 0))
+    local absorbedAmount = math.max(0, math.floor(tonumber(damageResult.absorbedAmount) or 0))
+    if amount <= 0 and absorbedAmount <= 0 then
+        return false
+    end
+
+    local effect = entry.effect
+    local schoolRef = type(damageResult.damageSchoolRef) == "string" and damageResult.damageSchoolRef or nil
+    if schoolRef == nil and type(effect) == "table" and type(effect.damageSchoolRefs) == "table" then
+        schoolRef = effect.damageSchoolRefs[1]
+    end
+
+    local schoolIcon = damageResult.damageSchoolIcon
+    local schoolLabel = damageResult.damageSchoolName
+    local accentColor = nil
+    if type(client.ResolveCombatLogDamageSchoolPresentation) == "function" then
+        schoolIcon, schoolLabel, accentColor = client:ResolveCombatLogDamageSchoolPresentation(
+            schoolRef,
+            schoolLabel,
+            schoolIcon
+        )
+    end
+
+    local spellIcon = type(client.ResolveCombatLogSpellIcon) == "function"
+        and client:ResolveCombatLogSpellIcon(context and context.spell or nil, entry.spellRef or (context and context.spellRef) or nil)
+        or nil
+    local aggregate = {
+        amountMin = amount,
+        amountMax = amount,
+        absorbedMin = absorbedAmount,
+        absorbedMax = absorbedAmount,
+        labelText = schoolLabel,
+        accentColor = accentColor,
+    }
+
+    return client:EmitCombatLogEntry({
+        eventId = tostring((eventState and eventState.id) or entry.eventId or ""),
+        entryType = "damage",
+        casterEventId = tonumber(entry.attackerUnit and entry.attackerUnit.eventID) or nil,
+        meterAmount = amount,
+        casterDisplayName = tostring(entry.attackerUnit and entry.attackerUnit.name or "Unknown"),
+        targetDisplayName = tostring(entry.defenderUnit and entry.defenderUnit.name or "Unknown"),
+        targetCount = 1,
+        amountMin = amount,
+        amountMax = amount,
+        absorbedAmount = absorbedAmount,
+        iconTexture = schoolIcon,
+        spellIconTexture = spellIcon,
+        spellRef = entry.spellRef or (context and context.spellRef) or nil,
+        labelText = tostring(schoolLabel or "") ~= "" and tostring(schoolLabel) or "True",
+        detailText = buildAggregateDamageDetailText(aggregate),
+        accentColor = accentColor,
+    })
 end
 
 local function normalizeHealthResourceRef(resourceRef)
@@ -854,6 +949,56 @@ function Combat:ApplyResourceDelta(unit, resourceRef, delta, options)
     return true, entry, nextValue - currentValue
 end
 
+function Combat:ResolveResourceEffectAmount(context, effect)
+    local amount = tonumber(type(effect) == "table" and effect.amount or nil) or 0
+    local amountMode = tostring(type(effect) == "table" and effect.amountMode or "flat")
+    local auraEntry = type(context) == "table" and context.aura or nil
+    local rankContext = nil
+    if type(auraEntry) == "table" then
+        rankContext = { spellRankMultiplier = auraEntry.rankMultiplier }
+    elseif type(effect) == "table" and effect.scaleWithRank == true then
+        rankContext = context
+    end
+    local rankedAmount = rankContext and Spellcasting.ApplySpellRankMultiplier(rankContext, amount) or amount
+    if amountMode == "flat" then
+        return rankedAmount
+    end
+
+    local targetUnit = type(context) == "table" and (context.targetUnit or context.target) or nil
+    local resourceRef = tostring(type(effect) == "table" and effect.resourceRef or "")
+    local resourceEntry = type(targetUnit) == "table" and Lookup.GetResourceEntry and Lookup.GetResourceEntry(targetUnit, resourceRef) or nil
+    local resourceValue = 0
+
+    if amountMode == "base_percent" then
+        local client = type(context) == "table" and context.client or Addon.Client
+        local eventState = type(context) == "table" and context.eventState or nil
+        local localUnit = type(client) == "table" and type(client.ResolveLocalEventUnit) == "function"
+            and client:ResolveLocalEventUnit(eventState)
+            or nil
+        local targetEventId = tonumber(type(targetUnit) == "table" and targetUnit.eventID or nil)
+        local localEventId = tonumber(type(localUnit) == "table" and localUnit.eventID or nil)
+        local isLocalPlayer = type(targetUnit) == "table"
+            and targetUnit.isPlayer == true
+            and ((localUnit == targetUnit) or (targetEventId and localEventId and targetEventId == localEventId))
+
+        if isLocalPlayer and type(Profile.GetResolvedBaseResourceValue) == "function" then
+            resourceValue = tonumber(Profile.GetResolvedBaseResourceValue(resourceRef, {
+                includeAuraBonuses = false,
+            })) or 0
+        end
+    end
+
+    if resourceValue <= 0 then
+        resourceValue = tonumber(resourceEntry and resourceEntry.maxValue)
+            or tonumber(resourceEntry and resourceEntry.currentValue)
+            or 0
+    end
+
+    -- Scale the authored percentage before preserving the existing ceiling conversion.
+    local resolvedAmount = math.ceil(resourceValue * math.abs(rankedAmount) / 100)
+    return rankedAmount < 0 and -resolvedAmount or resolvedAmount
+end
+
 function Combat:PreviewResourceDelta(unit, resourceRef, delta, options)
     if type(unit) ~= "table" then
         return false, nil, 0
@@ -952,7 +1097,12 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
     local state = self:GetOrCreateActionCombatEventState(castEntry, spell)
     local componentKey = Normalization.NormalizeToken(type(entry) == "table" and (entry.componentKey or (context and context.componentKey)) or nil)
     local amount = math.max(0, math.floor(tonumber(type(damageResult) == "table" and damageResult.amount or 0) or 0))
-    if type(state) ~= "table" or not componentKey or amount < 0 then
+    if type(state) ~= "table" then
+        -- A remote defender cannot share the attacker's in-memory castEntry.
+        -- Emit its authoritative post-absorb result as a complete single-target entry.
+        return emitSingleTargetDamageCombatLog(entry, damageResult)
+    end
+    if not componentKey or amount < 0 then
         return false
     end
 
@@ -962,11 +1112,14 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
         aggregate = {
             eventId = tostring(type(entry) == "table" and ((entry.eventState and entry.eventState.id) or entry.eventId) or ""),
             entryType = "damage",
+            casterEventId = tonumber(type(entry) == "table" and entry.attackerUnit and entry.attackerUnit.eventID) or nil,
             casterDisplayName = tostring(type(entry) == "table" and entry.attackerUnit and entry.attackerUnit.name or "Unknown"),
             targetCount = 0,
             targetDisplayName = "Unknown",
             amountMin = nil,
             amountMax = nil,
+            absorbedMin = nil,
+            absorbedMax = nil,
             iconTexture = nil,
             spellIconTexture = type(Addon.Client) == "table" and type(Addon.Client.ResolveCombatLogSpellIcon) == "function"
                 and Addon.Client:ResolveCombatLogSpellIcon(spell, type(context) == "table" and context.spellRef or nil)
@@ -974,9 +1127,15 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
             labelText = "",
             accentColor = nil,
             bonusDamageEntries = {},
+            meterAmount = 0,
         }
         state.damageLogsByComponentKey[componentKey] = aggregate
     end
+
+    if not aggregate.casterEventId then
+        aggregate.casterEventId = tonumber(type(entry) == "table" and entry.attackerUnit and entry.attackerUnit.eventID) or nil
+    end
+    aggregate.meterAmount = math.max(0, math.floor(tonumber(aggregate.meterAmount) or 0)) + amount
 
     aggregate.targetCount = math.max(0, math.floor(tonumber(aggregate.targetCount) or 0)) + 1
     if aggregate.targetCount == 1 then
@@ -990,6 +1149,13 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
     end
     if aggregate.amountMax == nil or amount > aggregate.amountMax then
         aggregate.amountMax = amount
+    end
+    local absorbedAmount = math.max(0, math.floor(tonumber(type(damageResult) == "table" and damageResult.absorbedAmount or 0) or 0))
+    if aggregate.absorbedMin == nil or absorbedAmount < aggregate.absorbedMin then
+        aggregate.absorbedMin = absorbedAmount
+    end
+    if aggregate.absorbedMax == nil or absorbedAmount > aggregate.absorbedMax then
+        aggregate.absorbedMax = absorbedAmount
     end
     if tostring(type(damageResult) == "table" and damageResult.damageSchoolIcon or "") ~= "" then
         aggregate.iconTexture = tostring(damageResult.damageSchoolIcon)
@@ -1063,7 +1229,8 @@ function Combat:RegisterTriggeredActionBonusDamage(actionContext, targetUnit, da
                 or 0
         )
     )
-    if amount <= 0 then
+    local absorbedAmount = math.max(0, math.floor(tonumber(damageResult.absorbedAmount) or 0))
+    if amount <= 0 and absorbedAmount <= 0 then
         return false
     end
 
@@ -1085,10 +1252,16 @@ function Combat:RegisterTriggeredActionBonusDamage(actionContext, targetUnit, da
     aggregate.bonusDamageEntries = aggregate.bonusDamageEntries or {}
     aggregate.bonusDamageEntries[#aggregate.bonusDamageEntries + 1] = {
         amount = amount,
+        absorbedAmount = absorbedAmount,
         colorHex = colorHex,
         targetEventId = tonumber(targetUnit and targetUnit.eventID) or 0,
         combatEventId = tostring(combatEventId or ""),
     }
+    local casterUnit = actionContext.casterUnit or actionContext.attackerUnit
+    if not aggregate.casterEventId then
+        aggregate.casterEventId = tonumber(casterUnit and casterUnit.eventID) or nil
+    end
+    aggregate.meterAmount = math.max(0, math.floor(tonumber(aggregate.meterAmount) or 0)) + amount
     return true
 end
 
@@ -1118,6 +1291,8 @@ function Combat:FlushActionDamageCombatLog(client, context, castEntry, spell, co
     return client:EmitCombatLogEntry({
         eventId = aggregate.eventId,
         entryType = "damage",
+        casterEventId = aggregate.casterEventId,
+        meterAmount = aggregate.meterAmount,
         casterDisplayName = aggregate.casterDisplayName,
         targetDisplayName = aggregate.targetDisplayName,
         targetCount = aggregate.targetCount,
@@ -1171,6 +1346,9 @@ local function isOutcomeBoundHookEventId(eventId)
         or eventId == "on_critical_hit_taken"
         or eventId == "on_critical_heal"
         or eventId == "on_critical_heal_taken"
+        or eventId == "on_taunt"
+        or eventId == "on_taunted"
+        or eventId == "on_defence"
 end
 
 local function shouldEmitHookEvent(eventId, emission)
@@ -1183,6 +1361,10 @@ local function shouldEmitHookEvent(eventId, emission)
     local attackType = tostring(type(emission) == "table" and emission.attackType or "")
     local hitType = tostring(type(emission) == "table" and emission.hitType or "")
     local wasCritical = type(emission) == "table" and emission.wasCritical == true or false
+
+    if eventId == "on_taunt" or eventId == "on_taunted" or eventId == "on_defence" then
+        return false
+    end
 
     if eventId == "on_auto_attack_hit" then
         return role == "caster" and effectType == "damage" and hitType == "auto"

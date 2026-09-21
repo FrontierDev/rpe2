@@ -151,48 +151,8 @@ local function resolveCreatureTypeDamageStatRef(combatRules, defenderUnit)
 end
 
 local function rebuildThreatPreview(entry, result, combatRules, effect)
-    result.threatGenerated = 0
-    result.threatSourceEventId = 0
-    result.threatTargetEventId = 0
-    result.threatTotal = 0
-    result.threatUpdate = nil
-
-    if type(entry.defenderUnit) ~= "table"
-        or entry.defenderUnit.isPlayer == true
-        or (tonumber(result.amount) or 0) <= 0
-    then
-        return
-    end
-
-    local attackerEventId = math.floor(tonumber(entry.attackerEventId or (entry.attackerUnit and entry.attackerUnit.eventID)) or 0)
-    local defenderEventId = math.floor(tonumber(entry.defenderEventId or (entry.defenderUnit and entry.defenderUnit.eventID)) or 0)
-    if attackerEventId <= 0 or defenderEventId <= 0 then
-        return
-    end
-
-    local threatCoefficient = tonumber(effect and effect.threatCoefficient) or 1
-    local threatAmount = math.max(0, round((tonumber(result.amount) or 0) * threatCoefficient))
-    threatAmount = math.max(0, round(applyPercentModifier(
-        threatAmount,
-        getStatValue(entry.hitResolutionContext or entry.context, entry.attackerUnit, combatRules and combatRules.threatGeneratedStat),
-        false
-    )))
-
-    local previousThreat = 0
-    if type(entry.defenderUnit.threatTable) == "table" then
-        previousThreat = tonumber(entry.defenderUnit.threatTable[attackerEventId]) or 0
-    end
-
-    result.threatGenerated = threatAmount
-    result.threatSourceEventId = attackerEventId
-    result.threatTargetEventId = defenderEventId
-    result.threatTotal = previousThreat + threatAmount
-    if threatAmount > 0 then
-        result.threatUpdate = {
-            targetEventId = defenderEventId,
-            sourceEventId = attackerEventId,
-            amount = threatAmount,
-        }
+    if type(Combat.RefreshDamageThreatPreview) == "function" then
+        Combat:RefreshDamageThreatPreview(entry, result)
     end
 end
 
@@ -309,6 +269,7 @@ local function applyDifficultyDamageResult(entry, result)
 
     finalDamage = math.max(0, round(finalDamage))
     scaledRawDamage = math.max(0, round(scaledRawDamage))
+    result.preAbsorbAmount = finalDamage
     result.amount = finalDamage
     result.mitigated = math.max(0, scaledRawDamage - finalDamage)
     result.mitigationPercent = scaledRawDamage > 0 and ((result.mitigated / scaledRawDamage) * 100) or 0
@@ -399,6 +360,9 @@ end
 local baseBuildDamagePreview = Combat.BuildDamagePreview
 if type(baseBuildDamagePreview) == "function" then
     function Combat:BuildDamagePreview(entry)
+        if type(entry) == "table" and type(entry.authoritativeDamageResult) == "table" then
+            return entry.authoritativeDamageResult
+        end
         local result = baseBuildDamagePreview(self, entry)
         if type(result) == "table" then
             applyDifficultyDamageResult(entry, result)
@@ -416,6 +380,12 @@ end
 local baseApplyResolvedDamage = Combat.ApplyResolvedDamage
 if type(baseApplyResolvedDamage) == "function" then
     function Combat:ApplyResolvedDamage(entry, previewOnly)
+        if previewOnly ~= true
+            and type(entry) == "table"
+            and type(entry.authoritativeDamageResult) == "table"
+        then
+            return true, entry.authoritativeDamageResult
+        end
         if type(self.BuildDamagePreview) == "function" then
             self:BuildDamagePreview(entry)
         end

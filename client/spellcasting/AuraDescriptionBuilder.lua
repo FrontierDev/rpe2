@@ -231,6 +231,23 @@ local function resolveStatName(statRef)
     return ensureString(statId or statRef, "a stat")
 end
 
+local function resolveDefenceLabel(statRef)
+    local normalizedRef = ensureString(statRef)
+    if normalizedRef == "" then
+        return nil
+    end
+
+    if type(Registry.ResolveStatReference) == "function" then
+        local _, stat = Registry:ResolveStatReference(normalizedRef)
+        local defenceLabel = trimText(stat and stat.defenceLabel or "")
+        if defenceLabel ~= "" then
+            return defenceLabel
+        end
+    end
+
+    return resolveStatName(normalizedRef)
+end
+
 local function resolveSkillName(skillRef)
     local resolvedRow = type(Profile.GetResolvedSkillRow) == "function" and Profile.GetResolvedSkillRow(skillRef) or nil
     local resolvedName = resolvedRow and resolvedRow.name or nil
@@ -291,6 +308,7 @@ local function buildAuraEffectContext(options)
     return {
         aura = {
             powerLevel = tonumber(type(options) == "table" and options.powerLevel) or 0,
+            rankMultiplier = tonumber(type(options) == "table" and options.rankMultiplier) or 1,
             stacks = math.max(1, math.floor(tonumber(type(options) == "table" and options.stacks) or 1)),
         },
         casterUnit = type(options) == "table" and options.casterUnit or nil,
@@ -312,6 +330,52 @@ local function resolveAmount(options, effect, baseField)
     return math.floor((tonumber(amount) or 0) + 0.5)
 end
 
+local function resolveAuraThreatDescription(auraDefinition)
+    local hasHighThreat = false
+    local hasModerateThreat = false
+    local hasLowThreat = false
+
+    for index = 1, #((type(auraDefinition) == "table" and auraDefinition.effects) or {}) do
+        local effect = auraDefinition.effects[index]
+        if type(effect) == "table" and tostring(effect.type or "") == "damage" and effect.threatCoefficient ~= nil then
+            local threatCoefficient = tonumber(effect.threatCoefficient)
+            if threatCoefficient and threatCoefficient > 1.8 then
+                hasHighThreat = true
+            elseif threatCoefficient and threatCoefficient > 1.2 then
+                hasModerateThreat = true
+            elseif threatCoefficient and threatCoefficient < 0.5 then
+                hasLowThreat = true
+            end
+        end
+    end
+
+    if hasHighThreat then
+        return "Generates a high amount of threat."
+    end
+    if hasModerateThreat then
+        return "Generates a moderate amount of threat."
+    end
+    if hasLowThreat then
+        return "Generates a low amount of threat."
+    end
+    return ""
+end
+
+local function appendAuraThreatDescription(auraDefinition, descriptionText)
+    local description = trimText(descriptionText)
+    local threatDescription = resolveAuraThreatDescription(auraDefinition)
+    if threatDescription == "" then
+        return description
+    end
+    if description == "" then
+        return threatDescription
+    end
+    if description:sub(-#threatDescription) == threatDescription then
+        return description
+    end
+    return description .. " " .. threatDescription
+end
+
 local function buildPassiveDamageSentence(effect, targetContext, options)
     local amount = math.max(0, resolveAmount(options, effect, "baseDamage"))
     local amountMode = tostring(effect and effect.amountMode or "flat")
@@ -327,6 +391,23 @@ local function buildPassiveDamageSentence(effect, targetContext, options)
     end
     
     return ("Deals %s %s damage each turn."):format(amountText, schoolLabel)
+end
+
+local function buildPassiveAbsorbSentence(effect, targetContext, options)
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    local amountText = nil
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base"):format(tonumber(effect and effect.baseAbsorption) or 0)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max"):format(tonumber(effect and effect.baseAbsorption) or 0)
+    else
+        amountText = tostring(math.max(0, resolveAmount(options, effect, "baseAbsorption")))
+    end
+
+    local schoolLabel = #((effect and effect.damageSchoolRefs) or {}) > 0
+        and (resolveDamageSchoolLabel(effect) .. " damage")
+        or "damage"
+    return ("Absorbs %s %s."):format(amountText, schoolLabel)
 end
 
 local function buildPassiveHealSentence(effect, targetContext, options)
@@ -455,8 +536,47 @@ local function buildPassiveControlSentence(effect, targetContext, options)
     return table.concat(sentences, " ")
 end
 
-local function resolveCombatTriggerLabel(combatEventId, targetContext)
+local function resolveCombatTriggerLabel(combatEventId, targetContext, defenceStatRef, damageSchoolRef)
     local eventId = tostring(combatEventId or "")
+    if eventId == "on_taunt" then
+        if targetContext.subject == "you" then
+            return "When you taunt an enemy"
+        end
+        return ("When %s taunts an enemy"):format(targetContext.subject)
+    end
+    if eventId == "on_taunted" then
+        if targetContext.subject == "you" then
+            return "When you are taunted"
+        end
+        return ("When %s is taunted"):format(targetContext.subject)
+    end
+    if eventId == "on_defence" then
+        local defenceLabel = resolveDefenceLabel(defenceStatRef)
+        if defenceLabel then
+            defenceLabel = string.lower(defenceLabel)
+            if targetContext.subject == "you" then
+                return ("When you successfully %s an attack"):format(defenceLabel)
+            end
+            return ("When %s successfully %s an attack"):format(targetContext.subject, defenceLabel)
+        end
+        if targetContext.subject == "you" then
+            return "When you successfully defend against an attack"
+        end
+        return ("When %s successfully defends against an attack"):format(targetContext.subject)
+    end
+    if eventId == "on_damage_type" then
+        local damageSchoolLabel = resolveDamageSchoolName(damageSchoolRef)
+        if damageSchoolLabel then
+            if targetContext.subject == "you" then
+                return ("When you deal %s damage"):format(damageSchoolLabel)
+            end
+            return ("When %s deals %s damage"):format(targetContext.subject, damageSchoolLabel)
+        end
+        if targetContext.subject == "you" then
+            return "When you deal damage"
+        end
+        return ("When %s deals damage"):format(targetContext.subject)
+    end
     if eventId == "on_auto_attack_hit" then
         if targetContext.subject == "you" then
             return "When you hit with a basic attack"
@@ -574,6 +694,22 @@ local function resolveTriggeredTargetContext(combatEventId, triggerTarget, auraT
     if targetKey == "aura_target" then
         return auraTargetContext
     end
+    if eventId == "on_damage_type" and targetKey == "event_source" then
+        return {
+            subject = "the damage dealer",
+            object = "the damage dealer",
+            possessive = "the damage dealer's",
+            reflexive = "itself",
+        }
+    end
+    if eventId == "on_damage_type" and targetKey == "event_other" then
+        return {
+            subject = "the damaged unit",
+            object = "the damaged unit",
+            possessive = "the damaged unit's",
+            reflexive = "itself",
+        }
+    end
     if targetKey == "event_source" then
         if eventId == "on_heal" or eventId == "on_heal_taken" then
             return {
@@ -638,6 +774,22 @@ local function resolveTriggeredTargetContext(combatEventId, triggerTarget, auraT
         or eventId == "on_critical_heal_taken"
     then
         return auraTargetContext
+    end
+    if eventId == "on_taunt" then
+        return {
+            subject = "the taunted target",
+            object = "the taunted target",
+            possessive = "the taunted target's",
+            reflexive = "itself",
+        }
+    end
+    if eventId == "on_taunted" then
+        return {
+            subject = "the taunter",
+            object = "the taunter",
+            possessive = "the taunter's",
+            reflexive = "itself",
+        }
     end
 
     return auraTargetContext
@@ -832,6 +984,8 @@ function AuraDescriptionBuilder:BuildGeneratedDescription(auraDefinition, option
         local sentence = nil
         if effectType == "damage" then
             sentence = buildPassiveDamageSentence(effect, targetContext, options)
+        elseif effectType == "absorb" then
+            sentence = buildPassiveAbsorbSentence(effect, targetContext, options)
         elseif effectType == "heal" then
             sentence = buildPassiveHealSentence(effect, targetContext, options)
         elseif effectType == "resource" then
@@ -873,7 +1027,12 @@ function AuraDescriptionBuilder:BuildGeneratedDescription(auraDefinition, option
         end
 
         if #clauses > 0 then
-            local prefix = resolveCombatTriggerLabel(auraEvent and auraEvent.combatEventId or nil, targetContext)
+            local prefix = resolveCombatTriggerLabel(
+                auraEvent and auraEvent.combatEventId or nil,
+                targetContext,
+                auraEvent and auraEvent.defenceStatRef or nil,
+                auraEvent and auraEvent.damageSchoolRef or nil
+            )
             local chance = normalizeChancePercent(auraEvent and auraEvent.chance)
             if chance < 100 then
                 prefix = ("%s (%g%% chance)"):format(prefix, chance)
@@ -882,7 +1041,7 @@ function AuraDescriptionBuilder:BuildGeneratedDescription(auraDefinition, option
         end
     end
 
-    return table.concat(sentences, " ")
+    return appendAuraThreatDescription(auraDefinition, table.concat(sentences, " "))
 end
 
 local function buildStackingTemplate(auraDefinition)
@@ -939,6 +1098,27 @@ local function buildPassiveDamageSentenceTemplate(effect, effectIndex, state)
         applyMode = "damage_amount",
     })
     return ("Deals %s %s damage each turn."):format(amountToken, schoolLabel)
+end
+
+local function buildPassiveAbsorbSentenceTemplate(effect, effectIndex, state)
+    local amountMode = tostring(effect and effect.amountMode or "flat")
+    local amountText = nil
+    if amountMode == "base_percent" then
+        amountText = ("%g%% of Base"):format(tonumber(effect and effect.baseAbsorption) or 0)
+    elseif amountMode == "max_percent" then
+        amountText = ("%g%% of Max"):format(tonumber(effect and effect.baseAbsorption) or 0)
+    else
+        amountText = buildAuraAmountToken(state, "AURA_ABSORB", {
+            effectIndex = effectIndex,
+            baseField = "baseAbsorption",
+            applyMode = "absorb_amount",
+        })
+    end
+
+    local schoolLabel = #((effect and effect.damageSchoolRefs) or {}) > 0
+        and (resolveDamageSchoolLabel(effect) .. " damage")
+        or "damage"
+    return ("Absorbs %s %s."):format(amountText, schoolLabel)
 end
 
 local function buildPassiveHealSentenceTemplate(effect, effectIndex, state)
@@ -1211,10 +1391,10 @@ local function resolveAuraTemplateToken(auraDefinition, token, options)
         return nil
     end
 
-    if applyMode == "damage_amount" or applyMode == "heal_amount" or applyMode == "stat_amount" or applyMode == "skill_amount" then
+    if applyMode == "damage_amount" or applyMode == "heal_amount" or applyMode == "absorb_amount" or applyMode == "stat_amount" or applyMode == "skill_amount" then
         local amount = resolveAmount(options, effect, tostring(token.baseField or "baseAmount"))
         local numericAmount = math.abs(amount)
-        if applyMode == "damage_amount" or applyMode == "heal_amount" then
+        if applyMode == "damage_amount" or applyMode == "heal_amount" or applyMode == "absorb_amount" then
             local amountMode = tostring(effect.amountMode or "flat")
             if amountMode == "base_percent" then
                 return ("%g%% of Base"):format(math.abs(tonumber(effect[token.baseField or "baseAmount"]) or 0))
@@ -1282,6 +1462,8 @@ function AuraDescriptionBuilder:BuildTooltipTemplatePayload(auraDefinition, opti
         local sentence = nil
         if effectType == "damage" then
             sentence = buildPassiveDamageSentenceTemplate(effect, effectIndex, bodyState)
+        elseif effectType == "absorb" then
+            sentence = buildPassiveAbsorbSentenceTemplate(effect, effectIndex, bodyState)
         elseif effectType == "heal" then
             sentence = buildPassiveHealSentenceTemplate(effect, effectIndex, bodyState)
         elseif effectType == "resource" then
@@ -1327,7 +1509,12 @@ function AuraDescriptionBuilder:BuildTooltipTemplatePayload(auraDefinition, opti
         end
 
         if #clauses > 0 then
-            local prefix = resolveCombatTriggerLabel(auraEvent and auraEvent.combatEventId or nil, targetContext)
+            local prefix = resolveCombatTriggerLabel(
+                auraEvent and auraEvent.combatEventId or nil,
+                targetContext,
+                auraEvent and auraEvent.defenceStatRef or nil,
+                auraEvent and auraEvent.damageSchoolRef or nil
+            )
             local chance = normalizeChancePercent(auraEvent and auraEvent.chance)
             if chance < 100 then
                 prefix = ("%s (%g%% chance)"):format(prefix, chance)
@@ -1337,8 +1524,10 @@ function AuraDescriptionBuilder:BuildTooltipTemplatePayload(auraDefinition, opti
     end
 
     local stackingText, stackingTokens = buildStackingTemplate(auraDefinition)
+    local bodyText = #bodySentences > 0 and table.concat(bodySentences, " ") or authoredDescriptionText
+    bodyText = appendAuraThreatDescription(auraDefinition, bodyText)
     return TooltipTemplate.NormalizeAuraPayload({
-        bodyText = #bodySentences > 0 and table.concat(bodySentences, " ") or authoredDescriptionText,
+        bodyText = bodyText,
         bodyTokens = bodyState.tokens,
         stackingText = stackingText,
         stackingTokens = stackingTokens,
@@ -1392,6 +1581,7 @@ function AuraDescriptionBuilder:BuildTooltipSectionTemplate(auraRef, options)
         casterUnit = type(options) == "table" and options.casterUnit or nil,
         targetUnit = type(options) == "table" and options.targetUnit or nil,
         powerLevel = type(options) == "table" and options.powerLevel or nil,
+        rankMultiplier = type(options) == "table" and options.rankMultiplier or nil,
         stacks = type(options) == "table" and options.stacks or nil,
         duration = type(options) == "table" and options.duration or nil,
         targetContext = type(options) == "table" and options.targetContext or nil,
@@ -1408,6 +1598,7 @@ function AuraDescriptionBuilder:BuildTooltipSectionTemplate(auraRef, options)
             casterUnit = resolvedOptions.casterUnit,
             targetUnit = resolvedOptions.targetUnit,
             powerLevel = resolvedOptions.powerLevel,
+            rankMultiplier = resolvedOptions.rankMultiplier,
             stacks = resolvedOptions.stacks,
             duration = resolvedOptions.duration,
             targetContext = resolvedOptions.targetContext,
@@ -1423,6 +1614,7 @@ function AuraDescriptionBuilder:BuildTooltipSectionTemplate(auraRef, options)
             descriptionText = TooltipTemplate.CombineText(payload.bodyText, payload.stackingText),
             tokens = TooltipTemplate.MergeTokens(payload.bodyTokens, payload.stackingTokens),
             powerLevel = type(options) == "table" and options.powerLevel or nil,
+            rankMultiplier = type(options) == "table" and options.rankMultiplier or nil,
             stacks = type(options) == "table" and options.stacks or nil,
             duration = type(options) == "table" and options.duration or nil,
             targetContext = type(options) == "table" and options.targetContext or nil,
@@ -1449,6 +1641,7 @@ function AuraDescriptionBuilder:BuildTooltipSectionTemplate(auraRef, options)
         descriptionText = descriptionText,
         tokens = {},
         powerLevel = resolvedOptions.powerLevel,
+        rankMultiplier = resolvedOptions.rankMultiplier,
         stacks = resolvedOptions.stacks,
         duration = resolvedOptions.duration,
         targetContext = resolvedOptions.targetContext,
@@ -1478,6 +1671,9 @@ function AuraDescriptionBuilder:ResolveTooltipSectionTemplate(section, options)
             casterUnit = type(options) == "table" and options.casterUnit or nil,
             targetUnit = type(options) == "table" and options.targetUnit or nil,
             powerLevel = tonumber(section.powerLevel) or 0,
+            rankMultiplier = tonumber(type(options) == "table" and options.rankMultiplier)
+                or tonumber(section.rankMultiplier)
+                or 1,
             stacks = tonumber(section.stacks) or 1,
             duration = section.duration,
             targetContext = section.targetContext,
@@ -1494,7 +1690,7 @@ function AuraDescriptionBuilder:BuildTooltipSection(auraRef, options)
     end
 
     if auraDefinition.tooltipTemplate == true then
-        local resolvedDescriptionText, resolveError = self:ResolveTooltipTemplatePayload(auraDefinition, auraDefinition.tooltipTemplateData, {
+        local resolvedOptions = {
             auraRef = qualifiedAuraRef or auraRef,
             datasetId = dataset and dataset.id or (type(options) == "table" and options.datasetId or nil),
             dataset = dataset or (type(options) == "table" and options.dataset or nil),
@@ -1502,10 +1698,18 @@ function AuraDescriptionBuilder:BuildTooltipSection(auraRef, options)
             casterUnit = type(options) == "table" and options.casterUnit or nil,
             targetUnit = type(options) == "table" and options.targetUnit or nil,
             powerLevel = type(options) == "table" and options.powerLevel or nil,
+            rankMultiplier = type(options) == "table" and options.rankMultiplier or nil,
             stacks = type(options) == "table" and options.stacks or nil,
             duration = type(options) == "table" and options.duration or nil,
             targetContext = type(options) == "table" and options.targetContext or nil,
-        })
+        }
+        local payload = type(TooltipTemplate.NormalizeAuraPayload) == "function"
+            and TooltipTemplate.NormalizeAuraPayload(auraDefinition.tooltipTemplateData)
+            or nil
+        if type(payload) ~= "table" then
+            payload = self:BuildTooltipTemplatePayload(auraDefinition, resolvedOptions)
+        end
+        local resolvedDescriptionText, resolveError = self:ResolveTooltipTemplatePayload(auraDefinition, payload, resolvedOptions)
         local descriptionText = trimText(resolvedDescriptionText)
         if descriptionText == "" then
             return {
@@ -1533,6 +1737,7 @@ function AuraDescriptionBuilder:BuildTooltipSection(auraRef, options)
         spellDatasetId = type(options) == "table" and options.spellDatasetId or nil,
         casterUnit = type(options) == "table" and options.casterUnit or nil,
         powerLevel = type(options) == "table" and options.powerLevel or nil,
+        rankMultiplier = type(options) == "table" and options.rankMultiplier or nil,
         stacks = type(options) == "table" and options.stacks or nil,
         targetContext = type(options) == "table" and options.targetContext or nil,
     })

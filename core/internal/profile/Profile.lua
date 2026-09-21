@@ -258,6 +258,19 @@ local function buildKnownSpellRefs()
     local refs = {}
     local seen = {}
 
+    local function isEligibleAtProfileLevel(spell)
+        local spellcasting = Addon.Client and Addon.Client.Spellcasting or nil
+        if type(spellcasting) ~= "table" or type(spellcasting.ResolveSpellRankContext) ~= "function" then
+            return false
+        end
+
+        local level = Profile.GetLevel and Profile.GetLevel()
+            or (Database.GetProfileLevel and Database.GetProfileLevel())
+            or 1
+        local rankContext = spellcasting.ResolveSpellRankContext(spell, { casterLevel = level })
+        return type(rankContext) == "table" and rankContext.eligible == true
+    end
+
     local manualSpellbook = Database.ListProfileSpellbook and Database.ListProfileSpellbook() or {}
     for index = 1, #manualSpellbook do
         local spellRef = ensureString(manualSpellbook[index])
@@ -275,7 +288,10 @@ local function buildKnownSpellRefs()
         if datasetId ~= "" then
             for spellIndex = 1, #(dataset and dataset.spells or {}) do
                 local spell = dataset.spells[spellIndex]
-                if spell and spell.id and tostring(spell.learnMode or "trainer") == "always_learned" then
+                if spell and spell.id
+                    and tostring(spell.learnMode or "trainer") == "always_learned"
+                    and isEligibleAtProfileLevel(spell)
+                then
                     local spellRef = ("%s:%s"):format(datasetId, tostring(spell.id))
                     if not seen[spellRef] then
                         seen[spellRef] = true
@@ -955,6 +971,16 @@ local function buildKnownSpellLightweightRow(spellRef, rowIndex)
         dataset, spell = registry:ResolveSpellReference(normalizedRef)
     end
 
+    local spellcasting = Addon.Client and Addon.Client.Spellcasting or nil
+    local level = Profile.GetLevel and Profile.GetLevel()
+        or (Database.GetProfileLevel and Database.GetProfileLevel())
+        or 1
+    local rankContext = type(spell) == "table"
+        and type(spellcasting) == "table"
+        and type(spellcasting.ResolveSpellRankContext) == "function"
+        and spellcasting.ResolveSpellRankContext(spell, { casterLevel = level })
+        or nil
+
     return {
         rowIndex = rowIndex,
         spellRef = normalizedRef,
@@ -962,6 +988,14 @@ local function buildKnownSpellLightweightRow(spellRef, rowIndex)
         isMissing = spell == nil,
         dataset = dataset,
         spell = spell,
+        isAvailable = spell == nil or type(rankContext) == "table" and rankContext.eligible == true,
+        requiredLevel = type(rankContext) == "table" and rankContext.eligible ~= true and rankContext.learnLevel or nil,
+        rankContext = rankContext,
+        rank = type(rankContext) == "table" and rankContext.rank or nil,
+        rankMultiplier = type(rankContext) == "table" and rankContext.multiplier or nil,
+        useSpellRanks = type(rankContext) == "table" and rankContext.useSpellRanks == true or false,
+        usesRanks = type(rankContext) ~= "table" or rankContext.usesRanks ~= false,
+        nextRankLevel = type(rankContext) == "table" and rankContext.nextRankLevel or nil,
         spellbookCategory = isSpellProvidedBySelectedMount(normalizedRef) and "Mounted" or (spell and trimString(spell.spellbookCategory) or ""),
     }
 end
@@ -1650,6 +1684,24 @@ function Profile.ValidateTraitAssignment(traitRef, options)
     local isClassTalent = membership.anyClassTalent
     local isSelectedClassTalent = membership.selectedClassTalent
     local isManual = not membership.anyClassTalent and not membership.anyClassPassive and not membership.anyRace
+
+    for index = 1, #(trait.mutuallyExclusiveTraitRefs or {}) do
+        local conflictingRef = ensureString(trait.mutuallyExclusiveTraitRefs[index])
+        if conflictingRef ~= "" and conflictingRef ~= normalizedRef and selectedTalentLookup[conflictingRef] == true then
+            local conflictingTrait = nil
+            if type(registry.ResolveTraitReference) == "function" then
+                _, conflictingTrait = registry:ResolveTraitReference(conflictingRef)
+            end
+            local conflictingName = ensureString(conflictingTrait and conflictingTrait.name)
+            if conflictingName == "" then
+                conflictingName = conflictingRef
+            end
+            return traitAssignmentFailure("mutually_exclusive_trait", ("Mutually exclusive with %s."):format(conflictingName), {
+                typeCategory = isClassTalent and "talent" or "talent",
+                conflictingTraitRef = conflictingRef,
+            })
+        end
+    end
 
     if membership.anyRace or membership.anyClassPassive then
         return traitAssignmentFailure("passive_not_assignable", "This passive trait is granted automatically.", { typeCategory = membership.selectedRace and "race" or "class" })
@@ -2635,6 +2687,14 @@ function Profile.ListKnownSpells(options)
                     dataset = detail.dataset,
                     spell = detail.spell,
                     spellbookCategory = detail.spellbookCategory,
+                    isAvailable = detail.isAvailable,
+                    requiredLevel = detail.requiredLevel,
+                    rankContext = detail.rankContext,
+                    rank = detail.rank,
+                    rankMultiplier = detail.rankMultiplier,
+                    useSpellRanks = detail.useSpellRanks,
+                    usesRanks = detail.usesRanks,
+                    nextRankLevel = detail.nextRankLevel,
                 }
             end
         end
@@ -3325,6 +3385,16 @@ function Profile.GetKnownSpellDetails(spellRef)
         dataset, spell = registry:ResolveSpellReference(normalizedRef)
     end
 
+    local spellcasting = Addon.Client and Addon.Client.Spellcasting or nil
+    local level = Profile.GetLevel and Profile.GetLevel()
+        or (Database.GetProfileLevel and Database.GetProfileLevel())
+        or 1
+    local rankContext = type(spell) == "table"
+        and type(spellcasting) == "table"
+        and type(spellcasting.ResolveSpellRankContext) == "function"
+        and spellcasting.ResolveSpellRankContext(spell, { casterLevel = level })
+        or nil
+
     local spellName = registry.ResolveSpellName and registry:ResolveSpellName(normalizedRef) or normalizedRef
     local datasetName = dataset and Database.GetDatasetDisplayName and Database.GetDatasetDisplayName(dataset) or "Unknown Dataset"
     local summaryText = getSpellSummaryText(spell)
@@ -3354,6 +3424,14 @@ function Profile.GetKnownSpellDetails(spellRef)
         descriptionText = descriptionText,
         descriptionSource = descriptionSource,
         learnMode = learnMode,
+        isAvailable = spell == nil or type(rankContext) == "table" and rankContext.eligible == true,
+        requiredLevel = type(rankContext) == "table" and rankContext.eligible ~= true and rankContext.learnLevel or nil,
+        rankContext = rankContext,
+        rank = type(rankContext) == "table" and rankContext.rank or nil,
+        rankMultiplier = type(rankContext) == "table" and rankContext.multiplier or nil,
+        useSpellRanks = type(rankContext) == "table" and rankContext.useSpellRanks == true or false,
+        usesRanks = type(rankContext) ~= "table" or rankContext.usesRanks ~= false,
+        nextRankLevel = type(rankContext) == "table" and rankContext.nextRankLevel or nil,
         spellbookCategory = isSpellProvidedBySelectedMount(normalizedRef) and "Mounted" or (spell and trimString(spell.spellbookCategory) or ""),
         mountedCombatOnly = spell and spell.mountedCombatOnly == true or false,
         isMissing = spell == nil,
@@ -3363,7 +3441,33 @@ end
 
 function Profile.AddKnownSpell(spellRef)
     if Database.AddProfileSpellbookSpell then
-        local changed = Database.AddProfileSpellbookSpell(spellRef)
+        local normalizedRef = ensureString(spellRef)
+        local registry = getRegistry()
+        local spell = nil
+        if normalizedRef ~= "" and registry.ResolveSpellReference then
+            local _, resolvedSpell = registry:ResolveSpellReference(normalizedRef)
+            spell = resolvedSpell
+        end
+
+        local spellcasting = Addon.Client and Addon.Client.Spellcasting or nil
+        if type(spell) == "table" then
+            if type(spellcasting) ~= "table" or type(spellcasting.ResolveSpellRankContext) ~= "function" then
+                return false, { reason = "spell-rank-context-unavailable" }
+            end
+
+            local level = Profile.GetLevel and Profile.GetLevel()
+                or (Database.GetProfileLevel and Database.GetProfileLevel())
+                or 1
+            local rankContext = spellcasting.ResolveSpellRankContext(spell, { casterLevel = level })
+            if type(rankContext) ~= "table" or rankContext.eligible ~= true then
+                return false, {
+                    reason = type(rankContext) == "table" and "level-required" or "spell-rank-context-unavailable",
+                    requiredLevel = type(rankContext) == "table" and rankContext.learnLevel or nil,
+                }
+            end
+        end
+
+        local changed = Database.AddProfileSpellbookSpell(normalizedRef)
         if changed then
             bumpProfileTooltipContextRevision()
         end

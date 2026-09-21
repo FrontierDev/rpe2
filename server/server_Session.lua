@@ -103,11 +103,13 @@ local function normalizeThreatUpdates(text)
         local targetEventId = math.floor(tonumber(values[1]) or 0)
         local sourceEventId = math.floor(tonumber(values[2]) or 0)
         local amount = math.max(0, tonumber(values[3]) or 0)
+        local turnNumber = math.floor(tonumber(values[4]) or 0)
         if targetEventId > 0 and sourceEventId > 0 and amount > 0 then
             normalized[#normalized + 1] = {
                 targetEventId = targetEventId,
                 sourceEventId = sourceEventId,
                 amount = amount,
+                turnNumber = turnNumber > 0 and turnNumber or nil,
             }
         end
     end
@@ -115,20 +117,20 @@ local function normalizeThreatUpdates(text)
     return normalized
 end
 
-local function applyThreatUpdatesToUnits(units, threatUpdates, changedByEventId)
+local function applyThreatUpdatesToUnits(units, threatUpdates, changedByEventId, validSourceUnits)
     local changed = false
+    local sourceUnits = validSourceUnits or {}
     for index = 1, #(threatUpdates or {}) do
         local update = threatUpdates[index]
         local unit = findEventUnitById(units, update and update.targetEventId)
-        if unit and unit.isPlayer ~= true then
+        local sourceEventId = math.floor(tonumber(update and update.sourceEventId) or 0)
+        local amount = math.max(0, tonumber(update and update.amount) or 0)
+        local sourceUnit = findEventUnitById(sourceUnits, sourceEventId)
+        if unit and unit.isPlayer ~= true and sourceUnit and sourceEventId > 0 and amount > 0 then
             unit.threatTable = type(unit.threatTable) == "table" and unit.threatTable or {}
-            local sourceEventId = math.floor(tonumber(update.sourceEventId) or 0)
-            local amount = math.max(0, tonumber(update.amount) or 0)
-            if sourceEventId > 0 and amount > 0 then
-                unit.threatTable[sourceEventId] = (tonumber(unit.threatTable[sourceEventId]) or 0) + amount
-                changedByEventId[tonumber(unit.eventID) or 0] = unit
-                changed = true
-            end
+            unit.threatTable[sourceEventId] = (tonumber(unit.threatTable[sourceEventId]) or 0) + amount
+            changedByEventId[tonumber(unit.eventID) or 0] = unit
+            changed = true
         end
     end
 
@@ -142,8 +144,14 @@ local function applyThreatUpdatesToServerState(server, threatUpdates)
     end
 
     local changedByEventId = {}
-    local eventChanged = applyThreatUpdatesToUnits(server.EventState and server.EventState.units, normalizedThreatUpdates, changedByEventId)
-    local draftChanged = applyThreatUpdatesToUnits(server.EventDraftState and server.EventDraftState.units, normalizedThreatUpdates, {})
+    local activeUnits = server.EventState and server.EventState.units or nil
+    local eventChanged = applyThreatUpdatesToUnits(activeUnits, normalizedThreatUpdates, changedByEventId, activeUnits)
+    local draftChanged = applyThreatUpdatesToUnits(
+        server.EventDraftState and server.EventDraftState.units,
+        normalizedThreatUpdates,
+        {},
+        activeUnits
+    )
     if not eventChanged and not draftChanged then
         return false
     end
@@ -420,10 +428,10 @@ function Server:BuildClientHashMismatchWarning(state)
     end
 
     if pendingCount > 0 then
-        return ("Warning: Waiting for compatibility hashes from %s. Event start is locked."):format(table.concat(details, ", "))
+        return ("Warning: Waiting for compatibility hashes from %s. Hold Shift while clicking Start Event on the Event Manager dashboard to override."):format(table.concat(details, ", "))
     end
 
-    return ("Warning: Client hash mismatch detected for %s. Event start is locked."):format(table.concat(details, ", "))
+    return ("Warning: Client hash mismatch detected for %s. Hold Shift while clicking Start Event on the Event Manager dashboard to override."):format(table.concat(details, ", "))
 end
 
 function Server:SendServerStartToClient(state, clientName)

@@ -4,6 +4,7 @@ Addon.Client = Addon.Client or {}
 
 local Client = Addon.Client
 local AuraEvaluator = Client.AutopilotAuraEvaluator or {}
+local normalizeRankMultiplier = AuraEvaluator.NormalizeRankMultiplier
 
 if type(AuraEvaluator) ~= "table" or AuraEvaluator._performanceCowInstalled == true then
     return
@@ -63,6 +64,7 @@ local function cloneProjectedAuraStateShared(state)
         stacks = math.max(0, math.floor(tonumber(state.stacks) or 0)),
         turnsRemaining = math.max(0, math.floor(tonumber(state.turnsRemaining) or 0)),
         powerLevel = tonumber(state.powerLevel) or 0,
+        rankMultiplier = normalizeRankMultiplier(state.rankMultiplier),
         stackBehavior = normalizeStackBehavior(state.stackBehavior),
         maxStacks = normalizePositiveInteger(state.maxStacks, 1),
         stackTurns = copyStackTurns(state.stackTurns),
@@ -189,6 +191,7 @@ local function applyProjectedAuraApplicationShared(previousState, application, i
         stacks = 0,
         turnsRemaining = 0,
         powerLevel = 0,
+        rankMultiplier = 1,
         stackBehavior = stackBehavior,
         maxStacks = maxStacks,
         stackTurns = nil,
@@ -202,6 +205,7 @@ local function applyProjectedAuraApplicationShared(previousState, application, i
     state.casterEventId = identity.casterEventId
     state.targetEventId = identity.targetEventId
     state.powerLevel = tonumber(application and application.powerLevel) or 0
+    state.rankMultiplier = normalizeRankMultiplier(application and application.rankMultiplier)
     state.stackBehavior = stackBehavior
     state.maxStacks = maxStacks
     state.profile = profile

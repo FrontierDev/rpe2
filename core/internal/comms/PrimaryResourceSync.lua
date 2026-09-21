@@ -382,8 +382,8 @@ if type(Event) == "table" and Event.PrimaryResourceNetworkWrapped ~= true then
     end
 
     local nativeDeserializeUnits = Event.DeserializeUnitsFromNetwork
-    function Event.DeserializeUnitsFromNetwork(unitsText)
-        local units = type(nativeDeserializeUnits) == "function" and nativeDeserializeUnits(unitsText) or {}
+    function Event.DeserializeUnitsFromNetwork(unitsText, options)
+        local units = type(nativeDeserializeUnits) == "function" and nativeDeserializeUnits(unitsText, options) or {}
         if type(unitsText) ~= "string" or unitsText == "" then
             return units
         end
@@ -399,8 +399,8 @@ if type(Event) == "table" and Event.PrimaryResourceNetworkWrapped ~= true then
     end
 
     local nativeSerializeDelta = Event.SerializeUnitDeltaBatchForNetwork
-    function Event.SerializeUnitDeltaBatchForNetwork(entries)
-        local serialized = type(nativeSerializeDelta) == "function" and nativeSerializeDelta(entries) or ""
+    function Event.SerializeUnitDeltaBatchForNetwork(entries, options)
+        local serialized = type(nativeSerializeDelta) == "function" and nativeSerializeDelta(entries, options) or ""
         if serialized == "" then
             return serialized
         end
@@ -420,8 +420,8 @@ if type(Event) == "table" and Event.PrimaryResourceNetworkWrapped ~= true then
     end
 
     local nativeDeserializeDelta = Event.DeserializeUnitDeltaBatchFromNetwork
-    function Event.DeserializeUnitDeltaBatchFromNetwork(batchText)
-        local entries = type(nativeDeserializeDelta) == "function" and nativeDeserializeDelta(batchText) or {}
+    function Event.DeserializeUnitDeltaBatchFromNetwork(batchText, options)
+        local entries = type(nativeDeserializeDelta) == "function" and nativeDeserializeDelta(batchText, options) or {}
         if type(batchText) ~= "string" or batchText == "" then
             return entries
         end

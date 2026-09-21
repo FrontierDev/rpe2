@@ -230,6 +230,38 @@ local function buildActionBarResourceState(resourceRef, entry, resolvedRow)
     }
 end
 
+local function addActionBarAbsorptionState(healthState, eventState, eventUnit)
+    if type(healthState) ~= "table" then
+        return healthState
+    end
+
+    local localEventUnit = eventUnit
+    if type(localEventUnit) ~= "table" and type(Client.ResolveLocalEventUnit) == "function" then
+        localEventUnit = Client:ResolveLocalEventUnit(eventState)
+    end
+
+    local totalAbsorption = 0
+    local absorptionRevision = 0
+    local auraManager = Client.Spellcasting and Client.Spellcasting.AuraManager or nil
+    local targetEventId = tonumber(localEventUnit and localEventUnit.eventID) or 0
+    if auraManager
+        and type(eventState) == "table"
+        and eventState.active == true
+        and targetEventId > 0
+    then
+        if type(auraManager.GetTotalAbsorption) == "function" then
+            totalAbsorption = math.max(0, tonumber(auraManager:GetTotalAbsorption(Client, eventState, targetEventId)) or 0)
+        end
+        if type(auraManager.GetEventAuraRevision) == "function" then
+            absorptionRevision = math.max(0, math.floor(tonumber(auraManager:GetEventAuraRevision(Client, eventState.id)) or 0))
+        end
+    end
+
+    healthState.absorption = totalAbsorption
+    healthState.absorptionRevision = absorptionRevision
+    return healthState
+end
+
 local function buildResourceTooltipSpec(state)
     if type(state) ~= "table" or tostring(state.kind or "") ~= "resource" then
         return nil
@@ -364,7 +396,7 @@ local function buildActionBarResourceContextSignature(resourceContext)
     }, "\29")
 end
 
-local function buildActionBarCompanionStateSignature(eventUnit, resourceContext, castState, layoutWidth)
+local function buildActionBarCompanionStateSignature(eventUnit, resourceContext, castState, layoutWidth, healthState)
     local unitResources = type(eventUnit) == "table" and type(eventUnit.resources) == "table" and eventUnit.resources or nil
     if type(eventUnit) == "table"
         and eventUnit.isPlayer == true
@@ -379,6 +411,8 @@ local function buildActionBarCompanionStateSignature(eventUnit, resourceContext,
         tostring(tonumber(eventUnit and eventUnit.team) or 0),
         tostring(type(eventUnit) == "table" and eventUnit.isPlayer == true and 1 or 0),
         buildTrackedResourceSignature(unitResources),
+        tostring(tonumber(healthState and healthState.absorption) or 0),
+        tostring(tonumber(healthState and healthState.absorptionRevision) or 0),
         tostring(type(castState) == "table" and castState.spellRef or ""),
         tostring(tonumber(type(castState) == "table" and castState.turnsElapsed) or 0),
         tostring(tonumber(type(castState) == "table" and castState.turnsTotal) or 0),
@@ -507,6 +541,8 @@ function ActionBarWidget:BuildActionBarResourceStates(eventState, eventUnit, res
         healthResourceRef = findFirstResourceRef(baseResources, stateByRef, resolvedByRef, buildExcludedResourceRefSet(specialResourceRef, primaryResourceRef))
         healthState = healthResourceRef and stateByRef[healthResourceRef] or nil
     end
+
+    healthState = addActionBarAbsorptionState(healthState, eventState, eventUnit)
 
     if not primaryState and not localPlayerContext then
         primaryResourceRef = findFirstResourceRef(baseResources, stateByRef, resolvedByRef, buildExcludedResourceRefSet(healthResourceRef, specialResourceRef))
@@ -742,7 +778,7 @@ function ActionBarWidget:RefreshActionBarCompanionBars(source)
     local primaryState = type(resourceStates) == "table" and resourceStates.primary or nil
     local specialState = type(resourceStates) == "table" and resourceStates.special or nil
     local castState = self.ResolveActionBarCastState and self:ResolveActionBarCastState(eventUnit, eventState) or nil
-    local refreshSignature = buildActionBarCompanionStateSignature(eventUnit, resourceContext, castState, totalWidth)
+    local refreshSignature = buildActionBarCompanionStateSignature(eventUnit, resourceContext, castState, totalWidth, healthState)
 
     local bottomStates = {}
     if healthState then

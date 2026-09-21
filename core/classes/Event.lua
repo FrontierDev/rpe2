@@ -922,7 +922,7 @@ function Event.FromTable(data)
     return Event:New(data)
 end
 
-function Event.DeserializeUnitsFromNetwork(unitsText)
+function Event.DeserializeUnitsFromNetwork(unitsText, options)
     local units = {}
 
     if type(unitsText) ~= "string" or unitsText == "" then
@@ -939,7 +939,25 @@ function Event.DeserializeUnitsFromNetwork(unitsText)
     return units
 end
 
-function Event.DeserializeUnitDeltaBatchFromNetwork(batchText)
+function Event.CountPlayerUnitsInNetwork(unitsText)
+    local count = 0
+    if type(unitsText) ~= "string" or unitsText == "" then
+        return count
+    end
+
+    local records = splitPreservingEmpty and splitPreservingEmpty(unitsText, UNIT_RECORD_SEPARATOR) or {}
+    for index = 1, #records do
+        if records[index] ~= "" then
+            local unit = deserializeUnit(records[index])
+            if unit and unit.isPlayer == true then
+                count = count + 1
+            end
+        end
+    end
+    return count
+end
+
+function Event.DeserializeUnitDeltaBatchFromNetwork(batchText, options)
     local entries = {}
     if type(batchText) ~= "string" or batchText == "" then
         return entries
@@ -963,6 +981,12 @@ function Event.FromStartArguments(arguments)
     local usesExtendedLayout = argumentCount >= 17
     local legacyTeamColors = deserializeTeamColors(arguments and arguments[9] or "")
     local teams = usesExtendedLayout and deserializeTeams(arguments and arguments[11] or "", legacyTeamColors) or normalizeTeams(nil, legacyTeamColors)
+    local eventLevel = usesExtendedLayout and normalizeLevel(arguments and arguments[14], 1)
+        or argumentCount >= 13 and normalizeLevel(arguments and arguments[10], 1)
+        or 1
+    local eventDifficulty = usesExtendedLayout and normalizeDifficulty(arguments and arguments[10], DEFAULT_EVENT_DIFFICULTY)
+        or DEFAULT_EVENT_DIFFICULTY
+    local unitsText = arguments and arguments[7] or ""
 
     return Event:New({
         channelName = arguments and arguments[1] or "",
@@ -972,14 +996,18 @@ function Event.FromStartArguments(arguments)
         hostName = arguments and arguments[5] or "",
         startedAt = tonumber(arguments and arguments[6]) or 0,
         active = true,
-        units = Event.DeserializeUnitsFromNetwork(arguments and arguments[7] or ""),
+        units = Event.DeserializeUnitsFromNetwork(unitsText, {
+            level = eventLevel,
+            difficulty = eventDifficulty,
+            playerCount = Event.CountPlayerUnitsInNetwork(unitsText),
+        }),
         subtext = arguments and arguments[8] or "",
-        difficulty = usesExtendedLayout and normalizeDifficulty(arguments and arguments[10], DEFAULT_EVENT_DIFFICULTY) or DEFAULT_EVENT_DIFFICULTY,
+        difficulty = eventDifficulty,
         teams = teams,
         eventAuras = usesExtendedLayout and deserializeEventAuras(arguments and arguments[12] or "") or {},
         lootRefs = usesExtendedLayout and deserializeRefList(arguments and arguments[13] or "") or {},
         teamColors = legacyTeamColors,
-        level = usesExtendedLayout and normalizeLevel(arguments and arguments[14], 1) or argumentCount >= 13 and normalizeLevel(arguments and arguments[10], 1) or 1,
+        level = eventLevel,
         turnNumber = normalizeCounter(arguments and arguments[usesExtendedLayout and 15 or argumentCount >= 13 and 11 or 10], 0),
         tickNumber = normalizeCounter(arguments and arguments[usesExtendedLayout and 16 or argumentCount >= 13 and 12 or 11], 0),
         totalTicks = normalizeCounter(arguments and arguments[usesExtendedLayout and 17 or argumentCount >= 13 and 13 or 12], 0),

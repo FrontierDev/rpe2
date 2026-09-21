@@ -11,6 +11,7 @@ local Dependencies = Database.Dependecies or {}
 local Profile = Addon.Internal.Profile or {}
 local Registry = Addon.Internal.Registry or {}
 local Ruleset = Addon.Internal.Ruleset or {}
+local EventUnit = (Database.Classes or {}).EventUnit
 local Dice = Addon.Utils.Dice or {}
 local Common = Addon.Utils.Common or {}
 
@@ -188,7 +189,7 @@ local function isLocalPlayerSkillProgressionSource(eventState, eventUnit)
     return isLocalPlayerEventUnit(eventState, eventUnit)
 end
 
-local function resolveRuntimeStatValue(eventUnit, statRef)
+local function resolveRuntimeStatValue(eventUnit, statRef, eventState)
     local normalizedStatRef = normalizeRef(statRef)
     if type(eventUnit) ~= "table" or not normalizedStatRef then
         return nil
@@ -209,9 +210,11 @@ local function resolveRuntimeStatValue(eventUnit, statRef)
     end
 
     local value = findInRows(eventUnit.stats)
-    if value == nil and type(eventUnit.GetResolvedUnit) == "function" then
-        local resolvedUnit = eventUnit:GetResolvedUnit()
-        value = findInRows(resolvedUnit and resolvedUnit.stats)
+    if value == nil and type(EventUnit) == "table" and type(EventUnit.BuildResolvedStats) == "function" then
+        local stats = EventUnit.BuildResolvedStats(eventUnit, nil, {
+            level = eventState and eventState.level,
+        })
+        value = findInRows(stats)
     end
     if value == nil then
         return nil
@@ -258,7 +261,7 @@ local function resolveSkillModifier(skillRef, skill, eventState, eventUnit)
         return 0
     end
 
-    local statValue = resolveRuntimeStatValue(eventUnit, derivedStatRef)
+    local statValue = resolveRuntimeStatValue(eventUnit, derivedStatRef, eventState)
     if statValue == nil then
         return 0
     end
@@ -310,26 +313,21 @@ local function buildRollDetailText(baseRoll, modifier, total)
     )
 end
 
-local function emitSkillRollChatMessage(result)
-    if not (DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function") then
-        return false
-    end
-
-    local message = ("%s rolls %s: %s."):format(
-        tostring(result.unitName or "Unknown"),
-        tostring(result.skillName or result.skillRef or "Skill"),
-        buildRollDetailText(result.baseRoll, result.modifier, result.total)
-    )
-    DEFAULT_CHAT_FRAME:AddMessage(message, 0.6, 0.6, 0.6)
-    return true
-end
-
 local function buildSkillRollChatMessage(result)
     return ("%s rolls %s: %s."):format(
         tostring(result.unitName or "Unknown"),
         tostring(result.skillName or result.skillRef or "Skill"),
         buildRollDetailText(result.baseRoll, result.modifier, result.total)
     )
+end
+
+local function emitSkillRollChatMessage(result)
+    if not (DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function") then
+        return false
+    end
+
+    DEFAULT_CHAT_FRAME:AddMessage(buildSkillRollChatMessage(result), 0.6, 0.6, 0.6)
+    return true
 end
 
 local function buildSkillRollArguments(result)
@@ -425,6 +423,30 @@ local function sendSkillRollToGroupChat(result)
     end
 
     return pcall(SendChatMessage, buildSkillRollChatMessage(result), distribution)
+end
+
+local function publishSkillRoll(result, eventState)
+    if type(eventState) == "table" and eventState.active == true then
+        -- Event rolls remain authoritative through the RPE server relay. The
+        -- local presentation is marked as seen so the relayed result cannot
+        -- surface the same roll a second time.
+        if sendSkillRollToServer(result) then
+            markSkillRollSeen(result)
+            emitSkillRollChatMessage(result)
+        elseif not sendSkillRollToGroupChat(result) then
+            emitSkillRollChatMessage(result)
+        end
+        return true
+    end
+
+    -- Outside an event, normal group chat is the sole visible source. A
+    -- private RPE session may still be active, but it must not change this
+    -- transport decision.
+    if sendSkillRollToGroupChat(result) then
+        return true
+    end
+
+    return emitSkillRollChatMessage(result)
 end
 
 local function emitSkillRollCombatLog(result, skill, eventState, options)
@@ -560,12 +582,7 @@ function Client:RollSkill(skillRef, options)
         math.max(0, math.floor(tonumber(type(Common.GetNow) == "function" and Common.GetNow() or 0) or 0)),
         skillRollBroadcastSequence
     )
-    if sendSkillRollToServer(result) then
-        markSkillRollSeen(result)
-        emitSkillRollChatMessage(result)
-    elseif not sendSkillRollToGroupChat(result) then
-        emitSkillRollChatMessage(result)
-    end
+    publishSkillRoll(result, eventState)
     emitSkillRollCombatLog(result, skill, eventState, options)
     local progression = Client.SkillProgression
     if type(progression) == "table"

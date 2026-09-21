@@ -387,7 +387,7 @@ local function getAuraSourceRefs(aura)
         local effectType = type(effect) == "table" and tostring(effect.type or "") or ""
         local effectTable = type(effect) == "table" and effect or nil
 
-        if effectType == "damage" or effectType == "heal" or effectType == "stat" then
+        if effectType == "damage" or effectType == "heal" or effectType == "stat" or effectType == "absorb" then
             local statScaling = effectTable and effectTable.statScaling or {}
             for scalingIndex = 1, #statScaling do
                 local scaling = statScaling[scalingIndex]
@@ -398,7 +398,7 @@ local function getAuraSourceRefs(aura)
             end
         end
 
-        if effectType == "damage" then
+        if effectType == "damage" or effectType == "absorb" then
             local damageSchoolRefs = effectTable and effectTable.damageSchoolRefs or {}
             for schoolIndex = 1, #damageSchoolRefs do
                 local damageSchoolRef = damageSchoolRefs[schoolIndex]
@@ -424,6 +424,10 @@ local function getUnitSourceRefs(unit)
     local refs = {}
     if type(unit) ~= "table" then
         return refs
+    end
+
+    if type(unit.extendsUnitRef) == "string" and unit.extendsUnitRef ~= "" then
+        refs[#refs + 1] = unit.extendsUnitRef:gsub("^%s+", ""):gsub("%s+$", "")
     end
 
     for index = 1, #(unit.spells or {}) do
@@ -1623,7 +1627,7 @@ function Dependecies.HandleDatasetDeleted(datasetId)
                     local effectTable = type(effect) == "table" and effect or nil
                     local effectType = type(effect) == "table" and tostring(effect.type or "") or ""
 
-                    if effectTable and (effectType == "damage" or effectType == "heal" or effectType == "stat") then
+                    if effectTable and (effectType == "damage" or effectType == "heal" or effectType == "stat" or effectType == "absorb") then
                         local keptScaling = {}
                         local scalingMutated = false
                         local statScaling = effectTable.statScaling or {}
@@ -1642,7 +1646,7 @@ function Dependecies.HandleDatasetDeleted(datasetId)
                         end
                     end
 
-                    if effectType == "damage" then
+                    if effectType == "damage" or effectType == "absorb" then
                         local keptDamageSchools = {}
                         local schoolMutated = false
                         local damageSchoolRefs = effectTable and effectTable.damageSchoolRefs or {}
@@ -1828,6 +1832,31 @@ function Dependecies.HandleDatasetDeleted(datasetId)
     return changed
 end
 
+local function pruneDamageSchoolRefsFromEffects(effects, deletedRef, includeAbsorb)
+    local mutated = false
+    for effectIndex = 1, #(effects or {}) do
+        local effect = effects[effectIndex]
+        local effectType = type(effect) == "table" and tostring(effect.type or "") or ""
+        if type(effect) == "table" and (effectType == "damage" or (includeAbsorb and effectType == "absorb")) then
+            local keptRefs = {}
+            local refsMutated = false
+            for schoolIndex = 1, #(effect.damageSchoolRefs or {}) do
+                local schoolRef = effect.damageSchoolRefs[schoolIndex]
+                if tostring(schoolRef or "") == deletedRef then
+                    refsMutated = true
+                else
+                    keptRefs[#keptRefs + 1] = schoolRef
+                end
+            end
+            if refsMutated then
+                effect.damageSchoolRefs = keptRefs
+                mutated = true
+            end
+        end
+    end
+    return mutated
+end
+
 function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
     local deletedEntryId = type(entry) == "table" and tostring(entry.id or "") or ""
     if deletedEntryId == "" then
@@ -1849,7 +1878,51 @@ function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
     for currentDatasetId, dataset in pairs(root.datasets or {}) do
         local mutated = false
 
-        if collectionKey == "skills" then
+        if collectionKey == "damageSchools" then
+            for index = 1, #(dataset.items or {}) do
+                local item = dataset.items[index]
+                if type(item) == "table" and tostring(item.damageSchoolRef or "") == deletedRef then
+                    item.damageSchoolRef = nil
+                    mutated = true
+                end
+            end
+
+            for index = 1, #(dataset.units or {}) do
+                local unit = dataset.units[index]
+                local keptResistances = {}
+                local resistancesMutated = false
+                for resistanceIndex = 1, #(unit and unit.resistances or {}) do
+                    local resistance = unit.resistances[resistanceIndex]
+                    if type(resistance) == "table" and tostring(resistance.damageSchoolRef or "") == deletedRef then
+                        resistancesMutated = true
+                    else
+                        keptResistances[#keptResistances + 1] = resistance
+                    end
+                end
+                if resistancesMutated then
+                    unit.resistances = keptResistances
+                    mutated = true
+                end
+            end
+
+            for index = 1, #(dataset.spells or {}) do
+                local spell = dataset.spells[index]
+                for componentIndex = 1, #(spell and spell.components or {}) do
+                    local component = spell.components[componentIndex]
+                    local effect = type(component) == "table" and component.effect or nil
+                    if pruneDamageSchoolRefsFromEffects({ effect }, deletedRef, false) then
+                        mutated = true
+                    end
+                end
+            end
+
+            for index = 1, #(dataset.auras or {}) do
+                local aura = dataset.auras[index]
+                if pruneDamageSchoolRefsFromEffects(aura and aura.effects, deletedRef, true) then
+                    mutated = true
+                end
+            end
+        elseif collectionKey == "skills" then
             for index = 1, #(dataset.items or {}) do
                 local item = dataset.items[index]
                 local keptBonuses = {}

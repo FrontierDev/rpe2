@@ -563,6 +563,29 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
                         nextEffect.resourceRef = nil
                         nextEffect.amount = nil
                         nextEffect.unitRef = nil
+                    elseif value == "taunt" then
+                        nextEffect.duration = math.max(1, math.floor(tonumber(nextEffect.duration) or 2))
+                        nextEffect.baseDamage = nil
+                        nextEffect.baseHealing = nil
+                        nextEffect.basePower = nil
+                        nextEffect.threatCoefficient = nil
+                        nextEffect.weaponDamageMode = nil
+                        nextEffect.weaponDamageCoefficient = nil
+                        nextEffect.statScaling = nil
+                        nextEffect.damageSchoolRefs = nil
+                        nextEffect.hitType = nil
+                        nextEffect.damageType = nil
+                        nextEffect.alwaysHits = nil
+                        nextEffect.usesProjectile = nil
+                        nextEffect.projectilePath = nil
+                        nextEffect.projectileSpeed = nil
+                        nextEffect.applyAura = nil
+                        nextEffect.auraRef = nil
+                        nextEffect.auraStacks = nil
+                        nextEffect.stacks = nil
+                        nextEffect.resourceRef = nil
+                        nextEffect.amount = nil
+                        nextEffect.unitRef = nil
                     elseif value == "interrupt" or value == "revert" then
                         nextEffect.baseDamage = nil
                         nextEffect.baseHealing = nil
@@ -626,6 +649,7 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
                         end
                     end
                 end)
+                self:RefreshSpellInspectorPage()
             end
         end,
     })
@@ -1003,6 +1027,7 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
 
     self.SpellInspectorAuraStacksGroup = createEffectTextGroup("RPEDataEditorSpellInspectorAuraStacksGroup", "Aura Stacks", "SpellInspectorAuraStacksInput")
     self.SpellInspectorApplyAuraDurationGroup = createEffectTextGroup("RPEDataEditorSpellInspectorApplyAuraDurationGroup", "Aura Duration", "SpellInspectorApplyAuraDurationInput")
+    self.SpellInspectorTauntDurationGroup = createEffectTextGroup("RPEDataEditorSpellInspectorTauntDurationGroup", "Taunt Duration", "SpellInspectorTauntDurationInput")
     self.SpellInspectorRemoveAuraTagGroup = createEffectTextGroup("RPEDataEditorSpellInspectorRemoveAuraTagGroup", "Aura Tag(s), comma-separated", "SpellInspectorRemoveAuraTagInput")
     self.SpellInspectorRemoveAuraMaxAurasGroup = createEffectTextGroup("RPEDataEditorSpellInspectorRemoveAuraMaxAurasGroup", "Max Auras (blank = all)", "SpellInspectorRemoveAuraMaxAurasInput")
     self.SpellInspectorResourceAmountGroup = createEffectTextGroup("RPEDataEditorSpellInspectorResourceAmountGroup", "Resource Amount", "SpellInspectorResourceAmountInput")
@@ -1047,6 +1072,29 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
     })
     self.SpellInspectorResourceAmountModeGroup:AddChild(self.SpellInspectorResourceAmountModeDropdown)
     attachMouseWheel(self.SpellInspectorResourceAmountModeDropdown)
+
+    self.SpellInspectorResourceScaleWithRankCheckbox = self:CreateSpellInspectorCheckbox(
+        root:GetFrame(),
+        "RPEDataEditorSpellInspectorResourceScaleWithRankCheckbox",
+        "Scale With Rank",
+        false,
+        function(checked)
+            if self._refreshingSpellInspector then
+                return
+            end
+
+            local component = self:GetSelectedSpellInspectorComponent()
+            if component and tostring(component.effect and component.effect.type or "") == "resource" then
+                self:CommitSelectedSpell(function()
+                    component.effect.scaleWithRank = checked == true
+                end)
+                self:RefreshSpellInspectorPage()
+            end
+        end
+    )
+    self.SpellInspectorResourceScaleWithRankCheckbox._visibleHeight = 18
+    root:AddChild(self.SpellInspectorResourceScaleWithRankCheckbox)
+    attachMouseWheel(self.SpellInspectorResourceScaleWithRankCheckbox)
 
     self.SpellInspectorSummonPetUnitGroup = createGroup("RPEDataEditorSpellInspectorSummonPetUnitGroup", "Summoned Unit", 18)
     self.SpellInspectorSummonPetUnitDropdown = UI.CreateDropdown(self.SpellInspectorSummonPetUnitGroup:GetFrame(), "RPEDataEditorSpellInspectorSummonPetUnitDropdown", {
@@ -1167,6 +1215,14 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
         if component then
             self:CommitSelectedSpell(function()
                 component.effect.duration = tonumber(self.SpellInspectorApplyAuraDurationInput:GetText()) or 12
+            end)
+        end
+    end)
+    bindInput("SpellInspectorTauntDurationInput", function()
+        local component = self:GetSelectedSpellInspectorComponent()
+        if component then
+            self:CommitSelectedSpell(function()
+                component.effect.duration = math.max(1, math.floor(tonumber(self.SpellInspectorTauntDurationInput:GetText()) or 2))
             end)
         end
     end)

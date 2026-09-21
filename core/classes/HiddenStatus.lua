@@ -86,6 +86,9 @@ local VALID_COMBAT_EVENTS = {
     on_critical_hit_taken = true,
     on_critical_heal = true,
     on_critical_heal_taken = true,
+    on_taunt = true,
+    on_taunted = true,
+    on_defence = true,
 }
 
 local function normalizeEventList(values)

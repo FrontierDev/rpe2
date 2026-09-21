@@ -11,6 +11,7 @@ local Ruleset = Addon.Internal and Addon.Internal.Ruleset or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local ResourceSync = Addon.Internal and Addon.Internal.Comms and Addon.Internal.Comms.ResourceSync or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
+local DEFAULT_ABSORPTION_ICON = "Interface\\Icons\\Spell_Holy_PowerWordShield"
 
 local function getTimings()
     return Addon.Debug and Addon.Debug.Timings or nil
@@ -397,6 +398,8 @@ local function buildPortraitDisplayKey(eventState, eventUnit, healthState, prima
         tostring(tonumber(eventUnit.raidMarker) or 0),
         tostring(tonumber(healthState and healthState.currentValue) or 0),
         tostring(tonumber(healthState and healthState.maxValue) or 0),
+        tostring(tonumber(healthState and healthState.absorption) or tonumber(healthState and healthState.total) or 0),
+        tostring(tonumber(healthState and healthState.absorptionRevision) or 0),
         tostring(healthState and healthState.resourceRef or ""),
         tostring(primaryState and primaryState.resourceRef or ""),
         tostring(tonumber(primaryState and primaryState.currentValue) or 0),
@@ -649,6 +652,34 @@ local function buildPortraitResourceState(resourceRef, entry, resolvedRow)
     }
 end
 
+local function addPortraitAbsorptionState(healthState, eventUnit, eventState)
+    if type(healthState) ~= "table" then
+        return healthState
+    end
+
+    local totalAbsorption = 0
+    local absorptionRevision = 0
+    local auraManager = Client.Spellcasting and Client.Spellcasting.AuraManager or nil
+    local targetEventId = tonumber(eventUnit and eventUnit.eventID) or 0
+    if auraManager
+        and type(eventState) == "table"
+        and eventState.active == true
+        and targetEventId > 0
+    then
+        if type(auraManager.GetTotalAbsorption) == "function" then
+            totalAbsorption = math.max(0, tonumber(auraManager:GetTotalAbsorption(Client, eventState, targetEventId)) or 0)
+        end
+        if type(auraManager.GetEventAuraRevision) == "function" then
+            absorptionRevision = math.max(0, math.floor(tonumber(auraManager:GetEventAuraRevision(Client, eventState.id)) or 0))
+        end
+    end
+
+    healthState.absorption = totalAbsorption
+    healthState.total = totalAbsorption
+    healthState.absorptionRevision = absorptionRevision
+    return healthState
+end
+
 local function buildPortraitResourceStates(actionBarWidget, eventUnit, eventState, resourceContext)
     if type(eventUnit) ~= "table" then
         if type(actionBarWidget) ~= "table" or type(actionBarWidget.BuildActionBarResourceStates) ~= "function" then
@@ -660,7 +691,7 @@ local function buildPortraitResourceStates(actionBarWidget, eventUnit, eventStat
             return nil, nil
         end
 
-        return fallbackStates.health, fallbackStates.primary
+        return addPortraitAbsorptionState(fallbackStates.health, eventUnit, eventState), fallbackStates.primary
     end
 
     resourceContext = type(resourceContext) == "table" and resourceContext or nil
@@ -675,7 +706,7 @@ local function buildPortraitResourceStates(actionBarWidget, eventUnit, eventStat
             return nil, nil
         end
 
-        return fallbackStates.health, fallbackStates.primary
+        return addPortraitAbsorptionState(fallbackStates.health, eventUnit, eventState), fallbackStates.primary
     end
 
     local resolvedByRef = type(resourceContext) == "table" and type(resourceContext.resolvedByRef) == "table" and resourceContext.resolvedByRef or {}
@@ -734,6 +765,7 @@ local function buildPortraitResourceStates(actionBarWidget, eventUnit, eventStat
     end
 
     if healthState or primaryState then
+        healthState = addPortraitAbsorptionState(healthState, eventUnit, eventState)
         return healthState, primaryState
     end
 
@@ -746,7 +778,7 @@ local function buildPortraitResourceStates(actionBarWidget, eventUnit, eventStat
         return nil, nil
     end
 
-    return fallbackStates.health, fallbackStates.primary
+    return addPortraitAbsorptionState(fallbackStates.health, eventUnit, eventState), fallbackStates.primary
 end
 
 local function buildPortraitCastState(actionBarWidget, eventUnit, eventState)
@@ -857,6 +889,19 @@ local function buildPortraitTooltipResourceLine(state)
     }
 end
 
+local function buildPortraitTooltipAbsorptionLine(healthState)
+    local absorption = math.max(0, tonumber(healthState and healthState.absorption) or tonumber(healthState and healthState.total) or 0)
+    if absorption <= 0 then
+        return nil
+    end
+
+    return {
+        icon = DEFAULT_ABSORPTION_ICON,
+        text = ("%.0f absorption"):format(absorption),
+        colorToken = "text.primary",
+    }
+end
+
 local function collectPlayerPetUnits(eventUnit, eventState)
     if type(eventUnit) ~= "table" or eventUnit.isPlayer ~= true or type(eventState) ~= "table" then
         return {}
@@ -916,6 +961,11 @@ local function appendPlayerPetTooltipLines(tooltip, ownerEventUnit, eventState, 
             end
         end
 
+        local absorptionLine = buildPortraitTooltipAbsorptionLine(healthState)
+        if absorptionLine then
+            tooltip.lines[#tooltip.lines + 1] = absorptionLine
+        end
+
         local petDescription = ""
         if petUnit.GetResolvedValue then
             petDescription = tostring(petUnit:GetResolvedValue("description", petUnit.description or "") or "")
@@ -963,6 +1013,11 @@ local function buildEventPortraitTooltip(eventUnit, eventState, healthState, pri
         if primaryLine then
             tooltip.lines[#tooltip.lines + 1] = primaryLine
         end
+    end
+
+    local absorptionLine = buildPortraitTooltipAbsorptionLine(healthState)
+    if absorptionLine then
+        tooltip.lines[#tooltip.lines + 1] = absorptionLine
     end
 
     if eventUnit.isPlayer ~= true then

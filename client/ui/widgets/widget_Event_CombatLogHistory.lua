@@ -22,6 +22,10 @@ local HISTORY_PANEL_INSET = 8
 local HISTORY_TITLE_HEIGHT = 18
 local HISTORY_ROW_HEIGHT = 27
 local HISTORY_ROW_SPACING = 1
+local EVENT_UTILITY_WINDOW_WIDTH = 420
+local EVENT_UTILITY_WINDOW_HEIGHT = 340
+local EVENT_UTILITY_WINDOW_INSET = 8
+local EVENT_UTILITY_HEADER_HEIGHT = 20
 
 local function getActiveEventState()
     if type(Client.GetEventState) == "function" then
@@ -115,6 +119,156 @@ local function buildHistoryButton(parentFrame, name, text, onClick)
     return button
 end
 
+local function renderCombatLogHistoryRow(row, item)
+    if row and row.SetText then
+        row:SetText(buildCombatLogText(item))
+    end
+    if row and row.SetJustifyH then
+        row:SetJustifyH("LEFT")
+    end
+    if row and row.SetJustifyV then
+        row:SetJustifyV("MIDDLE")
+    end
+    if row and row.SetWordWrap then
+        row:SetWordWrap(false)
+    end
+end
+
+function EventWidget:EnsureEventUtilityWindow()
+    if self.eventUtilityWindow then
+        return self.eventUtilityWindow
+    end
+
+    local window = UI.Window:New({
+        name = "RPEClientEventUtilityWindow",
+        width = EVENT_UTILITY_WINDOW_WIDTH,
+        height = EVENT_UTILITY_WINDOW_HEIGHT,
+        movable = true,
+        frameStrata = "DIALOG",
+        frameLevel = 70,
+        toplevel = true,
+        contentInsetLeft = EVENT_UTILITY_WINDOW_INSET,
+        contentInsetRight = EVENT_UTILITY_WINDOW_INSET,
+        contentInsetTop = EVENT_UTILITY_HEADER_HEIGHT + EVENT_UTILITY_WINDOW_INSET,
+        contentInsetBottom = EVENT_UTILITY_WINDOW_INSET,
+        onClose = function()
+            self.eventUtilityMode = nil
+        end,
+    })
+    window:SetParent(UIParent)
+    window:SetTitle("Combat Log")
+    window:Create()
+    self.eventUtilityWindow = window
+
+    local frame = getFrame(window)
+    if frame then
+        if type(frame.SetFrameStrata) == "function" then
+            frame:SetFrameStrata("DIALOG")
+        end
+        if type(frame.SetToplevel) == "function" then
+            frame:SetToplevel(true)
+        end
+        if type(frame.SetClampedToScreen) == "function" then
+            frame:SetClampedToScreen(true)
+        end
+        if not self.eventUtilityWindowPositioned then
+            local rootFrame = getFrame(self.rootPanel)
+            if rootFrame then
+                frame:SetPoint("TOPLEFT", rootFrame, "TOPRIGHT", HISTORY_PANEL_GAP, 0)
+            else
+                frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+            end
+            self.eventUtilityWindowPositioned = true
+        end
+        frame:Hide()
+    end
+
+    local contentFrame = window:GetContentFrame()
+    self.combatLogUtilityScroll = UI.ScrollLayout:New({
+        name = "RPEClientEventUtilityCombatLogScroll",
+        width = EVENT_UTILITY_WINDOW_WIDTH - (EVENT_UTILITY_WINDOW_INSET * 2),
+        height = EVENT_UTILITY_WINDOW_HEIGHT - EVENT_UTILITY_HEADER_HEIGHT - (EVENT_UTILITY_WINDOW_INSET * 2),
+        visibleRows = HISTORY_LIMIT,
+        rowHeight = HISTORY_ROW_HEIGHT,
+        rowSpacing = HISTORY_ROW_SPACING,
+        border = false,
+        rowElementClass = UI.Text,
+        rowFontSize = 10,
+        rowFontFlags = "OUTLINE",
+        rowWordWrap = false,
+        rowInsetLeft = 2,
+        rowInsetRight = 2,
+        contentInsetLeft = 0,
+        contentInsetRight = 0,
+        contentInsetTop = 0,
+        contentInsetBottom = 0,
+    })
+    self.combatLogUtilityScroll:SetParent(contentFrame)
+    self.combatLogUtilityScroll:SetRowRenderer(renderCombatLogHistoryRow)
+    self.combatLogUtilityScroll:Create()
+    local scrollFrame = getFrame(self.combatLogUtilityScroll)
+    scrollFrame:SetPoint("TOPLEFT", contentFrame, "TOPLEFT", 0, 0)
+    scrollFrame:SetPoint("BOTTOMRIGHT", contentFrame, "BOTTOMRIGHT", 0, 0)
+
+    self.combatLogUtilityEmptyText = UI.CreateText(contentFrame, "RPEClientEventUtilityCombatLogEmpty", "No event messages yet.", {
+        fontSize = 10,
+        justifyH = "CENTER",
+        justifyV = "MIDDLE",
+        wordWrap = false,
+        textColor = UI.ResolveColor(nil, "text.muted"),
+    })
+    local emptyFrame = getFrame(self.combatLogUtilityEmptyText)
+    emptyFrame:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 0, 0)
+    emptyFrame:SetPoint("BOTTOMRIGHT", scrollFrame, "BOTTOMRIGHT", 0, 0)
+
+    return window
+end
+
+function EventWidget:HideEventUtilityWindow()
+    local frame = getFrame(self.eventUtilityWindow)
+    if frame and type(frame.Hide) == "function" then
+        frame:Hide()
+    end
+    return true
+end
+
+function EventWidget:ShowEventUtilityWindow(mode)
+    local normalizedMode = tostring(mode or "combat-log") == "meters" and "meters" or "combat-log"
+    local window = self:EnsureEventUtilityWindow()
+    if not window then
+        return false
+    end
+
+    self.eventUtilityMode = normalizedMode
+    window:SetTitle(normalizedMode == "meters" and "Meters" or "Combat Log")
+
+    local utilityScrollFrame = getFrame(self.combatLogUtilityScroll)
+    local utilityEmptyFrame = getFrame(self.combatLogUtilityEmptyText)
+    local metersFrame = getFrame(self.metersPanel)
+    if normalizedMode == "meters" then
+        if utilityScrollFrame then utilityScrollFrame:Hide() end
+        if utilityEmptyFrame then utilityEmptyFrame:Hide() end
+        if metersFrame then metersFrame:Show() end
+        local historyPanelFrame = getFrame(self.combatLogHistoryPanel)
+        if historyPanelFrame then historyPanelFrame:Hide() end
+    else
+        if metersFrame then metersFrame:Hide() end
+        if utilityScrollFrame then utilityScrollFrame:Show() end
+        if utilityEmptyFrame then utilityEmptyFrame:Show() end
+        local historyPanelFrame = getFrame(self.combatLogHistoryPanel)
+        if historyPanelFrame then historyPanelFrame:Hide() end
+    end
+
+    local frame = getFrame(window)
+    if frame then
+        frame:Show()
+        if type(frame.Raise) == "function" then
+            frame:Raise()
+        end
+    end
+    return true
+end
+
 function EventWidget:GetCombatLogHistory()
     self.combatLogHistory = self.combatLogHistory or {}
     return self.combatLogHistory
@@ -128,11 +282,22 @@ function EventWidget:GetCombatLogHistoryViewTitle()
     return "Combat Log"
 end
 
+local function getCombatLogHistoryPresentation(self)
+    if self.eventUtilityMode == "combat-log" and self.combatLogUtilityScroll then
+        return self.combatLogUtilityScroll, self.combatLogUtilityEmptyText
+    end
+    return self.combatLogHistoryScroll, self.combatLogHistoryEmptyText
+end
+
 function EventWidget:IsCombatLogHistoryPanelShown()
+    if self.eventUtilityMode == "combat-log" and isFrameShown(self.eventUtilityWindow) then
+        return true
+    end
     return isFrameShown(self.combatLogHistoryPanel)
 end
 
 function EventWidget:HideCombatLogHistoryPanel()
+    self:HideEventUtilityWindow()
     local frame = getFrame(self.combatLogHistoryPanel)
     if frame and frame.Hide then
         frame:Hide()
@@ -146,11 +311,21 @@ function EventWidget:ResetCombatLogHistory(eventId, reason)
     self.lastCombatLogHistoryResetReason = reason
     self:HideCombatLogHistoryPanel()
 
+    local historyScroll, historyEmptyText = getCombatLogHistoryPresentation(self)
     if self.combatLogHistoryScroll and self.combatLogHistoryScroll.SetItems then
         self.combatLogHistoryScroll:SetItems({})
     end
+    if self.combatLogUtilityScroll and self.combatLogUtilityScroll.SetItems then
+        self.combatLogUtilityScroll:SetItems({})
+    end
+    if historyEmptyText and historyEmptyText.SetText then
+        historyEmptyText:SetText("No event messages yet.")
+    end
     if self.combatLogHistoryEmptyText and self.combatLogHistoryEmptyText.SetText then
         self.combatLogHistoryEmptyText:SetText("No event messages yet.")
+    end
+    if self.combatLogUtilityEmptyText and self.combatLogUtilityEmptyText.SetText then
+        self.combatLogUtilityEmptyText:SetText("No event messages yet.")
     end
     return true
 end
@@ -189,7 +364,8 @@ function EventWidget:AppendCombatLogHistoryEntry(entry)
 end
 
 function EventWidget:RefreshCombatLogHistoryPanel()
-    if not self.combatLogHistoryPanel or not self.combatLogHistoryScroll then
+    local historyScroll, historyEmptyText = getCombatLogHistoryPresentation(self)
+    if not historyScroll then
         return false
     end
 
@@ -202,11 +378,14 @@ function EventWidget:RefreshCombatLogHistoryPanel()
     if self.combatLogHistoryTitle and self.combatLogHistoryTitle.SetText then
         self.combatLogHistoryTitle:SetText(self:GetCombatLogHistoryViewTitle())
     end
-    if self.combatLogHistoryScroll.SetItems then
-        self.combatLogHistoryScroll:SetItems(entries)
+    if self.combatLogUtilityEmptyText and self.eventUtilityMode == "combat-log" then
+        self.eventUtilityWindow:SetTitle(self:GetCombatLogHistoryViewTitle())
+    end
+    if historyScroll.SetItems then
+        historyScroll:SetItems(entries)
     end
 
-    local emptyFrame = getFrame(self.combatLogHistoryEmptyText)
+    local emptyFrame = getFrame(historyEmptyText)
     if emptyFrame then
         if #entries == 0 and emptyFrame.Show then
             emptyFrame:Show()
@@ -220,7 +399,21 @@ end
 function EventWidget:ShowCombatLogHistoryPanel(mode)
     self:EnsureCombatLogHistoryUI()
     self.combatLogHistoryMode = tostring(mode or "combat-log")
+
+    if self.combatLogHistoryMode ~= "dm-helper" then
+        self:EnsureEventUtilityWindow()
+        self.eventUtilityMode = "combat-log"
+        self:RefreshCombatLogHistoryPanel()
+        local historyPanelFrame = getFrame(self.combatLogHistoryPanel)
+        if historyPanelFrame then
+            historyPanelFrame:Hide()
+        end
+        return self:ShowEventUtilityWindow("combat-log")
+    end
+
+    self.eventUtilityMode = nil
     self:RefreshCombatLogHistoryPanel()
+    self:HideEventUtilityWindow()
 
     local frame = getFrame(self.combatLogHistoryPanel)
     if frame and frame.Show then
@@ -231,7 +424,7 @@ function EventWidget:ShowCombatLogHistoryPanel(mode)
 end
 
 function EventWidget:ToggleCombatLogHistoryPanel()
-    if self:IsCombatLogHistoryPanelShown() and tostring(self.combatLogHistoryMode or "combat-log") == "combat-log" then
+    if self.eventUtilityMode == "combat-log" and isFrameShown(self.eventUtilityWindow) then
         return self:HideCombatLogHistoryPanel()
     end
 
@@ -356,6 +549,7 @@ function EventWidget:EnsureCombatLogHistoryUI()
     emptyFrame:SetPoint("TOPLEFT", scrollFrame, "TOPLEFT", 0, 0)
     emptyFrame:SetPoint("BOTTOMRIGHT", scrollFrame, "BOTTOMRIGHT", 0, 0)
 
+    self:EnsureEventUtilityWindow()
     self:RefreshCombatLogHistoryPanel()
     return self.combatLogHistoryPanel
 end
@@ -379,7 +573,7 @@ end
 
 function EventWidget:Refresh(...)
     local state = getActiveEventState()
-    if type(state) == "table" and state.active == true then
+    if type(state) == "table" and state.active == true and state.ending ~= true then
         self:SyncCombatLogHistoryEvent(state.id)
     else
         self:ResetCombatLogHistory("", "event-inactive")

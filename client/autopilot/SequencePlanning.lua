@@ -257,14 +257,15 @@ local function buildResourceCommitments(candidate, protectsFutureActivation)
     for resourceRef, amount in pairs(endCommitments) do
         if protectsFutureActivation == true then
             -- Canonical activation checks start/end affordability separately.
-            -- A main action executes after all auxiliaries, so earlier actions
-            -- only need to preserve the larger phase requirement for that
-            -- later live activation; summing both phases would be stricter
-            -- than BuildSpellActivationSnapshot.
+            -- A later channel-triggering or terminal action only needs the
+            -- larger phase requirement preserved for live activation;
+            -- summing both phases would be stricter than the canonical
+            -- BuildSpellActivationSnapshot check.
             result[resourceRef] = math.max(normalizeNonNegative(result[resourceRef]), normalizeNonNegative(amount))
         else
-            -- An instant auxiliary resolves before the next sequence action,
-            -- so both phases are actual prior consumption and must be reserved.
+            -- A non-GCD-channel action resolves before the next sequence
+            -- action, so both phases are actual prior consumption and must
+            -- be reserved.
             result[resourceRef] = normalizeNonNegative(result[resourceRef]) + normalizeNonNegative(amount)
         end
     end
@@ -281,16 +282,22 @@ local function buildActionEconomyInput(candidate)
     end
 
     if type(Spellcasting.ResolvePersistentCastTurns) ~= "function"
-        or type(Spellcasting.SpellIgnoresGlobalCooldown) ~= "function"
-        or type(Spellcasting.SpellUsesGlobalCooldown) ~= "function"
+        or type(Spellcasting.ResolveSpellCooldownChannel) ~= "function"
         or type(Spellcasting.NormalizeTurnCount) ~= "function"
     then
         return nil
     end
 
     local persistentCastTurns = Spellcasting.ResolvePersistentCastTurns(spell)
-    local ignoresGlobalCooldown = Spellcasting.SpellIgnoresGlobalCooldown(spell)
-    local usesGlobalCooldown = Spellcasting.SpellUsesGlobalCooldown(spell)
+    local cooldownChannelId, cooldownChannel, _, cooldownChannelReason = Spellcasting.ResolveSpellCooldownChannel(spell)
+    local cooldownChannelConfigured = type(cooldownChannel) == "table" and cooldownChannel.enabled == true
+    local cooldownChannelTriggersGCD = type(cooldownChannel) == "table"
+        and cooldownChannel.triggersGCD == true
+        or nil
+    local cooldownChannelCanUseOffTurn = type(cooldownChannel) == "table"
+        and cooldownChannel.enabled == true
+        and cooldownChannel.canUseOffTurn == true
+        or false
     local cooldownTurns = Spellcasting.NormalizeTurnCount(spell.cooldown)
     local cooldownGroup = nil
     if cooldownTurns ~= nil then
@@ -303,12 +310,18 @@ local function buildActionEconomyInput(candidate)
         spellRef = candidate.spellRef,
         canCast = activation.canCast == true,
         persistentCastTurns = persistentCastTurns,
-        usesGlobalCooldown = usesGlobalCooldown,
-        ignoresGlobalCooldown = ignoresGlobalCooldown,
+        cooldownChannelId = cooldownChannelId,
+        cooldownChannelName = type(cooldownChannel) == "table" and cooldownChannel.name or nil,
+        cooldownChannelTriggersGCD = cooldownChannelTriggersGCD,
+        cooldownChannelCanUseOffTurn = cooldownChannelCanUseOffTurn,
+        cooldownChannelConfigured = cooldownChannelConfigured,
+        cooldownChannelReason = cooldownChannelConfigured
+            and ""
+            or tostring(cooldownChannelReason or "invalid-cooldown-channel"),
         cooldownGroup = cooldownGroup,
         resourceCommitments = buildResourceCommitments(
             candidate,
-            persistentCastTurns ~= nil or usesGlobalCooldown == true
+            persistentCastTurns ~= nil or cooldownChannelTriggersGCD == true
         ),
     })
 end

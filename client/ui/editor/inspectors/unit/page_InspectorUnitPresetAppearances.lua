@@ -530,7 +530,10 @@ function DataEditor:RefreshUnitInspectorPresetsPage()
     if self.UnitInspectorPresetDropdown then
         self.UnitInspectorPresetDropdown:SetItems(self:BuildUnitInspectorPresetSelectorItems(unit))
         self.UnitInspectorPresetDropdown:SetSelectedValue(presetIndex and tostring(presetIndex) or "", true)
-        self:SetUnitInspectorDropdownEnabled(self.UnitInspectorPresetDropdown, hasUnit and #(unit and unit.presets or {}) > 0)
+        self:SetUnitInspectorDropdownEnabled(
+            self.UnitInspectorPresetDropdown,
+            hasUnit and (#(unit and unit.presets or {}) > 0 or tostring(unit.extendsUnitRef or "") ~= "")
+        )
     end
 
     if self.UnitInspectorPresetSectionDropdown then

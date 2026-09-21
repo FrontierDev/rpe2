@@ -377,6 +377,15 @@ local function normalizeInterruptEffect(value)
     }
 end
 
+local function normalizeTauntEffect(value)
+    local data = Normalization.EnsureTable(value)
+    return {
+        type = "taunt",
+        duration = math.max(1, Normalization.NormalizeInteger(data.duration, 2, 1)),
+        targetEvents = normalizeEventList(data.targetEvents),
+    }
+end
+
 local function normalizeRevertEffect(value)
     local data = Normalization.EnsureTable(value)
     return {
@@ -504,6 +513,10 @@ function Normalization.NormalizeInterruptEffect(value)
     return normalizeInterruptEffect(value)
 end
 
+function Normalization.NormalizeTauntEffect(value)
+    return normalizeTauntEffect(value)
+end
+
 function Normalization.NormalizeRevertEffect(value)
     return normalizeRevertEffect(value)
 end
@@ -537,6 +550,10 @@ function Normalization.NormalizeEffectData(effectType, value)
 
     if normalizedType == "interrupt" then
         return normalizeInterruptEffect(value)
+    end
+
+    if normalizedType == "taunt" then
+        return normalizeTauntEffect(value)
     end
 
     if normalizedType == "revert" then

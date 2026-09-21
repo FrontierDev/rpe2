@@ -113,6 +113,20 @@ local function getAuraManager()
         or nil
 end
 
+local function normalizeRankMultiplier(value)
+    local multiplier = tonumber(value)
+    if multiplier == nil or multiplier ~= multiplier or math.abs(multiplier) == math.huge or multiplier < 0 then
+        return 1
+    end
+    return multiplier
+end
+Evaluator.NormalizeRankMultiplier = normalizeRankMultiplier
+
+local function applyRankMultiplier(multiplier, amount)
+    local spellcasting = Addon.Client and Addon.Client.Spellcasting or nil
+    return spellcasting.ApplySpellRankMultiplier({ spellRankMultiplier = normalizeRankMultiplier(multiplier) }, amount)
+end
+
 local function getContextDataset(context)
     if type(context) ~= "table" then
         return nil
@@ -447,6 +461,10 @@ local function resolveApplication(effect, component, spell, context, cache)
         stacks = normalizePositiveInteger(isPureAura and effect.stacks or effect.auraStacks, 1),
         duration = normalizeTurnCount(effect.duration, profile and profile.duration or 1),
         powerLevel = tonumber(effect.basePower) or 0,
+        rankMultiplier = normalizeRankMultiplier(
+            type(context) == "table" and (context.spellRankMultiplier
+                or (type(context.spellRankContext) == "table" and context.spellRankContext.multiplier))
+        ),
         spellRef = type(spell) == "table" and spell.id or nil,
     }
 end
@@ -481,6 +499,7 @@ function Evaluator.CopyAuraEntry(entry, context, cache)
         stacks = math.max(0, math.floor(tonumber(entry.stacks) or 0)),
         turnsRemaining = math.max(0, math.floor(tonumber(entry.turnsRemaining) or 0)),
         powerLevel = tonumber(entry.powerLevel) or 0,
+        rankMultiplier = normalizeRankMultiplier(entry.rankMultiplier),
         stackBehavior = normalizeStackBehavior(entry.stackBehavior),
         maxStacks = normalizePositiveInteger(entry.maxStacks, 1),
         lastAdvancedOwnerTurnNumber = tonumber(entry.lastAdvancedOwnerTurnNumber),
@@ -585,7 +604,7 @@ local function resolveStatScaling(casterUnit, effect)
     return total
 end
 
-function Evaluator.ResolvePeriodicEffectMagnitude(casterUnit, targetUnit, effect, powerLevel, stacks)
+function Evaluator.ResolvePeriodicEffectMagnitude(casterUnit, targetUnit, effect, powerLevel, stacks, rankMultiplier)
     if type(effect) ~= "table" then
         return 0
     end
@@ -598,6 +617,7 @@ function Evaluator.ResolvePeriodicEffectMagnitude(casterUnit, targetUnit, effect
     local baseAmount = (tonumber(effect[baseField]) or 0)
         + (tonumber(powerLevel) or 0)
         + resolveStatScaling(casterUnit, effect)
+    baseAmount = tonumber(applyRankMultiplier(rankMultiplier, baseAmount)) or 0
     local amountMode = tostring(effect.amountMode or "flat")
     if amountMode == "base_percent" or amountMode == "max_percent" then
         local resourceValue = getResourceMaximum(targetUnit, tostring(effect.resourceRef or ""))
@@ -738,7 +758,8 @@ function Evaluator.ProjectPeriodicAuraValue(state, casterUnit, targetUnit)
                 targetUnit,
                 occurrence.periodicDamageEffects[effectIndex],
                 state.powerLevel,
-                occurrence.activeStacks
+                occurrence.activeStacks,
+                state.rankMultiplier
             )
         end
         local occurrenceHealing = 0
@@ -748,7 +769,8 @@ function Evaluator.ProjectPeriodicAuraValue(state, casterUnit, targetUnit)
                 targetUnit,
                 occurrence.periodicHealingEffects[effectIndex],
                 state.powerLevel,
-                occurrence.activeStacks
+                occurrence.activeStacks,
+                state.rankMultiplier
             )
         end
         local occurrenceIndex = math.max(1, math.floor(tonumber(occurrence.index) or index))
@@ -822,6 +844,7 @@ local function cloneProjectedAuraState(state)
         stacks = math.max(0, math.floor(tonumber(state.stacks) or 0)),
         turnsRemaining = math.max(0, math.floor(tonumber(state.turnsRemaining) or 0)),
         powerLevel = tonumber(state.powerLevel) or 0,
+        rankMultiplier = normalizeRankMultiplier(state.rankMultiplier),
         stackBehavior = normalizeStackBehavior(state.stackBehavior),
         maxStacks = normalizePositiveInteger(state.maxStacks, 1),
         stackTurns = copyValue(state.stackTurns),
@@ -934,6 +957,7 @@ local function applyProjectedAuraApplication(previousState, application, identit
         stacks = 0,
         turnsRemaining = 0,
         powerLevel = 0,
+        rankMultiplier = 1,
         stackBehavior = stackBehavior,
         maxStacks = maxStacks,
         stackTurns = nil,
@@ -947,6 +971,7 @@ local function applyProjectedAuraApplication(previousState, application, identit
     state.casterEventId = identity.casterEventId
     state.targetEventId = identity.targetEventId
     state.powerLevel = tonumber(application and application.powerLevel) or 0
+    state.rankMultiplier = normalizeRankMultiplier(application and application.rankMultiplier)
     state.stackBehavior = stackBehavior
     state.maxStacks = maxStacks
     state.profile = copyValue(profile)

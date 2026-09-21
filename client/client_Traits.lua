@@ -400,6 +400,8 @@ local function emitTriggeredDamageCombatLog(client, eventState, casterUnit, targ
     local entry = {
         eventId = eventState.id,
         entryType = "damage",
+        casterEventId = tonumber(casterUnit and casterUnit.eventID) or nil,
+        meterAmount = amount,
         casterDisplayName = tostring(casterUnit and casterUnit.name or "Unknown"),
         targetDisplayName = tostring(targetUnit and targetUnit.name or "Unknown"),
         targetCount = 1,
@@ -1948,6 +1950,54 @@ local function resolveTraitTriggeredTarget(ownerUnit, triggerTarget, eventSource
     return eventOtherUnit
 end
 
+local function normalizeDefenceStatRef(value)
+    local reference = ensureString(value)
+    return reference ~= "" and reference or nil
+end
+
+local function normalizeDamageSchoolRef(value)
+    local reference = ensureString(value)
+    return reference ~= "" and reference or nil
+end
+
+local function sameDamageSchoolRef(left, right)
+    local leftRef = normalizeDamageSchoolRef(left)
+    local rightRef = normalizeDamageSchoolRef(right)
+    if not leftRef or not rightRef then
+        return false
+    end
+    if leftRef == rightRef then
+        return true
+    end
+
+    local leftDatasetId, leftId = string.match(leftRef, "^([^:]+):(.+)$")
+    local rightDatasetId, rightId = string.match(rightRef, "^([^:]+):(.+)$")
+    if leftDatasetId and rightDatasetId then
+        return false
+    end
+
+    return (leftId or leftRef) == (rightId or rightRef)
+end
+
+local function matchesTraitCombatEvent(eventEntry, combatEventId, resolvedDefenceStatRef, resolvedDamageSchoolRef)
+    if combatEventId == "on_defence" then
+        local requestedRef = normalizeDefenceStatRef(eventEntry and eventEntry.defenceStatRef)
+        if not requestedRef then
+            return true
+        end
+
+        return requestedRef == normalizeDefenceStatRef(resolvedDefenceStatRef)
+    end
+
+    if combatEventId == "on_damage_type" then
+        local requestedRef = normalizeDamageSchoolRef(eventEntry and eventEntry.damageSchoolRef)
+        local resolvedRef = normalizeDamageSchoolRef(resolvedDamageSchoolRef)
+        return requestedRef ~= nil and resolvedRef ~= nil and sameDamageSchoolRef(requestedRef, resolvedRef)
+    end
+
+    return true
+end
+
 function Client:HandleTraitCombatEvent(context)
     local eventState = type(context) == "table" and context.eventState or nil
     local recipientEventId = tonumber(type(context) == "table" and context.recipientEventId or nil) or 0
@@ -2041,12 +2091,19 @@ function Client:HandleTraitCombatEvent(context)
     for index = 1, #(registeredEvents or {}) do
         local registeredEntry = registeredEvents[index]
         local eventEntry = registeredEntry and registeredEntry.event or nil
-        local targetUnit = resolveTraitTriggeredTarget(
-            ownerUnit,
-            ensureString(eventEntry and eventEntry.triggerTarget),
-            type(context) == "table" and context.eventSourceUnit or nil,
-            type(context) == "table" and context.eventOtherUnit or nil
-        )
+        local targetUnit = matchesTraitCombatEvent(
+                eventEntry,
+                combatEventId,
+                context.defenceStatRef,
+                context.damageSchoolRef
+            )
+            and resolveTraitTriggeredTarget(
+                ownerUnit,
+                ensureString(eventEntry and eventEntry.triggerTarget),
+                type(context) == "table" and context.eventSourceUnit or nil,
+                type(context) == "table" and context.eventOtherUnit or nil
+            )
+            or nil
         if type(targetUnit) ~= "table" then
             logTraitProcDebug(
                 registeredEntry,

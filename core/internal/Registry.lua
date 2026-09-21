@@ -5,15 +5,19 @@ Addon.Internal.Registry = Addon.Internal.Registry or {}
 
 local Registry = Addon.Internal.Registry
 local Database = Addon.Internal.Database or {}
+local function getUnitClass()
+    return Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes
+        and Addon.Internal.Database.Classes.Unit or nil
+end
 local Debug = Addon.Debug or {}
 local Common = Addon.Utils and Addon.Utils.Common or nil
 local HASH_MODULUS = 4294967296
 local HASH_MULTIPLIER = 33
 local DATASET_HASH_SALTS = {
-    "RPE_ACTIVATED_DATASETS_V1:A",
-    "RPE_ACTIVATED_DATASETS_V1:B",
-    "RPE_ACTIVATED_DATASETS_V1:C",
-    "RPE_ACTIVATED_DATASETS_V1:D",
+    "RPE_ACTIVATED_DATASETS_V2:A",
+    "RPE_ACTIVATED_DATASETS_V2:B",
+    "RPE_ACTIVATED_DATASETS_V2:C",
+    "RPE_ACTIVATED_DATASETS_V2:D",
 }
 local RULESET_HASH_SALTS = {
     "RPE_ACTIVE_RULESET_V1:A",
@@ -263,7 +267,11 @@ function Registry:GenerateActivatedDatasetsHash()
 
     for index = 1, #sortedIds do
         local datasetId = tostring(sortedIds[index] or "")
-        local exportText = Database.ExportDataset and Database.ExportDataset(datasetId) or nil
+        -- Lifecycle metadata determines local dataset availability, not the
+        -- playable definition that compatibility validates.
+        local exportText = Database.ExportDatasetForCompatibilityHash
+            and Database.ExportDatasetForCompatibilityHash(datasetId)
+            or nil
         if type(exportText) ~= "string" or exportText == "" then
             local dataset = Database.GetDatasetByID and Database.GetDatasetByID(datasetId) or nil
             exportText = tostring(dataset and dataset.name or "")
@@ -399,6 +407,86 @@ local function resolveDatasetEntryByCollection(datasetId, entryId, collectionKey
 
     local byId = ensureDatasetEntryCache(dataset, collectionKey)
     return dataset, byId and byId[entryId] or nil
+end
+
+local function findUnitRecord(unitRef, includeInactive)
+    local datasetId, unitId = parseDatasetQualifiedRef(unitRef)
+    if not datasetId or not unitId then
+        return nil, nil
+    end
+
+    local datasets = includeInactive == true
+        and (Database.ListDatasets and Database.ListDatasets() or {})
+        or (Registry.GetActivatedDatasets and Registry:GetActivatedDatasets() or {})
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        if dataset and tostring(dataset.id or "") == datasetId then
+            for unitIndex = 1, #(dataset.units or {}) do
+                local unit = dataset.units[unitIndex]
+                if unit and tostring(unit.id or "") == unitId then
+                    return dataset, unit
+                end
+            end
+            return dataset, nil
+        end
+    end
+
+    return nil, nil
+end
+
+-- Resolve a Unit's authored record to its effective gameplay definition. The
+-- returned raw record remains the child overlay; resolution always copies it.
+function Registry:ResolveUnitDefinition(unitRef, options)
+    local normalizedRef = tostring(unitRef or "")
+    normalizedRef = normalizedRef:gsub("^%s+", ""):gsub("%s+$", "")
+    local includeInactive = type(options) == "table" and options.includeInactive == true
+    local rootDataset, rootUnit = findUnitRecord(normalizedRef, includeInactive)
+    if not rootDataset or not rootUnit then
+        return nil, nil, nil
+    end
+
+    local UnitClass = getUnitClass()
+    if type(UnitClass) ~= "table" or type(UnitClass.MergeDefinitions) ~= "function" then
+        error("Unit inheritance resolver is unavailable.", 2)
+    end
+
+    local path = {}
+    local pathIndexByRef = {}
+    local function resolve(currentRef, currentDataset, currentUnit)
+        local previousIndex = pathIndexByRef[currentRef]
+        if previousIndex then
+            local chain = {}
+            for index = previousIndex, #path do
+                chain[#chain + 1] = path[index]
+            end
+            chain[#chain + 1] = currentRef
+            error("Unit inheritance cycle: " .. table.concat(chain, " -> "), 0)
+        end
+
+        path[#path + 1] = currentRef
+        pathIndexByRef[currentRef] = #path
+        local parentRef = currentUnit.extendsUnitRef
+        local effective
+        if parentRef ~= nil and tostring(parentRef) ~= "" then
+            parentRef = tostring(parentRef)
+            parentRef = parentRef:gsub("^%s+", ""):gsub("%s+$", "")
+            local parentDataset, parentUnit = findUnitRecord(parentRef, includeInactive)
+            if not parentDataset or not parentUnit then
+                error(("Unit '%s' extends missing or unavailable Unit '%s'."):format(currentRef, parentRef), 0)
+            end
+            local parentEffective = resolve(parentRef, parentDataset, parentUnit)
+            effective = UnitClass.MergeDefinitions(parentEffective, currentUnit)
+        else
+            effective = UnitClass.FromTable(currentUnit):ToTable()
+        end
+
+        pathIndexByRef[currentRef] = nil
+        path[#path] = nil
+        return effective
+    end
+
+    local effective = resolve(normalizedRef, rootDataset, rootUnit)
+    return rootDataset, effective, rootUnit
 end
 
 function Registry:ResolveStatReference(statRef)

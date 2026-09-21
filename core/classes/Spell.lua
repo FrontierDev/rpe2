@@ -11,6 +11,10 @@ local Condition = Addon.Internal.Database.Classes.Condition or {}
 local FIXED_ID_LENGTH = 8
 local GUID_ALPHABET = "0123456789abcdef"
 local guidRandomSeeded = false
+local COOLDOWN_CHANNEL_MIN_ID = 1
+local COOLDOWN_CHANNEL_MAX_ID = 10
+local DEFAULT_LEARN_LEVEL = 1
+local DEFAULT_RANK_INTERVAL = 8
 
 local function ensureTable(value)
     if type(value) == "table" then
@@ -50,6 +54,22 @@ local function normalizePositiveIntegerOrNil(value)
     end
 
     return nil
+end
+
+local function normalizeCooldownChannelId(value)
+    local numeric = tonumber(value)
+    if numeric == nil
+        or numeric ~= numeric
+        or numeric == math.huge
+        or numeric == -math.huge
+        or numeric < COOLDOWN_CHANNEL_MIN_ID
+        or numeric > COOLDOWN_CHANNEL_MAX_ID
+        or math.floor(numeric) ~= numeric
+    then
+        return nil
+    end
+
+    return numeric
 end
 
 local function normalizeTagList(value)
@@ -218,6 +238,18 @@ local function normalizeBool(value, fallback)
     return value == true
 end
 
+local function resolveLegacyCooldownChannel(spell)
+    if normalizeBool(spell and spell.ignoreGCD, false) then
+        return 2
+    end
+
+    if normalizeBool(spell and spell.triggersGCD, true) then
+        return 1
+    end
+
+    return 4
+end
+
 local function ensureGuidRandomSeed()
     if guidRandomSeeded then
         return
@@ -347,6 +379,9 @@ local function normalizeEventKey(value)
         or key == "on_critical_hit_taken"
         or key == "on_critical_heal"
         or key == "on_critical_heal_taken"
+        or key == "on_taunt"
+        or key == "on_taunted"
+        or key == "on_defence"
     then
         return key
     end
@@ -445,6 +480,14 @@ local function buildDefaultEffect(effectType)
         }
     end
 
+    if normalizedType == "taunt" then
+        return {
+            type = "taunt",
+            duration = 2,
+            targetEvents = {},
+        }
+    end
+
     if normalizedType == "revert" then
         return {
             type = "revert",
@@ -514,6 +557,7 @@ local function buildDefaultEffect(effectType)
             resourceRef = nil,
             amount = 0,
             amountMode = "flat",
+            scaleWithRank = false,
             targetEvents = {},
         }
     end
@@ -618,6 +662,12 @@ local function normalizeEffect(value)
         return effect
     end
 
+    if effect.type == "taunt" then
+        effect.duration = math.max(1, math.floor(tonumber(data.duration) or 2))
+        effect.targetEvents = normalizeEventList(data.targetEvents)
+        return effect
+    end
+
     if effect.type == "interrupt" or effect.type == "revert" then
         effect.targetEvents = normalizeEventList(data.targetEvents)
         return effect
@@ -626,6 +676,9 @@ local function normalizeEffect(value)
     effect.resourceRef = normalizeRef(data.resourceRef)
     effect.amount = tonumber(data.amount) or 0
     effect.amountMode = normalizeResourceCostAmountMode(data.amountMode)
+    if effect.type == "resource" then
+        effect.scaleWithRank = normalizeBool(data.scaleWithRank, false)
+    end
     effect.targetEvents = normalizeEventList(data.targetEvents)
     return effect
 end
@@ -744,6 +797,120 @@ local function normalizeComponents(values)
     return normalized
 end
 
+function Spell.NormalizeCooldownChannelId(value)
+    return normalizeCooldownChannelId(value)
+end
+
+function Spell.ResolveCooldownChannel(spell)
+    if type(spell) ~= "table" then
+        return nil, "invalid", "spell-is-not-a-table"
+    end
+
+    local source = rawget(spell, "_cooldownChannelSource")
+    if source == "invalid" then
+        return 1, "explicit", "invalid-explicit-cooldown-channel"
+    end
+
+    if source == "legacy" then
+        local normalizedChannel = normalizeCooldownChannelId(rawget(spell, "cooldownChannel"))
+        if normalizedChannel ~= nil then
+            return normalizedChannel, source
+        end
+        return resolveLegacyCooldownChannel(spell), source
+    end
+
+    if rawget(spell, "cooldownChannel") ~= nil then
+        local explicitChannel = normalizeCooldownChannelId(spell.cooldownChannel)
+        if explicitChannel == nil then
+            return 1, "explicit", "invalid-explicit-cooldown-channel"
+        end
+
+        return explicitChannel, "explicit"
+    end
+
+    return resolveLegacyCooldownChannel(spell), "legacy"
+end
+
+function Spell.GetCooldownChannelSource(spell)
+    local _, source = Spell.ResolveCooldownChannel(spell)
+    return source
+end
+
+function Spell.ResolveLearnLevel(spell)
+    local value = type(spell) == "table" and spell.learnLevel or nil
+    return normalizePositiveIntegerOrNil(value) or DEFAULT_LEARN_LEVEL
+end
+
+function Spell.ResolveUsesRanks(spell)
+    return not (type(spell) == "table" and spell.usesRanks == false)
+end
+
+function Spell.ResolveRankInterval(spell)
+    local value = type(spell) == "table" and spell.rankInterval or nil
+    return normalizePositiveIntegerOrNil(value) or DEFAULT_RANK_INTERVAL
+end
+
+function Spell.ResolveRankScalingOffset(spell)
+    return math.floor((Spell.ResolveLearnLevel(spell) - 1) / Spell.ResolveRankInterval(spell))
+end
+
+function Spell.ResolveRankScalingIntercept(spell)
+    return Spell.ResolveLearnLevel(spell)
+        - (Spell.ResolveRankScalingOffset(spell) * Spell.ResolveRankInterval(spell))
+end
+
+function Spell.ResolveNextRankLevel(spell, rank)
+    if not Spell.ResolveUsesRanks(spell) then
+        return nil
+    end
+    local normalizedRank = normalizePositiveIntegerOrNil(rank)
+    if not normalizedRank then
+        return nil
+    end
+
+    return Spell.ResolveLearnLevel(spell) + (normalizedRank * Spell.ResolveRankInterval(spell))
+end
+
+function Spell.ResolveRankForLevel(spell, casterLevel)
+    local learnLevel = Spell.ResolveLearnLevel(spell)
+    local rankInterval = Spell.ResolveRankInterval(spell)
+    local usesRanks = Spell.ResolveUsesRanks(spell)
+    local level = tonumber(casterLevel)
+    if level == nil or level ~= level or level == math.huge or level == -math.huge then
+        level = DEFAULT_LEARN_LEVEL
+    end
+
+    if level < learnLevel then
+        return {
+            eligible = false,
+            usesRanks = usesRanks,
+            learnLevel = learnLevel,
+            rankInterval = rankInterval,
+        }
+    end
+
+    if not usesRanks then
+        return {
+            eligible = true,
+            usesRanks = false,
+            rank = 1,
+            learnLevel = learnLevel,
+            rankInterval = rankInterval,
+            nextRankLevel = nil,
+        }
+    end
+
+    local rank = 1 + math.floor((level - learnLevel) / rankInterval)
+    return {
+        eligible = true,
+        usesRanks = true,
+        rank = rank,
+        learnLevel = learnLevel,
+        rankInterval = rankInterval,
+        nextRankLevel = Spell.ResolveNextRankLevel(spell, rank),
+    }
+end
+
 function Spell:New(data)
     return setmetatable({
         id = nil,
@@ -754,6 +921,9 @@ function Spell:New(data)
         icon = "",
         seedNPCSpell = false,
         learnMode = "trainer",
+        learnLevel = DEFAULT_LEARN_LEVEL,
+        rankInterval = DEFAULT_RANK_INTERVAL,
+        usesRanks = true,
         spellbookCategory = "",
         castTime = 0,
         cooldown = 0,
@@ -761,8 +931,7 @@ function Spell:New(data)
         charges = 0,
         useCooldownCharges = false,
         cooldownScalesWithHaste = false,
-        triggersGCD = true,
-        ignoreGCD = false,
+        cooldownChannel = 1,
         range = 0,
         canMoveWhileCasting = false,
         allowDeadTargets = false,
@@ -783,8 +952,20 @@ function Spell:Merge(data)
         return self
     end
 
+    local suppliedCooldownChannel = data.cooldownChannel
+    local hasSuppliedCooldownChannel = suppliedCooldownChannel ~= nil
+    local hasLegacyCooldownFlags = data.triggersGCD ~= nil or data.ignoreGCD ~= nil
+
     for key, value in pairs(data) do
-        if key ~= "resourceCosts" and key ~= "components" and key ~= "cost" and key ~= "effects" and key ~= "conditions" and key ~= "isChanneled" then
+        if key ~= "resourceCosts"
+            and key ~= "components"
+            and key ~= "cost"
+            and key ~= "effects"
+            and key ~= "conditions"
+            and key ~= "isChanneled"
+            and key ~= "triggersGCD"
+            and key ~= "ignoreGCD"
+        then
             self[key] = value
         end
     end
@@ -795,6 +976,9 @@ function Spell:Merge(data)
     self.icon = ensureString(self.icon)
     self.seedNPCSpell = normalizeBool(self.seedNPCSpell, false)
     self.learnMode = normalizeLearnMode(self.learnMode)
+    self.learnLevel = normalizePositiveIntegerOrNil(self.learnLevel) or DEFAULT_LEARN_LEVEL
+    self.rankInterval = normalizePositiveIntegerOrNil(self.rankInterval) or DEFAULT_RANK_INTERVAL
+    self.usesRanks = normalizeBool(self.usesRanks, true)
     self.spellbookCategory = normalizeSpellbookCategory(self.spellbookCategory)
     self.castTime = tonumber(self.castTime) or 0
     self.cooldown = tonumber(self.cooldown) or 0
@@ -802,11 +986,31 @@ function Spell:Merge(data)
     self.charges = tonumber(self.charges) or 0
     self.useCooldownCharges = normalizeBool(self.useCooldownCharges, false)
     self.cooldownScalesWithHaste = normalizeBool(self.cooldownScalesWithHaste, false)
-    self.triggersGCD = normalizeBool(self.triggersGCD, true)
-    self.ignoreGCD = normalizeBool(self.ignoreGCD, false)
-    if self.ignoreGCD then
-        self.triggersGCD = false
+    if hasSuppliedCooldownChannel then
+        local explicitChannel = normalizeCooldownChannelId(suppliedCooldownChannel)
+        if explicitChannel ~= nil then
+            self.cooldownChannel = explicitChannel
+            self._cooldownChannelSource = "explicit"
+            self._cooldownChannelRaw = nil
+        else
+            -- Invalid authored input follows the normalized Spell fallback:
+            -- Main Action is the safe default channel.
+            self.cooldownChannel = 1
+            self._cooldownChannelSource = "explicit"
+            self._cooldownChannelRaw = nil
+        end
+    elseif self._cooldownChannelSource == "explicit" or self._cooldownChannelSource == "invalid" then
+        -- Preserve an already-authored channel when Merge is used for a
+        -- partial edit that does not include the channel field.
+        self.cooldownChannel = normalizeCooldownChannelId(self.cooldownChannel) or 1
+        self._cooldownChannelSource = "explicit"
+        self._cooldownChannelRaw = nil
+    elseif hasLegacyCooldownFlags or self._cooldownChannelSource ~= "legacy" then
+        self.cooldownChannel = resolveLegacyCooldownChannel(data)
+        self._cooldownChannelSource = "legacy"
+        self._cooldownChannelRaw = nil
     end
+
     self.range = tonumber(self.range) or 0
     self.canMoveWhileCasting = normalizeBool(self.canMoveWhileCasting, false)
     self.allowDeadTargets = normalizeBool(self.allowDeadTargets, false)
@@ -824,7 +1028,7 @@ function Spell:Merge(data)
 end
 
 function Spell:ToTable()
-    return {
+    local values = {
         id = self.id,
         name = self.name,
         description = self.description,
@@ -833,6 +1037,9 @@ function Spell:ToTable()
         icon = self.icon,
         seedNPCSpell = self.seedNPCSpell == true,
         learnMode = self.learnMode,
+        learnLevel = self.learnLevel,
+        rankInterval = self.rankInterval,
+        usesRanks = self.usesRanks == true,
         spellbookCategory = self.spellbookCategory,
         castTime = self.castTime,
         cooldown = self.cooldown,
@@ -840,8 +1047,7 @@ function Spell:ToTable()
         charges = self.charges,
         useCooldownCharges = self.useCooldownCharges == true,
         cooldownScalesWithHaste = self.cooldownScalesWithHaste == true,
-        triggersGCD = self.triggersGCD == true,
-        ignoreGCD = self.ignoreGCD == true,
+        cooldownChannel = normalizeCooldownChannelId(self.cooldownChannel) or 1,
         range = self.range,
         canMoveWhileCasting = self.canMoveWhileCasting == true,
         allowDeadTargets = self.allowDeadTargets == true,
@@ -855,6 +1061,8 @@ function Spell:ToTable()
         components = normalizeComponents(self.components),
         tags = self.tags,
     }
+
+    return values
 end
 
 function Spell.FromTable(data)

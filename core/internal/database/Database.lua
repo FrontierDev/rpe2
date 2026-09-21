@@ -1634,7 +1634,8 @@ local function buildSeededUnitFields(dataset)
         if stat and stat.id and stat.seedNPCStat == true then
             seededStats[#seededStats + 1] = {
                 statRef = ("%s:%s"):format(datasetId, stat.id),
-                value = tonumber(stat.baseValue) or 0,
+                initialValue = tonumber(stat.baseValue) or 0,
+                perLevelValue = 0,
             }
         end
     end
@@ -1747,7 +1748,10 @@ local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId
         normalized.id = normalized.id
     end
 
-    if normalized.name == nil or normalized.name == "" then
+    local hasUnitParent = collectionKey == "units"
+        and type(sourceData.extendsUnitRef) == "string"
+        and sourceData.extendsUnitRef:gsub("^%s+", ""):gsub("%s+$", "") ~= ""
+    if (normalized.name == nil or normalized.name == "") and not hasUnitParent then
         normalized.name = ("New %s"):format(definition.singular or "Entry")
     end
 
@@ -4500,6 +4504,63 @@ function Database.ExportDataset(datasetId)
     }
 
     return "RPE_DATASET_V1\n" .. serializeLuaValue(payload)
+end
+
+-- Compatibility compares gameplay definitions. Keep ordinary exports lossless
+-- so temporary datasets still retain their lifetime and absolute expiry when
+-- shared with another client.
+function Database.ExportDatasetForCompatibilityHash(datasetId)
+    local dataset = Database.GetDatasetByID(datasetId)
+    if not dataset then
+        return nil
+    end
+
+    local normalized = normalizeDatasetRecord(copyAuthoredConfiguration(dataset), dataset.id, dataset.name)
+    normalized.lifetime = nil
+    normalized.expiresAt = nil
+
+    return "RPE_DATASET_V1\n" .. serializeLuaValue({
+        format = "rpe-dataset",
+        version = 1,
+        dataset = normalized,
+    })
+end
+
+-- Manager requests need to verify the declared dataset identity before the
+-- canonical importer mutates the database. Keep this read-only inspection on
+-- the same decoder and envelope format as Database.ImportDataset.
+function Database.GetDatasetImportPayloadIdentity(text)
+    local normalizedText = ensureString(text, "")
+    normalizedText = normalizedText:gsub("^%s+", ""):gsub("%s+$", "")
+    local header = "RPE_DATASET_V1"
+    if not startsWith(normalizedText, header) then
+        return nil, "Payload must use the RPE_DATASET_V1 format."
+    end
+
+    local body = normalizedText:sub(#header + 1)
+    if startsWith(body, "\r\n") then
+        body = body:sub(3)
+    elseif startsWith(body, "\n") or startsWith(body, "\r") then
+        body = body:sub(2)
+    else
+        return nil, "RPE_DATASET_V1 header must be followed by a newline."
+    end
+
+    local decoded, decodeError = deserializeLuaValue(body)
+    if type(decoded) ~= "table"
+        or decoded.format ~= "rpe-dataset"
+        or tonumber(decoded.version) ~= 1
+        or type(decoded.dataset) ~= "table"
+    then
+        return nil, decodeError or "Payload is not a supported RPE_DATASET_V1 dataset export."
+    end
+
+    local datasetId = ensureString(decoded.dataset.id, "")
+    if datasetId == "" then
+        return nil, "Payload dataset is missing its dataset ID."
+    end
+
+    return datasetId
 end
 
 function Database.ExportDatasets(datasetIds)

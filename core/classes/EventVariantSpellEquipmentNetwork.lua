@@ -199,8 +199,8 @@ function Event:SerializeUnitsForNetwork()
 end
 
 local baseDeserializeUnitsFromNetwork = Event.DeserializeUnitsFromNetwork
-function Event.DeserializeUnitsFromNetwork(unitsText)
-    local units = type(baseDeserializeUnitsFromNetwork) == "function" and baseDeserializeUnitsFromNetwork(unitsText) or {}
+function Event.DeserializeUnitsFromNetwork(unitsText, options)
+    local units = type(baseDeserializeUnitsFromNetwork) == "function" and baseDeserializeUnitsFromNetwork(unitsText, options) or {}
     if type(unitsText) ~= "string" or unitsText == "" then
         return units
     end
@@ -217,9 +217,9 @@ function Event.DeserializeUnitsFromNetwork(unitsText)
 end
 
 local baseSerializeUnitDeltaBatchForNetwork = Event.SerializeUnitDeltaBatchForNetwork
-function Event.SerializeUnitDeltaBatchForNetwork(entries)
+function Event.SerializeUnitDeltaBatchForNetwork(entries, options)
     local serialized = type(baseSerializeUnitDeltaBatchForNetwork) == "function"
-        and baseSerializeUnitDeltaBatchForNetwork(entries)
+        and baseSerializeUnitDeltaBatchForNetwork(entries, options)
         or ""
     if serialized == "" then
         return serialized
@@ -241,9 +241,9 @@ function Event.SerializeUnitDeltaBatchForNetwork(entries)
 end
 
 local baseDeserializeUnitDeltaBatchFromNetwork = Event.DeserializeUnitDeltaBatchFromNetwork
-function Event.DeserializeUnitDeltaBatchFromNetwork(batchText)
+function Event.DeserializeUnitDeltaBatchFromNetwork(batchText, options)
     local entries = type(baseDeserializeUnitDeltaBatchFromNetwork) == "function"
-        and baseDeserializeUnitDeltaBatchFromNetwork(batchText)
+        and baseDeserializeUnitDeltaBatchFromNetwork(batchText, options)
         or {}
     if type(batchText) ~= "string" or batchText == "" then
         return entries

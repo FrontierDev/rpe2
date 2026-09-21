@@ -108,9 +108,17 @@ function Server:SendEventRejoinState(clientName, options)
 
     local auraRecords = buildAuraSnapshot(eventId)
     local castRecords = buildCastSnapshot(eventId)
+    local meters = {
+        damage = {},
+        healing = {},
+    }
+    if type(Client.EventMeters) == "table" and type(Client.EventMeters.GetSnapshot) == "function" then
+        meters = Client.EventMeters:GetSnapshot(eventId, { currentTurn = eventState.turnNumber }) or meters
+    end
     local payload = EventRejoinState.SerializeSnapshot({
         auras = auraRecords,
         casts = castRecords,
+        meters = meters,
     })
     if type(payload) ~= "string" or payload == "" then
         return false
@@ -135,12 +143,14 @@ function Server:SendEventRejoinState(clientName, options)
 
     if type(Debug.Internal) == "function" then
         Debug.Internal(
-            "Event rejoin state queued: client=%s event=%s mode=%s auras=%d casts=%d queued=%s.",
+            "Event rejoin state queued: client=%s event=%s mode=%s auras=%d casts=%d damageRows=%d healingRows=%d queued=%s.",
             normalizedClientName,
             eventId,
             mode,
             #auraRecords,
             #castRecords,
+            #((meters.total and meters.total.damage) or meters.damage or {}),
+            #((meters.total and meters.total.healing) or meters.healing or {}),
             tostring(sent)
         )
     end

@@ -41,8 +41,16 @@ function DataEditor:RefreshUnitInspectorStatEditor()
         end
     end
 
-    if self.UnitInspectorPendingStatValueInput then
-        self.UnitInspectorPendingStatValueInput:SetText(tostring(stat and stat.value or 0))
+    if self.UnitInspectorPendingStatInitialInput then
+        local initialValue = stat and stat.initialValue
+        if initialValue == nil then
+            initialValue = stat and stat.value
+        end
+        self.UnitInspectorPendingStatInitialInput:SetText(tostring(initialValue or 0))
+    end
+
+    if self.UnitInspectorPendingStatPerLevelInput then
+        self.UnitInspectorPendingStatPerLevelInput:SetText(tostring(stat and stat.perLevelValue or 0))
     end
 
     if self.UnitInspectorAddStatButton and self.UnitInspectorAddStatButton.SetText then
@@ -166,7 +174,8 @@ function DataEditor:BuildUnitInspectorStatRows(unit)
         rows[#rows + 1] = {
             rowIndex = index,
             statText = self:ResolveUnitInspectorReferenceLabel("stats", entry and entry.statRef or ""),
-            valueText = tostring(entry and entry.value or 0),
+            initialValueText = tostring(entry and (entry.initialValue ~= nil and entry.initialValue or entry.value) or 0),
+            perLevelValueText = tostring(entry and entry.perLevelValue or 0),
         }
     end
 
@@ -236,8 +245,9 @@ function DataEditor:BuildUnitInspectorStatsPage(page)
     self.UnitInspectorStatsScroll:SetRowRenderer(function(row, item, itemIndex)
         if row.SetColumns then
             row:SetColumns({
-                { key = "statText", width = 184, justifyH = "LEFT" },
-                { key = "valueText", width = 36, justifyH = "RIGHT" },
+                { key = "statText", width = 140, justifyH = "LEFT" },
+                { key = "initialValueText", width = 40, justifyH = "RIGHT" },
+                { key = "perLevelValueText", width = 48, justifyH = "RIGHT" },
             })
         end
         if row.SetRowData then
@@ -268,21 +278,13 @@ function DataEditor:BuildUnitInspectorStatsPage(page)
     root:AddChild(self.UnitInspectorPendingStatRow)
 
     self.UnitInspectorPendingStatDropdown = UI.CreateDropdown(self.UnitInspectorPendingStatRow:GetFrame(), "RPEDataEditorUnitInspectorPendingStatDropdown", {
-        width = 154,
+        width = 194,
         height = 18,
         items = {
             { label = "None", value = "" },
         },
     })
     self.UnitInspectorPendingStatRow:AddChild(self.UnitInspectorPendingStatDropdown)
-
-    self.UnitInspectorPendingStatValueInput = UI.CreateTextInput(self.UnitInspectorPendingStatRow:GetFrame(), "RPEDataEditorUnitInspectorPendingStatValueInput", {
-        width = 42,
-        height = 18,
-        text = "0",
-        borderColor = UI.ResolveColor(nil, "panel.border"),
-    })
-    self.UnitInspectorPendingStatRow:AddChild(self.UnitInspectorPendingStatValueInput)
 
     self.UnitInspectorAddStatButton = UI.CreateButton(self.UnitInspectorPendingStatRow:GetFrame(), "RPEDataEditorUnitInspectorAddStatButton", "Add", 36, function()
         if self._refreshingUnitInspector then
@@ -299,16 +301,20 @@ function DataEditor:BuildUnitInspectorStatsPage(page)
             return
         end
 
-        local value = tonumber(self.UnitInspectorPendingStatValueInput and self.UnitInspectorPendingStatValueInput:GetText()) or 0
+        local initialValue = tonumber(self.UnitInspectorPendingStatInitialInput and self.UnitInspectorPendingStatInitialInput:GetText()) or 0
+        local perLevelValue = tonumber(self.UnitInspectorPendingStatPerLevelInput and self.UnitInspectorPendingStatPerLevelInput:GetText()) or 0
         self:CommitSelectedUnit(function(unit)
             unit.stats = unit.stats or {}
             if selectedIndex and unit.stats[selectedIndex] then
                 unit.stats[selectedIndex].statRef = statRef
-                unit.stats[selectedIndex].value = value
+                unit.stats[selectedIndex].initialValue = initialValue
+                unit.stats[selectedIndex].perLevelValue = perLevelValue
+                unit.stats[selectedIndex].value = nil
             else
                 unit.stats[#unit.stats + 1] = {
                     statRef = statRef,
-                    value = value,
+                    initialValue = initialValue,
+                    perLevelValue = perLevelValue,
                 }
             end
         end)
@@ -319,6 +325,33 @@ function DataEditor:BuildUnitInspectorStatsPage(page)
         fontSize = 7,
     })
     self.UnitInspectorPendingStatRow:AddChild(self.UnitInspectorAddStatButton)
+
+    self.UnitInspectorPendingStatValuesRow = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorUnitInspectorPendingStatValuesRow", {
+        width = self.UnitInspectorFieldWidth,
+        height = 18,
+        spacing = 2,
+        fitChildrenWidth = false,
+        fitChildrenHeight = false,
+    })
+    root:AddChild(self.UnitInspectorPendingStatValuesRow)
+
+    self.UnitInspectorPendingStatValuesRow:AddChild(self:BuildUnitInspectorLabel(self.UnitInspectorPendingStatValuesRow:GetFrame(), "RPEDataEditorUnitInspectorPendingStatInitialLabel", "Initial", 44))
+    self.UnitInspectorPendingStatInitialInput = UI.CreateTextInput(self.UnitInspectorPendingStatValuesRow:GetFrame(), "RPEDataEditorUnitInspectorPendingStatInitialInput", {
+        width = 54,
+        height = 18,
+        text = "0",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.UnitInspectorPendingStatValuesRow:AddChild(self.UnitInspectorPendingStatInitialInput)
+
+    self.UnitInspectorPendingStatValuesRow:AddChild(self:BuildUnitInspectorLabel(self.UnitInspectorPendingStatValuesRow:GetFrame(), "RPEDataEditorUnitInspectorPendingStatPerLevelLabel", "Per Level", 58))
+    self.UnitInspectorPendingStatPerLevelInput = UI.CreateTextInput(self.UnitInspectorPendingStatValuesRow:GetFrame(), "RPEDataEditorUnitInspectorPendingStatPerLevelInput", {
+        width = 68,
+        height = 18,
+        text = "0",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    self.UnitInspectorPendingStatValuesRow:AddChild(self.UnitInspectorPendingStatPerLevelInput)
 
     root:AddChild(self:BuildUnitInspectorLabel(root:GetFrame(), "RPEDataEditorUnitInspectorResistancesLabel", "Resistances"))
 

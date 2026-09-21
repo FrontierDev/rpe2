@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 11,
+    version = 25,
     dataset = {
         achievements = {},
         auras = {
@@ -139,17 +139,58 @@ Addon.Data.DefaultDatasets:Register({
             },
             {
                 description = "",
+                duration = 5,
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseAbsorption = 104,
+                        damageSchoolRefs = {},
+                        statScaling = {
+                            {
+                                coefficient = 0.624,
+                                statRef = "f82db71a:hj6d4kvy"
+                            }
+                        },
+                        type = "absorb"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_holy_powerwordshield.blp",
+                id = "pwrshld1",
+                maxStacks = 1,
+                name = "Power Word: Shield",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Absorbs {AURA_ABSORB_1} damage.",
+                    bodyTokens = {
+                        {
+                            applyMode = "absorb_amount",
+                            baseField = "baseAbsorption",
+                            effectIndex = 1,
+                            key = "AURA_ABSORB_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
                 duration = 3,
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 16,
+                        baseDamage = 16.7592,
                         damageSchoolRefs = {
                             "f82db71a:wwctys5s"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.359,
+                                coefficient = 0.2514,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -269,7 +310,7 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 14.56,
+                        baseDamage = 20.8,
                         damageSchoolRefs = {
                             "f82db71a:1ggt4t3v"
                         },
@@ -312,13 +353,13 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseDamage = 25.6,
+                        baseDamage = 17.68,
                         damageSchoolRefs = {
                             "f82db71a:1ggt4t3v"
                         },
                         statScaling = {
                             {
-                                coefficient = 0.952,
+                                coefficient = 0.442,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -355,10 +396,10 @@ Addon.Data.DefaultDatasets:Register({
                 effects = {
                     {
                         amountMode = "flat",
-                        baseHealing = 12.336,
+                        baseHealing = 8.84,
                         statScaling = {
                             {
-                                coefficient = 0.442,
+                                coefficient = 0.221,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -466,7 +507,168 @@ Addon.Data.DefaultDatasets:Register({
                     stackingTokens = {},
                     version = 1
                 }
-            }
+            },
+            {
+                description = "",
+                duration = 5,
+                effects = {
+                    {
+                        baseAmount = -10,
+                        operation = "flat",
+                        statRef = "f82db71a:itpo751d",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_shadow_blackplague.blp",
+                id = "shdwvau1",
+                maxStacks = 5,
+                name = "Shadow Weaving",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Reduces Shadow Resistance by {AURA_STAT_1}.",
+                    bodyTokens = {
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 1,
+                            key = "AURA_STAT_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
+                    stackingText = "Applies {AURA_APPLIED_STACKS_1} stacks. Stacks up to {AURA_MAX_STACKS_1} times.",
+                    stackingTokens = {
+                        {
+                            applyMode = "applied_stacks",
+                            key = "AURA_APPLIED_STACKS_1",
+                            tokenType = "aura_stacks"
+                        },
+                        {
+                            applyMode = "max_stacks",
+                            key = "AURA_MAX_STACKS_1",
+                            tokenType = "aura_stacks"
+                        }
+                    },
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 1,
+                effects = {
+                    {
+                        cancelOnDamage = false,
+                        forceAutoHitAgainstTarget = true,
+                        movementRangeOverride = 0,
+                        preventCasting = true,
+                        statScaling = {},
+                        type = "control"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_shadow_gathershadows.blp",
+                id = "blckouta",
+                maxStacks = 1,
+                name = "Blackout",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 1,
+                effects = {
+                    {
+                        cancelOnDamage = false,
+                        forceAutoHitAgainstTarget = false,
+                        preventCasting = true,
+                        statScaling = {},
+                        type = "control"
+                    },
+                    {
+                        baseAmount = 90,
+                        operation = "flat",
+                        statRef = "f82db71a:pu05li08",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_shadow_dispersion.blp",
+                id = "dispersa",
+                maxStacks = 1,
+                name = "Dispersion",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Prevents the affected unit from casting spells. Increases Damage Reduction by 90%.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "",
+                duration = 5,
+                effects = {},
+                events = {
+                    {
+                        chance = 100,
+                        combatEventId = "on_auto_attack_taken",
+                        effects = {
+                            {
+                                amountMode = "max_percent",
+                                baseHealing = 2,
+                                statScaling = {},
+                                type = "heal"
+                            },
+                            {
+                                auraRef = "1c1038a7:prmndau1",
+                                stacks = 1,
+                                type = "remove_aura"
+                            }
+                        },
+                        triggerTarget = "aura_target"
+                    }
+                },
+                icon = "interface/icons/spell_holy_prayerofmendingtga.blp",
+                id = "prmndau1",
+                maxStacks = 3,
+                name = "Prayer of Mending",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "When the affected unit is victim of a basic attack, heal the affected unit for 2% of Max health and remove 1 stack.",
+                    bodyTokens = {},
+                    stackingText = "Applies {AURA_APPLIED_STACKS_1} stacks. Stacks up to {AURA_MAX_STACKS_1} times.",
+                    stackingTokens = {
+                        {
+                            applyMode = "applied_stacks",
+                            key = "AURA_APPLIED_STACKS_1",
+                            tokenType = "aura_stacks"
+                        },
+                        {
+                            applyMode = "max_stacks",
+                            key = "AURA_MAX_STACKS_1",
+                            tokenType = "aura_stacks"
+                        }
+                    },
+                    version = 1
+                }
+            },
         },
         authorName = "Ortellus-ArgentDawn",
         classes = {
@@ -534,7 +736,10 @@ Addon.Data.DefaultDatasets:Register({
                     "1c1038a7:splward5",
                     "1c1038a7:shdfocus",
                     "1c1038a7:inspirit",
-                    "1c1038a7:mental10"
+                    "1c1038a7:mental10",
+                    "1c1038a7:shadform",
+                    "1c1038a7:shdweav1",
+                    "1c1038a7:blackout"
                 }
             }
         },
@@ -624,8 +829,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_heal.blp",
                 id = "eet5xd4t",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 16,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Heal",
                 range = 0,
@@ -656,7 +864,101 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "1c1038a7:pwrshld1",
+                            basePower = 0,
+                            duration = 5,
+                            stacks = 1,
+                            targetEvents = {},
+                            threatCoefficient = 0.375,
+                            type = "apply_aura"
+                        },
+                        key = "pwshldc1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_powerwordshield.blp",
+                id = "pwshld01",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 6,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Power Word: Shield",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 15,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Discipline",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "1c1038a7:pwrshld1",
+                            datasetId = "1c1038a7",
+                            descriptionText = "Absorbs {AURA_ABSORB_1} damage.",
+                            duration = 5,
+                            icon = "interface/icons/spell_holy_powerwordshield.blp",
+                            nameText = "Power Word: Shield",
+                            powerLevel = 0,
+                            spellDatasetId = "1c1038a7",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected ally",
+                                possessive = "the affected ally's",
+                                reflexive = "itself",
+                                subject = "the affected ally"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "absorb_amount",
+                                    baseField = "baseAbsorption",
+                                    effectIndex = 1,
+                                    key = "AURA_ABSORB_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Power Word: Shield to an ally for 5 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
                 useCooldownCharges = false
             },
             {
@@ -711,8 +1013,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_greaterheal.blp",
                 id = "dbk3frh2",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 40,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Greater Heal",
                 range = 0,
@@ -743,7 +1048,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -798,8 +1102,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_lesserheal.blp",
                 id = "h3n22bv2",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Lesser Heal",
                 range = 0,
@@ -830,7 +1137,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -891,7 +1197,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.332,
+                                    coefficient = 0.3315,
                                     statRef = "f82db71a:hj6d4kvy"
                                 }
                             },
@@ -918,8 +1224,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_blindingheal.blp",
                 id = "b7dot26a",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 52,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Binding Heal",
                 range = 0,
@@ -956,7 +1265,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1011,8 +1319,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_flashheal.blp",
                 id = "5yht8j0f",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Flash Heal",
                 range = 0,
@@ -1043,7 +1354,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1083,8 +1393,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_renew.blp",
                 id = "qqkkenuw",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 8,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Renew",
                 range = 0,
@@ -1135,7 +1448,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1178,7 +1490,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.5,
+                                    coefficient = 0.35,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -1186,10 +1498,10 @@ Addon.Data.DefaultDatasets:Register({
                                 "on_spell_taken",
                                 "on_critical_hit_taken"
                             },
-                            threatCoefficient = 0.49,
+                            threatCoefficient = 0.5,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "98a6b74a",
@@ -1211,8 +1523,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_holysmite.blp",
                 id = "rm9rekvj",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Smite",
                 range = 0,
@@ -1243,7 +1558,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1277,7 +1591,7 @@ Addon.Data.DefaultDatasets:Register({
                             applyAura = true,
                             auraRef = "1c1038a7:bgmk5vpf",
                             auraStacks = 1,
-                            baseDamage = 70,
+                            baseDamage = 80.325,
                             damageSchoolRefs = {
                                 "f82db71a:wwctys5s"
                             },
@@ -1287,7 +1601,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.7,
+                                    coefficient = 0.4165,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -1295,10 +1609,10 @@ Addon.Data.DefaultDatasets:Register({
                                 "on_spell_taken",
                                 "on_critical_hit_taken"
                             },
-                            threatCoefficient = 0.49,
+                            threatCoefficient = 0.5,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "98a6b74a",
@@ -1320,14 +1634,17 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_searinglight.blp",
                 id = "1x1q35og",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Holy Fire",
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 6.8,
+                        amount = 3.4,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1378,7 +1695,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1418,8 +1734,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_painsupression.blp",
                 id = "mnuc5di4",
-                ignoreGCD = true,
+                cooldownChannel = 5,
                 learnMode = "always_learned",
+                learnLevel = 50,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Pain Suppression",
                 range = 0,
@@ -1462,7 +1781,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1502,14 +1820,17 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_divinespirit.blp",
                 id = "lg9aex8t",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 30,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Divine Spirit",
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 5,
+                        amount = 10,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1546,7 +1867,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1586,14 +1906,17 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_wordfortitude.blp",
                 id = "hhxhszcv",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 48,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Prayer of Fortitude",
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 5,
+                        amount = 10,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1630,7 +1953,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1670,14 +1992,17 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_prayerofshadowprotection.blp",
                 id = "ilkjmlyk",
-                ignoreGCD = true,
+                cooldownChannel = 3,
                 learnMode = "always_learned",
+                learnLevel = 56,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Prayer of Shadow Protection",
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 5,
+                        amount = 10,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -1722,7 +2047,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1762,8 +2086,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_psychicscream.blp",
                 id = "3ctxnb99",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 14,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Psychic Scream",
                 range = 0,
@@ -1806,7 +2133,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -1846,8 +2172,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_psychichorrors.blp",
                 id = "5q7jx4c1",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 50,
+                usesRanks = false,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Psychic Horror",
                 range = 0,
@@ -1890,7 +2219,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -1942,8 +2270,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_shadowwordpain.blp",
                 id = "drza38ax",
-                ignoreGCD = true,
+                cooldownChannel = 2,
                 learnMode = "always_learned",
+                learnLevel = 4,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Shadow Word: Pain",
                 range = 0,
@@ -1994,7 +2325,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2056,14 +2386,17 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_holy_stoicism.blp",
                 id = "k71jmcz0",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 50,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Vampiric Touch",
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 12.3,
+                        amount = 3.4,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -2144,7 +2477,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = false,
                 useCooldownCharges = false
             },
             {
@@ -2165,7 +2497,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 175,
+                            baseDamage = 175.5,
                             damageSchoolRefs = {
                                 "f82db71a:1ggt4t3v"
                             },
@@ -2186,7 +2518,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "0152ac53",
@@ -2208,8 +2540,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_unholyfrenzy.blp",
                 id = "oe32yzws",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 10,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Mind Blast",
                 range = 0,
@@ -2240,7 +2575,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2262,7 +2596,7 @@ Addon.Data.DefaultDatasets:Register({
                             applyAura = true,
                             auraRef = "1c1038a7:u8wmuosy",
                             auraStacks = 1,
-                            baseDamage = 114.75,
+                            baseDamage = 120.488,
                             damageSchoolRefs = {
                                 "f82db71a:1ggt4t3v"
                             },
@@ -2272,7 +2606,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.595,
+                                    coefficient = 0.6248,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -2283,7 +2617,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "0152ac53",
@@ -2305,8 +2639,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_priest_mindspike.blp",
                 id = "vmtnl0y4",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 44,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Mind Spike",
                 range = 0,
@@ -2366,7 +2703,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2387,7 +2723,7 @@ Addon.Data.DefaultDatasets:Register({
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
-                            baseDamage = 135,
+                            baseDamage = 141.75,
                             damageSchoolRefs = {
                                 "f82db71a:1ggt4t3v"
                             },
@@ -2397,7 +2733,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.7,
+                                    coefficient = 0.735,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -2408,7 +2744,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "0152ac53",
@@ -2430,8 +2766,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_siphonmana.blp",
                 id = "u8dvti6t",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 20,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Mind Flay",
                 range = 0,
@@ -2462,7 +2801,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
             },
             {
@@ -2504,7 +2842,7 @@ Addon.Data.DefaultDatasets:Register({
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
-                            weaponDamageCoefficient = 1,
+                            weaponDamageCoefficient = 0,
                             weaponDamageMode = "none"
                         },
                         key = "62408d39",
@@ -2534,8 +2872,11 @@ Addon.Data.DefaultDatasets:Register({
                 description = "",
                 icon = "interface/icons/spell_shadow_demonicfortitude.blp",
                 id = "3z4hi35b",
-                ignoreGCD = false,
+                cooldownChannel = 1,
                 learnMode = "always_learned",
+                learnLevel = 50,
+                usesRanks = true,
+                rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Shadow Word: Death",
                 range = 0,
@@ -2566,9 +2907,546 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1
                 },
                 totalTicks = 0,
-                triggersGCD = true,
                 useCooldownCharges = false
-            }
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "1c1038a7:dispersa",
+                            basePower = 0,
+                            duration = 1,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "dspraura",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    },
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amount = 40,
+                            amountMode = "base_percent",
+                            resourceRef = "f82db71a:4c8mfm99",
+                            targetEvents = {},
+                            type = "resource"
+                        },
+                        key = "dsprmana",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_shadow_dispersion.blp",
+                id = "dispers1",
+                cooldownChannel = 5,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Dispersion",
+                range = 0,
+                resourceCosts = {},
+                seedNPCSpell = false,
+                spellbookCategory = "Shadow",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "1c1038a7:dispersa",
+                            datasetId = "1c1038a7",
+                            descriptionText = "Prevents the affected unit from casting spells. Increases Damage Reduction by 90%.",
+                            duration = 1,
+                            icon = "interface/icons/spell_shadow_dispersion.blp",
+                            nameText = "Dispersion",
+                            powerLevel = 0,
+                            spellDatasetId = "1c1038a7",
+                            stacks = 1,
+                            targetContext = {
+                                object = "you",
+                                possessive = "your",
+                                reflexive = "yourself",
+                                subject = "you"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Apply Dispersion to yourself for 1 turn. Restore {RESOURCE_AMOUNT_1} to yourself.",
+                    tokens = {
+                        {
+                            applyMode = "resource_gain_amount",
+                            componentIndex = 2,
+                            key = "RESOURCE_AMOUNT_1",
+                            tokenType = "spell_resource_amount"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_heal",
+                    "on_critical_heal"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseHealing = 29.25,
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.1755,
+                                    statRef = "f82db71a:hj6d4kvy"
+                                }
+                            },
+                            targetEvents = {
+                                "on_heal_taken",
+                                "on_critical_heal_taken"
+                            },
+                            threatCoefficient = 0.375,
+                            type = "heal",
+                            usesProjectile = false
+                        },
+                        key = "cohheal1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 5,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "multi"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_circleofrenewal.blp",
+                id = "circheal",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Circle of Healing",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 15,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Holy",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Heal up to 5 allies for {HEAL_1} health.",
+                    tokens = {
+                        {
+                            applyMode = "heal_range",
+                            componentIndex = 1,
+                            key = "HEAL_1",
+                            tokenType = "spell_heal_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_heal",
+                    "on_critical_heal"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseHealing = 45,
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.27,
+                                    statRef = "f82db71a:hj6d4kvy"
+                                }
+                            },
+                            targetEvents = {
+                                "on_heal_taken",
+                                "on_critical_heal_taken"
+                            },
+                            threatCoefficient = 0.5,
+                            type = "heal",
+                            usesProjectile = false
+                        },
+                        key = "pohheal1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 5,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "multi"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_prayerofhealing02.blp",
+                id = "prayheal",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Prayer of Healing",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 21.8,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Holy",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Heal up to 5 allies for {HEAL_1} health.",
+                    tokens = {
+                        {
+                            applyMode = "heal_range",
+                            componentIndex = 1,
+                            key = "HEAL_1",
+                            tokenType = "spell_heal_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 1,
+                casterEvents = {
+                    "on_heal",
+                    "on_critical_heal"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseHealing = 120.7125,
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.666,
+                                    statRef = "f82db71a:hj6d4kvy"
+                                }
+                            },
+                            targetEvents = {
+                                "on_heal_taken",
+                                "on_critical_heal_taken"
+                            },
+                            threatCoefficient = 0.5,
+                            type = "heal",
+                            usesProjectile = false
+                        },
+                        key = "dhymheal",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "all_allies"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_divinehymn.blp",
+                id = "divhymn1",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Divine Hymn",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 12.3,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Holy",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Heal all allies for {HEAL_1} health.",
+                    tokens = {
+                        {
+                            applyMode = "heal_range",
+                            componentIndex = 1,
+                            key = "HEAL_1",
+                            tokenType = "spell_heal_range"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 1,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amount = 20,
+                            amountMode = "base_percent",
+                            resourceRef = "f82db71a:4c8mfm99",
+                            targetEvents = {},
+                            type = "resource"
+                        },
+                        key = "symmana1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "all_allies"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_symbolofhope.blp",
+                id = "symhope1",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Symbol of Hope",
+                range = 0,
+                resourceCosts = {},
+                seedNPCSpell = false,
+                spellbookCategory = "Holy",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Restore {RESOURCE_AMOUNT_1} to all allies.",
+                    tokens = {
+                        {
+                            applyMode = "resource_gain_amount",
+                            componentIndex = 1,
+                            key = "RESOURCE_AMOUNT_1",
+                            tokenType = "spell_resource_amount"
+                        }
+                    },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "1c1038a7:prmndau1",
+                            basePower = 0,
+                            duration = 5,
+                            stacks = 3,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "pomaura1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 3,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "multi"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_prayerofmendingtga.blp",
+                id = "prmend01",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Prayer of Mending",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 15,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Holy",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "1c1038a7:prmndau1",
+                            datasetId = "1c1038a7",
+                            descriptionText = "When the affected unit is victim of a basic attack, heal the affected unit for 2% of Max health and remove 1 stack. Applies {AURA_APPLIED_STACKS_1} stacks. Stacks up to {AURA_MAX_STACKS_1} times.",
+                            duration = 5,
+                            icon = "interface/icons/spell_holy_prayerofmendingtga.blp",
+                            nameText = "Prayer of Mending",
+                            powerLevel = 0,
+                            spellDatasetId = "1c1038a7",
+                            stacks = 3,
+                            targetContext = {
+                                object = "the affected ally",
+                                possessive = "the affected ally's",
+                                reflexive = "itself",
+                                subject = "the affected ally"
+                            },
+                            tokens = {
+                                {
+                                    applyMode = "applied_stacks",
+                                    key = "AURA_APPLIED_STACKS_1",
+                                    tokenType = "aura_stacks"
+                                },
+                                {
+                                    applyMode = "max_stacks",
+                                    key = "AURA_MAX_STACKS_1",
+                                    tokenType = "aura_stacks"
+                                }
+                            }
+                        }
+                    },
+                    mainText = "Apply Prayer of Mending to up to 3 allies with 3 stacks for 5 turns.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
         },
         stats = {},
         traits = {
@@ -2758,7 +3636,95 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 unlockLevel = 1
-            }
+            },
+            {
+                automaticAuras = {},
+                category = "Shadow",
+                conditions = {},
+                description = "",
+                events = {},
+                icon = "interface/icons/spell_shadow_shadowform.blp",
+                id = "shadform",
+                isEnvironmental = false,
+                name = "Shadowform",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        operation = "percent",
+                        statRef = "f82db71a:7t7xgzcx",
+                        value = 15
+                    },
+                    {
+                        statRef = "f82db71a:5pxmfw02",
+                        value = -100
+                    },
+                    {
+                        statRef = "f82db71a:pu05li08",
+                        value = 15
+                    }
+                },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Shadow",
+                conditions = {},
+                description = "",
+                events = {
+                    {
+                        chance = 100,
+                        combatEventId = "on_damage_type",
+                        damageSchoolRef = "f82db71a:1ggt4t3v",
+                        effects = {
+                            {
+                                auraRef = "1c1038a7:shdwvau1",
+                                basePower = 0,
+                                duration = 5,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "event_other"
+                    }
+                },
+                icon = "interface/icons/spell_shadow_blackplague.blp",
+                id = "shdweav1",
+                isEnvironmental = false,
+                name = "Shadow Weaving",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Shadow",
+                conditions = {},
+                description = "",
+                events = {
+                    {
+                        chance = 5,
+                        combatEventId = "on_damage_type",
+                        damageSchoolRef = "f82db71a:1ggt4t3v",
+                        effects = {
+                            {
+                                auraRef = "1c1038a7:blckouta",
+                                basePower = 0,
+                                duration = 1,
+                                stacks = 1,
+                                type = "apply_aura"
+                            }
+                        },
+                        triggerTarget = "event_other"
+                    }
+                },
+                icon = "interface/icons/spell_shadow_gathershadows.blp",
+                id = "blackout",
+                isEnvironmental = false,
+                name = "Blackout",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
         },
         units = {},
         weaponTypes = {}

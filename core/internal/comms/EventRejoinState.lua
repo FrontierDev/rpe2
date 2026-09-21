@@ -8,7 +8,7 @@ local Comms = Addon.Internal.Comms
 local EventRejoinState = Comms.EventRejoinState
 local Operations = Comms.Operations or {}
 
-EventRejoinState.ProtocolVersion = 1
+EventRejoinState.ProtocolVersion = 5
 EventRejoinState.Opcode = 31
 
 local function normalizeNonNegativeInteger(value)
@@ -18,6 +18,26 @@ local function normalizeNonNegativeInteger(value)
     end
     numeric = math.floor(numeric)
     if numeric < 0 then
+        return nil
+    end
+    return numeric
+end
+
+local function normalizePositiveInteger(value)
+    local numeric = tonumber(value)
+    if numeric == nil then
+        return nil
+    end
+    if numeric ~= math.floor(numeric) then
+        return nil
+    end
+    numeric = math.floor(numeric)
+    return numeric > 0 and numeric or nil
+end
+
+local function normalizeNonNegativeNumber(value)
+    local numeric = tonumber(value)
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge or numeric < 0 then
         return nil
     end
     return numeric
@@ -129,6 +149,51 @@ local function deserializeScalarNumberList(text)
     return values
 end
 
+local function serializeAuraRuntimeStates(effectState)
+    local records = {}
+    for effectIndex, state in pairs(type(effectState) == "table" and effectState or {}) do
+        if type(state) == "table" and state.kind == "absorb" then
+            local maximum = math.max(0, tonumber(state.maximum) or 0)
+            local remaining = math.max(0, math.min(maximum, tonumber(state.remaining) or 0))
+            records[#records + 1] = encodeFields({
+                math.floor(tonumber(effectIndex) or 0),
+                maximum,
+                remaining,
+                math.max(0, math.floor(tonumber(state.revision) or 0)),
+            })
+        end
+    end
+    table.sort(records)
+    return encodeFields({ tostring(#records), encodeFields(records) })
+end
+
+local function deserializeAuraRuntimeStates(payload)
+    local fields = decodeFields(payload)
+    if type(fields) ~= "table" or #fields ~= 2 then
+        return {}
+    end
+    local count = normalizeNonNegativeInteger(fields[1]) or 0
+    local states = {}
+    local records = decodeFields(fields[2]) or {}
+    for index = 1, count do
+        local record = decodeFields(records[index])
+        if type(record) ~= "table" or #record < 1 then
+            break
+        end
+        local effectIndex = math.floor(tonumber(record[1]) or 0)
+        if effectIndex > 0 then
+            local maximum = math.max(0, tonumber(record[2]) or 0)
+            states[effectIndex] = {
+                kind = "absorb",
+                maximum = maximum,
+                remaining = math.max(0, math.min(maximum, tonumber(record[3]) or 0)),
+                revision = math.max(0, math.floor(tonumber(record[4]) or 0)),
+            }
+        end
+    end
+    return states
+end
+
 local function serializeTargetSelections(targetSelections, targetSelectionOrder)
     local keys = {}
     local seen = {}
@@ -197,12 +262,14 @@ local function serializeAuraRecord(entry)
         math.max(1, math.floor(tonumber(entry and entry.stacks) or 1)),
         math.max(1, math.floor(tonumber(entry and entry.turnsRemaining) or 1)),
         tonumber(entry and entry.powerLevel) or 0,
+        normalizeNonNegativeNumber(entry and entry.rankMultiplier) or 1,
+        serializeAuraRuntimeStates(entry and entry.effectState),
     })
 end
 
 local function deserializeAuraRecord(payload)
     local fields = decodeFields(payload)
-    if type(fields) ~= "table" or #fields ~= 6 then
+    if type(fields) ~= "table" or (#fields ~= 6 and #fields ~= 7 and #fields ~= 8) then
         return nil
     end
     local casterEventId = math.floor(tonumber(fields[1]) or 0)
@@ -211,6 +278,7 @@ local function deserializeAuraRecord(payload)
     if casterEventId <= 0 or targetEventId <= 0 or auraRef == "" then
         return nil
     end
+    local runtimeStateField = #fields >= 8 and fields[8] or (#fields >= 7 and fields[7] or nil)
     return {
         casterEventId = casterEventId,
         targetEventId = targetEventId,
@@ -218,6 +286,8 @@ local function deserializeAuraRecord(payload)
         stacks = math.max(1, math.floor(tonumber(fields[4]) or 1)),
         turnsRemaining = math.max(1, math.floor(tonumber(fields[5]) or 1)),
         powerLevel = tonumber(fields[6]) or 0,
+        rankMultiplier = #fields >= 8 and (normalizeNonNegativeNumber(fields[7]) or 1) or 1,
+        effectState = deserializeAuraRuntimeStates(runtimeStateField) or {},
     }
 end
 
@@ -296,11 +366,156 @@ local function deserializeRecordList(payload, deserializer)
     return records
 end
 
+local function serializeMeterRecord(entry)
+    return encodeFields({
+        math.floor(tonumber(entry and entry.eventId) or 0),
+        tonumber(entry and entry.amount) or -1,
+        tostring(entry and entry.name or ""),
+        entry and entry.team ~= nil and tostring(entry.team) or "",
+    })
+end
+
+local function deserializeMeterRecord(payload)
+    local fields = decodeFields(payload)
+    if type(fields) ~= "table" or #fields ~= 4 then
+        return nil
+    end
+
+    local eventId = normalizePositiveInteger(fields[1])
+    local amount = normalizeNonNegativeNumber(fields[2])
+    if not eventId or amount == nil then
+        return nil
+    end
+
+    local name = tostring(fields[3] or "")
+    local team = nil
+    if tostring(fields[4] or "") ~= "" then
+        team = normalizeNonNegativeNumber(fields[4])
+        if team == nil then
+            return nil
+        end
+    end
+
+    return {
+        eventId = eventId,
+        amount = amount,
+        name = name ~= "" and name or nil,
+        team = team,
+    }
+end
+
+local function serializeThreatMeterRecords(records)
+    local normalized = {}
+    for index = 1, #(records or {}) do
+        local record = records[index]
+        local targetEventId = normalizePositiveInteger(record and record.targetEventId)
+        if targetEventId and type(record) == "table" and type(record.rows) == "table" then
+            normalized[#normalized + 1] = encodeFields({
+                targetEventId,
+                serializeRecordList(record.rows, serializeMeterRecord),
+            })
+        end
+    end
+    return serializeRecordList(normalized, function(value) return value end)
+end
+
+local function deserializeThreatMeterRecords(payload)
+    local encoded = deserializeRecordList(payload, function(value) return value end)
+    if type(encoded) ~= "table" then
+        return nil
+    end
+    local records = {}
+    for index = 1, #encoded do
+        local fields = decodeFields(encoded[index])
+        if type(fields) ~= "table" or #fields ~= 2 then
+            return nil
+        end
+        local targetEventId = normalizePositiveInteger(fields[1])
+        local rows = deserializeRecordList(fields[2], deserializeMeterRecord)
+        if not targetEventId or type(rows) ~= "table" then
+            return nil
+        end
+        records[#records + 1] = { targetEventId = targetEventId, rows = rows }
+    end
+    return records
+end
+
+local function serializeMeterGroup(group)
+    group = type(group) == "table" and group or {}
+    return encodeFields({
+        serializeRecordList(group.damage or {}, serializeMeterRecord),
+        serializeRecordList(group.healing or {}, serializeMeterRecord),
+        serializeThreatMeterRecords(group.threat or {}),
+    })
+end
+
+local function deserializeMeterGroup(payload)
+    local fields = decodeFields(payload)
+    if type(fields) ~= "table" or #fields ~= 3 then
+        return nil
+    end
+    local damage = deserializeRecordList(fields[1], deserializeMeterRecord)
+    local healing = deserializeRecordList(fields[2], deserializeMeterRecord)
+    local threat = deserializeThreatMeterRecords(fields[3])
+    if type(damage) ~= "table" or type(healing) ~= "table" or type(threat) ~= "table" then
+        return nil
+    end
+    return { damage = damage, healing = healing, threat = threat }
+end
+
+local function serializeMeterSnapshot(snapshot)
+    snapshot = type(snapshot) == "table" and snapshot or {}
+    return encodeFields({
+        normalizePositiveInteger(snapshot.currentTurn) or 1,
+        serializeMeterGroup(snapshot.total or snapshot),
+    })
+end
+
+local function deserializeMeterSnapshot(payload)
+    local fields = decodeFields(payload)
+    if type(fields) ~= "table" then
+        return nil
+    end
+    -- Protocol 3 snapshots contained only total damage and healing.
+    if #fields == 2 then
+        local currentTurn = normalizePositiveInteger(fields[1])
+        if currentTurn then
+            local total = deserializeMeterGroup(fields[2])
+            if type(total) ~= "table" then return nil end
+            return {
+                currentTurn = currentTurn,
+                total = total,
+                damage = total.damage,
+                healing = total.healing,
+                threat = total.threat,
+            }
+        end
+
+        local damage = deserializeRecordList(fields[1], deserializeMeterRecord)
+        local healing = deserializeRecordList(fields[2], deserializeMeterRecord)
+        if type(damage) ~= "table" or type(healing) ~= "table" then return nil end
+        return { currentTurn = 1, total = { damage = damage, healing = healing, threat = {} }, turn = {}, damage = damage, healing = healing }
+    end
+    if #fields ~= 3 then return nil end
+    local currentTurn = normalizePositiveInteger(fields[1])
+    local total = deserializeMeterGroup(fields[2])
+    local turn = deserializeMeterGroup(fields[3])
+    if not currentTurn or type(total) ~= "table" or type(turn) ~= "table" then return nil end
+    return {
+        currentTurn = currentTurn,
+        total = total,
+        damage = total.damage,
+        healing = total.healing,
+        threat = total.threat,
+    }
+end
+
 function EventRejoinState.SerializeSnapshot(snapshot)
     local body = encodeFields({
         EventRejoinState.ProtocolVersion,
         serializeRecordList(type(snapshot) == "table" and snapshot.auras or {}, serializeAuraRecord),
         serializeRecordList(type(snapshot) == "table" and snapshot.casts or {}, serializeCastRecord),
+        serializeMeterSnapshot(type(snapshot) == "table" and snapshot.meters or nil),
     })
     return toHex(body)
 end
@@ -314,7 +529,17 @@ function EventRejoinState.DeserializeSnapshot(payload)
     if type(fields) ~= "table" then
         return nil, reason or "invalid-snapshot"
     end
-    if #fields ~= 3 or tonumber(fields[1]) ~= EventRejoinState.ProtocolVersion then
+    local protocolVersion = tonumber(fields[1])
+    if protocolVersion ~= 1
+        and protocolVersion ~= 2
+        and protocolVersion ~= 3
+        and protocolVersion ~= 4
+        and protocolVersion ~= EventRejoinState.ProtocolVersion
+    then
+        return nil, "unsupported-version"
+    end
+    local expectedFieldCount = protocolVersion >= 3 and 4 or 3
+    if #fields ~= expectedFieldCount then
         return nil, "unsupported-version"
     end
     local auras = deserializeRecordList(fields[2], deserializeAuraRecord)
@@ -322,10 +547,22 @@ function EventRejoinState.DeserializeSnapshot(payload)
     if type(auras) ~= "table" or type(casts) ~= "table" then
         return nil, "invalid-record-list"
     end
+    local meters = {
+        damage = {},
+        healing = {},
+    }
+    if protocolVersion >= 3 then
+        meters = deserializeMeterSnapshot(fields[4])
+        if type(meters) ~= "table" then
+            return nil, "invalid-meter-snapshot"
+        end
+    end
+
     return {
         protocolVersion = EventRejoinState.ProtocolVersion,
         auras = auras,
         casts = casts,
+        meters = meters,
     }, nil
 end
 

@@ -345,6 +345,18 @@ local function resolveSpellcastActivationSnapshot(client, spellRef, activationSn
     return nil
 end
 
+local function attachSpellRankContext(entry, rankContext)
+    if type(entry) ~= "table" or type(rankContext) ~= "table" then
+        return entry
+    end
+
+    entry.spellRankContext = rankContext
+    entry.spellRank = rankContext.rank
+    entry.spellRankMultiplier = rankContext.multiplier or 1
+    entry.spellUsesRanks = rankContext.usesRanks ~= false
+    return entry
+end
+
 local function sendSpellcasterResourceSync(self, eventUnit, reason, resourceDeltas)
     local sessionState = self.GetState and self:GetState() or nil
     local eventState = self.GetEventState and self:GetEventState() or nil
@@ -467,6 +479,18 @@ function Client:HandleSpellcastStart(arguments, sender)
         payload.sender,
         "start"
     )
+    local existing = Spellcasting.GetCastEntry and Spellcasting.GetCastEntry(self, payload.eventId, payload.casterEventId) or nil
+    local rankContext = suppressLog and type(existing) == "table" and existing.spellRankContext or nil
+    if type(rankContext) ~= "table" then
+        rankContext = Spellcasting.ResolveSpellRankContext and Spellcasting.ResolveSpellRankContext(payload.spell, {
+            casterUnit = payload.casterUnit,
+            eventState = payload.eventState,
+        }) or nil
+    end
+    if type(rankContext) ~= "table" or rankContext.eligible ~= true then
+        return false
+    end
+
     local entry = Spellcasting.BuildCastEntry(
         payload.spellRef,
         Spellcasting.ResolveSpellName(payload.spellRef),
@@ -478,8 +502,8 @@ function Client:HandleSpellcastStart(arguments, sender)
     if not entry then
         return false
     end
+    attachSpellRankContext(entry, rankContext)
 
-    local existing = Spellcasting.GetCastEntry and Spellcasting.GetCastEntry(self, payload.eventId, payload.casterEventId) or nil
     if suppressLog and existing then
         entry.targetSelections = existing.targetSelections
         entry.targetSelectionOrder = existing.targetSelectionOrder
@@ -487,6 +511,7 @@ function Client:HandleSpellcastStart(arguments, sender)
         entry.focusedTargetEventId = existing.focusedTargetEventId
         entry.targetPolicy = existing.targetPolicy
         entry.resolvedStartCostAmounts = existing.resolvedStartCostAmounts
+        attachSpellRankContext(entry, existing.spellRankContext or rankContext)
     end
 
     Spellcasting.SetCastEntry(self, payload.eventId, payload.casterEventId, entry)
@@ -589,6 +614,17 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
         return false
     end
 
+    local rankContext = snapshot.spellRankContext
+    if type(rankContext) ~= "table" then
+        rankContext = Spellcasting.ResolveSpellRankContext and Spellcasting.ResolveSpellRankContext(spell, {
+            casterUnit = casterUnit,
+            eventState = activeEventState,
+        }) or nil
+    end
+    if type(rankContext) ~= "table" or rankContext.eligible ~= true then
+        return false
+    end
+
     local conditionStartTime = timingEnabled and getNowMilliseconds() or nil
     local queuedTargetSelection = Spellcasting.PeekQueuedSpellTargetSelection and Spellcasting.PeekQueuedSpellTargetSelection(self, spellRef) or nil
     local queuedTargetUnit = resolveLifecycleTargetUnit(activeEventState or eventState, queuedTargetSelection)
@@ -659,7 +695,8 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
 
     if numericCastTime == nil then
         local instantDispatchStartTime = timingEnabled and getNowMilliseconds() or nil
-        local instantCastEntry = Spellcasting.ConsumeQueuedSpellTargetSelection and Spellcasting.ConsumeQueuedSpellTargetSelection(self, spellRef) or nil
+        local instantCastEntry = Spellcasting.ConsumeQueuedSpellTargetSelection and Spellcasting.ConsumeQueuedSpellTargetSelection(self, spellRef) or {}
+        attachSpellRankContext(instantCastEntry, rankContext)
         if timingEnabled then
             appendTimingPhase(timingPhases, "instant-dispatch", getNowMilliseconds() - instantDispatchStartTime, SPELLCAST_SLOW_HELPER_MS)
             logSpellcastTiming("start", spellRef, timingPhases, getNowMilliseconds() - (totalStartTime or 0), SPELLCAST_SLOW_TOTAL_MS)
@@ -693,6 +730,7 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
     end
 
     entry.resolvedStartCostAmounts = resolvedStartCostAmounts
+    attachSpellRankContext(entry, rankContext)
 
     Spellcasting.SetCastEntry(self, eventState.id, casterUnit.eventID, entry)
     Spellcasting.LogLifecycle("start", casterUnit.isPlayer == true and "player" or "npc", casterUnit.name, Spellcasting.ResolveSpellName(spellRef), numericCastTime)
@@ -785,6 +823,21 @@ function Client:OnSpellcastComplete(spellRef, castEntryOverride)
         return false
     end
 
+    local rankContext = type(candidateEntry) == "table" and candidateEntry.spellRankContext or nil
+    if type(rankContext) ~= "table" then
+        rankContext = Spellcasting.ResolveSpellRankContext and Spellcasting.ResolveSpellRankContext(spell, {
+            casterUnit = casterUnit,
+            eventState = eventState,
+        }) or nil
+    end
+    if type(rankContext) ~= "table" or rankContext.eligible ~= true then
+        return false
+    end
+    if type(candidateEntry) ~= "table" then
+        candidateEntry = {}
+    end
+    attachSpellRankContext(candidateEntry, rankContext)
+
     local targetResolveStartTime = timingEnabled and getNowMilliseconds() or nil
     local targetUnit = resolveLifecycleTargetUnit(eventState, candidateEntry)
     if timingEnabled then
@@ -822,7 +875,10 @@ function Client:OnSpellcastComplete(spellRef, castEntryOverride)
 
     local stateStartTime = timingEnabled and getNowMilliseconds() or nil
     local previous = Spellcasting.RemoveCastEntry(self, eventState.id, casterUnit.eventID)
-    local castEntry = previous or castEntryOverride or (Spellcasting.ConsumeQueuedSpellTargetSelection and Spellcasting.ConsumeQueuedSpellTargetSelection(self, spellRef)) or nil
+    local castEntry = previous
+        or castEntryOverride
+        or (Spellcasting.ConsumeQueuedSpellTargetSelection and Spellcasting.ConsumeQueuedSpellTargetSelection(self, spellRef))
+        or candidateEntry
     if timingEnabled then
         appendTimingPhase(timingPhases, "state", getNowMilliseconds() - stateStartTime, SPELLCAST_SLOW_HELPER_MS)
     end

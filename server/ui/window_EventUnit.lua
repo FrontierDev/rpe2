@@ -116,7 +116,20 @@ function EventUnitWindow:BuildUnitItems()
         for unitIndex = 1, #(dataset and dataset.units or {}) do
             local unit = dataset.units[unitIndex]
             if unit and unit.id then
-                local subgroup = buildUnitSubgroupInfo(unit)
+                local registryId = ("%s:%s"):format(dataset.id, unit.id)
+                local displayUnit = unit
+                local invalidInheritance = false
+                if type(Registry.ResolveUnitDefinition) == "function" then
+                    local ok, _, resolved = pcall(function()
+                        return Registry:ResolveUnitDefinition(registryId)
+                    end)
+                    if ok and resolved then
+                        displayUnit = resolved
+                    elseif not ok then
+                        invalidInheritance = true
+                    end
+                end
+                local subgroup = buildUnitSubgroupInfo(displayUnit)
                 if not subgroupMap[subgroup.key] then
                     subgroupMap[subgroup.key] = {
                         label = subgroup.label,
@@ -126,8 +139,9 @@ function EventUnitWindow:BuildUnitItems()
                 end
 
                 subgroupMap[subgroup.key].children[#subgroupMap[subgroup.key].children + 1] = {
-                    label = type(unit.name) == "string" and unit.name ~= "" and unit.name or tostring(unit.id),
-                    value = ("%s:%s"):format(dataset.id, unit.id),
+                    label = (type(displayUnit.name) == "string" and displayUnit.name ~= "" and displayUnit.name or tostring(unit.id))
+                        .. (invalidInheritance and " (invalid inheritance)" or ""),
+                    value = registryId,
                 }
             end
         end
@@ -449,36 +463,10 @@ function EventUnitWindow:RefreshSpellPreview(unit)
 end
 
 function EventUnitWindow:ResolveUnitDefinition(registryId)
-    local normalizedRegistryId = type(registryId) == "string" and registryId or ""
-    if normalizedRegistryId == "" then
+    if type(Registry.ResolveUnitDefinition) ~= "function" then
         return nil, nil
     end
-
-    local separatorIndex = string.find(normalizedRegistryId, ":", 1, true)
-    if not separatorIndex then
-        return nil, nil
-    end
-
-    local datasetId = string.sub(normalizedRegistryId, 1, separatorIndex - 1)
-    local unitId = string.sub(normalizedRegistryId, separatorIndex + 1)
-    if datasetId == "" or unitId == "" then
-        return nil, nil
-    end
-
-    local datasets = Registry.GetActivatedDatasets and Registry:GetActivatedDatasets() or {}
-    for datasetIndex = 1, #datasets do
-        local dataset = datasets[datasetIndex]
-        if dataset and dataset.id == datasetId then
-            for unitIndex = 1, #(dataset.units or {}) do
-                local unit = dataset.units[unitIndex]
-                if unit and unit.id == unitId then
-                    return dataset, unit
-                end
-            end
-        end
-    end
-
-    return nil, nil
+    return Registry:ResolveUnitDefinition(registryId)
 end
 
 function EventUnitWindow:SetViewedUnit(unit, options)

@@ -379,20 +379,20 @@ function Conditions:GetUnitHealthPercent(unit)
     return nil
 end
 
-function Conditions:UnitHasAura(context, unit, auraRef)
+function Conditions:GetUnitAuraStacks(context, unit, auraRef)
     if type(unit) ~= "table" or ensureString(auraRef) == "" then
-        return false
+        return 0
     end
 
     local eventState = type(context) == "table" and context.eventState or nil
     local auraManager = Client and Client.Spellcasting and Client.Spellcasting.AuraManager or nil
     if type(eventState) ~= "table" or eventState.active ~= true or type(auraManager) ~= "table" then
-        return false
+        return 0
     end
 
     local targetEventId = tonumber(unit.eventID) or 0
     if targetEventId <= 0 then
-        return false
+        return 0
     end
 
     local ownerDatasetId = type(context) == "table" and ensureString(context.ownerDatasetId) or ""
@@ -434,12 +434,16 @@ function Conditions:UnitHasAura(context, unit, auraRef)
             end
             appendUniqueRef(entryAuraRefs, entryQualifiedAuraRef)
             if anyAuraRefMatches(entryAuraRefs, requiredAuraRefs) then
-                return true
+                return math.max(0, math.floor(tonumber(entry and entry.stacks) or 1))
             end
         end
     end
 
-    return false
+    return 0
+end
+
+function Conditions:UnitHasAura(context, unit, auraRef)
+    return self:GetUnitAuraStacks(context, unit, auraRef) > 0
 end
 
 function Conditions:IsTraitActive(traitRef)

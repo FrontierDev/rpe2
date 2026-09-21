@@ -105,6 +105,52 @@ function Operations:Dispatch(opcode, arguments, sender, distribution, target, me
     return true
 end
 
+function Operations:Allocate(key, handler, name)
+    local normalizedKey = type(key) == "string" and string.upper(key) or ""
+    if normalizedKey == "" or type(handler) ~= "function" then
+        return nil
+    end
+
+    local existingOpcode = self.KeyIndex and self.KeyIndex[normalizedKey] or nil
+    if not existingOpcode then
+        for opcode, definition in pairs(self.Opcodes or {}) do
+            if type(definition) == "table" and string.upper(tostring(definition.key or "")) == normalizedKey then
+                existingOpcode = tonumber(opcode)
+                break
+            end
+        end
+    end
+
+    if existingOpcode then
+        local operation = self:Register(existingOpcode, handler, name)
+        operation.key = normalizedKey
+        self.KeyIndex[normalizedKey] = existingOpcode
+        self.Opcodes[existingOpcode] = operation
+        return existingOpcode
+    end
+
+    local highestOpcode = 0
+    for opcode in pairs(self.Opcodes or {}) do
+        highestOpcode = math.max(highestOpcode, tonumber(opcode) or 0)
+    end
+    for opcode in pairs(self.Registry or {}) do
+        highestOpcode = math.max(highestOpcode, tonumber(opcode) or 0)
+    end
+
+    local opcode = highestOpcode + 1
+    while (self.Opcodes and self.Opcodes[opcode]) or (self.Registry and self.Registry[opcode]) do
+        opcode = opcode + 1
+    end
+
+    local operation = self:Register(opcode, handler, name)
+    operation.key = normalizedKey
+    self.Opcodes = self.Opcodes or {}
+    self.Opcodes[opcode] = operation
+    self.KeyIndex = self.KeyIndex or {}
+    self.KeyIndex[normalizedKey] = opcode
+    return opcode
+end
+
 function Operations:ResetRegistry()
     self.Registry = {}
     self.KeyIndex = {}
@@ -564,6 +610,30 @@ Operations.Opcodes = Operations.Opcodes or {
             end
 
             return client:HandleSkillRollResult(arguments, sender, distribution, target, message)
+        end,
+    },
+    [39] = {
+        key = "AURA_RUNTIME_UPDATE",
+        name = "aura-runtime-update",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleAuraRuntimeUpdate) ~= "function" then
+                return false
+            end
+
+            return client:HandleAuraRuntimeUpdate(arguments, sender, distribution, target, message)
+        end,
+    },
+    [40] = {
+        key = "AURA_RUNTIME_UPDATE_BATCH",
+        name = "aura-runtime-update-batch",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleAuraRuntimeUpdateBatch) ~= "function" then
+                return false
+            end
+
+            return client:HandleAuraRuntimeUpdateBatch(arguments, sender, distribution, target, message)
         end,
     },
 }
