@@ -3,6 +3,7 @@ local _, Addon = ...
 local CORE_DATASET_ID = "f82db71a"
 local CORE_GUILD_SETTING_ID = "g6mh7pla"
 local REAGENTS_CATEGORY_ID = "l8r4h2xn"
+local DAILY_REWARDS_CATEGORY_ID = "d8y4c6vc"
 
 local definition = Addon.Data.DefaultDatasets.Definitions[CORE_DATASET_ID]
 if not definition or not definition.dataset then
@@ -28,29 +29,31 @@ for index = #dataset.currencies, 1, -1 do
     end
 end
 
--- Reagent requisitions reference the packaged Miscellaneous Items dataset.
--- Keep that relationship explicit for dependency activation/validation.
+-- Guild requisitions and daily rewards reference these packaged datasets.
+-- Keep those relationships explicit for dependency activation/validation.
 dataset.dependencies = dataset.dependencies or {}
-local hasMiscDependency = false
-for _, dependencyId in ipairs(dataset.dependencies) do
-    if tostring(dependencyId or "") == "3eb7e9bb" then
-        hasMiscDependency = true
-        break
+local guildSettingDependencyIds = {
+    "3eb7e9bb", -- Miscellaneous Items
+    "d6ffc4e2", -- Alchemy
+    "61fdf3df", -- Blacksmithing
+    "af503002", -- Engineering
+    "732368d4", -- Enchanting
+    "4999dcec", -- Jewelcrafting
+    "538a54a0", -- Leatherworking
+    "072d4851", -- Inscription
+    "7259f1d3", -- Tailoring
+}
+for _, requiredDependencyId in ipairs(guildSettingDependencyIds) do
+    local hasDependency = false
+    for _, dependencyId in ipairs(dataset.dependencies) do
+        if tostring(dependencyId or "") == requiredDependencyId then
+            hasDependency = true
+            break
+        end
     end
-end
-if not hasMiscDependency then
-    dataset.dependencies[#dataset.dependencies + 1] = "3eb7e9bb"
-end
-
-local hasTailoringDependency = false
-for _, dependencyId in ipairs(dataset.dependencies) do
-    if tostring(dependencyId or "") == "7259f1d3" then
-        hasTailoringDependency = true
-        break
+    if not hasDependency then
+        dataset.dependencies[#dataset.dependencies + 1] = requiredDependencyId
     end
-end
-if not hasTailoringDependency then
-    dataset.dependencies[#dataset.dependencies + 1] = "7259f1d3"
 end
 
 -- Role IDs are stable implementation details. The Data Editor presents Role
@@ -105,9 +108,8 @@ for _, role in ipairs(professionRoles) do
     roles[#roles + 1] = role
 end
 
--- These unlimited Guild Shop entries are intentionally limited to exceptional
--- legacy/special reagents. Normal gathering and crafting materials remain part
--- of the ordinary acquisition economy rather than the Guild Shop.
+-- Guild Shop stock includes exceptional legacy reagents and profession daily
+-- reward caches.
 local requisitions = {
     {
         id = "w1v4r3ag",
@@ -208,6 +210,102 @@ local requisitions = {
         roleIds = { "xzn8ikd5", "tx7n3n76", "7lqa25jv" },
         shopCategoryId = REAGENTS_CATEGORY_ID,
     },
+    {
+        id = "p2k8m4qz",
+        itemRef = "",
+        sourceType = "loot_table",
+        lootRef = "d6ffc4e2:a6h3r8vk", -- Alchemy Daily Herb Cache
+        quantity = 1,
+        costs = {
+            { currencyRef = "justice", amount = 100 },
+        },
+        characterLimit = 0,
+        shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
+    },
+    {
+        id = "b7r1w6ce",
+        itemRef = "",
+        sourceType = "loot_table",
+        lootRef = "61fdf3df:d4p7k2ms", -- Blacksmithing Daily Bar Cache
+        quantity = 1,
+        costs = {
+            { currencyRef = "justice", amount = 100 },
+        },
+        characterLimit = 0,
+        shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
+    },
+    {
+        id = "e3n9c5vx",
+        itemRef = "",
+        sourceType = "loot_table",
+        lootRef = "af503002:n6r3k8vz", -- Engineering Daily Material Cache
+        quantity = 1,
+        costs = {
+            { currencyRef = "justice", amount = 100 },
+        },
+        characterLimit = 0,
+        shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
+    },
+    {
+        id = "j6t2h8ra",
+        itemRef = "",
+        sourceType = "loot_table",
+        lootRef = "732368d4:e5n8c2qx", -- Enchanting Daily Material Cache
+        quantity = 1,
+        costs = {
+            { currencyRef = "justice", amount = 100 },
+        },
+        characterLimit = 0,
+        shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
+    },
+    {
+        id = "l4f7p1ny",
+        itemRef = "",
+        sourceType = "loot_table",
+        lootRef = "4999dcec:j4c8m2rx", -- Jewelcrafting Daily Gem Cache
+        quantity = 1,
+        costs = {
+            { currencyRef = "justice", amount = 100 },
+        },
+        characterLimit = 0,
+        shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
+    },
+    {
+        id = "i9c3d6qa",
+        itemRef = "",
+        sourceType = "loot_table",
+        lootRef = "538a54a0:l7w4c9px", -- Leatherworking Daily Leather Cache
+        quantity = 1,
+        costs = {
+            { currencyRef = "justice", amount = 100 },
+        },
+        characterLimit = 0,
+        shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
+    },
+    {
+        id = "t8m5v2rk",
+        itemRef = "",
+        sourceType = "loot_table",
+        lootRef = "072d4851:i7n3k5qx", -- Inscription Daily Ink Cache
+        quantity = 1,
+        costs = {
+            { currencyRef = "justice", amount = 100 },
+        },
+        characterLimit = 0,
+        shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
+    },
+    {
+        id = "g1x4b7we",
+        itemRef = "",
+        sourceType = "loot_table",
+        lootRef = "7259f1d3:q8m2v7kc", -- Tailoring Daily Cloth Cache
+        quantity = 1,
+        costs = {
+            { currencyRef = "justice", amount = 100 },
+        },
+        characterLimit = 0,
+        shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
+    },
 }
 
 local guildSetting = {
@@ -226,6 +324,11 @@ local guildSetting = {
             id = REAGENTS_CATEGORY_ID,
             name = "Reagents",
             order = 10,
+        },
+        {
+            id = DAILY_REWARDS_CATEGORY_ID,
+            name = "Daily Rewards",
+            order = 20,
         },
     },
     requisitions = requisitions,

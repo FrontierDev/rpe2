@@ -4526,6 +4526,43 @@ function Database.ExportDatasetForCompatibilityHash(datasetId)
     })
 end
 
+-- Manager requests need to verify the declared dataset identity before the
+-- canonical importer mutates the database. Keep this read-only inspection on
+-- the same decoder and envelope format as Database.ImportDataset.
+function Database.GetDatasetImportPayloadIdentity(text)
+    local normalizedText = ensureString(text, "")
+    normalizedText = normalizedText:gsub("^%s+", ""):gsub("%s+$", "")
+    local header = "RPE_DATASET_V1"
+    if not startsWith(normalizedText, header) then
+        return nil, "Payload must use the RPE_DATASET_V1 format."
+    end
+
+    local body = normalizedText:sub(#header + 1)
+    if startsWith(body, "\r\n") then
+        body = body:sub(3)
+    elseif startsWith(body, "\n") or startsWith(body, "\r") then
+        body = body:sub(2)
+    else
+        return nil, "RPE_DATASET_V1 header must be followed by a newline."
+    end
+
+    local decoded, decodeError = deserializeLuaValue(body)
+    if type(decoded) ~= "table"
+        or decoded.format ~= "rpe-dataset"
+        or tonumber(decoded.version) ~= 1
+        or type(decoded.dataset) ~= "table"
+    then
+        return nil, decodeError or "Payload is not a supported RPE_DATASET_V1 dataset export."
+    end
+
+    local datasetId = ensureString(decoded.dataset.id, "")
+    if datasetId == "" then
+        return nil, "Payload dataset is missing its dataset ID."
+    end
+
+    return datasetId
+end
+
 function Database.ExportDatasets(datasetIds)
     if type(datasetIds) ~= "table" or #datasetIds == 0 then
         return nil

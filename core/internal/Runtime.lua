@@ -6,6 +6,7 @@ Addon.Internal.Events = Addon.Internal.Events or {}
 local Events = Addon.Internal.Events
 local Tasks = Addon.Internal.Tasks or {}
 local Comms = Addon.Internal.Comms or {}
+local ExternalManager = Addon.Internal.ExternalManager or {}
 
 local function safeCall(handler, ...)
     if type(handler) ~= "function" then
@@ -54,6 +55,10 @@ function Addon.Internal.DispatchEvent(event, ...)
 
         if Comms and Comms.RegisterPrefix then
             safeCall(Comms.RegisterPrefix, Comms)
+        end
+
+        if ExternalManager and ExternalManager.Initialize then
+            safeCall(ExternalManager.Initialize, ExternalManager)
         end
 
         local Client = Addon.Client or nil

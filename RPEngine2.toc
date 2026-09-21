@@ -3,7 +3,7 @@
 ## Notes: Fully-integrated roll system and associated RP tools.
 ## Version: 2.0.alpha5
 ## Author: Ortellus @ Argent Dawn (Discord: ortellus)
-## SavedVariables: RPEngineProfilesDB, RPEngineRulesetDB, RPEngineDatasetDB, RPEngineGlobalSettingsDB, RPEngineInventoryDB
+## SavedVariables: RPEngineProfilesDB, RPEngineRulesetDB, RPEngineDatasetDB, RPEngineGlobalSettingsDB, RPEngineInventoryDB, RPEngineManagerDB
 
 ## Initialisation and Common Files
 Init.lua
@@ -144,6 +144,7 @@ core/classes/DamageSchool.lua
 core/classes/Loot.lua
 core/internal/database/DatasetSchema23.lua
 core/internal/database/DatasetSchema24.lua
+core/internal/manager/ExternalManager.lua
 core/classes/Recipe.lua
 core/classes/Aura.lua
 core/classes/HiddenStatus.lua
