@@ -45,7 +45,7 @@ RPE_DATASET_ENTRY_V1
         icon = "interface/icons/inv_chest_plate03.blp",
         id = "h2p8cuir",
         isTwoHanded = false,
-        itemLevel = 76,
+        itemLevel = 75,
         itemSetKey = "t2_pala_healer",
         itemType = "armor",
         maxDamagePerTurn = 0,
@@ -60,8 +60,24 @@ RPE_DATASET_ENTRY_V1
         name = "Judgement Cuirass",
         quality = "epic",
         sellPrice = 0,
+        blueSockets = 0,
+        cogSockets = 0,
+        greenSockets = 0,
+        metaSockets = 0,
+        prismaticSockets = 3,
+        redSockets = 0,
         skillBonuses = {  },
-        sockets = {  },
+        sockets = {
+            {
+                color = "prismatic",
+            },
+            {
+                color = "prismatic",
+            },
+            {
+                color = "prismatic",
+            },
+        },
         stats = {
             {
                 sourceStatRef = "f82db71a:v42albuv",
@@ -108,6 +124,7 @@ RPE_DATASET_ENTRY_V1
         validSlotRefs = {
             "f82db71a:nwfvxbto",
         },
+        yellowSockets = 0,
     },
 }
 ```
@@ -153,7 +170,7 @@ RPE_DATASET_ENTRY_V1
         icon = "interface/icons/inv_boots_plate_09.blp",
         id = "h2p8trds",
         isTwoHanded = false,
-        itemLevel = 76,
+        itemLevel = 75,
         itemSetKey = "t2_pala_healer",
         itemType = "armor",
         maxDamagePerTurn = 0,
@@ -168,6 +185,12 @@ RPE_DATASET_ENTRY_V1
         name = "Judgement Treads",
         quality = "epic",
         sellPrice = 0,
+        blueSockets = 0,
+        cogSockets = 0,
+        greenSockets = 0,
+        metaSockets = 0,
+        prismaticSockets = 0,
+        redSockets = 0,
         skillBonuses = {  },
         sockets = {  },
         stats = {
@@ -212,6 +235,7 @@ RPE_DATASET_ENTRY_V1
         validSlotRefs = {
             "f82db71a:raiu9t05",
         },
+        yellowSockets = 0,
     },
 }
 ```
@@ -257,7 +281,7 @@ RPE_DATASET_ENTRY_V1
         icon = "interface/icons/inv_gauntlets_29.blp",
         id = "h2p8glov",
         isTwoHanded = false,
-        itemLevel = 76,
+        itemLevel = 75,
         itemSetKey = "t2_pala_healer",
         itemType = "armor",
         maxDamagePerTurn = 0,
@@ -272,6 +296,12 @@ RPE_DATASET_ENTRY_V1
         name = "Judgement Gloves",
         quality = "epic",
         sellPrice = 0,
+        blueSockets = 0,
+        cogSockets = 0,
+        greenSockets = 0,
+        metaSockets = 0,
+        prismaticSockets = 0,
+        redSockets = 0,
         skillBonuses = {  },
         sockets = {  },
         stats = {
@@ -316,6 +346,7 @@ RPE_DATASET_ENTRY_V1
         validSlotRefs = {
             "f82db71a:wasvuom2",
         },
+        yellowSockets = 0,
     },
 }
 ```
@@ -361,7 +392,7 @@ RPE_DATASET_ENTRY_V1
         icon = "interface/icons/inv_helmet_74.blp",
         id = "h2p8helm",
         isTwoHanded = false,
-        itemLevel = 76,
+        itemLevel = 75,
         itemSetKey = "t2_pala_healer",
         itemType = "armor",
         maxDamagePerTurn = 0,
@@ -376,8 +407,21 @@ RPE_DATASET_ENTRY_V1
         name = "Judgement Helm",
         quality = "epic",
         sellPrice = 0,
+        blueSockets = 0,
+        cogSockets = 0,
+        greenSockets = 0,
+        metaSockets = 1,
+        prismaticSockets = 1,
+        redSockets = 0,
         skillBonuses = {  },
-        sockets = {  },
+        sockets = {
+            {
+                color = "meta",
+            },
+            {
+                color = "prismatic",
+            },
+        },
         stats = {
             {
                 sourceStatRef = "f82db71a:v42albuv",
@@ -424,6 +468,7 @@ RPE_DATASET_ENTRY_V1
         validSlotRefs = {
             "f82db71a:bgvs1zx6",
         },
+        yellowSockets = 0,
     },
 }
 ```
@@ -469,7 +514,7 @@ RPE_DATASET_ENTRY_V1
         icon = "interface/icons/inv_pants_04.blp",
         id = "h2p8skrt",
         isTwoHanded = false,
-        itemLevel = 76,
+        itemLevel = 75,
         itemSetKey = "t2_pala_healer",
         itemType = "armor",
         maxDamagePerTurn = 0,
@@ -484,8 +529,21 @@ RPE_DATASET_ENTRY_V1
         name = "Judgement Plate Skirt",
         quality = "epic",
         sellPrice = 0,
+        blueSockets = 0,
+        cogSockets = 0,
+        greenSockets = 0,
+        metaSockets = 0,
+        prismaticSockets = 2,
+        redSockets = 0,
         skillBonuses = {  },
-        sockets = {  },
+        sockets = {
+            {
+                color = "prismatic",
+            },
+            {
+                color = "prismatic",
+            },
+        },
         stats = {
             {
                 sourceStatRef = "f82db71a:v42albuv",
@@ -532,6 +590,7 @@ RPE_DATASET_ENTRY_V1
         validSlotRefs = {
             "f82db71a:obmt4ntq",
         },
+        yellowSockets = 0,
     },
 }
 ```
@@ -577,7 +636,7 @@ RPE_DATASET_ENTRY_V1
         icon = "interface/icons/inv_shoulder_37.blp",
         id = "h2p8mant",
         isTwoHanded = false,
-        itemLevel = 76,
+        itemLevel = 75,
         itemSetKey = "t2_pala_healer",
         itemType = "armor",
         maxDamagePerTurn = 0,
@@ -592,6 +651,12 @@ RPE_DATASET_ENTRY_V1
         name = "Judgement Mantle",
         quality = "epic",
         sellPrice = 0,
+        blueSockets = 0,
+        cogSockets = 0,
+        greenSockets = 0,
+        metaSockets = 0,
+        prismaticSockets = 0,
+        redSockets = 0,
         skillBonuses = {  },
         sockets = {  },
         stats = {
@@ -636,6 +701,7 @@ RPE_DATASET_ENTRY_V1
         validSlotRefs = {
             "f82db71a:66i80qm1",
         },
+        yellowSockets = 0,
     },
 }
 ```
@@ -681,7 +747,7 @@ RPE_DATASET_ENTRY_V1
         icon = "interface/icons/inv_belt_27.blp",
         id = "h2p8gird",
         isTwoHanded = false,
-        itemLevel = 76,
+        itemLevel = 75,
         itemSetKey = "t2_pala_healer",
         itemType = "armor",
         maxDamagePerTurn = 0,
@@ -696,8 +762,18 @@ RPE_DATASET_ENTRY_V1
         name = "Judgement Girdle",
         quality = "epic",
         sellPrice = 0,
+        blueSockets = 0,
+        cogSockets = 0,
+        greenSockets = 0,
+        metaSockets = 0,
+        prismaticSockets = 1,
+        redSockets = 0,
         skillBonuses = {  },
-        sockets = {  },
+        sockets = {
+            {
+                color = "prismatic",
+            },
+        },
         stats = {
             {
                 sourceStatRef = "f82db71a:v42albuv",
@@ -740,6 +816,7 @@ RPE_DATASET_ENTRY_V1
         validSlotRefs = {
             "f82db71a:haks0gz4",
         },
+        yellowSockets = 0,
     },
 }
 ```
@@ -785,7 +862,7 @@ RPE_DATASET_ENTRY_V1
         icon = "interface/icons/inv_bracer_18.blp",
         id = "h2p8brac",
         isTwoHanded = false,
-        itemLevel = 76,
+        itemLevel = 75,
         itemSetKey = "t2_pala_healer",
         itemType = "armor",
         maxDamagePerTurn = 0,
@@ -800,6 +877,12 @@ RPE_DATASET_ENTRY_V1
         name = "Judgement Bracers",
         quality = "epic",
         sellPrice = 0,
+        blueSockets = 0,
+        cogSockets = 0,
+        greenSockets = 0,
+        metaSockets = 0,
+        prismaticSockets = 0,
+        redSockets = 0,
         skillBonuses = {  },
         sockets = {  },
         stats = {
@@ -840,6 +923,7 @@ RPE_DATASET_ENTRY_V1
         validSlotRefs = {
             "f82db71a:crezt6ix",
         },
+        yellowSockets = 0,
     },
 }
 ```
