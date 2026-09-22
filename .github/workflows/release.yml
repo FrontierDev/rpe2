@@ -22,21 +22,21 @@ jobs:
       - name: Check out source commit
         uses: actions/checkout@v4
 
-      - name: Install Lua 5.4
+      - name: Install Lua 5.1
         shell: bash
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install --yes lua5.4
-          lua5.4 -v
+          sudo apt-get install --yes lua5.1
+          lua5.1 -v
 
       - name: Run first-run bootstrap regression suite
         shell: bash
         run: |
           set -euo pipefail
-          lua5.4 tests/DefaultRulesetImportTest.lua
-          lua5.4 tests/DefaultDatasetStartupTest.lua
-          lua5.4 tests/RuntimeExternalManagerStartupTest.lua
+          lua5.1 tests/DefaultRulesetImportTest.lua
+          lua5.1 tests/DefaultDatasetStartupTest.lua
+          lua5.1 tests/RuntimeExternalManagerStartupTest.lua
 
   release-package:
     name: Validate release package
