@@ -14,7 +14,7 @@ The codes target the Paladin dataset `b0211ab3`, use the current RPE `RPE_DATASE
 - WoW effects that increase hit or critical chance for **all spells and attacks** are represented by both the RPE melee and spell hit/critical stats.
 - Holy-set healing bonuses use RPE **Healing Power**; their damage component uses RPE **Spell Power**.
 - Retribution's Holy-only spell-damage bonuses use RPE **Spell Power**, because RPE currently has no school-specific Holy Spell Power stat.
-- RPE currently has **Block Chance** and **Defense Rating**, but no **Shield Block Value** stat. Protection pieces that have Block Value but no existing Block Chance receive **+1% Block Chance** as the RPE approximation. Pieces that already have Block Chance keep their authored Block Chance; the Greaves retain their Block Value text because they already carry +2% Block Chance.
+- RPE currently has **Block Chance** and **Defense Rating**, but no **Shield Block Value** stat. Protection pieces that have Block Value but no existing Block Chance receive **+1% Block Chance** as the RPE approximation. Pieces that already have Block Chance keep their authored Block Chance. Unsupported Shield Block Value text is omitted rather than preserved in item descriptions.
 - No sockets have been added. Season of Discovery Tier 2 does not natively have RPE's socket system; socketing can be authored separately if desired.
 - Existing RPE item-set keys are retained where already established: `t2_pala_dps` and `t2_pala_tank`. Holy uses `t2_pala_healer`.
 
