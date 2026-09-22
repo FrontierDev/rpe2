@@ -60,22 +60,22 @@ RPE_DATASET_ENTRY_V1
         name = "Judgement Chestguard",
         quality = "epic",
         sellPrice = 0,
-        blueSockets = 0,
+        blueSockets = 1,
         cogSockets = 0,
-        greenSockets = 0,
+        greenSockets = 1,
         metaSockets = 0,
-        prismaticSockets = 3,
+        prismaticSockets = 0,
         redSockets = 0,
         skillBonuses = {  },
         sockets = {
             {
-                color = "prismatic",
+                color = "blue",
             },
             {
-                color = "prismatic",
+                color = "orange",
             },
             {
-                color = "prismatic",
+                color = "green",
             },
         },
         stats = {
@@ -383,11 +383,11 @@ RPE_DATASET_ENTRY_V1
         name = "Judgement Great Helm",
         quality = "epic",
         sellPrice = 0,
-        blueSockets = 0,
+        blueSockets = 1,
         cogSockets = 0,
         greenSockets = 0,
         metaSockets = 1,
-        prismaticSockets = 1,
+        prismaticSockets = 0,
         redSockets = 0,
         skillBonuses = {  },
         sockets = {
@@ -395,7 +395,7 @@ RPE_DATASET_ENTRY_V1
                 color = "meta",
             },
             {
-                color = "prismatic",
+                color = "blue",
             },
         },
         stats = {
@@ -505,19 +505,19 @@ RPE_DATASET_ENTRY_V1
         name = "Judgement Legguards",
         quality = "epic",
         sellPrice = 0,
-        blueSockets = 0,
+        blueSockets = 1,
         cogSockets = 0,
         greenSockets = 0,
         metaSockets = 0,
-        prismaticSockets = 2,
+        prismaticSockets = 0,
         redSockets = 0,
         skillBonuses = {  },
         sockets = {
             {
-                color = "prismatic",
+                color = "blue",
             },
             {
-                color = "prismatic",
+                color = "orange",
             },
         },
         stats = {
@@ -724,14 +724,14 @@ RPE_DATASET_ENTRY_V1
         sellPrice = 0,
         blueSockets = 0,
         cogSockets = 0,
-        greenSockets = 0,
+        greenSockets = 1,
         metaSockets = 0,
-        prismaticSockets = 1,
+        prismaticSockets = 0,
         redSockets = 0,
         skillBonuses = {  },
         sockets = {
             {
-                color = "prismatic",
+                color = "green",
             },
         },
         stats = {
