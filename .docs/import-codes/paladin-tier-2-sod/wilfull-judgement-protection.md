@@ -333,7 +333,7 @@ RPE_DATASET_ENTRY_V1
         },
         damageMode = "fixed",
         damagePerTurn = 0,
-        description = "Equip: Increases the block value of your shield by 12.",
+        description = "",
         icon = "interface/icons/inv_helmet_74.blp",
         id = "i7f32pv7",
         isTwoHanded = false,
@@ -381,6 +381,10 @@ RPE_DATASET_ENTRY_V1
             },
             {
                 sourceStatRef = "f82db71a:v2g0tw0o",
+                value = 1,
+            },
+            {
+                sourceStatRef = "f82db71a:p8syz5ba",
                 value = 1,
             },
             {
@@ -437,7 +441,7 @@ RPE_DATASET_ENTRY_V1
         },
         damageMode = "fixed",
         damagePerTurn = 0,
-        description = "Equip: Increases the block value of your shield by 21.",
+        description = "",
         icon = "interface/icons/inv_pants_04.blp",
         id = "t2p8legs",
         isTwoHanded = false,
@@ -478,6 +482,10 @@ RPE_DATASET_ENTRY_V1
             {
                 sourceStatRef = "f82db71a:jjn0my8k",
                 value = 10,
+            },
+            {
+                sourceStatRef = "f82db71a:p8syz5ba",
+                value = 1,
             },
             {
                 sourceStatRef = "f82db71a:0wyp78x9",
@@ -533,7 +541,7 @@ RPE_DATASET_ENTRY_V1
         },
         damageMode = "fixed",
         damagePerTurn = 0,
-        description = "Equip: Increases the block value of your shield by 14.",
+        description = "",
         icon = "interface/icons/inv_shoulder_37.blp",
         id = "t2p8paul",
         isTwoHanded = false,
@@ -570,6 +578,10 @@ RPE_DATASET_ENTRY_V1
             {
                 sourceStatRef = "f82db71a:jjn0my8k",
                 value = 10,
+            },
+            {
+                sourceStatRef = "f82db71a:p8syz5ba",
+                value = 1,
             },
             {
                 sourceStatRef = "f82db71a:0wyp78x9",
@@ -625,7 +637,7 @@ RPE_DATASET_ENTRY_V1
         },
         damageMode = "fixed",
         damagePerTurn = 0,
-        description = "Equip: Increases the block value of your shield by 17.",
+        description = "",
         icon = "interface/icons/inv_belt_27.blp",
         id = "t2p8wast",
         isTwoHanded = false,
@@ -662,6 +674,10 @@ RPE_DATASET_ENTRY_V1
             {
                 sourceStatRef = "f82db71a:jjn0my8k",
                 value = 10,
+            },
+            {
+                sourceStatRef = "f82db71a:p8syz5ba",
+                value = 1,
             },
             {
                 sourceStatRef = "f82db71a:0wyp78x9",
