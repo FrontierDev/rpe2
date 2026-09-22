@@ -141,7 +141,7 @@ RPE_DATASET_ENTRY_V1
         },
         damageMode = "fixed",
         damagePerTurn = 0,
-        description = "Equip: Increases the block value of your shield by 14.",
+        description = "",
         icon = "interface/icons/inv_boots_plate_09.blp",
         id = "t2p8grvs",
         isTwoHanded = false,
