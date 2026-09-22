@@ -39,6 +39,8 @@ local function copyMovementDetailsByMember(source)
             if baseStatFound == nil then
                 baseStatFound = statRef ~= "" and reason ~= "movement-range-stat-missing"
             end
+            local usedMissingStatFallback = details.usedMissingStatFallback == true
+                or (baseStatFound ~= true and details.movementRangeOverride == nil)
             copied[eventId] = {
                 available = details.available ~= false,
                 reason = details.reason,
@@ -46,6 +48,8 @@ local function copyMovementDetailsByMember(source)
                 baseStatFound = baseStatFound == true,
                 baseValue = details.baseValue,
                 movementRangeOverride = details.movementRangeOverride,
+                usedMissingStatFallback = usedMissingStatFallback,
+                missingStatFallbackValue = details.missingStatFallbackValue or (usedMissingStatFallback and 30 or nil),
                 effectiveValue = details.effectiveValue,
             }
         end

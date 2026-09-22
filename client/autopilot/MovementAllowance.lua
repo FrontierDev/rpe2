@@ -7,6 +7,7 @@ Addon.Utils = Addon.Utils or {}
 local Profile = Addon.Internal.Profile or {}
 local Lookup = Addon.Utils.Lookup or {}
 local Movement = RPE and RPE.Core and RPE.Core.Movement or nil
+local MISSING_MOVEMENT_RANGE_FALLBACK = 30
 
 if type(Movement) ~= "table" then
     return
@@ -47,12 +48,12 @@ function Movement:ResolveEventUnitMovementAllowance(eventState, eventUnit)
             and select(1, Lookup.GetStatEntry(eventUnit, statRef))
             or nil
         baseStatFound = type(statEntry) == "table"
-        resolvedStatValue = tonumber(
-            type(Lookup.GetStatValue) == "function"
-                and Lookup.GetStatValue(eventUnit, statRef, 0)
-                or 0
-        ) or 0
         if baseStatFound then
+            resolvedStatValue = tonumber(
+                type(Lookup.GetStatValue) == "function"
+                    and Lookup.GetStatValue(eventUnit, statRef, 0)
+                    or 0
+            ) or 0
             baseValue = resolvedStatValue
         else
             reason = "movement-range-stat-missing"
@@ -74,13 +75,7 @@ function Movement:ResolveEventUnitMovementAllowance(eventState, eventUnit)
         or nil
     local effectiveValue = movementRangeOverride ~= nil
         and movementRangeOverride
-        or resolvedStatValue
-    if effectiveValue == nil then
-        -- The existing local-player movement tracker converts an unavailable
-        -- Profile.GetMovementRangeValue() to zero. Preserve that behavior
-        -- rather than inventing an Autopilot-specific movement default.
-        effectiveValue = 0
-    end
+        or (baseStatFound and resolvedStatValue or MISSING_MOVEMENT_RANGE_FALLBACK)
     effectiveValue = math.max(0, tonumber(effectiveValue) or 0)
 
     return effectiveValue, {
@@ -90,6 +85,8 @@ function Movement:ResolveEventUnitMovementAllowance(eventState, eventUnit)
         baseStatFound = baseStatFound,
         baseValue = baseValue,
         movementRangeOverride = movementRangeOverride,
+        usedMissingStatFallback = movementRangeOverride == nil and baseStatFound ~= true,
+        missingStatFallbackValue = MISSING_MOVEMENT_RANGE_FALLBACK,
         effectiveValue = effectiveValue,
         controlState = controlState,
     }

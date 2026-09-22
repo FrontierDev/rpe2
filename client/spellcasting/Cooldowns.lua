@@ -297,6 +297,41 @@ local function normalizeCooldownTurns(spell, requirePositive)
     return nil
 end
 
+local function isAutoAttackSpell(spell)
+    local components = type(spell) == "table" and spell.components or nil
+    if type(components) ~= "table" then
+        return false
+    end
+
+    for index = 1, #components do
+        local component = components[index]
+        local effect = type(component) == "table" and component.effect or nil
+        if type(effect) == "table"
+            and string.lower(tostring(effect.type or "")) == "damage"
+            and string.lower(tostring(effect.hitType or "")) == "auto"
+        then
+            return true
+        end
+    end
+
+    return false
+end
+
+-- Auto-attacks are Free Actions at the channel level, but each individual
+-- auto-attack must still be unavailable until the next turn. Keep this
+-- personal cooldown distinct from channels and cooldown groups.
+local function normalizePersonalCooldownTurns(spell, requirePositive)
+    local turns = normalizeCooldownTurns(spell, requirePositive)
+    if isAutoAttackSpell(spell) then
+        return math.max(1, math.floor(tonumber(turns) or 0))
+    end
+
+    return turns
+end
+
+Spellcasting.IsAutoAttackSpell = isAutoAttackSpell
+Spellcasting.GetEffectivePersonalCooldownTurns = normalizePersonalCooldownTurns
+
 local function formatTurnLabel(turns)
     local numericTurns = math.max(0, math.floor(tonumber(turns) or 0))
     if numericTurns == 1 then
@@ -597,7 +632,7 @@ local function applyExternalSpellLockout(unitState, spellRef, spell, lockoutTurn
         local maxCharges = normalizeChargeCount(spell)
         spellState.currentCharges = tonumber(spellState.currentCharges) ~= nil and math.max(0, math.min(maxCharges, math.floor(tonumber(spellState.currentCharges) or maxCharges))) or maxCharges
         spellState.maxCharges = maxCharges
-        spellState.cooldownTurns = normalizeCooldownTurns(spell, true)
+        spellState.cooldownTurns = normalizePersonalCooldownTurns(spell, true)
         spellState.usesCharges = true
     else
         spellState.currentCharges = nil
@@ -1142,7 +1177,7 @@ function Spellcasting.ApplyLocalSpellCooldown(self, eventState, casterUnit, spel
 
     if spell.useCooldownCharges == true then
         local maxCharges = normalizeChargeCount(spell)
-        local cooldownTurns = normalizeCooldownTurns(spell, true)
+        local cooldownTurns = normalizePersonalCooldownTurns(spell, true)
         local spellState = cloneSpellState(getSpellCooldownState(unitState, spellRef)) or {
             remainingTurns = 0,
             currentCharges = maxCharges,
@@ -1156,6 +1191,14 @@ function Spellcasting.ApplyLocalSpellCooldown(self, eventState, casterUnit, spel
         spellState.currentCharges = math.max(0, math.min(maxCharges, math.floor(tonumber(spellState.currentCharges) or maxCharges)))
         spellState.usesCharges = true
         spellState.lockoutRemainingTurns = getSpellLockoutRemaining(spellState)
+
+        -- Charges normally permit repeated casts while charges remain. That
+        -- is not valid for auto-attacks: their one-turn personal cooldown
+        -- applies even when an authored auto-attack has multiple charges.
+        if isAutoAttackSpell(spell) and spellState.lockoutRemainingTurns < 1 then
+            spellState.lockoutRemainingTurns = 1
+            changed = true
+        end
 
         local nextCharges = math.max(0, spellState.currentCharges - 1)
         if nextCharges ~= spellState.currentCharges then
@@ -1178,7 +1221,7 @@ function Spellcasting.ApplyLocalSpellCooldown(self, eventState, casterUnit, spel
 
         setSpellCooldownState(unitState, spellRef, spellState)
     else
-        local cooldownTurns = normalizeCooldownTurns(spell, false)
+        local cooldownTurns = normalizePersonalCooldownTurns(spell, false)
         if cooldownTurns ~= nil and cooldownTurns > 0 then
             local spellState = cloneSpellState(getSpellCooldownState(unitState, spellRef)) or {
                 remainingTurns = 0,

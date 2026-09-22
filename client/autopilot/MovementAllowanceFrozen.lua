@@ -17,6 +17,8 @@ function Movement:ResolveEventUnitMovementAllowance(eventState, eventUnit)
         if baseStatFound == nil then
             baseStatFound = statRef ~= "" and reason ~= "movement-range-stat-missing"
         end
+        local usedMissingStatFallback = frozen.usedMissingStatFallback == true
+            or (baseStatFound ~= true and frozen.movementRangeOverride == nil)
         return math.max(0, tonumber(frozen.effectiveValue) or 0), {
             available = frozen.available ~= false,
             reason = frozen.reason,
@@ -24,6 +26,8 @@ function Movement:ResolveEventUnitMovementAllowance(eventState, eventUnit)
             baseStatFound = baseStatFound == true,
             baseValue = frozen.baseValue,
             movementRangeOverride = frozen.movementRangeOverride,
+            usedMissingStatFallback = usedMissingStatFallback,
+            missingStatFallbackValue = frozen.missingStatFallbackValue or (usedMissingStatFallback and 30 or nil),
             effectiveValue = math.max(0, tonumber(frozen.effectiveValue) or 0),
             controlState = controlState,
             frozen = true,

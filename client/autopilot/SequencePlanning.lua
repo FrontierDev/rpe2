@@ -298,7 +298,9 @@ local function buildActionEconomyInput(candidate)
         and cooldownChannel.enabled == true
         and cooldownChannel.canUseOffTurn == true
         or false
-    local cooldownTurns = Spellcasting.NormalizeTurnCount(spell.cooldown)
+    local cooldownTurns = type(Spellcasting.GetEffectivePersonalCooldownTurns) == "function"
+        and Spellcasting.GetEffectivePersonalCooldownTurns(spell)
+        or Spellcasting.NormalizeTurnCount(spell.cooldown)
     local cooldownGroup = nil
     if cooldownTurns ~= nil then
         local group = tostring(spell.cooldownGroup or "")

@@ -982,9 +982,12 @@ function Combat:ResolveResourceEffectAmount(context, effect)
             and ((localUnit == targetUnit) or (targetEventId and localEventId and targetEventId == localEventId))
 
         if isLocalPlayer and type(Profile.GetResolvedBaseResourceValue) == "function" then
-            resourceValue = tonumber(Profile.GetResolvedBaseResourceValue(resourceRef, {
+            -- GetResolvedBaseResourceValue also returns its resolved row. The
+            -- parentheses retain only the numeric first return before tonumber
+            -- sees it as an optional base argument.
+            resourceValue = tonumber((Profile.GetResolvedBaseResourceValue(resourceRef, {
                 includeAuraBonuses = false,
-            })) or 0
+            }))) or 0
         end
     end
 

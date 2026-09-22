@@ -93,6 +93,8 @@ local function copyMovementDetails(details, fallbackAllowance)
     if baseStatFound == nil then
         baseStatFound = statRef ~= "" and reason ~= "movement-range-stat-missing"
     end
+    local usedMissingStatFallback = source.usedMissingStatFallback == true
+        or (baseStatFound ~= true and source.movementRangeOverride == nil)
     return {
         available = source.available ~= false,
         reason = source.reason,
@@ -100,6 +102,8 @@ local function copyMovementDetails(details, fallbackAllowance)
         baseStatFound = baseStatFound == true,
         baseValue = source.baseValue,
         movementRangeOverride = source.movementRangeOverride,
+        usedMissingStatFallback = usedMissingStatFallback,
+        missingStatFallbackValue = source.missingStatFallbackValue or (usedMissingStatFallback and 30 or nil),
         effectiveValue = tonumber(source.effectiveValue) or tonumber(fallbackAllowance),
     }
 end
