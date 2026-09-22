@@ -19,7 +19,8 @@ The codes target the Paladin dataset `b0211ab3`, use the current RPE `RPE_DATASE
 - Existing RPE item-set keys are retained where already established: `t2_pala_dps` and `t2_pala_tank`. Holy uses `t2_pala_healer`.
 
 - Every piece supports generic modifier key `mod`, capped at **1**.
-- Chest pieces have **3** gem sockets; heads have **2** including **1 meta** socket; legs have **2**; belts have **1**. Unspecified non-meta socket colours are represented as **prismatic**.
+- Chest pieces have **3** gem sockets; heads have **2** including **1 meta** socket; legs have **2**; belts have **1**.
+- Socket colours are role-based and follow the current Jewelcrafting gem families: Retribution uses **orange/red/yellow** (Strength, Spell Power, hit/crit); Holy uses **red/yellow/blue** (Healing/Spell Power, Intellect/crit, Healing/Stamina/Spirit); Protection uses **blue/orange/green** (Stamina, Strength, hit/crit).
 
 ## Files
 
