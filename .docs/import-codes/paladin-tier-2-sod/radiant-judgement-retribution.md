@@ -65,14 +65,14 @@ RPE_DATASET_ENTRY_V1
         greenSockets = 0,
         metaSockets = 0,
         prismaticSockets = 0,
-        redSockets = 0,
+        redSockets = 2,
         skillBonuses = {  },
         sockets = {
             {
-                color = "orange",
+                color = "red",
             },
             {
-                color = "orange",
+                color = "red",
             },
             {
                 color = "yellow",
@@ -400,14 +400,14 @@ RPE_DATASET_ENTRY_V1
         greenSockets = 0,
         metaSockets = 1,
         prismaticSockets = 0,
-        redSockets = 0,
+        redSockets = 1,
         skillBonuses = {  },
         sockets = {
             {
                 color = "meta",
             },
             {
-                color = "orange",
+                color = "red",
             },
         },
         stats = {
@@ -530,10 +530,10 @@ RPE_DATASET_ENTRY_V1
         skillBonuses = {  },
         sockets = {
             {
-                color = "orange",
+                color = "red",
             },
             {
-                color = "red",
+                color = "yellow",
             },
         },
         stats = {
@@ -578,7 +578,7 @@ RPE_DATASET_ENTRY_V1
         validSlotRefs = {
             "f82db71a:obmt4ntq",
         },
-        yellowSockets = 0,
+        yellowSockets = 1,
     },
 }
 ```
