@@ -55,7 +55,11 @@ local function datasetFixture()
         id = "compat", name = "Compatibility", dependencies = { "foo", "core", "foo" },
         units = { { id = "unit", name = "Unit", resources = { { resourceRef = "compat:health", initialValue = 10, perPlayer = true } } } },
         items = { { id = "item", name = "Item", itemType = "material", useSpellRef = "compat:spell", staleItemField = "old" } },
-        spells = { { id = "spell", name = "Spell", cooldown = 1, unknownSpellField = true } },
+        spells = { {
+            id = "spell", name = "Spell", cooldown = 1, unknownSpellField = true,
+            -- Legacy component records did not always have stable keys.
+            components = { { castingGroup = "main", castPhase = "instant", target = "target", effect = "damage" } },
+        } },
         loot = { { id = "loot", name = "Loot", entries = { { id = "entry", type = "item", ref = "compat:item" } }, items = { "legacy-a" } } },
     }
 end
@@ -66,9 +70,18 @@ local function datasetExport(dataset)
     return assert(Database.ExportDatasetForCompatibilityHash("compat"))
 end
 
+local function datasetHash(dataset)
+    rawset(_G, "RPEngineDatasetDB", { datasets = { compat = dataset }, activeByChar = {}, activatedDatasets = { "compat" } })
+    Database.Datasets = nil
+    Addon.Internal.ConfigurationRevision = (Addon.Internal.ConfigurationRevision or 0) + 1
+    Registry.DatasetHashCache = nil
+    return assert(Registry:GenerateActivatedDatasetsHash())
+end
+
 local first = datasetFixture()
 local second = datasetFixture()
 second.oldMigrationFlag = "different"
+second.name, second.groupName, second.description, second.authorName = "Renamed", "Other", "Different", "Another Author"
 second.units[1].resources[1].perPlayer = false
 second.items[1].staleItemField = "different"
 second.items[1].useSpellRef = "compat:other-spell"
@@ -76,6 +89,19 @@ second.spells[1].unknownSpellField = "different"
 second.loot[1].items = { "legacy-b" }
 second.dependencies = { "core", "foo" }
 assertEqual(datasetExport(first), datasetExport(second), "historical dataset fields do not affect compatibility export")
+
+local savedUnitFullName = rawget(_G, "UnitFullName")
+rawset(_G, "UnitFullName", function() return "First", "Realm" end)
+local firstLegacySpellExport = datasetExport(datasetFixture())
+local repeatedLegacySpellExport = datasetExport(datasetFixture())
+local firstLegacySpellHash = datasetHash(datasetFixture())
+rawset(_G, "UnitFullName", function() return "Second", "Realm" end)
+local secondLegacySpellExport = datasetExport(datasetFixture())
+local secondLegacySpellHash = datasetHash(datasetFixture())
+rawset(_G, "UnitFullName", savedUnitFullName)
+assertEqual(firstLegacySpellExport, repeatedLegacySpellExport, "missing Spell component keys are deterministic across repeated exports")
+assertEqual(firstLegacySpellExport, secondLegacySpellExport, "missing Spell component keys are deterministic across clients")
+assertEqual(firstLegacySpellHash, secondLegacySpellHash, "missing Spell component keys are deterministic in dataset hashes")
 
 local changed = datasetFixture()
 changed.spells[1].cooldown = 2
@@ -92,7 +118,6 @@ assertEqual(datasetExport(ordered), datasetExport(reversed), "dataset entry orde
 
 local legacyAuthor = datasetFixture()
 local legacySnapshot = deepCopy(legacyAuthor)
-local savedUnitFullName = rawget(_G, "UnitFullName")
 rawset(_G, "UnitFullName", function() return "First", "Realm" end)
 local firstLegacyCanonical = Database.BuildDatasetCompatibilityRecord(legacyAuthor)
 rawset(_G, "UnitFullName", function() return "Second", "Realm" end)
@@ -108,10 +133,10 @@ local function rulesetExport(ruleset)
 end
 
 local rulesA = { id = "rules", name = "Rules", rules = {} }
-local rulesB = { id = "rules", name = "Rules", oldMigrationFlag = true, rules = {
+local rulesB = { id = "rules", name = "Renamed Rules", description = "Different", authorName = "Another Author", tagState = "long-term", oldMigrationFlag = true, rules = {
     legacy_category = { old_rule = 123 }, character = { old_removed_rule = true },
 } }
-assertEqual(rulesetExport(rulesA), rulesetExport(rulesB), "unknown ruleset fields and rules are ignored")
+assertEqual(rulesetExport(rulesA), rulesetExport(rulesB), "descriptive and unknown ruleset fields are ignored")
 
 local explicitDefaults = { id = "rules", name = "Rules", rules = { character = { use_level_system = false } } }
 assertEqual(rulesetExport(rulesA), rulesetExport(explicitDefaults), "missing rules equal explicit defaults")

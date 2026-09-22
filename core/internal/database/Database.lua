@@ -796,10 +796,7 @@ local function normalizeDatasetRecord(record, fallbackId, fallbackName)
         name = name,
         groupName = ensureString(data.groupName, ""),
         description = ensureString(data.description, ""),
-        -- A legacy record may omit this metadata. Do not materialize a local
-        -- player name into SavedVariables: that would make the same imported
-        -- definition client-specific before compatibility can project it.
-        authorName = ensureString(data.authorName, ""),
+        authorName = ensureString(data.authorName, getCharacterDisplayName()),
         datasetType = normalizeDatasetState(data.datasetType, DATASET_TYPE_VALUES, "general"),
         lifetime = lifetime,
         expiresAt = expiresAt,
@@ -837,8 +834,7 @@ local function normalizeRulesetRecord(record, fallbackId, fallbackName)
         id = rulesetId,
         name = name,
         description = ensureString(data.description, ""),
-        -- New records set an author explicitly; legacy omissions are stable.
-        authorName = ensureString(data.authorName, ""),
+        authorName = ensureString(data.authorName, getCharacterDisplayName()),
         tagState = normalizeDatasetState(data.tagState, { "standard", "short-term", "long-term" }, "standard"),
         rules = ensureTable(data.rules),
     }
@@ -1695,7 +1691,44 @@ local function getDatasetEntryClassObject(collectionKey)
     return classes and classes[definition.className] or nil
 end
 
-local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId)
+local function prepareSpellComponentsForCompatibility(sourceData)
+    -- Spell's normal persistence path assigns keys to legacy components with
+    -- randomness. Compatibility must supply stable keys first, without
+    -- changing that normal authoring/persistence behaviour.
+    local components = type(sourceData.components) == "table"
+        and sourceData.components
+        or sourceData.effects
+    if type(components) ~= "table" then
+        return
+    end
+
+    local usedKeys = {}
+    for index = 1, #components do
+        local component = components[index]
+        if type(component) == "table" then
+            local key = ensureString(component.key, "")
+            if key ~= "" then
+                usedKeys[key] = true
+            end
+        end
+    end
+
+    for index = 1, #components do
+        local component = components[index]
+        if type(component) == "table" and ensureString(component.key, "") == "" then
+            local key = ("__rpe_compat_component_%d"):format(index)
+            local suffix = 1
+            while usedKeys[key] do
+                suffix = suffix + 1
+                key = ("__rpe_compat_component_%d_%d"):format(index, suffix)
+            end
+            component.key = key
+            usedKeys[key] = true
+        end
+    end
+end
+
+local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId, options)
     local definition = DATASET_ENTRY_DEFINITIONS[collectionKey]
     if not definition then
         return nil
@@ -1703,6 +1736,9 @@ local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId
 
     local classObject = getDatasetEntryClassObject(collectionKey)
     local sourceData = deepCopy(type(data) == "table" and data or {})
+    if collectionKey == "spells" and type(options) == "table" and options.compatibility == true then
+        prepareSpellComponentsForCompatibility(sourceData)
+    end
     if collectionKey == "classes" and type(sourceData.traitRefs) == "table" then
         sourceData.passiveTraitRefs = type(sourceData.passiveTraitRefs) == "table" and sourceData.passiveTraitRefs or {}
         sourceData.talentTraitRefs = type(sourceData.talentTraitRefs) == "table" and sourceData.talentTraitRefs or {}
@@ -1770,11 +1806,6 @@ local function buildDatasetCompatibilityRecord(dataset)
     local data = ensureTable(dataset)
     local compatibility = {
         id = ensureString(data.id, ""),
-        name = normalizeDatasetName(data.name),
-        groupName = ensureString(data.groupName, ""),
-        description = ensureString(data.description, ""),
-        -- Compatibility data must never acquire a client-specific author.
-        authorName = ensureString(data.authorName, ""),
         datasetType = normalizeDatasetState(data.datasetType, DATASET_TYPE_VALUES, "general"),
         dependencies = {},
     }
@@ -1806,7 +1837,9 @@ local function buildDatasetCompatibilityRecord(dataset)
         for index = 1, #entries do
             local entry = entries[index]
             local entryId = type(entry) == "table" and entry.id or nil
-            local normalized = normalizeDatasetEntryRecord(data, collectionKey, entry, entryId)
+            local normalized = normalizeDatasetEntryRecord(data, collectionKey, entry, entryId, {
+                compatibility = true,
+            })
             if type(normalized) ~= "table" then
                 error(("Cannot build dataset compatibility data: invalid %s entry at index %d.")
                     :format(collectionKey, index), 2)
@@ -1842,11 +1875,6 @@ local function buildRulesetCompatibilityRecord(ruleset)
     local data = ensureTable(ruleset)
     local compatibility = {
         id = ensureString(data.id, ""),
-        name = normalizeDatasetName(data.name),
-        description = ensureString(data.description, ""),
-        -- As with datasets, a missing author must not depend on this client.
-        authorName = ensureString(data.authorName, ""),
-        tagState = normalizeDatasetState(data.tagState, { "standard", "short-term", "long-term" }, "standard"),
         rules = {},
     }
 
