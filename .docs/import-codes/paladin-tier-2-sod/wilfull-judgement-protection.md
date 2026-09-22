@@ -60,9 +60,9 @@ RPE_DATASET_ENTRY_V1
         name = "Judgement Chestguard",
         quality = "epic",
         sellPrice = 0,
-        blueSockets = 1,
+        blueSockets = 2,
         cogSockets = 0,
-        greenSockets = 1,
+        greenSockets = 0,
         metaSockets = 0,
         prismaticSockets = 0,
         redSockets = 0,
@@ -72,10 +72,10 @@ RPE_DATASET_ENTRY_V1
                 color = "blue",
             },
             {
-                color = "orange",
+                color = "blue",
             },
             {
-                color = "green",
+                color = "yellow",
             },
         },
         stats = {
@@ -116,7 +116,7 @@ RPE_DATASET_ENTRY_V1
         validSlotRefs = {
             "f82db71a:nwfvxbto",
         },
-        yellowSockets = 0,
+        yellowSockets = 1,
     },
 }
 ```
@@ -517,7 +517,7 @@ RPE_DATASET_ENTRY_V1
                 color = "blue",
             },
             {
-                color = "orange",
+                color = "yellow",
             },
         },
         stats = {
@@ -558,7 +558,7 @@ RPE_DATASET_ENTRY_V1
         validSlotRefs = {
             "f82db71a:obmt4ntq",
         },
-        yellowSockets = 0,
+        yellowSockets = 1,
     },
 }
 ```
@@ -722,16 +722,16 @@ RPE_DATASET_ENTRY_V1
         name = "Judgement Waistguard",
         quality = "epic",
         sellPrice = 0,
-        blueSockets = 0,
+        blueSockets = 1,
         cogSockets = 0,
-        greenSockets = 1,
+        greenSockets = 0,
         metaSockets = 0,
         prismaticSockets = 0,
         redSockets = 0,
         skillBonuses = {  },
         sockets = {
             {
-                color = "green",
+                color = "blue",
             },
         },
         stats = {
