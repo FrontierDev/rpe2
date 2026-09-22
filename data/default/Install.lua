@@ -692,24 +692,15 @@ local function syncDefaultDatasets()
     local _, skippedDefinitions = Database.SyncDefaultDatasets(DefaultDatasets.Definitions, {
         force = forceSync,
     })
-    if skippedDefinitions == 0 then
-        savedRoot.defaultDatasetSyncRevision = PACKAGED_DEFAULT_SYNC_REVISION
+    if skippedDefinitions ~= 0 then
+        logInstallDiagnostic(("%d packaged default dataset definition(s) failed validation."):format(skippedDefinitions))
+        return false
     end
+
+    savedRoot.defaultDatasetSyncRevision = PACKAGED_DEFAULT_SYNC_REVISION
     return true
 end
 
-local installer = CreateFrame and CreateFrame("Frame")
-if not installer then
-    logInstallDiagnostic("ADDON_LOADED event frame is unavailable")
-    return
-end
-
-installer:RegisterEvent("ADDON_LOADED")
-installer:SetScript("OnEvent", function(self, event, loadedAddonName)
-    if event ~= "ADDON_LOADED" or loadedAddonName ~= addonName then
-        return
-    end
-
-    self:UnregisterEvent("ADDON_LOADED")
-    syncDefaultDatasets()
-end)
+-- Runtime owns ADDON_LOADED sequencing. Expose the canonical installer there
+-- so it rebinds SavedVariables and synchronizes defaults before Manager work.
+Addon.Data.SyncDefaultDatasets = syncDefaultDatasets

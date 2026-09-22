@@ -44,6 +44,10 @@ function Addon.Internal.DispatchEvent(event, ...)
         end
 
         local data = Addon.Data or nil
+        if data and type(data.SyncDefaultDatasets) == "function" then
+            safeCall(data.SyncDefaultDatasets)
+        end
+
         if data and type(data.SyncDefaultRuleset) == "function" then
             safeCall(data.SyncDefaultRuleset)
         end
