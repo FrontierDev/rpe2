@@ -10,8 +10,8 @@ if not definition or not definition.dataset then
     error("Core default dataset must be registered before core_guild_settings.lua", 2)
 end
 
-if definition.version < 5 then
-    definition.version = 5
+if definition.version < 34 then
+    definition.version = 34
 end
 
 local dataset = definition.dataset
@@ -220,6 +220,7 @@ local requisitions = {
             { currencyRef = "justice", amount = 100 },
         },
         characterLimit = 0,
+        roleIds = { "5jz51hqf" }, -- Alchemy
         shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
     },
     {
@@ -232,6 +233,7 @@ local requisitions = {
             { currencyRef = "justice", amount = 100 },
         },
         characterLimit = 0,
+        roleIds = { "xzn8ikd5" }, -- Blacksmithing
         shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
     },
     {
@@ -244,6 +246,7 @@ local requisitions = {
             { currencyRef = "justice", amount = 100 },
         },
         characterLimit = 0,
+        roleIds = { "hibfzy2h" }, -- Engineering
         shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
     },
     {
@@ -256,6 +259,7 @@ local requisitions = {
             { currencyRef = "justice", amount = 100 },
         },
         characterLimit = 0,
+        roleIds = { "dowfaitu" }, -- Enchanting
         shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
     },
     {
@@ -268,6 +272,7 @@ local requisitions = {
             { currencyRef = "justice", amount = 100 },
         },
         characterLimit = 0,
+        roleIds = { "csw345vc" }, -- Jewelcrafting
         shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
     },
     {
@@ -280,6 +285,7 @@ local requisitions = {
             { currencyRef = "justice", amount = 100 },
         },
         characterLimit = 0,
+        roleIds = { "tx7n3n76" }, -- Leatherworking
         shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
     },
     {
@@ -292,6 +298,7 @@ local requisitions = {
             { currencyRef = "justice", amount = 100 },
         },
         characterLimit = 0,
+        roleIds = { "p5btrcra" }, -- Inscription
         shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
     },
     {
@@ -304,6 +311,7 @@ local requisitions = {
             { currencyRef = "justice", amount = 100 },
         },
         characterLimit = 0,
+        roleIds = { "7lqa25jv" }, -- Tailoring
         shopCategoryId = DAILY_REWARDS_CATEGORY_ID,
     },
 }

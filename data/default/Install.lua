@@ -616,7 +616,10 @@ end
 -- Defaults are stored in SavedVariables. This migration replaces older copies
 -- that were installed from packages whose contents changed without a matching
 -- per-dataset version bump, so all clients converge on this release's data.
-local PACKAGED_DEFAULT_SYNC_REVISION = 1
+-- Revision 2 installs the role-gated profession loot-table requisitions into
+-- the saved Core dataset, including installations with stale per-dataset
+-- version metadata from earlier Core package updates.
+local PACKAGED_DEFAULT_SYNC_REVISION = 2
 
 local function logInstallDiagnostic(message)
     local debug = Addon.Debug or nil
