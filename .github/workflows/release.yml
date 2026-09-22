@@ -14,8 +14,34 @@ permissions:
   contents: write
 
 jobs:
+  first-run-bootstrap:
+    name: Validate first-run bootstrap
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source commit
+        uses: actions/checkout@v4
+
+      - name: Install Lua 5.4
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes lua5.4
+          lua5.4 -v
+
+      - name: Run first-run bootstrap regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          lua5.4 tests/DefaultRulesetImportTest.lua
+          lua5.4 tests/DefaultDatasetStartupTest.lua
+          lua5.4 tests/RuntimeExternalManagerStartupTest.lua
+
   release-package:
     name: Validate release package
+    needs:
+      - first-run-bootstrap
     runs-on: ubuntu-latest
 
     steps:
@@ -43,7 +69,7 @@ jobs:
 
           toc_version="$(sed -nE 's/^##[[:space:]]*Version:[[:space:]]*(.+)[[:space:]]*$/\1/p' RPEngine2.toc | head -n 1)"
           if [[ -z "$toc_version" ]]; then
-            echo "::error::RPEngine2.toc does not contain a usable Version field."
+            echo "::error::RPEngine2.toc does not contain a usable ## Version field."
             exit 1
           fi
 
