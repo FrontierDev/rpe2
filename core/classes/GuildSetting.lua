@@ -255,6 +255,21 @@ local function normalizeRoleIds(value)
     return roleIds
 end
 
+local function normalizeRequisitionSourceType(source)
+    local sourceType = string.lower(trimText(source and source.sourceType))
+    if sourceType == "loot" or sourceType == "table" or sourceType == "loot_table" then
+        return "loot_table"
+    end
+
+    if normalizeReference(source and source.lootRef) ~= ""
+        and normalizeReference(source and source.itemRef) == ""
+    then
+        return "loot_table"
+    end
+
+    return "item"
+end
+
 local function normalizeRequisition(value, index, usedIds, legacyRoleId)
     local source = type(value) == "table" and value or {}
     local roleIds = normalizeRoleIds(source.roleIds)
@@ -264,7 +279,9 @@ local function normalizeRequisition(value, index, usedIds, legacyRoleId)
 
     return {
         id = normalizeStableId(source.id, index, "requisition", usedIds),
+        sourceType = normalizeRequisitionSourceType(source),
         itemRef = normalizeReference(source.itemRef),
+        lootRef = normalizeReference(source.lootRef),
         quantity = normalizeInteger(source.quantity, 1, 1),
         costs = normalizeCosts(source.costs),
         characterLimit = normalizeCharacterLimit(source.characterLimit),
@@ -290,7 +307,7 @@ end
 local function normalizeDailyReward(value, index, usedIds)
     local source = type(value) == "table" and value or {}
     local rewardType = string.lower(trimText(source.type))
-    if rewardType ~= "item" and rewardType ~= "currency" then
+    if rewardType ~= "item" and rewardType ~= "currency" and rewardType ~= "loot_table" then
         rewardType = "item"
     end
 
