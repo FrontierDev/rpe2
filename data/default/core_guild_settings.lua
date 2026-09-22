@@ -10,8 +10,8 @@ if not definition or not definition.dataset then
     error("Core default dataset must be registered before core_guild_settings.lua", 2)
 end
 
-if definition.version < 34 then
-    definition.version = 34
+if definition.version < 35 then
+    definition.version = 35
 end
 
 local dataset = definition.dataset
@@ -335,7 +335,7 @@ local guildSetting = {
         },
         {
             id = DAILY_REWARDS_CATEGORY_ID,
-            name = "Daily Rewards",
+            name = "Loot Tables",
             order = 20,
         },
     },

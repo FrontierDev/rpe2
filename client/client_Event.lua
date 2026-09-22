@@ -2261,7 +2261,15 @@ function Client:BeginPendingTurnCommit(sessionStateOverride, eventStateOverride,
         if isCurrentTurnCommit(self, existing) then
             if options.hostAdvancementRequested == true then
                 existing.hostAdvancementRequested = true
-                existing.onFinished = options.onFinished or existing.onFinished
+                if type(options.onFinished) == "function" and existing.onFinished ~= options.onFinished then
+                    local previousOnFinished = existing.onFinished
+                    existing.onFinished = function(completedCommit, completed, reason)
+                        if type(previousOnFinished) == "function" then
+                            previousOnFinished(completedCommit, completed, reason)
+                        end
+                        options.onFinished(completedCommit, completed, reason)
+                    end
+                end
             end
             return existing
         end
@@ -2306,24 +2314,12 @@ function Client:BeginPendingTurnCommit(sessionStateOverride, eventStateOverride,
             if (cancelReason == "stale" and sourceInvalidated)
                 or tostring(cancelReason or ""):find("source")
             then
-                if type(work.client.DiscardPendingTurnResourceDeltas) == "function" then
-                    work.client:DiscardPendingTurnResourceDeltas(
-                        work.eventId,
-                        work.sourceTurnNumber,
-                        work.sourceTickNumber
-                    )
-                end
-                local auraManager = work.client.Spellcasting and work.client.Spellcasting.AuraManager or nil
-                if type(auraManager) == "table"
-                    and type(auraManager.DiscardPendingOutboundAuraOperations) == "function"
-                then
-                    auraManager:DiscardPendingOutboundAuraOperations(
-                        work.client,
-                        "turn",
-                        work.eventId,
-                        work.sourceTurnNumber,
-                        work.sourceTickNumber
-                    )
+                -- The server must explicitly resolve a forced barrier before
+                -- changing a source step. Retain any known source-step work if
+                -- it nevertheless changes, so it is observable/retriable
+                -- instead of silently throwing away health or aura changes.
+                if Addon.Debug and type(Addon.Debug.Warn) == "function" then
+                    Addon.Debug.Warn("Pending turn commit became stale with uncommitted source-step state (%s, %d, %d).", work.eventId, work.sourceTurnNumber, work.sourceTickNumber)
                 end
             end
             finishTurnCommit(work and work.client, work, "cancelled", cancelReason or "turn-commit-cancelled")
@@ -2376,14 +2372,17 @@ function Client:EndTurn()
     if tracker and type(tracker.OnPlayerTurnEnd) == "function" then
         tracker:OnPlayerTurnEnd()
     end
-    local commit = self:FlushPendingTurnChanges(sessionState, eventState)
+    local localEventUnit = self.ResolveLocalEventUnit and self:ResolveLocalEventUnit(eventState) or nil
+    local commit = self:FlushPendingTurnChanges(sessionState, eventState, {
+        onFinished = function(_, completed)
+            if completed == true and type(self.SendEventTurnComplete) == "function" then
+                self:SendEventTurnComplete(eventState, localEventUnit)
+            end
+        end,
+    })
     if type(commit) ~= "table" then
         self.TurnEndPending = false
         return false
-    end
-    local localEventUnit = self.ResolveLocalEventUnit and self:ResolveLocalEventUnit(eventState) or nil
-    if type(self.SendEventTurnComplete) == "function" then
-        self:SendEventTurnComplete(eventState, localEventUnit)
     end
     return true
 end
@@ -2442,6 +2441,12 @@ function Client:ReleaseControl(reason)
 end
 
 local function processEventCompletionAchievement(client, eventState, reason)
+    -- Skipping end-of-event distribution means this was intentionally not a
+    -- completed/rewarded event for achievement purposes.
+    if type(eventState) == "table" and eventState.distributeEndRewards == false then
+        return true
+    end
+
     local achievements = type(client) == "table" and client.Achievements or nil
     if not achievements or type(achievements.HandleRPEEventComplete) ~= "function" then
         return true
@@ -3061,6 +3066,12 @@ function Client:HandleEventEnd(arguments)
     end
 
     local reason = arguments and arguments[3] or "ended"
+    local distributionFlag = type(arguments) == "table" and arguments[4] or nil
+    if distributionFlag ~= nil then
+        state.distributeEndRewards = distributionFlag ~= false
+            and tostring(distributionFlag) ~= "false"
+            and tostring(distributionFlag) ~= "0"
+    end
     local activeTransition = self.EventTransition
     if state.ending == true
         and type(activeTransition) == "table"

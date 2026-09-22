@@ -2551,22 +2551,9 @@ function Server:AdvanceEventStep()
         return false
     end
 
-    self.EventAdvanceRequestGeneration = math.max(0, math.floor(tonumber(self.EventAdvanceRequestGeneration) or 0)) + 1
-    local commit = Client:BeginPendingTurnCommit(
-        Client.GetState and Client:GetState() or nil,
-        clientEventState,
-        {
-            hostAdvancementRequested = true,
-            onFinished = function(completedCommit, completed, reason)
-                self:_AdvanceEventStepAfterCommit(completedCommit, completed, reason)
-            end,
-        }
-    )
-    if type(commit) ~= "table" then
-        return false
-    end
-    commit.serverRequestGeneration = self.EventAdvanceRequestGeneration
-    self.PendingEventAdvanceCommit = commit
+    if type(self.BeginEventTurnCommitBarrier) ~= "function"
+        or self:BeginEventTurnCommitBarrier(eventState, clientEventState, sourceTurnNumber, sourceTickNumber) ~= true
+    then return false end
     refreshEventManagePage()
     return false
 end

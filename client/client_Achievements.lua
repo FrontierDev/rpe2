@@ -1095,6 +1095,15 @@ function Achievements:HandleRPEEventComplete(eventState, reason)
         }
     end
 
+    if eventState.distributeEndRewards == false then
+        return {
+            trigger = "rpe_event_complete",
+            updated = 0,
+            completed = 0,
+            skipped = true,
+        }
+    end
+
     local state = eventState
     if state.__rpeAchievementCompletionProcessed == true then
         return {

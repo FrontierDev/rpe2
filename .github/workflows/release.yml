@@ -40,6 +40,8 @@ jobs:
           lua5.1 tests/CompatibilityHashCanonicalizationTest.lua
           lua5.1 tests/AutoAttackCooldownTest.lua
           lua5.1 tests/MovementAllowanceFallbackTest.lua
+          lua5.1 tests/EventCompletionAchievementDistributionTest.lua
+          lua5.1 tests/EventTurnCommitBarrierTest.lua
 
   release-package:
     name: Validate release package

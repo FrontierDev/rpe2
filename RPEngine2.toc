@@ -52,6 +52,7 @@ core/internal/comms/EventUnitHidden.lua
 core/internal/comms/EventUnitTaunt.lua
 core/internal/comms/EventUnitTauntApplied.lua
 core/internal/comms/EventTurnComplete.lua
+core/internal/comms/EventTurnCommitBarrier.lua
 core/internal/comms/Serialization.lua
 core/internal/comms/EventRejoinState.lua
 core/internal/comms/Core.lua
@@ -163,6 +164,7 @@ client/client_Event.lua
 client/client_EventUnitHidden.lua
 client/client_EventUnitTaunt.lua
 client/client_EventTurnComplete.lua
+client/client_EventTurnCommitBarrier.lua
 client/conditions/Hidden.lua
 client/client_Loot.lua
 client/client_LootNotifications.lua
@@ -177,6 +179,7 @@ server/server_EventNpcMode.lua
 server/server_EventUnitHidden.lua
 server/server_EventUnitTaunt.lua
 server/server_EventTurnComplete.lua
+server/server_EventTurnCommitBarrier.lua
 server/server_EventEndLoot.lua
 server/server_Loot.lua
 server/server_LootRecentEvent.lua
@@ -345,6 +348,7 @@ client/ui/tooltips/tooltip_Skill.lua
 client/ui/tooltips/tooltip_Trait.lua
 client/ui/tooltips/tooltip_Player.lua
 client/ui/tooltips/tooltip_Item.lua
+client/ui/tooltips/tooltip_Loot.lua
 client/ui/tooltips/tooltip_Achievement.lua
 client/ui/windows/window_IconFinder.lua
 client/ui/windows/window_ModelFinder.lua

@@ -579,8 +579,29 @@ local function resolveLootDisplay(requisition)
         display.description = trim(lootTable.description)
         display.drawCount = positiveInteger(lootTable.drawCount, 1)
         display.icon = trim(lootTable.icon) ~= "" and lootTable.icon or display.icon
+        display.lootTable = lootTable
     end
     return display
+end
+
+local function buildLootTooltip(display, requisition)
+    local builder = Addon.Client and Addon.Client.UI and Addon.Client.UI.Tooltips and Addon.Client.UI.Tooltips.Loot or nil
+    if builder and type(builder.Build) == "function" then
+        local tooltip = builder:Build({
+            lootRef = display and display.ref,
+            lootTable = display and display.lootTable,
+        })
+        if tooltip then return tooltip end
+    end
+
+    return {
+        type = "custom",
+        title = display and display.name or "Loot Table",
+        lines = {
+            { left = display and display.description or "", colorToken = "text.secondary" },
+            { left = ("Rolls: %d"):format(positiveInteger(requisition and requisition.quantity, 1)), colorToken = "text.secondary" },
+        },
+    }
 end
 
 local function roleName(setting, roleId)
@@ -626,19 +647,8 @@ function Page:BindShopEntry(entry, requisition)
     entry:SetCostColor(reason == "insufficient-currency" and "danger" or "text.secondary")
     entry:SetEnabled(eligible)
     entry:SetTooltip(function()
-        local lines = {}
-        if display.description ~= "" then lines[#lines + 1] = { left = display.description, colorToken = "text.secondary" } end
-        local rollCount = positiveInteger(requisition.quantity, 1)
-        lines[#lines + 1] = {
-            left = ("%d Loot Table roll%s per purchase"):format(rollCount, rollCount == 1 and "" or "s"),
-            colorToken = "text.secondary",
-        }
-        if display.drawCount then
-            lines[#lines + 1] = {
-                left = ("%d draw%s per roll"):format(display.drawCount, display.drawCount == 1 and "" or "s"),
-                colorToken = "text.secondary",
-            }
-        end
+        local tooltip = buildLootTooltip(display, requisition)
+        local lines = tooltip.lines or {}
         if reason == "missing-required-role" then
             local names = {}
             for index = 1, #(requisition.roleIds or {}) do names[#names + 1] = roleName(self.ActiveGuildSetting, requisition.roleIds[index]) end
@@ -647,7 +657,7 @@ function Page:BindShopEntry(entry, requisition)
                 colorToken = "danger",
             }
         end
-        return { type = "custom", title = display.name, lines = lines }
+        return tooltip
     end)
     entry:Show()
 end
