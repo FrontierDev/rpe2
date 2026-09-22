@@ -273,8 +273,8 @@ function Registry:GenerateActivatedDatasetsHash()
             and Database.ExportDatasetForCompatibilityHash(datasetId)
             or nil
         if type(exportText) ~= "string" or exportText == "" then
-            local dataset = Database.GetDatasetByID and Database.GetDatasetByID(datasetId) or nil
-            exportText = tostring(dataset and dataset.name or "")
+            error(("Unable to generate compatibility export for dataset '%s'.")
+                :format(datasetId), 2)
         end
 
         segments[#segments + 1] = datasetId
@@ -307,10 +307,12 @@ function Registry:GenerateActiveRulesetHash()
         return nil
     end
 
-    local exportText = Database.ExportRuleset and Database.ExportRuleset(rulesetId) or nil
+    local exportText = Database.ExportRulesetForCompatibilityHash
+        and Database.ExportRulesetForCompatibilityHash(rulesetId)
+        or nil
     if type(exportText) ~= "string" or exportText == "" then
-        local ruleset = Database.GetRulesetByID and Database.GetRulesetByID(rulesetId) or nil
-        exportText = tostring(ruleset and ruleset.name or "")
+        error(("Unable to generate compatibility export for ruleset '%s'.")
+            :format(tostring(rulesetId)), 2)
     end
 
     local hash = generateHashFromSegments(RULESET_HASH_SALTS, {

@@ -796,7 +796,10 @@ local function normalizeDatasetRecord(record, fallbackId, fallbackName)
         name = name,
         groupName = ensureString(data.groupName, ""),
         description = ensureString(data.description, ""),
-        authorName = ensureString(data.authorName, getCharacterDisplayName()),
+        -- A legacy record may omit this metadata. Do not materialize a local
+        -- player name into SavedVariables: that would make the same imported
+        -- definition client-specific before compatibility can project it.
+        authorName = ensureString(data.authorName, ""),
         datasetType = normalizeDatasetState(data.datasetType, DATASET_TYPE_VALUES, "general"),
         lifetime = lifetime,
         expiresAt = expiresAt,
@@ -834,7 +837,8 @@ local function normalizeRulesetRecord(record, fallbackId, fallbackName)
         id = rulesetId,
         name = name,
         description = ensureString(data.description, ""),
-        authorName = ensureString(data.authorName, getCharacterDisplayName()),
+        -- New records set an author explicitly; legacy omissions are stable.
+        authorName = ensureString(data.authorName, ""),
         tagState = normalizeDatasetState(data.tagState, { "standard", "short-term", "long-term" }, "standard"),
         rules = ensureTable(data.rules),
     }
@@ -1757,6 +1761,127 @@ local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId
 
     return normalized
 end
+
+-- Compatibility is deliberately a projection of the current executable
+-- schema, rather than a lossless SavedVariables export.  Keep this separate
+-- from normalizeDatasetRecord: normal dataset import/export must retain
+-- historical fields so that users do not lose data when upgrading.
+local function buildDatasetCompatibilityRecord(dataset)
+    local data = ensureTable(dataset)
+    local compatibility = {
+        id = ensureString(data.id, ""),
+        name = normalizeDatasetName(data.name),
+        groupName = ensureString(data.groupName, ""),
+        description = ensureString(data.description, ""),
+        -- Compatibility data must never acquire a client-specific author.
+        authorName = ensureString(data.authorName, ""),
+        datasetType = normalizeDatasetState(data.datasetType, DATASET_TYPE_VALUES, "general"),
+        dependencies = {},
+    }
+
+    local dependencyIds = {}
+    for index = 1, #(type(data.dependencies) == "table" and data.dependencies or {}) do
+        local dependencyId = ensureString(data.dependencies[index], "")
+        if dependencyId ~= "" then
+            dependencyIds[dependencyId] = true
+        end
+    end
+    for dependencyId in pairs(dependencyIds) do
+        compatibility.dependencies[#compatibility.dependencies + 1] = dependencyId
+    end
+    table.sort(compatibility.dependencies)
+
+    for collectionKey, definition in pairs(DATASET_ENTRY_DEFINITIONS) do
+        local classObject = getDatasetEntryClassObject(collectionKey)
+        if not classObject
+            or type(classObject.FromTable) ~= "function"
+            or type(classObject.ToTable) ~= "function"
+        then
+            error(("Cannot build dataset compatibility data: current %s schema is unavailable.")
+                :format(definition.className or collectionKey), 2)
+        end
+
+        local entries = type(data[collectionKey]) == "table" and data[collectionKey] or {}
+        local canonicalEntries = {}
+        for index = 1, #entries do
+            local entry = entries[index]
+            local entryId = type(entry) == "table" and entry.id or nil
+            local normalized = normalizeDatasetEntryRecord(data, collectionKey, entry, entryId)
+            if type(normalized) ~= "table" then
+                error(("Cannot build dataset compatibility data: invalid %s entry at index %d.")
+                    :format(collectionKey, index), 2)
+            end
+
+            local canonicalEntry = copyAuthoredConfiguration(normalized)
+            -- Loot.items is intentionally retained by Loot for lossless
+            -- persistence of an obsolete shape. Current runtime Loot uses
+            -- entries exclusively, so it cannot participate in compatibility.
+            if collectionKey == "loot" then
+                canonicalEntry.items = nil
+            end
+            canonicalEntries[#canonicalEntries + 1] = canonicalEntry
+        end
+
+        table.sort(canonicalEntries, function(left, right)
+            local leftId = ensureString(left and left.id, "")
+            local rightId = ensureString(right and right.id, "")
+            if leftId == rightId then
+                return serializeLuaValue(left) < serializeLuaValue(right)
+            end
+            return leftId < rightId
+        end)
+        compatibility[collectionKey] = canonicalEntries
+    end
+
+    return compatibility
+end
+
+Database.BuildDatasetCompatibilityRecord = buildDatasetCompatibilityRecord
+
+local function buildRulesetCompatibilityRecord(ruleset)
+    local data = ensureTable(ruleset)
+    local compatibility = {
+        id = ensureString(data.id, ""),
+        name = normalizeDatasetName(data.name),
+        description = ensureString(data.description, ""),
+        -- As with datasets, a missing author must not depend on this client.
+        authorName = ensureString(data.authorName, ""),
+        tagState = normalizeDatasetState(data.tagState, { "standard", "short-term", "long-term" }, "standard"),
+        rules = {},
+    }
+
+    local rulesetLogic = Addon.Internal and Addon.Internal.Ruleset or nil
+    local rules = type(rulesetLogic) == "table" and rulesetLogic.Rules or nil
+    local definitions = type(rules) == "table" and rules.Definitions or nil
+    if type(rulesetLogic) ~= "table"
+        or type(rulesetLogic.GetRulesetRuleValue) ~= "function"
+        or type(definitions) ~= "table"
+    then
+        error("Cannot build ruleset compatibility data: current ruleset schema is unavailable.", 2)
+    end
+
+    for categoryIndex = 1, #definitions do
+        local categoryDefinition = definitions[categoryIndex]
+        local categoryKey = type(categoryDefinition) == "table" and categoryDefinition.key or nil
+        if type(categoryKey) == "string" and categoryKey ~= "" then
+            local categoryRules = {}
+            for ruleIndex = 1, #(categoryDefinition.rules or {}) do
+                local ruleDefinition = categoryDefinition.rules[ruleIndex]
+                local ruleKey = type(ruleDefinition) == "table" and ruleDefinition.key or nil
+                if type(ruleKey) == "string" and ruleKey ~= "" then
+                    categoryRules[ruleKey] = deepCopy(
+                        rulesetLogic.GetRulesetRuleValue(data, categoryKey, ruleDefinition)
+                    )
+                end
+            end
+            compatibility.rules[categoryKey] = categoryRules
+        end
+    end
+
+    return compatibility
+end
+
+Database.BuildRulesetCompatibilityRecord = buildRulesetCompatibilityRecord
 
 local function findDatasetEntry(dataset, collectionKey, entryIdOrIndex)
     local definition = DATASET_ENTRY_DEFINITIONS[collectionKey]
@@ -4110,6 +4235,19 @@ function Database.ExportRuleset(rulesetId)
     return "RPE_RULESET_V2\n" .. serializeLuaValue(payload)
 end
 
+function Database.ExportRulesetForCompatibilityHash(rulesetId)
+    local ruleset = Database.GetRulesetByID(rulesetId)
+    if not ruleset then
+        return nil
+    end
+
+    return "RPE_RULESET_V1\n" .. serializeLuaValue({
+        format = "rpe-ruleset",
+        version = 1,
+        ruleset = buildRulesetCompatibilityRecord(ruleset),
+    })
+end
+
 function Database.ImportRuleset(text, options)
     local normalizedText = ensureString(text, "")
     normalizedText = normalizedText:gsub("^%s+", ""):gsub("%s+$", "")
@@ -4515,14 +4653,10 @@ function Database.ExportDatasetForCompatibilityHash(datasetId)
         return nil
     end
 
-    local normalized = normalizeDatasetRecord(copyAuthoredConfiguration(dataset), dataset.id, dataset.name)
-    normalized.lifetime = nil
-    normalized.expiresAt = nil
-
     return "RPE_DATASET_V1\n" .. serializeLuaValue({
         format = "rpe-dataset",
         version = 1,
-        dataset = normalized,
+        dataset = buildDatasetCompatibilityRecord(dataset),
     })
 end
 

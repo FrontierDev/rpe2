@@ -37,6 +37,7 @@ jobs:
           lua5.1 tests/DefaultRulesetImportTest.lua
           lua5.1 tests/DefaultDatasetStartupTest.lua
           lua5.1 tests/RuntimeExternalManagerStartupTest.lua
+          lua5.1 tests/CompatibilityHashCanonicalizationTest.lua
 
   release-package:
     name: Validate release package
