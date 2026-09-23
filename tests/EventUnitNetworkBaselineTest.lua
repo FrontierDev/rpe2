@@ -35,6 +35,18 @@ local Addon = {
             GetActivatedDatasets = function()
                 return { dataset }
             end,
+            ResolveUnitDefinition = function(_, unitRef)
+                if type(dataset) ~= "table" or tostring(unitRef or "") ~= "test:npc" then
+                    return nil, nil
+                end
+                for index = 1, #(dataset.units or {}) do
+                    local unit = dataset.units[index]
+                    if unit and tostring(unit.id or "") == "npc" then
+                        return dataset, unit
+                    end
+                end
+                return nil, nil
+            end,
         },
         Ruleset = {
             GetRulesetRuleValueByKey = function(_, category, key, fallback)
