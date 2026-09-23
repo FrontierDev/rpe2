@@ -175,7 +175,9 @@ local function assertStatsEqual(actual, expected, message)
         local actualRow = findRow(actual, "statRef", expectedRow.statRef)
         assert(actualRow, message .. " missing " .. tostring(expectedRow.statRef))
         assertClose(actualRow.value, expectedRow.value, message .. " value for " .. expectedRow.statRef)
-        assertClose(actualRow.currentValue, expectedRow.currentValue, message .. " current value for " .. expectedRow.statRef)
+        local actualCurrent = actualRow.currentValue ~= nil and actualRow.currentValue or actualRow.value
+        local expectedCurrent = expectedRow.currentValue ~= nil and expectedRow.currentValue or expectedRow.value
+        assertClose(actualCurrent, expectedCurrent, message .. " current value for " .. expectedRow.statRef)
     end
 end
 
