@@ -94,6 +94,9 @@ local definition = Unit:New({
     presets = {
         {
             name = "Empowered",
+            appearances = {
+                { displayId = 123456 },
+            },
             statModifiers = {
                 { statRef = "test:power", percentBonus = 50, flatBonus = 5 },
             },
@@ -272,6 +275,7 @@ assertEqual(receivedOptions.contextMarker, "preserved-through-wrappers", "networ
 
 local summon = materializeNpc(4, 60, 1)
 summon.summonedByEventID = 1
+summon.appearanceIndex = 1
 local deltaOptions = { level = 60, difficulty = "normal", playerCount = 2 }
 local deltaPayload = Event.SerializeUnitDeltaBatchForNetwork({
     { operation = "upsert", eventID = 4, unit = summon },
@@ -280,11 +284,35 @@ local deltaFields = splitPreservingEmpty(splitPreservingEmpty(deltaPayload, stri
 local upsertUnitFields = splitPreservingEmpty(deltaFields[3], string.char(29))
 assertEqual(upsertUnitFields[15], "", "live preset upsert omits derived stat rows")
 assertEqual(upsertUnitFields[20], "inherit", "live preset upsert carries inherited stat mode")
+assertEqual(upsertUnitFields[24], "1", "live upsert preserves preset identity at field 24")
+assertEqual(upsertUnitFields[25], "1", "live upsert preserves appearance identity at field 25")
+assertEqual(upsertUnitFields[30], "0", "primary-resource wrapper keeps its metadata after variant identity")
+assertEqual(upsertUnitFields[32], "0", "spell-equipment wrapper keeps NPC-mode metadata after primary metadata")
 local decodedDelta = Event.DeserializeUnitDeltaBatchFromNetwork(deltaPayload, deltaOptions)
 local hydratedSummon = EventUnit.HydrateNetworkUnit(decodedDelta[1].unit, deltaOptions)
 assertStatsEqual(hydratedSummon.stats, summon.stats, "live summon upsert uses current Event level and preset")
 assertClose(findRow(hydratedSummon.resources, "resourceRef", "test:health").maxValue,
     findRow(summon.resources, "resourceRef", "test:health").maxValue, "live summon upsert preserves preset resources")
+assertEqual(hydratedSummon.registryID, summon.registryID, "live summon upsert preserves registry identity")
+assertEqual(hydratedSummon.presetIndex, summon.presetIndex, "live summon upsert preserves preset identity")
+assertEqual(hydratedSummon.appearanceIndex, summon.appearanceIndex, "live summon upsert preserves appearance identity")
+assertEqual(hydratedSummon:GetResolvedAppearance().displayId, 123456, "live summon upsert resolves selected appearance")
+
+local liveUnit = materializeNpc(4, 60, 1)
+liveUnit.appearanceIndex = 1
+local originalLiveUnit = liveUnit
+assertEqual(liveUnit:MergeLiveNetworkUpdate(hydratedSummon), true, "live delta merges into the existing EventUnit")
+assertEqual(liveUnit, originalLiveUnit, "live delta keeps the EventUnit object used by the portrait")
+assertEqual(liveUnit.registryID, "test:npc", "merged unit retains registry identity")
+assertEqual(liveUnit.presetIndex, 1, "merged unit retains preset identity")
+assertEqual(liveUnit.appearanceIndex, 1, "merged unit retains appearance identity")
+assertEqual(liveUnit:GetResolvedAppearance().displayId, 123456, "merged unit remains renderable as the selected appearance")
+
+local incompleteLegacyUpdate = EventUnit:New({ eventID = 4, registryID = "test:npc", resources = liveUnit.resources })
+assertEqual(liveUnit:MergeLiveNetworkUpdate(incompleteLegacyUpdate), true, "incomplete legacy live update is accepted without replacing identity")
+assertEqual(liveUnit.presetIndex, 1, "incomplete live update cannot erase preset identity")
+assertEqual(liveUnit.appearanceIndex, 1, "incomplete live update cannot erase appearance identity")
+assertEqual(liveUnit:GetResolvedAppearance().displayId, 123456, "incomplete live update remains renderable")
 
 dataset = { id = "test", name = "Network test", units = {} }
 local missingOk, missingError = pcall(function()

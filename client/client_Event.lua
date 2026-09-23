@@ -1743,7 +1743,23 @@ local function upsertAppendedEventUnit(units, unit)
     local replaced = false
     for index = 1, #units do
         if tonumber(units[index] and units[index].eventID) == tonumber(unit.eventID) then
-            units[index] = unit
+            local existing = units[index]
+            if type(existing.MergeLiveNetworkUpdate) == "function" then
+                local merged, reason = existing:MergeLiveNetworkUpdate(unit)
+                if merged ~= true then
+                    if Addon.Debug and type(Addon.Debug.Error) == "function" then
+                        Addon.Debug.Error("Rejected live Event unit update %s: %s", tostring(unit.eventID or "unknown"), tostring(reason or "identity-validation-failed"))
+                    end
+                    return false
+                end
+            else
+                -- A live update must never silently replace a runtime unit when
+                -- variant-aware merging is unavailable.
+                if Addon.Debug and type(Addon.Debug.Error) == "function" then
+                    Addon.Debug.Error("Rejected live Event unit update %s: EventUnit identity merge is unavailable.", tostring(unit.eventID or "unknown"))
+                end
+                return false
+            end
             replaced = true
             break
         end
