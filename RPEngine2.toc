@@ -1,7 +1,7 @@
 ## Interface: 120100
-## Title: RPEngine 2.0.alpha18
+## Title: RPEngine 2.0.alpha19
 ## Notes: Fully-integrated roll system and associated RP tools.
-## Version: 2.0.alpha18
+## Version: 2.0.alpha19
 ## Author: Ortellus @ Argent Dawn (Discord: ortellus)
 ## SavedVariables: RPEngineProfilesDB, RPEngineRulesetDB, RPEngineDatasetDB, RPEngineGlobalSettingsDB, RPEngineInventoryDB, RPEngineManagerDB
 
