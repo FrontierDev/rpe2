@@ -100,10 +100,6 @@ RPE_DATASET_ENTRY_V1
                 value = 10,
             },
             {
-                sourceStatRef = "f82db71a:jslmczbi",
-                value = 1,
-            },
-            {
                 sourceStatRef = "f82db71a:69hfqhne",
                 value = 1,
             },
@@ -211,10 +207,6 @@ RPE_DATASET_ENTRY_V1
                 value = 10,
             },
             {
-                sourceStatRef = "f82db71a:jslmczbi",
-                value = 1,
-            },
-            {
                 sourceStatRef = "f82db71a:69hfqhne",
                 value = 1,
             },
@@ -320,10 +312,6 @@ RPE_DATASET_ENTRY_V1
             {
                 sourceStatRef = "f82db71a:pg0ytacb",
                 value = 10,
-            },
-            {
-                sourceStatRef = "f82db71a:jslmczbi",
-                value = 1,
             },
             {
                 sourceStatRef = "f82db71a:69hfqhne",
@@ -444,10 +432,6 @@ RPE_DATASET_ENTRY_V1
                 value = 10,
             },
             {
-                sourceStatRef = "f82db71a:jslmczbi",
-                value = 1,
-            },
-            {
                 sourceStatRef = "f82db71a:69hfqhne",
                 value = 1,
             },
@@ -566,10 +550,6 @@ RPE_DATASET_ENTRY_V1
                 value = 10,
             },
             {
-                sourceStatRef = "f82db71a:jslmczbi",
-                value = 2,
-            },
-            {
                 sourceStatRef = "f82db71a:69hfqhne",
                 value = 2,
             },
@@ -675,10 +655,6 @@ RPE_DATASET_ENTRY_V1
             {
                 sourceStatRef = "f82db71a:jjn0my8k",
                 value = 10,
-            },
-            {
-                sourceStatRef = "f82db71a:jslmczbi",
-                value = 1,
             },
             {
                 sourceStatRef = "f82db71a:69hfqhne",
@@ -792,10 +768,6 @@ RPE_DATASET_ENTRY_V1
                 value = 10,
             },
             {
-                sourceStatRef = "f82db71a:jslmczbi",
-                value = 1,
-            },
-            {
                 sourceStatRef = "f82db71a:69hfqhne",
                 value = 1,
             },
@@ -897,10 +869,6 @@ RPE_DATASET_ENTRY_V1
             {
                 sourceStatRef = "f82db71a:ygjno50i",
                 value = 12,
-            },
-            {
-                sourceStatRef = "f82db71a:jslmczbi",
-                value = 1,
             },
             {
                 sourceStatRef = "f82db71a:69hfqhne",
