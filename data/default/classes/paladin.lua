@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 45,
+    version = 46,
     dataset = {
         achievements = {},
         auras = {
@@ -5636,7 +5636,68 @@ Addon.Data.DefaultDatasets:Register({
                 yellowSockets = 0,
             }
         },
-        loot = {},
+        loot = {
+            {
+                conditions = {},
+                description = "Equal-weight Tier 0.5 Retribution Paladin set-piece table.",
+                drawCount = 1,
+                entries = {
+                    { id = "s05rchst", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05rchst", type = "item", weight = 1 },
+                    { id = "s05rboot", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05rboot", type = "item", weight = 1 },
+                    { id = "s05rhand", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05rhand", type = "item", weight = 1 },
+                    { id = "s05rhelm", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05rhelm", type = "item", weight = 1 },
+                    { id = "s05rlegs", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05rlegs", type = "item", weight = 1 },
+                    { id = "s05rshld", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05rshld", type = "item", weight = 1 },
+                    { id = "s05rwais", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05rwais", type = "item", weight = 1 },
+                    { id = "s05rwris", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05rwris", type = "item", weight = 1 },
+                },
+                icon = "interface/icons/inv_helmet_08.blp",
+                id = "p05retr1",
+                items = {},
+                name = "Soulforge - Retribution",
+                tags = {},
+            },
+            {
+                conditions = {},
+                description = "Equal-weight Tier 0.5 Holy Paladin set-piece table.",
+                drawCount = 1,
+                entries = {
+                    { id = "s05hchst", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05hchst", type = "item", weight = 1 },
+                    { id = "s05hboot", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05hboot", type = "item", weight = 1 },
+                    { id = "s05hhand", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05hhand", type = "item", weight = 1 },
+                    { id = "s05hhelm", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05hhelm", type = "item", weight = 1 },
+                    { id = "s05hlegs", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05hlegs", type = "item", weight = 1 },
+                    { id = "s05hshld", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05hshld", type = "item", weight = 1 },
+                    { id = "s05hwais", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05hwais", type = "item", weight = 1 },
+                    { id = "s05hwris", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05hwris", type = "item", weight = 1 },
+                },
+                icon = "interface/icons/inv_helmet_08.blp",
+                id = "p05holy1",
+                items = {},
+                name = "Soulforge - Holy",
+                tags = {},
+            },
+            {
+                conditions = {},
+                description = "Equal-weight Tier 0.5 Protection Paladin set-piece table.",
+                drawCount = 1,
+                entries = {
+                    { id = "s05tchst", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05tchst", type = "item", weight = 1 },
+                    { id = "s05tboot", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05tboot", type = "item", weight = 1 },
+                    { id = "s05thand", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05thand", type = "item", weight = 1 },
+                    { id = "s05thelm", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05thelm", type = "item", weight = 1 },
+                    { id = "s05tlegs", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05tlegs", type = "item", weight = 1 },
+                    { id = "s05tshld", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05tshld", type = "item", weight = 1 },
+                    { id = "s05twais", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05twais", type = "item", weight = 1 },
+                    { id = "s05twris", maxQuantity = 1, minQuantity = 1, ref = "b0211ab3:s05twris", type = "item", weight = 1 },
+                },
+                icon = "interface/icons/inv_helmet_08.blp",
+                id = "p05prot1",
+                items = {},
+                name = "Soulforge - Protection",
+                tags = {},
+            },
+        },
         mounts = {},
         name = "Paladin",
         pets = {},
