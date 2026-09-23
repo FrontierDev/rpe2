@@ -974,6 +974,15 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     local root = shell and shell.root or nil
     if not root then return end
 
+    local _, accessSection = InspectorShared.createInspectorSection(
+        root,
+        "RPEDataEditorGuildSettingInspectorRequisitionAccessPanel",
+        "Access & Shop Placement",
+        126
+    )
+    self.GuildSettingInspectorRequisitionAccessSection = accessSection
+    root = accessSection
+
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorAllowedRolesLabel", "Allowed Roles"))
     self.GuildSettingInspectorAllowedRolesHint = UI.CreateText(root:GetFrame(), "RPEDataEditorGuildSettingInspectorAllowedRolesHint",
         "No Roles selected = unrestricted. If one or more Roles are selected, any selected Role grants access.", {
@@ -1012,6 +1021,7 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     })
     categoryGroup:AddChild(self.GuildSettingInspectorRequisitionCategoryDropdown)
     self.GuildSettingInspectorRequisitionCategoryGroup = categoryGroup
+    if accessSection.UpdateHeight then accessSection:UpdateHeight() end
     refreshPageScroll(parent)
 end
 
@@ -1153,6 +1163,9 @@ function DataEditor:RefreshGuildSettingRequisitionsPage()
         local unlimited = requisition ~= nil and normalizeCharacterLimit(requisition.characterLimit) == 0
         setDropdownEnabled(self.GuildSettingInspectorRequisitionCategoryDropdown, unlimited)
         setElementGroupVisible(self.GuildSettingInspectorRequisitionCategoryGroup, unlimited)
+    end
+    if self.GuildSettingInspectorRequisitionAccessSection and self.GuildSettingInspectorRequisitionAccessSection.UpdateHeight then
+        self.GuildSettingInspectorRequisitionAccessSection:UpdateHeight()
     end
     refreshPageScroll(self.GuildSettingInspectorRequisitionsPage)
 end

@@ -761,7 +761,7 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
         root,
         "RPEDataEditorGuildSettingInspectorRequisitionPanel",
         "Requisitions",
-        82
+        112
     )
     self.GuildSettingInspectorRequisitionScroll = UI.ScrollLayout:New({
         name = "RPEDataEditorGuildSettingInspectorRequisitionScroll",
@@ -791,7 +791,7 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     self.GuildSettingInspectorRequisitionScroll:Create()
     requisitionSection:AddChild(self.GuildSettingInspectorRequisitionScroll)
 
-    local requisitionActions = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionActions", {
+    local requisitionActions = UI.CreateLayout(UI.HorizontalLayoutGroup, requisitionSection:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionActions", {
         spacing = 2, height = 18, fitChildrenWidth = true, fitChildrenHeight = false,
     })
     self.GuildSettingInspectorAddRequisitionButton = UI.CreateButton(requisitionActions:GetFrame(), "RPEDataEditorGuildSettingInspectorAddRequisitionButton", "Add", 42, function()
@@ -823,7 +823,15 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
         self:RefreshGuildSettingRequisitionsPage()
     end, { height = 18, fontSize = 7 })
     requisitionActions:AddChild(self.GuildSettingInspectorDeleteRequisitionButton)
-    root:AddChild(requisitionActions)
+    requisitionSection:AddChild(requisitionActions)
+
+    local _, requisitionDetailsSection = InspectorShared.createInspectorSection(
+        root,
+        "RPEDataEditorGuildSettingInspectorRequisitionDetailsPanel",
+        "Selected Requisition",
+        142
+    )
+    root = requisitionDetailsSection
 
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionIdLabel", "Requisition ID"))
     self.GuildSettingInspectorRequisitionIdInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionIdInput", {
@@ -917,11 +925,12 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     end
     root:AddChild(numberInputs)
 
+    local pageRoot = parent._guildSettingPageScrollShell.root
     local _, costSection = InspectorShared.createInspectorSection(
-        root,
+        pageRoot,
         "RPEDataEditorGuildSettingInspectorCostPanel",
         "Costs (Currency / Amount)",
-        70
+        112
     )
     self.GuildSettingInspectorCostScroll = UI.ScrollLayout:New({
         name = "RPEDataEditorGuildSettingInspectorCostScroll",
@@ -950,7 +959,7 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     self.GuildSettingInspectorCostScroll:Create()
     costSection:AddChild(self.GuildSettingInspectorCostScroll)
 
-    local costActions = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorCostActions", {
+    local costActions = UI.CreateLayout(UI.HorizontalLayoutGroup, costSection:GetFrame(), "RPEDataEditorGuildSettingInspectorCostActions", {
         spacing = 2, height = 18, fitChildrenWidth = true, fitChildrenHeight = false,
     })
     self.GuildSettingInspectorAddCostButton = UI.CreateButton(costActions:GetFrame(), "RPEDataEditorGuildSettingInspectorAddCostButton", "Add Cost", 62, function()
@@ -979,9 +988,9 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
         self:RefreshGuildSettingRequisitionsPage()
     end, { height = 18, fontSize = 7 })
     costActions:AddChild(self.GuildSettingInspectorDeleteCostButton)
-    root:AddChild(costActions)
+    costSection:AddChild(costActions)
 
-    local costInputs = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorCostInputs", {
+    local costInputs = UI.CreateLayout(UI.HorizontalLayoutGroup, costSection:GetFrame(), "RPEDataEditorGuildSettingInspectorCostInputs", {
         spacing = 2, height = 18, fitChildrenWidth = true, fitChildrenHeight = false,
     })
     self.GuildSettingInspectorCostCurrencyDropdown = UI.CreateDropdown(costInputs:GetFrame(), "RPEDataEditorGuildSettingInspectorCostCurrencyDropdown", {
@@ -1022,7 +1031,10 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     end
     self.GuildSettingInspectorCostAmountInput:SetScript("OnEnterPressed", commitCost)
     self.GuildSettingInspectorCostAmountInput:SetScript("OnEditFocusLost", commitCost)
-    root:AddChild(costInputs)
+    costSection:AddChild(costInputs)
+    if requisitionSection.UpdateHeight then requisitionSection:UpdateHeight() end
+    if requisitionDetailsSection.UpdateHeight then requisitionDetailsSection:UpdateHeight() end
+    if costSection.UpdateHeight then costSection:UpdateHeight() end
     refreshGuildSettingPageScroll(self.GuildSettingInspectorRequisitionsPage)
 end
 
