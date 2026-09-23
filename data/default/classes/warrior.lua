@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 41,
+        version = 42,
     dataset = {
         achievements = {},
         auras = {
@@ -3705,7 +3705,48 @@ Addon.Data.DefaultDatasets:Register({
                 yellowSockets = 0,
             }
         },
-        loot = {},
+        loot = {
+            {
+                conditions = {},
+                description = "Equal-weight Tier 0.5 DPS Warrior set-piece table.",
+                drawCount = 1,
+                entries = {
+                    { id = "h05dchst", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05dchst", type = "item", weight = 1 },
+                    { id = "h05dboot", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05dboot", type = "item", weight = 1 },
+                    { id = "h05dhnds", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05dhnds", type = "item", weight = 1 },
+                    { id = "h05dhelm", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05dhelm", type = "item", weight = 1 },
+                    { id = "h05dlegs", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05dlegs", type = "item", weight = 1 },
+                    { id = "h05dshld", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05dshld", type = "item", weight = 1 },
+                    { id = "h05dwais", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05dwais", type = "item", weight = 1 },
+                    { id = "h05dwris", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05dwris", type = "item", weight = 1 },
+                },
+                icon = "interface/icons/inv_helmet_02.blp",
+                id = "w05dps01",
+                items = {},
+                name = "Battlegear of Heroism - DPS",
+                tags = {},
+            },
+            {
+                conditions = {},
+                description = "Equal-weight Tier 0.5 Tank Warrior set-piece table.",
+                drawCount = 1,
+                entries = {
+                    { id = "h05tchst", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05tchst", type = "item", weight = 1 },
+                    { id = "h05tboot", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05tboot", type = "item", weight = 1 },
+                    { id = "h05thnds", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05thnds", type = "item", weight = 1 },
+                    { id = "h05tface", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05tface", type = "item", weight = 1 },
+                    { id = "h05tlegs", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05tlegs", type = "item", weight = 1 },
+                    { id = "h05tshld", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05tshld", type = "item", weight = 1 },
+                    { id = "h05twais", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05twais", type = "item", weight = 1 },
+                    { id = "h05twris", maxQuantity = 1, minQuantity = 1, ref = "7bbb4cb9:h05twris", type = "item", weight = 1 },
+                },
+                icon = "interface/icons/inv_helmet_02.blp",
+                id = "w05tank1",
+                items = {},
+                name = "Battlegear of Heroism - Tank",
+                tags = {},
+            },
+        },
         mounts = {},
         name = "Warrior",
         pets = {},
