@@ -53,6 +53,7 @@ local REASON_TEXT = {
     ["distance-api-unavailable"] = "The distance calculation API is unavailable.",
     ["distance-unavailable"] = "The distance to the planned destination could not be calculated.",
     ["no-useful-action"] = "No useful legal action was found for this NPC.",
+    ["autopilot-rejected"] = "Every candidate action was rejected by the planner.",
     ["dm-rejected"] = "This action was rejected by the DM.",
     ["dm-skipped"] = "This movement was skipped by the DM.",
     ["dm-replan"] = "The DM requested a replacement plan.",
@@ -999,6 +1000,10 @@ function Helper.BuildOverviewDetails(eventState)
             local noAction = pending.noActions[index]
             local caster = unitName(eventState, noAction and noAction.casterEventId)
             local reason = tostring(noAction and noAction.reason or "no-useful-action")
+            local diagnostic = tostring(noAction and noAction.diagnostic or "")
+            if diagnostic ~= "" then
+                lines[#lines + 1] = "Diagnostic: " .. diagnostic
+            end
             lines[#lines + 1] = ("%s: No Action — %s"):format(caster, tostring(Helper.GetReasonText(reason) or reason))
         end
     end
@@ -1069,6 +1074,7 @@ function Helper.BuildEntries(eventState)
         appendDetail(lines, "NPC", caster)
         appendDetail(lines, "Status", "No Action")
         local reasonCode, reasonText = appendReason(lines, reason)
+        appendDetail(lines, "Diagnostic", noAction and noAction.diagnostic)
         entries[#entries + 1] = {
             kind = "no-action",
             entryId = ("autopilot-no-action:%s:%d"):format(tostring(pending.planId or ""), index),
