@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 29,
+    version = 30,
     dataset = {
         achievements = {},
         auras = {
@@ -3759,7 +3759,48 @@ Addon.Data.DefaultDatasets:Register({
                 yellowSockets = 0,
             }
         },
-        loot = {},
+        loot = {
+            {
+                conditions = {},
+                description = "Equal-weight Tier 0.5 DPS Rogue set-piece table.",
+                drawCount = 1,
+                entries = {
+                    { id = "r05dtuni", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05dtuni", type = "item", weight = 1 },
+                    { id = "r05dfoot", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05dfoot", type = "item", weight = 1 },
+                    { id = "r05dgrip", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05dgrip", type = "item", weight = 1 },
+                    { id = "r05dcap", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05dcap", type = "item", weight = 1 },
+                    { id = "r05dpant", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05dpant", type = "item", weight = 1 },
+                    { id = "r05dspau", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05dspau", type = "item", weight = 1 },
+                    { id = "r05dbelt", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05dbelt", type = "item", weight = 1 },
+                    { id = "r05dbrac", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05dbrac", type = "item", weight = 1 },
+                },
+                icon = "interface/icons/inv_helmet_41.blp",
+                id = "rg05dps1",
+                items = {},
+                name = "Darkmantle Armor - DPS",
+                tags = {},
+            },
+            {
+                conditions = {},
+                description = "Equal-weight Tier 0.5 Tank Rogue set-piece table.",
+                drawCount = 1,
+                entries = {
+                    { id = "r05tarmo", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05tarmo", type = "item", weight = 1 },
+                    { id = "r05ttrea", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05ttrea", type = "item", weight = 1 },
+                    { id = "r05thand", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05thand", type = "item", weight = 1 },
+                    { id = "r05tface", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05tface", type = "item", weight = 1 },
+                    { id = "r05tlegs", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05tlegs", type = "item", weight = 1 },
+                    { id = "r05tpaul", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05tpaul", type = "item", weight = 1 },
+                    { id = "r05twais", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05twais", type = "item", weight = 1 },
+                    { id = "r05twris", maxQuantity = 1, minQuantity = 1, ref = "23d5dce2:r05twris", type = "item", weight = 1 },
+                },
+                icon = "interface/icons/inv_helmet_41.blp",
+                id = "rg05tank",
+                items = {},
+                name = "Darkmantle Armor - Tank",
+                tags = {},
+            },
+        },
         mounts = {},
         name = "Rogue",
         pets = {},
