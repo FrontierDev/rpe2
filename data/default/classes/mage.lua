@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 34,
+    version = 35,
     dataset = {
         achievements = {},
         auras = {
@@ -3962,7 +3962,48 @@ Addon.Data.DefaultDatasets:Register({
                 yellowSockets = 0,
             }
         },
-        loot = {},
+        loot = {
+            {
+                conditions = {},
+                description = "Equal-weight Tier 0.5 DPS Mage set-piece table.",
+                drawCount = 1,
+                entries = {
+                    { id = "m05drobe", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05drobe", type = "item", weight = 1 },
+                    { id = "m05dsand", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05dsand", type = "item", weight = 1 },
+                    { id = "m05dgaun", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05dgaun", type = "item", weight = 1 },
+                    { id = "m05dcrow", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05dcrow", type = "item", weight = 1 },
+                    { id = "m05dlegs", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05dlegs", type = "item", weight = 1 },
+                    { id = "m05dmant", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05dmant", type = "item", weight = 1 },
+                    { id = "m05dbelt", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05dbelt", type = "item", weight = 1 },
+                    { id = "m05dbind", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05dbind", type = "item", weight = 1 },
+                },
+                icon = "interface/icons/inv_crown_02.blp",
+                id = "mg05dps1",
+                items = {},
+                name = "Sorcerer's Regalia - DPS",
+                tags = {},
+            },
+            {
+                conditions = {},
+                description = "Equal-weight Tier 0.5 Healing Mage set-piece table.",
+                drawCount = 1,
+                entries = {
+                    { id = "m05hchst", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05hchst", type = "item", weight = 1 },
+                    { id = "m05hboot", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05hboot", type = "item", weight = 1 },
+                    { id = "m05hglov", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05hglov", type = "item", weight = 1 },
+                    { id = "m05hhelm", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05hhelm", type = "item", weight = 1 },
+                    { id = "m05hlegs", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05hlegs", type = "item", weight = 1 },
+                    { id = "m05hshld", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05hshld", type = "item", weight = 1 },
+                    { id = "m05hwais", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05hwais", type = "item", weight = 1 },
+                    { id = "m05hwris", maxQuantity = 1, minQuantity = 1, ref = "d7c874c4:m05hwris", type = "item", weight = 1 },
+                },
+                icon = "interface/icons/inv_crown_02.blp",
+                id = "mg05heal",
+                items = {},
+                name = "Sorcerer's Regalia - Healing",
+                tags = {},
+            },
+        },
         mounts = {},
         name = "Mage",
         pets = {},
