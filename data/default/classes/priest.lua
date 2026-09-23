@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 27,
+    version = 28,
     dataset = {
         achievements = {},
         auras = {
@@ -3941,7 +3941,48 @@ Addon.Data.DefaultDatasets:Register({
                 yellowSockets = 0,
             }
         },
-        loot = {},
+        loot = {
+            {
+                conditions = {},
+                description = "Equal-weight Tier 0.5 Healing Priest set-piece table.",
+                drawCount = 1,
+                entries = {
+                    { id = "v05hrobe", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05hrobe", type = "item", weight = 1 },
+                    { id = "v05hboot", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05hboot", type = "item", weight = 1 },
+                    { id = "v05hmitt", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05hmitt", type = "item", weight = 1 },
+                    { id = "v05hcrow", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05hcrow", type = "item", weight = 1 },
+                    { id = "v05hskrt", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05hskrt", type = "item", weight = 1 },
+                    { id = "v05hmant", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05hmant", type = "item", weight = 1 },
+                    { id = "v05hbelt", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05hbelt", type = "item", weight = 1 },
+                    { id = "v05hbrac", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05hbrac", type = "item", weight = 1 },
+                },
+                icon = "interface/icons/inv_crown_01.blp",
+                id = "pr05heal",
+                items = {},
+                name = "Vestments of the Virtuous - Healing",
+                tags = {},
+            },
+            {
+                conditions = {},
+                description = "Equal-weight Tier 0.5 Shadow Priest set-piece table.",
+                drawCount = 1,
+                entries = {
+                    { id = "v05dgown", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05dgown", type = "item", weight = 1 },
+                    { id = "v05dslip", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05dslip", type = "item", weight = 1 },
+                    { id = "v05dhnds", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05dhnds", type = "item", weight = 1 },
+                    { id = "v05dcowl", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05dcowl", type = "item", weight = 1 },
+                    { id = "v05dlegs", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05dlegs", type = "item", weight = 1 },
+                    { id = "v05depau", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05depau", type = "item", weight = 1 },
+                    { id = "v05dcord", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05dcord", type = "item", weight = 1 },
+                    { id = "v05dwrap", maxQuantity = 1, minQuantity = 1, ref = "1c1038a7:v05dwrap", type = "item", weight = 1 },
+                },
+                icon = "interface/icons/inv_crown_01.blp",
+                id = "pr05shdw",
+                items = {},
+                name = "Vestments of the Virtuous - Shadow",
+                tags = {},
+            },
+        },
         mounts = {},
         name = "Priest",
         pets = {},
