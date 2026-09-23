@@ -31,7 +31,7 @@ local authored = {
         },
     },
     dailyRewards = {
-        { id = "loot-reward", type = "loot_table", ref = "7259f1d3:q8m2v7kc", amount = 1 },
+        { id = "loot-reward", type = "loot_table", ref = "7259f1d3:q8m2v7kc", amount = 1, roleIds = { "alchemy-role", "tailoring-role", "alchemy-role" } },
         { id = "item-reward", type = "item", ref = "f82db71a:item", amount = 2 },
         { id = "currency-reward", type = "currency", ref = "justice", amount = 3 },
     },
@@ -44,6 +44,9 @@ assertEqual(created.requisitions[1].roleIds[1], "alchemy-role", "New preserves l
 assertEqual(created.requisitions[2].sourceType, "item", "New keeps item requisitions as items")
 assertEqual(created.requisitions[2].itemRef, "f82db71a:item", "New preserves item requisition reference")
 assertEqual(created.dailyRewards[1].type, "loot_table", "New preserves loot-table daily reward type")
+assertEqual(created.dailyRewards[1].roleIds[1], "alchemy-role", "New preserves daily reward role IDs")
+assertEqual(created.dailyRewards[1].roleIds[2], "tailoring-role", "New preserves daily reward role IDs in order")
+assertEqual(#created.dailyRewards[1].roleIds, 2, "New de-duplicates daily reward role IDs")
 assertEqual(created.dailyRewards[1].ref, "7259f1d3:q8m2v7kc", "New preserves loot-table daily reward reference")
 assertEqual(created.dailyRewards[2].type, "item", "New preserves item daily reward type")
 assertEqual(created.dailyRewards[2].ref, "f82db71a:item", "New preserves item daily reward reference")
@@ -56,6 +59,7 @@ assertEqual(roundTrip.requisitions[1].lootRef, "d6ffc4e2:a6h3r8vk", "round trip 
 assertEqual(roundTrip.requisitions[2].sourceType, "item", "round trip preserves item requisition source type")
 assertEqual(roundTrip.requisitions[2].itemRef, "f82db71a:item", "round trip preserves item requisition reference")
 assertEqual(roundTrip.dailyRewards[1].type, "loot_table", "round trip preserves loot-table daily reward type")
+assertEqual(roundTrip.dailyRewards[1].roleIds[1], "alchemy-role", "round trip preserves daily reward role IDs")
 assertEqual(roundTrip.dailyRewards[1].ref, "7259f1d3:q8m2v7kc", "round trip preserves loot-table daily reward reference")
 assertEqual(roundTrip.dailyRewards[2].type, "item", "round trip preserves item daily reward type")
 assertEqual(roundTrip.dailyRewards[2].ref, "f82db71a:item", "round trip preserves item daily reward reference")

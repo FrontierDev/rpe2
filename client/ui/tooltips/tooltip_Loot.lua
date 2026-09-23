@@ -96,8 +96,9 @@ function LootTooltip:Build(detail)
     local loot, reference = resolveLoot(detail)
     if not loot then
         return {
-            type = "custom", title = "Missing Loot Table",
-            lines = { { left = ("Missing loot table reference: %s"):format(reference ~= "" and reference or "-"), colorToken = "danger" } },
+            type = "game", title = "Missing Loot Table",
+            titleColor = { r = 0.95, g = 0.35, b = 0.35 },
+            lines = { { text = ("Missing loot table reference: %s"):format(reference ~= "" and reference or "-"), r = 0.95, g = 0.35, b = 0.35, wrap = true } },
         }
     end
 
@@ -105,19 +106,23 @@ function LootTooltip:Build(detail)
     if title == "" then title = "Loot Table" end
     local lines = {}
     local description = trim(loot.description)
-    if description ~= "" then lines[#lines + 1] = { left = description, colorToken = "text.secondary" } end
-    lines[#lines + 1] = { left = ("Rolls: %d"):format(positiveInteger(loot.drawCount, 1)), colorToken = "text.secondary" }
+    if description ~= "" then lines[#lines + 1] = { text = description, r = 0.82, g = 0.84, b = 0.88, wrap = true } end
+    lines[#lines + 1] = { text = ("Rolls: %d"):format(positiveInteger(loot.drawCount, 1)), r = 0.50, g = 0.82, b = 1.00, wrap = false }
 
     local groups = buildRewardGroups(loot)
-    for _, definition in ipairs({ { key = "high", label = "High Chance:" }, { key = "moderate", label = "Moderate Chance:" }, { key = "low", label = "Low Chance:" } }) do
+    for _, definition in ipairs({
+        { key = "high", label = "High Chance:", r = 0.30, g = 0.95, b = 0.45 },
+        { key = "moderate", label = "Moderate Chance:", r = 1.00, g = 0.82, b = 0.20 },
+        { key = "low", label = "Low Chance:", r = 1.00, g = 0.45, b = 0.30 },
+    }) do
         local rewards = groups[definition.key]
         if #rewards > 0 then
-            lines[#lines + 1] = { left = "" }
-            lines[#lines + 1] = { left = definition.label, colorToken = "text.primary" }
-            lines[#lines + 1] = { left = table.concat(rewards, ", "), colorToken = "text.secondary", wrap = true }
+            lines[#lines + 1] = { text = " ", wrap = false }
+            lines[#lines + 1] = { text = definition.label, r = definition.r, g = definition.g, b = definition.b, wrap = false }
+            lines[#lines + 1] = { text = table.concat(rewards, ", "), r = 0.82, g = 0.84, b = 0.88, wrap = true }
         end
     end
-    return { type = "custom", title = title, lines = lines }
+    return { type = "game", title = title, titleColor = { r = 1.00, g = 0.82, b = 0.20 }, lines = lines }
 end
 
 return LootTooltip

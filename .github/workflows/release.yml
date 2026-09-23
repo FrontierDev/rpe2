@@ -42,6 +42,7 @@ jobs:
           lua5.1 tests/MovementAllowanceFallbackTest.lua
           lua5.1 tests/EventCompletionAchievementDistributionTest.lua
           lua5.1 tests/EventTurnCommitBarrierTest.lua
+          lua5.1 tests/GuildSettingLootTableTest.lua
 
   release-package:
     name: Validate release package

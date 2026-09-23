@@ -18,7 +18,6 @@ if type(dataset) == "table" then
     end
 
     local materialDefinitions = {
-        { id = "copper", name = "Copper Bar", weight = 20, minQuantity = 6, maxQuantity = 10 },
         { id = "bronze", name = "Bronze Bar", weight = 18, minQuantity = 6, maxQuantity = 10 },
         { id = "steel", name = "Steel Bar", weight = 16, minQuantity = 5, maxQuantity = 8 },
         { id = "mithril", name = "Mithril Bar", weight = 14, minQuantity = 4, maxQuantity = 7 },
@@ -55,7 +54,7 @@ if type(dataset) == "table" then
                 description = "Daily Blacksmithing material cache. Guarantees one bar reward, weighted toward ordinary metal bars with uncommon precious bar outcomes.",
                 drawCount = 1,
                 entries = entries,
-                icon = "interface/icons/inv_ingot_03.blp",
+                icon = "interface/icons/inv_misc_stonetablet_05.blp",
                 id = lootId,
                 items = {},
                 name = "Blacksmithing Daily Bar Cache",
@@ -72,7 +71,7 @@ if type(dataset) == "table" then
             description = "Daily Blacksmithing material cache. Guarantees one bar reward, weighted toward ordinary metal bars with uncommon precious bar outcomes.",
             drawCount = 1,
             entries = entries,
-            icon = "interface/icons/inv_ingot_03.blp",
+            icon = "interface/icons/inv_misc_stonetablet_05.blp",
             id = lootId,
             items = {},
             name = "Blacksmithing Daily Bar Cache",
@@ -80,5 +79,5 @@ if type(dataset) == "table" then
         }
     end
 
-    blacksmithing.version = math.max(8, math.floor(tonumber(blacksmithing.version) or 1))
+    blacksmithing.version = math.max(9, math.floor(tonumber(blacksmithing.version) or 1))
 end

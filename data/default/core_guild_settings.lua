@@ -10,8 +10,8 @@ if not definition or not definition.dataset then
     error("Core default dataset must be registered before core_guild_settings.lua", 2)
 end
 
-if definition.version < 35 then
-    definition.version = 35
+if definition.version < 36 then
+    definition.version = 36
 end
 
 local dataset = definition.dataset
@@ -341,12 +341,14 @@ local guildSetting = {
     },
     requisitions = requisitions,
     dailyRewards = {
-        {
-            id = "q8m2v7kc",
-            type = "loot_table",
-            ref = "7259f1d3:q8m2v7kc",
-            amount = 1,
-        },
+        { id = "daily_alchemy", type = "loot_table", ref = "d6ffc4e2:a6h3r8vk", amount = 1, roleIds = { "5jz51hqf" } },
+        { id = "daily_blacksmithing", type = "loot_table", ref = "61fdf3df:d4p7k2ms", amount = 1, roleIds = { "xzn8ikd5" } },
+        { id = "daily_engineering", type = "loot_table", ref = "af503002:n6r3k8vz", amount = 1, roleIds = { "hibfzy2h" } },
+        { id = "daily_enchanting", type = "loot_table", ref = "732368d4:e5n8c2qx", amount = 1, roleIds = { "dowfaitu" } },
+        { id = "daily_jewelcrafting", type = "loot_table", ref = "4999dcec:j4c8m2rx", amount = 1, roleIds = { "csw345vc" } },
+        { id = "daily_leatherworking", type = "loot_table", ref = "538a54a0:l7w4c9px", amount = 1, roleIds = { "tx7n3n76" } },
+        { id = "daily_inscription", type = "loot_table", ref = "072d4851:i7n3k5qx", amount = 1, roleIds = { "p5btrcra" } },
+        { id = "daily_tailoring", type = "loot_table", ref = "7259f1d3:q8m2v7kc", amount = 1, roleIds = { "7lqa25jv" } },
     },
     tags = {},
 }

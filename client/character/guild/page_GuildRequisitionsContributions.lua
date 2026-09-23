@@ -480,7 +480,7 @@ function Guild:GetDailyRewardStatus()
     for index = 1, #authoredRewards do
         local reward = authoredRewards[index]
         if isLootDailyReward(reward) then
-            surrogateRewards[index] = { id = reward.id, type = "currency", ref = "copper", amount = 1 }
+            surrogateRewards[index] = { id = reward.id, type = "currency", ref = "copper", amount = 1, roleIds = reward.roleIds }
         else
             surrogateRewards[index] = reward
         end
@@ -492,7 +492,13 @@ function Guild:GetDailyRewardStatus()
     if not callOk or type(status) ~= "table" then
         return { status = "processing-failed", reason = "processing-failed", rewards = authoredRewards }
     end
-    status.rewards = authoredRewards
+    local eligibleById = {}
+    for index = 1, #(status.rewards or {}) do eligibleById[tostring(status.rewards[index] and status.rewards[index].id or "")] = true end
+    status.rewards = {}
+    for index = 1, #authoredRewards do
+        local reward = authoredRewards[index]
+        if eligibleById[tostring(reward and reward.id or "")] then status.rewards[#status.rewards + 1] = reward end
+    end
     if status.status ~= "available-today" then return status end
 
     local validated, reason, detail = validateDailyLootTables(setting)
@@ -507,15 +513,18 @@ function Guild:GetDailyRewardStatus()
     return status
 end
 
-local function resolveDailyRewards(setting)
+local function resolveDailyRewards(setting, selectedRewards)
     local validated, reason, detail = validateDailyLootTables(setting)
     if not validated then return nil, reason, detail end
     if type(Loot.ValidateConcreteReward) ~= "function" or type(Loot.MergeConcreteRewards) ~= "function" then
         return nil, "loot-api-unavailable"
     end
     local concreteRewards = {}
+    local selectedById = {}
+    for index = 1, #(selectedRewards or {}) do selectedById[tostring(selectedRewards[index] and selectedRewards[index].id or "")] = true end
     for index = 1, #(setting and setting.dailyRewards or {}) do
         local reward = setting.dailyRewards[index]
+        if selectedById[tostring(reward and reward.id or "")] then
         if isLootDailyReward(reward) then
             local rolled, rollReason, rollDetail = resolveLootRolls(validated[index], positiveInteger(reward.amount, 1))
             if not rolled then return nil, rollReason, rollDetail end
@@ -529,6 +538,7 @@ local function resolveDailyRewards(setting)
             end
             concreteRewards[#concreteRewards + 1] = concrete
         end
+        end
     end
     return Loot.MergeConcreteRewards(concreteRewards)
 end
@@ -541,10 +551,17 @@ function Guild:ProcessDailyRewards()
     if type(status) ~= "table" or status.status ~= "available-today" then
         return false, status and status.status or "unavailable", status
     end
-    local concreteRewards, reason, detail = resolveDailyRewards(setting)
+    local concreteRewards, reason, detail = resolveDailyRewards(setting, status.availableRewards or status.rewards)
     if not concreteRewards then return false, reason or "loot-resolution-failed", detail end
 
     local temporary = {}
+    local eligibleRoleIds, eligibleRoleSeen = {}, {}
+    for index = 1, #(status.availableRewards or {}) do
+        for roleIndex = 1, #(status.availableRewards[index].roleIds or {}) do
+            local roleId = status.availableRewards[index].roleIds[roleIndex]
+            if not eligibleRoleSeen[roleId] then eligibleRoleSeen[roleId] = true; eligibleRoleIds[#eligibleRoleIds + 1] = roleId end
+        end
+    end
     for index = 1, #concreteRewards do
         local reward = concreteRewards[index]
         temporary[index] = {
@@ -552,6 +569,7 @@ function Guild:ProcessDailyRewards()
             type = reward.type,
             ref = reward.ref,
             amount = reward.amount,
+            roleIds = eligibleRoleIds,
         }
     end
 
@@ -559,6 +577,14 @@ function Guild:ProcessDailyRewards()
         return BaseProcessDailyRewards(self)
     end)
     if not callOk then return false, "processing-failed", { error = success } end
+    if success then
+        for index = 1, #(status.plan or {}) do
+            local reward = status.plan[index]
+            local stored = type(Profile.SetDailyRewardClaim) == "function"
+                and Profile.SetDailyRewardClaim(status.guildKey, status.dayKey, status.settingRef, Profile.DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE, reward.id)
+            if type(stored) ~= "table" then return false, "claim-persistence-failed", result end
+        end
+    end
     if success and type(result) == "table" then result.resolvedRewards = concreteRewards end
     return success, processReason, result
 end
@@ -652,9 +678,13 @@ function Page:BindShopEntry(entry, requisition)
         if reason == "missing-required-role" then
             local names = {}
             for index = 1, #(requisition.roleIds or {}) do names[#names + 1] = roleName(self.ActiveGuildSetting, requisition.roleIds[index]) end
+            lines[#lines + 1] = { text = " ", wrap = false }
             lines[#lines + 1] = {
-                left = #names == 1 and ("Requires Role: %s"):format(names[1]) or ("Requires one of: %s"):format(table.concat(names, ", ")),
-                colorToken = "danger",
+                text = #names == 1 and ("Requires Role: %s"):format(names[1]) or ("Requires one of: %s"):format(table.concat(names, ", ")),
+                r = 0.95,
+                g = 0.35,
+                b = 0.35,
+                wrap = true,
             }
         end
         return tooltip

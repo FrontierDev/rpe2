@@ -316,6 +316,7 @@ local function normalizeDailyReward(value, index, usedIds)
         type = rewardType,
         ref = normalizeReference(source.ref),
         amount = normalizeInteger(source.amount, 1, 1),
+        roleIds = normalizeRoleIds(source.roleIds),
     }
 end
 

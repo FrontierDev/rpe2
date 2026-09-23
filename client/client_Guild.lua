@@ -591,8 +591,8 @@ function Guild:TryRequisition(guildSettingRef, requisitionId)
     }
 end
 
-local function buildDailyRewardPlan(setting)
-    local rewards = type(setting and setting.dailyRewards) == "table" and setting.dailyRewards or {}
+local function buildDailyRewardPlan(setting, rewardList)
+    local rewards = type(rewardList) == "table" and rewardList or type(setting and setting.dailyRewards) == "table" and setting.dailyRewards or {}
     local plan, needsItem, needsCurrency = {}, false, false
     for index = 1, #rewards do
         local reward = rewards[index]
@@ -658,7 +658,7 @@ function Guild:GetDailyRewardStatus()
         settingRef = resolution and resolution.ref or nil,
         guildKey = resolution and resolution.guildKey or "",
         identity = resolution and resolution.identity or getGuildIdentity(),
-        rewards = type(setting and setting.dailyRewards) == "table" and setting.dailyRewards or {},
+        rewards = {},
     }
     if not setting then return result end
     local general = type(setting.general) == "table" and setting.general or {}
@@ -667,20 +667,29 @@ function Guild:GetDailyRewardStatus()
     if not resetState then result.status, result.reason = resetReason, resetReason return result end
     result.resetState, result.dayKey = resetState, resetState.cycleKey
     if type(Profile.GetDailyRewardClaim) ~= "function" then result.status, result.reason = "profile-api-unavailable", "profile-api-unavailable" return result end
-    local okClaim, claimDate, claimSettingRef, claimSemantics = pcall(Profile.GetDailyRewardClaim, result.guildKey)
-    if not okClaim then result.status, result.reason = "profile-api-unavailable", "profile-api-unavailable" return result end
-    if claimDate and claimSemantics ~= DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE then
-        claimDate = legacyClaimBelongsToCurrentCycle(claimDate, resetState) and resetState.cycleKey or claimDate
-        claimSettingRef = trimText(claimSettingRef) ~= "" and claimSettingRef or result.settingRef
-        claimSemantics = DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE
+    local _, effective = self:GetEffectiveRoles()
+    if type(effective) ~= "table" or effective.status ~= "active" then result.status, result.reason = "setting-unavailable", "setting-unavailable" return result end
+    local eligible, available = {}, {}
+    for index = 1, #(setting.dailyRewards or {}) do
+        local reward = setting.dailyRewards[index]
+        local matches = false
+        for roleIndex = 1, #(reward and reward.roleIds or {}) do
+            if effective.byId and effective.byId[trimText(reward.roleIds[roleIndex])] then matches = true break end
+        end
+        if matches then
+            eligible[#eligible + 1] = reward
+            local okClaim, claimDate = pcall(Profile.GetDailyRewardClaim, result.guildKey, result.settingRef, reward.id)
+            if not okClaim then result.status, result.reason = "profile-api-unavailable", "profile-api-unavailable" return result end
+            if claimDate ~= result.dayKey then available[#available + 1] = reward end
+        end
     end
-    result.claimDate, result.claimSettingRef, result.claimSemantics = claimDate, claimSettingRef, claimSemantics
-    if claimDate == result.dayKey then result.status, result.reason = "received-today", "received-today" return result end
+    result.rewards, result.eligibleRewards, result.availableRewards = eligible, eligible, available
+    if #available == 0 then result.status, result.reason = "received-today", "received-today" return result end
     if type(Profile.GetDailyRewardTransaction) ~= "function" then result.status, result.reason = "profile-api-unavailable", "profile-api-unavailable" return result end
     local okTx, tx = pcall(Profile.GetDailyRewardTransaction, result.guildKey)
     if not okTx then result.status, result.reason = "profile-api-unavailable", "profile-api-unavailable" return result end
     if type(tx) == "table" then result.status, result.reason, result.transaction = "transaction-recovery-required", "transaction-recovery-required", tx return result end
-    local plan, planReason, flags = buildDailyRewardPlan(setting)
+    local plan, planReason, flags = buildDailyRewardPlan(setting, available)
     if not plan then result.status, result.reason, result.detail = planReason, planReason, flags return result end
     local inventory = getInventoryService()
     if flags.needsItemAward and type(inventory.AddItem) ~= "function" then result.status, result.reason = "inventory-api-unavailable", "inventory-api-unavailable" return result end
@@ -770,12 +779,15 @@ function Guild:ProcessDailyRewards()
             persistDailyRewardTransactionState(context, "failed", "claim-persistence-unavailable")
             return false, "claim-persistence-unavailable", status
         end
-        local okSet, bucket = pcall(Profile.SetDailyRewardClaim, status.guildKey, status.dayKey, status.settingRef, DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE)
-        local okGet, storedDate, storedSettingRef, storedSemantics = pcall(Profile.GetDailyRewardClaim, status.guildKey)
-        if not okSet or type(bucket) ~= "table" or not okGet or storedDate ~= status.dayKey or storedSettingRef ~= status.settingRef or storedSemantics ~= DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE then
-            pcall(transaction.Rollback, transaction)
-            persistDailyRewardTransactionState(context, "failed", "claim-persistence-failed")
-            return false, "claim-persistence-failed", status
+        for index = 1, #(status.plan or {}) do
+            local reward = status.plan[index]
+            local okSet, bucket = pcall(Profile.SetDailyRewardClaim, status.guildKey, status.dayKey, status.settingRef, DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE, reward.id)
+            local okGet, storedDate = pcall(Profile.GetDailyRewardClaim, status.guildKey, status.settingRef, reward.id)
+            if not okSet or type(bucket) ~= "table" or not okGet or storedDate ~= status.dayKey then
+                pcall(transaction.Rollback, transaction)
+                persistDailyRewardTransactionState(context, "failed", "claim-persistence-failed")
+                return false, "claim-persistence-failed", status
+            end
         end
         clearDailyRewardTransactionState(status.guildKey)
         pcall(self.RefreshWindow, self)
