@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 42,
+    version = 43,
     dataset = {
         achievements = {},
         auras = {
@@ -1265,36 +1265,40 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 696
+                        value = 696,
                     },
                     {
                         sourceStatRef = "f82db71a:zfqm8dxp",
-                        value = 21
+                        value = 21,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 34
+                        value = 34,
                     },
                     {
                         sourceStatRef = "f82db71a:pg0ytacb",
-                        value = 10
+                        value = 10,
                     },
                     {
                         sourceStatRef = "f82db71a:jjn0my8k",
-                        value = 10
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:wbj4zuf3",
+                        value = 1,
                     },
                     {
                         sourceStatRef = "f82db71a:v2g0tw0o",
-                        value = 1
+                        value = 1,
                     },
                     {
                         sourceStatRef = "f82db71a:p8syz5ba",
-                        value = 1
+                        value = 1,
                     },
                     {
                         sourceStatRef = "f82db71a:0wyp78x9",
-                        value = 9
-                    }
+                        value = 9,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1377,36 +1381,36 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 696
+                        value = 696,
                     },
                     {
                         sourceStatRef = "f82db71a:zfqm8dxp",
-                        value = 24
+                        value = 24,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 12
+                        value = 12,
                     },
                     {
                         sourceStatRef = "f82db71a:pg0ytacb",
-                        value = 10
+                        value = 10,
                     },
                     {
                         sourceStatRef = "f82db71a:jjn0my8k",
-                        value = 10
-                    },
-                    {
-                        sourceStatRef = "f82db71a:wbj4zuf3",
-                        value = 1
+                        value = 10,
                     },
                     {
                         sourceStatRef = "f82db71a:jslmczbi",
-                        value = 2
+                        value = 2,
                     },
                     {
-                        sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 19
-                    }
+                        sourceStatRef = "f82db71a:wbj4zuf3",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:u7b49vs9",
+                        value = 19,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1489,24 +1493,24 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 642
+                        value = 642,
                     },
                     {
                         sourceStatRef = "f82db71a:zfqm8dxp",
-                        value = 30
+                        value = 30,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 11
+                        value = 11,
                     },
                     {
                         sourceStatRef = "f82db71a:jjn0my8k",
-                        value = 10
+                        value = 10,
                     },
                     {
                         sourceStatRef = "f82db71a:jslmczbi",
-                        value = 1
-                    }
+                        value = 1,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1582,24 +1586,24 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 375
+                        value = 375,
                     },
                     {
                         sourceStatRef = "f82db71a:zfqm8dxp",
-                        value = 20
+                        value = 20,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 10
+                        value = 10,
                     },
                     {
                         sourceStatRef = "f82db71a:wbj4zuf3",
-                        value = 1
+                        value = 1,
                     },
                     {
-                        sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 16
-                    }
+                        sourceStatRef = "f82db71a:u7b49vs9",
+                        value = 16,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1679,28 +1683,28 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     {
                         sourceStatRef = "f82db71a:v42albuv",
-                        value = 535
+                        value = 535,
                     },
                     {
                         sourceStatRef = "f82db71a:zfqm8dxp",
-                        value = 25
+                        value = 25,
                     },
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
-                        value = 13
-                    },
-                    {
-                        sourceStatRef = "f82db71a:wbj4zuf3",
-                        value = 1
-                    },
-                    {
-                        sourceStatRef = "f82db71a:7t7xgzcx",
-                        value = 24
+                        value = 13,
                     },
                     {
                         sourceStatRef = "f82db71a:pg0ytacb",
-                        value = 10
-                    }
+                        value = 10,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:wbj4zuf3",
+                        value = 1,
+                    },
+                    {
+                        sourceStatRef = "f82db71a:u7b49vs9",
+                        value = 24,
+                    },
                 },
                 tags = {},
                 targetArmorWeight = "none",
@@ -1799,10 +1803,6 @@ Addon.Data.DefaultDatasets:Register({
                         value = 10,
                     },
                     {
-                        sourceStatRef = "f82db71a:jslmczbi",
-                        value = 1,
-                    },
-                    {
                         sourceStatRef = "f82db71a:69hfqhne",
                         value = 1,
                     },
@@ -1898,10 +1898,6 @@ Addon.Data.DefaultDatasets:Register({
                         value = 10,
                     },
                     {
-                        sourceStatRef = "f82db71a:jslmczbi",
-                        value = 1,
-                    },
-                    {
                         sourceStatRef = "f82db71a:69hfqhne",
                         value = 1,
                     },
@@ -1995,10 +1991,6 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         sourceStatRef = "f82db71a:pg0ytacb",
                         value = 10,
-                    },
-                    {
-                        sourceStatRef = "f82db71a:jslmczbi",
-                        value = 1,
                     },
                     {
                         sourceStatRef = "f82db71a:69hfqhne",
@@ -2107,10 +2099,6 @@ Addon.Data.DefaultDatasets:Register({
                         value = 10,
                     },
                     {
-                        sourceStatRef = "f82db71a:jslmczbi",
-                        value = 1,
-                    },
-                    {
                         sourceStatRef = "f82db71a:69hfqhne",
                         value = 1,
                     },
@@ -2217,10 +2205,6 @@ Addon.Data.DefaultDatasets:Register({
                         value = 10,
                     },
                     {
-                        sourceStatRef = "f82db71a:jslmczbi",
-                        value = 2,
-                    },
-                    {
                         sourceStatRef = "f82db71a:69hfqhne",
                         value = 2,
                     },
@@ -2314,10 +2298,6 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         sourceStatRef = "f82db71a:jjn0my8k",
                         value = 10,
-                    },
-                    {
-                        sourceStatRef = "f82db71a:jslmczbi",
-                        value = 1,
                     },
                     {
                         sourceStatRef = "f82db71a:69hfqhne",
@@ -2419,10 +2399,6 @@ Addon.Data.DefaultDatasets:Register({
                         value = 10,
                     },
                     {
-                        sourceStatRef = "f82db71a:jslmczbi",
-                        value = 1,
-                    },
-                    {
                         sourceStatRef = "f82db71a:69hfqhne",
                         value = 1,
                     },
@@ -2512,10 +2488,6 @@ Addon.Data.DefaultDatasets:Register({
                     {
                         sourceStatRef = "f82db71a:ygjno50i",
                         value = 12,
-                    },
-                    {
-                        sourceStatRef = "f82db71a:jslmczbi",
-                        value = 1,
                     },
                     {
                         sourceStatRef = "f82db71a:69hfqhne",
@@ -2631,11 +2603,7 @@ Addon.Data.DefaultDatasets:Register({
                         value = 2,
                     },
                     {
-                        sourceStatRef = "f82db71a:69hfqhne",
-                        value = 2,
-                    },
-                    {
-                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        sourceStatRef = "f82db71a:u7b49vs9",
                         value = 14,
                     },
                 },
@@ -2726,11 +2694,7 @@ Addon.Data.DefaultDatasets:Register({
                         value = 1,
                     },
                     {
-                        sourceStatRef = "f82db71a:v2g0tw0o",
-                        value = 1,
-                    },
-                    {
-                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        sourceStatRef = "f82db71a:u7b49vs9",
                         value = 17,
                     },
                 },
@@ -2832,11 +2796,7 @@ Addon.Data.DefaultDatasets:Register({
                         value = 2,
                     },
                     {
-                        sourceStatRef = "f82db71a:69hfqhne",
-                        value = 2,
-                    },
-                    {
-                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        sourceStatRef = "f82db71a:u7b49vs9",
                         value = 14,
                     },
                 },
@@ -2931,11 +2891,7 @@ Addon.Data.DefaultDatasets:Register({
                         value = 1,
                     },
                     {
-                        sourceStatRef = "f82db71a:69hfqhne",
-                        value = 1,
-                    },
-                    {
-                        sourceStatRef = "f82db71a:7t7xgzcx",
+                        sourceStatRef = "f82db71a:u7b49vs9",
                         value = 16,
                     },
                 },
