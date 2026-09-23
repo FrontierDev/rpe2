@@ -104,11 +104,7 @@ RPE_DATASET_ENTRY_V1
                 value = 2,
             },
             {
-                sourceStatRef = "f82db71a:69hfqhne",
-                value = 2,
-            },
-            {
-                sourceStatRef = "f82db71a:7t7xgzcx",
+                sourceStatRef = "f82db71a:u7b49vs9",
                 value = 14,
             },
         },
@@ -211,11 +207,7 @@ RPE_DATASET_ENTRY_V1
                 value = 1,
             },
             {
-                sourceStatRef = "f82db71a:v2g0tw0o",
-                value = 1,
-            },
-            {
-                sourceStatRef = "f82db71a:7t7xgzcx",
+                sourceStatRef = "f82db71a:u7b49vs9",
                 value = 17,
             },
         },
@@ -318,11 +310,7 @@ RPE_DATASET_ENTRY_V1
                 value = 1,
             },
             {
-                sourceStatRef = "f82db71a:v2g0tw0o",
-                value = 1,
-            },
-            {
-                sourceStatRef = "f82db71a:7t7xgzcx",
+                sourceStatRef = "f82db71a:u7b49vs9",
                 value = 24,
             },
         },
@@ -436,19 +424,11 @@ RPE_DATASET_ENTRY_V1
                 value = 2,
             },
             {
-                sourceStatRef = "f82db71a:69hfqhne",
-                value = 2,
-            },
-            {
                 sourceStatRef = "f82db71a:wbj4zuf3",
                 value = 1,
             },
             {
-                sourceStatRef = "f82db71a:v2g0tw0o",
-                value = 1,
-            },
-            {
-                sourceStatRef = "f82db71a:7t7xgzcx",
+                sourceStatRef = "f82db71a:u7b49vs9",
                 value = 19,
             },
         },
@@ -562,11 +542,7 @@ RPE_DATASET_ENTRY_V1
                 value = 2,
             },
             {
-                sourceStatRef = "f82db71a:69hfqhne",
-                value = 2,
-            },
-            {
-                sourceStatRef = "f82db71a:7t7xgzcx",
+                sourceStatRef = "f82db71a:u7b49vs9",
                 value = 14,
             },
         },
@@ -666,10 +642,6 @@ RPE_DATASET_ENTRY_V1
             },
             {
                 sourceStatRef = "f82db71a:jslmczbi",
-                value = 1,
-            },
-            {
-                sourceStatRef = "f82db71a:69hfqhne",
                 value = 1,
             },
         },
@@ -776,11 +748,7 @@ RPE_DATASET_ENTRY_V1
                 value = 1,
             },
             {
-                sourceStatRef = "f82db71a:69hfqhne",
-                value = 1,
-            },
-            {
-                sourceStatRef = "f82db71a:7t7xgzcx",
+                sourceStatRef = "f82db71a:u7b49vs9",
                 value = 16,
             },
         },
@@ -879,11 +847,7 @@ RPE_DATASET_ENTRY_V1
                 value = 1,
             },
             {
-                sourceStatRef = "f82db71a:v2g0tw0o",
-                value = 1,
-            },
-            {
-                sourceStatRef = "f82db71a:7t7xgzcx",
+                sourceStatRef = "f82db71a:u7b49vs9",
                 value = 16,
             },
         },
