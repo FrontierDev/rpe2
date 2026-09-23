@@ -4,14 +4,15 @@ local CORE_DATASET_ID = "f82db71a"
 local CORE_GUILD_SETTING_ID = "g6mh7pla"
 local REAGENTS_CATEGORY_ID = "l8r4h2xn"
 local DAILY_REWARDS_CATEGORY_ID = "d8y4c6vc"
+local ARMOUR_CATEGORY_ID = "a6r4m2ur"
 
 local definition = Addon.Data.DefaultDatasets.Definitions[CORE_DATASET_ID]
 if not definition or not definition.dataset then
     error("Core default dataset must be registered before core_guild_settings.lua", 2)
 end
 
-if definition.version < 36 then
-    definition.version = 36
+if definition.version < 37 then
+    definition.version = 37
 end
 
 local dataset = definition.dataset
@@ -316,6 +317,130 @@ local requisitions = {
     },
 }
 
+-- Tier 0.5 / Dungeon Set 2 armour sold for Justice.
+-- Waist/belt pieces use the same 1,250 Justice small-slot tier as wrists.
+local armourStockGroups = {
+    {
+        cost = 1250,
+        itemRefs = {
+            "b0211ab3:s05rwais",
+            "b0211ab3:s05rwris",
+            "b0211ab3:s05hwais",
+            "b0211ab3:s05hwris",
+            "b0211ab3:s05twais",
+            "b0211ab3:s05twris",
+            "7bbb4cb9:h05dwais",
+            "7bbb4cb9:h05dwris",
+            "7bbb4cb9:h05twais",
+            "7bbb4cb9:h05twris",
+            "1c1038a7:v05hbelt",
+            "1c1038a7:v05hbrac",
+            "1c1038a7:v05dcord",
+            "1c1038a7:v05dwrap",
+            "d7c874c4:m05dbelt",
+            "d7c874c4:m05dbind",
+            "d7c874c4:m05hwais",
+            "d7c874c4:m05hwris",
+            "23d5dce2:r05dbelt",
+            "23d5dce2:r05dbrac",
+            "23d5dce2:r05twais",
+            "23d5dce2:r05twris",
+        },
+    },
+    {
+        cost = 1750,
+        itemRefs = {
+            "b0211ab3:s05rhand",
+            "b0211ab3:s05rboot",
+            "b0211ab3:s05hhand",
+            "b0211ab3:s05hboot",
+            "b0211ab3:s05thand",
+            "b0211ab3:s05tboot",
+            "7bbb4cb9:h05dhnds",
+            "7bbb4cb9:h05dboot",
+            "7bbb4cb9:h05thnds",
+            "7bbb4cb9:h05tboot",
+            "1c1038a7:v05hmitt",
+            "1c1038a7:v05hboot",
+            "1c1038a7:v05dhnds",
+            "1c1038a7:v05dslip",
+            "d7c874c4:m05dgaun",
+            "d7c874c4:m05dsand",
+            "d7c874c4:m05hglov",
+            "d7c874c4:m05hboot",
+            "23d5dce2:r05dgrip",
+            "23d5dce2:r05dfoot",
+            "23d5dce2:r05thand",
+            "23d5dce2:r05ttrea",
+        },
+    },
+    {
+        cost = 2250,
+        itemRefs = {
+            "b0211ab3:s05rhelm",
+            "b0211ab3:s05rshld",
+            "b0211ab3:s05rchst",
+            "b0211ab3:s05rlegs",
+            "b0211ab3:s05hhelm",
+            "b0211ab3:s05hshld",
+            "b0211ab3:s05hchst",
+            "b0211ab3:s05hlegs",
+            "b0211ab3:s05thelm",
+            "b0211ab3:s05tshld",
+            "b0211ab3:s05tchst",
+            "b0211ab3:s05tlegs",
+            "7bbb4cb9:h05dhelm",
+            "7bbb4cb9:h05dshld",
+            "7bbb4cb9:h05dchst",
+            "7bbb4cb9:h05dlegs",
+            "7bbb4cb9:h05tface",
+            "7bbb4cb9:h05tshld",
+            "7bbb4cb9:h05tchst",
+            "7bbb4cb9:h05tlegs",
+            "1c1038a7:v05hcrow",
+            "1c1038a7:v05hmant",
+            "1c1038a7:v05hrobe",
+            "1c1038a7:v05hskrt",
+            "1c1038a7:v05dcowl",
+            "1c1038a7:v05depau",
+            "1c1038a7:v05dgown",
+            "1c1038a7:v05dlegs",
+            "d7c874c4:m05dcrow",
+            "d7c874c4:m05dmant",
+            "d7c874c4:m05drobe",
+            "d7c874c4:m05dlegs",
+            "d7c874c4:m05hhelm",
+            "d7c874c4:m05hshld",
+            "d7c874c4:m05hchst",
+            "d7c874c4:m05hlegs",
+            "23d5dce2:r05dcap",
+            "23d5dce2:r05dspau",
+            "23d5dce2:r05dtuni",
+            "23d5dce2:r05dpant",
+            "23d5dce2:r05tface",
+            "23d5dce2:r05tpaul",
+            "23d5dce2:r05tarmo",
+            "23d5dce2:r05tlegs",
+        },
+    },
+}
+
+for _, stockGroup in ipairs(armourStockGroups) do
+    for _, itemRef in ipairs(stockGroup.itemRefs) do
+        requisitions[#requisitions + 1] = {
+            id = "t05_" .. itemRef:gsub(":", "_"),
+            itemRef = itemRef,
+            quantity = 1,
+            costs = {
+                { currencyRef = "justice", amount = stockGroup.cost },
+            },
+            characterLimit = 0,
+            roleIds = {},
+            shopCategoryId = ARMOUR_CATEGORY_ID,
+        }
+    end
+end
+
 local guildSetting = {
     id = CORE_GUILD_SETTING_ID,
     name = "Base Guild Settings",
@@ -334,9 +459,14 @@ local guildSetting = {
             order = 10,
         },
         {
+            id = ARMOUR_CATEGORY_ID,
+            name = "Armour",
+            order = 20,
+        },
+        {
             id = DAILY_REWARDS_CATEGORY_ID,
             name = "Loot Tables",
-            order = 20,
+            order = 30,
         },
     },
     requisitions = requisitions,
