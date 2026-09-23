@@ -245,8 +245,9 @@ assertClose(damagedHealth.maxValue, findRow(damagedNpc.resources, "resourceRef",
 
 local buffedNpc = materializeNpc(3, 60, 0)
 local power = findRow(buffedNpc.stats, "statRef", "test:power")
+local powerCurrent = power.currentValue ~= nil and power.currentValue or power.value
 power.value = power.value + 17
-power.currentValue = power.currentValue + 17
+power.currentValue = powerCurrent + 17
 local buffedPayload = buildEvent(60, buffedNpc):SerializeUnitsForNetwork()
 local buffedFields = networkFields(buffedPayload)
 assertEqual(buffedFields[20], "bonus", "runtime stat change uses a bonus relative to derived stats")
