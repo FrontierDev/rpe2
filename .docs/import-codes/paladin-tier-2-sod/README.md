@@ -21,6 +21,8 @@ The codes target the Paladin dataset `b0211ab3`, use the current RPE `RPE_DATASE
 - Every piece supports generic modifier key `mod`, capped at **1**.
 - Chest pieces have **3** gem sockets; heads have **2** including **1 meta** socket; legs have **2**; belts have **1**.
 - Socket colours are restricted to **red, blue, and yellow**, with **meta** used only for the required helm meta socket. Retribution favours red/yellow, Holy uses red/yellow/blue, and Protection favours blue/yellow.
+- WoW bonuses that apply to all spells and attacks are specialized by the intended RPE set role rather than duplicated across melee and spell stats: **Radiant Judgement** uses Melee Attack Power, Melee Hit Chance, and Melee Crit. Chance; **Merciful Judgement** uses Spell Power/Healing Power and Spell Hit/Crit only.
+
 ## Files
 
 - `radiant-judgement-retribution.md`
