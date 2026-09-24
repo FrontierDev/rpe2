@@ -619,7 +619,10 @@ end
 -- Revision 2 installs the role-gated profession loot-table requisitions into
 -- the saved Core dataset, including installations with stale per-dataset
 -- version metadata from earlier Core package updates.
-local PACKAGED_DEFAULT_SYNC_REVISION = 2
+-- Revision 3 also refreshes packaged defaults after the Core NPC spell and
+-- Human-unit additions, including clients whose Core version metadata was
+-- recorded during an intermediate package build.
+local PACKAGED_DEFAULT_SYNC_REVISION = 3
 
 local function logInstallDiagnostic(message)
     local debug = Addon.Debug or nil
