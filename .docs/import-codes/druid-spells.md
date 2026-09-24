@@ -2765,8 +2765,8 @@ These abilities are authored as the Druid's Bear/tank toolkit but, by design, **
 
 | Spell | Rage | RPE implementation |
 |---|---:|---|
-| Maul | 19 | Tank-role Bonus Action weapon attack; moderate threat. Rage cost is calculated from the authoring specification. |
-| Swipe (Bear) | 54 | Tank-role Main Action, up to 3 enemies on one raid marker; high threat. Rage cost is calculated from the authoring specification. |
+| Maul | 15 | Actual WoW Classic Rage cost. Tank-role Bonus Action weapon attack; moderate threat. |
+| Swipe (Bear) | 20 | Actual WoW Classic Rage cost. Tank-role Main Action, up to 3 enemies on one raid marker; high threat. |
 | Growl | 0 | Copy Warrior Taunt: 3-turn taunt, 3-turn cooldown. |
 | Demoralizing Roar | 10 | Copy Demoralizing Shout: -10% Melee Attack Power to up to 5 enemies for 2 turns. |
 | Enrage | 0 | Generates 20 Rage over 5 RPE turns (4/turn) while reducing Armor by 27%; 10-turn cooldown. |
@@ -2775,8 +2775,8 @@ These abilities are authored as the Druid's Bear/tank toolkit but, by design, **
 
 Damage/scaling notes:
 
-- **Maul** uses the Tank-role instant Bonus Action weapon budget: **39 base + 0.182 Melee Attack Power + 0.52 main-hand weapon damage**, with **1.5 threat coefficient**. Its Rage cost is calculated from the authoring sheet: Cheap Rage (12) × instant resource modifier (1.25) × Bonus Action resource modifier (1.25) = **18.75 → 19 Rage**.
-- **Swipe (Bear)** is not modeled as a weapon strike because Classic Swipe is a direct Physical area attack rather than an empowered weapon swing. The RPE Tank/Main Action/3-target budget gives **48 base + 0.168 Melee Attack Power per target**, with **2.0 threat coefficient**. Its resource power ratio is 1.80, making it Expensive: 43 Rage × 1.25 instant = **53.75 → 54 Rage**.
+- **Maul** costs **15 Rage**, matching WoW Classic. Its RPE output remains **39 base + 0.182 Melee Attack Power + 0.52 main-hand weapon damage**, with **1.5 threat coefficient**. This is also the exact current output shape of Warrior **Heroic Strike**, which costs the same 15 Rage, so no further damage reduction is justified.
+- **Swipe (Bear)** costs **20 Rage**, matching WoW Classic. It is not modeled as a weapon strike because Classic Swipe is a direct Physical area attack rather than an empowered weapon swing. Its RPE output remains **48 base + 0.168 Melee Attack Power per target** against up to 3 targets, with **2.0 threat coefficient**. This was rechecked against the current 20-Rage Warrior **Cleave** and 25-Rage **Whirlwind**: Bear Swipe already has substantially lower per-target output because it is a Tank-profile, 3-target, non-weapon attack, so the incorrect 54-Rage calculator result must not be used to justify further damage inflation or a higher cost.
 - Fixed control, taunt, stat-debuff, and resource-generation effects do not rank-scale. Maul and Swipe use normal 8-level ranks.
 - **Bash** is control-only and therefore outside the numerical calculator. Its 1-turn stun shape and **6-turn cooldown** use current **Hammer of Justice** as the same-mechanic analogue. Its **10 Rage** cost is retained as the explicit Classic ability cost rather than presented as calculator-derived.
 - **Challenging Roar** is also outside the numerical calculator. RPE has no current multi-target taunt analogue, so this entry is explicitly bespoke: **up to 5 enemies sharing one raid marker, 2-turn taunt, 10-turn cooldown, 15 Rage**. These values are design parameters, not calculator outputs.
@@ -2864,7 +2864,7 @@ RPE_DATASET_ENTRY_V1
             range = 0,
             resourceCosts = {
                         {
-                                        amount = 19,
+                                        amount = 15,
                                         amountMode = "flat",
                                         castPhase = "on_cast_end",
                                         refundOnInterrupt = 0,
@@ -2976,7 +2976,7 @@ RPE_DATASET_ENTRY_V1
             range = 0,
             resourceCosts = {
                         {
-                                        amount = 54,
+                                        amount = 20,
                                         amountMode = "flat",
                                         castPhase = "on_cast_end",
                                         refundOnInterrupt = 0,
