@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 46,
+    version = 47,
     dataset = {
         achievements = {},
         auras = {
@@ -201,7 +201,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.169,
+                                coefficient = 0.338,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -453,7 +453,7 @@ Addon.Data.DefaultDatasets:Register({
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 0.4225,
+                                        coefficient = 0.845,
                                         statRef = "f82db71a:7t7xgzcx"
                                     }
                                 },
@@ -800,7 +800,7 @@ Addon.Data.DefaultDatasets:Register({
                                 },
                                 statScaling = {
                                     {
-                                        coefficient = 0.2,
+                                        coefficient = 0.4,
                                         statRef = "f82db71a:7t7xgzcx"
                                     }
                                 },
@@ -7137,7 +7137,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.5525,
+                                    coefficient = 1.105,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -9126,7 +9126,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.8,
+                                    coefficient = 1.6,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -9235,7 +9235,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.48,
+                                    coefficient = 0.96,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },

@@ -112,12 +112,17 @@ The calculator only defines instant and 1-turn casts. Do not extrapolate a new c
 
 ## 3.2 Base stat coefficients
 
-| Scaling stat | Instant | 1-turn cast |
+| Damage scaling stat | Instant | 1-turn cast |
 |---|---:|---:|
 | Melee Attack Power | 0.35 | 0.50 |
 | Ranged Attack Power | 0.35 | 0.50 |
-| Spell Power | 0.50 | 0.70 |
+| Spell Power | 1.00 | 1.40 |
+
+| Healing scaling stat | Instant | 1-turn cast |
+|---|---:|---:|
 | Healing Power | 0.60 | 0.80 |
+
+The 1.00 / 1.40 Spell Power values are **damage coefficients only**. Existing heals, absorption effects, stat effects and other non-damage mechanics that intentionally scale from Spell Power are not automatically doubled. They retain their existing balance basis unless separately recalibrated. Absorption effects retain their existing non-damage Spell Power basis.
 
 **Important:** the cast benefit is already represented by choosing the Instant or 1-turn coefficient. Do not multiply the stat coefficient by the base-output cast modifier again.
 
@@ -394,20 +399,20 @@ Flat base per tick
 ```
 
 ```text
-Spell Power coefficient per tick
-= 0.50 × 0.65 × 1.60
-= 0.52
+Spell Power damage coefficient per tick
+= 1.00 × 0.65 × 1.60
+= 1.04
 ```
 
 Correct result:
 
 ```text
-20.8 + (Spell Power × 0.52) damage each turn for 5 turns
+20.8 + (Spell Power × 1.04) damage each turn for 5 turns
 ```
 
 The full-duration flat base is 104.
 
-The full-duration scaling contribution is five applications of the 0.52 coefficient. This is intentional.
+The full-duration scaling contribution is five applications of the 1.04 coefficient. This is intentional.
 
 ## 6.6 Example — 2-turn secondary melee DoT
 
@@ -436,13 +441,13 @@ These are useful regression examples of the formula, not special overrides:
 
 | Class | Effect | Duration | Base / turn | Coefficient / turn |
 |---|---|---:|---:|---:|
-| Mage | Fireball DoT | 5 | 17.68 | 0.442 Spell Power |
-| Mage | Pyroblast DoT | 5 | 17.68 | 0.442 Spell Power |
+| Mage | Fireball DoT | 5 | 17.68 | 0.884 Spell Power |
+| Mage | Pyroblast DoT | 5 | 17.68 | 0.884 Spell Power |
 | Paladin | Expurgation | 3 | 23.9417 | 0.2514 Melee AP |
 | Priest | Renew | 5 | 20.8 | 0.624 Healing Power |
-| Priest | Holy Fire DoT | 3 | 16.7592 | 0.2514 Spell Power |
-| Priest | Shadow Word: Pain | 5 | 20.8 | 0.52 Spell Power |
-| Priest | Vampiric Touch | 5 | 17.68 | 0.442 Spell Power |
+| Priest | Holy Fire DoT | 3 | 16.7592 | 0.5028 Spell Power |
+| Priest | Shadow Word: Pain | 5 | 20.8 | 1.04 Spell Power |
+| Priest | Vampiric Touch | 5 | 17.68 | 0.884 Spell Power |
 | Priest | Vampiric Regeneration | 5 | 8.84 | 0.221 Spell Power |
 | Rogue | Rupture | 5 | 20.8 | 0.364 Melee AP |
 | Rogue | Garrote | 2 | 31.7688 | 0.2224 Melee AP |
@@ -489,7 +494,7 @@ One target, no cooldown, no secondary effect:
 
 ```text
 Base absorption = 100 × 0.65 = 65
-Spell Power coefficient = 0.50 × 0.65 = 0.325
+Non-damage Spell Power absorption coefficient = 0.50 × 0.65 = 0.325
 ```
 
 That matches the generic Power Word: Shield-style budget.
@@ -669,7 +674,7 @@ No cooldown, Spell Power, no secondary effect:
 
 ```text
 Base damage = 100
-Spell Power coefficient = 0.50
+Spell Power damage coefficient = 1.00
 Threat coefficient = 1.00
 Power ratio = 1.00
 ```
@@ -686,7 +691,7 @@ No cooldown, Spell Power, no secondary effect:
 
 ```text
 Base damage = 100 × 1.35 = 135
-Spell Power coefficient = 0.70
+Spell Power damage coefficient = 1.40
 Threat coefficient = 1.00
 Power ratio = 1.35 -> Standard
 Mana cost = 8% × 0.85 = 6.8%
@@ -701,9 +706,9 @@ Base damage
 = 100 × 0.65 × 1.60
 = 104
 
-Spell Power coefficient
-= 0.50 × 0.65 × 1.60
-= 0.52
+Spell Power damage coefficient
+= 1.00 × 0.65 × 1.60
+= 1.04
 
 Threat coefficient
 = 1.00 × 0.75
@@ -720,7 +725,7 @@ DPS, Spell Power, no cooldown, no secondary effect:
 
 ```text
 Base damage = 225
-Spell Power coefficient = 1.125
+Spell Power damage coefficient = 2.25
 Threat coefficient = 1.00
 Power ratio = 2.25 -> Expensive
 ```

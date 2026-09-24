@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 28,
+    version = 29,
     dataset = {
         achievements = {},
         auras = {
@@ -190,7 +190,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.2514,
+                                coefficient = 0.5028,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -316,7 +316,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.52,
+                                coefficient = 1.04,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -359,7 +359,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.442,
+                                coefficient = 0.884,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -4716,7 +4716,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.35,
+                                    coefficient = 0.7,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -4827,7 +4827,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.4165,
+                                    coefficient = 0.833,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -5733,7 +5733,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.91,
+                                    coefficient = 1.82,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -5832,7 +5832,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.6248,
+                                    coefficient = 1.2496,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -5959,7 +5959,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 0.735,
+                                    coefficient = 1.47,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },
@@ -6057,7 +6057,7 @@ Addon.Data.DefaultDatasets:Register({
                             projectileSpeed = 0,
                             statScaling = {
                                 {
-                                    coefficient = 1.125,
+                                    coefficient = 2.25,
                                     statRef = "f82db71a:7t7xgzcx"
                                 }
                             },

@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 32,
+    version = 34,
     dataset = {
         achievements = {},
         auras = {},
@@ -3350,7 +3350,7 @@ Addon.Data.DefaultDatasets:Register({
                             alwaysHits = false, amountMode = "flat", applyAura = false, auraStacks = 1, baseDamage = 0,
                             damageSchoolRefs = { "f82db71a:v1azo4j6" }, damageType = "ranged", hitType = "auto",
                             projectilePath = "", projectileSpeed = 0,
-                            statScaling = { { coefficient = 0.5, statRef = "f82db71a:xqz0daz2" } },
+                            statScaling = { { coefficient = 1.0, statRef = "f82db71a:7t7xgzcx" } },
                             targetEvents = { "on_auto_attack_taken" }, threatCoefficient = 1, type = "damage", usesProjectile = false,
                             weaponDamageCoefficient = 1, weaponDamageMode = "none"
                         },
