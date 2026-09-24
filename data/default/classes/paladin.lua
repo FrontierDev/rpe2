@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 47,
+    version = 49,
     dataset = {
         achievements = {},
         auras = {
@@ -201,7 +201,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.338,
+                                coefficient = 0.14,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -920,7 +920,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.2514,
+                                coefficient = 0.1,
                                 statRef = "f82db71a:u7b49vs9"
                             }
                         },
@@ -1221,7 +1221,24 @@ Addon.Data.DefaultDatasets:Register({
                 canStack = false,
                 canTrade = true,
                 cogSockets = 0,
-                conditions = {},
+                conditions = {
+                    {
+                        invert = false,
+                        minimumValue = 60,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "",
+                        type = "level"
+                    },
+                    {
+                        classRefs = {
+                            "b0211ab3:wvirv9um"
+                        },
+                        invert = false,
+                        showOnTooltip = true,
+                        tooltipTextOverride = "Classes: Paladin",
+                        type = "class"
+                    }
+                },
                 consumableElixirType = "",
                 consumableType = "",
                 damageMode = "fixed",

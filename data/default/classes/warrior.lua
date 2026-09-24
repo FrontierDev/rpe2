@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 42,
+        version = 44,
     dataset = {
         achievements = {},
         auras = {
@@ -174,7 +174,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.364,
+                                coefficient = 0.15,
                                 statRef = "f82db71a:u7b49vs9"
                             }
                         },
@@ -217,7 +217,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.29575,
+                                coefficient = 0.0875,
                                 statRef = "f82db71a:u7b49vs9"
                             }
                         },
@@ -664,7 +664,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -779,7 +779,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -876,7 +876,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -973,7 +973,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1081,7 +1081,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1189,7 +1189,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1290,7 +1290,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1395,7 +1395,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1488,7 +1488,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1595,7 +1595,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1692,7 +1692,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1789,7 +1789,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1893,7 +1893,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1997,7 +1997,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2094,7 +2094,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2191,7 +2191,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2280,7 +2280,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2373,7 +2373,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2462,7 +2462,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2551,7 +2551,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2640,7 +2640,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2733,7 +2733,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2826,7 +2826,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2915,7 +2915,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3004,7 +3004,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3097,7 +3097,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3186,7 +3186,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3275,7 +3275,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3368,7 +3368,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3457,7 +3457,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3546,7 +3546,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3635,7 +3635,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "sb4b9ef3:wvirv9um",
+                            "7bbb4cb9:wvirv9um",
                         },
                         invert = false,
                         showOnTooltip = true,

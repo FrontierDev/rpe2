@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 36,
+    version = 38,
     dataset = {
         achievements = {},
         auras = {
@@ -17,7 +17,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.884,
+                                coefficient = 0.22,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -60,7 +60,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.845,
+                                coefficient = 0.25,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -110,7 +110,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.884,
+                                coefficient = 0.26,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -797,7 +797,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -912,7 +912,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1013,7 +1013,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1110,7 +1110,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1222,7 +1222,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1330,7 +1330,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1431,7 +1431,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1532,7 +1532,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1621,7 +1621,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1736,7 +1736,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1837,7 +1837,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1938,7 +1938,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2050,7 +2050,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2162,7 +2162,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2263,7 +2263,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2368,7 +2368,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2465,7 +2465,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2558,7 +2558,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2651,7 +2651,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2740,7 +2740,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2833,7 +2833,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2922,7 +2922,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3015,7 +3015,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3108,7 +3108,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3197,7 +3197,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3294,7 +3294,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3391,7 +3391,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3492,7 +3492,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3593,7 +3593,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3690,7 +3690,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3787,7 +3787,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3884,7 +3884,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "vtrjl3l2:02p0r8a2",
+                            "d7c874c4:02p0r8a2",
                         },
                         invert = false,
                         showOnTooltip = true,

@@ -293,7 +293,7 @@ local function buildActionEconomyInput(candidate)
     local cooldownChannelConfigured = type(cooldownChannel) == "table" and cooldownChannel.enabled == true
     local cooldownChannelTriggersGCD = type(cooldownChannel) == "table"
         and cooldownChannel.triggersGCD == true
-        or nil
+        or false
     local cooldownChannelCanUseOffTurn = type(cooldownChannel) == "table"
         and cooldownChannel.enabled == true
         and cooldownChannel.canUseOffTurn == true

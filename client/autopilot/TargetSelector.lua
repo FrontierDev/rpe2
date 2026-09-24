@@ -194,7 +194,11 @@ local function buildInterruptEntry(state, targetUnit)
         and type(state.activeCastsByEventId) == "table"
         and state.activeCastsByEventId[eventId]
         or nil
-    if type(activeCast) ~= "table" then
+    if type(activeCast) ~= "table"
+        or activeCast.interruptible == false
+        or activeCast.canInterrupt == false
+        or activeCast.canBeInterrupted == false
+    then
         return nil
     end
     return {

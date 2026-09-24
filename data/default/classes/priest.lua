@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 29,
+    version = 31,
     dataset = {
         achievements = {},
         auras = {
@@ -190,7 +190,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.5028,
+                                coefficient = 0.18,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -316,7 +316,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 1.04,
+                                coefficient = 0.42,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -359,7 +359,7 @@ Addon.Data.DefaultDatasets:Register({
                         },
                         statScaling = {
                             {
-                                coefficient = 0.884,
+                                coefficient = 0.32,
                                 statRef = "f82db71a:7t7xgzcx"
                             }
                         },
@@ -776,7 +776,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -899,7 +899,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1004,7 +1004,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1113,7 +1113,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1233,7 +1233,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1345,7 +1345,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1446,7 +1446,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1551,7 +1551,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1648,7 +1648,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1763,7 +1763,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1860,7 +1860,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -1957,7 +1957,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2073,7 +2073,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2185,7 +2185,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2282,7 +2282,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2379,7 +2379,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2476,7 +2476,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2569,7 +2569,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2666,7 +2666,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2759,7 +2759,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2860,7 +2860,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -2953,7 +2953,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3046,7 +3046,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3143,7 +3143,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3236,7 +3236,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3325,7 +3325,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3418,7 +3418,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3507,7 +3507,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3604,7 +3604,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3697,7 +3697,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3786,7 +3786,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,
@@ -3871,7 +3871,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         classRefs = {
-                            "cqblzgiw:nxlle3j6",
+                            "1c1038a7:nxlle3j6",
                         },
                         invert = false,
                         showOnTooltip = true,

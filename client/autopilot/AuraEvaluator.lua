@@ -106,6 +106,60 @@ local function normalizeStackBehavior(value)
         or "refresh_duration"
 end
 
+local function resolveApplicationProfile(application, profile)
+    if type(profile) == "table" then
+        return profile
+    end
+    if type(application) == "table" and type(application.profile) == "table" then
+        return application.profile
+    end
+    if type(Evaluator.BuildAuraProfile) == "function" then
+        return Evaluator.BuildAuraProfile(application, {
+            datasetId = application and application.datasetId,
+        })
+    end
+    return nil
+end
+
+-- A non-stacking refresh-duration Aura should not be refreshed merely because
+-- resetting its timer produces a larger projected total. Allow a refresh near
+-- expiry, or when the incoming application is materially stronger.
+function Evaluator.ShouldSuppressProjectedAuraRefresh(previousState, application, profile)
+    if type(previousState) ~= "table" or type(application) ~= "table" then
+        return false
+    end
+
+    local resolvedProfile = resolveApplicationProfile(application, profile)
+    if type(resolvedProfile) ~= "table"
+        or normalizeStackBehavior(resolvedProfile.stackBehavior) ~= "refresh_duration"
+        or normalizeStackBehavior(previousState.stackBehavior) ~= "refresh_duration"
+        or normalizePositiveInteger(resolvedProfile.maxStacks, 1) > 1
+        or normalizePositiveInteger(previousState.maxStacks, 1) > 1
+    then
+        return false
+    end
+
+    local remaining = math.max(0, math.floor(tonumber(previousState.turnsRemaining) or 0))
+    if remaining <= 0 or math.max(0, math.floor(tonumber(previousState.stacks) or 0)) <= 0 then
+        return false
+    end
+
+    local duration = normalizeTurnCount(application.duration, resolvedProfile.duration)
+    local refreshWindow = math.max(1, math.ceil(duration * 0.2))
+    if remaining <= refreshWindow then
+        return false
+    end
+
+    local previousPower = tonumber(previousState.powerLevel) or 0
+    local incomingPower = tonumber(application.powerLevel) or 0
+    if incomingPower ~= previousPower then
+        return false
+    end
+
+    return normalizeRankMultiplier(application.rankMultiplier)
+        == normalizeRankMultiplier(previousState.rankMultiplier)
+end
+
 local function getAuraManager()
     return Addon.Client
         and Addon.Client.Spellcasting
@@ -1021,6 +1075,9 @@ function Evaluator.ReserveProjectedAura(ledger, application, casterEventId, targ
 
     local currentLedger = type(ledger) == "table" and ledger or Evaluator.CreateProjectedAuraLedger()
     local previousState = cloneProjectedAuraState(getLedgerStateReference(currentLedger, identity))
+    if Evaluator.ShouldSuppressProjectedAuraRefresh(previousState, application) then
+        return currentLedger, previousState, previousState, identity
+    end
     local nextState = applyProjectedAuraApplication(previousState, application, identity)
     local nextLedger, nextByTarget = cloneLedgerForIdentity(currentLedger, identity)
     nextByTarget[identity.targetEventId] = nextState

@@ -41,6 +41,7 @@ loadAddonFile("data/default/Datasets.lua", Addon)
 local packagedDataFiles = {
     "data/default/core.lua",
     "data/default/core_guild_settings.lua",
+    "data/default/classes/hunter.lua",
     "data/default/classes/mage.lua",
     "data/default/classes/paladin.lua",
     "data/default/classes/priest.lua",

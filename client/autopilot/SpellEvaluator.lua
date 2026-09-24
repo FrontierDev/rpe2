@@ -382,6 +382,8 @@ function Evaluator.BuildSpellProfile(activationSnapshot, options)
         hasDamage = classification.hasDamage or hasPeriodicDamage,
         hasHeal = classification.hasHeal or hasPeriodicHealing,
         hasInterrupt = classification.hasInterrupt == true,
+        isSituationalInterrupt = classification.hasInterrupt == true
+            and string.lower(tostring(spell.cooldownGroup or "")) == "interrupt",
         hasControl = hasControl,
         hasImmediateDamage = classification.hasDamage,
         hasImmediateHeal = classification.hasHeal,
@@ -688,7 +690,11 @@ function Evaluator.ResolveInterruptUtility(profile, targetUnit, options)
     end
 
     local activeCast = getTargetMapEntry(options, profile, "activeCastsByEventId", targetEventId)
-    if type(activeCast) ~= "table" then
+    if type(activeCast) ~= "table"
+        or activeCast.interruptible == false
+        or activeCast.canInterrupt == false
+        or activeCast.canBeInterrupted == false
+    then
         return result
     end
 
@@ -744,6 +750,24 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
 
     local control = Evaluator.ResolveControlUtility(profile, targetUnit, options)
     local interrupt = Evaluator.ResolveInterruptUtility(profile, targetUnit, options)
+    local isSituationalInterrupt = profile.isSituationalInterrupt == true
+        or (profile.hasInterrupt == true
+            and type(profile.spell) == "table"
+            and string.lower(tostring(profile.spell.cooldownGroup or "")) == "interrupt")
+    local suppressSituationalUtility = isSituationalInterrupt
+        and interrupt.hasUsefulInterrupt ~= true
+    if suppressSituationalUtility then
+        immediateDamage = 0
+        usefulPeriodicDamage = 0
+        immediateHealing = 0
+        immediateEffectiveHealing = 0
+        usefulPeriodicHealing = 0
+        control = {
+            movementControlUtility = 0,
+            castingPreventionUtility = 0,
+            controlUtility = 0,
+        }
+    end
     local damageUtility = immediateDamage + usefulPeriodicDamage
     local healingUtility = math.max(0, immediateEffectiveHealing + usefulPeriodicHealing)
     local controlUtility = tonumber(control.controlUtility) or 0
@@ -777,6 +801,7 @@ function Evaluator.EvaluateCandidate(activationSnapshot, targetUnit, options)
         hasHeal = profile.hasHeal,
         hasControl = profile.hasControl == true,
         hasInterrupt = profile.hasInterrupt == true,
+        isSituationalInterrupt = isSituationalInterrupt,
         hasImmediateDamage = profile.hasImmediateDamage == true,
         hasImmediateHeal = profile.hasImmediateHeal == true,
         hasPeriodicDamage = profile.hasPeriodicDamage == true,

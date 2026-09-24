@@ -18,6 +18,12 @@ local Addon = {
             GetActivatedDatasets = function()
                 return { dataset }
             end,
+            ResolveUnitDefinition = function(_, registryID)
+                if registryID == "test:npc" and dataset then
+                    return dataset, dataset.units[1]
+                end
+                return nil, nil
+            end,
         },
         Ruleset = {},
     },
@@ -63,7 +69,15 @@ local baseUnit = Unit:New({
         },
     },
 }):ToTable()
-dataset = { id = "test", name = "Test", units = { baseUnit } }
+dataset = {
+    id = "test",
+    name = "Test",
+    resources = {
+        { id = "health", startsAtZero = true },
+        { id = "mana", startsAtZero = false },
+    },
+    units = { baseUnit },
+}
 
 local function findRow(rows, key, ref)
     for index = 1, #(rows or {}) do
@@ -89,7 +103,27 @@ local rawProgressionEventUnit = EventUnit:New({
 assertEqual(#rawProgressionEventUnit.stats, 0, "Unit progression rows are not normalized as runtime stats")
 assertEqual(#rawProgressionEventUnit.resources, 0, "Unit progression rows are not normalized as runtime resources")
 assertEqual(findRow(EventUnit.BuildResolvedStats(rawProgressionEventUnit, nil, { level = 30 }), "statRef", "test:power").value, 390, "raw stat rows resolve through the shared EventUnit helper")
-assertEqual(findRow(EventUnit.BuildResolvedResources(rawProgressionEventUnit, 0, { level = 30, healthPercent = 0 }), "resourceRef", "test:health").maxValue, 390, "raw resource rows resolve through the shared EventUnit helper")
+local inheritedResources = EventUnit.BuildResolvedResources(rawProgressionEventUnit, 0, { level = 30, healthPercent = 0 })
+assertEqual(findRow(inheritedResources, "resourceRef", "test:health").maxValue, 390, "raw resource rows resolve through the shared EventUnit helper")
+assertEqual(findRow(EventUnit.BuildResolvedResources(rawProgressionEventUnit, 0, { level = 30 }), "resourceRef", "test:health").currentValue, 0, "starts-at-zero NPC resources initialize empty")
+assertEqual(findRow(EventUnit.BuildResolvedResources(rawProgressionEventUnit, 0, { level = 30 }), "resourceRef", "test:mana").currentValue, 78, "starts-full NPC resources initialize at maximum")
+local playerEventUnit = EventUnit:New({ registryID = "test:npc", isPlayer = true })
+assertEqual(findRow(EventUnit.BuildResolvedResources(playerEventUnit, 0, { level = 30 }), "resourceRef", "test:health").currentValue, 390, "player resource initialization remains unchanged")
+local explicitResourceEventUnit = EventUnit:New({
+    registryID = "test:npc",
+    resources = {
+        { resourceRef = "test:health", currentValue = 17, maxValue = 390 },
+    },
+})
+assertEqual(findRow(EventUnit.BuildResolvedResources(explicitResourceEventUnit, 0, { level = 30 }), "resourceRef", "test:health").currentValue, 17, "explicit NPC resource values remain authoritative")
+local explicitRuntimeBase = {
+    id = "explicit-npc",
+    challengeLevel = "normal",
+    resources = {
+        { resourceRef = "test:health", currentValue = 17, maxValue = 390 },
+    },
+}
+assertEqual(findRow(EventUnit.BuildUnitDerivedResources(explicitRuntimeBase, 0, 0, { level = 30, healthPercent = 0 }), "resourceRef", "test:health").currentValue, 17, "explicit derived resource values remain authoritative")
 
 local variantEventUnit = EventUnit:New({ registryID = "test:npc", presetIndex = 1 })
 local resolvedStats = EventUnit.BuildResolvedStats(variantEventUnit, nil, { level = 10 })
@@ -108,7 +142,7 @@ local resourceOptions = {
 }
 local resolvedResources, policy = EventUnit.BuildUnitDerivedResources(baseUnit, 1, 2, resourceOptions)
 assertClose(findRow(resolvedResources, "resourceRef", "test:health").maxValue, 438.9, "player and difficulty scaling apply once after level and preset")
-assertClose(findRow(resolvedResources, "resourceRef", "test:health").currentValue, 438.9, "health current value follows resolved maximum")
+assertClose(findRow(resolvedResources, "resourceRef", "test:health").currentValue, 0, "starts-at-zero health initializes empty")
 assertEqual(findRow(resolvedResources, "resourceRef", "test:mana").maxValue, 43, "non-health resource receives preset flat modifier only")
 assertEqual(findRow(resolvedResources, "resourceRef", "test:missing-resource").maxValue, 7, "missing resource modifier retains base-zero behavior")
 assertEqual(policy.level, 10, "resource policy records the explicit Event level")
