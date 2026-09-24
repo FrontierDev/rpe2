@@ -3252,13 +3252,13 @@ Addon.Data.DefaultDatasets:Register({
                             hitType = "auto",
                             projectilePath = "",
                             projectileSpeed = 0,
-                            statScaling = { { coefficient = 0.5, statRef = "f82db71a:xqz0daz2" } },
+                            statScaling = { { coefficient = 0.5, statRef = "f82db71a:v2rs9cpy" } },
                             targetEvents = { "on_auto_attack_taken" },
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
                             weaponDamageCoefficient = 1,
-                            weaponDamageMode = "none"
+                            weaponDamageMode = "main_hand"
                         },
                         key = "shoota01",
                         target = { allowDeadTargets = false, disableSelfCast = false, maxTargets = 1, minTargets = 1, requiresTarget = true, targetDisposition = "enemy", type = "single" }
@@ -3316,9 +3316,9 @@ Addon.Data.DefaultDatasets:Register({
                             alwaysHits = false, amountMode = "flat", applyAura = false, auraStacks = 1, baseDamage = 0,
                             damageSchoolRefs = { "f82db71a:v1azo4j6" }, damageType = "ranged", hitType = "auto",
                             projectilePath = "", projectileSpeed = 0,
-                            statScaling = { { coefficient = 0.5, statRef = "f82db71a:xqz0daz2" } },
+                            statScaling = { { coefficient = 0.5, statRef = "f82db71a:v2rs9cpy" } },
                             targetEvents = { "on_auto_attack_taken" }, threatCoefficient = 1, type = "damage", usesProjectile = false,
-                            weaponDamageCoefficient = 1, weaponDamageMode = "none"
+                            weaponDamageCoefficient = 1, weaponDamageMode = "main_hand"
                         },
                         key = "throwa01",
                         target = { allowDeadTargets = false, disableSelfCast = false, maxTargets = 1, minTargets = 1, requiresTarget = true, targetDisposition = "enemy", type = "single" }
@@ -3348,11 +3348,11 @@ Addon.Data.DefaultDatasets:Register({
                         castingGroup = "default",
                         effect = {
                             alwaysHits = false, amountMode = "flat", applyAura = false, auraStacks = 1, baseDamage = 0,
-                            damageSchoolRefs = { "f82db71a:v1azo4j6" }, damageType = "ranged", hitType = "auto",
+                            damageSchoolRefs = { "f82db71a:v1azo4j6" }, damageType = "spell", hitType = "auto",
                             projectilePath = "", projectileSpeed = 0,
                             statScaling = { { coefficient = 1.0, statRef = "f82db71a:7t7xgzcx" } },
                             targetEvents = { "on_auto_attack_taken" }, threatCoefficient = 1, type = "damage", usesProjectile = false,
-                            weaponDamageCoefficient = 1, weaponDamageMode = "none"
+                            weaponDamageCoefficient = 1, weaponDamageMode = "main_hand"
                         },
                         key = "wandauto",
                         target = { allowDeadTargets = false, disableSelfCast = false, maxTargets = 1, minTargets = 1, requiresTarget = true, targetDisposition = "enemy", type = "single" }
@@ -3364,7 +3364,7 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Wand", range = 0, resourceCosts = {}, seedNPCSpell = true, spellbookCategory = "", tags = {}, tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Basic ranged attack. Deal {DAMAGE_1} Physical damage to an enemy.",
+                    mainText = "Basic spell attack. Deal {DAMAGE_1} Physical damage to an enemy.",
                     tokens = { { applyMode = "damage_range", componentIndex = 1, key = "DAMAGE_1", tokenType = "spell_damage_range" } },
                     version = 1
                 },

@@ -83,6 +83,37 @@ for datasetId, definition in pairs(definitions) do
     expectedDefinitionCount = expectedDefinitionCount + 1
 end
 
+local coreDefinition = definitions["f82db71a"]
+assertTrue(type(coreDefinition) == "table" and type(coreDefinition.dataset) == "table", "Core packaged definition exists")
+
+local function findCoreSpell(spellId)
+    for index = 1, #(coreDefinition.dataset.spells or {}) do
+        local spell = coreDefinition.dataset.spells[index]
+        if spell and spell.id == spellId then
+            return spell
+        end
+    end
+end
+
+local function assertBasicWeaponAttack(spellId, expectedDamageType, expectedStatRef, label)
+    local spell = findCoreSpell(spellId)
+    assertTrue(type(spell) == "table", label .. " exists in Core")
+    assertEqual(spell.cooldownChannel, 4, label .. " remains a Free Action")
+    local component = spell.components and spell.components[1]
+    local effect = component and component.effect
+    assertTrue(type(effect) == "table", label .. " has a damage effect")
+    assertEqual(effect.hitType, "auto", label .. " remains a basic auto attack")
+    assertEqual(effect.damageType, expectedDamageType, label .. " uses the correct attack type")
+    assertEqual(effect.weaponDamageMode, "main_hand", label .. " includes its equipped ranged-slot weapon")
+    assertEqual(effect.weaponDamageCoefficient, 1, label .. " uses full weapon damage")
+    assertEqual(effect.statScaling and effect.statScaling[1] and effect.statScaling[1].statRef, expectedStatRef, label .. " uses the correct offensive stat")
+    assertEqual(effect.statScaling and effect.statScaling[1] and effect.statScaling[1].coefficient, 0.5, label .. " uses the basic-attack stat coefficient")
+end
+
+assertBasicWeaponAttack("shoota01", "ranged", "f82db71a:v2rs9cpy", "Shoot")
+assertBasicWeaponAttack("throwa01", "ranged", "f82db71a:v2rs9cpy", "Throw")
+assertBasicWeaponAttack("wandauto", "spell", "f82db71a:7t7xgzcx", "Wand")
+
 local dependencyRecomputations = 0
 local originalRecompute = Dependecies.RecomputeDatasetDependencies
 Dependecies.RecomputeDatasetDependencies = function(datasetId)
